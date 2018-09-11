@@ -72,5 +72,5 @@ class BaseCallback:
     def __init__(self):
         None
 
-    def callbackNouvelleTransaction(self, ch, method, properties, body):
+    def callbackAvecAck(self, ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)

@@ -5,22 +5,22 @@ from millegrilles.transaction.Configuration import TransactionConfiguration
 from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback
 
 ''' Classe d'exemple pour implementation callback avec ACK (superclasse) '''
-class CallbackImpl(BaseCallback):
+class CallbackNouvelleTransaction(BaseCallback):
 
-    def callbackNouvelleTransaction(self, ch, method, properties, body):
+    def callbackAvecAck(self, ch, method, properties, body):
         print("Message recu: %s" % body)
-        super().callbackNouvelleTransaction(ch, method, properties, body)
+        super().callbackAvecAck(ch, method, properties, body)
 
 class TransactionMain:
 
     def __init__(self):
         self.configuration = TransactionConfiguration()
         self.transactionLirePika = PikaDAO(self.configuration)
-        self.callbackImpl = CallbackImpl()
+        self.callbackImpl = CallbackNouvelleTransaction()
 
     def connecter(self):
         self.connexionMq = self.transactionLirePika.connecter()
-        self.transactionLirePika.preparerLectureNouvellesTransactions(self.callbackImpl.callbackNouvelleTransaction)
+        self.transactionLirePika.preparerLectureNouvellesTransactions(self.callbackImpl.callbackAvecAck)
 
     def deconnecter(self):
         self.transactionLirePika.deconnecter()
