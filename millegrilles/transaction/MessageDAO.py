@@ -19,18 +19,23 @@ class PikaDAO:
 
     # Connecter au serveur RabbitMQ
     # Le callback est une methode qui va etre appelee lorsqu'un message est recu
-    def connecter(self, callback):
-        self.connectionmq = pika.BlockingConnection(pika.ConnectionParameters(self.configuration.mqHost))
+    def connecter(self):
+        self.connectionmq = pika.BlockingConnection(pika.ConnectionParameters(
+            self.configuration.mqHost,
+            self.configuration.mqPort))
         self.channel = self.connectionmq.channel()
-        self.channel.queue_declare(queue=self.configuration.mqQueue)
+
+        return self.connectionmq
+
+    def preparerQueueNouvellesTransactions(self, callback):
+        self.channel.queue_declare(queue=self.configuration.mqQueueNouvellesTransactions)
 
         self.channel.basic_consume(callback,
-                                   queue=self.configuration.mqQueue,
-                                   no_ack=True)
+                                   queue=self.configuration.mqQueueNouvellesTransactions,
+                                   no_ack=False)
 
         self.channel.start_consuming()
 
-        return self.connectionmq
 
     # Mettre la classe en etat d'erreur
     def enterErrorState(self):
@@ -52,3 +57,13 @@ class PikaDAO:
         finally:
             self.channel = None
             self.connectionmq = None
+
+''' Classe qui facilite l'implementation de callbacks avec ACK
+'''
+class BaseCallback:
+
+    def __init__(self):
+        None
+
+    def callbackNouvelleTransaction(self, ch, method, properties, body):
+        ch.basic_ack(delivery_tag=method.delivery_tag)

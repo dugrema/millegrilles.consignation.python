@@ -10,7 +10,7 @@ import json, time
 
 connection = pika.BlockingConnection( pika.ConnectionParameters('dev2', 5672) )
 channel = connection.channel()
-channel.queue_declare(queue='transactions')
+channel.queue_declare(queue='mg.nouvelles_transactions')
 
 message = {
     "contenu": "Valeur"
@@ -19,7 +19,7 @@ message = {
 message_utf8 = json.dumps(message)
 
 channel.basic_publish(exchange='',
-                      routing_key='transactions',
+                      routing_key='mg.nouvelles_transactions',
                       body=message_utf8)
 
 print("Sent: %s" % message)
