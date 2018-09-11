@@ -5,27 +5,32 @@ class TransactionConfiguration:
 
     def __init__(self):
         # Configuration de connection a l'hote
-        self.mq_host = "dev2" #os.environ['MQ_HOST']
-        self.mq_port = 5672
+        self._mq_host = "dev2" #os.environ['MQ_HOST']
+        self._mq_port = 5672
+        self._nom_millegrille = "sansnom" # Nom de la MilleGrille
 
         # Configuration des queues
-        self.mq_queue_nouvelles_transactions = "mg.nouvelles_transactions"
+        self._mq_queue_nouvelles_transactions = "mg.nouvelles_transactions"
 
     def loadEnvironment(self):
-        self.mq_host = os.environ['MQ_HOST']
-        elf.mq_host = os.environ['MQ_PORT']
+        self._mq_host = os.environ['MQ_HOST']
+        self._mq_port = os.environ['MQ_PORT']
 
         #self.mq_queue = os.environ['MQ_QUEUE_NOUVTRAN']
 
     @property
-    def mqHost(self):
-        return self.mq_host
+    def mq_host(self):
+        return self._mq_host
 
     @property
-    def mqPort(self):
-        return self.mq_port
+    def mq_port(self):
+        return self._mq_port
 
     @property
-    def mqQueueNouvellesTransactions(self):
-        return self.mq_queue_nouvelles_transactions
+    def nom_millegrille(self):
+        return self._nom_millegrille
+
+    @property
+    def queue_nouvelles_transactions(self):
+        return self._mq_queue_nouvelles_transactions
 

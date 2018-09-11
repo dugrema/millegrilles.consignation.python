@@ -20,7 +20,7 @@ class TransactionMain:
 
     def connecter(self):
         self.connexionMq = self.transactionLirePika.connecter()
-        self.transactionLirePika.preparerQueueNouvellesTransactions(self.callbackImpl.callbackNouvelleTransaction)
+        self.transactionLirePika.preparerLectureNouvellesTransactions(self.callbackImpl.callbackNouvelleTransaction)
 
     def deconnecter(self):
         self.transactionLirePika.deconnecter()
@@ -28,7 +28,7 @@ class TransactionMain:
     # Methode principale de traitement
     def run(self):
         print("Demarrage du traitement des transactions MQ -> MongoDB")
-        print("MQ Host: %s, MQ Queue: %s" % (self.configuration.mqHost, self.configuration.mqQueueNouvellesTransactions))
+        print("MQ Host: %s, MQ Queue: %s" % (self.configuration.mq_host, self.configuration.queue_nouvelles_transactions))
 
         self.connecter()
 
