@@ -74,7 +74,7 @@ class PikaDAO:
     ''' Prepare la reception de message '''
     def demarrer_lecture_nouvelles_transactions(self, callback):
         self.channel.basic_consume(callback,
-                                   queue=self.configuration.queue_nouvelles_transactions,
+                                   queue='mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions),
                                    no_ack=False)
 
         self.channel.start_consuming()
@@ -89,8 +89,8 @@ class PikaDAO:
         uuid_transaction = enveloppe["info-transaction"]["id-transaction"]
         message_utf8 = self.json_helper.dict_vers_json(enveloppe)
 
-        self.channel.basic_publish(exchange='',
-                              routing_key=self.configuration.queue_nouvelles_transactions,
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                              routing_key='%s.transaction.nouvelle' % self.configuration.nom_millegrille,
                               body=message_utf8)
 
         return uuid_transaction

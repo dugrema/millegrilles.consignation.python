@@ -34,12 +34,12 @@ message = {
 #connection.close()
 
 configuration = TransactionConfiguration()
-transactionDAO = PikaDAO(configuration)
+messageDao = PikaDAO(configuration)
 
-transactionDAO.connecter()
+messageDao.connecter()
 
-enveloppe = transactionDAO.transmettre_message_transaction(message)
+enveloppe = messageDao.transmettre_message_transaction(message)
 
 print("Sent: %s" % enveloppe)
 
-transactionDAO.deconnecter()
+messageDao.deconnecter()
