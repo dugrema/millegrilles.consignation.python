@@ -67,10 +67,11 @@ class PikaDAO:
         meta = {}
         meta["id-transaction"] = "%s" % uuid_transaction
         meta["estampille"] = int(time.time())
+        meta["signature-contenu"] = ""
 
         enveloppe = {}
-        enveloppe["trmeta"] = meta
-        enveloppe["contenu"] = message_dict
+        enveloppe["info-transaction"] = meta
+        enveloppe["charge-utile"] = message_dict
 
         return enveloppe
 

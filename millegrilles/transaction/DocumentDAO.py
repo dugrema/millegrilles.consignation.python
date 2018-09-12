@@ -1,7 +1,7 @@
 ''' Gestion des documents.
 '''
 
-import datetime
+import time
 from pymongo import MongoClient
 
 '''
@@ -35,6 +35,9 @@ class MongoDAO:
 
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
+
+        # Ajouter l'element evenements et l'evenement de persistance
+        enveloppe_transaction["evenements"] = {"persistance": [int(time.time())]}
 
         resultat = self.collection_transactions.insert_one(enveloppe_transaction)
         id = resultat.inserted_id
