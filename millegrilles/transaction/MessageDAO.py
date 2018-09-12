@@ -1,6 +1,9 @@
 # Gestion des messages via Pika.
 import codecs
 import pika
+import json
+import uuid
+import time
 
 
 ''' 
@@ -28,17 +31,38 @@ class PikaDAO:
             self.configuration.mq_port))
         self.channel = self.connectionmq.channel()
 
+        # S'assurer que toutes les queues existes
+        self.channel.queue_declare(queue=self.configuration.queue_nouvelles_transactions)
+
         return self.connectionmq
 
     ''' Prepare la reception de message '''
-    def preparerLectureNouvellesTransactions(self, callback):
-        self.channel.queue_declare(queue=self.configuration.queue_nouvelles_transactions)
-
+    def demarrer_lecture_nouvelles_transactions(self, callback):
         self.channel.basic_consume(callback,
                                    queue=self.configuration.queue_nouvelles_transactions,
                                    no_ack=False)
 
         self.channel.start_consuming()
+
+    def transmettre_message_transaction(self, message_dict):
+
+        # Ajouter identificateur unique et temps de la transaction
+        uuid_transaction = uuid.uuid1()
+        meta = {}
+        meta["id-transaction"] = "%s" % uuid_transaction
+        meta["estampille"] = int(time.time())
+
+        enveloppe = {}
+        enveloppe["trmeta"] = meta
+        enveloppe["contenu"] = message_dict
+
+        message_utf8 = json.dumps(enveloppe, sort_keys=True)
+
+        self.channel.basic_publish(exchange='',
+                              routing_key=self.configuration.queue_nouvelles_transactions,
+                              body=message_utf8)
+
+        return message_utf8
 
 
     # Mettre la classe en etat d'erreur
@@ -61,6 +85,7 @@ class PikaDAO:
         finally:
             self.channel = None
             self.connectionmq = None
+
 
 ''' 
 Classe qui facilite l'implementation de callbacks avec ACK

@@ -20,7 +20,7 @@ class TransactionMain:
 
     def connecter(self):
         self.connexionMq = self.transactionLirePika.connecter()
-        self.transactionLirePika.preparerLectureNouvellesTransactions(self.callbackImpl.callbackAvecAck)
+        self.transactionLirePika.demarrer_lecture_nouvelles_transactions(self.callbackImpl.callbackAvecAck)
 
     def deconnecter(self):
         self.transactionLirePika.deconnecter()
