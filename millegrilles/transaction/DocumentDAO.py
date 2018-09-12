@@ -20,7 +20,11 @@ class MongoDAO:
         self.collection_transactions = None
 
     def connecter(self):
-        self.client = MongoClient('dev2', 27017, username="root", password="example")
+        self.client = MongoClient(
+            self.configuration.mongo_host,
+            self.configuration.mongo_port,
+            username=self.configuration.mongo_user,
+            password=self.configuration.mongo_password)
         #print("Verify if connection established")
         self.client.admin.command('ismaster')
 
