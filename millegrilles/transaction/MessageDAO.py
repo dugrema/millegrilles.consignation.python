@@ -44,7 +44,11 @@ class PikaDAO:
 
         self.channel.start_consuming()
 
+    ''' Transmet un message. La connexion doit etre ouverte. '''
     def transmettre_message_transaction(self, message_dict):
+
+        if self.connectionmq == None or self.connectionmq.is_closed :
+            raise Exception("La connexion Pika n'est pas ouverte")
 
         # Ajouter identificateur unique et temps de la transaction
         uuid_transaction = uuid.uuid1()
@@ -62,7 +66,7 @@ class PikaDAO:
                               routing_key=self.configuration.queue_nouvelles_transactions,
                               body=message_utf8)
 
-        return message_utf8
+        return uuid_transaction
 
 
     # Mettre la classe en etat d'erreur
