@@ -75,6 +75,16 @@ class PikaDAO:
 
         return enveloppe
 
+    def transmettre_evenement_persistance(self, id_document, id_transaction):
+
+        message = {"_id": str(id_document), "id-transaction": id_transaction, "evenement": "transaction.persistee"}
+        message_utf8 = self.json_helper.dict_vers_json(message)
+
+        self.channel.basic_publish(exchange='millegrilles.evenements',
+                              routing_key='%s.transaction.persistee' % self.configuration.nom_millegrille,
+                              body=message_utf8)
+
+
     # Mettre la classe en etat d'erreur
     def enterErrorState(self):
         self.inError = True

@@ -33,7 +33,9 @@ class ConsignateurTransaction(BaseCallback):
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def callbackAvecAck(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        self.document_dao.sauvegarder_nouvelle_transaction(message_dict)
+        id_document = self.document_dao.sauvegarder_nouvelle_transaction(message_dict)
+        id_transaction = message_dict['info-transaction']['id-transaction']
+        self.message_dao.transmettre_evenement_persistance(id_document, id_transaction)
         super().callbackAvecAck(ch, method, properties, body)
 
 
