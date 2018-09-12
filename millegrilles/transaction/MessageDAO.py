@@ -19,9 +19,9 @@ class PikaDAO:
         self.connectionmq = None
         self.channel = None
 
-        self.reader = codecs.getreader("utf-8")
-
         self.inError = True
+
+        self.json_helper = JSONHelper()
 
     # Connecter au serveur RabbitMQ
     # Le callback est une methode qui va etre appelee lorsqu'un message est recu
@@ -51,8 +51,8 @@ class PikaDAO:
             raise Exception("La connexion Pika n'est pas ouverte")
 
         enveloppe = self.preparer_enveloppe(message_dict)
-        uuid_transaction = enveloppe["meta"]["id-transaction"]
-        message_utf8 = json.dumps(enveloppe, sort_keys=True)
+        uuid_transaction = enveloppe["info-transaction"]["id-transaction"]
+        message_utf8 = self.json_helper.dict_vers_json(enveloppe)
 
         self.channel.basic_publish(exchange='',
                               routing_key=self.configuration.queue_nouvelles_transactions,
@@ -96,6 +96,22 @@ class PikaDAO:
             self.channel = None
             self.connectionmq = None
 
+''' Classe avec utilitaires pour JSON '''
+
+
+class JSONHelper:
+
+    def __init__(self):
+        self.reader = codecs.getreader("utf-8")
+
+    def dict_vers_json(self, enveloppe_dict):
+        message_utf8 = json.dumps(enveloppe_dict, sort_keys=True, ensure_ascii=False)
+        return message_utf8
+
+    def bin_utf8_json_vers_dict(self, json_utf8):
+        message_json = json_utf8.decode("utf-8")
+        dict = json.loads(message_json)
+        return dict
 
 ''' 
 Classe qui facilite l'implementation de callbacks avec ACK

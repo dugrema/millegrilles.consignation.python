@@ -2,13 +2,20 @@
 '''
 
 from millegrilles.transaction.Configuration import TransactionConfiguration
-from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback
+from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback, JSONHelper
 
 ''' Classe d'exemple pour implementation callback avec ACK (superclasse) '''
 class CallbackNouvelleTransaction(BaseCallback):
 
+    def __init__(self):
+
+        self.json_helper = JSONHelper()
+
     def callbackAvecAck(self, ch, method, properties, body):
-        print("Message recu: %s" % body)
+
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        print("Message recu: %s" % message_dict)
         super().callbackAvecAck(ch, method, properties, body)
 
 class TransactionMain:

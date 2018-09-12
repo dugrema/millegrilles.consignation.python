@@ -19,7 +19,8 @@ from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback
 #channel.queue_declare(queue=queuename)
 
 message = {
-    "contenu": "Valeur"
+    "contenu": "valeur était à alisée",
+    "nombre": 22
 }
 
 #message_utf8 = json.dumps(message)
