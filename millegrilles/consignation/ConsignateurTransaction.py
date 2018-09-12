@@ -39,12 +39,19 @@ class ConsignateurTransaction(BaseCallback):
 
 def main():
 
+    print("Demarrage de ConsignateurTransaction")
+
     consignateur = ConsignateurTransaction()
     consignateur.configurer()
+
     try:
+        print("ConsignateurTransaction est pret")
         consignateur.executer()
     finally:
+        print("Arret de ConsignateurTransaction")
         consignateur.deconnecter()
+
+    print("ConsignateurTransaction est arrete")
 
 if __name__=="__main__":
     main()
