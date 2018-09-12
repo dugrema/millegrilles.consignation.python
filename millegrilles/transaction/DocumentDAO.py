@@ -21,10 +21,10 @@ class MongoDAO:
 
     def connecter(self):
         self.client = MongoClient('dev2', 27017, username="root", password="example")
-        print("Verify if connection established")
+        #print("Verify if connection established")
         self.client.admin.command('ismaster')
 
-        print("Connection etablie, ouverture base de donnes %s" % (self.nom_millegrille))
+        #print("Connection etablie, ouverture base de donnes %s" % (self.nom_millegrille))
 
         self.mg_database = self.client[self.nom_millegrille]
         self.collection_transactions = self.mg_database["transactions"]

@@ -19,10 +19,16 @@ class ConsignateurTransaction(BaseCallback):
     def configurer(self):
         self.document_dao.connecter()
         self.message_dao.connecter()
+        print("Configuration et connection completee")
 
     def executer(self):
         # Note: la methode demarrer_... est blocking
         self.message_dao.demarrer_lecture_nouvelles_transactions(self.callbackAvecAck)
+
+    def deconnecter(self):
+        self.document_dao.deconnecter()
+        self.message_dao.deconnecter()
+        print("Deconnexion completee")
 
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def callbackAvecAck(self, ch, method, properties, body):
@@ -32,9 +38,13 @@ class ConsignateurTransaction(BaseCallback):
 
 
 def main():
+
     consignateur = ConsignateurTransaction()
     consignateur.configurer()
-    consignateur.executer()
+    try:
+        consignateur.executer()
+    finally:
+        consignateur.deconnecter()
 
 if __name__=="__main__":
     main()
