@@ -50,6 +50,18 @@ class PikaDAO:
         if self.connectionmq == None or self.connectionmq.is_closed :
             raise Exception("La connexion Pika n'est pas ouverte")
 
+        enveloppe = self.preparer_enveloppe(message_dict)
+        uuid_transaction = enveloppe["meta"]["id-transaction"]
+        message_utf8 = json.dumps(enveloppe, sort_keys=True)
+
+        self.channel.basic_publish(exchange='',
+                              routing_key=self.configuration.queue_nouvelles_transactions,
+                              body=message_utf8)
+
+        return uuid_transaction
+
+    def preparer_enveloppe(self, message_dict):
+
         # Ajouter identificateur unique et temps de la transaction
         uuid_transaction = uuid.uuid1()
         meta = {}
@@ -60,14 +72,7 @@ class PikaDAO:
         enveloppe["trmeta"] = meta
         enveloppe["contenu"] = message_dict
 
-        message_utf8 = json.dumps(enveloppe, sort_keys=True)
-
-        self.channel.basic_publish(exchange='',
-                              routing_key=self.configuration.queue_nouvelles_transactions,
-                              body=message_utf8)
-
-        return uuid_transaction
-
+        return enveloppe
 
     # Mettre la classe en etat d'erreur
     def enterErrorState(self):
