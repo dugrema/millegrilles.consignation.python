@@ -10,6 +10,8 @@ class TransactionConfiguration:
         self._mq_host = "dev2"
         self._mq_port = 5672
         self._mq_queue_nouvelles_transactions = "nouvelles_transactions"
+        self._mq_queue_entree_processus = "entree_processus"
+        self._mq_exchange_evenements = "millegrilles.evenements"
 
         # Configuration de connection a MongoDB
         self._mongo_host = "dev2"
@@ -47,10 +49,6 @@ class TransactionConfiguration:
         return self._nom_millegrille
 
     @property
-    def queue_nouvelles_transactions(self):
-        return "mg.%s.%s" % (self._nom_millegrille, self._mq_queue_nouvelles_transactions)
-
-    @property
     def mongo_host(self):
         return self._mongo_host
 
@@ -66,3 +64,14 @@ class TransactionConfiguration:
     def mongo_password(self):
         return self._mongo_password
 
+    @property
+    def queue_nouvelles_transactions(self):
+        return self._mq_queue_nouvelles_transactions
+
+    @property
+    def queue_entree_processus(self):
+        return self._mq_queue_entree_processus
+
+    @property
+    def exchange_evenements(self):
+        return self._mq_exchange_evenements

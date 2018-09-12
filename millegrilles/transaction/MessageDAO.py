@@ -31,10 +31,45 @@ class PikaDAO:
             self.configuration.mq_port))
         self.channel = self.connectionmq.channel()
 
-        # S'assurer que toutes les queues existes
-        self.channel.queue_declare(queue=self.configuration.queue_nouvelles_transactions)
-
         return self.connectionmq
+
+    def configurer_rabbitmq(self):
+
+        # S'assurer que toutes les queues existes
+        nom_millegrille = self.configuration.nom_millegrille
+        nom_echange_evenements = self.configuration.exchange_evenements
+        nom_q_nouvelles_transactions = "mg.%s.%s" % (nom_millegrille, self.configuration.queue_nouvelles_transactions)
+        nom_q_entree_processus =  "mg.%s.%s" % (nom_millegrille, self.configuration.queue_entree_processus)
+
+        # Creer l'echange de type topics pour toutes les MilleGrilles
+        self.channel.exchange_declare(
+            exchange=nom_echange_evenements,
+            exchange_type='topic',
+            durable=True
+        )
+
+        # Creer la Q de nouvelles transactions pour cette MilleGrille
+        self.channel.queue_declare(
+            queue=nom_q_nouvelles_transactions,
+            durable=True)
+
+        self.channel.queue_bind(
+            exchange = nom_echange_evenements,
+            queue=nom_q_nouvelles_transactions,
+            routing_key='%s.transaction.nouvelle' % nom_millegrille
+        )
+
+        # Creer la Q d'entree de processus (workflows) pour cette MilleGrille
+        self.channel.queue_declare(
+            queue=nom_q_entree_processus,
+            durable=True)
+
+        self.channel.queue_bind(
+            exchange = nom_echange_evenements,
+            queue=nom_q_entree_processus,
+            routing_key='%s.transaction.persistee' % nom_millegrille
+        )
+
 
     ''' Prepare la reception de message '''
     def demarrer_lecture_nouvelles_transactions(self, callback):
