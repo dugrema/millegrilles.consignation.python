@@ -112,7 +112,7 @@ class PikaDAO:
 
     def transmettre_evenement_persistance(self, id_document, id_transaction):
 
-        message = {"_id": str(id_document), "id-transaction": id_transaction, "evenement": "transaction.persistee"}
+        message = {"_id": str(id_document), "id-transaction": id_transaction, "evenement": "transaction_persistee"}
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         self.channel.basic_publish(exchange='millegrilles.evenements',
