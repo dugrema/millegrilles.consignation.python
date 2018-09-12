@@ -8,6 +8,7 @@ from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback, JSONHelpe
 class CallbackNouvelleTransaction(BaseCallback):
 
     def __init__(self):
+        super().__init__()
 
         self.json_helper = JSONHelper()
 
