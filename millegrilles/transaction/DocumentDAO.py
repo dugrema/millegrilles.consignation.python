@@ -41,7 +41,8 @@ class MongoDAO:
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
 
         # Ajouter l'element evenements et l'evenement de persistance
-        enveloppe_transaction["evenements"] = {"persistance": [int(time.time())]}
+        estampille = enveloppe_transaction['info-transaction']['estampille']
+        enveloppe_transaction['evenements'] = {'transaction_nouvelle': [estampille], 'transaction_persistance': [int(time.time())]}
 
         resultat = self.collection_transactions.insert_one(enveloppe_transaction)
         id = resultat.inserted_id
