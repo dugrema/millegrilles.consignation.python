@@ -34,6 +34,7 @@ message = {
 #connection.close()
 
 configuration = TransactionConfiguration()
+configuration.loadEnvironment()
 messageDao = PikaDAO(configuration)
 
 messageDao.connecter()

@@ -12,6 +12,7 @@ class ConsignateurTransaction(BaseCallback):
 
         self.json_helper = JSONHelper()
         self.configuration = TransactionConfiguration()
+        self.configuration.loadEnvironment()
         self.message_dao = PikaDAO(self.configuration)
         self.document_dao = MongoDAO(self.configuration)
 

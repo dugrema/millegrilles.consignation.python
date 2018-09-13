@@ -23,6 +23,8 @@ class TransactionMain:
 
     def __init__(self):
         self.configuration = TransactionConfiguration()
+        self.configuration.loadEnvironment()
+
         self.transactionLirePika = PikaDAO(self.configuration)
         self.callbackImpl = CallbackNouvelleTransaction()
 

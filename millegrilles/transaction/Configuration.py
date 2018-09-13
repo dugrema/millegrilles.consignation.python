@@ -8,8 +8,8 @@ class TransactionConfiguration:
     def __init__(self):
         # Configuration de connection a RabbitMQ
         self._mq_config = {
-            'mq_host': "dev2",
-            'mq_port': 5672,
+            'mq_host': "localhost",
+            'mq_port': '5672',
             'mq_queue_nouvelles_transactions': 'nouvelles_transactions',
             'mq_queue_entree_processus': 'entree_processus',
             'mq_exchange_evenements': 'millegrilles.evenements'
@@ -17,18 +17,20 @@ class TransactionConfiguration:
 
         # Configuration de connection a MongoDB
         self._mongo_config = {
-            'mongo_host': 'dev2',
+            'mongo_host': 'localhost',
             'mongo_port': '27017',
             'mongo_user': 'root',
             'mongo_password': 'example'
         }
 
         # Configuration specifique a la MilleGrille
-        self._nom_millegrille = "sansnom" # Nom de la MilleGrille
+        self._millegrille_config = {
+            'nom_millegrille': 'sansnom' # Nom de la MilleGrille
+        }
 
     def loadEnvironment(self):
         # Faire la liste des dictionnaires de configuration a charger
-        configurations = [self._mq_config, self._mongo_config]
+        configurations = [self._mq_config, self._mongo_config, self._millegrille_config]
 
         for config_dict in configurations:
 
@@ -49,11 +51,11 @@ class TransactionConfiguration:
 
     @property
     def mq_port(self):
-        return self._mq_config['mq_port']
+        return int(self._mq_config['mq_port'])
 
     @property
     def nom_millegrille(self):
-        return self._nom_millegrille
+        return self._millegrille_config['nom_millegrille']
 
     @property
     def mongo_host(self):
