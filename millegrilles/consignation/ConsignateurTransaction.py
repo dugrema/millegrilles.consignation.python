@@ -20,6 +20,10 @@ class ConsignateurTransaction(BaseCallback):
     def configurer(self):
         self.document_dao.connecter()
         self.message_dao.connecter()
+
+        # Executer la configuration pour RabbitMQ
+        self.message_dao.configurer_rabbitmq()
+
         print("Configuration et connection completee")
 
     def executer(self):
