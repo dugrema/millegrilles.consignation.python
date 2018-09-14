@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 ''' Programme principal pour transferer les nouvelles transactions vers MongoDB '''
-from millegrilles.transaction.MessageDAO import PikaDAO, JSONHelper, BaseCallback
-from millegrilles.transaction.DocumentDAO import MongoDAO
-from millegrilles.transaction.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO, JSONHelper, BaseCallback
+from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.Configuration import TransactionConfiguration
 
 class ConsignateurTransaction(BaseCallback):
 

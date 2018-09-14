@@ -1,8 +1,8 @@
 ''' Executer thread lecture messages (test)
 '''
 
-from millegrilles.transaction.Configuration import TransactionConfiguration
-from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback, JSONHelper
+from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO, BaseCallback, JSONHelper
 
 ''' Classe d'exemple pour implementation callback avec ACK (superclasse) '''
 class CallbackNouvelleTransaction(BaseCallback):

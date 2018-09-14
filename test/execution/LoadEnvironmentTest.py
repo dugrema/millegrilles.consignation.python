@@ -1,4 +1,4 @@
-from millegrilles.transaction.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration
 
 configuration = TransactionConfiguration()
 

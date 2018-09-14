@@ -2,12 +2,8 @@
 
 '''
 
-import pika
-import json, time
-
-from millegrilles.transaction.Configuration import TransactionConfiguration
-from millegrilles.transaction.MessageDAO import PikaDAO, BaseCallback
-
+from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO
 
 #credentials = pika.PlainCredentials('mathieu', 'p1234')
 #connection = pika.BlockingConnection(pika.ConnectionParameters('cuisine', 5674, credentials=credentials))

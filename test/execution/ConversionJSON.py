@@ -1,5 +1,4 @@
-from millegrilles.transaction.Configuration import TransactionConfiguration
-from millegrilles.transaction.MessageDAO import JSONHelper
+from millegrilles.dao.MessageDAO import JSONHelper
 
 json_helper = JSONHelper()
 

@@ -1,6 +1,6 @@
-from millegrilles.transaction.DocumentDAO import MongoDAO
-from millegrilles.transaction.Configuration import TransactionConfiguration
-from millegrilles.transaction.MessageDAO import PikaDAO
+from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO
 
 configuration = TransactionConfiguration()
 
