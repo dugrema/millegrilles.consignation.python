@@ -1,8 +1,8 @@
 # Module pour les processus de Senseur
 
-from millegrilles.processus.MGProcessus import MGProcessusEtape
+from millegrilles.processus.MGProcessus import MGProcessus
 
-class Lecture(MGProcessusEtape):
+class Lecture(MGProcessus):
 
     def __init__(self):
         super().__init__()

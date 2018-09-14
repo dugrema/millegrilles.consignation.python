@@ -1,7 +1,7 @@
 # Module de processus pour MilleGrilles
 
 '''
-Controleur des processus MilleGrilles. Connait le deroulement des etapes.
+Controleur des processus MilleGrilles. Identifie et execute les processus.
 
 MGPProcessus = MilleGrilles Python Processus. D'autres controleurs de processus peuvent etre disponibles.
 
@@ -20,7 +20,7 @@ class MGPProcessusControleur:
     
     :returns: Dictionnaire de toutes les etapes supportees dans ce processus. 
     """
-    def initialiser_processus(self):
+    def initialiser_liste_processus(self):
         None
 
     """
@@ -29,7 +29,7 @@ class MGPProcessusControleur:
     :param message: Le message recu sur la Q, devrait contenir les identificateurs necessaires au
                     demarrage du processus.
     """
-    def demarrer_procesus(self, message):
+    def demarrer_processus(self, message):
         None
 
     """ 
@@ -44,9 +44,9 @@ class MGPProcessusControleur:
 
 
     """
-    :returns: Etape initialise prete a etre executee
+    :returns: Identifie le processus a executer
     """
-    def identifier_etape(self, message):
+    def identifier_processus(self, message):
         None
 
 
@@ -57,8 +57,51 @@ class MGPProcessusControleur:
     
     :param etape: Etape a executer
     """
-    def executer_etape(self, etape):
-        None
+    def executer_etape(self, processus):
+        processus.identifier_etape()
+        processus.executer_etape()
+
+
+class MGProcessus:
+
+    """
+    :param controleur: Controleur de processus qui appelle l'etape
+    :param nom_complet: Nom complet du processus (celui identifie dans le dictionnaire des processus)
+    :param message: Message recu qui a declenche l'execution de cette etape
+    """
+    def __init__(self, controleur, nom_complet, message):
+        self._controleur = controleur
+        self.nom_complet = nom_complet
+        self.message = message
+
+    """
+    :returns: Etape initialise prete a etre executee
+    """
+    def identifier_etape_courante(self):
+        self._etape = None
+
+
+    def identifier_etape_suivante(self):
+        # Verifier que l'etape a ete executee avec succes. Retourner etape suivante.
+        return None
+
+    """
+    Execute l'etape.
+
+    :raises ErreurExecutionEtape: Erreur fatale encontree lors de l'execution de l'etape
+    """
+    def executer_etape(self):
+        self._etape.executer()
+
+    """
+    Appeler lorsque l'etape a ete executee avec succes. Identifie la prochaine etape
+    et transmet le message pour declencher son execution.
+    """
+    def preparer_etape_suivante(self):
+
+        libelle_etape = self.identifier_etape_suivante()
+
+        # Creer message sur la Q pour declencher l'execution de la prochaine etape
 
 
 ''' 
@@ -69,14 +112,11 @@ Superclasse abstraite pour une etape d'un processus MilleGrilles.
 class MGProcessusEtape:
 
     """
-    :param controleur: Controleur de processus qui appelle l'etape
-    :param nom_complet: Nom complet de l'etape (celui identifie dans le dictionnaire du processus
-    :param message: Message recu qui a declenche l'execution de cette etape
+    :param processus: Classe qui gere le processus
     """
-    def __init__(self, controleur, nom_complet, message):
-        self._controleur = controleur
-        self.nom_complet = nom_complet
-        self.message = message
+    def __init__(self, processus):
+        self.processus = processus
+        self._controleur = processus._controleur
 
     """
     Execute l'etape.
