@@ -12,6 +12,8 @@ class OrienteurTransaction(BaseCallback):
     def __init__(self):
 
         self.dict_libelle = {}
+        self.message_dao = None
+        self.document_dao = None
 
     # Methode de callback avec ACK pour ecouter sur la Q des transactions persistees.
     def callbackAvecAck(self, ch, method, properties, body):
@@ -27,7 +29,5 @@ class OrienteurTransaction(BaseCallback):
         # MGPProcessus: MilleGrille Python Processus. C'est un processus qui va correspondre directement
         # a un "module.classe" du package millegrilles.processus.
         self.dict_libelle = {
-            "senseur.lecture": "MGPProcessus.senseur."
+            "senseur.lecture": "MGPProcessus.Senseur.ConsignerLecture"
         }
-
-        None

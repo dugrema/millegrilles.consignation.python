@@ -11,7 +11,8 @@ MGPProcessus = MilleGrilles Python Processus. D'autres controleurs de processus 
 class MGPProcessusControleur:
 
     def __init__(self):
-        None
+        self.document_dao = None
+        self.message_dao = None
 
     """
     Methode faite pour etre implementee. Retourne un dictionnaire de toutes les etapes avec la liste des
@@ -21,7 +22,6 @@ class MGPProcessusControleur:
     """
     def initialiser_processus(self):
         None
-
 
     """
     Demarre le processus - execute la premiere etape.
@@ -37,12 +37,33 @@ class MGPProcessusControleur:
     
     :param message: Le message pour lequel l'erreur a ete generee.
     :param nom_etape: Nom complet de l'etape qui a genere l'erreur.
-    :param detail_erreur: Optionnel, 
+    :param detail_erreur: Optionnel, objet ErreurExecutionEtape.
     """
     def erreur_fatale(self, message, nom_etape, detail_erreur=None):
         None
 
-''' Superclasse abstraite pour une etape d'un processus MilleGrilles. '''
+
+    """
+    :returns: Etape initialise prete a etre executee
+    """
+    def identifier_etape(self, message):
+        None
+
+
+    """
+    Methode responsable de l'execution d'une etape et de l'enchainement de la 
+    prochaine etape au besoin. S'occupe aussi de toute erreur qui survient durant l'execution
+    d'une etape.
+    
+    :param etape: Etape a executer
+    """
+    def executer_etape(self, etape):
+        None
+
+
+''' 
+Superclasse abstraite pour une etape d'un processus MilleGrilles. 
+'''
 
 
 class MGProcessusEtape:
@@ -57,3 +78,30 @@ class MGProcessusEtape:
         self.nom_complet = nom_complet
         self.message = message
 
+    """
+    Execute l'etape.
+    
+    :raises ErreurExecutionEtape: Erreur fatale encontree lors de l'execution de l'etape
+    """
+    def executer(self):
+        None
+
+
+'''
+Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
+'''
+
+
+class ErreurExecutionEtape(Exception):
+
+    def __init__(self, etape):
+        super().__init__(self)
+        self._etape = etape
+
+    @property
+    def etape(self):
+        return self._etape
+
+    @property
+    def nom_etape(self):
+        return self._etape.nom_complet
