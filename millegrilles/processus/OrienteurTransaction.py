@@ -5,20 +5,44 @@
     apres la persistance initiale.
 '''
 
-from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
+from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper, PikaDAO
+from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.Configuration import TransactionConfiguration
 
 class OrienteurTransaction(BaseCallback):
 
     def __init__(self):
 
+        super().__init__()
+
         self.dict_libelle = {}
         self._message_dao = None
         self._document_dao = None
         self._json_helper = JSONHelper()
+        self._configuration = TransactionConfiguration()
 
     def initialiser(self):
-        self._message_dao = None
-        self._document_dao = None
+        self._configuration.loadEnvironment()
+        self._message_dao = PikaDAO(self._configuration)
+        self._document_dao = MongoDAO(self._configuration)
+
+        # Connecter les DAOs
+        self._document_dao.connecter()
+        self._message_dao.connecter()
+
+        # Executer la configuration pour RabbitMQ
+        self._message_dao.configurer_rabbitmq()
+
+        print("Configuration et connection completee")
+
+    def executer(self):
+        # Note: la methode demarrer_... est blocking
+        self._message_dao.demarrer_lecture_entree_processus(self.callbackAvecAck)
+
+    def deconnecter(self):
+        self._document_dao.deconnecter()
+        self._message_dao.deconnecter()
+        print("Deconnexion completee")
 
     '''
     Traitement des nouvelles transactions. Le message est decode et le processus est declenche.
@@ -53,20 +77,30 @@ class OrienteurTransaction(BaseCallback):
         }
 
     def traiter_transaction(self, dictionnaire_evenement):
+
+        id_document = dictionnaire_evenement["_id"]
+        transaction_id = dictionnaire_evenement.get("id-tramsaction")
+
         try:
             processus_a_declencher = self.orienter_message(dictionnaire_evenement)
-            # On va declencher un nouveau processus
 
+            if processus_a_declencher is not None:
+                # On va declencher un nouveau processus
+                self._message_dao.transmettre_evenement_mgpprocessus(
+                    id_document,
+                    processus_a_declencher,
+                    dict_parametres=dictionnaire_evenement
+                )
+            else:
+                raise Exception("Transaction ne correspond pas a un processus. ERREUR LOGIQUE: une exception aurait du etre lancee au prealable")
 
         except ErreurInitialisationProcessus as erreur:
             # Une erreur fatale est survenue - l'erreur est liee au contenu du message (ne peut pas etre ressaye)
-            doc_id = dictionnaire_evenement["_id"]
             transaction_id = dictionnaire_evenement.get("id-tramsaction")
-            self._message_dao.transmettre_erreur_transaction(doc_id, transaction_id, erreur)
+            self._message_dao.transmettre_erreur_transaction(id_document, transaction_id, erreur)
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
-            doc_id = dictionnaire_evenement["_id"]
-            self._message_dao.transmettre_erreur_transaction(id_document=doc_id, detail=erreur)
+            self._message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
 
     '''
     :param message: Evenement d'initialisation de processus recu de la Q (format dictionnaire).
@@ -130,3 +164,21 @@ class ErreurInitialisationProcessus(Exception):
     def evenement(self):
         return self._evenement
 
+def main():
+
+    print("Demarrage de OrienteurTransaction")
+
+    orienteur = OrienteurTransaction()
+    orienteur.initialiser()
+
+    try:
+        print("OrienteurTransaction est pret")
+        orienteur.executer()
+    finally:
+        print("Arret de OrienteurTransaction")
+        orienteur.deconnecter()
+
+    print("OrienteurTransaction est arrete")
+
+if __name__=="__main__":
+    main()

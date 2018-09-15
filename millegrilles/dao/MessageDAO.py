@@ -103,6 +103,14 @@ class PikaDAO:
 
         self.channel.start_consuming()
 
+    ''' Demarre la lecture de la queue entree_processus. Appel bloquant. '''
+    def demarrer_lecture_entree_processus(self, callback):
+        self.channel.basic_consume(callback,
+                                   queue=self.queuename_entree_processus(),
+                                   no_ack=False)
+
+        self.channel.start_consuming()
+
     ''' Transmet un message. La connexion doit etre ouverte. '''
     def transmettre_message_transaction(self, message_dict):
 
