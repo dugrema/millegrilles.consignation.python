@@ -35,14 +35,14 @@ class OrienteurTransactionTest(unittest.TestCase):
             self.fail("ErreurInitialisationProcessus aurait du etre lance")
 
     def test_orienter_message_processus_connu(self):
-        self._orienteur.dict_libelle = {"senseur.lecture": "MGPProcessus.Senseur.ConsignerLecture"}
-        processus = self._orienteur.orienter_message({"libelle":"senseur.lecture"})
+        self._orienteur.dict_libelle = {"MGPProcessus.senseur.lecture": "Senseur.ConsignerLecture"}
+        processus = self._orienteur.orienter_message({"libelle":"MGPProcessus.senseur.lecture"})
         self.assertEqual(processus, "MGPProcessus.Senseur.ConsignerLecture")
 
     def test_orienter_message_processus_inconnu(self):
         #self._orienteur.dict_libelle = {"senseur.lecture": "MGPProcessus.Senseur.ConsignerLecture"}
         try:
-            processus = self._orienteur.orienter_message({"libelle":"senseur.lecture"})
+            processus = self._orienteur.orienter_message({"libelle":"MGPProcessus.senseur.lecture"})
             self.fail("ErreurInitialisationProcessus aurait du etre lance")
         except ErreurInitialisationProcessus:
             pass
