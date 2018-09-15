@@ -38,8 +38,10 @@ class PikaDAO:
         # S'assurer que toutes les queues existes
         nom_millegrille = self.configuration.nom_millegrille
         nom_echange_evenements = self.configuration.exchange_evenements
-        nom_q_nouvelles_transactions = "mg.%s.%s" % (nom_millegrille, self.configuration.queue_nouvelles_transactions)
-        nom_q_entree_processus =  "mg.%s.%s" % (nom_millegrille, self.configuration.queue_entree_processus)
+        nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
+        nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
+        nom_q_entree_processus =  self.queuename_entree_processus()
+        nom_q_mgp_processus =  self.queuename_mgp_processus()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
         self.channel.exchange_declare(
@@ -68,6 +70,28 @@ class PikaDAO:
             exchange = nom_echange_evenements,
             queue=nom_q_entree_processus,
             routing_key='%s.transaction.persistee' % nom_millegrille
+        )
+
+        # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
+        self.channel.queue_declare(
+            queue=nom_q_mgp_processus,
+            durable=True)
+
+        self.channel.queue_bind(
+            exchange = nom_echange_evenements,
+            queue=nom_q_mgp_processus,
+            routing_key='%s.mgp.processus' % nom_millegrille
+        )
+
+        # Creer la Q d'erreurs dans les transactions pour cette MilleGrille
+        self.channel.queue_declare(
+            queue=nom_q_erreurs_transactions,
+            durable=True)
+
+        self.channel.queue_bind(
+            exchange = nom_echange_evenements,
+            queue=nom_q_erreurs_transactions,
+            routing_key='%s.transaction.erreur' % nom_millegrille
         )
 
 
@@ -119,6 +143,44 @@ class PikaDAO:
                               routing_key='%s.transaction.persistee' % self.configuration.nom_millegrille,
                               body=message_utf8)
 
+    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale', dict_parametres=None):
+        message = {
+            "_id": id_document,
+            "processus": nom_processus,
+            "etape": nom_etape
+        }
+        if dict_parametres is not None:
+            message['parametres'] = dict_parametres
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                              routing_key='%s.mgp.processus' % self.configuration.nom_millegrille,
+                              body=message_utf8)
+
+    '''
+    Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
+    
+    :param id_document: Document affecte (Object ID dans Mongo)
+    :param id_transaction: (Optionnel) Identificateur de la transaction qui est bloquee
+    :param detail: (Optionnel) Information sur l'erreur.
+    '''
+    def transmettre_erreur_transaction(self, id_document, id_transaction=None, detail=None):
+
+        message = {
+            "_id": id_document,
+        }
+        if id_transaction is not None:
+            message["id-transaction"] = id_transaction
+        if detail is not None:
+            message["erreur"] = str(detail)
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                              routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
+                              body=message_utf8)
+
 
     # Mettre la classe en etat d'erreur
     def enterErrorState(self):
@@ -140,6 +202,21 @@ class PikaDAO:
         finally:
             self.channel = None
             self.connectionmq = None
+
+    def _queuename(self, nom_queue):
+        return "mg.%s.%s" % (self.configuration.nom_millegrille, nom_queue)
+
+    def queuename_nouvelles_transactions(self):
+        return self._queuename(self.configuration.queue_nouvelles_transactions)
+
+    def queuename_erreurs_transactions(self):
+        return self._queuename(self.configuration.queue_erreurs_transactions)
+
+    def queuename_entree_processus(self):
+        return self._queuename(self.configuration.queue_entree_processus)
+
+    def queuename_mgp_processus(self):
+        return self._queuename(self.configuration.queue_mgp_processus)
 
 ''' Classe avec utilitaires pour JSON '''
 

@@ -12,6 +12,8 @@ class TransactionConfiguration:
             'mq_port': '5672',
             'mq_queue_nouvelles_transactions': 'nouvelles_transactions',
             'mq_queue_entree_processus': 'entree_processus',
+            'mq_queue_erreurs_transactions': 'erreurs_transactions',
+            'mq_queue_mgp_processus': 'mgp_processus',
             'mq_exchange_evenements': 'millegrilles.evenements'
         }
 
@@ -78,8 +80,16 @@ class TransactionConfiguration:
         return self._mq_config['mq_queue_nouvelles_transactions']
 
     @property
+    def queue_erreurs_transactions(self):
+        return self._mq_config['mq_queue_erreurs_transactions']
+
+    @property
     def queue_entree_processus(self):
         return self._mq_config['mq_queue_entree_processus']
+
+    @property
+    def queue_mgp_processus(self):
+        return self._mq_config['mq_queue_mgp_processus']
 
     @property
     def exchange_evenements(self):

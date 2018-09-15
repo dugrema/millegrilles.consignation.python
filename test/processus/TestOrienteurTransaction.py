@@ -29,6 +29,8 @@ class OrienteurTransactionTest(unittest.TestCase):
         self._orienteur._document_dao = self._document_dao
         self._message = None
 
+    # ************* Section pour tester l'orientation ***************
+
     def test_chargement_liste_processus(self):
         self._orienteur.charger_liste_processus()
         self.assertGreater(len(self._orienteur.dict_libelle), 0, "Le dictionnaire de libelles est vide")
@@ -66,6 +68,18 @@ class OrienteurTransactionTest(unittest.TestCase):
         except Exception:
             self.fail("ErreurInitialisationProcessus aurait du etre lance")
 
+    def test_orienter_message_typeprocessus_inconnu(self):
+        self._document_dao._document = {"charge-utile": {"libelle-transaction": "MGJS.senseur.lecture"}}
+        try:
+            processus = self._orienteur.orienter_message({"_id": "dummy_object_id_string"})
+            self.fail("ErreurInitialisationProcessus aurait du etre lance")
+        except ErreurInitialisationProcessus:
+            self.assertTrue(self._document_dao._called_charger_document_par_id,
+                            "Le chargement du document aurait du etre invoque.")
+            pass
+        except Exception:
+            self.fail("ErreurInitialisationProcessus aurait du etre lance")
+
     def test_orienter_message_processus_connu(self):
         self._document_dao._document = {"charge-utile": {"libelle-transaction": "MGPProcessus.senseur.lecture"}}
         self._orienteur.dict_libelle = {"MGPProcessus.senseur.lecture": "Senseur.ConsignerLecture"}
@@ -73,6 +87,12 @@ class OrienteurTransactionTest(unittest.TestCase):
         processus = self._orienteur.orienter_message({"_id": "dummy_object_id_string"})
         self.assertEqual(processus, "Senseur.ConsignerLecture")
 
+
+    # ************* Section pour tester le callback ***************
+    def test_extraire_evenement(self):
+
+        evenement_dict = self._orienteur.extraire_evenement(b'{"label":"value"}')
+        self.assertEqual(evenement_dict["label"], "value")
 
 if __name__ == '__main__':
     unittest.main()
