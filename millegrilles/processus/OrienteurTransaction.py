@@ -115,7 +115,7 @@ class OrienteurTransaction(BaseCallback):
         if mongo_id is None:
             raise ErreurInitialisationProcessus(dictionnaire_evenement, "L'identifiant _id est vide ou absent")
 
-        transaction = self._document_dao.charger_document_par_id(mongo_id)
+        transaction = self._document_dao.charger_transaction_par_id(mongo_id)
         if transaction is None:
             raise ErreurInitialisationProcessus(dictionnaire_evenement, "Aucune transaction ne correspond a _id:%s" % mongo_id)
 

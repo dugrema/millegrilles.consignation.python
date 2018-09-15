@@ -3,6 +3,7 @@
 
 import time
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 
 '''
 Data access object pour les documents dans MongoDB
@@ -49,11 +50,11 @@ class MongoDAO:
         return id
 
     '''
-    Chargement d'un document a partir d'un identificateur MongoDB
+    Chargement d'un document de transaction a partir d'un identificateur MongoDB
     
     :param id_doc: Numero unique du document dans MongoDB.
     :returns: Document ou None si aucun document ne correspond.
     '''
-    def charger_document_par_id(self, id_doc):
-        pass
+    def charger_transaction_par_id(self, id_doc):
+        return self.collection_transactions.find_one({'_id': ObjectId(id_doc)})
 
