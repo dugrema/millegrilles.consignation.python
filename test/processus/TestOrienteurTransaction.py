@@ -3,22 +3,30 @@ from millegrilles.processus.OrienteurTransaction import OrienteurTransaction
 from millegrilles.processus.OrienteurTransaction import ErreurInitialisationProcessus
 
 
-class MyTestCase(unittest.TestCase):
+class MessageDAOStub:
 
-    def setUp(self):
+    def __init__(self):
         pass
 
-    def tearDown(self):
-        pass
+class DocumentDAOStub:
 
-    def test_something(self):
-        self.assertEqual(True, True)
+    def __init__(self):
+        self._document = None
+        self._called_charger_document_par_id = False
 
+    def charger_document_par_id(self, id_doc):
+        self._called_charger_document_par_id = True
+        return self._document
 
 class OrienteurTransactionTest(unittest.TestCase):
 
     def setUp(self):
+        self._message_dao = MessageDAOStub()
+        self._document_dao = DocumentDAOStub()
         self._orienteur = OrienteurTransaction()
+        # Ajouter les DAOs stub
+        self._orienteur._message_dao = self._message_dao
+        self._orienteur._document_dao = self._document_dao
         self._message = None
 
     def test_chargement_liste_processus(self):
@@ -34,18 +42,37 @@ class OrienteurTransactionTest(unittest.TestCase):
         except Exception:
             self.fail("ErreurInitialisationProcessus aurait du etre lance")
 
-    def test_orienter_message_processus_connu(self):
-        self._orienteur.dict_libelle = {"MGPProcessus.senseur.lecture": "Senseur.ConsignerLecture"}
-        processus = self._orienteur.orienter_message({"libelle":"MGPProcessus.senseur.lecture"})
-        self.assertEqual(processus, "MGPProcessus.Senseur.ConsignerLecture")
-
-    def test_orienter_message_processus_inconnu(self):
-        #self._orienteur.dict_libelle = {"senseur.lecture": "MGPProcessus.Senseur.ConsignerLecture"}
+    ''' Verifier qu'une erreur est lancee immediatement si le document de transaction n'existe pas. '''
+    def test_orienter_message_document_inconnu(self):
         try:
-            processus = self._orienteur.orienter_message({"libelle":"MGPProcessus.senseur.lecture"})
+            self._orienteur.orienter_message({"_id": "dummy_object_id_string"})
             self.fail("ErreurInitialisationProcessus aurait du etre lance")
         except ErreurInitialisationProcessus:
+            self.assertTrue(self._document_dao._called_charger_document_par_id,
+                            "Le chargement du document aurait du etre invoque.")
             pass
+        except Exception:
+            self.fail("ErreurInitialisationProcessus aurait du etre lance")
+
+    def test_orienter_message_processus_inconnu(self):
+        self._document_dao._document = {"charge-utile": {"libelle-transaction": "senseur.lecture"}}
+        try:
+            processus = self._orienteur.orienter_message({"_id": "dummy_object_id_string"})
+            self.fail("ErreurInitialisationProcessus aurait du etre lance")
+        except ErreurInitialisationProcessus:
+            self.assertTrue(self._document_dao._called_charger_document_par_id,
+                            "Le chargement du document aurait du etre invoque.")
+            pass
+        except Exception:
+            self.fail("ErreurInitialisationProcessus aurait du etre lance")
+
+    def test_orienter_message_processus_connu(self):
+        self._document_dao._document = {"charge-utile": {"libelle-transaction": "MGPProcessus.senseur.lecture"}}
+        self._orienteur.dict_libelle = {"MGPProcessus.senseur.lecture": "Senseur.ConsignerLecture"}
+        #{"libelle": "MGPProcessus.senseur.lecture"}
+        processus = self._orienteur.orienter_message({"_id": "dummy_object_id_string"})
+        self.assertEqual(processus, "Senseur.ConsignerLecture")
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -12,8 +12,12 @@ class OrienteurTransaction(BaseCallback):
     def __init__(self):
 
         self.dict_libelle = {}
-        self.message_dao = None
-        self.document_dao = None
+        self._message_dao = None
+        self._document_dao = None
+
+    def initialiser(self):
+        self._message_dao = None
+        self._document_dao = None
 
     # Methode de callback avec ACK pour ecouter sur la Q des transactions persistees.
     def callbackAvecAck(self, ch, method, properties, body):
@@ -45,23 +49,35 @@ class OrienteurTransaction(BaseCallback):
         if mongo_id is None:
             raise ErreurInitialisationProcessus(dictionnaire_evenement, "L'identifiant _id est vide ou absent")
 
+        transaction = self._document_dao.charger_document_par_id(mongo_id)
+        if transaction is None:
+            raise ErreurInitialisationProcessus(dictionnaire_evenement, "Aucune transaction ne correspond a _id:%s" % mongo_id)
+
+        # Tenter d'orienter la transaction
+        processus_correspondant = None
+
         # Le message d'evenement doit avoir un element "libelle", c'est la cle pour MGPProcessus.
-        libelle = dictionnaire_evenement.get('libelle')
+        charge_utile = transaction.get('charge-utile')
+        if charge_utile is not None:
 
-        if libelle is None:
-            raise ErreurInitialisationProcessus(dictionnaire_evenement)
+            libelle = charge_utile.get('libelle-transaction')
 
-        # On utilise le dictionanire de processus pour trouver le nom du module et de la classe
-        processus_correspondant = self.dict_libelle.get(libelle)
+            #if libelle is None:
+            #    raise ErreurInitialisationProcessus(dictionnaire_evenement, "La transaction %s ne contient pas de libelle pour l'orientation" % mongo_id)
+
+            processus_correspondant = self.orienter_message_mgpprocessus(dictionnaire_evenement, libelle)
+
         if processus_correspondant is None:
-            raise ErreurInitialisationProcessus(dictionnaire_evenement)
-
-        # Char
+            raise ErreurInitialisationProcessus(dictionnaire_evenement,
+                                                "Le document _id: %s n'est pas une transaction reconnue" % mongo_id)
 
         return processus_correspondant
 
-    def orienter_message_mgpprocessus(self, dictionnaire_message, libelle):
-        pass
+    def orienter_message_mgpprocessus(self, dictionnaire_evenement, libelle):
+        # On utilise le dictionanire de processus pour trouver le nom du module et de la classe
+        processus_correspondant = self.dict_libelle.get(libelle)
+
+        return processus_correspondant
 
 '''
 Exception lancee lorsque le processus ne peut pas etre initialise (erreur fatale).
