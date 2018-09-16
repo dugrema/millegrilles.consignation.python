@@ -14,7 +14,7 @@ class DocumentDAOStub:
         self._document = None
         self._called_charger_document_par_id = False
 
-    def charger_document_par_id(self, id_doc):
+    def charger_transaction_par_id(self, id_doc):
         self._called_charger_document_par_id = True
         return self._document
 

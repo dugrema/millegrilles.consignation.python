@@ -33,6 +33,9 @@ class OrienteurTransaction(BaseCallback):
         # Executer la configuration pour RabbitMQ
         self._message_dao.configurer_rabbitmq()
 
+        # Configurer le comportement de l'orienteur
+        self.charger_liste_processus()
+
         print("Configuration et connection completee")
 
     def executer(self):
@@ -89,8 +92,8 @@ class OrienteurTransaction(BaseCallback):
                 # On va declencher un nouveau processus
                 self._message_dao.transmettre_evenement_mgpprocessus(
                     id_document,
-                    processus_a_declencher,
-                    dict_parametres=dictionnaire_evenement
+                    nom_processus=processus_a_declencher,
+                    evenement_declencheur=dictionnaire_evenement
                 )
             else:
                 raise Exception("Transaction ne correspond pas a un processus. ERREUR LOGIQUE: une exception aurait du etre lancee au prealable")

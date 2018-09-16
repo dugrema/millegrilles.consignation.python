@@ -151,12 +151,23 @@ class PikaDAO:
                               routing_key='%s.transaction.persistee' % self.configuration.nom_millegrille,
                               body=message_utf8)
 
-    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale', dict_parametres=None):
+    '''
+    Transmet un declencheur pour une etape de processus MilleGrilles.
+    
+    :param id_document: Document a referencer.
+    :param nom_process: Nom du processus a executer.
+    :param nom_etape: (Optionnel) Nom de la prochaine etape a declencher. Defaut: initiale
+    :param evenement_declencheur: (Optionnel) Evenement qui a declenche l'execution de l'etape courante.
+    :param dict_parametres: (Optionnel) Parametres a utiliser pour la prochaine etape du processus.
+    '''
+    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale', evenement_declencheur=None, dict_parametres=None):
         message = {
-            "_id": id_document,
+            "id_document": id_document,
             "processus": nom_processus,
             "etape": nom_etape
         }
+        if evenement_declencheur is not None:
+            message['declencheur'] = evenement_declencheur
         if dict_parametres is not None:
             message['parametres'] = dict_parametres
 
