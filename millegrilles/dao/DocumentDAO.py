@@ -35,9 +35,9 @@ class MongoDAO:
         self.collection_transactions = self.mg_database["transactions"]
 
     def deconnecter(self):
-        self.client.close()
-        self.client = None
-
+        if self.client is not None:
+            self.client.close()
+            self.client = None
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
 

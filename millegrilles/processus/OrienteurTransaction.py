@@ -5,6 +5,9 @@
     apres la persistance initiale.
 '''
 
+import signal
+import sys
+
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper, PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
@@ -168,19 +171,26 @@ class ErreurInitialisationProcessus(Exception):
     def evenement(self):
         return self._evenement
 
+orienteur = OrienteurTransaction()
+
+def exit_gracefully(signum, frame):
+    print("Arret de OrienteurTransaction")
+    orienteur.deconnecter()
+
 def main():
 
     print("Demarrage de OrienteurTransaction")
 
-    orienteur = OrienteurTransaction()
+    signal.signal(signal.SIGINT, exit_gracefully)
+    signal.signal(signal.SIGTERM, exit_gracefully)
+
     orienteur.initialiser()
 
     try:
         print("OrienteurTransaction est pret")
         orienteur.executer()
     finally:
-        print("Arret de OrienteurTransaction")
-        orienteur.deconnecter()
+        exit_gracefully(None, None)
 
     print("OrienteurTransaction est arrete")
 

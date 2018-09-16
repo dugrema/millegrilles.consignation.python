@@ -101,15 +101,20 @@ class PikaDAO:
                                    queue='mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions),
                                    no_ack=False)
 
-        self.channel.start_consuming()
+        try:
+            self.channel.start_consuming()
+        except OSError as oserr:
+            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Demarre la lecture de la queue entree_processus. Appel bloquant. '''
     def demarrer_lecture_entree_processus(self, callback):
         self.channel.basic_consume(callback,
                                    queue=self.queuename_entree_processus(),
                                    no_ack=False)
-
-        self.channel.start_consuming()
+        try:
+            self.channel.start_consuming()
+        except OSError as oserr:
+            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Transmet un message. La connexion doit etre ouverte. '''
     def transmettre_message_transaction(self, message_dict):
@@ -216,8 +221,12 @@ class PikaDAO:
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
         try:
-            if self.connectionmq != None:
-                self.connectionmq.close()
+            if self.connectionmq is not None:
+                if self.channel is not None:
+                    self.channel.stop_consuming()
+                    self.channel.close()
+                if self.connectionmq is not None:
+                    self.connectionmq.close()
         finally:
             self.channel = None
             self.connectionmq = None
