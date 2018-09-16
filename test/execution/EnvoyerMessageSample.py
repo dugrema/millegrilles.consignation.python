@@ -16,7 +16,11 @@ from millegrilles.dao.MessageDAO import PikaDAO
 
 message = {
     "contenu": "valeur était à alisée",
-    "nombre": 22
+    "nombre": 23
+}
+
+message_test_orienteur = {
+    "libelle-transaction": "MGPProcessus.ProcessusTest.TestOrienteur"
 }
 
 #message_utf8 = json.dumps(message)
@@ -35,7 +39,7 @@ messageDao = PikaDAO(configuration)
 
 messageDao.connecter()
 
-enveloppe = messageDao.transmettre_message_transaction(message)
+enveloppe = messageDao.transmettre_message_transaction(message_test_orienteur)
 
 print("Sent: %s" % enveloppe)
 

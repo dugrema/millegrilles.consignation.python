@@ -73,6 +73,7 @@ class OrienteurTransaction(BaseCallback):
         # MGPProcessus: MilleGrille Python Processus. C'est un processus qui va correspondre directement
         # a un "module.classe" du package millegrilles.processus.
         self.dict_libelle = {
+            "MGPProcessus.ProcessusTest.TestOrienteur": "ProcessusTest.TestOrienteur",
             "MGPProcessus.Senseur.ConsignerLecture": "Senseur.ConsignerLecture"
         }
 
