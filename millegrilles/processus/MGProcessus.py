@@ -24,16 +24,6 @@ class MGPProcessusControleur:
     def identifier_processus(self, message):
         pass
 
-    """
-    Demarre le processus - execute la premiere etape d'un processus.
-    
-    :param nom_processus: Nom du processus a initialiser.
-    :param message: Le message recu sur la Q, devrait contenir les identificateurs necessaires au
-                    demarrage du processus.
-    """
-    def demarrer_processus(self, nom_prcessus, message):
-        pass
-
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
     
@@ -51,15 +41,26 @@ class MGProcessus:
     Classe de processus MilleGrilles. Continent des methodes qui representes les etapes du processus.
 
     :param controleur: Controleur de processus qui appelle l'etape
-    :param nom_complet: Nom complet du processus (celui identifie dans le dictionnaire des processus)
+    :param nom_processus: Nom complet du processus (celui identifie dans le dictionnaire des processus)
     :param message: Message recu qui a declenche l'execution de cette etape
     """
-    def __init__(self, controleur, nom_complet, message):
+    def __init__(self, controleur, nom_processus, message):
         self._controleur = controleur
-        self._nom_complet = nom_complet
+        self._nom_complet = nom_processus
         self._message = message
+
         self._etape_suivante = None
         self._etape_complete = False
+        self._methode_etape_courante = None
+
+    '''
+    Utilise le message pour identifier l'etape courante qui doit etre executee. 
+    
+    :returns: Methode executable.
+    :raises ErreurEtapeInconnue: Si l'etape ne correspond a aucune methode dans le processus.    
+    '''
+    def _identifier_etape_courante(self):
+        pass
 
     '''
     Prepare un message qui peut etre mis sur la Q de MGPProcessus pour declencher l'execution de l'etape suivante.
@@ -78,40 +79,34 @@ class MGProcessus:
 
         return message
 
-    """
-    Execute l'etape.
+    '''
+    Execute l'etape identifiee dans le message.
 
     :raises ErreurExecutionEtape: Erreur fatale encontree lors de l'execution de l'etape
-    """
+    '''
     def executer_etape(self):
         self._etape_suivante = Constantes.PROCESSUS_ETAPE_FINALE
         self._etape_complete = True
+
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
 '''
 
 
-class ErreurExecutionEtape(Exception):
-
-    def __init__(self, etape):
-        super().__init__(self)
-        self._etape = etape
-
-    @property
-    def etape(self):
-        return self._etape
-
-    @property
-    def nom_etape(self):
-        return self._etape.nom_complet
-
 class ErreurProcessusInconnu(Exception):
 
-    def __init__(self, etape):
-        super().__init__(self)
+    def __init__(self, message=None):
+        super().__init__(self, message=message)
+
+
+class ErreurEtapeInconnue(Exception):
+
+    def __init__(self, message=None):
+        super().__init__(self, message=message)
+
 
 class ErreurEtapePasEncoreExecutee(Exception):
 
-    def __init__(self, etape):
-        super().__init__(self)
+    def __init__(self, message=None):
+        super().__init__(self, message=message)
