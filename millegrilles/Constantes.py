@@ -29,3 +29,7 @@ DEFAUT_NOM_MILLEGRILLE = 'sansnom'
 
 # Environnement
 PREFIXE_ENV_MG = 'MG_'
+
+# Constantes de processus
+PROCESSUS_ETAPE_INITIALE = 'initiale'
+PROCESSUS_ETAPE_FINALE = 'finale'
