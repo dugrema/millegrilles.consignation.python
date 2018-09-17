@@ -9,6 +9,12 @@ CONFIG_QUEUE_ENTREE_PROCESSUS = 'mq_queue_entree_processus'
 CONFIG_QUEUE_ERREURS_TRANSACTIONS = 'mq_queue_erreurs_transactions'
 CONFIG_QUEUE_MGP_PROCESSUS =  'mq_queue_mgp_processus'
 
+DEFAUT_MQ_EXCHANGE_EVENEMENTS = 'millegrilles.evenements'
+DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS = 'nouvelles_transactions'
+DEFAUT_QUEUE_ENTREE_PROCESSUS = 'entree_processus'
+DEFAUT_QUEUE_ERREURS_TRANSACTIONS = 'erreurs_transactions'
+DEFAUT_QUEUE_MGP_PROCESSUS = 'mgp_processus'
+
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
 CONFIG_MONGO_PORT = 'mongo_port'

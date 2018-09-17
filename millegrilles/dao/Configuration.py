@@ -9,13 +9,13 @@ class TransactionConfiguration:
     def __init__(self):
         # Configuration de connection a RabbitMQ
         self._mq_config = {
-            Constantes.CONFIG_MQ_HOST: "localhost",
+            Constantes.CONFIG_MQ_HOST: 'localhost',
             Constantes.CONFIG_MQ_PORT: '5672',
-            Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: 'nouvelles_transactions',
-            Constantes.CONFIG_QUEUE_ENTREE_PROCESSUS: 'entree_processus',
-            Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: 'erreurs_transactions',
-            Constantes.CONFIG_QUEUE_MGP_PROCESSUS: 'mgp_processus',
-            Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: 'millegrilles.evenements'
+            Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
+            Constantes.CONFIG_QUEUE_ENTREE_PROCESSUS: Constantes.DEFAUT_QUEUE_ENTREE_PROCESSUS,
+            Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_ERREURS_TRANSACTIONS,
+            Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
+            Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS
         }
 
         # Configuration de connection a MongoDB
@@ -50,48 +50,48 @@ class TransactionConfiguration:
 
     @property
     def mq_host(self):
-        return self._mq_config['mq_host']
+        return self._mq_config[Constantes.CONFIG_MQ_HOST]
 
     @property
     def mq_port(self):
-        return int(self._mq_config['mq_port'])
+        return int(self._mq_config[Constantes.CONFIG_MQ_PORT])
 
     @property
     def nom_millegrille(self):
-        return self._millegrille_config['nom_millegrille']
+        return self._millegrille_config[Constantes.CONFIG_NOM_MILLEGRILLE]
 
     @property
     def mongo_host(self):
-        return self._mongo_config['mongo_host']
+        return self._mongo_config[Constantes.CONFIG_MONGO_HOST]
 
     @property
     def mongo_port(self):
-        return int(self._mongo_config['mongo_port'])
+        return int(self._mongo_config[Constantes.CONFIG_MONGO_PORT])
 
     @property
     def mongo_user(self):
-        return self._mongo_config['mongo_user']
+        return self._mongo_config[Constantes.CONFIG_MONGO_USER]
 
     @property
     def mongo_password(self):
-        return self._mongo_config['mongo_password']
+        return self._mongo_config[Constantes.CONFIG_MONGO_PASSWORD]
 
     @property
     def queue_nouvelles_transactions(self):
-        return self._mq_config['mq_queue_nouvelles_transactions']
+        return self._mq_config[Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS]
 
     @property
     def queue_erreurs_transactions(self):
-        return self._mq_config['mq_queue_erreurs_transactions']
+        return self._mq_config[Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS]
 
     @property
     def queue_entree_processus(self):
-        return self._mq_config['mq_queue_entree_processus']
+        return self._mq_config[Constantes.CONFIG_QUEUE_ENTREE_PROCESSUS]
 
     @property
     def queue_mgp_processus(self):
-        return self._mq_config['mq_queue_mgp_processus']
+        return self._mq_config[Constantes.CONFIG_QUEUE_MGP_PROCESSUS]
 
     @property
     def exchange_evenements(self):
-        return self._mq_config['mq_exchange_evenements']
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS]
