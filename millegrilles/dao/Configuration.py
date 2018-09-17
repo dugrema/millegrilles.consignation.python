@@ -2,32 +2,33 @@
 '''
 
 import os
+from millegrilles import Constantes
 
 class TransactionConfiguration:
 
     def __init__(self):
         # Configuration de connection a RabbitMQ
         self._mq_config = {
-            'mq_host': "localhost",
-            'mq_port': '5672',
-            'mq_queue_nouvelles_transactions': 'nouvelles_transactions',
-            'mq_queue_entree_processus': 'entree_processus',
-            'mq_queue_erreurs_transactions': 'erreurs_transactions',
-            'mq_queue_mgp_processus': 'mgp_processus',
-            'mq_exchange_evenements': 'millegrilles.evenements'
+            Constantes.CONFIG_MQ_HOST: "localhost",
+            Constantes.CONFIG_MQ_PORT: '5672',
+            Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: 'nouvelles_transactions',
+            Constantes.CONFIG_QUEUE_ENTREE_PROCESSUS: 'entree_processus',
+            Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: 'erreurs_transactions',
+            Constantes.CONFIG_QUEUE_MGP_PROCESSUS: 'mgp_processus',
+            Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: 'millegrilles.evenements'
         }
 
         # Configuration de connection a MongoDB
         self._mongo_config = {
-            'mongo_host': 'localhost',
-            'mongo_port': '27017',
-            'mongo_user': 'root',
-            'mongo_password': 'example'
+            Constantes.CONFIG_MONGO_HOST: 'localhost',
+            Constantes.CONFIG_MONGO_PORT: '27017',
+            Constantes.CONFIG_MONGO_USER: 'root',
+            Constantes.CONFIG_MONGO_PASSWORD: 'example'
         }
 
         # Configuration specifique a la MilleGrille
         self._millegrille_config = {
-            'nom_millegrille': 'sansnom' # Nom de la MilleGrille
+            Constantes.CONFIG_NOM_MILLEGRILLE: Constantes.DEFAUT_NOM_MILLEGRILLE # Nom de la MilleGrille
         }
 
     def loadEnvironment(self):
@@ -38,7 +39,7 @@ class TransactionConfiguration:
 
             # Configuration de connection a RabbitMQ
             for property in config_dict.keys():
-                env_value = os.environ.get('MG_%s' %property.upper())
+                env_value = os.environ.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
                 if(env_value != None):
                     config_dict[property] = env_value
 
