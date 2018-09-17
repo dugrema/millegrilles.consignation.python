@@ -19,6 +19,7 @@ class MongoDAO:
         self.client = None
         self.mg_database = None
         self.collection_transactions = None
+        self.collection_processus = None
 
     def connecter(self):
         self.client = MongoClient(
@@ -33,6 +34,7 @@ class MongoDAO:
 
         self.mg_database = self.client[self.nom_millegrille]
         self.collection_transactions = self.mg_database["transactions"]
+        self.collection_processus = self.mg_database["processus"]
 
     def deconnecter(self):
         if self.client is not None:
@@ -48,6 +50,25 @@ class MongoDAO:
         resultat = self.collection_transactions.insert_one(enveloppe_transaction)
         id = resultat.inserted_id
         return id
+
+    '''
+    Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
+    
+    :param parametres: Parametres pour l'etape initiale.
+    :returns: _id du nouveau document de processus
+    '''
+    def sauvegarder_initialisation_processus(self, nom_processus, parametres):
+        document = {
+            "processus": nom_processus,
+            "etapes": [
+                {
+                    "nom-etape": "initiale",
+                    "parametres": parametres
+                }
+            ]
+        }
+        doc_id = self.collection_processus.insert_one(document)
+        return doc_id.inserted_id
 
     '''
     Chargement d'un document de transaction a partir d'un identificateur MongoDB

@@ -4,6 +4,7 @@ import pika
 import json
 import uuid
 import time
+import traceback
 
 
 ''' 
@@ -80,7 +81,7 @@ class PikaDAO:
         self.channel.queue_bind(
             exchange = nom_echange_evenements,
             queue=nom_q_mgp_processus,
-            routing_key='%s.mgp.processus' % nom_millegrille
+            routing_key='%s.mgpprocessus.#' % nom_millegrille
         )
 
         # Creer la Q d'erreurs dans les transactions pour cette MilleGrille
@@ -165,21 +166,22 @@ class PikaDAO:
     :param evenement_declencheur: (Optionnel) Evenement qui a declenche l'execution de l'etape courante.
     :param dict_parametres: (Optionnel) Parametres a utiliser pour la prochaine etape du processus.
     '''
-    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale', evenement_declencheur=None, dict_parametres=None):
+    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale'):
         message = {
-            "id_document": id_document,
+            "id_document_processus": str(id_document),
             "processus": nom_processus,
             "etape": nom_etape
         }
-        if evenement_declencheur is not None:
-            message['declencheur'] = evenement_declencheur
-        if dict_parametres is not None:
-            message['parametres'] = dict_parametres
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
+        routing_key = '%s.mgpprocessus.%s.%s' % \
+                (self.configuration.nom_millegrille,
+                nom_processus,
+                nom_etape)
+
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                              routing_key='%s.mgp.processus' % self.configuration.nom_millegrille,
+                              routing_key=routing_key,
                               body=message_utf8)
 
     '''
@@ -198,6 +200,7 @@ class PikaDAO:
             message["id-transaction"] = id_transaction
         if detail is not None:
             message["erreur"] = str(detail)
+            message["stacktrace"] = traceback.format_exception(etype=type(detail), value=detail, tb=detail.__traceback__)
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 

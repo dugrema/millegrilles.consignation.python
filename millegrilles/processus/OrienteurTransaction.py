@@ -93,10 +93,12 @@ class OrienteurTransaction(BaseCallback):
 
             if processus_a_declencher is not None:
                 # On va declencher un nouveau processus
+                id_doc_processus = self._document_dao.sauvegarder_initialisation_processus(
+                    processus_a_declencher, dictionnaire_evenement)
+
                 self._message_dao.transmettre_evenement_mgpprocessus(
-                    id_document,
-                    nom_processus=processus_a_declencher,
-                    evenement_declencheur=dictionnaire_evenement
+                    id_doc_processus,
+                    nom_processus=processus_a_declencher
                 )
             else:
                 raise Exception("Transaction ne correspond pas a un processus. ERREUR LOGIQUE: une exception aurait du etre lancee au prealable")
@@ -104,7 +106,7 @@ class OrienteurTransaction(BaseCallback):
         except ErreurInitialisationProcessus as erreur:
             # Une erreur fatale est survenue - l'erreur est liee au contenu du message (ne peut pas etre ressaye)
             transaction_id = dictionnaire_evenement.get("id-tramsaction")
-            self._message_dao.transmettre_erreur_transaction(id_document, transaction_id, erreur)
+            self._message_dao.transmettre_erreur_transaction(id_document, transaction_id, detail=erreur)
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
             self._message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
