@@ -71,6 +71,26 @@ class MongoDAO:
         return doc_id.inserted_id
 
     '''
+    Modifie un document de processus en ajoutant l'information de l'etape a la suite des autres etapes
+    dans la liste du processus.
+    
+    :param id_document_processus: _id du document dans la collection processus.
+    :param dict_etape: Dictionnaire complet a ajoute a la file des autres etapes.
+    '''
+    def sauvegarder_etape_processus(self, id_document_processus, dict_etape):
+        # Convertir id_document_process en ObjectId
+        if isinstance(id_document_processus, ObjectId):
+            id_document = {'_id': id_document_processus}
+        else:
+            id_document = {'_id': ObjectId(id_document_processus)}
+
+        operation = {'$push': {"etapes": dict_etape}}
+        resultat = self.collection_processus.update_one(id_document, operation)
+
+        if resultat.modified_count != 1:
+            raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
+
+    '''
     Chargement d'un document de transaction a partir d'un identificateur MongoDB
     
     :param id_doc: Numero unique du document dans MongoDB.
@@ -78,4 +98,12 @@ class MongoDAO:
     '''
     def charger_transaction_par_id(self, id_doc):
         return self.collection_transactions.find_one({'_id': ObjectId(id_doc)})
+
+    def charger_processus_par_id(self, id_doc):
+        return self.collection_processus.find_one({'_id': ObjectId(id_doc)})
+
+class ErreurMAJProcessus(Exception):
+
+    def __init__(self, message=None):
+        super().__init__(message=message)
 
