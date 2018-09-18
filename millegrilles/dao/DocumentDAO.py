@@ -4,6 +4,7 @@
 import time
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+from millegrilles import Constantes
 
 '''
 Data access object pour les documents dans MongoDB
@@ -59,12 +60,12 @@ class MongoDAO:
     '''
     def sauvegarder_initialisation_processus(self, nom_processus, parametres):
         document = {
-            "processus": nom_processus,
-            "etape-suivante": 'initiale',
-            "etapes": [
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: 'initiale',
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: [
                 {
-                    "nom-etape": 'orientation',
-                    "parametres": parametres
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: 'orientation',
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres
                 }
             ]
         }
@@ -81,11 +82,11 @@ class MongoDAO:
     def sauvegarder_etape_processus(self, id_document_processus, dict_etape):
         # Convertir id_document_process en ObjectId
         if isinstance(id_document_processus, ObjectId):
-            id_document = {'_id': id_document_processus}
+            id_document = {Constantes.MONGO_DOC_ID: id_document_processus}
         else:
-            id_document = {'_id': ObjectId(id_document_processus)}
+            id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
 
-        operation = {'$push': {"etapes": dict_etape}}
+        operation = {'$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: dict_etape}}
         resultat = self.collection_processus.update_one(id_document, operation)
 
         if resultat.modified_count != 1:
@@ -98,10 +99,10 @@ class MongoDAO:
     :returns: Document ou None si aucun document ne correspond.
     '''
     def charger_transaction_par_id(self, id_doc):
-        return self.collection_transactions.find_one({'_id': ObjectId(id_doc)})
+        return self.collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
 
     def charger_processus_par_id(self, id_doc):
-        return self.collection_processus.find_one({'_id': ObjectId(id_doc)})
+        return self.collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
 
 class ErreurMAJProcessus(Exception):
 

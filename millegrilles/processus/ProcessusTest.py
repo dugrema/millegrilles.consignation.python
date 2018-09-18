@@ -11,3 +11,5 @@ class TestOrienteur(MGProcessus):
         print("Etape initiale executee avec evenement: %s" % self._evenement)
         self._initiale_executee = True
 
+        return None # Implicitement l'etape devrait etre enregistree dans le document de processus
+

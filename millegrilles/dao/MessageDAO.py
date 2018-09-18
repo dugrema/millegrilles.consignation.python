@@ -311,7 +311,7 @@ Classe qui facilite l'implementation de callbacks avec ACK
 class BaseCallback:
 
     def __init__(self):
-        None
+        pass
 
     def callbackAvecAck(self, ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
