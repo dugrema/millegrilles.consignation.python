@@ -66,6 +66,7 @@ class MongoDAO:
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_MOTEUR: moteur,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: 'initiale',
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: [
                 {
                     Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: 'orientation',
