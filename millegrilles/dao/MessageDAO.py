@@ -6,6 +6,7 @@ import uuid
 import time
 import traceback
 
+from millegrilles import Constantes
 
 ''' 
 DAO vers la messagerie
@@ -135,7 +136,7 @@ class PikaDAO:
             raise Exception("La connexion Pika n'est pas ouverte")
 
         enveloppe = self.preparer_enveloppe(message_dict)
-        uuid_transaction = enveloppe["info-transaction"]["id-transaction"]
+        uuid_transaction = enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         message_utf8 = self.json_helper.dict_vers_json(enveloppe)
 
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
@@ -149,19 +150,23 @@ class PikaDAO:
         # Ajouter identificateur unique et temps de la transaction
         uuid_transaction = uuid.uuid1()
         meta = {}
-        meta["id-transaction"] = "%s" % uuid_transaction
-        meta["estampille"] = int(time.time())
-        meta["signature-contenu"] = ""
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(time.time())
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = ""
 
         enveloppe = {}
-        enveloppe["info-transaction"] = meta
-        enveloppe["charge-utile"] = message_dict
+        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
+        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE] = message_dict
 
         return enveloppe
 
     def transmettre_evenement_persistance(self, id_document, id_transaction):
 
-        message = {"_id": str(id_document), "id-transaction": id_transaction, "evenement": "transaction_persistee"}
+        message = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: "transaction_persistee"
+        }
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         self.channel.basic_publish(exchange='millegrilles.evenements',
@@ -179,9 +184,9 @@ class PikaDAO:
     '''
     def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale'):
         message = {
-            "id_document_processus": str(id_document),
-            "processus": nom_processus,
-            "etape": nom_etape
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(id_document),
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: nom_processus,
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_NOMETAPE: nom_etape
         }
 
         message_utf8 = self.json_helper.dict_vers_json(message)
@@ -205,10 +210,10 @@ class PikaDAO:
     def transmettre_erreur_transaction(self, id_document, id_transaction=None, detail=None):
 
         message = {
-            "_id": id_document,
+            Constantes.MONGO_DOC_ID: id_document,
         }
         if id_transaction is not None:
-            message["id-transaction"] = id_transaction
+            message[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO] = id_transaction
         if detail is not None:
             message["erreur"] = str(detail)
             message["stacktrace"] = traceback.format_exception(etype=type(detail), value=detail, tb=detail.__traceback__)

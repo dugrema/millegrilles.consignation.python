@@ -11,6 +11,7 @@ import sys
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper, PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles import Constantes
 
 class OrienteurTransaction(BaseCallback):
 
@@ -85,8 +86,8 @@ class OrienteurTransaction(BaseCallback):
 
     def traiter_transaction(self, dictionnaire_evenement):
 
-        id_document = dictionnaire_evenement["_id"]
-        transaction_id = dictionnaire_evenement.get("id-tramsaction")
+        id_document = dictionnaire_evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        transaction_uuid = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
         try:
             moteur, processus_a_declencher = self.orienter_message(dictionnaire_evenement)
@@ -120,7 +121,7 @@ class OrienteurTransaction(BaseCallback):
 
         # L'evenement recu dans la Q ne contient que les identifiants.
         # Charger la transaction a partir de Mongo pour identifier le type de processus a declencher.
-        mongo_id = dictionnaire_evenement.get("_id")
+        mongo_id = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO)
         if mongo_id is None:
             raise ErreurInitialisationProcessus(dictionnaire_evenement, "L'identifiant _id est vide ou absent")
 

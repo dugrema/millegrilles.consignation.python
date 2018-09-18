@@ -4,6 +4,7 @@
 from millegrilles.dao.MessageDAO import PikaDAO, JSONHelper, BaseCallback
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles import Constantes
 
 class ConsignateurTransaction(BaseCallback):
 
@@ -39,8 +40,8 @@ class ConsignateurTransaction(BaseCallback):
     def callbackAvecAck(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         id_document = self.document_dao.sauvegarder_nouvelle_transaction(message_dict)
-        id_transaction = message_dict['info-transaction']['id-transaction']
-        self.message_dao.transmettre_evenement_persistance(id_document, id_transaction)
+        uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        self.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction)
         super().callbackAvecAck(ch, method, properties, body)
 
 

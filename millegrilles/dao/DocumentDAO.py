@@ -46,7 +46,10 @@ class MongoDAO:
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction['info-transaction']['estampille']
-        enveloppe_transaction['evenements'] = {'transaction_nouvelle': [estampille], 'transaction_persistance': [int(time.time())]}
+        enveloppe_transaction['evenements'] = {
+            'transaction_nouvelle': [estampille],
+            'transaction_persistance': [int(time.time())]
+        }
 
         resultat = self.collection_transactions.insert_one(enveloppe_transaction)
         id = resultat.inserted_id
