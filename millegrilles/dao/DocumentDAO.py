@@ -60,9 +60,10 @@ class MongoDAO:
     def sauvegarder_initialisation_processus(self, nom_processus, parametres):
         document = {
             "processus": nom_processus,
+            "etape-suivante": 'initiale',
             "etapes": [
                 {
-                    "nom-etape": "initiale",
+                    "nom-etape": 'orientation',
                     "parametres": parametres
                 }
             ]

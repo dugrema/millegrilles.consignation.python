@@ -160,7 +160,7 @@ class PikaDAO:
     '''
     Transmet un declencheur pour une etape de processus MilleGrilles.
     
-    :param id_document: Document a referencer.
+    :param id_document: Document contenant l'information pour ce processus.
     :param nom_process: Nom du processus a executer.
     :param nom_etape: (Optionnel) Nom de la prochaine etape a declencher. Defaut: initiale
     :param evenement_declencheur: (Optionnel) Evenement qui a declenche l'execution de l'etape courante.
