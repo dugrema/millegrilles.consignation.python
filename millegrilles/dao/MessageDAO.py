@@ -43,6 +43,7 @@ class PikaDAO:
         nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
         nom_q_entree_processus =  self.queuename_entree_processus()
         nom_q_mgp_processus =  self.queuename_mgp_processus()
+        nom_q_erreurs_processus = self.queuename_erreurs_procesus()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
         self.channel.exchange_declare(
@@ -95,6 +96,16 @@ class PikaDAO:
             routing_key='%s.transaction.erreur' % nom_millegrille
         )
 
+        # Creer la Q d'erreurs dans les processus pour cette MilleGrille
+        self.channel.queue_declare(
+            queue=nom_q_erreurs_transactions,
+            durable=True)
+
+        self.channel.queue_bind(
+            exchange = nom_echange_evenements,
+            queue=nom_q_erreurs_transactions,
+            routing_key='%s.transaction.erreur' % nom_millegrille
+        )
 
     ''' Prepare la reception de message '''
     def demarrer_lecture_nouvelles_transactions(self, callback):
@@ -208,6 +219,29 @@ class PikaDAO:
                               routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
                               body=message_utf8)
 
+    '''
+     Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
+
+     :param id_document: Document affecte (Object ID dans Mongo)
+     :param id_transaction: (Optionnel) Identificateur de la transaction qui est bloquee
+     :param detail: (Optionnel) Information sur l'erreur.
+     '''
+
+    def transmettre_erreur_processus(self, id_document_processus, detail=None):
+
+        message = {
+            "_id": id_document_processus,
+        }
+        if detail is not None:
+            message["erreur"] = str(detail)
+            message["stacktrace"] = traceback.format_exception(etype=type(detail), value=detail,
+                                                               tb=detail.__traceback__)
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                                   routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
+                                   body=message_utf8)
 
     # Mettre la classe en etat d'erreur
     def enterErrorState(self):
@@ -245,6 +279,9 @@ class PikaDAO:
 
     def queuename_entree_processus(self):
         return self._queuename(self.configuration.queue_entree_processus)
+
+    def queuename_erreurs_processus(self):
+        return self._queuename(self.configuration.queue_erreurs_processus)
 
     def queuename_mgp_processus(self):
         return self._queuename(self.configuration.queue_mgp_processus)

@@ -93,5 +93,9 @@ class TransactionConfiguration:
         return self._mq_config[Constantes.CONFIG_QUEUE_MGP_PROCESSUS]
 
     @property
+    def queue_erreurs_processus(self):
+        return self._mq_config[Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS]
+
+    @property
     def exchange_evenements(self):
         return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS]
