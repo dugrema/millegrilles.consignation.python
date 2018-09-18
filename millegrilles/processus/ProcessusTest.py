@@ -10,8 +10,8 @@ class TestOrienteur(MGProcessus):
     def initiale(self):
         print("Etape initiale executee avec evenement: %s" % self._evenement)
         self._initiale_executee = True
-        self._etape_executee = True
-        self._etape_suivante = 'finale'
+        self.set_etape_suivante() # Set etape suivante, par defaut utilise finale
 
-        return None # Implicitement l'etape devrait etre enregistree dans le document de processus
+        # Implicitement l'etape devrait etre enregistree dans le document de processus
+        return {'texte': 'La methode initiale de ProcessusTest est completee'}
 

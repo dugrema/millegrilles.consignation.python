@@ -49,7 +49,7 @@ class MGPProcessusControleur(BaseCallback):
     def callbackAvecAck(self, ch, method, properties, body):
         # Decoder l'evenement qui contient l'information sur l'etape a traiter
         evenement_dict = self.extraire_evenement(body)
-        print("Recu evenement processus: %s" % str(evenement_dict))
+        #print("Recu evenement processus: %s" % str(evenement_dict))
         self.traiter_evenement(evenement_dict)
         super().callbackAvecAck(ch, method, properties, body)
 
@@ -72,7 +72,7 @@ class MGPProcessusControleur(BaseCallback):
     def identifier_processus(self, evenement):
         nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
         nom_module, nom_classe = nom_processus.split('.')
-        print('Importer %s, %s' % (nom_module, nom_classe))
+        #print('Importer %s, %s' % (nom_module, nom_classe))
         module_processus = __import__('millegrilles.processus.%s' % nom_module, fromlist=nom_classe)
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
@@ -183,8 +183,8 @@ class MGProcessus:
             document_etape = {
                 Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: etape_execution.__name__
             }
-#            if resultat is not None:
-#                document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
+            if resultat is not None:
+                document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
             self._controleur.sauvegarder_etape_processus(id_document_processus, document_etape, self._etape_suivante)
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
@@ -202,7 +202,17 @@ class MGProcessus:
     def finale(self):
         self._etape_complete = True
         self._processus_complete = True
-        print("Etape finale executee pour %s" % self.__class__.__name__)
+        #print("Etape finale executee pour %s" % self.__class__.__name__)
+
+    '''
+    Utiliser cette methode pour indiquer quelle est la prochaine etape a executer.
+    
+    :param etape_suivante: Prochaine etape (methode) a executer. Par defaut utilise l'etape finale qui va terminer le processus.
+    '''
+    def set_etape_suivante(self, etape_suivante='finale'):
+        self._etape_complete = True
+        self._etape_suivante = etape_suivante
+
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
