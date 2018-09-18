@@ -44,11 +44,12 @@ class MGPProcessusControleur(BaseCallback):
 
 
     def executer(self):
-        self._message_dao.demarrer_lecture_entree_processus(self.callbackAvecAck)
+        self._message_dao.demarrer_lecture_etape_processus(self.callbackAvecAck)
 
     def callbackAvecAck(self, ch, method, properties, body):
         # Decoder l'evenement qui contient l'information sur l'etape a traiter
         evenement_dict = self.extraire_evenement(body)
+        print("Recu evenement processus: %s" % str(evenement_dict))
         self.traiter_evenement(evenement_dict)
         super().callbackAvecAck(ch, method, properties, body)
 
@@ -152,7 +153,7 @@ class MGProcessus:
 
         nom_module_tronque = self.__module__.split('.')[2]
         nom_classe = self.__class__.__name__
-        nom_processus = 'MGPProcessus.%s.%s' % (nom_module_tronque, nom_classe)
+        nom_processus = '%s.%s' % (nom_module_tronque, nom_classe)
 
         self._controleur.message_etape_suivante(
             self._document_processus[Constantes.MONGO_DOC_ID],
@@ -175,7 +176,7 @@ class MGProcessus:
 
             # Executer l'etape
             etape_execution = self._identifier_etape_courante()
-            resultat = etape_execution(self)
+            resultat = etape_execution()
             self._etape_complete = True
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
@@ -191,7 +192,9 @@ class MGProcessus:
     Implementation de reference pour l'etape finale. 
     '''
     def finale(self):
-        pass
+        self._etape_complete = True
+        self._processus_complete = True
+        print("Etape finale executee pour %s" % self.__class__.__name__)
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
