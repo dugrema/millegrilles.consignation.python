@@ -83,7 +83,7 @@ class MongoDAO:
     :param id_document_processus: _id du document dans la collection processus.
     :param dict_etape: Dictionnaire complet a ajoute a la file des autres etapes.
     '''
-    def sauvegarder_etape_processus(self, id_document_processus, dict_etape):
+    def sauvegarder_etape_processus(self, id_document_processus, dict_etape, etape_suivante=None):
         # Convertir id_document_process en ObjectId
         if isinstance(id_document_processus, ObjectId):
             id_document = {Constantes.MONGO_DOC_ID: id_document_processus}
@@ -91,7 +91,18 @@ class MongoDAO:
             id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
 
         #print("$push vers mongo: %s --- %s" % (id_document, str(dict_etape)))
-        operation = {'$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: dict_etape}}
+        set_operation = {}
+        operation = {
+            '$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: dict_etape},
+        }
+        if etape_suivante is None:
+            operation['$unset'] = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: ''}
+        else:
+            set_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE]=etape_suivante
+
+        if len(set_operation) > 0:
+            operation['$set'] = set_operation
+
         resultat = self.collection_processus.update_one(id_document, operation)
 
         if resultat.modified_count != 1:

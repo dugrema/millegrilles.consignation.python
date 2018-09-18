@@ -80,8 +80,8 @@ class MGPProcessusControleur(BaseCallback):
     def charger_document_processus(self, id_document_processus):
         return self._document_dao.charger_processus_par_id(id_document_processus)
 
-    def sauvegarder_etape_processus(self, id_document_processus, dict_etape):
-        self._document_dao.sauvegarder_etape_processus(id_document_processus, dict_etape)
+    def sauvegarder_etape_processus(self, id_document_processus, dict_etape, etape_suivante=None):
+        self._document_dao.sauvegarder_etape_processus(id_document_processus, dict_etape, etape_suivante)
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
         self._message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
@@ -185,7 +185,7 @@ class MGProcessus:
             }
 #            if resultat is not None:
 #                document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
-            self._controleur.sauvegarder_etape_processus(id_document_processus, document_etape)
+            self._controleur.sauvegarder_etape_processus(id_document_processus, document_etape, self._etape_suivante)
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
             if not self._processus_complete:
