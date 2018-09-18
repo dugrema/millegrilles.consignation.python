@@ -101,6 +101,12 @@ class MongoDAO:
         else:
             set_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE]=etape_suivante
 
+        dict_etapes_parametres = dict_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES)
+        if dict_etapes_parametres is not None:
+            for key, value in dict_etapes_parametres.items():
+                complete_key = 'parametres.%s' % key
+                set_operation[complete_key] = value
+
         if len(set_operation) > 0:
             operation['$set'] = set_operation
 
