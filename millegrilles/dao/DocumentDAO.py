@@ -90,6 +90,7 @@ class MongoDAO:
         else:
             id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
 
+        #print("$push vers mongo: %s --- %s" % (id_document, str(dict_etape)))
         operation = {'$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: dict_etape}}
         resultat = self.collection_processus.update_one(id_document, operation)
 

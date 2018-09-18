@@ -179,6 +179,14 @@ class MGProcessus:
             resultat = etape_execution()
             self._etape_complete = True
 
+            # Enregistrer le resultat de l'execution de l'etape
+            document_etape = {
+                Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: etape_execution.__name__
+            }
+#            if resultat is not None:
+#                document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
+            self._controleur.sauvegarder_etape_processus(id_document_processus, document_etape)
+
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
             if not self._processus_complete:
                 self.transmettre_message_etape_suivante(resultat)
