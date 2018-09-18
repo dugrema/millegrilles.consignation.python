@@ -129,6 +129,16 @@ class PikaDAO:
         except OSError as oserr:
             print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
+    ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
+    def demarrer_lecture_etape_processus(self, callback):
+        self.channel.basic_consume(callback,
+                                   queue=self.queuename_mgp_processus(),
+                                   no_ack=False)
+        try:
+            self.channel.start_consuming()
+        except OSError as oserr:
+            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+
     ''' Transmet un message. La connexion doit etre ouverte. '''
     def transmettre_message_transaction(self, message_dict):
 
@@ -186,7 +196,7 @@ class PikaDAO:
         message = {
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(id_document),
             Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: nom_processus,
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_NOMETAPE: nom_etape
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: nom_etape
         }
 
         message_utf8 = self.json_helper.dict_vers_json(message)

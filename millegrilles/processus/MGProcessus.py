@@ -1,8 +1,10 @@
 # Module de processus pour MilleGrilles
+import signal
+
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
-from millegrilles.dao.MessageDAO import PikaDAO, BaseCallback
+from millegrilles.dao.MessageDAO import PikaDAO, BaseCallback, JSONHelper
 
 '''
 Controleur des processus MilleGrilles. Identifie et execute les processus.
@@ -17,6 +19,8 @@ class MGPProcessusControleur(BaseCallback):
     def __init__(self):
         super().__init__()
 
+        self._json_helper = JSONHelper()
+
         self._configuration = TransactionConfiguration()
         self._document_dao = None
         self._message_dao = None
@@ -25,6 +29,38 @@ class MGPProcessusControleur(BaseCallback):
         self._configuration.loadEnvironment()
         self._document_dao = MongoDAO(self._configuration)
         self._message_dao = PikaDAO(self._configuration)
+
+        # Connecter les DAOs
+        self._document_dao.connecter()
+        self._message_dao.connecter()
+
+        # Executer la configuration pour RabbitMQ
+        self._message_dao.configurer_rabbitmq()
+
+    def deconnecter(self):
+        self._document_dao.deconnecter()
+        self._message_dao.deconnecter()
+        print("Deconnexion completee")
+
+
+    def executer(self):
+        self._message_dao.demarrer_lecture_entree_processus(self.callbackAvecAck)
+
+    def callbackAvecAck(self, ch, method, properties, body):
+        # Decoder l'evenement qui contient l'information sur l'etape a traiter
+        evenement_dict = self.extraire_evenement(body)
+        self.traiter_evenement(evenement_dict)
+        super().callbackAvecAck(ch, method, properties, body)
+
+    def extraire_evenement(self, message_body):
+        # Extraire le message qui devrait etre un document JSON
+        message_dict = self._json_helper.bin_utf8_json_vers_dict(message_body)
+        return message_dict
+
+    def traiter_evenement(self, evenement):
+        classe_processus = self.identifier_processus(evenement)
+        instance_processus = classe_processus(self, evenement)
+        instance_processus.traitement_etape()
 
     """
     Identifie le processus a executer, retourne une instance si le processus est trouve.
@@ -178,3 +214,31 @@ class ErreurEtapePasEncoreExecutee(Exception):
 
     def __init__(self, message=None):
         super().__init__(self, message)
+
+# --- MAIN ---
+
+controleur = MGPProcessusControleur()
+
+def exit_gracefully(signum, frame):
+    print("Arret de MGProcessusControleur")
+    controleur.deconnecter()
+
+def main():
+
+    print("Demarrage de MGProcessusControleur")
+
+    signal.signal(signal.SIGINT, exit_gracefully)
+    signal.signal(signal.SIGTERM, exit_gracefully)
+
+    controleur.initialiser()
+
+    try:
+        print("MGProcessusControleur est pret")
+        controleur.executer()
+    finally:
+        exit_gracefully(None, None)
+
+    print("MGProcessusControleur est arrete")
+
+if __name__=="__main__":
+    main()
