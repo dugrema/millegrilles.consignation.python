@@ -46,6 +46,9 @@ class MGPProcessusControleur(BaseCallback):
     def sauvegarder_etape_processus(self, id_document_processus, dict_etape):
         self._document_dao.sauvegarder_etape_processus(id_document_processus, dict_etape)
 
+    def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
+        self._message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
+
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
     
@@ -100,18 +103,26 @@ class MGProcessus:
     '''
     def transmettre_message_etape_suivante(self, parametres=None):
         # Verifier que l'etape a ete executee avec succes.
-        if not self._etape_complete and self._etape_suivante is not None:
+        if not self._etape_complete or self._etape_suivante is None:
             raise ErreurEtapePasEncoreExecutee("L'etape n'a pas encore ete executee ou l'etape suivante est inconnue")
 
-        message = {
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: self.__class__.__name__,
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE: self._etape_suivante,
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(self._document_processus[Constantes.MONGO_DOC_ID])
-        }
-        if parametres is not None:
-            message[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES] = parametres
+#        message = {
+#            Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: self.__class__.__name__,
+#            Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE: self._etape_suivante,
+#            Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(self._document_processus[Constantes.MONGO_DOC_ID])
+#        }
+#        if parametres is not None:
+#            message[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES] = parametres
 
-        return message
+        nom_module_tronque = self.__module__.split('.')[2]
+        nom_classe = self.__class__.__name__
+        nom_processus = 'MGPProcessus.%s.%s' % (nom_module_tronque, nom_classe)
+
+        self._controleur.message_etape_suivante(
+            self._document_processus[Constantes.MONGO_DOC_ID],
+            nom_processus,
+            self._etape_suivante
+        )
 
     '''
     Execute l'etape identifiee dans le message.
@@ -154,7 +165,7 @@ Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
 class ErreurProcessusInconnu(Exception):
 
     def __init__(self, message=None):
-        super().__init__(self, message=message)
+        super().__init__(self, message)
 
 
 class ErreurEtapeInconnue(Exception):
@@ -166,4 +177,4 @@ class ErreurEtapeInconnue(Exception):
 class ErreurEtapePasEncoreExecutee(Exception):
 
     def __init__(self, message=None):
-        super().__init__(self, message=message)
+        super().__init__(self, message)

@@ -89,12 +89,12 @@ class OrienteurTransaction(BaseCallback):
         transaction_id = dictionnaire_evenement.get("id-tramsaction")
 
         try:
-            processus_a_declencher = self.orienter_message(dictionnaire_evenement)
+            moteur, processus_a_declencher = self.orienter_message(dictionnaire_evenement)
 
             if processus_a_declencher is not None:
                 # On va declencher un nouveau processus
                 id_doc_processus = self._document_dao.sauvegarder_initialisation_processus(
-                    processus_a_declencher, dictionnaire_evenement)
+                    moteur, processus_a_declencher, dictionnaire_evenement)
 
                 self._message_dao.transmettre_evenement_mgpprocessus(
                     id_doc_processus,
@@ -129,6 +129,7 @@ class OrienteurTransaction(BaseCallback):
             raise ErreurInitialisationProcessus(dictionnaire_evenement, "Aucune transaction ne correspond a _id:%s" % mongo_id)
 
         # Tenter d'orienter la transaction
+        moteur = None
         processus_correspondant = None
 
         # Le message d'evenement doit avoir un element "libelle", c'est la cle pour MGPProcessus.
@@ -150,7 +151,7 @@ class OrienteurTransaction(BaseCallback):
             raise ErreurInitialisationProcessus(dictionnaire_evenement,
                                                 "Le document _id: %s n'est pas une transaction reconnue" % mongo_id)
 
-        return processus_correspondant
+        return moteur, processus_correspondant
 
     def orienter_message_mgpprocessus(self, dictionnaire_evenement, libelle):
         # On utilise le dictionanire de processus pour trouver le nom du module et de la classe

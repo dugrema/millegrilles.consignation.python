@@ -43,7 +43,7 @@ class PikaDAO:
         nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
         nom_q_entree_processus =  self.queuename_entree_processus()
         nom_q_mgp_processus =  self.queuename_mgp_processus()
-        nom_q_erreurs_processus = self.queuename_erreurs_procesus()
+        nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
         self.channel.exchange_declare(
@@ -98,13 +98,13 @@ class PikaDAO:
 
         # Creer la Q d'erreurs dans les processus pour cette MilleGrille
         self.channel.queue_declare(
-            queue=nom_q_erreurs_transactions,
+            queue=nom_q_erreurs_processus,
             durable=True)
 
         self.channel.queue_bind(
             exchange = nom_echange_evenements,
-            queue=nom_q_erreurs_transactions,
-            routing_key='%s.transaction.erreur' % nom_millegrille
+            queue=nom_q_erreurs_processus,
+            routing_key='%s.processus.erreur' % nom_millegrille
         )
 
     ''' Prepare la reception de message '''

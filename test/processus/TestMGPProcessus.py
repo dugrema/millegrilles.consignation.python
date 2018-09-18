@@ -13,7 +13,7 @@ class MGPProcessusTest(unittest.TestCase):
         self._controleur._document_dao = self._message_dao
         self._evenement = {
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: 'ProcessusTest.TestOrienteur',
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE: 'initiale'
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE: 'initiale',
         }
 
     def test_init(self):
@@ -60,8 +60,27 @@ class MGPProcessusTest(unittest.TestCase):
         except AttributeError as erreur:
             pass
 
+    def test_transmettre_message_etape_suivante(self):
+        processus = TestOrienteur(self._controleur, self._evenement)
+        processus._document_processus = {
+            Constantes.MONGO_DOC_ID: "dummy-doc-id"
+        }
+
+        processus._etape_complete = True
+        processus._etape_suivante = 'finale'
+        processus.transmettre_message_etape_suivante()
+
+        params_transmis = self._controleur._message_dao.tranmettre_evenement_mgpprocessus_params
+        self.assertIsNotNone(params_transmis)
+        print('test_transmettre_message_etape_suivante, param transmis sur message: %s' % str(params_transmis))
+
 class MessageDaoStub():
-    pass
+
+    def __init__(self):
+        self.tranmettre_evenement_mgpprocessus_params = None
+
+    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale'):
+        self.tranmettre_evenement_mgpprocessus_params = (id_document, nom_processus, nom_etape)
 
 class DocumentDaoStub():
     pass

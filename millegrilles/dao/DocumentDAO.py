@@ -58,8 +58,9 @@ class MongoDAO:
     :param parametres: Parametres pour l'etape initiale.
     :returns: _id du nouveau document de processus
     '''
-    def sauvegarder_initialisation_processus(self, nom_processus, parametres):
+    def sauvegarder_initialisation_processus(self, moteur, nom_processus, parametres):
         document = {
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_MOTEUR: moteur,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: 'initiale',
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: [
