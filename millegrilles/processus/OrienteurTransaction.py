@@ -86,7 +86,7 @@ class OrienteurTransaction(BaseCallback):
     def traiter_transaction(self, dictionnaire_evenement):
 
         id_document = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO)
-        transaction_uuid = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+        #transaction_uuid = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
         try:
             moteur, processus_a_declencher = self.orienter_message(dictionnaire_evenement)
@@ -133,19 +133,29 @@ class OrienteurTransaction(BaseCallback):
         processus_correspondant = None
 
         # Le message d'evenement doit avoir un element "libelle", c'est la cle pour MGPProcessus.
-        charge_utile = transaction.get('charge-utile')
-        if charge_utile is not None:
+        indice = None
+        info_transaction = transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION)
+        if info_transaction is not None:
+            indice = info_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INDICE_PROCESSUS)
 
-            libelle = charge_utile.get('libelle-transaction')
+        if indice is None:
+            charge_utile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
+            if charge_utile is not None:
+                indice = charge_utile.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INDICE_PROCESSUS)
 
-            if libelle is not None:
-                # Determiner le moteur qui va gerer le processus
-                moteur = libelle.split('.')[0]
-                if moteur == 'MGPProcessus':
-                    processus_correspondant = self.orienter_message_mgpprocessus(dictionnaire_evenement, libelle)
-                else:
+        print("Indice est: %s " % indice)
+
+        if indice is not None:
+            # Determiner le moteur qui va gerer le processus
+            moteur = indice.split('.')[0]
+            if moteur == 'MGPProcessus':
+                processus_correspondant = self.orienter_message_mgpprocessus(dictionnaire_evenement, indice)
+                if processus_correspondant is None:
                     raise ErreurInitialisationProcessus(dictionnaire_evenement,
-                                                        "Le document _id: %s est associe a un type de processus inconnu, libelle: %s" % (mongo_id, libelle))
+                                                        "Le document _id: %s n'est pas une transaction MGPProcessus reconnue" % mongo_id)
+            else:
+                raise ErreurInitialisationProcessus(dictionnaire_evenement,
+                                                    "Le document _id: %s est associe a un type de processus inconnu, libelle: %s" % (mongo_id, indice))
 
         if processus_correspondant is None:
             raise ErreurInitialisationProcessus(dictionnaire_evenement,
@@ -155,9 +165,10 @@ class OrienteurTransaction(BaseCallback):
 
     def orienter_message_mgpprocessus(self, dictionnaire_evenement, libelle):
         # On utilise le dictionanire de processus pour trouver le nom du module et de la classe
-        processus_correspondant = self.dict_libelle.get(libelle)
+        #processus_correspondant = self.dict_libelle.get(libelle)
+        return libelle.replace('MGPProcessus.', '')
 
-        return processus_correspondant
+        #return processus_correspondant
 
 '''
 Exception lancee lorsque le processus ne peut pas etre initialise (erreur fatale).
