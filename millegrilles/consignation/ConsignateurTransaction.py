@@ -5,6 +5,7 @@ from millegrilles.dao.MessageDAO import PikaDAO, JSONHelper, BaseCallback
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles import Constantes
+import signal
 
 class ConsignateurTransaction(BaseCallback):
 
@@ -45,11 +46,19 @@ class ConsignateurTransaction(BaseCallback):
         super().callbackAvecAck(ch, method, properties, body)
 
 
+consignateur = ConsignateurTransaction()
+
+def exit_gracefully(signum, frame):
+    print("Arret de OrienteurTransaction")
+    consignateur.deconnecter()
+
 def main():
 
     print("Demarrage de ConsignateurTransaction")
 
-    consignateur = ConsignateurTransaction()
+    signal.signal(signal.SIGINT, exit_gracefully)
+    signal.signal(signal.SIGTERM, exit_gracefully)
+
     consignateur.configurer()
 
     try:

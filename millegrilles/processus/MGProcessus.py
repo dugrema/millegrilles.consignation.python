@@ -42,22 +42,41 @@ class MGPProcessusControleur(BaseCallback):
         self._message_dao.deconnecter()
         print("Deconnexion completee")
 
-
+    '''
+    Methode qui demarre la lecture des evenements sur la Q de processus.
+    '''
     def executer(self):
         self._message_dao.demarrer_lecture_etape_processus(self.callbackAvecAck)
 
-    def callbackAvecAck(self, ch, method, properties, body):
-        # Decoder l'evenement qui contient l'information sur l'etape a traiter
-        evenement_dict = self.extraire_evenement(body)
-        #print("Recu evenement processus: %s" % str(evenement_dict))
-        self.traiter_evenement(evenement_dict)
-        super().callbackAvecAck(ch, method, properties, body)
+    '''
+    Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
+    '''
+    def traiter_message(self, ch, method, properties, body):
 
+        id_doc_processus = None
+        try:
+            # Decoder l'evenement qui contient l'information sur l'etape a traiter
+            evenement_dict = self.extraire_evenement(body)
+            id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
+            #print("Recu evenement processus: %s" % str(evenement_dict))
+            self.traiter_evenement(evenement_dict)
+        except Exception as e:
+            # Mettre le message d'erreur sur la Q erreur processus
+            self.erreur_fatale(id_doc_processus, str(body), e)
+
+    '''
+    Lit l'evenement JSON est retourne un dictionnaire avec toute l'information.
+    
+    :returns: Dictionnaire de tout le contenu de l'evenement.
+    '''
     def extraire_evenement(self, message_body):
         # Extraire le message qui devrait etre un document JSON
         message_dict = self._json_helper.bin_utf8_json_vers_dict(message_body)
         return message_dict
 
+    '''
+    Execute une etape d'un processus. La classe MGProcessus est responsable de l'orchestration.
+    '''
     def traiter_evenement(self, evenement):
         classe_processus = self.identifier_processus(evenement)
         instance_processus = classe_processus(self, evenement)
@@ -93,9 +112,9 @@ class MGPProcessusControleur(BaseCallback):
     :param nom_etape: Nom complet de l'etape qui a genere l'erreur.
     :param detail_erreur: Optionnel, objet ErreurExecutionEtape.
     """
-    def erreur_fatale(self, id_document_processus, erreur):
+    def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
         self._message_dao.transmettre_erreur_processus(
-            id_document_processus=id_document_processus, detail=erreur)
+            id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
 
 class MGProcessus:
@@ -142,14 +161,6 @@ class MGProcessus:
         # Verifier que l'etape a ete executee avec succes.
         if not self._etape_complete or self._etape_suivante is None:
             raise ErreurEtapePasEncoreExecutee("L'etape n'a pas encore ete executee ou l'etape suivante est inconnue")
-
-#        message = {
-#            Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: self.__class__.__name__,
-#            Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE: self._etape_suivante,
-#            Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(self._document_processus[Constantes.MONGO_DOC_ID])
-#        }
-#        if parametres is not None:
-#            message[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES] = parametres
 
         nom_module_tronque = self.__module__.split('.')[2]
         nom_classe = self.__class__.__name__

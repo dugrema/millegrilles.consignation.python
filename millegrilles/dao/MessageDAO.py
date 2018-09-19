@@ -242,11 +242,13 @@ class PikaDAO:
      :param detail: (Optionnel) Information sur l'erreur.
      '''
 
-    def transmettre_erreur_processus(self, id_document_processus, detail=None):
+    def transmettre_erreur_processus(self, id_document_processus, message_original=None, detail=None):
 
         message = {
             "_id": id_document_processus,
         }
+        if message_original is not None:
+            message['message_original'] = message_original
         if detail is not None:
             message["erreur"] = str(detail)
             message["stacktrace"] = traceback.format_exception(etype=type(detail), value=detail,
@@ -329,4 +331,16 @@ class BaseCallback:
         pass
 
     def callbackAvecAck(self, ch, method, properties, body):
+        try:
+            self.traiter_message(ch, method, properties, body)
+        except Exception as e:
+            print("Erreur dans callbackAvecAck, exception: %s" % str(e))
+        finally:
+            self.transmettre_ack(ch, method)
+
+    def transmettre_ack(self, ch, method):
         ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    ''' Methode qui peut etre remplacee dans la sous-classe '''
+    def traiter_message(self, ch, method, properties, body):
+        pass
