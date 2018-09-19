@@ -162,6 +162,9 @@ class MGProcessus:
         if not self._etape_complete or self._etape_suivante is None:
             raise ErreurEtapePasEncoreExecutee("L'etape n'a pas encore ete executee ou l'etape suivante est inconnue")
 
+        # L'etape suviante est declenchee a partir d'un message qui a le nom du processus, l'etape et
+        # le document de processus. On va chercher le nom du module et de la classe directement (__module__ et
+        # __name__) plutot que d'utiliser des constantes pour faciliter le refactoring.
         nom_module_tronque = self.__module__.split('.')[2]
         nom_classe = self.__class__.__name__
         nom_processus = '%s.%s' % (nom_module_tronque, nom_classe)
@@ -208,7 +211,7 @@ class MGProcessus:
 
 
     '''
-    Implementation de reference pour l'etape finale. 
+    Implementation de reference pour l'etape finale. Peut etre modifiee par la sous-classe au besoin.
     '''
     def finale(self):
         self._etape_complete = True
@@ -248,6 +251,7 @@ class ErreurEtapePasEncoreExecutee(Exception):
         super().__init__(self, message)
 
 # --- MAIN ---
+
 
 controleur = MGPProcessusControleur()
 

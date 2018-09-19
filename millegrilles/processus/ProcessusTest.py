@@ -8,7 +8,7 @@ class TestOrienteur(MGProcessus):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
-        self._initiale_executee = False
+        self._initiale_executee = False # Utilise par unit tests
 
     def initiale(self):
         print("Etape initiale executee avec evenement: %s" % self._evenement)
@@ -39,3 +39,5 @@ class TestOrienteur(MGProcessus):
             'nombre': 234,
             'etape-courante-evenement': self._document_processus[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE]
         }
+
+    #def finale(self): Noter que l'etape finale est deja implementee dans MGProcessus
