@@ -119,13 +119,12 @@ class InformationDocumentHelper:
     :param selection: Dictionnaire qui permet d'identifier un document existant pour cet historique.
     :param document: Valeurs a ajouter a l'historique (a la suite)
     '''
-    def inserer_historique_quotidien_selection(self, selection, document):
+    def inserer_historique_quotidien_selection(self, selection, document, timestamp=datetime.datetime.utcnow()):
 
         selection_jour = selection.copy()
-        now = datetime.datetime.utcnow()
-        selection_jour['annee'] = now.year
-        selection_jour['mois'] = now.month
-        selection_jour['jour'] = now.day
+        selection_jour['annee'] = timestamp.year
+        selection_jour['mois'] = timestamp.month
+        selection_jour['jour'] = timestamp.day
 
         operation = {
             '$push': {'faits': document}
@@ -134,3 +133,13 @@ class InformationDocumentHelper:
         resultat = self._collection_information_documents.update_one(selection_jour, operation, True)
 
         return resultat.upserted_id
+
+
+    '''
+    Verifie l'existance d'un document a partir d'un critere de selection.
+    
+    :param selection: Critere de selection MongoDB.
+    '''
+    def verifier_existance_document(self, selection):
+        resultat = self._collection_information_documents.find_one(selection, '{_id: 1}')
+        return resultat is not None

@@ -2,7 +2,7 @@ from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from millegrilles import Constantes
-import datetime
+from datetime import datetime, timezone
 
 def test_ajouter_document():
     chemin = ['test', 'document']
@@ -45,6 +45,10 @@ def test_maj_document_contenu(selection):
 def test_historique(selection, document):
     informationHelper.inserer_historique_quotidien_selection(selection, document)
 
+def test_existance_document(selection):
+    resultat = informationHelper.verifier_existance_document(selection)
+    print("Document existe: %s" % str(resultat))
+
 # Wiring initial
 configuration = TransactionConfiguration()
 configuration.loadEnvironment()
@@ -69,8 +73,14 @@ try:
             Constantes.DOCUMENT_INFODOC_CHEMIN: ['test', 'integration'],
             'cle': 'le soir'
         }, {
-        'Donnees': datetime.datetime.utcnow()
+        'Donnees': datetime.utcnow()
     })
+
+    date = datetime(2018, 3, 18, 12, 4, 3, 0, tzinfo=timezone.utc)
+    test_existance_document({
+            Constantes.DOCUMENT_INFODOC_CHEMIN: ['test', 'integration'],
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$gte': date}
+        })
 
 finally:
     # Fin / deconnecter

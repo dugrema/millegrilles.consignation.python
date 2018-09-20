@@ -2,6 +2,7 @@
 from millegrilles import Constantes
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from bson.objectid import ObjectId
+import datetime
 
 
 '''
@@ -34,6 +35,11 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
         if lecture.get('senseur') is None or lecture.get('noeud') is None:
             raise ValueError("La lecture doit avoir 'senseur', 'noeud' pour etre sauvegardee")
 
+        if lecture.get('temps_lecture') is None:
+            raise ValueError('La lecture doit fournir le temps original de lecture (temps-lect)')
+
+        temps_lect = datetime.datetime.fromtimestamp(lecture['temps_lecture'])
+
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         selection = {
             'noeud': lecture['noeud'],
@@ -41,6 +47,8 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
         }
 
         # Verifier que la lecture a sauvegarder ne va pas ecraser une lecture plus recente pour le meme senseur
+        selection_verif_plusrecent = selection.copy()
+        selection_verif_plusrecent[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = {'$gte': temps_lect}
         document_plusrecent_existe = False
 
         if not document_plusrecent_existe:
@@ -52,5 +60,5 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
         # Ajouter la lecture au document d'historique
         selection_historique = selection.copy()
         selection_historique[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'historique'])
-        super().inserer_historique_quotidien_selection(selection_historique, lecture)
+        super().inserer_historique_quotidien_selection(selection_historique, lecture, timestamp=temps_lect)
 
