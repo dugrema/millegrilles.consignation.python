@@ -142,4 +142,5 @@ class InformationDocumentHelper:
     '''
     def verifier_existance_document(self, selection):
         resultat = self._collection_information_documents.find_one(selection, '{_id: 1}')
+        print("Resultat: %s" % str(resultat))
         return resultat is not None

@@ -48,17 +48,18 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
 
         # Verifier que la lecture a sauvegarder ne va pas ecraser une lecture plus recente pour le meme senseur
         selection_verif_plusrecent = selection.copy()
-        selection_verif_plusrecent[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = {'$gte': temps_lect}
-        document_plusrecent_existe = False
+        selection_verif_plusrecent[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'courant'])
+        selection_verif_plusrecent['temps_lecture'] = {'$gte': lecture['temps_lecture']}
+        document_plusrecent_existe = self.verifier_existance_document(selection_verif_plusrecent)
 
         if not document_plusrecent_existe:
             # Enregistrer cette lecture comme courante (plus recente)
             selection_courant = selection.copy()
             selection_courant[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'courant'])
-            super().maj_document_selection(selection_courant, lecture, upsert=True)
+            self.maj_document_selection(selection_courant, lecture, upsert=True)
 
         # Ajouter la lecture au document d'historique
         selection_historique = selection.copy()
         selection_historique[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'historique'])
-        super().inserer_historique_quotidien_selection(selection_historique, lecture, timestamp=temps_lect)
+        self.inserer_historique_quotidien_selection(selection_historique, lecture, timestamp=temps_lect)
 

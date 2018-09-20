@@ -5,13 +5,13 @@ from mgdomaine.appareils.AppareilInformationDocument import AppareilInformationD
 lecture_modele = {
     'millivolt': 2811,
     'version': 6,
-    'temps_lecture': 1537463897,
+    'temps_lecture': 1537463710,
     'humidite': 76.9,
     'location': '14',
     'pression': 101.5,
-    'senseur': 14,
+    'senseur': 15,
     'noeud': 1,
-    'temperature': 17.66
+    'temperature': 19.66
 }
 
 
