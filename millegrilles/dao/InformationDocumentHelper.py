@@ -127,7 +127,8 @@ class InformationDocumentHelper:
         selection_jour['jour'] = timestamp.day
 
         operation = {
-            '$push': {'faits': document}
+            '$push': {'faits': document},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
         resultat = self._collection_information_documents.update_one(selection_jour, operation, True)

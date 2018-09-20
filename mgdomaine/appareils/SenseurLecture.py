@@ -3,6 +3,7 @@ from millegrilles import Constantes
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from bson.objectid import ObjectId
 import datetime
+from millegrilles.processus.MGProcessus import MGProcessus
 
 
 '''
@@ -26,17 +27,19 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
     Correspondance document existant: 
       - chemin = ['appareils', 'senseur', 'courant']
       - cle: {'senseur': senseur, 'noeud': noeud}
+      
+    Element temporel (historique et courant): temps_lecture
 
     :param chemin: Liste du chemin du document (path).
     :param lecture: Le document (dictionnaire) a ajouter.
     '''
     def sauvegarder_senseur_lecture(self, lecture):
-        # S'assurer que le document a les cles necessaures: senseur et noeud
+        # S'assurer que le document a les cles necessaires: senseur et noeud
         if lecture.get('senseur') is None or lecture.get('noeud') is None:
             raise ValueError("La lecture doit avoir 'senseur', 'noeud' pour etre sauvegardee")
 
         if lecture.get('temps_lecture') is None:
-            raise ValueError('La lecture doit fournir le temps original de lecture (temps-lect)')
+            raise ValueError('La lecture doit fournir le temps original de lecture (temps_lecture)')
 
         temps_lect = datetime.datetime.fromtimestamp(lecture['temps_lecture'])
 

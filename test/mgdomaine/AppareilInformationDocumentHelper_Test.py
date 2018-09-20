@@ -1,6 +1,6 @@
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
-from mgdomaine.appareils.AppareilInformationDocument import AppareilInformationDocumentHelper
+from mgdomaine.appareils.SenseurLecture import AppareilInformationDocumentHelper
 
 lecture_modele = {
     'millivolt': 2811,

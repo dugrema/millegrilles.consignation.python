@@ -96,6 +96,9 @@ class MGPProcessusControleur(BaseCallback):
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
 
+    def charger_transaction_par_id(self, id_transaction):
+        return self._document_dao.charger_transaction_par_id(id_transaction)
+
     def charger_document_processus(self, id_document_processus):
         return self._document_dao.charger_processus_par_id(id_document_processus)
 
@@ -105,11 +108,10 @@ class MGPProcessusControleur(BaseCallback):
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
         self._message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
 
-    def sauvegarder_document_information(self, document):
-        pass
+    def preparer_document_helper(self, collection, classe):
+        helper = classe(self._document_dao.get_collection(collection))
+        return helper
 
-    def modifier_document_information(self, _id_document, selecteur, operations):
-        pass
 
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
@@ -254,6 +256,13 @@ class MGProcessusTransaction(MGProcessus):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
+
+        self._transaction = None
+
+    def charger_transaction(self):
+        id_transaction = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES][Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        self._transaction = self._controleur.charger_transaction_par_id(id_transaction)
+        return self._transaction
 
     def finale(self):
         # Ajouter l'evenement 'traitee' dans la transaction

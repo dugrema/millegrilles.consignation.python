@@ -14,24 +14,38 @@ from millegrilles.dao.MessageDAO import PikaDAO
 #channel = connection.channel()
 #channel.queue_declare(queue=queuename)
 
-message = {
-    "contenu": "valeur était à alisée",
-    "nombre": 23
-}
 
-message_test_orienteur = {
-    "libelle-transaction": "MGPProcessus.ProcessusTest.TestOrienteur"
-}
+def envoyer_message_test_senseur_lecture():
 
-#message_utf8 = json.dumps(message)
+    lecture_modele = {
+        'millivolt': 2811,
+        'version': 6,
+        'temps_lecture': 1537463709,
+        'humidite': 76.9,
+        'location': '14',
+        'pression': 101.5,
+        'senseur': 15,
+        'noeud': 'test',
+        'temperature': 19.66
+    }
 
-#channel.basic_publish(exchange='',
-#                      routing_key=queuename,
-#                      body=message_utf8)
+    enveloppe = messageDao.transmettre_message_transaction(lecture_modele,
+                                                           'MGPProcessus.Appareils.ProcesssusSenseurConserverLecture')
 
-#print("Sent: %s" % message)
+    return enveloppe
 
-#connection.close()
+def message_test():
+
+    message_test_orienteur = {
+        "libelle-transaction": "MGPProcessus.ProcessusTest.TestOrienteur"
+    }
+
+    enveloppe = messageDao.transmettre_message_transaction(message_test_orienteur,
+                                                           'MGPProcessus.ProcessusTest.TestOrienteur')
+
+    return enveloppe
+
+# --- MAIN ---
 
 configuration = TransactionConfiguration()
 configuration.loadEnvironment()
@@ -39,7 +53,11 @@ messageDao = PikaDAO(configuration)
 
 messageDao.connecter()
 
-enveloppe = messageDao.transmettre_message_transaction(message_test_orienteur, 'MGPProcessus.ProcessusTest.TestOrienteur')
+# TEST
+
+enveloppe = envoyer_message_test_senseur_lecture()
+
+# FIN TEST
 
 print("Sent: %s" % enveloppe)
 
