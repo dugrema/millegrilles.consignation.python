@@ -55,7 +55,7 @@ class InformationDocumentHelper:
     def maj_document(self, id_document, valeurs_a_ajouter=None, valeurs_a_supprimer=None):
         selection = {Constantes.MONGO_DOC_ID: ObjectId(id_document)}
 
-        # Effectuer un touch sur la date de derniere modification
+        # Effectuer une maj sur la date de derniere modification
         operation = {'$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
 
         if valeurs_a_ajouter is not None:
@@ -69,4 +69,45 @@ class InformationDocumentHelper:
         resultat = self._collection_information_documents.update_one(selection, operation)
 
         if resultat.modified_count != 1:
-            raise Exception("Erreur touch _id-information-documents: %s" % id_document)
+            raise Exception("Erreur maj _id-information-documents: %s" % id_document)
+
+    '''
+    Mise a jour de la collection information-documents quand le _id est inconnu. 
+    Le critere de selection  
+
+    :param selection: Critere de selection qui va trouver le document a mettre a jour.
+    :param valeurs_a_ajouter: Dictionnaire des valeurs a ajouter/modifier.
+    :param valeurs_a_supprimer: Liste des valeurs (cles) a supprimer. 
+    :param upsert: Si True, un nouveau document est cree s'il n'existe pas.
+    '''
+
+    def maj_document_selection(self, selection, valeurs_a_ajouter=None, valeurs_a_supprimer=None, upsert=False):
+        if selection is None:
+            raise TypeError('Le parametre selection ne peut pas etre None')
+
+        if upsert and selection.get(Constantes.DOCUMENT_INFODOC_CHEMIN) is None:
+            raise ValueError('Pour une operation qui peut resulter en upsert, il faut toujours fournir le chemin dans selection')
+
+        # Effectuer une maj sur la date de derniere modification.
+        operation = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        if upsert:
+            # En cas de upsert, il faut s'assurer d'avoir tous les parametres necessaires
+            # pour un document bien forme. Le _mg-chemin et _mg-derniere-modification sont deja assures.
+            # Mais il faut inserer un nouveau uuid.
+            operation['$setOnInsert'] = {Constantes.DOCUMENT_INFODOC_UUID: str(uuid.uuid1())}
+
+        if valeurs_a_ajouter is not None:
+            operation['$set'] = valeurs_a_ajouter
+
+        if valeurs_a_supprimer is not None:
+            valeurs_supprimer_dict = {}
+            for val_sup in valeurs_a_supprimer:
+                valeurs_supprimer_dict[val_sup] = ''
+            operation['$unset'] = valeurs_supprimer_dict
+
+        resultat = self._collection_information_documents.update_one(selection, operation, upsert)
+        if resultat.matched_count == 0 and (upsert and resultat.upserted_id is None):
+            raise Exception("Erreur maj contenu documents, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
+
