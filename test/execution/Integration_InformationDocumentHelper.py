@@ -41,10 +41,10 @@ documentDao.connecter()
 informationHelper = documentDao.information_document_helper()
 
 try:
-#    doc_id = test_ajouter_document()
-#    test_charger_document(doc_id)
+    doc_id = test_ajouter_document()
+    test_charger_document(doc_id)
 
-    id_doc_test = '5ba2e708e094091602cac914'
+    id_doc_test = '5ba2f236e0940932985ada15'
     test_touch_document(id_doc_test)
     test_maj_document_set(id_doc_test)
     test_maj_document_unset(id_doc_test)
