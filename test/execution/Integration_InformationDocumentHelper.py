@@ -2,6 +2,7 @@ from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from millegrilles import Constantes
+import datetime
 
 def test_ajouter_document():
     chemin = ['test', 'document']
@@ -41,6 +42,9 @@ def test_maj_document_contenu(selection):
     valeurs = {'maj': 'Mise a jour via selection: %s' % selection}
     informationHelper.maj_document_selection(selection, valeurs, upsert=True)
 
+def test_historique(selection, document):
+    informationHelper.inserer_historique_quotidien_selection(selection, document)
+
 # Wiring initial
 configuration = TransactionConfiguration()
 configuration.loadEnvironment()
@@ -60,6 +64,13 @@ try:
             Constantes.DOCUMENT_INFODOC_CHEMIN: ['test', 'integration'],
             'cle': 'le soir'
         })
+
+    test_historique({
+            Constantes.DOCUMENT_INFODOC_CHEMIN: ['test', 'integration'],
+            'cle': 'le soir'
+        }, {
+        'Donnees': datetime.datetime.utcnow()
+    })
 
 finally:
     # Fin / deconnecter

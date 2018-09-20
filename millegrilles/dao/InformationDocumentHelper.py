@@ -112,3 +112,25 @@ class InformationDocumentHelper:
             raise Exception("Erreur maj contenu documents, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
 
         return resultat.upserted_id
+
+    '''
+    Inser un dictionnaire dans un document d'historique. Le document complet est conserve dans une liste.
+    
+    :param selection: Dictionnaire qui permet d'identifier un document existant pour cet historique.
+    :param document: Valeurs a ajouter a l'historique (a la suite)
+    '''
+    def inserer_historique_quotidien_selection(self, selection, document):
+
+        selection_jour = selection.copy()
+        now = datetime.datetime.utcnow()
+        selection_jour['annee'] = now.year
+        selection_jour['mois'] = now.month
+        selection_jour['jour'] = now.day
+
+        operation = {
+            '$push': {'faits': document}
+        }
+
+        resultat = self._collection_information_documents.update_one(selection_jour, operation, True)
+
+        return resultat.upserted_id

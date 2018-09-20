@@ -34,12 +34,25 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
         if lecture.get('senseur') is None or lecture.get('noeud') is None:
             raise ValueError("La lecture doit avoir 'senseur', 'noeud' pour etre sauvegardee")
 
-        # Verifier que la lecture a sauvegarder ne va pas ecraser une lecture plus recente pour le meme senseur
-
+        # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         chemin_complet = self.chemin(['senseur', 'courant'])
         selection = {
             Constantes.DOCUMENT_INFODOC_CHEMIN: chemin_complet,
             'noeud': lecture['noeud'],
             'senseur': lecture['senseur']
         }
-        super().maj_document_selection(selection, lecture, upsert=True)
+
+        # Verifier que la lecture a sauvegarder ne va pas ecraser une lecture plus recente pour le meme senseur
+        document_plusrecent_existe = False
+
+        if not document_plusrecent_existe:
+            # Enregistrer cette lecture comme courante (plus recente)
+            selection = {
+                Constantes.DOCUMENT_INFODOC_CHEMIN: chemin_complet,
+                'noeud': lecture['noeud'],
+                'senseur': lecture['senseur']
+            }
+            super().maj_document_selection(selection, lecture, upsert=True)
+
+        # Ajouter la lecture au document d'historique
+
