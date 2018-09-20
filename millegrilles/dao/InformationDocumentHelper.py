@@ -37,4 +37,21 @@ class InformationDocumentHelper:
 
         resultat = self._collection_information_documents.update_one(selection, operation)
         if resultat.modified_count != 1:
-            raise Exception("Erreur MAJ processus: %s" % str(resultat))
+            raise Exception("Erreur touch _id-information-documents: %s" % id_document)
+
+    def maj_document(self, id_document, valeurs_a_ajouter=None, valeurs_a_supprimer=None):
+        selection = {Constantes.MONGO_DOC_ID: ObjectId(id_document)}
+
+        # Effectuer un touch sur la date de derniere modification
+        operation = {'$currentDate': {'_mg-derniere-modification': True}}
+
+        if valeurs_a_ajouter is not None:
+            operation['$set'] = valeurs_a_ajouter
+        if valeurs_a_supprimer is not None:
+            valeurs_supprimer_dict = {}
+            for val_sup in valeurs_a_supprimer:
+                valeurs_supprimer_dict[val_sup] = ''
+            operation['$unset'] = valeurs_supprimer_dict
+        resultat = self._collection_information_documents.update_one(selection, operation)
+        if resultat.modified_count != 1:
+            raise Exception("Erreur touch _id-information-documents: %s" % id_document)

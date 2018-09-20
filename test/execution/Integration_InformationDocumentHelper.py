@@ -25,7 +25,13 @@ def test_touch_document(id_doc):
 
     informationHelper.touch_document(id_doc)
 
+def test_maj_document_set(id_doc):
+    valeurs = {'bian': {'le': 'bonjour', 'la': 'nuite', 'les': ['beignes', 'sont', 'bons']}}
+    informationHelper.maj_document(id_doc, valeurs_a_ajouter=valeurs)
 
+def test_maj_document_unset(id_doc):
+    valeurs = ['bian.le']
+    informationHelper.maj_document(id_doc, valeurs_a_supprimer=valeurs)
 
 # Wiring initial
 configuration = TransactionConfiguration()
@@ -35,9 +41,13 @@ documentDao.connecter()
 informationHelper = documentDao.information_document_helper()
 
 try:
-    doc_id = test_ajouter_document()
-    test_charger_document(doc_id)
-    test_touch_document('5ba2e708e094091602cac914')
+#    doc_id = test_ajouter_document()
+#    test_charger_document(doc_id)
+
+    id_doc_test = '5ba2e708e094091602cac914'
+    test_touch_document(id_doc_test)
+    test_maj_document_set(id_doc_test)
+    test_maj_document_unset(id_doc_test)
 
 finally:
     # Fin / deconnecter
