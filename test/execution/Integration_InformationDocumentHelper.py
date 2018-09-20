@@ -21,6 +21,11 @@ def test_charger_document(id_doc):
 
     return document
 
+def test_touch_document(id_doc):
+
+    informationHelper.touch_document(id_doc)
+
+
 
 # Wiring initial
 configuration = TransactionConfiguration()
@@ -32,6 +37,7 @@ informationHelper = documentDao.information_document_helper()
 try:
     doc_id = test_ajouter_document()
     test_charger_document(doc_id)
+    test_touch_document('5ba2e708e094091602cac914')
 
 finally:
     # Fin / deconnecter

@@ -31,4 +31,10 @@ class InformationDocumentHelper:
 
     ''' Ajuste la date _mg-derniere-modification a maintenant. '''
     def touch_document(self, id_document):
-        pass
+
+        selection = {Constantes.MONGO_DOC_ID: ObjectId(id_document)}
+        operation = {'$currentDate': {'_mg-derniere-modification': True}}
+
+        resultat = self._collection_information_documents.update_one(selection, operation)
+        if resultat.modified_count != 1:
+            raise Exception("Erreur MAJ processus: %s" % str(resultat))
