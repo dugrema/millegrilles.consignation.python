@@ -35,9 +35,7 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
             raise ValueError("La lecture doit avoir 'senseur', 'noeud' pour etre sauvegardee")
 
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
-        chemin_complet = self.chemin(['senseur', 'courant'])
         selection = {
-            Constantes.DOCUMENT_INFODOC_CHEMIN: chemin_complet,
             'noeud': lecture['noeud'],
             'senseur': lecture['senseur']
         }
@@ -47,12 +45,12 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
 
         if not document_plusrecent_existe:
             # Enregistrer cette lecture comme courante (plus recente)
-            selection = {
-                Constantes.DOCUMENT_INFODOC_CHEMIN: chemin_complet,
-                'noeud': lecture['noeud'],
-                'senseur': lecture['senseur']
-            }
-            super().maj_document_selection(selection, lecture, upsert=True)
+            selection_courant = selection.copy()
+            selection_courant[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'courant'])
+            super().maj_document_selection(selection_courant, lecture, upsert=True)
 
         # Ajouter la lecture au document d'historique
+        selection_historique = selection.copy()
+        selection_historique[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'historique'])
+        super().inserer_historique_quotidien_selection(selection_historique, lecture)
 
