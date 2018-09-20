@@ -105,6 +105,12 @@ class MGPProcessusControleur(BaseCallback):
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
         self._message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
 
+    def sauvegarder_document_information(self, document):
+        pass
+
+    def modifier_document_information(self, _id_document, selecteur, operations):
+        pass
+
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
     
@@ -126,6 +132,9 @@ class MGProcessus:
     :param message: Message recu qui a declenche l'execution de cette etape
     """
     def __init__(self, controleur, evenement):
+        if controleur is None or evenement is None:
+            raise Exception('controleur et evenement ne doivent pas etre None')
+
         self._controleur = controleur
         self._evenement = evenement
 
@@ -218,6 +227,16 @@ class MGProcessus:
         self._processus_complete = True
         #print("Etape finale executee pour %s" % self.__class__.__name__)
 
+    def erreur_fatale(self, detail=None):
+        self._etape_complete = True
+        self._processus_complete = True
+        print("Erreur fatale - voir Q")
+
+        information = None
+        if detail is not None:
+            information = {'erreur': detail}
+        return information
+
     '''
     Utiliser cette methode pour indiquer quelle est la prochaine etape a executer.
     
@@ -227,6 +246,26 @@ class MGProcessus:
         self._etape_complete = True
         self._etape_suivante = etape_suivante
 
+'''
+Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
+comme ayant ete completee.
+'''
+class MGProcessusTransaction(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def finale(self):
+        # Ajouter l'evenement 'traitee' dans la transaction
+        self.marquer_transaction_traitee()
+        super().finale()
+
+    ''' Ajoute l'evenement 'traitee' dans la transaction '''
+    def marquer_transaction_traitee(self):
+        pass
+
+    def marquer_transaction_incomplete(self):
+        pass
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).

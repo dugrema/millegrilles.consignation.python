@@ -1,10 +1,10 @@
-''' Gestion des documents.
-'''
+# Gestion des documents.
 
 import time
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from millegrilles import Constantes
+from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 
 '''
 Data access object pour les documents dans MongoDB
@@ -14,33 +14,39 @@ Data access object pour les documents dans MongoDB
 class MongoDAO:
 
     def __init__(self, configuration):
-        self.configuration = configuration
-        self.nom_millegrille = "mg-%s" % (self.configuration.nom_millegrille)
+        self._configuration = configuration
+        self._nom_millegrille = "mg-%s" % self._configuration.nom_millegrille
 
-        self.client = None
-        self.mg_database = None
-        self.collection_transactions = None
-        self.collection_processus = None
+        self._client = None
+        self._mg_database = None
+        self._collection_transactions = None
+        self._collection_processus = None
+        self._collection_information_documents = None
+        self._information_document_helper = None
 
     def connecter(self):
-        self.client = MongoClient(
-            self.configuration.mongo_host,
-            self.configuration.mongo_port,
-            username=self.configuration.mongo_user,
-            password=self.configuration.mongo_password)
+        self._client = MongoClient(
+            self._configuration.mongo_host,
+            self._configuration.mongo_port,
+            username=self._configuration.mongo_user,
+            password=self._configuration.mongo_password)
         #print("Verify if connection established")
-        self.client.admin.command('ismaster')
+        self._client.admin.command('ismaster')
 
         #print("Connection etablie, ouverture base de donnes %s" % (self.nom_millegrille))
 
-        self.mg_database = self.client[self.nom_millegrille]
-        self.collection_transactions = self.mg_database["transactions"]
-        self.collection_processus = self.mg_database["processus"]
+        self._mg_database = self._client[self._nom_millegrille]
+        self._collection_transactions = self._mg_database[Constantes.DOCUMENT_COLLECTION_TRANSACTIONS]
+        self._collection_processus = self._mg_database[Constantes.DOCUMENT_COLLECTION_PROCESSUS]
+        self._collection_information_documents = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS]
+
+        # Generer les classes Helper
+        self._information_document_helper = InformationDocumentHelper(self._collection_information_documents)
 
     def deconnecter(self):
-        if self.client is not None:
-            self.client.close()
-            self.client = None
+        if self._client is not None:
+            self._client.close()
+            self._client = None
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
 
@@ -51,7 +57,7 @@ class MongoDAO:
             'transaction_persistance': [int(time.time())]
         }
 
-        resultat = self.collection_transactions.insert_one(enveloppe_transaction)
+        resultat = self._collection_transactions.insert_one(enveloppe_transaction)
         id = resultat.inserted_id
         return id
 
@@ -74,7 +80,7 @@ class MongoDAO:
                 }
             ]
         }
-        doc_id = self.collection_processus.insert_one(document)
+        doc_id = self._collection_processus.insert_one(document)
         return doc_id.inserted_id
 
     '''
@@ -110,7 +116,7 @@ class MongoDAO:
         if len(set_operation) > 0:
             operation['$set'] = set_operation
 
-        resultat = self.collection_processus.update_one(id_document, operation)
+        resultat = self._collection_processus.update_one(id_document, operation)
 
         if resultat.modified_count != 1:
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
@@ -122,10 +128,13 @@ class MongoDAO:
     :returns: Document ou None si aucun document ne correspond.
     '''
     def charger_transaction_par_id(self, id_doc):
-        return self.collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
+        return self._collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
 
     def charger_processus_par_id(self, id_doc):
-        return self.collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
+        return self._collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
+
+    def information_document_helper(self):
+        return self._information_document_helper
 
 class ErreurMAJProcessus(Exception):
 
