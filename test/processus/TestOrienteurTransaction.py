@@ -1,6 +1,6 @@
 import unittest
-from millegrilles.processus.OrienteurTransaction import OrienteurTransaction
-from millegrilles.processus.OrienteurTransaction import ErreurInitialisationProcessus
+from millegrilles.transaction.OrienteurTransaction import OrienteurTransaction
+from millegrilles.transaction.OrienteurTransaction import ErreurInitialisationProcessus
 from millegrilles import Constantes
 
 class OrienteurTransactionTest(unittest.TestCase):
