@@ -136,6 +136,9 @@ class MongoDAO:
     def information_document_helper(self):
         return self._information_document_helper
 
+    def collection_information_documents(self):
+        return self._collection_information_documents
+
 class ErreurMAJProcessus(Exception):
 
     def __init__(self, message=None):

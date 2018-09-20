@@ -111,3 +111,4 @@ class InformationDocumentHelper:
         if resultat.matched_count == 0 and (upsert and resultat.upserted_id is None):
             raise Exception("Erreur maj contenu documents, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
 
+        return resultat.upserted_id
