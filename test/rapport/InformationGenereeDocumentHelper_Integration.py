@@ -5,7 +5,7 @@ from millegrilles import Constantes
 import datetime
 
 
-def test_generer_rapport1():
+def test_executer_recherche1():
     selection = {
         Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'courant'],
         'noeud': 'test'
@@ -14,12 +14,10 @@ def test_generer_rapport1():
 
     }
 
-    cursor = helper.generer_rapport(selection) #, projection)
+    cursor = helper.executer_recherche(selection) #, projection)
     #print('Cursor: %s' % str(cursor))
 
     document_genere = {}
-    document_genere[Constantes.DOCUMENT_INFODOC_CHEMIN] = ['appareils', 'senseur', 'courant', 'noeud']
-    document_genere[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = datetime.datetime.utcnow()
     donnees = []
     document_genere['donnees'] = donnees
     for document in cursor:
@@ -27,7 +25,14 @@ def test_generer_rapport1():
         donnees.append(document)
 
     print("Document genere: %s" % str(document_genere))
+    return selection, document_genere
 
+def test_sauvegarder_rapport(selection, document_genere):
+
+    # Ajouter un qualiticatif pour ce rapport - il est fait par noeud
+    selection[Constantes.DOCUMENT_INFODOC_CHEMIN].append('noeud')
+
+    helper.sauvegarder_rapport(selection, document_genere)
 
 # --- MAIN ---
 configuration = TransactionConfiguration()
@@ -38,7 +43,8 @@ helper = document_dao.information_generee_helper()
 
 def main():
     try:
-        test_generer_rapport1()
+        selection, document_resultat = test_executer_recherche1()
+        test_sauvegarder_rapport(selection, document_resultat)
 
     finally:
         document_dao.deconnecter()

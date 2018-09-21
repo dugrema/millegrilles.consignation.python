@@ -13,6 +13,22 @@ class InformationGenereeHelper:
         self._collection_information_documents = mongo_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS]
         self._collection_information_generee = mongo_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_GENEREE]
 
-    def generer_rapport(self, selection, projection=None):
+    def executer_recherche(self, selection, projection=None):
         cursor = self._collection_information_documents.find(selection, projection)
         return cursor
+
+    def sauvegarder_rapport(self, selection, document_resultat):
+        # On prend le chemin tel quel et on ajoute 'rapport'
+        selection[Constantes.DOCUMENT_INFODOC_CHEMIN].append('rapport')
+
+        # Sauvegarder / mettre a jour le rapport
+        operation = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$set': document_resultat
+        }
+        resultat = self._collection_information_generee.update_one(selection, operation, upsert=True)
+
+        if resultat.matched_count == 0 and resultat.upserted_id is None:
+            raise Exception("Erreur maj rapport, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
+
+        return resultat
