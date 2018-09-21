@@ -10,21 +10,18 @@ def test_executer_recherche1():
         Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'courant'],
         'noeud': 'test'
     }
-    projection = {
 
-    }
+    resultats = []
+    with helper.executer_recherche(selection) as cursor:
+        for document in cursor:
+            print("Document: %s" % str(document))
+            resultats.append(document)
 
-    cursor = helper.executer_recherche(selection) #, projection)
-    #print('Cursor: %s' % str(cursor))
-
-    document_genere = {}
-    donnees = []
-    document_genere['donnees'] = donnees
-    for document in cursor:
-        print("Document: %s" % str(document))
-        donnees.append(document)
-
+    document_genere = {'senseurs': resultats}
     print("Document genere: %s" % str(document_genere))
+
+#    cursor.close()
+
     return selection, document_genere
 
 def test_sauvegarder_rapport(selection, document_genere):
