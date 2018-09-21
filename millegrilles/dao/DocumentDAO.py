@@ -5,6 +5,7 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 from millegrilles import Constantes
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
+from millegrilles.dao.InformationGenereeDocumentHelper import InformationGenereeHelper
 
 '''
 Data access object pour les documents dans MongoDB
@@ -23,6 +24,7 @@ class MongoDAO:
         self._collection_processus = None
         self._collection_information_documents = None
         self._information_document_helper = None
+        self._information_generee_helper = None
 
     def connecter(self):
         self._client = MongoClient(
@@ -39,9 +41,11 @@ class MongoDAO:
         self._collection_transactions = self._mg_database[Constantes.DOCUMENT_COLLECTION_TRANSACTIONS]
         self._collection_processus = self._mg_database[Constantes.DOCUMENT_COLLECTION_PROCESSUS]
         self._collection_information_documents = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS]
+        self._collection_information_generee = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_GENEREE]
 
         # Generer les classes Helper
         self._information_document_helper = InformationDocumentHelper(self._collection_information_documents)
+        self._information_generee_helper = InformationGenereeHelper(self._mg_database)
 
     def deconnecter(self):
         if self._client is not None:
@@ -135,6 +139,9 @@ class MongoDAO:
 
     def information_document_helper(self):
         return self._information_document_helper
+
+    def information_generee_helper(self):
+        return self._information_generee_helper
 
     def collection_information_documents(self):
         return self._collection_information_documents

@@ -22,11 +22,11 @@ def envoyer_message_test_senseur_lecture():
         'version': 6,
         'temps_lecture': 1537463709,
         'humidite': 76.9,
-        'location': '14',
+        'location': '15',
         'pression': 101.5,
         'senseur': 15,
         'noeud': 'test',
-        'temperature': 19.66
+        'temperature': 16.00
     }
 
     enveloppe = messageDao.transmettre_message_transaction(lecture_modele,
