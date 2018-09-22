@@ -33,6 +33,10 @@ class InformationGenereeHelper:
 
         return resultat
 
-    def executer_distinct(self, champ, selection=None):
+
+    '''
+    Methode qui fait une recherche distinct sur la 
+    '''
+    def executer_distinct_information_documents(self, champ, selection=None):
         resultat = self._collection_information_documents.distinct(champ, selection)
         return resultat

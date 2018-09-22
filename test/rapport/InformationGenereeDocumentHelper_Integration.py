@@ -8,7 +8,7 @@ def test_executer_groupement():
         Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'courant']
     }
 
-    resultat = helper.executer_distinct('noeud', selection)
+    resultat = helper.executer_distinct_information_documents('noeud', selection)
 
     print("Document resultats: %s" % str(resultat))
 
