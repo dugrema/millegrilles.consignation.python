@@ -1,7 +1,5 @@
 # Gestion des documents.
 
-import time
-import datetime
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from millegrilles import Constantes
@@ -55,19 +53,6 @@ class MongoDAO:
         if self._client is not None:
             self._client.close()
             self._client = None
-
-    def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
-
-        # Ajouter l'element evenements et l'evenement de persistance
-        estampille = enveloppe_transaction['info-transaction']['estampille']
-        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
-            Constantes.EVENEMENT_TRANSACTION_NOUVELLE: [datetime.datetime.fromtimestamp(estampille)],
-            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.utcnow()]
-        }
-
-        resultat = self._collection_transactions.insert_one(enveloppe_transaction)
-        id = resultat.inserted_id
-        return id
 
     '''
     Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.

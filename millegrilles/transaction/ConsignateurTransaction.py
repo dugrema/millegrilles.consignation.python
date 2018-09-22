@@ -7,10 +7,15 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles import Constantes
 import signal
 
+from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
+
+
 class ConsignateurTransaction(BaseCallback):
 
     def __init__(self):
         super().__init__()
+
+        self._transaction_helper = None
 
         self.json_helper = JSONHelper()
         self.configuration = TransactionConfiguration()
@@ -26,6 +31,8 @@ class ConsignateurTransaction(BaseCallback):
         # Executer la configuration pour RabbitMQ
         self.message_dao.configurer_rabbitmq()
 
+        self._transaction_helper = self.document_dao.transaction_helper()
+
         print("Configuration et connection completee")
 
     def executer(self):
@@ -40,7 +47,7 @@ class ConsignateurTransaction(BaseCallback):
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def callbackAvecAck(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        id_document = self.document_dao.sauvegarder_nouvelle_transaction(message_dict)
+        id_document = self._transaction_helper.sauvegarder_nouvelle_transaction(self.document_dao._collection_transactions, message_dict)
         uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         self.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction)
         super().callbackAvecAck(ch, method, properties, body)

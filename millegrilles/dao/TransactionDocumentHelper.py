@@ -26,3 +26,16 @@ class TransactionHelper:
         if resultat.modified_count != 1:
             raise Exception("Erreur ajout evenement transaction: %s" % str(resultat))
 
+
+    def sauvegarder_nouvelle_transaction(self, _collection_transactions, enveloppe_transaction):
+
+        # Ajouter l'element evenements et l'evenement de persistance
+        estampille = enveloppe_transaction['info-transaction']['estampille']
+        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
+            Constantes.EVENEMENT_TRANSACTION_NOUVELLE: [datetime.datetime.fromtimestamp(estampille)],
+            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.utcnow()]
+        }
+
+        resultat = _collection_transactions.insert_one(enveloppe_transaction)
+        id = resultat.inserted_id
+        return id
