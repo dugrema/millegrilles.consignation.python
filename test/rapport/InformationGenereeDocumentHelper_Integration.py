@@ -1,6 +1,7 @@
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles import Constantes
+from millegrilles.rapport.GenerateurRapports import GenerateurRapport
 
 
 def test_executer_groupement():
@@ -41,6 +42,23 @@ def test_sauvegarder_rapport(selection, document_genere):
 
     helper.sauvegarder_rapport(selection, document_genere)
 
+def test_generateur_documents2():
+
+    generateur = GenerateurRapport(document_dao)
+
+    generateur.set_source(
+        chemin=['appareils', 'senseur', 'courant'],
+        groupe='noeud',
+        ligne='senseur'
+    )
+    generateur.set_chemin_destination(['appareils', 'senseur', 'courant', 'rapport'])
+
+    #groupes = generateur.identifier_groupes_rapport()
+    #print('Groupes identifies pour le rapport: %s' % str(groupes))
+
+    generateur.generer()
+
+
 # --- MAIN ---
 configuration = TransactionConfiguration()
 configuration.loadEnvironment()
@@ -52,7 +70,8 @@ def main():
     try:
         #selection, document_resultat = test_executer_recherche1()
         #test_sauvegarder_rapport(selection, document_resultat)
-        test_executer_groupement()
+        #test_executer_groupement()
+        test_generateur_documents2()
 
     finally:
         document_dao.deconnecter()

@@ -17,16 +17,23 @@ class InformationGenereeHelper:
         cursor = self._collection_information_documents.find(selection, projection)
         return cursor
 
-    def sauvegarder_rapport(self, selection, document_resultat):
-        # On prend le chemin tel quel et on ajoute 'rapport'
-        selection[Constantes.DOCUMENT_INFODOC_CHEMIN].append('rapport')
+    def sauvegarder_rapport(self, selection_rapport, document_resultat):
+
+        if selection_rapport is None:
+            raise ValueError('selection_rapport ne doit pas etre None')
+
+        if document_resultat is None:
+            raise ValueError('document_resultat ne doit pas etre None')
 
         # Sauvegarder / mettre a jour le rapport
         operation = {
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             '$set': document_resultat
         }
-        resultat = self._collection_information_generee.update_one(selection, operation, upsert=True)
+
+        print("Preparation sauvegarde selection: %s \nDocument: %s" % (selection_rapport, document_resultat))
+
+        resultat = self._collection_information_generee.update_one(selection_rapport, operation, upsert=True)
 
         if resultat.matched_count == 0 and resultat.upserted_id is None:
             raise Exception("Erreur maj rapport, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
