@@ -26,7 +26,7 @@ etape_1 = {
     }
 }
 
-document_dao.sauvegarder_etape_processus(id_process_doc, etape_1)
+helper.sauvegarder_etape_processus(id_process_doc, etape_1)
 
 print("Document a l'etape 1: %s" % document_dao.charger_processus_par_id(id_process_doc))
 
@@ -38,7 +38,7 @@ etape_finale = {
     }
 }
 
-document_dao.sauvegarder_etape_processus(id_process_doc, etape_finale)
+helper.sauvegarder_etape_processus(id_process_doc, etape_finale)
 
 print("Document final: %s" % document_dao.charger_processus_par_id(id_process_doc))
 

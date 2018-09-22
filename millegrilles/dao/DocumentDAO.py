@@ -58,44 +58,6 @@ class MongoDAO:
             self._client = None
 
     '''
-    Modifie un document de processus en ajoutant l'information de l'etape a la suite des autres etapes
-    dans la liste du processus.
-    
-    :param id_document_processus: _id du document dans la collection processus.
-    :param dict_etape: Dictionnaire complet a ajoute a la file des autres etapes.
-    '''
-    def sauvegarder_etape_processus(self, id_document_processus, dict_etape, etape_suivante=None):
-        # Convertir id_document_process en ObjectId
-        if isinstance(id_document_processus, ObjectId):
-            id_document = {Constantes.MONGO_DOC_ID: id_document_processus}
-        else:
-            id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
-
-        #print("$push vers mongo: %s --- %s" % (id_document, str(dict_etape)))
-        set_operation = {}
-        operation = {
-            '$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: dict_etape},
-        }
-        if etape_suivante is None:
-            operation['$unset'] = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: ''}
-        else:
-            set_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE]=etape_suivante
-
-        dict_etapes_parametres = dict_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES)
-        if dict_etapes_parametres is not None:
-            for key, value in dict_etapes_parametres.items():
-                complete_key = 'parametres.%s' % key
-                set_operation[complete_key] = value
-
-        if len(set_operation) > 0:
-            operation['$set'] = set_operation
-
-        resultat = self._collection_processus.update_one(id_document, operation)
-
-        if resultat.modified_count != 1:
-            raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
-
-    '''
     Chargement d'un document de transaction a partir d'un identificateur MongoDB
     
     :param id_doc: Numero unique du document dans MongoDB.
@@ -124,9 +86,3 @@ class MongoDAO:
 
     def get_collection(self, collection):
         return self._mg_database[collection]
-
-class ErreurMAJProcessus(Exception):
-
-    def __init__(self, message=None):
-        super().__init__(message=message)
-
