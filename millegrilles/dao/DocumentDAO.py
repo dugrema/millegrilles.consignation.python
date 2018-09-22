@@ -6,6 +6,7 @@ from millegrilles import Constantes
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from millegrilles.dao.InformationGenereeDocumentHelper import InformationGenereeHelper
 from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
+from millegrilles.dao.ProcessusDocumentHelper import ProcessusHelper
 
 '''
 Data access object pour les documents dans MongoDB
@@ -26,6 +27,7 @@ class MongoDAO:
         self._transaction_document_helper = None
         self._information_document_helper = None
         self._information_generee_helper = None
+        self._processus_document_helper = None
 
     def connecter(self):
         self._client = MongoClient(
@@ -48,33 +50,12 @@ class MongoDAO:
         self._transaction_document_helper = TransactionHelper(self._mg_database)
         self._information_document_helper = InformationDocumentHelper(self._collection_information_documents)
         self._information_generee_helper = InformationGenereeHelper(self._mg_database)
+        self._processus_document_helper = ProcessusHelper(self._mg_database)
 
     def deconnecter(self):
         if self._client is not None:
             self._client.close()
             self._client = None
-
-    '''
-    Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
-    
-    :param parametres: Parametres pour l'etape initiale.
-    :returns: _id du nouveau document de processus
-    '''
-    def sauvegarder_initialisation_processus(self, moteur, nom_processus, parametres):
-        document = {
-            Constantes.PROCESSUS_DOCUMENT_LIBELLE_MOTEUR: moteur,
-            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
-            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: 'initiale',
-            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres,
-            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: [
-                {
-                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: 'orientation',
-                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres
-                }
-            ]
-        }
-        doc_id = self._collection_processus.insert_one(document)
-        return doc_id.inserted_id
 
     '''
     Modifie un document de processus en ajoutant l'information de l'etape a la suite des autres etapes
@@ -134,6 +115,9 @@ class MongoDAO:
 
     def information_generee_helper(self):
         return self._information_generee_helper
+
+    def processus_helper(self):
+        return self._processus_document_helper
 
     def collection_information_documents(self):
         return self._collection_information_documents

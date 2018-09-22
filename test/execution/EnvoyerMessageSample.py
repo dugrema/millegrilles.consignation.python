@@ -30,7 +30,7 @@ def envoyer_message_test_senseur_lecture():
     }
 
     enveloppe = messageDao.transmettre_message_transaction(lecture_modele,
-                                                           'MGPProcessus.Appareils.ProcesssusSenseurConserverLecture')
+                                                           'MGPProcessus.Appareils.ProcessusSenseurConserverLecture')
 
     return enveloppe
 

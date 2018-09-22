@@ -18,6 +18,8 @@ class OrienteurTransaction(BaseCallback):
 
         super().__init__()
 
+        self._processus_helper = None
+
         self.dict_libelle = {}
         self._message_dao = None
         self._document_dao = None
@@ -38,6 +40,8 @@ class OrienteurTransaction(BaseCallback):
 
         # Configurer le comportement de l'orienteur
         self.charger_liste_processus()
+
+        self._processus_helper = self._document_dao.processus_helper()
 
         print("Configuration et connection completee")
 
@@ -93,7 +97,7 @@ class OrienteurTransaction(BaseCallback):
 
             if processus_a_declencher is not None:
                 # On va declencher un nouveau processus
-                id_doc_processus = self._document_dao.sauvegarder_initialisation_processus(
+                id_doc_processus = self._processus_helper.sauvegarder_initialisation_processus(
                     moteur, processus_a_declencher, dictionnaire_evenement)
 
                 self._message_dao.transmettre_evenement_mgpprocessus(

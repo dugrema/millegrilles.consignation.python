@@ -6,10 +6,11 @@ configuration.loadEnvironment()
 
 document_dao = MongoDAO(configuration)
 document_dao.connecter()
+helper = document_dao.processus_helper()
 
 # Creer document processus
 
-id_process_doc = document_dao.sauvegarder_initialisation_processus('MGPProcessus.testsauvegarde.sauvegarde', {"param": "valeur"})
+id_process_doc = helper.sauvegarder_initialisation_processus('MGPProcessus.testsauvegarde.sauvegarde', {"param": "valeur"})
 
 print("Nouveau document cree pour le processus: %s" % id_process_doc)
 

@@ -5,7 +5,7 @@ from mgdomaine.appareils.SenseurLecture import AppareilInformationDocumentHelper
 '''
 Processus pour importer une lecture dans MilleGrilles.
 '''
-class ProcesssusSenseurConserverLecture(MGProcessusTransaction):
+class ProcessusSenseurConserverLecture(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
