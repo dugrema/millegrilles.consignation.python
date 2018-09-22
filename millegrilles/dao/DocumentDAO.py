@@ -1,6 +1,7 @@
 # Gestion des documents.
 
 import time
+import datetime
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from millegrilles import Constantes
@@ -57,8 +58,8 @@ class MongoDAO:
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction['info-transaction']['estampille']
         enveloppe_transaction['evenements'] = {
-            'transaction_nouvelle': [estampille],
-            'transaction_persistance': [int(time.time())]
+            'transaction_nouvelle': [datetime.datetime.fromtimestamp(estampille)],
+            'transaction_persistance': [datetime.datetime.utcnow()]
         }
 
         resultat = self._collection_transactions.insert_one(enveloppe_transaction)
