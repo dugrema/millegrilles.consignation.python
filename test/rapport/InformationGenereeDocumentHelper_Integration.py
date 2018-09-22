@@ -1,8 +1,18 @@
-from millegrilles.dao.InformationGenereeDocumentHelper import InformationGenereeHelper
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles import Constantes
-import datetime
+
+
+def test_executer_groupement():
+    selection = {
+        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'courant']
+    }
+
+    resultat = helper.executer_distinct('noeud', selection)
+
+    print("Document resultats: %s" % str(resultat))
+
+    return resultat
 
 
 def test_executer_recherche1():
@@ -40,8 +50,9 @@ helper = document_dao.information_generee_helper()
 
 def main():
     try:
-        selection, document_resultat = test_executer_recherche1()
-        test_sauvegarder_rapport(selection, document_resultat)
+        #selection, document_resultat = test_executer_recherche1()
+        #test_sauvegarder_rapport(selection, document_resultat)
+        test_executer_groupement()
 
     finally:
         document_dao.deconnecter()

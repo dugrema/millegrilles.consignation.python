@@ -32,3 +32,7 @@ class InformationGenereeHelper:
             raise Exception("Erreur maj rapport, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
 
         return resultat
+
+    def executer_distinct(self, champ, selection=None):
+        resultat = self._collection_information_documents.distinct(champ, selection)
+        return resultat
