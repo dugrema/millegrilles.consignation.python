@@ -108,10 +108,12 @@ class MGPProcessusControleur(BaseCallback):
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
         self._message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
 
+    def transaction_helper(self):
+        return self._document_dao.transaction_helper()
+
     def preparer_document_helper(self, collection, classe):
         helper = classe(self._document_dao.get_collection(collection))
         return helper
-
 
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
@@ -259,8 +261,13 @@ class MGProcessusTransaction(MGProcessus):
 
         self._transaction = None
 
+    def trouver_id_transaction(self):
+        id_transaction = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        return id_transaction
+
     def charger_transaction(self):
-        id_transaction = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES][Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        id_transaction = self.trouver_id_transaction()
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction)
         return self._transaction
 
@@ -271,7 +278,9 @@ class MGProcessusTransaction(MGProcessus):
 
     ''' Ajoute l'evenement 'traitee' dans la transaction '''
     def marquer_transaction_traitee(self):
-        pass
+        id_transaction = self.trouver_id_transaction()
+        helper = self._controleur.transaction_helper()
+        helper.ajouter_evenement_transaction(id_transaction, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
 
     def marquer_transaction_incomplete(self):
         pass

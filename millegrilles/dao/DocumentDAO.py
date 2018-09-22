@@ -7,6 +7,7 @@ from bson.objectid import ObjectId
 from millegrilles import Constantes
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from millegrilles.dao.InformationGenereeDocumentHelper import InformationGenereeHelper
+from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
 
 '''
 Data access object pour les documents dans MongoDB
@@ -24,6 +25,7 @@ class MongoDAO:
         self._collection_transactions = None
         self._collection_processus = None
         self._collection_information_documents = None
+        self._transaction_document_helper = None
         self._information_document_helper = None
         self._information_generee_helper = None
 
@@ -45,6 +47,7 @@ class MongoDAO:
         self._collection_information_generee = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_GENEREE]
 
         # Generer les classes Helper
+        self._transaction_document_helper = TransactionHelper(self._mg_database)
         self._information_document_helper = InformationDocumentHelper(self._collection_information_documents)
         self._information_generee_helper = InformationGenereeHelper(self._mg_database)
 
@@ -57,9 +60,9 @@ class MongoDAO:
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction['info-transaction']['estampille']
-        enveloppe_transaction['evenements'] = {
-            'transaction_nouvelle': [datetime.datetime.fromtimestamp(estampille)],
-            'transaction_persistance': [datetime.datetime.utcnow()]
+        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
+            Constantes.EVENEMENT_TRANSACTION_NOUVELLE: [datetime.datetime.fromtimestamp(estampille)],
+            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.utcnow()]
         }
 
         resultat = self._collection_transactions.insert_one(enveloppe_transaction)
@@ -137,6 +140,9 @@ class MongoDAO:
 
     def charger_processus_par_id(self, id_doc):
         return self._collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
+
+    def transaction_helper(self):
+        return self._transaction_document_helper
 
     def information_document_helper(self):
         return self._information_document_helper
