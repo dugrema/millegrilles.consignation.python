@@ -4,6 +4,7 @@ from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from bson.objectid import ObjectId
 import datetime
 from millegrilles.processus.MGProcessus import MGProcessus
+from millegrilles.rapport.GenerateurRapports import GenerateurRapport
 
 
 '''
@@ -65,4 +66,22 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
         selection_historique = selection.copy()
         selection_historique[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'historique'])
         self.inserer_historique_quotidien_selection(selection_historique, lecture, timestamp=temps_lect)
+
+class GenerateurPagesNoeudsSenseurs(GenerateurRapport):
+
+    def __init__(self, document_dao):
+        super().__init__(document_dao)
+
+        # Chemin pour le rapport dans la collection des documents generes
+        self.set_chemin_destination(['appareils', 'senseur', 'courant', 'rapport'])
+
+        # Document source pour le rapport.
+        # Chemin = apppareils, senseur, courant
+        # groupe (page) = noeud  (nom du noeud/machine qui enregistre les lectures)
+        # ligne = senseur  (id unique pour un noeud)
+        self.set_source(
+            chemin=['appareils', 'senseur', 'courant'],
+            groupe='noeud',
+            ligne='senseur'
+        )
 
