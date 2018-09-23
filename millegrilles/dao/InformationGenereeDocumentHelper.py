@@ -70,3 +70,21 @@ class InformationGenereeHelper:
                 resultat.append(res['_id'])
 
         return resultat
+
+    '''
+    Methode qui fait un calcule de regroupement
+
+    :param champs: Un champ (str) ou liste de champs a utiliser pour le distinct
+    :param selection: Critere de selection des documents.
+    :returns: List de str (si champ unique) ou de dict (si champs multiples) qui contient les valeurs uniques.
+    '''
+
+    def executer_regroupement_information_documents(self, operation):
+
+        resultat_curseur = self._collection_information_documents.aggregate(operation)
+
+        resultat = []
+        for res in resultat_curseur:
+            resultat.append(res)
+
+        return resultat

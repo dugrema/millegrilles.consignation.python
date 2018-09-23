@@ -4,19 +4,41 @@ from millegrilles import Constantes
 from millegrilles.rapport.GenerateurRapports import GenerateurRapport
 
 
+def test_executer_groupement_calcul():
+    selection = {
+        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'historique'],
+        'noeud': 'test',
+        'senseur': 15
+    }
+
+    regroupement = {
+        '_id': {'noeud': '$noeud', 'senseur': '$senseur'},
+    }
+
+    operation = [
+        {'$match': selection},
+        {'$group': regroupement},
+        {'$unwind': '$faits'}
+    ]
+
+    resultat = helper.executer_regroupement_information_documents(operation)
+    print("Document resultats groupement par noeud: %s" % str(resultat))
+
+    return resultat
+
 def test_executer_groupement():
     selection = {
         Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'courant']
     }
 
     resultat = helper.executer_distinct_information_documents('noeud', selection)
+
     print("Document resultats groupement par noeud: %s" % str(resultat))
 
     resultat = helper.executer_distinct_information_documents(['noeud', 'senseur'], selection)
     print("Document resultats groupement par noeud/senseur: %s" % str(resultat))
 
     return resultat
-
 
 def test_executer_recherche1():
     selection = {
@@ -72,8 +94,9 @@ def main():
     try:
         #selection, document_resultat = test_executer_recherche1()
         #test_sauvegarder_rapport(selection, document_resultat)
-        test_executer_groupement()
+        #test_executer_groupement()
         #test_generateur_documents2()
+        test_executer_groupement_calcul()
 
     finally:
         document_dao.deconnecter()
