@@ -6,19 +6,33 @@ from millegrilles.rapport.GenerateurRapports import GenerateurRapport
 
 def test_executer_groupement_calcul():
     selection = {
-        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'historique'],
+        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique'],
         'noeud': 'test',
         'senseur': 15
     }
 
     regroupement = {
-        '_id': {'noeud': '$noeud', 'senseur': '$senseur'},
+        '_id': {'noeud': '$noeud', 'senseur': '$senseur', 'heurejour':
+            {
+                '$dateFromParts': {
+                    'year': {'$year': '$_mg-estampille'},
+                    'month': {'$month': '$_mg-estampille'},
+                    'day': {'$dayOfMonth': '$_mg-estampille'},
+                    'hour': {'$hour': '$_mg-estampille'}
+                }
+            }
+        },
+        'temperature-maximum': {'$max': '$temperature'},
+        'temperature-minimum': {'$min': '$temperature'},
+        'humidite-maximum': {'$max': '$humidite'},
+        'humidite-minimum': {'$min': '$humidite'},
+        'pression-maximum': {'$max': '$pression'},
+        'pression-minimum': {'$min': '$pression'},
     }
 
     operation = [
         {'$match': selection},
-        {'$group': regroupement},
-        {'$unwind': '$faits'}
+        {'$group': regroupement}
     ]
 
     resultat = helper.executer_regroupement_information_documents(operation)
