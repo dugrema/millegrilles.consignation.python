@@ -119,21 +119,27 @@ class InformationDocumentHelper:
     :param selection: Dictionnaire qui permet d'identifier un document existant pour cet historique.
     :param document: Valeurs a ajouter a l'historique (a la suite)
     '''
-    def inserer_historique_quotidien_selection(self, selection, document, timestamp=datetime.datetime.utcnow()):
+    def inserer_historique_quotidien_selection(self, document, timestamp=datetime.datetime.utcnow()):
 
-        selection_jour = selection.copy()
-        selection_jour['annee'] = timestamp.year
-        selection_jour['mois'] = timestamp.month
-        selection_jour['jour'] = timestamp.day
+        document_historique = document.copy()
+        document_historique['_mg-estampille'] = timestamp
+        document_historique[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = datetime.datetime.utcnow()
 
-        operation = {
-            '$push': {'faits': document},
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
+        resultat = self._collection_information_documents.insert_one(document_historique)
 
-        resultat = self._collection_information_documents.update_one(selection_jour, operation, True)
+        #selection_jour = selection.copy()
+        #selection_jour['annee'] = timestamp.year
+        #selection_jour['mois'] = timestamp.month
+        #selection_jour['jour'] = timestamp.day
 
-        return resultat.upserted_id
+        #operation = {
+        #    '$push': {'faits': document},
+        #    '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        #}
+
+        #resultat = self._collection_information_documents.update_one(selection_jour, operation, True)
+
+        return resultat.inserted_id
 
 
     '''
