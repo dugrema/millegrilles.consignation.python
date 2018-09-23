@@ -1,5 +1,6 @@
 # Module de generateurs de rapports
 
+import datetime
 from millegrilles import Constantes
 
 '''
@@ -9,6 +10,10 @@ information-generee.
 
 
 class GenerateurRapport:
+
+    # Constantes pour cette classe
+    NIVEAU_AGGREGATION_HEURE = 'heure'
+    NIVEAU_AGGREGATION_JOUR = 'jour'
 
     def __init__(self, document_dao):
 
@@ -100,6 +105,72 @@ class GenerateurRapport:
 
         print('Document genere pour groupe %s: %s' % (groupe, resultats))
         return resultats
+
+    '''
+    Methode pour generer des documents de rapport par aggregation sur un champ temporel.
+    
+    :param selection: Dictionnaire qui permet de filtrer les documents a utiliser.
+    :param champs_regroupement: Dictionnaire qui correspond a la clause du $group
+    :param champ_date: Le champ de date ISO sur lequel faire le regroupement
+    :param niveau_aggregation: Utiliser une des constantes NIVEAU_ de cette classe
+    :param date_reference: Date de reference (fin de periode) a utiliser pour ce rapport.
+    '''
+    def generer_document_aggregation_periode(
+            self,
+            selection,
+            champs_regroupement,
+            champ_date='_mg-estampille',
+            niveau_aggregation=NIVEAU_AGGREGATION_HEURE,
+            date_reference=datetime.datetime.now()):
+
+        # Creer fenetre 24h / 30 jours
+
+        if niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_HEURE:
+            time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day,
+                                              date_reference.hour)
+            time_range_from = time_range_to - datetime.timedelta(days=1)
+        elif niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_HEURE:
+            time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day)
+            time_range_from = time_range_to - datetime.timedelta(days=30)
+        else:
+            raise ValueError("niveau_aggregation n'est pas supporte: %s" % niveau_aggregation)
+
+        selection_date = selection.copy()
+        selection_date[champ_date] = {'$gte': time_range_from, '$lt': time_range_to}
+
+        champ_date_var = '$%s' % champ_date
+
+        regroupement_periode = {
+            'year': {'$year': champ_date_var},
+            'month': {'$month': champ_date_var},
+            'day': {'$dayOfMonth': champ_date_var}
+        }
+
+        if niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_HEURE:
+            regroupement_periode['hour'] = {'$hour': champ_date_var}
+
+        regroupement = {
+            '_id': {
+                'noeud': '$noeud',
+                'senseur': '$senseur',
+                'periode': {
+                    '$dateFromParts': regroupement_periode
+                }
+            }
+        }
+
+        regroupement.update(champs_regroupement)
+
+        operation = [
+            {'$match': selection_date},
+            {'$group': regroupement}
+        ]
+
+        resultat = self._information_generee_helper.executer_regroupement_information_documents(operation)
+        print("Document resultats groupement par noeud: %s" % str(resultat))
+
+        return resultat
+
 
     def set_chemin_destination(self, valeur=None):
         self._chemin_destination = valeur

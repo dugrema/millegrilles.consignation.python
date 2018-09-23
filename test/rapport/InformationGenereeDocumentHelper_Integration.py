@@ -124,6 +124,33 @@ def test_generateur_documents2():
 
     generateur.generer()
 
+def test_generateur_aggregation1():
+
+    generateur = GenerateurRapport(document_dao)
+
+    generateur.set_chemin_destination(['appareils', 'senseur', 'rapport', 'quotidien'])
+
+    selection = {
+        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique'],
+        'noeud': 'test',
+        'senseur': 15
+    }
+
+    regroupement_champs = {
+        'temperature-maximum': {'$max': '$temperature'},
+        'temperature-minimum': {'$min': '$temperature'},
+        'humidite-maximum': {'$max': '$humidite'},
+        'humidite-minimum': {'$min': '$humidite'},
+        'pression-maximum': {'$max': '$pression'},
+        'pression-minimum': {'$min': '$pression'}
+    }
+
+    resultat = generateur.generer_document_aggregation_periode(
+        selection,
+        regroupement_champs,
+        '_mg-estampille',
+        date_reference=datetime.datetime(2018,9,21,14))
+    print("Resultat rapport quotidien: %s" % resultat)
 
 # --- MAIN ---
 configuration = TransactionConfiguration()
@@ -138,7 +165,8 @@ def main():
         #test_sauvegarder_rapport(selection, document_resultat)
         #test_executer_groupement()
         #test_generateur_documents2()
-        test_executer_groupement_calcul()
+        #test_executer_groupement_calcul()
+        test_generateur_aggregation1()
 
     finally:
         document_dao.deconnecter()
