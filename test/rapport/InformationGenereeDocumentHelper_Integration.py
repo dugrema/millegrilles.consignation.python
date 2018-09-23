@@ -150,7 +150,16 @@ def test_generateur_aggregation1():
         regroupement_champs,
         '_mg-estampille',
         date_reference=datetime.datetime(2018,9,21,14))
+    print("Resultat rapport horaire: %s" % resultat)
+
+    resultat = generateur.generer_document_aggregation_periode(
+        selection,
+        regroupement_champs,
+        '_mg-estampille',
+        niveau_aggregation=GenerateurRapport.NIVEAU_AGGREGATION_JOUR,
+        date_reference=datetime.datetime(2018,9,21,14))
     print("Resultat rapport quotidien: %s" % resultat)
+
 
 # --- MAIN ---
 configuration = TransactionConfiguration()

@@ -129,7 +129,7 @@ class GenerateurRapport:
             time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day,
                                               date_reference.hour)
             time_range_from = time_range_to - datetime.timedelta(days=1)
-        elif niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_HEURE:
+        elif niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_JOUR:
             time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day)
             time_range_from = time_range_to - datetime.timedelta(days=30)
         else:
