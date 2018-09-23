@@ -43,7 +43,7 @@ def test_maj_document_contenu(selection):
     informationHelper.maj_document_selection(selection, valeurs, upsert=True)
 
 def test_historique(selection, document):
-    informationHelper.inserer_historique_quotidien_selection(selection, document)
+    informationHelper.inserer_historique_information_document(selection, document)
 
 def test_existance_document(selection):
     resultat = informationHelper.verifier_existance_document(selection)

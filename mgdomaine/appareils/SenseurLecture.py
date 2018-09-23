@@ -46,7 +46,7 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
         document_historique = lecture.copy()
         document_historique[Constantes.DOCUMENT_INFODOC_CHEMIN] = self.chemin(['senseur', 'lecture', 'historique'])
         temps_lect = datetime.datetime.fromtimestamp(lecture['temps_lecture'])
-        self.inserer_historique_quotidien_selection(document_historique, timestamp=temps_lect)
+        self.inserer_historique_information_document(document_historique, timestamp=temps_lect)
 
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         selection = {

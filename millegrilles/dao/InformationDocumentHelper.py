@@ -116,10 +116,10 @@ class InformationDocumentHelper:
     '''
     Inser un dictionnaire dans un document d'historique. Le document complet est conserve dans une liste.
     
-    :param selection: Dictionnaire qui permet d'identifier un document existant pour cet historique.
     :param document: Valeurs a ajouter a l'historique (a la suite)
+    :param timestamp: Date a utiliser pour _mg-estampille (devrait etre date effective de l'information)
     '''
-    def inserer_historique_quotidien_selection(self, document, timestamp=datetime.datetime.utcnow()):
+    def inserer_historique_information_document(self, document, timestamp=datetime.datetime.utcnow()):
 
         document_historique = document.copy()
         document_historique['_mg-estampille'] = timestamp
