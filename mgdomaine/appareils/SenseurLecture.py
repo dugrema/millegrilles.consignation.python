@@ -85,3 +85,21 @@ class GenerateurPagesNoeudsSenseurs(GenerateurRapport):
             ligne='senseur'
         )
 
+
+class GenerateurPagesNoeudsStatistiques(GenerateurRapport):
+
+    def __init__(self, document_dao):
+        super().__init__(document_dao)
+
+        # Chemin pour le rapport dans la collection des documents generes
+        self.set_chemin_destination(['appareils', 'senseur', 'historique', 'rapportderniermois'])
+
+        # Document source pour le rapport.
+        # Chemin = apppareils, senseur, courant
+        # groupe (page) = noeud  (nom du noeud/machine qui enregistre les lectures)
+        # ligne = senseur  (id unique pour un noeud)
+        self.set_source(
+            chemin=['appareils', 'senseur', 'courant', 'historique'],
+            groupe=['noeud', 'senseur']
+        )
+

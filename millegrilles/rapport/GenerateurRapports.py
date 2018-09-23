@@ -72,11 +72,13 @@ class GenerateurRapport:
         chemin = self._source[Constantes.DOCUMENT_INFODOC_CHEMIN]
 
         # Il faut faire une requete qui va sortir la liste complete des groupes
-        champ_groupe = self._source['groupe']
+        champs_groupe = self._source['groupe']
         selection_groupes = {
-            Constantes.DOCUMENT_INFODOC_CHEMIN: chemin,
+            Constantes.DOCUMENT_INFODOC_CHEMIN: chemin
         }
-        groupes = self._information_generee_helper.executer_distinct_information_documents(champ_groupe)
+        groupes = self._information_generee_helper.executer_distinct_information_documents(
+            champs_groupe,
+            selection=selection_groupes)
 
         return groupes
 

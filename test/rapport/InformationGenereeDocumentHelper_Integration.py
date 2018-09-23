@@ -10,8 +10,10 @@ def test_executer_groupement():
     }
 
     resultat = helper.executer_distinct_information_documents('noeud', selection)
+    print("Document resultats groupement par noeud: %s" % str(resultat))
 
-    print("Document resultats: %s" % str(resultat))
+    resultat = helper.executer_distinct_information_documents(['noeud', 'senseur'], selection)
+    print("Document resultats groupement par noeud/senseur: %s" % str(resultat))
 
     return resultat
 
@@ -70,8 +72,8 @@ def main():
     try:
         #selection, document_resultat = test_executer_recherche1()
         #test_sauvegarder_rapport(selection, document_resultat)
-        #test_executer_groupement()
-        test_generateur_documents2()
+        test_executer_groupement()
+        #test_generateur_documents2()
 
     finally:
         document_dao.deconnecter()
