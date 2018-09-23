@@ -2,18 +2,29 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles import Constantes
 from millegrilles.rapport.GenerateurRapports import GenerateurRapport
+import datetime
 
 
 def test_executer_groupement_calcul():
+
+    # Creer fenetre 24h
+    #current_time = datetime.datetime.utcnow()
+    current_time = datetime.datetime(2018, 9, 21, 11, 12, 2)
+    time_range1 = datetime.datetime(current_time.year, current_time.month, current_time.day, current_time.hour)
+    time_range2 = time_range1 - datetime.timedelta(days=1)
+
     selection = {
         Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique'],
         'noeud': 'test',
-        'senseur': 15
+        'senseur': 15,
+        '_mg-estampille': {'$gte': time_range2, '$lte': time_range1}
     }
 
     regroupement = {
-        '_id': {'noeud': '$noeud', 'senseur': '$senseur', 'heurejour':
-            {
+        '_id': {
+            'noeud': '$noeud',
+            'senseur': '$senseur',
+            'heurejour': {
                 '$dateFromParts': {
                     'year': {'$year': '$_mg-estampille'},
                     'month': {'$month': '$_mg-estampille'},
