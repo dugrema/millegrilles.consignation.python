@@ -7,42 +7,59 @@ import datetime
 
 def test_executer_groupement_calcul():
 
-    # Creer fenetre 24h
-    #current_time = datetime.datetime.utcnow()
-    current_time = datetime.datetime(2018, 9, 21, 11, 12, 2)
-    time_range1 = datetime.datetime(current_time.year, current_time.month, current_time.day, current_time.hour)
-    time_range2 = time_range1 - datetime.timedelta(days=1)
-
+    # Parametres
     selection = {
         Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique'],
         'noeud': 'test',
-        'senseur': 15,
-        '_mg-estampille': {'$gte': time_range2, '$lte': time_range1}
+        'senseur': 15
     }
 
-    regroupement = {
-        '_id': {
-            'noeud': '$noeud',
-            'senseur': '$senseur',
-            'heurejour': {
-                '$dateFromParts': {
-                    'year': {'$year': '$_mg-estampille'},
-                    'month': {'$month': '$_mg-estampille'},
-                    'day': {'$dayOfMonth': '$_mg-estampille'},
-                    'hour': {'$hour': '$_mg-estampille'}
-                }
-            }
-        },
+    regroupement_champs = {
         'temperature-maximum': {'$max': '$temperature'},
         'temperature-minimum': {'$min': '$temperature'},
         'humidite-maximum': {'$max': '$humidite'},
         'humidite-minimum': {'$min': '$humidite'},
         'pression-maximum': {'$max': '$pression'},
-        'pression-minimum': {'$min': '$pression'},
+        'pression-minimum': {'$min': '$pression'}
     }
 
+    grouper_jours = True
+
+    # Creer fenetre 24h / 30 jours
+    current_time = datetime.datetime(2018, 9, 21, 15, 16, 2)
+    if grouper_jours:
+        time_range_to = datetime.datetime(current_time.year, current_time.month, current_time.day, current_time.hour)
+        time_range_from = time_range_to - datetime.timedelta(days=1)
+    else:
+        time_range_to = datetime.datetime(current_time.year, current_time.month, current_time.day)
+        time_range_from = time_range_to - datetime.timedelta(days=30)
+
+    selection_date = selection.copy()
+    selection_date['_mg-estampille'] = {'$gte': time_range_from, '$lt': time_range_to}
+
+    regroupement_periode = {
+        'year': {'$year': '$_mg-estampille'},
+        'month': {'$month': '$_mg-estampille'},
+        'day': {'$dayOfMonth': '$_mg-estampille'}
+    }
+
+    if grouper_jours:
+        regroupement_periode['hour'] = {'$hour': '$_mg-estampille'}
+
+    regroupement = {
+        '_id': {
+            'noeud': '$noeud',
+            'senseur': '$senseur',
+            'periode': {
+                '$dateFromParts': regroupement_periode
+            }
+        }
+    }
+
+    regroupement.update(regroupement_champs)
+
     operation = [
-        {'$match': selection},
+        {'$match': selection_date},
         {'$group': regroupement}
     ]
 
