@@ -11,10 +11,6 @@ information-generee.
 
 class GenerateurRapport:
 
-    # Constantes pour cette classe
-    NIVEAU_AGGREGATION_HEURE = 'heure'
-    NIVEAU_AGGREGATION_JOUR = 'jour'
-
     def __init__(self, document_dao):
 
         if document_dao is None:
@@ -43,6 +39,9 @@ class GenerateurRapport:
         # liste ordonnee des transformations a appliquer sur chaque ligne
         self._transformations = None
 
+    def generer(self):
+        raise NotImplemented('La methode doit etre redefinie par une sous-classe')
+
     def set_source(self, chemin, ligne=Constantes.MONGO_DOC_ID, groupe=None):
         self._source = {
             Constantes.DOCUMENT_INFODOC_CHEMIN: chemin,
@@ -50,6 +49,29 @@ class GenerateurRapport:
         }
         if groupe is not None:
             self._source['groupe'] = groupe
+
+    def identifier_groupes_rapport(self):
+        chemin = self._source[Constantes.DOCUMENT_INFODOC_CHEMIN]
+
+        # Il faut faire une requete qui va sortir la liste complete des groupes
+        champs_groupe = self._source['groupe']
+        selection_groupes = {
+            Constantes.DOCUMENT_INFODOC_CHEMIN: chemin
+        }
+        groupes = self._information_generee_helper.executer_distinct_information_documents(
+            champs_groupe,
+            selection=selection_groupes)
+
+        return groupes
+
+    def set_chemin_destination(self, valeur=None):
+        self._chemin_destination = valeur
+
+
+class GenerateurRapportParGroupe(GenerateurRapport):
+
+    def __init__(self, document_dao):
+        super().__init__(document_dao)
 
     def generer(self):
 
@@ -73,20 +95,6 @@ class GenerateurRapport:
             document = self.generer_document_groupe()
             self._information_generee_helper.sauvegarder_rapport(selection_rapport, document)
 
-    def identifier_groupes_rapport(self):
-        chemin = self._source[Constantes.DOCUMENT_INFODOC_CHEMIN]
-
-        # Il faut faire une requete qui va sortir la liste complete des groupes
-        champs_groupe = self._source['groupe']
-        selection_groupes = {
-            Constantes.DOCUMENT_INFODOC_CHEMIN: chemin
-        }
-        groupes = self._information_generee_helper.executer_distinct_information_documents(
-            champs_groupe,
-            selection=selection_groupes)
-
-        return groupes
-
     def generer_document_groupe(self, groupe=None):
 
         selection = {
@@ -106,15 +114,33 @@ class GenerateurRapport:
         print('Document genere pour groupe %s: %s' % (groupe, resultats))
         return resultats
 
+
+class GenerateurRapportParAggregation(GenerateurRapport):
+
+    # Constantes pour cette classe
+    NIVEAU_AGGREGATION_HEURE = 'heure'
+    NIVEAU_AGGREGATION_JOUR = 'jour'
+
+    def __init__(self, document_dao):
+        super().__init__(document_dao)
+
+        self._selection = None
+        self._champs_regroupement = None
+
+        self._champ_date = '_mg-estampille'
+        self._niveau_aggregation = GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE
+        self._date_reference = datetime.datetime.now()
+
+
     '''
-    Methode pour generer des documents de rapport par aggregation sur un champ temporel.
+     Methode pour generer des documents de rapport par aggregation sur un champ temporel.
     
-    :param selection: Dictionnaire qui permet de filtrer les documents a utiliser.
-    :param champs_regroupement: Dictionnaire qui correspond a la clause du $group
-    :param champ_date: Le champ de date ISO sur lequel faire le regroupement
-    :param niveau_aggregation: Utiliser une des constantes NIVEAU_ de cette classe
-    :param date_reference: Date de reference (fin de periode) a utiliser pour ce rapport.
-    '''
+     :param selection: Dictionnaire qui permet de filtrer les documents a utiliser.
+     :param champs_regroupement: Dictionnaire qui correspond a la clause du $group
+     :param champ_date: Le champ de date ISO sur lequel faire le regroupement
+     :param niveau_aggregation: Utiliser une des constantes NIVEAU_ de cette classe
+     :param date_reference: Date de reference (fin de periode) a utiliser pour ce rapport.
+     '''
     def generer_document_aggregation_periode(
             self,
             selection,
@@ -122,14 +148,13 @@ class GenerateurRapport:
             champ_date='_mg-estampille',
             niveau_aggregation=NIVEAU_AGGREGATION_HEURE,
             date_reference=datetime.datetime.now()):
-
         # Creer fenetre 24h / 30 jours
 
-        if niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_HEURE:
+        if niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE:
             time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day,
                                               date_reference.hour)
             time_range_from = time_range_to - datetime.timedelta(days=1)
-        elif niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_JOUR:
+        elif niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_JOUR:
             time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day)
             time_range_from = time_range_to - datetime.timedelta(days=30)
         else:
@@ -146,7 +171,7 @@ class GenerateurRapport:
             'day': {'$dayOfMonth': champ_date_var}
         }
 
-        if niveau_aggregation == GenerateurRapport.NIVEAU_AGGREGATION_HEURE:
+        if niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE:
             regroupement_periode['hour'] = {'$hour': champ_date_var}
 
         regroupement = {
@@ -171,6 +196,24 @@ class GenerateurRapport:
 
         return resultat
 
+    def generer(self):
 
-    def set_chemin_destination(self, valeur=None):
-        self._chemin_destination = valeur
+        selection_rapport = {
+            Constantes.DOCUMENT_INFODOC_CHEMIN: self._chemin_destination
+        }
+
+        if self._source.get('groupe') is not None:
+            groupes = self.identifier_groupes_rapport()
+
+            for groupe in groupes:
+                document = self.generer_document_groupe(groupe)
+
+                # Creer selection pour trouver le document existant ou le creer avec les valeurs appropriees
+                selection_rapport_groupe = selection_rapport.copy()
+                selection_rapport_groupe[self._source['groupe']] = groupe
+
+                self._information_generee_helper.sauvegarder_rapport(selection_rapport_groupe, document)
+        else:
+            # Il n'y a pas de groupes, on appelle la methode pour generer le document une seule fois
+            document = self.generer_document_groupe()
+            self._information_generee_helper.sauvegarder_rapport(selection_rapport, document)

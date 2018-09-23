@@ -1,7 +1,7 @@
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles import Constantes
-from millegrilles.rapport.GenerateurRapports import GenerateurRapport
+from millegrilles.rapport.GenerateurRapports import GenerateurRapportParGroupe, GenerateurRapportParAggregation
 import datetime
 
 
@@ -110,7 +110,7 @@ def test_sauvegarder_rapport(selection, document_genere):
 
 def test_generateur_documents2():
 
-    generateur = GenerateurRapport(document_dao)
+    generateur = GenerateurRapportParGroupe(document_dao)
 
     generateur.set_source(
         chemin=['appareils', 'senseur', 'courant'],
@@ -126,7 +126,7 @@ def test_generateur_documents2():
 
 def test_generateur_aggregation1():
 
-    generateur = GenerateurRapport(document_dao)
+    generateur = GenerateurRapportParAggregation(document_dao)
 
     generateur.set_chemin_destination(['appareils', 'senseur', 'rapport', 'quotidien'])
 
@@ -156,7 +156,7 @@ def test_generateur_aggregation1():
         selection,
         regroupement_champs,
         '_mg-estampille',
-        niveau_aggregation=GenerateurRapport.NIVEAU_AGGREGATION_JOUR,
+        niveau_aggregation=GenerateurRapportParAggregation.NIVEAU_AGGREGATION_JOUR,
         date_reference=datetime.datetime(2018,9,21,14))
     print("Resultat rapport quotidien: %s" % resultat)
 
@@ -172,6 +172,7 @@ def main():
     try:
         #selection, document_resultat = test_executer_recherche1()
         #test_sauvegarder_rapport(selection, document_resultat)
+
         #test_executer_groupement()
         #test_generateur_documents2()
         #test_executer_groupement_calcul()
