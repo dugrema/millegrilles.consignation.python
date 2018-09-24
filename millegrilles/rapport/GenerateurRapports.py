@@ -121,15 +121,24 @@ class GenerateurRapportParAggregation(GenerateurRapport):
     NIVEAU_AGGREGATION_HEURE = 'heure'
     NIVEAU_AGGREGATION_JOUR = 'jour'
 
-    def __init__(self, document_dao):
+    def __init__(
+            self,
+            document_dao,
+            selection,
+            champs_regroupement,
+            champ_date='_mg-estampille',
+            niveau_aggregation=NIVEAU_AGGREGATION_HEURE,
+            date_reference=datetime.datetime.now()
+    ):
+
         super().__init__(document_dao)
 
-        self._selection = None
-        self._champs_regroupement = None
+        self._selection = selection
+        self._champs_regroupement = champs_regroupement
 
-        self._champ_date = '_mg-estampille'
-        self._niveau_aggregation = GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE
-        self._date_reference = datetime.datetime.now()
+        self._champ_date = champ_date
+        self._niveau_aggregation = niveau_aggregation
+        self._date_reference = date_reference
 
 
     '''
@@ -141,29 +150,25 @@ class GenerateurRapportParAggregation(GenerateurRapport):
      :param niveau_aggregation: Utiliser une des constantes NIVEAU_ de cette classe
      :param date_reference: Date de reference (fin de periode) a utiliser pour ce rapport.
      '''
-    def generer_document_aggregation_periode(
-            self,
-            selection,
-            champs_regroupement,
-            champ_date='_mg-estampille',
-            niveau_aggregation=NIVEAU_AGGREGATION_HEURE,
-            date_reference=datetime.datetime.now()):
+    def generer_document_aggregation_periode(self, groupe):
         # Creer fenetre 24h / 30 jours
 
-        if niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE:
-            time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day,
-                                              date_reference.hour)
+        if self._niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE:
+            time_range_to = datetime.datetime(self._date_reference.year, self._date_reference.month, self._date_reference.day,
+                                              self._date_reference.hour)
             time_range_from = time_range_to - datetime.timedelta(days=1)
-        elif niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_JOUR:
-            time_range_to = datetime.datetime(date_reference.year, date_reference.month, date_reference.day)
+        elif self._niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_JOUR:
+            time_range_to = datetime.datetime(self._date_reference.year, self._date_reference.month, self._date_reference.day)
             time_range_from = time_range_to - datetime.timedelta(days=30)
         else:
-            raise ValueError("niveau_aggregation n'est pas supporte: %s" % niveau_aggregation)
+            raise ValueError("niveau_aggregation n'est pas supporte: %s" % self._niveau_aggregation)
 
-        selection_date = selection.copy()
-        selection_date[champ_date] = {'$gte': time_range_from, '$lt': time_range_to}
+        selection_date = self._selection.copy()
+        selection_date[self._champ_date] = {'$gte': time_range_from, '$lt': time_range_to}
+        if groupe is not None:
+            selection_date.update(groupe)
 
-        champ_date_var = '$%s' % champ_date
+        champ_date_var = '$%s' % self._champ_date
 
         regroupement_periode = {
             'year': {'$year': champ_date_var},
@@ -171,7 +176,7 @@ class GenerateurRapportParAggregation(GenerateurRapport):
             'day': {'$dayOfMonth': champ_date_var}
         }
 
-        if niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE:
+        if self._niveau_aggregation == GenerateurRapportParAggregation.NIVEAU_AGGREGATION_HEURE:
             regroupement_periode['hour'] = {'$hour': champ_date_var}
 
         regroupement = {
@@ -184,7 +189,7 @@ class GenerateurRapportParAggregation(GenerateurRapport):
             }
         }
 
-        regroupement.update(champs_regroupement)
+        regroupement.update(self._champs_regroupement)
 
         operation = [
             {'$match': selection_date},
@@ -192,6 +197,9 @@ class GenerateurRapportParAggregation(GenerateurRapport):
         ]
 
         resultat = self._information_generee_helper.executer_regroupement_information_documents(operation)
+
+        # Le document est une liste - pour sauvegarder, on doit lui donner un nom d'element
+        resultat = {'lignes': resultat}
         print("Document resultats groupement par noeud: %s" % str(resultat))
 
         return resultat
@@ -204,16 +212,20 @@ class GenerateurRapportParAggregation(GenerateurRapport):
 
         if self._source.get('groupe') is not None:
             groupes = self.identifier_groupes_rapport()
+            print("Groupes: %s" % groupes)
 
             for groupe in groupes:
-                document = self.generer_document_groupe(groupe)
+                document = self.generer_document_aggregation_periode(groupe)
 
                 # Creer selection pour trouver le document existant ou le creer avec les valeurs appropriees
                 selection_rapport_groupe = selection_rapport.copy()
-                selection_rapport_groupe[self._source['groupe']] = groupe
+                if isinstance(groupe, str):
+                    selection_rapport_groupe[self._source['groupe']] = groupe
+                elif isinstance(groupe, dict):
+                    selection_rapport_groupe.update(groupe)
 
                 self._information_generee_helper.sauvegarder_rapport(selection_rapport_groupe, document)
         else:
             # Il n'y a pas de groupes, on appelle la methode pour generer le document une seule fois
-            document = self.generer_document_groupe()
+            document = self.generer_document_aggregation_periode()
             self._information_generee_helper.sauvegarder_rapport(selection_rapport, document)

@@ -18,15 +18,15 @@ from millegrilles.dao.MessageDAO import PikaDAO
 def envoyer_message_test_senseur_lecture():
 
     lecture_modele = {
-        'millivolt': 2811,
+        'millivolt': 2911,
         'version': 6,
-        'temps_lecture': 1537476850,
-        'humidite': 55.9,
+        'temps_lecture': 1537499050,
+        'humidite': 54.9,
         'location': '15',
         'pression': 101.5,
-        'senseur': 15,
+        'senseur': 16,
         'noeud': 'test',
-        'temperature': 19.00
+        'temperature': 21.00
     }
 
     enveloppe = messageDao.transmettre_message_transaction(lecture_modele,

@@ -85,6 +85,10 @@ class InformationGenereeHelper:
 
         resultat = []
         for res in resultat_curseur:
+            # Remplacer le champ _id, transferer les valeurs dans le document principal
+            res.update(res['_id'])
+            del res['_id']
+
             resultat.append(res)
 
         return resultat

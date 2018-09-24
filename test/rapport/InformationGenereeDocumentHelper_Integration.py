@@ -126,14 +126,8 @@ def test_generateur_documents2():
 
 def test_generateur_aggregation1():
 
-    generateur = GenerateurRapportParAggregation(document_dao)
-
-    generateur.set_chemin_destination(['appareils', 'senseur', 'rapport', 'quotidien'])
-
     selection = {
-        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique'],
-        'noeud': 'test',
-        'senseur': 15
+        Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique']
     }
 
     regroupement_champs = {
@@ -145,20 +139,40 @@ def test_generateur_aggregation1():
         'pression-minimum': {'$min': '$pression'}
     }
 
-    resultat = generateur.generer_document_aggregation_periode(
+    # Rapport 24h
+
+    generateur1 = GenerateurRapportParAggregation(
+        document_dao,
         selection,
         regroupement_champs,
         '_mg-estampille',
-        date_reference=datetime.datetime(2018,9,21,14))
-    print("Resultat rapport horaire: %s" % resultat)
+        date_reference=datetime.datetime(2018,9,21,12))
 
-    resultat = generateur.generer_document_aggregation_periode(
+    generateur1.set_chemin_destination(['appareils', 'senseur', 'rapport', 'horaire'])
+    generateur1.set_source(
+        chemin=['appareils', 'senseur', 'lecture', 'historique'],
+        groupe=['noeud','senseur']
+    )
+
+    generateur1.generer()
+
+    # Rapport 30j
+
+    generateur2 = GenerateurRapportParAggregation(
+        document_dao,
         selection,
         regroupement_champs,
         '_mg-estampille',
         niveau_aggregation=GenerateurRapportParAggregation.NIVEAU_AGGREGATION_JOUR,
-        date_reference=datetime.datetime(2018,9,21,14))
-    print("Resultat rapport quotidien: %s" % resultat)
+        date_reference=datetime.datetime(2018,9,24))
+
+    generateur2.set_chemin_destination(['appareils', 'senseur', 'rapport', 'quotidien'])
+    generateur2.set_source(
+        chemin=['appareils', 'senseur', 'lecture', 'historique'],
+        groupe=['noeud','senseur']
+    )
+
+    generateur2.generer()
 
 
 # --- MAIN ---
