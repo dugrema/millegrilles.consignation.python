@@ -130,10 +130,12 @@ class InformationDocumentHelper:
             raise Exception("Erreur maj contenu documents, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
 
         upserted_id = None
+        evenement = Constantes.EVENEMENT_DOCUMENT_MAJ
         if resultat.upserted_id is not None:
             upserted_id = str(resultat.upserted_id)
+            evenement = Constantes.EVENEMENT_DOCUMENT_AJOUTE
 
-        self.transmettre_evenement(selection, Constantes.EVENEMENT_DOCUMENT_MAJ, upserted_id)
+        self.transmettre_evenement(selection, evenement, upserted_id)
 
         return resultat.upserted_id
 

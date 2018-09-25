@@ -20,11 +20,11 @@ def envoyer_message_test_senseur_lecture():
     lecture_modele = {
         'millivolt': 2911,
         'version': 6,
-        'temps_lecture': 1537504052,
+        'temps_lecture': 1537504053,
         'humidite': 54.9,
-        'location': '15',
+        'location': 'NA',
         'pression': 101.5,
-        'senseur': 16,
+        'senseur': 18,
         'noeud': 'test',
         'temperature': 21.00
     }
