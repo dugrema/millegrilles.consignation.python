@@ -48,7 +48,6 @@ class MongoDAO:
 
         # Generer les classes Helper
         self._transaction_document_helper = TransactionHelper(self._mg_database)
-        self._information_document_helper = InformationDocumentHelper(self._collection_information_documents)
         self._information_generee_helper = InformationGenereeHelper(self._mg_database)
         self._processus_document_helper = ProcessusHelper(self._mg_database)
 
@@ -73,7 +72,7 @@ class MongoDAO:
         return self._transaction_document_helper
 
     def information_document_helper(self):
-        return self._information_document_helper
+        raise NotImplementedError('Deprecated')
 
     def information_generee_helper(self):
         return self._information_generee_helper

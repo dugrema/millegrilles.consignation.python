@@ -119,6 +119,12 @@ class MGPProcessusControleur(BaseCallback):
         helper = classe(self._document_dao.get_collection(collection))
         return helper
 
+    def document_dao(self):
+        return self._document_dao
+
+    def message_dao(self):
+        return self._message_dao
+
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
     

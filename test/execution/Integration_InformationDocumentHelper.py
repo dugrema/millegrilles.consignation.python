@@ -50,11 +50,15 @@ def test_existance_document(selection):
     print("Document existe: %s" % str(resultat))
 
 # Wiring initial
+class MessageDaoStub:
+    pass
+
+message_dao = MessageDaoStub()
 configuration = TransactionConfiguration()
 configuration.loadEnvironment()
 documentDao = MongoDAO(configuration)
 documentDao.connecter()
-informationHelper = documentDao.information_document_helper()
+informationHelper = InformationDocumentHelper(documentDao, message_dao)
 
 try:
     doc_id = test_ajouter_document()

@@ -11,8 +11,7 @@ class ProcessusSenseurConserverLecture(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def dao_helper(self):
-        helper = self._controleur.preparer_document_helper(
-            Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS, AppareilInformationDocumentHelper)
+        helper = AppareilInformationDocumentHelper(self._controleur.document_dao(), self._controleur.message_dao())
         return helper
 
     def initiale(self):

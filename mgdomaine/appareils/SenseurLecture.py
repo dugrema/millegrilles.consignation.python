@@ -12,8 +12,8 @@ Classe qui permet de creer et modifier des documents de la collection Informatio
 '''
 class AppareilInformationDocumentHelper(InformationDocumentHelper):
 
-    def __init__(self, collection_information_documents):
-        super().__init__(collection_information_documents)
+    def __init__(self, document_dao, message_dao):
+        super().__init__(document_dao, message_dao)
 
     def chemin(self, sous_chemin=[]):
         chemin_complet = ['appareils']

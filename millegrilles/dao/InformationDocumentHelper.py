@@ -9,8 +9,18 @@ Classe avec des methodes pour travailler dans la collection 'information-documen
 '''
 class InformationDocumentHelper:
 
-    def __init__(self, collection_information_documents):
-        self._collection_information_documents = collection_information_documents
+    def __init__(self, document_dao, message_dao):
+
+        if document_dao is None:
+            raise TypeError('document_dao ne doit pas etre None')
+
+        if message_dao is None:
+            raise TypeError('message_dao ne doit pas etre None')
+
+        self._document_dao = document_dao
+        self._message_dao = message_dao
+
+        self._collection_information_documents = document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS)
 
     def charger_par_id(self, id_document):
         document = self._collection_information_documents.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_document)})
