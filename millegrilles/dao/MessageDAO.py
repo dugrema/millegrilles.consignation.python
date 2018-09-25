@@ -285,6 +285,21 @@ class PikaDAO:
                                    routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
                                    body=message_utf8)
 
+    def transmettre_evenement_generateur_documents(self, message):
+
+        chemin = message.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
+        if chemin is not None:
+            chemin = '.%s' % '.'.join(chemin)
+        else:
+            chemin = ''
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                                   routing_key='%s.generateurdocuments%s' % (self.configuration.nom_millegrille, chemin),
+                                   body=message_utf8)
+
+
     # Mettre la classe en etat d'erreur
     def enterErrorState(self):
         self.inError = True

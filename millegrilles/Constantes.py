@@ -74,8 +74,11 @@ DOCUMENT_INFODOC_UUID = '_mg-uuid-doc'
 DOCUMENT_INFODOC_DERNIERE_MODIFICATION = '_mg-derniere-modification'
 
 # Evenements
+EVENEMENT_MESSAGE_EVENEMENT = 'evenement'
 EVENEMENT_TRANSACTION_NOUVELLE = 'transaction_nouvelle'
 EVENEMENT_TRANSACTION_TRAITEE = 'transaction_traitee'
 EVENEMENT_DOCUMENT_PERSISTE = 'document_persiste'
 EVENEMENT_DOCUMENT_MAJ = 'document_maj'
 EVENEMENT_DOCUMENT_SUPPRIME = 'document_supprime'
+EVENEMENT_DOCUMENT_AJOUTE = 'document_ajoute'
+

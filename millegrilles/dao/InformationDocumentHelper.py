@@ -43,6 +43,10 @@ class InformationDocumentHelper:
 
         resultat = self._collection_information_documents.insert_one(document)
         id = resultat.inserted_id
+
+        # Transmettre evenement
+        self.transmettre_evenement(document, Constantes.EVENEMENT_DOCUMENT_AJOUTE, str(id))
+
         return id
 
     ''' Ajuste la date _mg-derniere-modification a maintenant. '''
@@ -80,6 +84,10 @@ class InformationDocumentHelper:
 
         if resultat.modified_count != 1:
             raise Exception("Erreur maj _id-information-documents: %s" % id_document)
+
+        # Transmettre evenement
+        self.transmettre_evenement(selection, Constantes.EVENEMENT_DOCUMENT_MAJ, str(id_document))
+
 
     '''
     Mise a jour de la collection information-documents quand le _id est inconnu. 
@@ -121,6 +129,12 @@ class InformationDocumentHelper:
         if resultat.matched_count == 0 and (upsert and resultat.upserted_id is None):
             raise Exception("Erreur maj contenu documents, aucune insertion/maj (match:%d): %s" % (resultat.matched_count, selection))
 
+        upserted_id = None
+        if resultat.upserted_id is not None:
+            upserted_id = str(resultat.upserted_id)
+
+        self.transmettre_evenement(selection, Constantes.EVENEMENT_DOCUMENT_MAJ, upserted_id)
+
         return resultat.upserted_id
 
     '''
@@ -149,6 +163,8 @@ class InformationDocumentHelper:
 
         #resultat = self._collection_information_documents.update_one(selection_jour, operation, True)
 
+        self.transmettre_evenement(document_historique, Constantes.EVENEMENT_DOCUMENT_AJOUTE, str(resultat.inserted_id))
+
         return resultat.inserted_id
 
 
@@ -161,3 +177,25 @@ class InformationDocumentHelper:
         resultat = self._collection_information_documents.find_one(selection, '{_id: 1}')
         print("Resultat: %s" % str(resultat))
         return resultat is not None
+
+
+    def transmettre_evenement(self, selection, evenement, id_document=None):
+        if id_document is None:
+            id_document = selection.get(Constantes.MONGO_DOC_ID)
+
+        chemin = selection.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
+
+        message = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement
+        }
+
+        if id_document is not None:
+            message[Constantes.MONGO_DOC_ID] = id_document
+        else:
+            # Inclure l'information de selection au complet pour permettre de retrouver le document
+            message.update(selection)
+
+        if chemin is not None:
+            message[Constantes.DOCUMENT_INFODOC_CHEMIN] = chemin
+
+        self._message_dao.transmettre_evenement_generateur_documents(message)
