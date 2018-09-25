@@ -39,7 +39,8 @@ class PikaDAO:
 
     def configurer_rabbitmq(self):
 
-        # S'assurer que toutes les queues existes
+        # S'assurer que toutes les queues durables existes. Ces queues doivent toujours exister
+        # pour eviter que des messages de donnees originales ne soient perdus.
         nom_millegrille = self.configuration.nom_millegrille
         nom_echange_evenements = self.configuration.exchange_evenements
         nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
@@ -47,6 +48,8 @@ class PikaDAO:
         nom_q_entree_processus =  self.queuename_entree_processus()
         nom_q_mgp_processus =  self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
+
+        nom_q_generateur_documents = self.queuename_generateur_documents()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
         self.channel.exchange_declare(
@@ -109,6 +112,19 @@ class PikaDAO:
             queue=nom_q_erreurs_processus,
             routing_key='%s.processus.erreur' % nom_millegrille
         )
+
+        # Creer la Q pour le gestionnaire de generateurs de documents
+        self.channel.queue_declare(
+            queue=nom_q_generateur_documents,
+            durable=True)
+
+        self.channel.queue_bind(
+            exchange=nom_echange_evenements,
+            queue=nom_q_generateur_documents,
+            routing_key='%s.generateurdocuments.#' % nom_millegrille
+        )
+
+
 
     ''' Prepare la reception de message '''
     def demarrer_lecture_nouvelles_transactions(self, callback):
@@ -311,6 +327,9 @@ class PikaDAO:
 
     def queuename_mgp_processus(self):
         return self._queuename(self.configuration.queue_mgp_processus)
+
+    def queuename_generateur_documents(self):
+        return self._queuename(self.configuration.queue_generateur_documents)
 
 ''' Classe avec utilitaires pour JSON '''
 
