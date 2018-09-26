@@ -6,7 +6,9 @@ from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper, PikaDAO
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
-from mgdomaine.appareils.SenseurLecture import GenerateurPagesNoeudsSenseurs, GenerateurPagesNoeudsStatistiques
+from mgdomaine.appareils.SenseurLecture import GenerateurPagesNoeudsSenseurs
+from mgdomaine.appareils.SenseurLecture import GenerateurPagesNoeudsStatistiquesDernierJour
+from mgdomaine.appareils.SenseurLecture import GenerateurPagesNoeudsStatistiquesDernierMois
 
 class GestionnaireGenerateurs(BaseCallback):
 
@@ -35,7 +37,8 @@ class GestionnaireGenerateurs(BaseCallback):
 
     def preparer_generateurs(self):
         self.ajouter_generateur(GenerateurPagesNoeudsSenseurs(self._document_dao))
-        self.ajouter_generateur(GenerateurPagesNoeudsStatistiques(self._document_dao))
+        self.ajouter_generateur(GenerateurPagesNoeudsStatistiquesDernierJour(self._document_dao))
+        self.ajouter_generateur(GenerateurPagesNoeudsStatistiquesDernierMois(self._document_dao))
 
     def executer(self):
         self._message_dao.demarrer_lecture_generateur_documents(self.callbackAvecAck)

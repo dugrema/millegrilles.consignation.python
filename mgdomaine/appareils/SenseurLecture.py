@@ -4,7 +4,7 @@ from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from bson.objectid import ObjectId
 import datetime
 from millegrilles.processus.MGProcessus import MGProcessus
-from millegrilles.rapport.GenerateurRapports import GenerateurRapportParGroupe
+from millegrilles.rapport.GenerateurRapports import GenerateurRapportParGroupe, GenerateurRapportParAggregation
 
 
 '''
@@ -93,13 +93,68 @@ class GenerateurPagesNoeudsSenseurs(GenerateurRapportParGroupe):
         return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
 
 
-class GenerateurPagesNoeudsStatistiques(GenerateurRapportParGroupe):
+class GenerateurPagesNoeudsStatistiquesDernierJour(GenerateurRapportParAggregation):
 
     def __init__(self, document_dao):
-        super().__init__(document_dao)
+        selection = {
+            Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique']
+        }
+
+        regroupement_champs = {
+            'temperature-maximum': {'$max': '$temperature'},
+            'temperature-minimum': {'$min': '$temperature'},
+            'humidite-maximum': {'$max': '$humidite'},
+            'humidite-minimum': {'$min': '$humidite'},
+            'pression-maximum': {'$max': '$pression'},
+            'pression-minimum': {'$min': '$pression'}
+        }
+
+        super().__init__(document_dao, selection, regroupement_champs)
 
         # Chemin pour le rapport dans la collection des documents generes
-        self.set_chemin_destination(['appareils', 'senseur', 'historique', 'rapportderniermois'])
+        self.set_chemin_destination(['appareils', 'senseur', 'historique', 'rapport', 'dernierjour'])
+
+        # CLEANUP/AMELIORATION - les valeurs suivantes devraient etre utilisees dans le rapport d'aggretation, a faire.
+
+        # Document source pour le rapport.
+        # Chemin = apppareils, senseur, courant
+        # groupe (page) = noeud  (nom du noeud/machine qui enregistre les lectures)
+        # ligne = senseur  (id unique pour un noeud)
+        self.set_source(
+            chemin=['appareils', 'senseur', 'lecture', 'historique'],
+            groupe=['noeud', 'senseur']
+        )
+
+    '''
+    Le trigger pour generer la page est toute modification a un document sur le chemin.
+    '''
+    def traiter_evenement(self, evenement):
+        chemin_evenement = evenement.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
+        return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
+
+
+class GenerateurPagesNoeudsStatistiquesDernierMois(GenerateurRapportParAggregation):
+
+    def __init__(self, document_dao):
+        selection = {
+            Constantes.DOCUMENT_INFODOC_CHEMIN: ['appareils', 'senseur', 'lecture', 'historique']
+        }
+
+        regroupement_champs = {
+            'temperature-maximum': {'$max': '$temperature'},
+            'temperature-minimum': {'$min': '$temperature'},
+            'humidite-maximum': {'$max': '$humidite'},
+            'humidite-minimum': {'$min': '$humidite'},
+            'pression-maximum': {'$max': '$pression'},
+            'pression-minimum': {'$min': '$pression'}
+        }
+
+        super().__init__(document_dao, selection, regroupement_champs, niveau_aggregation=GenerateurRapportParAggregation.NIVEAU_AGGREGATION_JOUR)
+
+        # Chemin pour le rapport dans la collection des documents generes
+        self.set_chemin_destination(['appareils', 'senseur', 'historique', 'rapport', 'derniermois'])
+
+        # CLEANUP/AMELIORATION - les valeurs suivantes devraient etre utilisees dans le rapport d'aggretation, a faire.
 
         # Document source pour le rapport.
         # Chemin = apppareils, senseur, courant
