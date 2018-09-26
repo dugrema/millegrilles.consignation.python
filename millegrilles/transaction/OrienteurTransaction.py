@@ -59,16 +59,13 @@ class OrienteurTransaction(BaseCallback):
     Traitement des nouvelles transactions. Le message est decode et le processus est declenche.
     En cas d'erreur, un message est mis sur la Q d'erreur. Dans tous les cas, le message va etre consomme.
     '''
-    def callbackAvecAck(self, ch, method, properties, body):
+    def traiter_message(self, ch, method, properties, body):
         # Decoder l'evenement qui contient l'information sur la transaction a traiter
         evenement_dict = self.extraire_evenement(body)
 
         # Traiter la transaction: cette methode complete toujours avec succes. Les erreurs
         # sont mises sur une Q a cet effet.
         self.traiter_transaction(evenement_dict)
-
-        # Transmettre le ACK pour indiquer que le message a ete traite
-        super(OrienteurTransaction, self).callbackAvecAck(ch, method, properties, body)
 
     def extraire_evenement(self, message_body):
         # Extraire le message qui devrait etre un document JSON
