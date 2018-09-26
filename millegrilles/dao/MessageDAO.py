@@ -157,6 +157,17 @@ class PikaDAO:
         except OSError as oserr:
             print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
+    ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
+
+    def demarrer_lecture_generateur_documents(self, callback):
+        self.channel.basic_consume(callback,
+                                   queue=self.queuename_generateur_documents(),
+                                   no_ack=False)
+        try:
+            self.channel.start_consuming()
+        except OSError as oserr:
+            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+
     ''' Transmet un message. La connexion doit etre ouverte. '''
     def transmettre_message_transaction(self, message_dict, indice_processus=None):
 
@@ -371,19 +382,35 @@ Classe qui facilite l'implementation de callbacks avec ACK
 class BaseCallback:
 
     def __init__(self):
-        pass
+        self.json_helper = JSONHelper()
 
     def callbackAvecAck(self, ch, method, properties, body):
         try:
             self.traiter_message(ch, method, properties, body)
         except Exception as e:
-            print("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            #print("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            self.transmettre_erreur(ch, body, e)
         finally:
             self.transmettre_ack(ch, method)
 
     def transmettre_ack(self, ch, method):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
+    def transmettre_erreur(self, ch, body, erreur):
+        message = {
+            "message_original": body
+        }
+        if erreur is not None:
+            message["erreur"] = str(erreur)
+            message["stacktrace"] = traceback.format_exception(etype=type(erreur), value=erreur,
+                                                               tb=erreur.__traceback__)
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                                   routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
+                                   body=message_utf8)
+
     ''' Methode qui peut etre remplacee dans la sous-classe '''
     def traiter_message(self, ch, method, properties, body):
-        pass
+        raise NotImplemented('traiter_message() methode doit etre implementee')
