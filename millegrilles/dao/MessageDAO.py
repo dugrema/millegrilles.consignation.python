@@ -381,8 +381,13 @@ Classe qui facilite l'implementation de callbacks avec ACK
 
 class BaseCallback:
 
-    def __init__(self):
+    def __init__(self, configuration):
+
+        if configuration is None:
+            raise TypeError('configuration ne doit pas etre None')
+
         self.json_helper = JSONHelper()
+        self._configuration = configuration
 
     def callbackAvecAck(self, ch, method, properties, body):
         try:
@@ -398,7 +403,7 @@ class BaseCallback:
 
     def transmettre_erreur(self, ch, body, erreur):
         message = {
-            "message_original": body
+            "message_original": str(body)
         }
         if erreur is not None:
             message["erreur"] = str(erreur)
@@ -407,8 +412,10 @@ class BaseCallback:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                   routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
+
+
+        ch.basic_publish(exchange=self._configuration.exchange_evenements,
+                                   routing_key='%s.processus.erreur' % self._configuration.nom_millegrille,
                                    body=message_utf8)
 
     ''' Methode qui peut etre remplacee dans la sous-classe '''

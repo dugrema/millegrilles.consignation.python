@@ -39,8 +39,15 @@ class GenerateurRapport:
         # liste ordonnee des transformations a appliquer sur chaque ligne
         self._transformations = None
 
-    def generer(self):
+    def generer(self, evenement=None):
         raise NotImplemented('La methode doit etre redefinie par une sous-classe')
+
+    '''
+    :returns: True si l'evenement doit etre traite. 
+    '''
+    def traiter_evenement(self, evenement):
+        raise NotImplemented('La methode doit etre redefinie par une sous-classe')
+        # return False
 
     def set_source(self, chemin, ligne=Constantes.MONGO_DOC_ID, groupe=None):
         self._source = {
@@ -73,7 +80,7 @@ class GenerateurRapportParGroupe(GenerateurRapport):
     def __init__(self, document_dao):
         super().__init__(document_dao)
 
-    def generer(self):
+    def generer(self, evenement=None):
 
         selection_rapport = {
             Constantes.DOCUMENT_INFODOC_CHEMIN: self._chemin_destination
@@ -204,7 +211,7 @@ class GenerateurRapportParAggregation(GenerateurRapport):
 
         return resultat
 
-    def generer(self):
+    def generer(self, evenement=None):
 
         selection_rapport = {
             Constantes.DOCUMENT_INFODOC_CHEMIN: self._chemin_destination

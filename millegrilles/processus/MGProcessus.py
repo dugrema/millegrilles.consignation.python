@@ -17,11 +17,11 @@ MGPProcessus = MilleGrilles Python Processus. D'autres controleurs de processus 
 class MGPProcessusControleur(BaseCallback):
 
     def __init__(self):
-        super().__init__()
+        self._configuration = TransactionConfiguration()
+        super().__init__(self._configuration)
 
         self._json_helper = JSONHelper()
 
-        self._configuration = TransactionConfiguration()
         self._document_dao = None
         self._message_dao = None
 

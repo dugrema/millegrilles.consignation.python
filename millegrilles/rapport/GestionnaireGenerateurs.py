@@ -1,10 +1,12 @@
 # Module pour le gestionnaire de generateurs de rapports.
 import signal
+import traceback
 
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper, PikaDAO
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
+from mgdomaine.appareils.SenseurLecture import GenerateurPagesNoeudsSenseurs
 
 class GestionnaireGenerateurs(BaseCallback):
 
@@ -28,6 +30,12 @@ class GestionnaireGenerateurs(BaseCallback):
         # Executer la configuration pour RabbitMQ
         self._message_dao.configurer_rabbitmq()
 
+        # Preparer les generateurs
+        self.preparer_generateurs()
+
+    def preparer_generateurs(self):
+        self.ajouter_generateur(GenerateurPagesNoeudsSenseurs(self._document_dao))
+
     def executer(self):
         self._message_dao.demarrer_lecture_generateur_documents(self.callbackAvecAck)
 
@@ -50,9 +58,13 @@ class GestionnaireGenerateurs(BaseCallback):
         # les generateurs faire le travail avec cette thread avant de marquer le message comme complete (ACK).
         for generateur in self._generateur:
             try:
-                generateur.traiter_evenement(message)
+                doit_traiter_evenement = generateur.traiter_evenement(message)
+                if doit_traiter_evenement:
+                    print("Traiter evenement %s pour generateur %s" % (message, generateur.__class__.__name__))
+                    generateur.generer(message)
             except Exception as e:
-                print("ERREUR Traitement message generateur")
+                print("ERREUR NON GEREE: Traitement message generateur: %s" % str(e))
+                traceback.print_exception(etype=type(e), value=e, tb=e.__traceback__)
 
 # --- MAIN ---
 

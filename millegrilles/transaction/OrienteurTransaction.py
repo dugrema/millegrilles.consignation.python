@@ -16,7 +16,8 @@ class OrienteurTransaction(BaseCallback):
 
     def __init__(self):
 
-        super().__init__()
+        self._configuration = TransactionConfiguration()
+        super().__init__(self._configuration)
 
         self._processus_helper = None
 
@@ -24,7 +25,7 @@ class OrienteurTransaction(BaseCallback):
         self._message_dao = None
         self._document_dao = None
         self._json_helper = JSONHelper()
-        self._configuration = TransactionConfiguration()
+
 
     def initialiser(self):
         self._configuration.loadEnvironment()

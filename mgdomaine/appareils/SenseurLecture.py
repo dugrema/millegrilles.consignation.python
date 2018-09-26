@@ -4,7 +4,7 @@ from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
 from bson.objectid import ObjectId
 import datetime
 from millegrilles.processus.MGProcessus import MGProcessus
-from millegrilles.rapport.GenerateurRapports import GenerateurRapport
+from millegrilles.rapport.GenerateurRapports import GenerateurRapportParGroupe
 
 
 '''
@@ -67,26 +67,33 @@ class AppareilInformationDocumentHelper(InformationDocumentHelper):
             selection_courant[Constantes.DOCUMENT_INFODOC_CHEMIN] = chemin_courant
             self.maj_document_selection(selection_courant, lecture, upsert=True)
 
-class GenerateurPagesNoeudsSenseurs(GenerateurRapport):
+class GenerateurPagesNoeudsSenseurs(GenerateurRapportParGroupe):
 
     def __init__(self, document_dao):
         super().__init__(document_dao)
 
         # Chemin pour le rapport dans la collection des documents generes
-        self.set_chemin_destination(['appareils', 'senseur', 'courant', 'rapport'])
+        self.set_chemin_destination(['appareils', 'senseur', 'lecture', 'noeud'])
 
         # Document source pour le rapport.
         # Chemin = apppareils, senseur, courant
         # groupe (page) = noeud  (nom du noeud/machine qui enregistre les lectures)
         # ligne = senseur  (id unique pour un noeud)
         self.set_source(
-            chemin=['appareils', 'senseur', 'courant'],
+            chemin=['appareils', 'senseur', 'lecture', 'courant'],
             groupe='noeud',
             ligne='senseur'
         )
 
+    '''
+    Le trigger pour generer la page est toute modification a un document sur le chemin.
+    '''
+    def traiter_evenement(self, evenement):
+        chemin_evenement = evenement.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
+        return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
 
-class GenerateurPagesNoeudsStatistiques(GenerateurRapport):
+
+class GenerateurPagesNoeudsStatistiques(GenerateurRapportParGroupe):
 
     def __init__(self, document_dao):
         super().__init__(document_dao)
@@ -99,7 +106,7 @@ class GenerateurPagesNoeudsStatistiques(GenerateurRapport):
         # groupe (page) = noeud  (nom du noeud/machine qui enregistre les lectures)
         # ligne = senseur  (id unique pour un noeud)
         self.set_source(
-            chemin=['appareils', 'senseur', 'courant', 'historique'],
+            chemin=['appareils', 'senseur', 'lecture', 'historique'],
             groupe=['noeud', 'senseur']
         )
 

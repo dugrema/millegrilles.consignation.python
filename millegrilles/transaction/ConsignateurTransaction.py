@@ -13,13 +13,14 @@ from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
 class ConsignateurTransaction(BaseCallback):
 
     def __init__(self):
-        super().__init__()
+        self.configuration = TransactionConfiguration()
+        self.configuration.loadEnvironment()
+
+        super().__init__(self.configuration)
 
         self._transaction_helper = None
 
         self.json_helper = JSONHelper()
-        self.configuration = TransactionConfiguration()
-        self.configuration.loadEnvironment()
         self.message_dao = PikaDAO(self.configuration)
         self.document_dao = MongoDAO(self.configuration)
 
