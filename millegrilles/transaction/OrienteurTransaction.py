@@ -145,7 +145,7 @@ class OrienteurTransaction(BaseCallback):
             if charge_utile is not None:
                 indice = charge_utile.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INDICE_PROCESSUS)
 
-        print("Indice est: %s " % indice)
+        #print("Indice est: %s " % indice)
 
         if indice is not None:
             # Determiner le moteur qui va gerer le processus

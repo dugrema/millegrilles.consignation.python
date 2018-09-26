@@ -34,6 +34,7 @@ class PikaDAO:
             self.configuration.mq_host,
             self.configuration.mq_port))
         self.channel = self.connectionmq.channel()
+        self.channel.basic_qos(prefetch_count=1)
 
         return self.connectionmq
 
@@ -128,12 +129,14 @@ class PikaDAO:
 
     ''' Prepare la reception de message '''
     def demarrer_lecture_nouvelles_transactions(self, callback):
-        self.channel.basic_consume(callback,
-                                   queue='mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions),
-                                   no_ack=False)
+
+        queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions)
+
+        self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
         try:
             self.channel.start_consuming()
+
         except OSError as oserr:
             print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
