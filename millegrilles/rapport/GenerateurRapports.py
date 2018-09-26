@@ -94,7 +94,13 @@ class GenerateurRapportParGroupe(GenerateurRapport):
 
                 # Creer selection pour trouver le document existant ou le creer avec les valeurs appropriees
                 selection_rapport_groupe = selection_rapport.copy()
-                selection_rapport_groupe[self._source['groupe']] = groupe
+
+                if isinstance(groupe, dict):
+                    selection_rapport_groupe.update(groupe)
+                elif isinstance(groupe, str):
+                    selection_rapport_groupe[self._source['groupe']] = groupe
+                else:
+                    raise ValueError("groupe ne contient pas un type supporte: %s" % groupe)
 
                 self._information_generee_helper.sauvegarder_rapport(selection_rapport_groupe, document)
         else:
@@ -109,7 +115,12 @@ class GenerateurRapportParGroupe(GenerateurRapport):
         }
 
         if groupe is not None:
-            selection[self._source['groupe']] = groupe
+            if isinstance(groupe, dict):
+                selection.update(groupe)
+            elif isinstance(groupe, str):
+                selection[self._source['groupe']] = groupe
+            else:
+                raise ValueError("groupe ne contient pas un type supporte: %s" % groupe)
 
         cle_ligne =  self._source['ligne']
         resultats = dict()

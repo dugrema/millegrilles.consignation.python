@@ -110,3 +110,9 @@ class GenerateurPagesNoeudsStatistiques(GenerateurRapportParGroupe):
             groupe=['noeud', 'senseur']
         )
 
+    '''
+    Le trigger pour generer la page est toute modification a un document sur le chemin.
+    '''
+    def traiter_evenement(self, evenement):
+        chemin_evenement = evenement.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
+        return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
