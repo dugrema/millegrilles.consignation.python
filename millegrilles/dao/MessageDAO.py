@@ -183,7 +183,8 @@ class PikaDAO:
 
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
                               routing_key='%s.transaction.nouvelle' % self.configuration.nom_millegrille,
-                              body=message_utf8)
+                              body=message_utf8,
+                              properties=pika.BasicProperties(delivery_mode=2))
 
         return uuid_transaction
 
