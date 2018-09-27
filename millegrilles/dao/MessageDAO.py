@@ -34,7 +34,7 @@ class PikaDAO:
             self.configuration.mq_host,
             self.configuration.mq_port))
         self.channel = self.connectionmq.channel()
-        self.channel.basic_qos(prefetch_count=1)
+        self.channel.basic_qos(prefetch_count=5)
 
         return self.connectionmq
 

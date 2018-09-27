@@ -130,7 +130,8 @@ class GenerateurPagesNoeudsStatistiquesDernierJour(GenerateurRapportParAggregati
     '''
     def traiter_evenement(self, evenement):
         chemin_evenement = evenement.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
-        return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
+        #return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
+        return False # Le trigger n'existe pas encore (cedule)
 
 
 class GenerateurPagesNoeudsStatistiquesDernierMois(GenerateurRapportParAggregation):
@@ -170,4 +171,5 @@ class GenerateurPagesNoeudsStatistiquesDernierMois(GenerateurRapportParAggregati
     '''
     def traiter_evenement(self, evenement):
         chemin_evenement = evenement.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
-        return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
+        # return self._source[Constantes.DOCUMENT_INFODOC_CHEMIN] == chemin_evenement
+        return False # Le trigger n'existe pas encore (cedule)
