@@ -23,6 +23,7 @@ class PikaDAO:
         self.connectionmq = None
         self.channel = None
 
+        self._actif = False
         self.inError = True
 
         self.json_helper = JSONHelper()
@@ -35,6 +36,8 @@ class PikaDAO:
             self.configuration.mq_port))
         self.channel = self.connectionmq.channel()
         self.channel.basic_qos(prefetch_count=5)
+
+        self._actif = True
 
         return self.connectionmq
 
@@ -247,8 +250,8 @@ class PikaDAO:
                 nom_etape)
 
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                              routing_key=routing_key,
-                              body=message_utf8)
+                                   routing_key=routing_key,
+                                   body=message_utf8)
 
     '''
     Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
@@ -329,6 +332,7 @@ class PikaDAO:
 
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
+        self._actif = False
         try:
             if self.connectionmq is not None:
                 if self.channel is not None:
