@@ -1,9 +1,9 @@
 # Module avec logique de gestion de la collection 'information-document' pour le domaine appareils
+import datetime
+
 from millegrilles import Constantes
 from millegrilles.dao.InformationDocumentHelper import InformationDocumentHelper
-from bson.objectid import ObjectId
-import datetime
-from millegrilles.processus.MGProcessus import MGProcessus
+from millegrilles.processus.MGProcessus import MGProcessusTransaction
 from millegrilles.rapport.GenerateurRapports import GenerateurRapportParGroupe, GenerateurRapportParAggregation
 
 
