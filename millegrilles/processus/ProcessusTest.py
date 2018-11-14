@@ -40,4 +40,5 @@ class TestOrienteur(MGProcessus):
             'etape-courante-evenement': self._document_processus[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE]
         }
 
-    #def finale(self): Noter que l'etape finale est deja implementee dans MGProcessus
+    #def finale(self): #Noter que l'etape finale est deja implementee dans MGProcessus
+        #super().finale(self)

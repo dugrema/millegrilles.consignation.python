@@ -90,9 +90,10 @@ class MGPProcessusControleur(BaseCallback):
     """
     def identifier_processus(self, evenement):
         nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
-        nom_module, nom_classe = nom_processus.split('.')
+        nom_module, nom_classe = nom_processus.split(':')
+        nom_module = nom_module.replace("_", ".")
         #print('Importer %s, %s' % (nom_module, nom_classe))
-        module_processus = __import__('millegrilles.processus.%s' % nom_module, fromlist=nom_classe)
+        module_processus = __import__('%s' % nom_module, fromlist=nom_classe)
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
 
@@ -296,6 +297,47 @@ class MGProcessusTransaction(MGProcessus):
 
     def marquer_transaction_incomplete(self):
         pass
+
+
+''' Classe qui sert a demarrer un processus '''
+class MGPProcessusDemarreur:
+
+    def __init__(self, message_dao, document_dao):
+        self._message_dao = message_dao
+        self._document_dao = document_dao
+        self._json_helper = JSONHelper()
+
+        self._processus_helper = None
+
+    ''' Demarre un processus - par defaut c'est un MGPProcessus
+
+    :param processus_a_declencher: Pour un MGPProcessus, nom qualifie d'une classe selon: modA_modB[_...]:Classe
+    :param dictionnaire_evenement: Le message qui declenche ce processus.
+    :param moteur: Nom du moteur (si autre que MGPProcessus)
+    '''
+    def demarrer_processus(self, processus_a_declencher, dictionnaire_evenement, moteur="MGPProcessus"):
+
+        id_document = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO)
+
+        if id_document is not None:
+            try:
+                # On va declencher un nouveau processus
+                id_doc_processus = self._processus_helper.sauvegarder_initialisation_processus(
+                    moteur, processus_a_declencher, dictionnaire_evenement)
+
+                self._message_dao.transmettre_evenement_mgpprocessus(
+                    id_doc_processus,
+                    nom_processus=processus_a_declencher
+                )
+
+            except Exception as erreur:
+                # Erreur inconnue. On va assumer qu'elle est fatale.
+                self._message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
+        else:
+            # Id de la transaction introuvable
+            self._message_dao.transmettre_erreur_transaction(
+                id_document=id_document,
+                detail="Demarrage de processus %s: id transaction introuvable" % processus_a_declencher)
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).

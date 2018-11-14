@@ -12,7 +12,7 @@ class MGPProcessusTest(unittest.TestCase):
         self._controleur._message_dao = self._message_dao
         self._controleur._document_dao = self._message_dao
         self._evenement = {
-            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: 'ProcessusTest.TestOrienteur',
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: 'millegrilles_processus_ProcessusTest:TestOrienteur',
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE: 'initiale',
         }
 
