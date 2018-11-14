@@ -14,6 +14,7 @@ def message_test():
     }
 
     demarreur.demarrer_processus("millegrilles_processus_ProcessusTest:TestOrienteur", message_test_orienteur)
+#    demarreur.demarrer_processus("millegrilles_processus_ProcessusTest:TestInexistant", message_test_orienteur)
 
     return message_test_orienteur
 

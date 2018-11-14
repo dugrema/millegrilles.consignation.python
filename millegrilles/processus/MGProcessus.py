@@ -190,9 +190,9 @@ class MGProcessus:
         # L'etape suviante est declenchee a partir d'un message qui a le nom du processus, l'etape et
         # le document de processus. On va chercher le nom du module et de la classe directement (__module__ et
         # __name__) plutot que d'utiliser des constantes pour faciliter le refactoring.
-        nom_module_tronque = self.__module__.split('.')[2]
+        nom_module_tronque = self.__class__.__module__.replace('.', '_')
         nom_classe = self.__class__.__name__
-        nom_processus = '%s.%s' % (nom_module_tronque, nom_classe)
+        nom_processus = '%s:%s' % (nom_module_tronque, nom_classe)
 
         self._controleur.message_etape_suivante(
             self._document_processus[Constantes.MONGO_DOC_ID],
