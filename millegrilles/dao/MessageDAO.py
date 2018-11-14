@@ -49,8 +49,8 @@ class PikaDAO:
         nom_echange_evenements = self.configuration.exchange_evenements
         nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
         nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
-        nom_q_entree_processus =  self.queuename_entree_processus()
-        nom_q_mgp_processus =  self.queuename_mgp_processus()
+        nom_q_entree_processus = self.queuename_entree_processus()
+        nom_q_mgp_processus = self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
         nom_q_generateur_documents = self.queuename_generateur_documents()
@@ -68,7 +68,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange = nom_echange_evenements,
+            exchange=nom_echange_evenements,
             queue=nom_q_nouvelles_transactions,
             routing_key='%s.transaction.nouvelle' % nom_millegrille
         )
@@ -79,7 +79,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange = nom_echange_evenements,
+            exchange=nom_echange_evenements,
             queue=nom_q_entree_processus,
             routing_key='%s.transaction.persistee' % nom_millegrille
         )
@@ -90,7 +90,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange = nom_echange_evenements,
+            exchange=nom_echange_evenements,
             queue=nom_q_mgp_processus,
             routing_key='%s.mgpprocessus.#' % nom_millegrille
         )
@@ -101,7 +101,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange = nom_echange_evenements,
+            exchange=nom_echange_evenements,
             queue=nom_q_erreurs_transactions,
             routing_key='%s.transaction.erreur' % nom_millegrille
         )
@@ -112,7 +112,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange = nom_echange_evenements,
+            exchange=nom_echange_evenements,
             queue=nom_q_erreurs_processus,
             routing_key='%s.processus.erreur' % nom_millegrille
         )
@@ -127,8 +127,6 @@ class PikaDAO:
             queue=nom_q_generateur_documents,
             routing_key='%s.generateurdocuments.#' % nom_millegrille
         )
-
-
 
     ''' Prepare la reception de message '''
     def demarrer_lecture_nouvelles_transactions(self, callback):
@@ -213,7 +211,7 @@ class PikaDAO:
 
         return enveloppe
 
-    def transmettre_evenement_persistance(self, id_document, id_transaction):
+    def transmettre_evenement_persistance(self, id_document, id_transaction, document_transaction=None):
 
         message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
@@ -222,8 +220,14 @@ class PikaDAO:
         }
         message_utf8 = self.json_helper.dict_vers_json(message)
 
+        if document_transaction is not None and document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine") is not None:
+            nom_domaine = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine")
+            routing_key = '%s.destinataire.domaine.%s' % (self.configuration.nom_millegrille, nom_domaine)
+        else:
+           routing_key = '%s.transaction.persistee' % (self.configuration.nom_millegrille)
+
         self.channel.basic_publish(exchange='millegrilles.evenements',
-                              routing_key='%s.transaction.persistee' % self.configuration.nom_millegrille,
+                              routing_key=routing_key,
                               body=message_utf8)
 
     '''
@@ -326,7 +330,7 @@ class PikaDAO:
             try:
                 self.channel.stop_consuming()
             except:
-                None
+                pass
 
         self.deconnecter()
 
@@ -419,8 +423,6 @@ class BaseCallback:
                                                                tb=erreur.__traceback__)
 
         message_utf8 = self.json_helper.dict_vers_json(message)
-
-
 
         ch.basic_publish(exchange=self._configuration.exchange_evenements,
                                    routing_key='%s.processus.erreur' % self._configuration.nom_millegrille,
