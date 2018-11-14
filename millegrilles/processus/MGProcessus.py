@@ -5,6 +5,7 @@ from millegrilles import Constantes
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.MessageDAO import PikaDAO, BaseCallback, JSONHelper
+from millegrilles.dao.ProcessusDocumentHelper import ProcessusHelper
 
 '''
 Controleur des processus MilleGrilles. Identifie et execute les processus.
@@ -307,7 +308,7 @@ class MGPProcessusDemarreur:
         self._document_dao = document_dao
         self._json_helper = JSONHelper()
 
-        self._processus_helper = None
+        self._processus_helper = ProcessusHelper(document_dao._mg_database)
 
     ''' Demarre un processus - par defaut c'est un MGPProcessus
 
@@ -319,25 +320,19 @@ class MGPProcessusDemarreur:
 
         id_document = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO)
 
-        if id_document is not None:
-            try:
-                # On va declencher un nouveau processus
-                id_doc_processus = self._processus_helper.sauvegarder_initialisation_processus(
-                    moteur, processus_a_declencher, dictionnaire_evenement)
+        try:
+            # On va declencher un nouveau processus
+            id_doc_processus = self._processus_helper.sauvegarder_initialisation_processus(
+                moteur, processus_a_declencher, dictionnaire_evenement)
 
-                self._message_dao.transmettre_evenement_mgpprocessus(
-                    id_doc_processus,
-                    nom_processus=processus_a_declencher
-                )
+            self._message_dao.transmettre_evenement_mgpprocessus(
+                id_doc_processus,
+                nom_processus=processus_a_declencher
+            )
 
-            except Exception as erreur:
-                # Erreur inconnue. On va assumer qu'elle est fatale.
-                self._message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
-        else:
-            # Id de la transaction introuvable
-            self._message_dao.transmettre_erreur_transaction(
-                id_document=id_document,
-                detail="Demarrage de processus %s: id transaction introuvable" % processus_a_declencher)
+        except Exception as erreur:
+            # Erreur inconnue. On va assumer qu'elle est fatale.
+            self._message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
