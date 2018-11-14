@@ -49,7 +49,6 @@ class PikaDAO:
         nom_echange_evenements = self.configuration.exchange_evenements
         nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
         nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
-        nom_q_entree_processus = self.queuename_entree_processus()
         nom_q_mgp_processus = self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
@@ -71,17 +70,6 @@ class PikaDAO:
             exchange=nom_echange_evenements,
             queue=nom_q_nouvelles_transactions,
             routing_key='%s.transaction.nouvelle' % nom_millegrille
-        )
-
-        # Creer la Q d'entree de processus (workflows) pour cette MilleGrille
-        self.channel.queue_declare(
-            queue=nom_q_entree_processus,
-            durable=True)
-
-        self.channel.queue_bind(
-            exchange=nom_echange_evenements,
-            queue=nom_q_entree_processus,
-            routing_key='%s.transaction.persistee' % nom_millegrille
         )
 
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
@@ -356,9 +344,6 @@ class PikaDAO:
 
     def queuename_erreurs_transactions(self):
         return self._queuename(self.configuration.queue_erreurs_transactions)
-
-    def queuename_entree_processus(self):
-        return self._queuename(self.configuration.queue_entree_processus)
 
     def queuename_erreurs_processus(self):
         return self._queuename(self.configuration.queue_erreurs_processus)

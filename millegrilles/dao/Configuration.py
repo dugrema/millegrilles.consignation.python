@@ -12,7 +12,6 @@ class TransactionConfiguration:
             Constantes.CONFIG_MQ_HOST: 'localhost',
             Constantes.CONFIG_MQ_PORT: '5672',
             Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
-            Constantes.CONFIG_QUEUE_ENTREE_PROCESSUS: Constantes.DEFAUT_QUEUE_ENTREE_PROCESSUS,
             Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_ERREURS_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
             Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS: Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
@@ -85,10 +84,6 @@ class TransactionConfiguration:
     @property
     def queue_erreurs_transactions(self):
         return self._mq_config[Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS]
-
-    @property
-    def queue_entree_processus(self):
-        return self._mq_config[Constantes.CONFIG_QUEUE_ENTREE_PROCESSUS]
 
     @property
     def queue_mgp_processus(self):
