@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/MilleGrilles.consignation.python.iml" filepath="$PROJECT_DIR$/.idea/MilleGrilles.consignation.python.iml" />
-      <module fileurl="file://$USER_HOME$/git/MilleGrilles.domaines.python/.idea/MilleGrilles.domaines.python.iml" filepath="$USER_HOME$/git/MilleGrilles.domaines.python/.idea/MilleGrilles.domaines.python.iml" />
       <module fileurl="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/.idea/python.iml" filepath="$USER_HOME$/git/MilleGrilles.consignation/util/python/.idea/python.iml" />
     </modules>
   </component>
