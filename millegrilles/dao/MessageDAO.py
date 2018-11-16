@@ -160,6 +160,19 @@ class PikaDAO:
         except OSError as oserr:
             print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
+    ''' 
+    Methode generique pour transmettre un evenement JSON avec l'echange millegrilles
+    
+    :param routing_key: Routing key utilise pour distribuer le message.
+    :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
+    '''
+    def transmettre_message(self, routing_key, message_dict):
+        message_utf8 = self.json_helper.dict_vers_json(message_dict)
+        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                              routing_key=routing_key,
+                              body=message_utf8,
+                              properties=pika.BasicProperties(delivery_mode=2))
+
     ''' Transmet un message. La connexion doit etre ouverte. '''
     def transmettre_message_transaction(self, message_dict, indice_processus=None):
 
