@@ -145,7 +145,7 @@ class MGProcessus:
     Classe de processus MilleGrilles. Continent des methodes qui representes les etapes du processus.
 
     :param controleur: Controleur de processus qui appelle l'etape
-    :param message: Message recu qui a declenche l'execution de cette etape
+    :param evenement: Message recu qui a declenche l'execution de cette etape
     """
     def __init__(self, controleur, evenement):
         if controleur is None or evenement is None:
@@ -172,7 +172,8 @@ class MGProcessus:
         # est determinee par l'etape precedente d'un processus.
         nom_methode = self._evenement.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE)
         if nom_methode is None:
-            raise ErreurEtapeInconnue("etape-suivante est manquante sur evenement pour classe %s: %s" % (self.__class__.__name__, self._evenement))
+            raise ErreurEtapeInconnue("etape-suivante est manquante sur evenement pour classe %s: %s" % (
+                self.__class__.__name__, self._evenement))
         methode_a_executer = getattr(self, nom_methode)
 
         return methode_a_executer
@@ -236,6 +237,9 @@ class MGProcessus:
             # Erreur inconnue. On va assumer qu'elle est fatale.
             self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur)
 
+    ''' Methode initiale, doit etre implementee par la sous-classe '''
+    def initiale(self):
+        raise NotImplemented("La methode initiale doit etre implementee par la sous-classe")
 
     '''
     Implementation de reference pour l'etape finale. Peut etre modifiee par la sous-classe au besoin.
@@ -263,6 +267,13 @@ class MGProcessus:
     def set_etape_suivante(self, etape_suivante='finale'):
         self._etape_complete = True
         self._etape_suivante = etape_suivante
+
+    def message_dao(self):
+        return self._controleur.message_dao()
+
+    def document_dao(self):
+        return self._controleur.document_dao()
+
 
 '''
 Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
@@ -296,7 +307,7 @@ class MGProcessusTransaction(MGProcessus):
         helper = self._controleur.transaction_helper()
         helper.ajouter_evenement_transaction(id_transaction, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
 
-    def marquer_transaction_incomplete(self):
+    def marquer_transaction_intraitable(self):
         pass
 
 
