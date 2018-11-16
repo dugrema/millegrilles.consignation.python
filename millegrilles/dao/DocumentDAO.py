@@ -57,7 +57,9 @@ class MongoDAO:
     :returns: Document ou None si aucun document ne correspond.
     '''
     def charger_transaction_par_id(self, id_doc):
-        return self._collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
+        if not isinstance(id_doc, ObjectId):
+            id_doc = ObjectId(id_doc)
+        return self._collection_transactions.find_one({Constantes.MONGO_DOC_ID: id_doc})
 
     def charger_processus_par_id(self, id_doc):
         return self._collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
