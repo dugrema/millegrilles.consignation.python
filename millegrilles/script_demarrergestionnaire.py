@@ -1,23 +1,33 @@
-import sys
+import traceback
+import argparse
 
-# **** MAIN ****
+parser = argparse.ArgumentParser(description="Demarrer un gestionnaire de domaine MilleGrilles")
 
-if len(sys.argv) == 3:
+def parse():
+    parser.add_argument('-m', type=str, nargs=1, required=True, help="Nom du module Python")
+    parser.add_argument('-c', type=str, nargs=1, required=True, help="Nom de la classe Python")
 
-    nom_module = sys.argv[1]
-    nom_classe = sys.argv[2]
+    return parser.parse_args()
+
+def run(args):
+    nom_module = args.m[0]
+    nom_classe = args.c[0]
 
     # Executer la methode
 
-    print("Demarrage du gestionnaire ")
+    print("Demarrage du gestionnaire %s %s" % (nom_module, nom_classe))
 
     classe_processus = __import__(nom_module, fromlist=nom_classe)
     classe = getattr(classe_processus, nom_classe)
     instance = classe()
     instance.executer_gestionnaire()
 
-else:
-    print("Il faut fournir le nom du module et le nom de la classe a executer. Exemple script_demarrergestionnaire.py nom.module classe")
-    print("Arguments fournis: %s" % sys.argv)
+# **** MAIN ****
+try:
+    args = parse()
+    run(args)
+except Exception as e:
+    print("Erreur %s" % e)
+    traceback.print_stack()
 
-
+    parser.print_help()
