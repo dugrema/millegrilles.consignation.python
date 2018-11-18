@@ -3,6 +3,8 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.MessageDAO import PikaDAO, JSONHelper
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
+import signal
+import traceback
 
 
 # Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine.
@@ -58,3 +60,34 @@ class GestionnaireDomaine:
     def demarrer_processus(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
 
+    '''
+    Implementer cette methode pour retourner le nom de la queue.
+    
+    :returns: Nom de la Q a ecouter.
+    '''
+    def get_nom_queue(self):
+        raise NotImplementedError("Methode non-implementee")
+
+    '''
+    Methode qui peut etre invoquee pour demarrer l'execution du gestionnaire.
+    '''
+    def executer_gestionnaire(self):
+
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+        try:
+            self.initialiser()
+            self.configurer()
+            self.traiter_backlog()
+            self.demarrer_traitement_messages_blocking(self.get_nom_queue())
+        except Exception as e:
+            print("Interruption du gestionnaire, erreur: %s" % str(e))
+            traceback.print_stack()
+        finally:
+            self.exit_gracefully()
+
+    def exit_gracefully(self, signum=None, frame=None):
+        print("Arret de MGProcessusControleur, signal=%s" % str(signum))
+        self.arreter_traitement_messages()
+        self.deconnecter()
