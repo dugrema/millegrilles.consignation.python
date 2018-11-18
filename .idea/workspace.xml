@@ -1,0 +1,1304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AnalysisUIOptions">
+    <option name="SCOPE_TYPE" value="3" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="" />
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FUSProjectUsageTrigger">
+    <session id="-1818189876">
+      <usages-collector id="statistics.lifecycle.project">
+        <counts>
+          <entry key="project.closed" value="43" />
+          <entry key="project.open.time.0" value="6" />
+          <entry key="project.open.time.1" value="2" />
+          <entry key="project.open.time.10" value="2" />
+          <entry key="project.open.time.11" value="3" />
+          <entry key="project.open.time.12" value="1" />
+          <entry key="project.open.time.15" value="1" />
+          <entry key="project.open.time.22" value="1" />
+          <entry key="project.open.time.3" value="2" />
+          <entry key="project.open.time.4" value="7" />
+          <entry key="project.open.time.5" value="5" />
+          <entry key="project.open.time.6" value="3" />
+          <entry key="project.open.time.7" value="2" />
+          <entry key="project.open.time.8" value="4" />
+          <entry key="project.open.time.9" value="5" />
+          <entry key="project.opened" value="44" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.extensions.edit">
+        <counts>
+          <entry key="Python Console" value="3" />
+          <entry key="dummy" value="168" />
+          <entry key="py" value="84291" />
+          <entry key="txt" value="9728" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.types.edit">
+        <counts>
+          <entry key="PLAIN_TEXT" value="9896" />
+          <entry key="Python" value="84101" />
+          <entry key="Scratch" value="193" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.extensions.open">
+        <counts>
+          <entry key="cfg" value="1" />
+          <entry key="json" value="1" />
+          <entry key="pth" value="1" />
+          <entry key="py" value="409" />
+          <entry key="pyi" value="1" />
+          <entry key="testfile" value="1" />
+          <entry key="txt" value="7" />
+        </counts>
+      </usages-collector>
+      <usages-collector id="statistics.file.types.open">
+        <counts>
+          <entry key="Ini" value="1" />
+          <entry key="JSON" value="1" />
+          <entry key="PLAIN_TEXT" value="9" />
+          <entry key="Python" value="407" />
+          <entry key="PythonStub" value="1" />
+          <entry key="Scratch" value="2" />
+        </counts>
+      </usages-collector>
+    </session>
+  </component>
+  <component name="FavoritesManager">
+    <favorites_list name="MilleGrilles.consignation.python" />
+  </component>
+  <component name="FileEditorManager">
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="360">
+              <caret line="101" column="55" selection-start-line="101" selection-start-column="55" selection-end-line="101" selection-end-column="55" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="480">
+              <caret line="35" selection-start-line="35" selection-end-line="35" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Setup Script" />
+        <option value="Python Unit Test" />
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>messageDao</find>
+      <find>uuid</find>
+      <find>NoneType</find>
+      <find>datetime</find>
+      <find>print(</find>
+      <find>qos</find>
+    </findStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="IdeDocumentHistory">
+    <option name="CHANGED_PATHS">
+      <list>
+        <option value="$PROJECT_DIR$/millegrilles/transaction/Document.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/Validation.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/Message.py" />
+        <option value="$APPLICATION_CONFIG_DIR$/scratches/EnvoyerMessageSample.py" />
+        <option value="$APPLICATION_CONFIG_DIR$/scratches/RunTransactionListener.py" />
+        <option value="$PROJECT_DIR$/test/execution/ConversionJSON.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/MessageDAO.py" />
+        <option value="$PROJECT_DIR$/test/execution/LoadEnvironmentTest.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/Configuration.py" />
+        <option value="$PROJECT_DIR$/test/execution/ConfigurerRabbitMQ.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/DocumentDAO.py" />
+        <option value="$PROJECT_DIR$/test/execution/RunTransactionListener.py" />
+        <option value="$PROJECT_DIR$/test/execution/Integration_DocumentDAO.py" />
+        <option value="$PROJECT_DIR$/millegrilles/consignation/ConsignateurTransaction.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/GenerateurTransaction.py" />
+        <option value="$PROJECT_DIR$/test/processus/TestOrienteurTransaction.py" />
+        <option value="$PROJECT_DIR$/millegrilles/processus/OrienteurTransaction.py" />
+        <option value="$PROJECT_DIR$/millegrilles/processus/Senseur.py" />
+        <option value="$PROJECT_DIR$/mg_domaine/appareils/AppareilInformationDocumentHelper.py" />
+        <option value="$PROJECT_DIR$/test/mg_domaine/AppareilInformationDocumentHelper_Test.py" />
+        <option value="$PROJECT_DIR$/test/mgdomaine/AppareilInformationDocumentHelper_Test.py" />
+        <option value="$PROJECT_DIR$/mgdomaine/appareils/AppareilInformationDocument.py" />
+        <option value="$PROJECT_DIR$/test/execution/AjouterTransactionDummy.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/ProcessusDocumentHelper.py" />
+        <option value="$PROJECT_DIR$/test/execution/Integration_DocumentDao_Processus.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/InformationGenereeDocumentHelper.py" />
+        <option value="$PROJECT_DIR$/test/rapport/InformationGenereeDocumentHelper_Integration.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/DocumentDAO.py" />
+        <option value="$PROJECT_DIR$/test/execution/Integration_InformationDocumentHelper.py" />
+        <option value="$PROJECT_DIR$/millegrilles/processus/Appareils.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/InformationDocumentHelper.py" />
+        <option value="$PROJECT_DIR$/millegrilles/rapport/GenerateurRapports.py" />
+        <option value="$PROJECT_DIR$/millegrilles/rapport/GestionnaireGenerateurs.py" />
+        <option value="$PROJECT_DIR$/millegrilles/util/MariaDBImport.py" />
+        <option value="$PROJECT_DIR$/requirements.txt" />
+        <option value="$USER_HOME$/git/MilleGrilles.consignation/util/python/requirements.txt" />
+        <option value="$PROJECT_DIR$/test/execution/EnvoyerMessageSample.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
+        <option value="$PROJECT_DIR$/mgdomaine/appareils/SenseurLecture.py" />
+        <option value="$PROJECT_DIR$/millegrilles/transaction/ConsignateurTransaction.py" />
+        <option value="$PROJECT_DIR$/millegrilles/Constantes.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/MessageDAO.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/Configuration.py" />
+        <option value="$PROJECT_DIR$/millegrilles/processus/ProcessusTest.py" />
+        <option value="$PROJECT_DIR$/test/processus/TestMGPProcessus.py" />
+        <option value="$PROJECT_DIR$/millegrilles/processus/MGProcessus.py" />
+        <option value="$PROJECT_DIR$/test/execution/test_divers.py" />
+        <option value="$PROJECT_DIR$/test/execution/EnvoyerMessage_ProcessusTest.py" />
+        <option value="$USER_HOME$/git/MilleGrilles.consignation/util/python/date_tests.py" />
+        <option value="$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py" />
+        <option value="$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectFrameBounds">
+    <option name="x" value="2338" />
+    <option name="y" value="428" />
+    <option name="width" value="1490" />
+    <option name="height" value="1000" />
+  </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="Scope" />
+      <pane id="ProjectPane">
+        <subPane>
+          <expand>
+            <path>
+              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
+              <item name="MilleGrilles.consignation.python" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
+              <item name="MilleGrilles.consignation.python" type="462c0819:PsiDirectoryNode" />
+              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
+              <item name="MilleGrilles.consignation.python" type="462c0819:PsiDirectoryNode" />
+              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
+              <item name="transaction" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="python" type="462c0819:PsiDirectoryNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="com.intellij.ide.scratch.LRUPopupBuilder$1/New Scratch File" value="Python" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="run.code.analysis.last.selected.profile" value="pProject Default" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyDependenciesConfigurable" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/mgdomaine/appareils" />
+      <recent name="$PROJECT_DIR$/millegrilles/transaction" />
+      <recent name="$PROJECT_DIR$/millegrilles/dao" />
+      <recent name="$PROJECT_DIR$/test/execution" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="RunManager" selected="Python.MariaDB_export_json">
+    <configuration name="ConsignateurTransaction" type="PythonConfigurationType" factoryName="Python">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/transaction" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/transaction/ConsignateurTransaction.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="EnvoyerMessageSample" type="PythonConfigurationType" factoryName="Python">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="dev2" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/EnvoyerMessageSample.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="EnvoyerMessage_ProcessusTest" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/EnvoyerMessage_ProcessusTest.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="GestionnaireGenerateurs" type="PythonConfigurationType" factoryName="Python">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MONGO_HOST" value="dev2" />
+        <env name="MG_MQ_HOST" value="dev2" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/rapport" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/rapport/GestionnaireGenerateurs.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Integration_InformationDocumentHelper" type="PythonConfigurationType" factoryName="Python">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MONGO_HOST" value="dev2" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/Integration_InformationDocumentHelper.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="MGProcessus" type="PythonConfigurationType" factoryName="Python">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/processus" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/processus/MGProcessus.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="MariaDB_export_json" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/git/MilleGrilles.consignation/util/python" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="OrienteurTransaction" type="PythonConfigurationType" factoryName="Python">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="dev2" />
+        <env name="MG_MONGO_HOST" value="dev2" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/transaction" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="date_tests" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/git/MilleGrilles.consignation/util/python" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/date_tests.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="test_divers" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/test_divers.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Unittests in TestMGPProcessus.py" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/processus" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/test/processus/TestMGPProcessus.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Python.MGProcessus" />
+      <item itemvalue="Python.OrienteurTransaction" />
+      <item itemvalue="Python.EnvoyerMessageSample" />
+      <item itemvalue="Python.ConsignateurTransaction" />
+      <item itemvalue="Python.GestionnaireGenerateurs" />
+      <item itemvalue="Python.Integration_InformationDocumentHelper" />
+      <item itemvalue="Python.MariaDB_export_json" />
+      <item itemvalue="Python.EnvoyerMessage_ProcessusTest" />
+      <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
+      <item itemvalue="Python.test_divers" />
+      <item itemvalue="Python.date_tests" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.MariaDB_export_json" />
+        <item itemvalue="Python.date_tests" />
+        <item itemvalue="Python.EnvoyerMessage_ProcessusTest" />
+        <item itemvalue="Python.test_divers" />
+        <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration>$USER_HOME$/.subversion</configuration>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="" />
+      <created>1536693472080</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1536693472080</updated>
+    </task>
+    <task id="LOCAL-00075" summary="Sauvegarde d'un rapport (information-generee).">
+      <created>1537543670989</created>
+      <option name="number" value="00075" />
+      <option name="presentableId" value="LOCAL-00075" />
+      <option name="project" value="LOCAL" />
+      <updated>1537543670989</updated>
+    </task>
+    <task id="LOCAL-00076" summary="Simplification methode test rapport.">
+      <created>1537551028722</created>
+      <option name="number" value="00076" />
+      <option name="presentableId" value="LOCAL-00076" />
+      <option name="project" value="LOCAL" />
+      <updated>1537551028722</updated>
+    </task>
+    <task id="LOCAL-00077" summary="Utilisation format datetime pour les dates d'evenements sur transaction.">
+      <created>1537623591451</created>
+      <option name="number" value="00077" />
+      <option name="presentableId" value="LOCAL-00077" />
+      <option name="project" value="LOCAL" />
+      <updated>1537623591451</updated>
+    </task>
+    <task id="LOCAL-00078" summary="Ajout evenement transaction_traitee lors de la fin d'un processus.&#10;&#10;S'applique a toutes les transactions.">
+      <created>1537625478701</created>
+      <option name="number" value="00078" />
+      <option name="presentableId" value="LOCAL-00078" />
+      <option name="project" value="LOCAL" />
+      <updated>1537625478701</updated>
+    </task>
+    <task id="LOCAL-00079" summary="Refactoring methodes transaction vers Helper.&#10;&#10;Methode: sauvegarder_nouvelle_transaction">
+      <created>1537625941568</created>
+      <option name="number" value="00079" />
+      <option name="presentableId" value="LOCAL-00079" />
+      <option name="project" value="LOCAL" />
+      <updated>1537625941568</updated>
+    </task>
+    <task id="LOCAL-00080" summary="Refactoring methodes processus vers Helper.&#10;&#10;Methode: sauvegarder_initialisation_processus">
+      <created>1537626772265</created>
+      <option name="number" value="00080" />
+      <option name="presentableId" value="LOCAL-00080" />
+      <option name="project" value="LOCAL" />
+      <updated>1537626772265</updated>
+    </task>
+    <task id="LOCAL-00081" summary="Refactoring methodes processus vers Helper.&#10;&#10;Methode: sauvegarder_etape_processus">
+      <created>1537627135010</created>
+      <option name="number" value="00081" />
+      <option name="presentableId" value="LOCAL-00081" />
+      <option name="project" value="LOCAL" />
+      <updated>1537627135010</updated>
+    </task>
+    <task id="LOCAL-00082" summary="Debut travail sur generateurs.">
+      <created>1537628455342</created>
+      <option name="number" value="00082" />
+      <option name="presentableId" value="LOCAL-00082" />
+      <option name="project" value="LOCAL" />
+      <updated>1537628455342</updated>
+    </task>
+    <task id="LOCAL-00083" summary="Creation methode distinct pour trouver groupes dans info-doc.">
+      <created>1537639213340</created>
+      <option name="number" value="00083" />
+      <option name="presentableId" value="LOCAL-00083" />
+      <option name="project" value="LOCAL" />
+      <updated>1537639213341</updated>
+    </task>
+    <task id="LOCAL-00084" summary="Creation methode distinct pour trouver groupes dans info-doc.">
+      <created>1537639280627</created>
+      <option name="number" value="00084" />
+      <option name="presentableId" value="LOCAL-00084" />
+      <option name="project" value="LOCAL" />
+      <updated>1537639280627</updated>
+    </task>
+    <task id="LOCAL-00085" summary="Generation de rapport et sauvegarde des resultats.">
+      <created>1537643841103</created>
+      <option name="number" value="00085" />
+      <option name="presentableId" value="LOCAL-00085" />
+      <option name="project" value="LOCAL" />
+      <updated>1537643841103</updated>
+    </task>
+    <task id="LOCAL-00086" summary="Suppression module Senseurs dans processus, jamais utilise.">
+      <created>1537644005636</created>
+      <option name="number" value="00086" />
+      <option name="presentableId" value="LOCAL-00086" />
+      <option name="project" value="LOCAL" />
+      <updated>1537644005636</updated>
+    </task>
+    <task id="LOCAL-00087" summary="Ajout GenerateurPageNoeudsSenseurs.">
+      <created>1537662040014</created>
+      <option name="number" value="00087" />
+      <option name="presentableId" value="LOCAL-00087" />
+      <option name="project" value="LOCAL" />
+      <updated>1537662040014</updated>
+    </task>
+    <task id="LOCAL-00088" summary="Ajout fonction d'aggregation par groupe de champs.">
+      <created>1537721970108</created>
+      <option name="number" value="00088" />
+      <option name="presentableId" value="LOCAL-00088" />
+      <option name="project" value="LOCAL" />
+      <updated>1537721970108</updated>
+    </task>
+    <task id="LOCAL-00089" summary="Travail sur aggregation.">
+      <created>1537729423708</created>
+      <option name="number" value="00089" />
+      <option name="presentableId" value="LOCAL-00089" />
+      <option name="project" value="LOCAL" />
+      <updated>1537729423708</updated>
+    </task>
+    <task id="LOCAL-00090" summary="Modification approche aux documents historiques.&#10;&#10;Mettre chemin courant pour document courant, historique pour tous les documents recus. Il n'y a plus d'aggregation des documents historiques par jour.">
+      <created>1537731030266</created>
+      <option name="number" value="00090" />
+      <option name="presentableId" value="LOCAL-00090" />
+      <option name="project" value="LOCAL" />
+      <updated>1537731030266</updated>
+    </task>
+    <task id="LOCAL-00091" summary="Test nouvelle approche historique.">
+      <created>1537731206712</created>
+      <option name="number" value="00091" />
+      <option name="presentableId" value="LOCAL-00091" />
+      <option name="project" value="LOCAL" />
+      <updated>1537731206712</updated>
+    </task>
+    <task id="LOCAL-00092" summary="Exploration des formats d'aggregation.">
+      <created>1537734153170</created>
+      <option name="number" value="00092" />
+      <option name="presentableId" value="LOCAL-00092" />
+      <option name="project" value="LOCAL" />
+      <updated>1537734153170</updated>
+    </task>
+    <task id="LOCAL-00093" summary="Identification methode pour avoir une fenetre de temps pour aggregation.">
+      <created>1537734987898</created>
+      <option name="number" value="00093" />
+      <option name="presentableId" value="LOCAL-00093" />
+      <option name="project" value="LOCAL" />
+      <updated>1537734987898</updated>
+    </task>
+    <task id="LOCAL-00094" summary="Exploration des formats d'aggregation, logique pour dates.">
+      <created>1537737412739</created>
+      <option name="number" value="00094" />
+      <option name="presentableId" value="LOCAL-00094" />
+      <option name="project" value="LOCAL" />
+      <updated>1537737412739</updated>
+    </task>
+    <task id="LOCAL-00095" summary="Ajout methode pour faire rapport par aggregation sur champs date.">
+      <created>1537744225182</created>
+      <option name="number" value="00095" />
+      <option name="presentableId" value="LOCAL-00095" />
+      <option name="project" value="LOCAL" />
+      <updated>1537744225182</updated>
+    </task>
+    <task id="LOCAL-00096" summary="Fix bug pour rapport par jour.">
+      <created>1537744319934</created>
+      <option name="number" value="00096" />
+      <option name="presentableId" value="LOCAL-00096" />
+      <option name="project" value="LOCAL" />
+      <updated>1537744319934</updated>
+    </task>
+    <task id="LOCAL-00097" summary="Separation des comportements de rapports en sous-classes.">
+      <created>1537745988551</created>
+      <option name="number" value="00097" />
+      <option name="presentableId" value="LOCAL-00097" />
+      <option name="project" value="LOCAL" />
+      <updated>1537745988551</updated>
+    </task>
+    <task id="LOCAL-00098" summary="Sauvegarde des rapports d'aggregation.">
+      <created>1537748230161</created>
+      <option name="number" value="00098" />
+      <option name="presentableId" value="LOCAL-00098" />
+      <option name="project" value="LOCAL" />
+      <updated>1537748230161</updated>
+    </task>
+    <task id="LOCAL-00099" summary="Ajout message dao dans information document helper.">
+      <created>1537901976822</created>
+      <option name="number" value="00099" />
+      <option name="presentableId" value="LOCAL-00099" />
+      <option name="project" value="LOCAL" />
+      <updated>1537901976822</updated>
+    </task>
+    <task id="LOCAL-00100" summary="Creation Q pour generateur de documents.">
+      <created>1537903242471</created>
+      <option name="number" value="00100" />
+      <option name="presentableId" value="LOCAL-00100" />
+      <option name="project" value="LOCAL" />
+      <updated>1537903242472</updated>
+    </task>
+    <task id="LOCAL-00101" summary="Creation evenements sur modification information-documents.">
+      <created>1537907024272</created>
+      <option name="number" value="00101" />
+      <option name="presentableId" value="LOCAL-00101" />
+      <option name="project" value="LOCAL" />
+      <updated>1537907024272</updated>
+    </task>
+    <task id="LOCAL-00102" summary="Fix evenement document maj.&#10;&#10;Pour un upsert, le document va etre rapporte comme ajoute plutot que maj.">
+      <created>1537907296113</created>
+      <option name="number" value="00102" />
+      <option name="presentableId" value="LOCAL-00102" />
+      <option name="project" value="LOCAL" />
+      <updated>1537907296113</updated>
+    </task>
+    <task id="LOCAL-00103" summary="Ajout gestionnaire de generateurs, main() et connexion Q.">
+      <created>1537970939747</created>
+      <option name="number" value="00103" />
+      <option name="presentableId" value="LOCAL-00103" />
+      <option name="project" value="LOCAL" />
+      <updated>1537970939748</updated>
+    </task>
+    <task id="LOCAL-00104" summary="Implementation GestionnaireGenerateur et chargement generateur noeud.&#10;&#10;Hard-coding du chargement du generateur pour noeud de senseurs.">
+      <created>1537978914039</created>
+      <option name="number" value="00104" />
+      <option name="presentableId" value="LOCAL-00104" />
+      <option name="project" value="LOCAL" />
+      <updated>1537978914039</updated>
+    </task>
+    <task id="LOCAL-00105" summary="Correction d'erreurs durant traitement messages.">
+      <created>1537981637606</created>
+      <option name="number" value="00105" />
+      <option name="presentableId" value="LOCAL-00105" />
+      <option name="project" value="LOCAL" />
+      <updated>1537981637606</updated>
+    </task>
+    <task id="LOCAL-00106" summary="Ajout rapport groupe historique pour senseurs.">
+      <created>1537987287132</created>
+      <option name="number" value="00106" />
+      <option name="presentableId" value="LOCAL-00106" />
+      <option name="project" value="LOCAL" />
+      <updated>1537987287132</updated>
+    </task>
+    <task id="LOCAL-00107" summary="Fix rapport aggregation, utilisait la mauvaise classe de base.&#10;&#10;Creation 2 generateurs: dernier jour et dernier mois pour les senseurs.">
+      <created>1537988093274</created>
+      <option name="number" value="00107" />
+      <option name="presentableId" value="LOCAL-00107" />
+      <option name="project" value="LOCAL" />
+      <updated>1537988093275</updated>
+    </task>
+    <task id="LOCAL-00108" summary="Creation utilitaire MariaDB pour exporter lectures senseurs.">
+      <created>1537999332291</created>
+      <option name="number" value="00108" />
+      <option name="presentableId" value="LOCAL-00108" />
+      <option name="project" value="LOCAL" />
+      <updated>1537999332292</updated>
+    </task>
+    <task id="LOCAL-00109" summary="Change QoS Pika a 1 message.&#10;&#10;Quand un grand volume etait envoye, tous les messages etaient lus en meme temps et les ACK ne se rendaient pas.">
+      <created>1538003735569</created>
+      <option name="number" value="00109" />
+      <option name="presentableId" value="LOCAL-00109" />
+      <option name="project" value="LOCAL" />
+      <updated>1538003735569</updated>
+    </task>
+    <task id="LOCAL-00110" summary="Ajout message persistance pour transactions.">
+      <created>1538006432841</created>
+      <option name="number" value="00110" />
+      <option name="presentableId" value="LOCAL-00110" />
+      <option name="project" value="LOCAL" />
+      <updated>1538006432841</updated>
+    </task>
+    <task id="LOCAL-00111" summary="Update QoS (5 messages), desactivation rapports.&#10;&#10;Les rapports statistiques doivent etre cedules, ils ne devraient pas etre mis a jour pour chaque changement de document.">
+      <created>1538059580299</created>
+      <option name="number" value="00111" />
+      <option name="presentableId" value="LOCAL-00111" />
+      <option name="project" value="LOCAL" />
+      <updated>1538059580299</updated>
+    </task>
+    <task id="LOCAL-00112" summary="Ajout flag _actif.">
+      <created>1542134398039</created>
+      <option name="number" value="00112" />
+      <option name="presentableId" value="LOCAL-00112" />
+      <option name="project" value="LOCAL" />
+      <updated>1542134398039</updated>
+    </task>
+    <task id="LOCAL-00113" summary="Deplacement du processus dans Appareils.py vers repertoire domaine.&#10;&#10;Il va rester a corriger le chargement des processus pour supporter l'utilisation de package global.">
+      <created>1542139758339</created>
+      <option name="number" value="00113" />
+      <option name="presentableId" value="LOCAL-00113" />
+      <option name="project" value="LOCAL" />
+      <updated>1542139758339</updated>
+    </task>
+    <task id="LOCAL-00114" summary="Suppression Appareils.py, le code est maintenant sous SenseurLecture.">
+      <created>1542139836770</created>
+      <option name="number" value="00114" />
+      <option name="presentableId" value="LOCAL-00114" />
+      <option name="project" value="LOCAL" />
+      <updated>1542139836770</updated>
+    </task>
+    <task id="LOCAL-00115" summary="Cleanup, deplacement fichiers mgdomaines vers nouveau git rep.">
+      <created>1542204152313</created>
+      <option name="number" value="00115" />
+      <option name="presentableId" value="LOCAL-00115" />
+      <option name="project" value="LOCAL" />
+      <updated>1542204152314</updated>
+    </task>
+    <task id="LOCAL-00116" summary="Creation utilitaire MariaDB pour exporter lectures senseurs.">
+      <created>1542220943924</created>
+      <option name="number" value="00116" />
+      <option name="presentableId" value="LOCAL-00116" />
+      <option name="project" value="LOCAL" />
+      <updated>1542220943924</updated>
+    </task>
+    <task id="LOCAL-00117" summary="Retrait de la notion d'entree de processus (Q).">
+      <created>1542223487272</created>
+      <option name="number" value="00117" />
+      <option name="presentableId" value="LOCAL-00117" />
+      <option name="project" value="LOCAL" />
+      <updated>1542223487272</updated>
+    </task>
+    <task id="LOCAL-00118" summary="Changement de l'encodage du nom du processus. &#10;&#10;Maintenant selon la forme mgdomaines_appareils_senseurs:SenseurTemp.">
+      <created>1542229784580</created>
+      <option name="number" value="00118" />
+      <option name="presentableId" value="LOCAL-00118" />
+      <option name="project" value="LOCAL" />
+      <updated>1542229784580</updated>
+    </task>
+    <task id="LOCAL-00119" summary="Creation test pour envoyer message initialisation.&#10;&#10;Fix du ProcessusHelper, ne chargeait pas documentdao._mg_database">
+      <created>1542231374926</created>
+      <option name="number" value="00119" />
+      <option name="presentableId" value="LOCAL-00119" />
+      <option name="project" value="LOCAL" />
+      <updated>1542231374927</updated>
+    </task>
+    <task id="LOCAL-00120" summary="Correction lecture du nom du processus.&#10;&#10;Le changement de nomenclature a ete applique partout (module:Classe).">
+      <created>1542235801547</created>
+      <option name="number" value="00120" />
+      <option name="presentableId" value="LOCAL-00120" />
+      <option name="project" value="LOCAL" />
+      <updated>1542235801547</updated>
+    </task>
+    <task id="LOCAL-00121" summary="Suppression de l'orienteur de transactions.">
+      <created>1542243371088</created>
+      <option name="number" value="00121" />
+      <option name="presentableId" value="LOCAL-00121" />
+      <option name="project" value="LOCAL" />
+      <updated>1542243371088</updated>
+    </task>
+    <task id="LOCAL-00122" summary="Ajout repository mgdomaines.">
+      <created>1542243598919</created>
+      <option name="number" value="00122" />
+      <option name="presentableId" value="LOCAL-00122" />
+      <option name="project" value="LOCAL" />
+      <updated>1542243598919</updated>
+    </task>
+    <task id="LOCAL-00123" summary="Transformation de l'estampille vers format date ISO pour Mongo.">
+      <created>1542328970799</created>
+      <option name="number" value="00123" />
+      <option name="presentableId" value="LOCAL-00123" />
+      <option name="project" value="LOCAL" />
+      <updated>1542328970800</updated>
+    </task>
+    <option name="localTasksCounter" value="124" />
+    <servers />
+  </component>
+  <component name="TestHistory">
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.09.18 at 15h 28m 40s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.09.18 at 15h 28m 51s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.09.18 at 15h 29m 19s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.09.18 at 15h 29m 29s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.11.14 at 16h 02m 16s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.11.14 at 16h 02m 51s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.11.14 at 16h 03m 40s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.11.14 at 16h 04m 00s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.11.14 at 16h 04m 14s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_in_TestMGPProcessus_py - 2018.11.14 at 16h 05m 17s.xml">
+      <configuration name="Unittests in TestMGPProcessus.py" configurationId="tests" />
+    </history-entry>
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="2338" y="428" width="1490" height="1000" extended-state="0" />
+    <editor active="true" />
+    <layout>
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.23417291" />
+      <window_info id="Structure" order="1" sideWeight="0.5016575" side_tool="true" weight="0.23417291" />
+      <window_info id="Favorites" order="2" sideWeight="0.5005525" side_tool="true" weight="0.24945612" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.32928178" />
+      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49963742" weight="0.32928178" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="Version Control" order="7" weight="0.32928178" />
+      <window_info anchor="bottom" id="Terminal" order="8" />
+      <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.5003626" side_tool="true" weight="0.32928178" />
+      <window_info anchor="bottom" id="Python Console" order="10" weight="0.32928178" />
+      <window_info anchor="bottom" id="Messages" order="11" />
+      <window_info anchor="bottom" id="Inspection Results" order="12" weight="0.32928178" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+    </layout>
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="RECENTLY_FILTERED_USER_GROUPS">
+                <collection />
+              </option>
+              <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
+                <collection />
+              </option>
+              <option name="COLUMN_ORDER">
+                <list>
+                  <option value="0" />
+                  <option value="1" />
+                  <option value="2" />
+                  <option value="3" />
+                </list>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsContentAnnotationSettings">
+    <option name="myLimit" value="2678400000" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Sauvegarde des rapports d'aggregation." />
+    <MESSAGE value="Ajout message dao dans information document helper." />
+    <MESSAGE value="Creation Q pour generateur de documents." />
+    <MESSAGE value="Creation evenements sur modification information-documents." />
+    <MESSAGE value="Fix evenement document maj.&#10;&#10;Pour un upsert, le document va etre rapporte comme ajoute plutot que maj." />
+    <MESSAGE value="Ajout gestionnaire de generateurs, main() et connexion Q." />
+    <MESSAGE value="Implementation GestionnaireGenerateur et chargement generateur noeud.&#10;&#10;Hard-coding du chargement du generateur pour noeud de senseurs." />
+    <MESSAGE value="Correction d'erreurs durant traitement messages." />
+    <MESSAGE value="Ajout rapport groupe historique pour senseurs." />
+    <MESSAGE value="Fix rapport aggregation, utilisait la mauvaise classe de base.&#10;&#10;Creation 2 generateurs: dernier jour et dernier mois pour les senseurs." />
+    <MESSAGE value="Change QoS Pika a 1 message.&#10;&#10;Quand un grand volume etait envoye, tous les messages etaient lus en meme temps et les ACK ne se rendaient pas." />
+    <MESSAGE value="Ajout message persistance pour transactions." />
+    <MESSAGE value="Update QoS (5 messages), desactivation rapports.&#10;&#10;Les rapports statistiques doivent etre cedules, ils ne devraient pas etre mis a jour pour chaque changement de document." />
+    <MESSAGE value="Ajout flag _actif." />
+    <MESSAGE value="Deplacement du processus dans Appareils.py vers repertoire domaine.&#10;&#10;Il va rester a corriger le chargement des processus pour supporter l'utilisation de package global." />
+    <MESSAGE value="Suppression Appareils.py, le code est maintenant sous SenseurLecture." />
+    <MESSAGE value="Cleanup, deplacement fichiers mgdomaines vers nouveau git rep." />
+    <MESSAGE value="Creation utilitaire MariaDB pour exporter lectures senseurs." />
+    <MESSAGE value="Retrait de la notion d'entree de processus (Q)." />
+    <MESSAGE value="Changement de l'encodage du nom du processus. &#10;&#10;Maintenant selon la forme mgdomaines_appareils_senseurs:SenseurTemp." />
+    <MESSAGE value="Creation test pour envoyer message initialisation.&#10;&#10;Fix du ProcessusHelper, ne chargeait pas documentdao._mg_database" />
+    <MESSAGE value="Correction lecture du nom du processus.&#10;&#10;Le changement de nomenclature a ete applique partout (module:Classe)." />
+    <MESSAGE value="Suppression de l'orienteur de transactions." />
+    <MESSAGE value="Ajout repository mgdomaines." />
+    <MESSAGE value="Transformation de l'estampille vers format date ISO pour Mongo." />
+    <option name="LAST_COMMIT_MESSAGE" value="Transformation de l'estampille vers format date ISO pour Mongo." />
+  </component>
+  <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/message.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="193">
+          <caret line="678" selection-start-line="678" selection-end-line="678" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/common.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="193">
+          <caret line="443" selection-start-line="443" selection-end-line="443" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/processus/Senseur.py" />
+    <entry file="file://$PROJECT_DIR$/mgdomaine/__init__.py" />
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/helpers.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="958">
+          <caret line="154" selection-start-line="154" selection-end-line="154" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_HOME_DIR$/helpers/typeshed/stdlib/2and3/datetime.pyi">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-2368" />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/collection.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1400">
+          <caret line="830" column="19" selection-start-line="830" selection-start-column="19" selection-end-line="830" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/requirements.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="15">
+          <caret line="1" column="15" selection-start-line="1" selection-start-column="15" selection-end-line="1" selection-end-column="15" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pika/adapters/blocking_connection.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="176">
+          <caret line="2208" column="17" selection-start-line="2208" selection-start-column="8" selection-end-line="2208" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/lib/python3.5/site-packages/pika/adapters/blocking_connection.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="410">
+          <caret line="2208" column="55" selection-start-line="2208" selection-start-column="41" selection-end-line="2208" selection-end-column="55" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/util/MariaDBImport.py" />
+    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/Validation.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mgdomaine/appareils/Appareils.py" />
+    <entry file="file://$PROJECT_DIR$/mgdomaine/appareils/SenseurLecture.py" />
+    <entry file="file://$PROJECT_DIR$/test/execution/ConversionJSON.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/ConfigurerRabbitMQ.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="7" lean-forward="true" selection-start-line="7" selection-end-line="7" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/AjouterTransactionDummy.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="15">
+          <caret line="3" lean-forward="true" selection-start-line="3" selection-end-line="3" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/Integration_DocumentDAO.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="13" column="26" lean-forward="true" selection-start-line="3" selection-end-line="13" selection-end-column="26" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/Integration_InformationDocumentHelper.py" />
+    <entry file="file://$PROJECT_DIR$/test/execution/Integration_DocumentDao_Processus.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="585">
+          <caret line="40" column="6" selection-start-line="40" selection-start-column="6" selection-end-line="40" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/LoadEnvironmentTest.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/RunTransactionListener.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../MilleGrilles.domaines.python/test/mgdomaines/AppareilInformationDocumentHelper_Test.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="105">
+          <caret line="9" column="21" lean-forward="true" selection-start-line="9" selection-start-column="21" selection-end-line="9" selection-end-column="21" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/rapport/InformationGenereeDocumentHelper_Integration.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2415">
+          <caret line="165" column="83" lean-forward="true" selection-start-line="165" selection-start-column="8" selection-end-line="165" selection-end-column="83" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/testfile" />
+    <entry file="file://$PROJECT_DIR$/requirements.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="15">
+          <caret line="1" column="10" selection-end-line="1" selection-end-column="10" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pip-10.0.1-py3.5.egg/pip/_vendor/packaging/__about__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="135">
+          <caret line="9" lean-forward="true" selection-start-line="9" selection-end-line="9" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/EnvoyerMessageSample.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="660">
+          <caret line="45" column="20" selection-end-line="63" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/processus/TestMGPProcessus.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-465">
+          <caret line="14" column="12" selection-start-line="14" selection-start-column="12" selection-end-line="14" selection-end-column="12" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/Constantes.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="645">
+          <caret line="43" selection-start-line="43" selection-end-line="43" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/Configuration.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="75">
+          <caret line="6" column="30" selection-start-line="6" selection-start-column="6" selection-end-line="6" selection-end-column="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/test_divers.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="6" column="59" selection-start-line="6" selection-start-column="59" selection-end-line="6" selection-end-column="59" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/processus/MGProcessus.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="215">
+          <caret line="192" column="72" selection-start-line="192" selection-start-column="72" selection-end-line="192" selection-end-column="72" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/processus/ProcessusTest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="6" column="19" selection-start-line="6" selection-start-column="6" selection-end-line="6" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/EnvoyerMessage_ProcessusTest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="240">
+          <caret line="16" column="1" selection-start-line="16" selection-start-column="1" selection-end-line="16" selection-end-column="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
+    <entry file="file://$PROJECT_DIR$/test/processus/TestOrienteurTransaction.py" />
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/DocumentDAO.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="225">
+          <caret line="51" column="75" selection-start-line="51" selection-start-column="63" selection-end-line="51" selection-end-column="75" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/ProcessusDocumentHelper.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="13" selection-start-line="13" selection-end-line="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/MessageDAO.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2385">
+          <caret line="168" column="8" selection-start-line="168" selection-start-column="8" selection-end-line="168" selection-end-column="8" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/InformationDocumentHelper.py" />
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/InformationGenereeDocumentHelper.py" />
+    <entry file="file://$PROJECT_DIR$/millegrilles/rapport/GenerateurRapports.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2010">
+          <caret line="135" column="6" selection-start-line="135" selection-start-column="6" selection-end-line="135" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/rapport/GestionnaireGenerateurs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="120">
+          <caret line="9" column="91" lean-forward="true" selection-start-line="9" selection-start-column="91" selection-end-line="9" selection-end-column="91" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/GenerateurTransaction.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="195">
+          <caret line="15" column="12" lean-forward="true" selection-start-line="15" selection-start-column="12" selection-end-line="15" selection-end-column="12" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.domaines.python/venv/pyvenv.cfg">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.domaines.python/mgdomaines/appareils/SenseurLecture.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="120">
+          <caret line="8" selection-start-line="8" selection-end-line="8" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/date_tests.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="4" column="45" lean-forward="true" selection-start-line="4" selection-start-column="45" selection-end-line="4" selection-end-column="45" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/ConsignateurTransaction.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="300">
+          <caret line="50" column="59" selection-start-line="50" selection-start-column="59" selection-end-line="50" selection-end-column="59" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="360">
+          <caret line="101" column="55" selection-start-line="101" selection-start-column="55" selection-end-line="101" selection-end-column="55" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="480">
+          <caret line="35" selection-start-line="35" selection-end-line="35" />
+        </state>
+      </provider>
+    </entry>
+  </component>
+  <component name="masterDetails">
+    <states>
+      <state key="ScopeChooserConfigurable.UI">
+        <settings>
+          <splitter-proportions>
+            <option name="proportions">
+              <list>
+                <option value="0.2" />
+              </list>
+            </option>
+          </splitter-proportions>
+        </settings>
+      </state>
+    </states>
+  </component>
+</project>
