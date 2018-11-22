@@ -2,11 +2,7 @@
 import codecs
 import pika
 import json
-import uuid
-import time
 import traceback
-import getpass
-import socket
 
 from millegrilles import Constantes
 
@@ -130,14 +126,14 @@ class PikaDAO:
             print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Demarre la lecture de la queue entree_processus. Appel bloquant. '''
-    def demarrer_lecture_entree_processus(self, callback):
-        self.channel.basic_consume(callback,
-                                   queue=self.queuename_entree_processus(),
-                                   no_ack=False)
-        try:
-            self.channel.start_consuming()
-        except OSError as oserr:
-            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+#    def demarrer_lecture_entree_processus(self, callback):
+#        self.channel.basic_consume(callback,
+#                                   queue=self.queuename_entree_processus(),
+#                                   no_ack=False)
+#        try:
+#            self.channel.start_consuming()
+#        except OSError as oserr:
+#            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
     def demarrer_lecture_etape_processus(self, callback):
@@ -167,50 +163,15 @@ class PikaDAO:
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
     def transmettre_message(self, routing_key, message_dict):
+
+        if self.connectionmq is None or self.connectionmq.is_closed:
+            raise Exception("La connexion Pika n'est pas ouverte")
+
         message_utf8 = self.json_helper.dict_vers_json(message_dict)
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
                               routing_key=routing_key,
                               body=message_utf8,
                               properties=pika.BasicProperties(delivery_mode=2))
-
-    ''' Transmet un message. La connexion doit etre ouverte. '''
-    def transmettre_message_transaction(self, message_dict, indice_processus=None):
-
-        if self.connectionmq == None or self.connectionmq.is_closed :
-            raise Exception("La connexion Pika n'est pas ouverte")
-
-        enveloppe = self.preparer_enveloppe(message_dict, indice_processus)
-        uuid_transaction = enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        message_utf8 = self.json_helper.dict_vers_json(enveloppe)
-
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                              routing_key='%s.transaction.nouvelle' % self.configuration.nom_millegrille,
-                              body=message_utf8,
-                              properties=pika.BasicProperties(delivery_mode=2))
-
-        return uuid_transaction
-
-    def preparer_enveloppe(self, message_dict, indice_processus=None):
-
-        # Identifier usager du systeme, nom de domaine
-        identificateur_systeme =  '%s@%s' % (getpass.getuser(), socket.getfqdn())
-
-        # Ajouter identificateur unique et temps de la transaction
-        uuid_transaction = uuid.uuid1()
-
-        meta = {}
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME] = identificateur_systeme
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(time.time())
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = ""
-        if indice_processus is not None:
-            meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_INDICE_PROCESSUS] = indice_processus
-
-        enveloppe = {}
-        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
-        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE] = message_dict
-
-        return enveloppe
 
     def transmettre_evenement_persistance(self, id_document, id_transaction, document_transaction=None):
 
