@@ -4,7 +4,9 @@
     <option name="SCOPE_TYPE" value="3" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="" />
+    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -15,9 +17,9 @@
     <session id="-1818189876">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
-          <entry key="project.closed" value="43" />
-          <entry key="project.open.time.0" value="6" />
-          <entry key="project.open.time.1" value="2" />
+          <entry key="project.closed" value="45" />
+          <entry key="project.open.time.0" value="7" />
+          <entry key="project.open.time.1" value="3" />
           <entry key="project.open.time.10" value="2" />
           <entry key="project.open.time.11" value="3" />
           <entry key="project.open.time.12" value="1" />
@@ -30,21 +32,21 @@
           <entry key="project.open.time.7" value="2" />
           <entry key="project.open.time.8" value="4" />
           <entry key="project.open.time.9" value="5" />
-          <entry key="project.opened" value="44" />
+          <entry key="project.opened" value="46" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="Python Console" value="3" />
           <entry key="dummy" value="168" />
-          <entry key="py" value="84291" />
+          <entry key="py" value="84323" />
           <entry key="txt" value="9728" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
           <entry key="PLAIN_TEXT" value="9896" />
-          <entry key="Python" value="84101" />
+          <entry key="Python" value="84133" />
           <entry key="Scratch" value="193" />
         </counts>
       </usages-collector>
@@ -79,8 +81,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="360">
-              <caret line="101" column="55" selection-start-line="101" selection-start-column="55" selection-end-line="101" selection-end-column="55" />
+            <state relative-caret-position="450">
+              <caret line="101" column="58" selection-start-line="101" selection-start-column="58" selection-end-line="101" selection-end-column="58" />
             </state>
           </provider>
         </entry>
@@ -1273,8 +1275,8 @@
     </entry>
     <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="360">
-          <caret line="101" column="55" selection-start-line="101" selection-start-column="55" selection-end-line="101" selection-end-column="55" />
+        <state relative-caret-position="450">
+          <caret line="101" column="58" selection-start-line="101" selection-start-column="58" selection-end-line="101" selection-end-column="58" />
         </state>
       </provider>
     </entry>
