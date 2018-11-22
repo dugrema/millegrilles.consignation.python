@@ -4,6 +4,7 @@ setup(
     name='MilleGrilles.consignation.python',
     version='0.3',
     packages=[
+        'millegrilles',
         'millegrilles.dao',
         'millegrilles.processus',
         'millegrilles.rapport',
