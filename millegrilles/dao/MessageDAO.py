@@ -162,7 +162,7 @@ class PikaDAO:
     :param routing_key: Routing key utilise pour distribuer le message.
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
-    def transmettre_message(self, routing_key, message_dict):
+    def transmettre_message(self, message_dict, routing_key):
 
         if self.connectionmq is None or self.connectionmq.is_closed:
             raise Exception("La connexion Pika n'est pas ouverte")
@@ -172,6 +172,10 @@ class PikaDAO:
                               routing_key=routing_key,
                               body=message_utf8,
                               properties=pika.BasicProperties(delivery_mode=2))
+
+    def transmettre_nouvelle_transaction(self, document_transaction):
+        routing_key = '%s.transaction.nouvelle' % (self.configuration.nom_millegrille)
+        self.transmettre_message(document_transaction, routing_key)
 
     def transmettre_evenement_persistance(self, id_document, id_transaction, document_transaction=None):
 

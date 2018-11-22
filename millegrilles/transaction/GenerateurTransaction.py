@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import uuid
 import time
 import getpass
@@ -13,10 +11,24 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 # Generateur de transaction - peut etre reutilise.
 class GenerateurTransaction:
 
-    def __init__(self):
-        self._configuration = TransactionConfiguration()
-        self._configuration.loadEnvironment()
-        self._message_dao = PikaDAO(self._configuration)
+    def __init__(self, configuration=None, message_dao=None):
+        # Initialiser la configuraiton et dao au besoin
+        if configuration is None:
+            self._configuration = TransactionConfiguration()
+            self._configuration.loadEnvironment()
+        else:
+            self._configuration = configuration
+
+        if message_dao is None:
+            self._message_dao = PikaDAO(self._configuration)
+        else:
+            self._message_dao = message_dao
+
+    def connecter(self):
+        self._message_dao.connecter()
+
+    def deconnecter(self):
+        self._message_dao.deconnecter()
 
     ''' 
     Transmet un message. La connexion doit etre ouverte.
@@ -34,7 +46,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._message_dao.transmettre_message(enveloppe, domaine)
+        self._message_dao.transmettre_nouvelle_transaction(enveloppe)
 
         return uuid_transaction
 
