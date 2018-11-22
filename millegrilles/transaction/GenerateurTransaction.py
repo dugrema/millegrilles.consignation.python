@@ -18,9 +18,6 @@ class GenerateurTransaction:
         self._configuration.loadEnvironment()
         self._message_dao = PikaDAO(self._configuration)
 
-    def soumettre_transaction(self, dict_message, domaine=None):
-        self._message_dao.transmettre_message_transaction(dict_message, domaine)
-
     ''' 
     Transmet un message. La connexion doit etre ouverte.
     
