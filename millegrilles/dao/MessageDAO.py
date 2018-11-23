@@ -20,7 +20,7 @@ class PikaDAO:
         self.channel = None
 
         self._actif = False
-        self.inError = True
+        self.in_error = True
 
         self.json_helper = JSONHelper()
 
@@ -165,13 +165,14 @@ class PikaDAO:
     def transmettre_message(self, message_dict, routing_key):
 
         if self.connectionmq is None or self.connectionmq.is_closed:
-            raise Exception("La connexion Pika n'est pas ouverte")
+            raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict)
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
                               routing_key=routing_key,
                               body=message_utf8,
                               properties=pika.BasicProperties(delivery_mode=2))
+        self.in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction):
         routing_key = '%s.transaction.nouvelle' % (self.configuration.nom_millegrille)
@@ -287,16 +288,15 @@ class PikaDAO:
                                    routing_key='%s.generateurdocuments%s' % (self.configuration.nom_millegrille, chemin),
                                    body=message_utf8)
 
-
     # Mettre la classe en etat d'erreur
-    def enterErrorState(self):
-        self.inError = True
+    def enter_error_state(self):
+        self.in_error = True
 
-        if self.channel != None:
+        if self.channel is not None:
             try:
                 self.channel.stop_consuming()
-            except:
-                pass
+            except Exception as e:
+                print("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
 
         self.deconnecter()
 
@@ -332,9 +332,8 @@ class PikaDAO:
     def queuename_generateur_documents(self):
         return self._queuename(self.configuration.queue_generateur_documents)
 
-''' Classe avec utilitaires pour JSON '''
 
-
+# Classe avec utilitaires pour JSON
 class JSONHelper:
 
     def __init__(self):
@@ -394,3 +393,7 @@ class BaseCallback:
     ''' Methode qui peut etre remplacee dans la sous-classe '''
     def traiter_message(self, ch, method, properties, body):
         raise NotImplemented('traiter_message() methode doit etre implementee')
+
+
+class ExceptionConnectionFermee(Exception):
+    pass
