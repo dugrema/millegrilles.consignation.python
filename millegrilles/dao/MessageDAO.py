@@ -34,6 +34,7 @@ class PikaDAO:
         self.channel.basic_qos(prefetch_count=5)
 
         self._actif = True
+        self.in_error = False
 
         return self.connectionmq
 
