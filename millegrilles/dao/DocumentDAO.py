@@ -1,6 +1,7 @@
 # Gestion des documents.
 
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 from bson.objectid import ObjectId
 from millegrilles import Constantes
 from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
@@ -47,8 +48,33 @@ class MongoDAO:
 
     def deconnecter(self):
         if self._client is not None:
-            self._client.close()
-            self._client = None
+            client = self._client
+
+            self._mg_database = None
+            self._collection_transactions = None
+            self._collection_processus = None
+            self._collection_information_documents = None
+            self._transaction_document_helper = None
+            self._processus_document_helper = None
+
+            client.close()
+
+    '''
+    Utiliser pour verifier si la connexion a Mongo fonctionne
+    
+    :returns: True si la connexion est live, False sinon.
+    '''
+    def est_enligne(self):
+        if self._client is None:
+            return False
+
+        try:
+            # The ismaster command is cheap and does not require auth.
+            self._client.admin.command('ismaster')
+            return True
+        except ConnectionFailure:
+            # print("Server not available")
+            return False
 
     '''
     Chargement d'un document de transaction a partir d'un identificateur MongoDB
