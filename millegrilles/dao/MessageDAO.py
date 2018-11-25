@@ -5,6 +5,7 @@ import json
 import traceback
 
 from millegrilles import Constantes
+from pika.credentials import PlainCredentials
 
 ''' 
 DAO vers la messagerie
@@ -27,9 +28,19 @@ class PikaDAO:
     # Connecter au serveur RabbitMQ
     # Le callback est une methode qui va etre appelee lorsqu'un message est recu
     def connecter(self):
-        self.connectionmq = pika.BlockingConnection(pika.ConnectionParameters(
-            self.configuration.mq_host,
-            self.configuration.mq_port))
+        credentials = PlainCredentials(
+            self.configuration.mq_user,
+            self.configuration.mq_password,
+            erase_on_connect=True
+        )
+        self.connectionmq = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=self.configuration.mq_host,
+                port=self.configuration.mq_port,
+                credentials=credentials,
+                # ssl=True  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
+            )
+        )
         self.channel = self.connectionmq.channel()
         self.channel.basic_qos(prefetch_count=5)
 

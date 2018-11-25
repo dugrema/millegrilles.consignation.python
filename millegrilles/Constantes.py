@@ -4,6 +4,8 @@
 CONFIG_MQ_HOST = 'mq_host'
 CONFIG_MQ_PORT = 'mq_port'
 CONFIG_MQ_EXCHANGE_EVENEMENTS = 'mq_exchange_evenements'
+CONFIG_MQ_USER = 'mq_user'
+CONFIG_MQ_PASSWORD = 'mq_password'
 CONFIG_QUEUE_NOUVELLES_TRANSACTIONS = 'mq_queue_nouvelles_transactions'
 CONFIG_QUEUE_ERREURS_TRANSACTIONS = 'mq_queue_erreurs_transactions'
 CONFIG_QUEUE_MGP_PROCESSUS =  'mq_queue_mgp_processus'
@@ -29,6 +31,7 @@ MONGO_DOC_ID = '_id'
 CONFIG_NOM_MILLEGRILLE = 'nom_millegrille'
 
 # Valeurs par defaut
+DEFAUT_MQ_USER = 'transaction'
 DEFAUT_NOM_MILLEGRILLE = 'sansnom'
 
 # Environnement
@@ -67,8 +70,8 @@ DOCUMENT_COLLECTION_PROCESSUS = 'processus'
 DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS = 'information-documents'
 DOCUMENT_COLLECTION_INFORMATION_GENEREE = 'information-generee'
 
-#DOCUMENT_INFODOC_CHEMIN = '_mg-chemin'
-#DOCUMENT_INFODOC_UUID = '_mg-uuid-doc'
+# DOCUMENT_INFODOC_CHEMIN = '_mg-chemin'
+# DOCUMENT_INFODOC_UUID = '_mg-uuid-doc'
 DOCUMENT_INFODOC_LIBELLE = '_mg-libelle'
 DOCUMENT_INFODOC_DERNIERE_MODIFICATION = '_mg-derniere-modification'
 

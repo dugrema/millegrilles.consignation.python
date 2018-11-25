@@ -16,7 +16,9 @@ class TransactionConfiguration:
             Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
             Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS: Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
             Constantes.CONFIG_QUEUE_GENERATEUR_DOCUMENTS: Constantes.DEFAUT_QUEUE_GENERATEUR_DOCUMENTS,
-            Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS
+            Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS,
+            Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
+            Constantes.CONFIG_MQ_PASSWORD: None
         }
 
         # Configuration de connection a MongoDB
@@ -41,7 +43,7 @@ class TransactionConfiguration:
             # Configuration de connection a RabbitMQ
             for property in config_dict.keys():
                 env_value = os.environ.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
-                if(env_value != None):
+                if env_value is not None :
                     config_dict[property] = env_value
 
     def loadProperty(self, map, property, env_name):
@@ -56,6 +58,14 @@ class TransactionConfiguration:
     @property
     def mq_port(self):
         return int(self._mq_config[Constantes.CONFIG_MQ_PORT])
+
+    @property
+    def mq_user(self):
+        return self._mq_config[Constantes.CONFIG_MQ_USER]
+
+    @property
+    def mq_password(self):
+        return self._mq_config[Constantes.CONFIG_MQ_PASSWORD]
 
     @property
     def nom_millegrille(self):
