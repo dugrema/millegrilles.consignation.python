@@ -1,4 +1,5 @@
 # Gestion des documents.
+import ssl
 
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -31,7 +32,10 @@ class MongoDAO:
             self._configuration.mongo_host,
             self._configuration.mongo_port,
             username=self._configuration.mongo_user,
-            password=self._configuration.mongo_password)
+            password=self._configuration.mongo_password,
+            ssl=True,
+            # ssl_cert_reqs=ssl.CERT_NONE  # Seulement neceesaire avec certificat de developpement (pas signe)
+        )
         # print("Verify if connection established")
         self._client.admin.command('ismaster')
 
