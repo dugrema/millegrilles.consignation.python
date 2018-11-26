@@ -33,12 +33,14 @@ class PikaDAO:
             self.configuration.mq_password,
             erase_on_connect=True
         )
+
+        ssl_option = self.configuration.mq_ssl
         self.connectionmq = pika.BlockingConnection(
             pika.ConnectionParameters(
                 host=self.configuration.mq_host,
                 port=self.configuration.mq_port,
                 credentials=credentials,
-                # ssl=True  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
+                ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
             )
         )
         self.channel = self.connectionmq.channel()

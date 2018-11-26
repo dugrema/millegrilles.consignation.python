@@ -10,7 +10,7 @@ class TransactionConfiguration:
         # Configuration de connection a RabbitMQ
         self._mq_config = {
             Constantes.CONFIG_MQ_HOST: 'localhost',
-            Constantes.CONFIG_MQ_PORT: '5672',
+            Constantes.CONFIG_MQ_PORT: '5671',
             Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_ERREURS_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
@@ -18,7 +18,8 @@ class TransactionConfiguration:
             Constantes.CONFIG_QUEUE_GENERATEUR_DOCUMENTS: Constantes.DEFAUT_QUEUE_GENERATEUR_DOCUMENTS,
             Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS,
             Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
-            Constantes.CONFIG_MQ_PASSWORD: None
+            Constantes.CONFIG_MQ_PASSWORD: None,
+            Constantes.CONFIG_MQ_SSL: 'on'  # Options on, off.
         }
 
         # Configuration de connection a MongoDB
@@ -67,6 +68,10 @@ class TransactionConfiguration:
     @property
     def mq_password(self):
         return self._mq_config[Constantes.CONFIG_MQ_PASSWORD]
+
+    @property
+    def mq_ssl(self):
+        return self._mq_config[Constantes.CONFIG_MQ_SSL]
 
     @property
     def nom_millegrille(self):
