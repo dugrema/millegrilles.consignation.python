@@ -14,7 +14,7 @@ transaction_helper = mongoDao.transaction_helper()
 print("Connecte a Mongo")
 
 message_dummy = {"contenu": "valeur"}
-enveloppe = messageDao.preparer_enveloppe(message_dummy)
+enveloppe = message_dummy
 
 mongo_id = transaction_helper.sauvegarder_nouvelle_transaction(mongoDao._collection_transactions, enveloppe)
 print("Document Mongo id=%s a ete cree" % mongo_id)

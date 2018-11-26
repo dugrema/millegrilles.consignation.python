@@ -46,7 +46,7 @@ class MongoDAO:
                 username=self._configuration.mongo_user,
                 password=self._configuration.mongo_password,
                 ssl=(ssl_option == "on" or ssl_option == "nocert"),
-                ssl_cert_reqs=self._use_cert(ssl_option)
+                ssl_cert_reqs=MongoDAO._use_cert(ssl_option)
             )
 
         # print("Verify if connection established")

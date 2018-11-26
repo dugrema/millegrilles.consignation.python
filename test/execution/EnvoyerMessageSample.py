@@ -51,6 +51,7 @@ configuration.loadEnvironment()
 messageDao = PikaDAO(configuration)
 
 messageDao.connecter()
+messageDao.configurer_rabbitmq()
 
 # TEST
 
