@@ -27,15 +27,28 @@ class MongoDAO:
         self._transaction_document_helper = None
         self._processus_document_helper = None
 
+    @staticmethod
+    def _use_cert(ssl_option):
+        if ssl_option == "nocert":
+            return ssl.CERT_NONE
+        elif ssl_option == 'on':
+            return ssl.CERT_REQUIRED
+        else:
+            return None
+
     def connecter(self):
-        self._client = MongoClient(
-            self._configuration.mongo_host,
-            self._configuration.mongo_port,
-            username=self._configuration.mongo_user,
-            password=self._configuration.mongo_password,
-            ssl=True,
-            # ssl_cert_reqs=ssl.CERT_NONE  # Seulement neceesaire avec certificat de developpement (pas signe)
-        )
+        ssl_option = self._configuration.mongo_ssl
+
+        if ssl_option == "off" or "on":
+            self._client = MongoClient(
+                self._configuration.mongo_host,
+                self._configuration.mongo_port,
+                username=self._configuration.mongo_user,
+                password=self._configuration.mongo_password,
+                ssl=(ssl_option == "on" or ssl_option == "nocert"),
+                ssl_cert_reqs=self._use_cert(ssl_option)
+            )
+
         # print("Verify if connection established")
         self._client.admin.command('ismaster')
 

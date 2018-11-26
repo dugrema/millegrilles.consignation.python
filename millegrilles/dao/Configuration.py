@@ -26,7 +26,8 @@ class TransactionConfiguration:
             Constantes.CONFIG_MONGO_HOST: 'localhost',
             Constantes.CONFIG_MONGO_PORT: '27017',
             Constantes.CONFIG_MONGO_USER: 'root',
-            Constantes.CONFIG_MONGO_PASSWORD: 'example'
+            Constantes.CONFIG_MONGO_PASSWORD: 'example',
+            Constantes.CONFIG_MONGO_SSL: 'on'   # Options on, off, nocert
         }
 
         # Configuration specifique a la MilleGrille
@@ -86,6 +87,10 @@ class TransactionConfiguration:
     @property
     def mongo_password(self):
         return self._mongo_config[Constantes.CONFIG_MONGO_PASSWORD]
+
+    @property
+    def mongo_ssl(self):
+        return self._mongo_config[Constantes.CONFIG_MONGO_SSL]
 
     @property
     def queue_nouvelles_transactions(self):

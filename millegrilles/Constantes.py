@@ -24,6 +24,7 @@ CONFIG_MONGO_HOST = 'mongo_host'
 CONFIG_MONGO_PORT = 'mongo_port'
 CONFIG_MONGO_USER = 'mongo_user'
 CONFIG_MONGO_PASSWORD = 'mongo_password'
+CONFIG_MONGO_SSL = 'mongo_ssl'
 
 MONGO_DOC_ID = '_id'
 
