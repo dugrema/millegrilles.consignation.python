@@ -29,8 +29,7 @@ def envoyer_message_test_senseur_lecture():
         'temperature': 21.00
     }
 
-    enveloppe = messageDao.transmettre_message_transaction(lecture_modele,
-                                                           'MGPProcessus.Appareils.ProcessusSenseurConserverLecture')
+    enveloppe = messageDao.transmettre_nouvelle_transaction(lecture_modele)
 
     return enveloppe
 
