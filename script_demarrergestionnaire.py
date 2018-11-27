@@ -3,11 +3,13 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Demarrer un gestionnaire de domaine MilleGrilles")
 
+
 def parse():
     parser.add_argument('-m', type=str, nargs=1, required=True, help="Nom du module Python")
     parser.add_argument('-c', type=str, nargs=1, required=True, help="Nom de la classe Python")
 
     return parser.parse_args()
+
 
 def run(args):
     nom_module = args.m[0]
@@ -21,6 +23,7 @@ def run(args):
     classe = getattr(classe_processus, nom_classe)
     instance = classe()
     instance.executer_gestionnaire()
+
 
 # **** MAIN ****
 try:
