@@ -1,18 +1,8 @@
-''' Script de test pour transmettre message de transaction
-
-'''
+# Script de test pour transmettre message de transaction
 
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.MessageDAO import PikaDAO
-
-#credentials = pika.PlainCredentials('mathieu', 'p1234')
-#connection = pika.BlockingConnection(pika.ConnectionParameters('cuisine', 5674, credentials=credentials))
-
-#queuename = "mg.sansnom.nouvelles_transactions"
-
-#connection = pika.BlockingConnection( pika.ConnectionParameters('dev2', 5672) )
-#channel = connection.channel()
-#channel.queue_declare(queue=queuename)
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 def envoyer_message_test_senseur_lecture():
@@ -29,29 +19,20 @@ def envoyer_message_test_senseur_lecture():
         'temperature': 21.00
     }
 
-    enveloppe = messageDao.transmettre_nouvelle_transaction(lecture_modele)
+    enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'test')
 
-    return enveloppe
+    return enveloppe_val
 
-def message_test():
-
-    message_test_orienteur = {
-        "libelle-transaction": "MGPProcessus.ProcessusTest.TestOrienteur"
-    }
-
-    enveloppe = messageDao.transmettre_message_transaction(message_test_orienteur,
-                                                           'MGPProcessus.ProcessusTest.TestOrienteur')
-
-    return enveloppe
 
 # --- MAIN ---
-
 configuration = TransactionConfiguration()
 configuration.loadEnvironment()
-messageDao = PikaDAO(configuration)
+message_dao = PikaDAO(configuration)
 
-messageDao.connecter()
-messageDao.configurer_rabbitmq()
+message_dao.connecter()
+message_dao.configurer_rabbitmq()
+
+generateur = GenerateurTransaction(configuration, message_dao)
 
 # TEST
 
@@ -61,4 +42,4 @@ enveloppe = envoyer_message_test_senseur_lecture()
 
 print("Sent: %s" % enveloppe)
 
-messageDao.deconnecter()
+message_dao.deconnecter()

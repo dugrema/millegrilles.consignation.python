@@ -1,8 +1,9 @@
-''' Configuration pour traiter les transactions
-'''
+# Configuration pour traiter les transactions
 
 import os
+import json
 from millegrilles import Constantes
+
 
 class TransactionConfiguration:
 
@@ -37,6 +38,15 @@ class TransactionConfiguration:
         }
 
     def loadEnvironment(self):
+        fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
+        dict_fichier_json = dict()
+        if fichier_json_path is not None:
+            print("Chargement fichier JSON")
+            # Charger le fichier et combiner au dictionnaire
+            with open(fichier_json_path) as fjson:
+                dict_fichier_json = json.load(fjson)
+                print("Config JSON: %s" % str(dict_fichier_json))
+
         # Faire la liste des dictionnaires de configuration a charger
         configurations = [self._mq_config, self._mongo_config, self._millegrille_config]
 
@@ -45,12 +55,15 @@ class TransactionConfiguration:
             # Configuration de connection a RabbitMQ
             for property in config_dict.keys():
                 env_value = os.environ.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
+                json_value = dict_fichier_json.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
                 if env_value is not None :
                     config_dict[property] = env_value
+                elif json_value is not None:
+                    config_dict[property] = json_value
 
-    def loadProperty(self, map, property, env_name):
+    def load_property(self, map, property, env_name):
         env_value = os.environ[env_name]
-        if(env_value != None):
+        if env_value is not None:
             map[property] = env_value
 
     @property

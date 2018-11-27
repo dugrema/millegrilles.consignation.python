@@ -1,5 +1,7 @@
 # Constantes de MilleGrillesPython
 
+CONFIG_FICHIER_JSON = 'mg_config_json'  # Fichier de configuration JSON a combiner avec les autres configurations
+
 # Configuration MQ
 CONFIG_MQ_HOST = 'mq_host'
 CONFIG_MQ_PORT = 'mq_port'
