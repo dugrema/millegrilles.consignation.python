@@ -39,6 +39,7 @@ class PikaDAO:
             pika.ConnectionParameters(
                 host=self.configuration.mq_host,
                 port=self.configuration.mq_port,
+                heartbeat=60,
                 credentials=credentials,
                 ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
             )
