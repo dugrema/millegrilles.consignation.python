@@ -20,4 +20,4 @@ class Declencheur:
     def transmettre_declencheur_domaine(self, domaine, dict_message):
         nom_millegrille = self.configuration.nom_millegrille
         routing_key = '%s.destinataire.domaine.%s' % (nom_millegrille, domaine)
-        self.message_dao.transmettre_message(routing_key, dict_message)
+        self.message_dao.transmettre_message(dict_message, routing_key)
