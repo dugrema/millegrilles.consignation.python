@@ -3,6 +3,7 @@ import codecs
 import pika
 import json
 import traceback
+import threading
 
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials
@@ -16,6 +17,8 @@ Connection a un moteur de messagerie via Pika.
 class PikaDAO:
 
     def __init__(self, configuration):
+        self._lock_transmettre_message = threading.Lock()
+
         self.configuration = configuration
         self.connectionmq = None
         self.channel = None
@@ -176,7 +179,7 @@ class PikaDAO:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict)
-        with self.channel:
+        with self._lock_transmettre_message:
             self.channel.basic_publish(
                 exchange=self.configuration.exchange_evenements,
                 routing_key=routing_key,
