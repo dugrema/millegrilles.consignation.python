@@ -176,11 +176,12 @@ class PikaDAO:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict)
-        self.channel.basic_publish(
-            exchange=self.configuration.exchange_evenements,
-            routing_key=routing_key,
-            body=message_utf8,
-            properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
+        with self.channel:
+            self.channel.basic_publish(
+                exchange=self.configuration.exchange_evenements,
+                routing_key=routing_key,
+                body=message_utf8,
+                properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
         self.in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction):
