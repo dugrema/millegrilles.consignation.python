@@ -5,6 +5,8 @@ import os
 import io
 import time
 import atexit
+import logging
+
 from signal import SIGTERM
 
 
@@ -117,7 +119,7 @@ class Daemon:
                                 if os.path.exists(self.pidfile):
                                         os.remove(self.pidfile)
                         else:
-                                print(str(err))
+                                logging.fatal(str(err))
                                 sys.exit(1)
  
         def restart(self):
