@@ -2,6 +2,7 @@
 
 import os
 import json
+import logging
 from millegrilles import Constantes
 
 
@@ -41,11 +42,11 @@ class TransactionConfiguration:
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
         if fichier_json_path is not None:
-            print("Chargement fichier JSON")
+            logging.info("Chargement fichier JSON")
             # Charger le fichier et combiner au dictionnaire
             with open(fichier_json_path) as fjson:
                 dict_fichier_json = json.load(fjson)
-                print("Config JSON: %s" % str(dict_fichier_json))
+                # logging.debug("Config JSON: %s" % str(dict_fichier_json))
 
         # Faire la liste des dictionnaires de configuration a charger
         configurations = [self._mq_config, self._mongo_config, self._millegrille_config]

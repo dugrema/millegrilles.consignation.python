@@ -5,6 +5,7 @@ from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
 import signal
 import traceback
+import logging
 
 
 # Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine.
@@ -43,7 +44,7 @@ class GestionnaireDomaine:
         try:
             self.message_dao.channel.start_consuming()
         except OSError as oserr:
-            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
@@ -82,12 +83,12 @@ class GestionnaireDomaine:
             self.traiter_backlog()
             self.demarrer_traitement_messages_blocking(self.get_nom_queue())
         except Exception as e:
-            print("Interruption du gestionnaire, erreur: %s" % str(e))
+            logging.debug("Interruption du gestionnaire, erreur: %s" % str(e))
             traceback.print_stack()
         finally:
             self.exit_gracefully()
 
     def exit_gracefully(self, signum=None, frame=None):
-        print("Arret de MGProcessusControleur, signal=%s" % str(signum))
+        logging.info("Arret de MGProcessusControleur, signal=%s" % str(signum))
         self.arreter_traitement_messages()
         self.deconnecter()

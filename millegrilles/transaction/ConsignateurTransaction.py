@@ -1,13 +1,12 @@
 #!/usr/bin/python3
+# Programme principal pour transferer les nouvelles transactions vers MongoDB
 
-''' Programme principal pour transferer les nouvelles transactions vers MongoDB '''
 from millegrilles.dao.MessageDAO import PikaDAO, JSONHelper, BaseCallback
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles import Constantes
 import signal
-
-from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
+import logging
 
 
 class ConsignateurTransaction(BaseCallback):
@@ -34,7 +33,7 @@ class ConsignateurTransaction(BaseCallback):
 
         self._transaction_helper = self.document_dao.transaction_helper()
 
-        print("Configuration et connection completee")
+        logging.info("Configuration et connection completee")
 
     def executer(self):
         # Note: la methode demarrer_... est blocking
@@ -43,7 +42,7 @@ class ConsignateurTransaction(BaseCallback):
     def deconnecter(self):
         self.document_dao.deconnecter()
         self.message_dao.deconnecter()
-        print("Deconnexion completee")
+        logging.info("Deconnexion completee")
 
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def traiter_message(self, ch, method, properties, body):
@@ -55,13 +54,15 @@ class ConsignateurTransaction(BaseCallback):
 
 consignateur = ConsignateurTransaction()
 
+
 def exit_gracefully(signum, frame):
-    print("Arret de OrienteurTransaction")
+    logging.debug("Arret de OrienteurTransaction")
     consignateur.deconnecter()
+
 
 def main():
 
-    print("Demarrage de ConsignateurTransaction")
+    logging.debug("Demarrage de ConsignateurTransaction")
 
     signal.signal(signal.SIGINT, exit_gracefully)
     signal.signal(signal.SIGTERM, exit_gracefully)
@@ -69,13 +70,14 @@ def main():
     consignateur.configurer()
 
     try:
-        print("ConsignateurTransaction est pret")
+        logging.debug("ConsignateurTransaction est pret")
         consignateur.executer()
     finally:
-        print("Arret de ConsignateurTransaction")
+        logging.debug("Arret de ConsignateurTransaction")
         consignateur.deconnecter()
 
-    print("ConsignateurTransaction est arrete")
+    logging.debug("ConsignateurTransaction est arrete")
+
 
 if __name__=="__main__":
     main()

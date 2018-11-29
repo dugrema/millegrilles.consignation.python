@@ -4,6 +4,7 @@ import pika
 import json
 import traceback
 import threading
+import logging
 
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials
@@ -142,7 +143,7 @@ class PikaDAO:
             self.channel.start_consuming()
 
         except OSError as oserr:
-            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
 
@@ -153,7 +154,7 @@ class PikaDAO:
         try:
             self.channel.start_consuming()
         except OSError as oserr:
-            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
 
@@ -164,7 +165,7 @@ class PikaDAO:
         try:
             self.channel.start_consuming()
         except OSError as oserr:
-            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' 
     Methode generique pour transmettre un evenement JSON avec l'echange millegrilles
@@ -317,7 +318,7 @@ class PikaDAO:
             try:
                 self.channel.stop_consuming()
             except Exception as e:
-                print("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
+                logging.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
 
         self.deconnecter()
 
@@ -389,7 +390,7 @@ class BaseCallback:
         try:
             self.traiter_message(ch, method, properties, body)
         except Exception as e:
-            # print("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            logging.warning("Erreur dans callbackAvecAck, exception: %s" % str(e))
             self.transmettre_erreur(ch, body, e)
         finally:
             self.transmettre_ack(ch, method)

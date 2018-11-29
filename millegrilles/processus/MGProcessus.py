@@ -1,5 +1,6 @@
 # Module de processus pour MilleGrilles
 import signal
+import logging
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import TransactionConfiguration
@@ -41,7 +42,7 @@ class MGPProcessusControleur(BaseCallback):
     def deconnecter(self):
         self._document_dao.deconnecter()
         self._message_dao.deconnecter()
-        print("Deconnexion completee")
+        logging.info("Deconnexion completee")
 
     '''
     Methode qui demarre la lecture des evenements sur la Q de processus.
@@ -59,7 +60,7 @@ class MGPProcessusControleur(BaseCallback):
             # Decoder l'evenement qui contient l'information sur l'etape a traiter
             evenement_dict = self.extraire_evenement(body)
             id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
-            #print("Recu evenement processus: %s" % str(evenement_dict))
+            logging.debug("Recu evenement processus: %s" % str(evenement_dict))
             self.traiter_evenement(evenement_dict)
         except Exception as e:
             # Mettre le message d'erreur sur la Q erreur processus
@@ -93,7 +94,7 @@ class MGPProcessusControleur(BaseCallback):
         nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
         nom_module, nom_classe = nom_processus.split(':')
         nom_module = nom_module.replace("_", ".")
-        #print('Importer %s, %s' % (nom_module, nom_classe))
+        logging.debug('Importer %s, %s' % (nom_module, nom_classe))
         module_processus = __import__('%s' % nom_module, fromlist=nom_classe)
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
@@ -247,12 +248,12 @@ class MGProcessus:
     def finale(self):
         self._etape_complete = True
         self._processus_complete = True
-        #print("Etape finale executee pour %s" % self.__class__.__name__)
+        logging.debug("Etape finale executee pour %s" % self.__class__.__name__)
 
     def erreur_fatale(self, detail=None):
         self._etape_complete = True
         self._processus_complete = True
-        print("Erreur fatale - voir Q")
+        logging.error("Erreur fatale - voir Q")
 
         information = None
         if detail is not None:
@@ -373,12 +374,12 @@ class ErreurEtapePasEncoreExecutee(Exception):
 controleur = MGPProcessusControleur()
 
 def exit_gracefully(signum, frame):
-    print("Arret de MGProcessusControleur")
+    logging.info("Arret de MGProcessusControleur")
     controleur.deconnecter()
 
 def main():
-
-    print("Demarrage de MGProcessusControleur")
+    logging.basicConfig(format='%(asctime)s %(message)s')
+    logging.info("Demarrage de MGProcessusControleur")
 
     signal.signal(signal.SIGINT, exit_gracefully)
     signal.signal(signal.SIGTERM, exit_gracefully)
@@ -386,12 +387,13 @@ def main():
     controleur.initialiser()
 
     try:
-        print("MGProcessusControleur est pret")
+        logging.info("MGProcessusControleur est pret")
         controleur.executer()
     finally:
         exit_gracefully(None, None)
 
-    print("MGProcessusControleur est arrete")
+    logging.info("MGProcessusControleur est arrete")
+
 
 if __name__=="__main__":
     main()

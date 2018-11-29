@@ -1,5 +1,6 @@
 # Gestion des documents.
 import ssl
+import logging
 
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -49,10 +50,10 @@ class MongoDAO:
                 ssl_cert_reqs=MongoDAO._use_cert(ssl_option)
             )
 
-        # print("Verify if connection established")
+        logging.debug("Verify if connection established")
         self._client.admin.command('ismaster')
 
-        # print("Connection etablie, ouverture base de donnes %s" % (self.nom_millegrille))
+        logging.info("Connection etablie, ouverture base de donnes %s" % self.nom_millegrille)
 
         self._mg_database = self._client[self._nom_millegrille]
         self._collection_transactions = self._mg_database[Constantes.DOCUMENT_COLLECTION_TRANSACTIONS]
@@ -90,7 +91,7 @@ class MongoDAO:
             self._client.admin.command('ismaster')
             return True
         except ConnectionFailure:
-            # print("Server not available")
+            logging.info("Server not available")
             return False
 
     '''
