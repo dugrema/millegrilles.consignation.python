@@ -7,7 +7,6 @@ setup(
         'millegrilles',
         'millegrilles.dao',
         'millegrilles.processus',
-        'millegrilles.rapport',
         'millegrilles.transaction',
         'millegrilles.util'
     ],
