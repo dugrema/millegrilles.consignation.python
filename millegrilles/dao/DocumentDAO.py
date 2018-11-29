@@ -53,7 +53,7 @@ class MongoDAO:
         logging.debug("Verify if connection established")
         self._client.admin.command('ismaster')
 
-        logging.info("Connection etablie, ouverture base de donnes %s" % self.nom_millegrille)
+        logging.info("Connection etablie, ouverture base de donnes %s" % self._configuration.nom_millegrille)
 
         self._mg_database = self._client[self._nom_millegrille]
         self._collection_transactions = self._mg_database[Constantes.DOCUMENT_COLLECTION_TRANSACTIONS]
