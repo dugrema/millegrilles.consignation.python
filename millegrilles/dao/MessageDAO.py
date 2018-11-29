@@ -128,6 +128,7 @@ class PikaDAO:
         )
 
     ''' Prepare la reception de message '''
+
     def demarrer_lecture_nouvelles_transactions(self, callback):
 
         queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions)
@@ -140,17 +141,8 @@ class PikaDAO:
         except OSError as oserr:
             print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
-    ''' Demarre la lecture de la queue entree_processus. Appel bloquant. '''
-#    def demarrer_lecture_entree_processus(self, callback):
-#        self.channel.basic_consume(callback,
-#                                   queue=self.queuename_entree_processus(),
-#                                   no_ack=False)
-#        try:
-#            self.channel.start_consuming()
-#        except OSError as oserr:
-#            print("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
-
     ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
+
     def demarrer_lecture_etape_processus(self, callback):
         self.channel.basic_consume(callback,
                                    queue=self.queuename_mgp_processus(),
@@ -177,16 +169,18 @@ class PikaDAO:
     :param routing_key: Routing key utilise pour distribuer le message.
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
+
     def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1):
 
         if self.connectionmq is None or self.connectionmq.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict)
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                              routing_key=routing_key,
-                              body=message_utf8,
-                              properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
+        self.channel.basic_publish(
+            exchange=self.configuration.exchange_evenements,
+            routing_key=routing_key,
+            body=message_utf8,
+            properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
         self.in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction):
@@ -203,15 +197,17 @@ class PikaDAO:
         }
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        if document_transaction is not None and document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine") is not None:
+        if document_transaction is not None and document_transaction[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine") is not None:
             nom_domaine = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine")
             routing_key = '%s.destinataire.domaine.%s' % (self.configuration.nom_millegrille, nom_domaine)
         else:
-           routing_key = '%s.transaction.persistee' % (self.configuration.nom_millegrille)
+            routing_key = '%s.transaction.persistee' % self.configuration.nom_millegrille
 
-        self.channel.basic_publish(exchange='millegrilles.evenements',
-                              routing_key=routing_key,
-                              body=message_utf8)
+        self.channel.basic_publish(
+            exchange='millegrilles.evenements',
+            routing_key=routing_key,
+            body=message_utf8)
 
     '''
     Transmet un declencheur pour une etape de processus MilleGrilles.
@@ -222,6 +218,7 @@ class PikaDAO:
     :param evenement_declencheur: (Optionnel) Evenement qui a declenche l'execution de l'etape courante.
     :param dict_parametres: (Optionnel) Parametres a utiliser pour la prochaine etape du processus.
     '''
+
     def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale'):
         message = {
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(id_document),
@@ -232,9 +229,9 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         routing_key = '%s.mgpprocessus.%s.%s' % \
-                (self.configuration.nom_millegrille,
-                nom_processus,
-                nom_etape)
+                      (self.configuration.nom_millegrille,
+                       nom_processus,
+                       nom_etape)
 
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
                                    routing_key=routing_key,
@@ -247,6 +244,7 @@ class PikaDAO:
     :param id_transaction: (Optionnel) Identificateur de la transaction qui est bloquee
     :param detail: (Optionnel) Information sur l'erreur.
     '''
+
     def transmettre_erreur_transaction(self, id_document, id_transaction=None, detail=None):
 
         message = {
@@ -256,13 +254,14 @@ class PikaDAO:
             message[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO] = id_transaction
         if detail is not None:
             message["erreur"] = str(detail)
-            message["stacktrace"] = traceback.format_exception(etype=type(detail), value=detail, tb=detail.__traceback__)
+            message["stacktrace"] = traceback.format_exception(etype=type(detail), value=detail,
+                                                               tb=detail.__traceback__)
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                              routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
-                              body=message_utf8)
+                                   routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
+                                   body=message_utf8)
 
     '''
      Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
@@ -290,19 +289,21 @@ class PikaDAO:
                                    routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
                                    body=message_utf8)
 
-    def transmettre_evenement_generateur_documents(self, message):
-
-        chemin = message.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
-        if chemin is not None:
-            chemin = '.%s' % '.'.join(chemin)
-        else:
-            chemin = ''
-
-        message_utf8 = self.json_helper.dict_vers_json(message)
-
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                   routing_key='%s.generateurdocuments%s' % (self.configuration.nom_millegrille, chemin),
-                                   body=message_utf8)
+    # def transmettre_evenement_generateur_documents(self, message):
+    #
+    #     chemin = message.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
+    #     if chemin is not None:
+    #         chemin = '.%s' % '.'.join(chemin)
+    #     else:
+    #         chemin = ''
+    #
+    #     message_utf8 = self.json_helper.dict_vers_json(message)
+    #
+    #     self.channel.basic_publish(
+    #         exchange=self.configuration.exchange_evenements,
+    #         routing_key='%s.generateurdocuments%s' % (
+    #             self.configuration.nom_millegrille, chemin),
+    #         body=message_utf8)
 
     # Mettre la classe en etat d'erreur
     def enter_error_state(self):
@@ -364,6 +365,7 @@ class JSONHelper:
         dict = json.loads(message_json)
         return dict
 
+
 ''' 
 Classe qui facilite l'implementation de callbacks avec ACK
 '''
@@ -383,7 +385,7 @@ class BaseCallback:
         try:
             self.traiter_message(ch, method, properties, body)
         except Exception as e:
-            #print("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            # print("Erreur dans callbackAvecAck, exception: %s" % str(e))
             self.transmettre_erreur(ch, body, e)
         finally:
             self.transmettre_ack(ch, method)
@@ -403,10 +405,11 @@ class BaseCallback:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         ch.basic_publish(exchange=self._configuration.exchange_evenements,
-                                   routing_key='%s.processus.erreur' % self._configuration.nom_millegrille,
-                                   body=message_utf8)
+                         routing_key='%s.processus.erreur' % self._configuration.nom_millegrille,
+                         body=message_utf8)
 
     ''' Methode qui peut etre remplacee dans la sous-classe '''
+
     def traiter_message(self, ch, method, properties, body):
         raise NotImplemented('traiter_message() methode doit etre implementee')
 
