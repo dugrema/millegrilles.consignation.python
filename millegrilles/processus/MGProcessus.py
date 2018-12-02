@@ -373,12 +373,15 @@ class ErreurEtapePasEncoreExecutee(Exception):
 
 controleur = MGPProcessusControleur()
 
+
 def exit_gracefully(signum, frame):
     logging.info("Arret de MGProcessusControleur")
     controleur.deconnecter()
 
+
 def main():
     logging.basicConfig(format='%(asctime)s %(message)s')
+#    logging.getLogger().setLevel(logging.DEBUG)
     logging.info("Demarrage de MGProcessusControleur")
 
     signal.signal(signal.SIGINT, exit_gracefully)
