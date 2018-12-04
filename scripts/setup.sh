@@ -14,7 +14,7 @@ python3 setup.py install
 
 echo "Copier script demarrer dans $BUNDLE_FOLDER"
 mkdir -p $BUNDLE_FOLDER
-cp $GIT_FOLDER/demarrer*.py $BUNDLE_FOLDER
+cp $GIT_FOLDER/scripts/demarrer*.py $BUNDLE_FOLDER
 
 cd $BUNDLE_FOLDER
 rm -rf $BUILD_FOLDER

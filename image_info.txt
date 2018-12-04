@@ -3,6 +3,6 @@
 REPO=registry.maple.mdugre.info:5000
 NAME=millegrilles_consignation_python
 BRANCH=`git name-rev --name-only HEAD`
-BUILD=3
+BUILD=4
 
 VERSION=$BRANCH.$BUILD
