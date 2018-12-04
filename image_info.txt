@@ -1,0 +1,8 @@
+# Fichier d'information pour le build Docker
+
+REPO=registry.maple.mdugre.info:5000
+NAME=millegrilles_consignation_python
+BRANCH=`git name-rev --name-only HEAD`
+BUILD=3
+
+VERSION=$BRANCH.$BUILD
