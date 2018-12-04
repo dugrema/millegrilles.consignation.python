@@ -11,7 +11,7 @@ ENV BUILD_FOLDER=/opt/millegrilles/build \
     MG_MONGO_HOST=mongo
 
 COPY scripts/ $BUILD_FOLDER/scripts
-COPY . $SRC_FOLDER/
+COPY ./ $SRC_FOLDER/MilleGrilles.consignation.python/
 
 RUN $BUILD_FOLDER/scripts/setup.sh
 
