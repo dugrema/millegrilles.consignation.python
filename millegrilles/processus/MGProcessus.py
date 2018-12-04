@@ -209,7 +209,7 @@ class MGProcessus:
     '''
     def traitement_etape(self):
 
-        id_document_processus=None
+        id_document_processus = None
         try:
             # Charger le document du processus
             id_document_processus = self._evenement[Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS]
@@ -276,10 +276,8 @@ class MGProcessus:
         return self._controleur.document_dao()
 
 
-'''
-Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
-comme ayant ete completee.
-'''
+# Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
+# comme ayant ete completee.
 class MGProcessusTransaction(MGProcessus):
 
     def __init__(self, controleur, evenement):
@@ -312,7 +310,7 @@ class MGProcessusTransaction(MGProcessus):
         pass
 
 
-''' Classe qui sert a demarrer un processus '''
+# Classe qui sert a demarrer un processus
 class MGPProcessusDemarreur:
 
     def __init__(self, message_dao, document_dao):
