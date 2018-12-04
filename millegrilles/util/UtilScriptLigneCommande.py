@@ -18,8 +18,11 @@ class ModeleConfiguration:
 
         self.configuration = TransactionConfiguration()
         self.configuration.loadEnvironment()
-        self.configurer_parser()
+
+        self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
+
+        self.configurer_parser()
 
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
