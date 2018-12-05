@@ -32,27 +32,32 @@ class PikaDAO:
     # Connecter au serveur RabbitMQ
     # Le callback est une methode qui va etre appelee lorsqu'un message est recu
     def connecter(self):
-        credentials = PlainCredentials(
-            self.configuration.mq_user,
-            self.configuration.mq_password,
-            erase_on_connect=True
-        )
 
-        ssl_option = self.configuration.mq_ssl
-        self.connectionmq = pika.BlockingConnection(
-            pika.ConnectionParameters(
-                host=self.configuration.mq_host,
-                port=self.configuration.mq_port,
-                heartbeat=60,
-                credentials=credentials,
-                ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
+        try:
+            credentials = PlainCredentials(
+                self.configuration.mq_user,
+                self.configuration.mq_password,
+                erase_on_connect=True
             )
-        )
-        self.channel = self.connectionmq.channel()
-        self.channel.basic_qos(prefetch_count=1)
 
-        self._actif = True
-        self.in_error = False
+            ssl_option = self.configuration.mq_ssl
+            self.connectionmq = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=self.configuration.mq_host,
+                    port=self.configuration.mq_port,
+                    heartbeat=60,
+                    credentials=credentials,
+                    ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
+                )
+            )
+            self.channel = self.connectionmq.channel()
+            self.channel.basic_qos(prefetch_count=1)
+
+            self._actif = True
+            self.in_error = False
+        except Exception as e:
+            self.in_error = True
+            raise e  # S'assurer de mettre le flag d'erreur
 
         return self.connectionmq
 
