@@ -1,5 +1,7 @@
 # Classe qui aide a creer et modifier les documents d'information generee.
 
+import datetime
+
 from millegrilles import Constantes
 from bson.objectid import ObjectId
 
@@ -26,10 +28,12 @@ class ProcessusHelper:
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: 'initiale',
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: [
                 {
                     Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: 'orientation',
-                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres,
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_DATEEXECUTION: datetime.datetime.utcnow()
                 }
             ]
         }
@@ -52,10 +56,13 @@ class ProcessusHelper:
         else:
             id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
 
+        doc_etape = dict_etape.copy()
+        doc_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_DATEEXECUTION] = datetime.datetime.utcnow()
+
         # print("$push vers mongo: %s --- %s" % (id_document, str(dict_etape)))
         set_operation = {}
         operation = {
-            '$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: dict_etape},
+            '$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: doc_etape},
         }
         if etape_suivante is None:
             operation['$unset'] = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: ''}
@@ -70,6 +77,9 @@ class ProcessusHelper:
 
         if len(set_operation) > 0:
             operation['$set'] = set_operation
+
+        # Conserver la date de mise a jour
+        operation['$currentDate'] = {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
 
         resultat = self._collection_processus.update_one(id_document, operation)
 
