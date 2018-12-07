@@ -210,6 +210,11 @@ class PikaDAO:
         # Utiliser delivery mode 2 (persistent) pour les transactions
         self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
 
+    def transmettre_notification(self, document_transaction, sub_routing_key):
+        routing_key = '%s.notification.%s' % (self.configuration.nom_millegrille, sub_routing_key)
+        # Utiliser delivery mode 2 (persistent) pour les notifications
+        self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
+
     def transmettre_evenement_persistance(self, id_document, id_transaction, document_transaction=None):
 
         message = {
