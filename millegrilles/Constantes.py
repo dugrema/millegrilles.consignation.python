@@ -14,6 +14,7 @@ CONFIG_QUEUE_ERREURS_TRANSACTIONS = 'mq_queue_erreurs_transactions'
 CONFIG_QUEUE_MGP_PROCESSUS =  'mq_queue_mgp_processus'
 CONFIG_QUEUE_ERREURS_PROCESSUS = 'mq_queue_erreurs_processus'
 CONFIG_QUEUE_GENERATEUR_DOCUMENTS = 'mq_queue_generateur_documents'
+CONFIG_QUEUE_NOTIFICATIONS = 'mq_queue_notifications'
 
 DEFAUT_MQ_EXCHANGE_EVENEMENTS = 'millegrilles.evenements'
 DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS = 'nouvelles_transactions'
@@ -21,6 +22,7 @@ DEFAUT_QUEUE_ERREURS_TRANSACTIONS = 'erreurs_transactions'
 DEFAUT_QUEUE_MGP_PROCESSUS = 'mgp_processus'
 DEFAUT_QUEUE_ERREURS_PROCESSUS = 'erreurs_processus'
 DEFAUT_QUEUE_GENERATEUR_DOCUMENTS = 'generateur_documents'
+DEFAUT_QUEUE_NOTIFICATIONS = 'notifications'
 
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
@@ -88,4 +90,3 @@ EVENEMENT_DOCUMENT_PERSISTE = 'document_persiste'
 EVENEMENT_DOCUMENT_MAJ = 'document_maj'
 EVENEMENT_DOCUMENT_SUPPRIME = 'document_supprime'
 EVENEMENT_DOCUMENT_AJOUTE = 'document_ajoute'
-

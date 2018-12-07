@@ -72,7 +72,8 @@ class PikaDAO:
         nom_q_mgp_processus = self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
-        nom_q_generateur_documents = self.queuename_generateur_documents()
+        # nom_q_generateur_documents = self.queuename_generateur_documents()
+        nom_q_notifications = self.queuename_notifications()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
         self.channel.exchange_declare(
@@ -125,15 +126,26 @@ class PikaDAO:
             routing_key='%s.processus.erreur' % nom_millegrille
         )
 
-        # Creer la Q pour le gestionnaire de generateurs de documents
+        # # Creer la Q pour le gestionnaire de generateurs de documents
+        # self.channel.queue_declare(
+        #     queue=nom_q_generateur_documents,
+        #     durable=True)
+        #
+        # self.channel.queue_bind(
+        #     exchange=nom_echange_evenements,
+        #     queue=nom_q_generateur_documents,
+        #     routing_key='%s.generateurdocuments.#' % nom_millegrille
+        # )
+
+        # Creer la Q et bindings pour les notifications
         self.channel.queue_declare(
-            queue=nom_q_generateur_documents,
+            queue=nom_q_notifications,
             durable=True)
 
         self.channel.queue_bind(
             exchange=nom_echange_evenements,
-            queue=nom_q_generateur_documents,
-            routing_key='%s.generateurdocuments.#' % nom_millegrille
+            queue=nom_q_notifications,
+            routing_key='%s.notification.#' % nom_millegrille
         )
 
     ''' Prepare la reception de message '''
@@ -358,6 +370,9 @@ class PikaDAO:
 
     def queuename_generateur_documents(self):
         return self._queuename(self.configuration.queue_generateur_documents)
+
+    def queuename_notifications(self):
+        return self._queuename(self.configuration.queue_notifications)
 
 
 # Classe avec utilitaires pour JSON

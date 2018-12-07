@@ -18,6 +18,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
             Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS: Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
             Constantes.CONFIG_QUEUE_GENERATEUR_DOCUMENTS: Constantes.DEFAUT_QUEUE_GENERATEUR_DOCUMENTS,
+            Constantes.CONFIG_QUEUE_NOTIFICATIONS: Constantes.DEFAUT_QUEUE_NOTIFICATIONS,
             Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS,
             Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
             Constantes.CONFIG_MQ_PASSWORD: None,
@@ -134,3 +135,7 @@ class TransactionConfiguration:
     @property
     def queue_generateur_documents(self):
         return self._mq_config[Constantes.CONFIG_QUEUE_GENERATEUR_DOCUMENTS]
+
+    @property
+    def queue_notifications(self):
+        return self._mq_config[Constantes.CONFIG_QUEUE_NOTIFICATIONS]
