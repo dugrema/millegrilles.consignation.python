@@ -32,7 +32,7 @@ class ModeleConfiguration:
     def print_help(self):
         self.parser.print_help()
 
-    def exit_gracefully(self):
+    def exit_gracefully(self, signal=None, frame=None):
         pass
 
     def parse(self):
@@ -59,7 +59,7 @@ class ModeleAvecMessageDAO(ModeleConfiguration):
         except Exception as em:
             logging.warning("Erreur fermeture message dao: %s" % str(em))
 
-    def exit_gracefully(self):
+    def exit_gracefully(self, signal=None, frame=None):
         self.deconnecter()
 
     def main(self):
@@ -69,10 +69,10 @@ class ModeleAvecMessageDAO(ModeleConfiguration):
 
             self.parse()  # Parsing de la ligne de commande
 
-            if self.args.debug:
-                # Active logging au niveau debug
-                logging.getLogger(__name__).setLevel(logging.DEBUG)
-                logging.getLogger("mgdomaines").setLevel(logging.DEBUG)
+            #if self.args.debug:
+            #    # Active logging au niveau debug
+            #    logging.getLogger(__name__).setLevel(logging.DEBUG)
+            #    logging.getLogger("mgdomaines").setLevel(logging.DEBUG)
 
             self.connecter()  # Connecter les ressource (DAOs)
             self.executer()  # Executer le download et envoyer message
@@ -103,5 +103,5 @@ class ModeleAvecDocumentDAO(ModeleConfiguration):
         except Exception as ed:
             logging.warning("Erreur fermeture document dao: %s" % str(ed))
 
-    def exit_gracefully(self):
+    def exit_gracefully(self, signal=None, frame=None):
         self.deconnecter()
