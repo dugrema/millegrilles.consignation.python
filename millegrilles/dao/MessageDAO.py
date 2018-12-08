@@ -248,12 +248,13 @@ class PikaDAO:
         "annee": 2018, "mois": 12, "jour": 8, "heure": 9, "minute": 54, "joursemaine": 5
       },
       "indicateurs": [
-        "heure", "jour", "mois", "annee", "semaine"
+        "heure", "TIMEZONE", "jour", "mois", "annee", "semaine"
       ]
     }
     
     Les indicateurs speciaux suivants sont ajoutes a la liste "indicateurs" lorsqu'applicable:
     - "heure"    # lorsque minute == 0
+    - "UTC"      # Lorsque c'est pour UTC. Autres time zones peuvent etre EST (ou EDT), etc.
     - "jour"     # lorsque heure == 0 et minute == 0
     - "mois"     # lorsque jour == 1 et heure == 0 et minute == 0
     - "annee"    # lorsque mois == 1 et jour == 1 et heure == 0 et minute == 0
@@ -267,31 +268,11 @@ class PikaDAO:
     - "sansnom.ceduleur.minute.heure.jour.mois.annee.semaine": Lorsque tous les indicateurs sont inclus
     - "sansnom.ceduleur.minute.heure.jour": Nouvelle journee a minuit.
     '''
-    def transmettre_evenement_ceduleur(self):
-
-        timestamp = datetime.datetime.now()
-        ts_dict = {
-            'annee': timestamp.year, 'mois': timestamp.month, 'jour': timestamp.day,
-            'heure': timestamp.hour, 'minute': timestamp.minute,
-            'joursemaine': timestamp.weekday()
-        }
-
-        # Calculer quels indicateurs on doit inclure
-        indicateurs = []
-        if ts_dict['minute'] == 0:
-            indicateurs.append('heure')
-            if ts_dict['heure'] == 0:
-                indicateurs.append('jour')
-                if ts_dict['jour'] == 1:
-                    indicateurs.append('mois')
-                    if ts_dict['mois'] == 1:
-                        indicateurs.append('annee')
-                if ts_dict['joursemaine'] == 0:
-                    indicateurs.append('semaine')
+    def transmettre_evenement_ceduleur(self, ts_dict, indicateurs):
 
         message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_CEDULEUR,
-            'timetamp': ts_dict,
+            'timestamp': ts_dict,
             'indicateurs': indicateurs
         }
         message_utf8 = self.json_helper.dict_vers_json(message)
