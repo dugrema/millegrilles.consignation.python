@@ -289,14 +289,18 @@ class PikaDAO:
                 if ts_dict['joursemaine'] == 0:
                     indicateurs.append('semaine')
 
-
         message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MINUTE,
             'timetamp': ts_dict,
             'indicateurs': indicateurs
         }
         message_utf8 = self.json_helper.dict_vers_json(message)
-        routing_key = '%s.ceduleur.minute' % self.configuration.nom_millegrille
+
+        # Creer la routing key avec les indicateurs (join l'array avec .)
+        ind_routing_key = '.'.join(indicateurs)
+        if len(ind_routing_key) > 0:
+            ind_routing_key = '.%s' % ind_routing_key
+        routing_key = '%s.ceduleur.minute%s' % (self.configuration.nom_millegrille, ind_routing_key)
 
         self.channel.basic_publish(
             exchange='millegrilles.evenements',
