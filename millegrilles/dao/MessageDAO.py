@@ -5,6 +5,7 @@ import json
 import traceback
 import threading
 import logging
+import datetime
 
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials
@@ -230,6 +231,72 @@ class PikaDAO:
             routing_key = '%s.destinataire.domaine.%s' % (self.configuration.nom_millegrille, nom_domaine)
         else:
             routing_key = '%s.transaction.persistee' % self.configuration.nom_millegrille
+
+        self.channel.basic_publish(
+            exchange='millegrilles.evenements',
+            routing_key=routing_key,
+            body=message_utf8)
+
+    ''' 
+    Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
+    pour declencher des processus reguliers. 
+    
+    Message: 
+    {
+      "evenements": "minute",
+      "timestamp": {
+        "annee": 2018, "mois": 12, "jour": 8, "heure": 9, "minute": 54, "joursemaine": 5
+      },
+      "indicateurs": [
+        "heure", "jour", "mois", "annee", "semaine"
+      ]
+    }
+    
+    Les indicateurs speciaux suivants sont ajoutes a la liste "indicateurs" lorsqu'applicable:
+    - "heure"    # lorsque minute == 0
+    - "jour"     # lorsque heure == 0 et minute == 0
+    - "mois"     # lorsque jour == 1 et heure == 0 et minute == 0
+    - "annee"    # lorsque mois == 1 et jour == 1 et heure == 0 et minute == 0
+    - "semaine"  # lorsque joursemaine == 0 et heure == 0 et minute == 0
+    
+    Noter que ces memes indicateurs sont aussi ajoutes a la routing key. Il est possible de s'abonner
+    uniquement a la notification desiree.
+    
+    routing_key: 
+    - "sansnom.ceduleur.minute" # Cle de base (sansnom est le nom de la MilleGrille)
+    - "sansnom.ceduleur.minute.heure.jour.mois.annee.semaine": Lorsque tous les indicateurs sont inclus
+    - "sansnom.ceduleur.minute.heure.jour": Nouvelle journee a minuit.
+    '''
+    def transmettre_evenement_ceduleur(self):
+
+        timestamp = datetime.datetime.now()
+        ts_dict = {
+            'annee': timestamp.year, 'mois': timestamp.month, 'jour': timestamp.day,
+            'heure': timestamp.hour, 'minute': timestamp.minute,
+            'joursemaine': timestamp.weekday()
+        }
+
+        # Calculer quels indicateurs on doit inclure
+        indicateurs = []
+        if ts_dict['minute'] == 0:
+            indicateurs.append('heure')
+            if ts_dict['heure'] == 0:
+                indicateurs.append('jour')
+                if ts_dict['jour'] == 1:
+                    indicateurs.append('mois')
+                    if ts_dict['mois'] == 1:
+                        indicateurs.append('annee')
+                if ts_dict['joursemaine'] == 0:
+                    indicateurs.append('semaine')
+
+
+        message = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MINUTE,
+            'timetamp': ts_dict,
+            'indicateurs': indicateurs
+        }
+        message_utf8 = self.json_helper.dict_vers_json(message)
+        routing_key = '%s.ceduleur.minute' % self.configuration.nom_millegrille
 
         self.channel.basic_publish(
             exchange='millegrilles.evenements',
