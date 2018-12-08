@@ -41,7 +41,7 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
         ]
 
         indicateurs = []
-        if timestamp_utc.minute == 24:
+        if timestamp_utc.minute == 0:
             indicateurs.append('heure')
 
         nom_timezones = []
@@ -62,8 +62,8 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
     def get_indicateurs(self, timestamp):
         # Calculer quels indicateurs on doit inclure
         indicateurs = []
-        if timestamp.minute == 24:
-            if timestamp.hour == 15:
+        if timestamp.minute == 0:
+            if timestamp.hour == 0:
                 indicateurs.append('jour')
                 if timestamp.day == 1:
                     indicateurs.append('mois')
