@@ -290,7 +290,7 @@ class PikaDAO:
                     indicateurs.append('semaine')
 
         message = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MINUTE,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_CEDULEUR,
             'timetamp': ts_dict,
             'indicateurs': indicateurs
         }
