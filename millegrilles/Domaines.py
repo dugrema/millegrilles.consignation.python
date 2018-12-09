@@ -4,29 +4,109 @@ from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
 
 import logging
+from threading import Thread, Event
 
 
-# Classe qui agit comme gestionnaire centralise de plusieurs domaines MilleGrilles.
-# Cette classe s'occupe des DAOs et du cycle de vie du programme.
 class GestionnaireDomainesMilleGrille(ModeleAvecDocumentMessageDAO):
+    """
+    Classe qui agit comme gestionnaire centralise de plusieurs domaines MilleGrilles.
+    Cette classe s'occupe des DAOs et du cycle de vie du programme.
+    """
 
     def __init__(self):
         super().__init__()
         self._logger = logging.getLogger("%s.GestionnaireDomainesMilleGrille" % __name__)
+        self._gestionnaires = []
+        self._stop_event = Event()
 
-    ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     def initialiser(self):
+        """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
         super().initialiser()
         self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
+    def configurer_parser(self):
+        super().configurer_parser()
+
+        self.parser.add_argument(
+            'domaines',
+            type=str,
+            help="Gestionnaires de domaines a charger. Format: nom_module1:nom_classe1,nom_module2:nom_classe2,[...]"
+        )
+
+        self.parser.add_argument(
+            '--debug', action="store_true", required=False,
+            help="Active le debugging (logger, tres verbose)"
+        )
+
+        self.parser.add_argument(
+            '--info', action="store_true", required=False,
+            help="Afficher davantage de messages (verbose)"
+        )
+
     ''' Charge les domaines listes en parametre '''
     def charger_domaines(self):
-        domaine_test = 'mgdomaines.appareils.SenseursPassifs.GestionnaireSenseursPassifs'
+
+        liste_domaines = self.args.domaines
+        gestionnaires = liste_domaines.split(',')
+        self._logger.info("Chargement des gestionnaires: %s" % str(gestionnaires))
+
+        for gestionnaire in gestionnaires:
+            noms_module_class = gestionnaire.strip().split(':')
+            nom_module = noms_module_class[0]
+            nom_classe = noms_module_class[1]
+
+            self._logger.debug("Nom package: %s, Classe: %s" % (nom_module, nom_classe))
+
+            classe_processus = __import__(nom_module, fromlist=[nom_classe])
+            classe = getattr(classe_processus, nom_classe)
+
+            # Preparer une instance du gestionnaire
+            instance = classe(self.configuration, self.message_dao, self.document_dao)
+            instance.configurer()  # Executer la configuration du gestionnaire de domaine
+            self._gestionnaires.append(instance)
+
+    def demarrer_execution_domaines(self):
+        for gestionnaire in self._gestionnaires:
+            gestionnaire.demarrer()
+
+    def exit_gracefully(self, signal=None, frame=None):
+        self._stop_event.set()  # Va arreter la boucle de verification des gestionnaires
+
+        # Avertir chaque gestionnaire
+        for gestionnaire in self._gestionnaires:
+            try:
+                gestionnaire.arreter()
+            except Exception as e:
+                self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__name__, str(e)))
+
+        super().exit_gracefully()
+
+    def executer(self):
+
+        self.set_logging_level()
+
+        self.charger_domaines()
+
+        self.demarrer_execution_domaines()
+
+        # Surveiller les gestionnaires - si un gestionnaire termine son execution, on doit tout fermer
+        while not self._stop_event.is_set():
+
+            self._stop_event.wait(20)  # Boucler toutes les 20 secondes
+
+    def set_logging_level(self):
+        """ Utilise args pour ajuster le logging level (debug, info) """
+        if self.args.debug:
+            self._logger.setLevel(logging.debug())
+            logging.getLogger('mgdomaines').setLevel(logging.info())
+            logging.getLogger('millegrilles').setLevel(logging.info())
+        elif self.args.info:
+            self._logger.setLevel(logging.info())
+            logging.getLogger('mgdomaines').setLevel(logging.info())
 
 
-
-# Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine.
-class GestionnaireDomaine():
+class GestionnaireDomaine:
+    """ Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine. """
 
     def __init__(self, configuration, message_dao, document_dao):
         self.configuration = configuration
@@ -36,17 +116,23 @@ class GestionnaireDomaine():
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
         self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
+        self._thread = None
 
     # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
-    ''' Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. '''
     def configurer(self):
+        """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         pass
 
-    ''' Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. '''
+    def demarrer(self):
+        """ Demarrer une thread pour ce gestionnaire """
+        self._thread = Thread(target=self.executer())
+        self._thread.start()
+
     def traiter_backlog(self):
+        """ Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. """
         pass
 
     ''' Demarre le traitement des messages pour le domaine '''
@@ -64,7 +150,7 @@ class GestionnaireDomaine():
     def arreter_traitement_messages(self):
         pass
 
-    def demarrer(self, processus, parametres):
+    def demarrer_processus(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
 
     '''

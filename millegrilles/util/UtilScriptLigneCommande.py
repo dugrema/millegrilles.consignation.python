@@ -27,15 +27,13 @@ class ModeleConfiguration:
             self.configuration = TransactionConfiguration()
             self.configuration.loadEnvironment()
 
-            self.configurer_parser()
-
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
 
     def print_help(self):
         self.parser.print_help()
 
-    def exit_gracefully(self, signal=None, frame=None):
+    def exit_gracefully(self, signum=None, frame=None):
         self.deconnecter()
 
     def parse(self):
@@ -56,7 +54,11 @@ class ModeleConfiguration:
             # Preparer logging
             logging.basicConfig(level=logging.WARNING)
 
-            self.parse()  # Parsing de la ligne de commande
+            # Faire le parsing des arguments pour verifier s'il en manque
+            self.configurer_parser()
+            self.parse()
+
+            self.initialiser()  # Initialiser toutes les
 
             self.connecter()  # Connecter les ressource (DAOs)
 
