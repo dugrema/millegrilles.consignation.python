@@ -28,6 +28,8 @@ class MongoDAO:
         self._transaction_document_helper = None
         self._processus_document_helper = None
 
+        self._logger = logging.getLogger("%s.MongoDAO" % __name__)
+
     @staticmethod
     def _use_cert(ssl_option):
         if ssl_option == "nocert":
@@ -50,10 +52,10 @@ class MongoDAO:
                 ssl_cert_reqs=MongoDAO._use_cert(ssl_option)
             )
 
-        logging.debug("Verify if connection established")
+        self._logger.debug("Verify if connection established")
         self._client.admin.command('ismaster')
 
-        logging.info("Connection etablie, ouverture base de donnes %s" % self._configuration.nom_millegrille)
+        self._logger.info("Connection etablie, ouverture base de donnes %s" % self._configuration.nom_millegrille)
 
         self._mg_database = self._client[self._nom_millegrille]
         self._collection_transactions = self._mg_database[Constantes.DOCUMENT_COLLECTION_TRANSACTIONS]
@@ -91,7 +93,7 @@ class MongoDAO:
             self._client.admin.command('ismaster')
             return True
         except ConnectionFailure:
-            logging.info("Server not available")
+            self._logger.info("Server not available")
             return False
 
     '''
@@ -116,3 +118,6 @@ class MongoDAO:
 
     def get_collection(self, collection):
         return self._mg_database[collection]
+
+    def get_database(self):
+        return self._mg_database
