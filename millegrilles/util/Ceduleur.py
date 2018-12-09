@@ -6,6 +6,7 @@ import pytz
 import logging
 
 from threading import Event
+from pika.exceptions import ConnectionClosed
 
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecMessageDAO
 
@@ -47,7 +48,7 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
         nom_timezones = []
         for tz in timezones:
             timestamp_tz = timestamp_utc.astimezone(tz=tz)
-            local_tz_name = timestamp_tz.tzname()
+            local_tz_name = str(tz)
             nom_timezones.append(local_tz_name)
 
             indicateurs_tz = self.get_indicateurs(timestamp_tz)
@@ -77,7 +78,7 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
     @staticmethod
     def temps_restant_pourminute():
         # Note: on utilise 62 pour ajouter executer 2 secondes apres la minute
-        time_sleep = 62 - (time.time()%60)
+        time_sleep = 62 - (time.time() % 60)
         return time_sleep
 
     def exit_gracefully(self, signal=None, frame=None):
@@ -98,7 +99,7 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
                 # Verifier avant d'executer, s'il reste moins de 30 secondes on attend la prochaine minute
                 temps_restant = CeduleurMilleGrilles.temps_restant_pourminute()
 
-                if temps_restant > 5:
+                if temps_restant > 45:
                     self.transmettre_evenement_ceduleur()
 
                     # Recalculer apres transmission message
@@ -110,6 +111,10 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
                     self.logger.warning("On skip, il reste juste %d secondes d'attente" % temps_restant)
 
                 self._stop_event.wait(temps_restant)
+
+            except ConnectionClosed as ce:
+                self.logger.fatal("Connection a Pika fermee, on termine l'execution. %s" % str(ce))
+                self.exit_gracefully()  # Connection perdue, On va fermer l'application
 
             except Exception as e:
                 self.logger.exception("Erreur durant le cycle de ceduleur: %s" % str(e))
