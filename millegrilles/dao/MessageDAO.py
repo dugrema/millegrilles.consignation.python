@@ -30,9 +30,15 @@ class PikaDAO:
 
         self.json_helper = JSONHelper()
 
-    # Connecter au serveur RabbitMQ
-    # Le callback est une methode qui va etre appelee lorsqu'un message est recu
-    def connecter(self):
+    def connecter(self, separer=False):
+        """
+        Connecter au serveur RabbitMQ
+        Le callback est une methode qui va etre appelee lorsqu'un message est recu
+
+        :param separer: Si False, la connexion est ouverte pour l'instance PikaDAO, Si True, on retourne la connexion
+                        sans conserver de pointeur.
+        :return: Connexion a RabbitMQ.
+        """
 
         try:
             credentials = PlainCredentials(
@@ -42,7 +48,7 @@ class PikaDAO:
             )
 
             ssl_option = self.configuration.mq_ssl
-            self.connectionmq = pika.BlockingConnection(
+            connectionmq = pika.BlockingConnection(
                 pika.ConnectionParameters(
                     host=self.configuration.mq_host,
                     port=self.configuration.mq_port,
@@ -51,16 +57,21 @@ class PikaDAO:
                     ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
                 )
             )
-            self.channel = self.connectionmq.channel()
-            self.channel.basic_qos(prefetch_count=1)
+            channel = connectionmq.channel()
+            channel.basic_qos(prefetch_count=1)
 
-            self._actif = True
-            self.in_error = False
+            if not separer:
+                # La connexion est pour l'instance de PikaDAO
+                self._actif = True
+                self.in_error = False
+                self.connectionmq = connectionmq
+                self.channel = channel
         except Exception as e:
-            self.in_error = True
+            if not separer:
+                self.in_error = True
             raise e  # S'assurer de mettre le flag d'erreur
 
-        return self.connectionmq
+        return connectionmq
 
     def configurer_rabbitmq(self):
 
@@ -467,7 +478,7 @@ class BaseCallback:
         try:
             self.traiter_message(ch, method, properties, body)
         except Exception as e:
-            logging.warning("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            logging.exception("Erreur dans callbackAvecAck, exception: %s" % str(e))
             self.transmettre_erreur(ch, body, e)
         finally:
             self.transmettre_ack(ch, method)

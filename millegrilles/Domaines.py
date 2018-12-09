@@ -6,6 +6,8 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageD
 import logging
 import json
 
+from pika.exceptions import ChannelClosed
+
 from threading import Thread, Event
 
 
@@ -108,6 +110,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
 
     def demarrer_execution_domaines(self):
         for gestionnaire in self._gestionnaires:
+            self._logger.debug("Demarrer un gestionnaire")
             gestionnaire.demarrer()
 
     def exit_gracefully(self, signum=None, frame=None):
@@ -118,6 +121,8 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         for gestionnaire in self._gestionnaires:
             try:
                 gestionnaire.arreter()
+            except ChannelClosed as ce:
+                self._logger.debug("Channel already closed: %s" % str(ce))
             except Exception as e:
                 self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__name__, str(e)))
 
@@ -144,8 +149,8 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         """ Utilise args pour ajuster le logging level (debug, info) """
         if self.args.debug:
             self._logger.setLevel(logging.DEBUG)
-            logging.getLogger('mgdomaines').setLevel(logging.INFO)
-            logging.getLogger('millegrilles').setLevel(logging.INFO)
+            logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
+            logging.getLogger('millegrilles').setLevel(logging.DEBUG)
         elif self.args.info:
             self._logger.setLevel(logging.INFO)
             logging.getLogger('mgdomaines').setLevel(logging.INFO)
@@ -163,8 +168,11 @@ class GestionnaireDomaine:
         self.json_helper = JSONHelper()
         self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
         self._thread = None
+        self.connexion_mq = None
+        self.channel_mq = None
+        self._arret_en_cours = False
 
-    # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
+        # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
@@ -174,8 +182,10 @@ class GestionnaireDomaine:
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
-        self._thread = Thread(target=self.executer())
+        self._logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
+        self._thread = Thread(target=self.executer)
         self._thread.start()
+        self._logger.debug("Debut demarree pour gestionnaire %s" % self.__class__.__name__)
 
     def traiter_backlog(self):
         """ Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. """
@@ -183,18 +193,32 @@ class GestionnaireDomaine:
 
     ''' Demarre le traitement des messages pour le domaine '''
     def demarrer_traitement_messages_blocking(self, queue_name):
-        self.message_dao.channel.basic_consume(self.traiter_transaction, queue=queue_name, no_ack=False)
-        try:
-            self.message_dao.channel.start_consuming()
-        except OSError as oserr:
-            self._logger.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+        with self.message_dao.connecter(separer=True) as connexion_mq:
+            self.connexion_mq = connexion_mq  # Garde une copie pour permettre de fermer de l'exterieur
+            self.channel_mq = connexion_mq.channel()
+            try:
+                self.channel_mq.basic_consume(self.traiter_transaction, queue=queue_name, no_ack=False)
+                self._logger.info("Debut ecoute sur queue %s" % queue_name)
+                self.channel_mq.start_consuming()
+
+                if not self._arret_en_cours:
+                    self._logger.warning("Retour de queue %s start_consuming()" % queue_name)
+            except OSError as oserr:
+                if not self._arret_en_cours:
+                    self._logger.exception(
+                        "erreur start_consuming, probablement du a la fermeture de la queue: %s" % str(oserr)
+                    )
+        self.channel_mq = None
+        self.connexion_mq = None
 
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
     ''' Arrete le traitement des messages pour le domaine '''
     def arreter_traitement_messages(self):
-        pass
+        self._arret_en_cours = True
+        if self.channel_mq is not None:
+            self.channel_mq.close()
 
     def demarrer_processus(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
@@ -208,6 +232,7 @@ class GestionnaireDomaine:
         raise NotImplementedError("Methode non-implementee")
 
     def executer(self):
+        self._logger.info("Debut execution gestionnaire de domaine %s" % self.__class__.__name__)
         # Doit creer le demarreur ici parce que la connexion a Mongo n'est pas prete avant
         self.demarreur_processus = MGPProcessusDemarreur(self.message_dao, self.document_dao)
 
