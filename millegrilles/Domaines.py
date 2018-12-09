@@ -7,7 +7,7 @@ import logging
 from threading import Thread, Event
 
 
-class GestionnaireDomainesMilleGrille(ModeleAvecDocumentMessageDAO):
+class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
     """
     Classe qui agit comme gestionnaire centralise de plusieurs domaines MilleGrilles.
     Cette classe s'occupe des DAOs et du cycle de vie du programme.
@@ -15,7 +15,7 @@ class GestionnaireDomainesMilleGrille(ModeleAvecDocumentMessageDAO):
 
     def __init__(self):
         super().__init__()
-        self._logger = logging.getLogger("%s.GestionnaireDomainesMilleGrille" % __name__)
+        self._logger = logging.getLogger("%s.GestionnaireDomainesMilleGrilles" % __name__)
         self._gestionnaires = []
         self._stop_event = Event()
 
@@ -69,7 +69,8 @@ class GestionnaireDomainesMilleGrille(ModeleAvecDocumentMessageDAO):
         for gestionnaire in self._gestionnaires:
             gestionnaire.demarrer()
 
-    def exit_gracefully(self, signal=None, frame=None):
+    def exit_gracefully(self, signum=None, frame=None):
+        self._logger.info("Arret du gestionnaire de domaines MilleGrilles")
         self._stop_event.set()  # Va arreter la boucle de verification des gestionnaires
 
         # Avertir chaque gestionnaire
@@ -97,12 +98,12 @@ class GestionnaireDomainesMilleGrille(ModeleAvecDocumentMessageDAO):
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """
         if self.args.debug:
-            self._logger.setLevel(logging.debug())
-            logging.getLogger('mgdomaines').setLevel(logging.info())
-            logging.getLogger('millegrilles').setLevel(logging.info())
+            self._logger.setLevel(logging.DEBUG)
+            logging.getLogger('mgdomaines').setLevel(logging.INFO)
+            logging.getLogger('millegrilles').setLevel(logging.INFO)
         elif self.args.info:
-            self._logger.setLevel(logging.info())
-            logging.getLogger('mgdomaines').setLevel(logging.info())
+            self._logger.setLevel(logging.INFO)
+            logging.getLogger('mgdomaines').setLevel(logging.INFO)
 
 
 class GestionnaireDomaine:
@@ -161,12 +162,6 @@ class GestionnaireDomaine:
     def get_nom_queue(self):
         raise NotImplementedError("Methode non-implementee")
 
-    # '''
-    # Methode qui peut etre invoquee pour demarrer l'execution du gestionnaire.
-    # '''
-    # def executer_gestionnaire(self):
-    #     self.main()
-
     def executer(self):
         # Doit creer le demarreur ici parce que la connexion a Mongo n'est pas prete avant
         self.demarreur_processus = MGPProcessusDemarreur(self.message_dao, self.document_dao)
@@ -176,11 +171,6 @@ class GestionnaireDomaine:
             self.demarrer_traitement_messages_blocking(self.get_nom_queue())
         except Exception as e:
             logging.exception("Interruption du gestionnaire, erreur: %s" % str(e))
-
-    # def exit_gracefully(self, signum=None, frame=None):
-    #     self._logger.warning("Arret de MGProcessusControleur, signal=%s" % str(signum))
-    #     self.arreter_traitement_messages()
-    #     super().exit_gracefully(signum, frame)
 
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
