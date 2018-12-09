@@ -36,6 +36,9 @@ MONGO_DOC_ID = '_id'
 # Configuration MilleGrilles
 CONFIG_NOM_MILLEGRILLE = 'nom_millegrille'
 
+# Domaines
+CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
+
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'
 DEFAUT_NOM_MILLEGRILLE = 'sansnom'

@@ -34,6 +34,10 @@ class TransactionConfiguration:
             Constantes.CONFIG_MONGO_SSL: 'on'   # Options on, off, nocert
         }
 
+        self._domaines_config = {
+            Constantes.CONFIG_DOMAINES_CONFIGURATION: None
+        }
+
         # Configuration specifique a la MilleGrille
         self._millegrille_config = {
             Constantes.CONFIG_NOM_MILLEGRILLE: Constantes.DEFAUT_NOM_MILLEGRILLE # Nom de la MilleGrille
@@ -50,7 +54,7 @@ class TransactionConfiguration:
                 # logging.debug("Config JSON: %s" % str(dict_fichier_json))
 
         # Faire la liste des dictionnaires de configuration a charger
-        configurations = [self._mq_config, self._mongo_config, self._millegrille_config]
+        configurations = [self._mq_config, self._mongo_config, self._millegrille_config, self._domaines_config]
 
         for config_dict in configurations:
 
@@ -139,3 +143,7 @@ class TransactionConfiguration:
     @property
     def queue_notifications(self):
         return self._mq_config[Constantes.CONFIG_QUEUE_NOTIFICATIONS]
+
+    @property
+    def domaines_json(self):
+        return self._domaines_config[Constantes.CONFIG_DOMAINES_CONFIGURATION]

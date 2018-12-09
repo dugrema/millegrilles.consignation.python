@@ -72,10 +72,14 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
                 liste_classes_gestionnaires.append(classe)
 
         # Charger le fichier de configuration json
-        if self.args.configuration is not None:
-            self._logger.info("Charger la configuration a partir du fichier: %s" % self.args.configuration)
+        chemin_fichier_configuration = self.args.configuration
+        if chemin_fichier_configuration is None:
+            chemin_fichier_configuration = self.configuration.domaines_json
 
-            with open(self.args.configuration) as json_config:
+        if chemin_fichier_configuration is not None:
+            self._logger.info("Charger la configuration a partir du fichier: %s" % chemin_fichier_configuration)
+
+            with open(chemin_fichier_configuration) as json_config:
                 configuration_json = json.load(json_config)
 
             domaines = configuration_json['domaines']
@@ -99,6 +103,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         self._logger.info("Nom package: %s, Classe: %s" % (nom_module, nom_classe))
         classe_processus = __import__(nom_module, fromlist=[nom_classe])
         classe = getattr(classe_processus, nom_classe)
+        self._logger.debug("Classe gestionnaire chargee: %s %s" % (classe.__module__, classe.__name__))
         return classe
 
     def demarrer_execution_domaines(self):
