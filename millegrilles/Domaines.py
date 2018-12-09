@@ -88,7 +88,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
                     domaine['module'],
                     domaine['classe']
                 )
-            liste_classes_gestionnaires.append(classe)
+                liste_classes_gestionnaires.append(classe)
 
         self._logger.info("%d classes de gestionnaires a charger" % len(liste_classes_gestionnaires))
 
