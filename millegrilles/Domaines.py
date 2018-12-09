@@ -4,6 +4,8 @@ from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
 
 import logging
+import json
+
 from threading import Thread, Event
 
 
@@ -28,9 +30,17 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         super().configurer_parser()
 
         self.parser.add_argument(
-            'domaines',
+            '--domaines',
             type=str,
+            required=False,
             help="Gestionnaires de domaines a charger. Format: nom_module1:nom_classe1,nom_module2:nom_classe2,[...]"
+        )
+
+        self.parser.add_argument(
+            '--configuration',
+            type=str,
+            required=False,
+            help="Chemin du fichier de configuration des domaines"
         )
 
         self.parser.add_argument(
@@ -46,24 +56,50 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
     ''' Charge les domaines listes en parametre '''
     def charger_domaines(self):
 
+        liste_classes_gestionnaires = []
+
+        # Faire liste des domaines args
         liste_domaines = self.args.domaines
-        gestionnaires = liste_domaines.split(',')
-        self._logger.info("Chargement des gestionnaires: %s" % str(gestionnaires))
+        if liste_domaines is not None:
+            gestionnaires = liste_domaines.split(',')
+            self._logger.info("Chargement des gestionnaires: %s" % str(gestionnaires))
 
-        for gestionnaire in gestionnaires:
-            noms_module_class = gestionnaire.strip().split(':')
-            nom_module = noms_module_class[0]
-            nom_classe = noms_module_class[1]
+            for gestionnaire in gestionnaires:
+                noms_module_class = gestionnaire.strip().split(':')
+                nom_module = noms_module_class[0]
+                nom_classe = noms_module_class[1]
+                classe = self.importer_classe_gestionnaire(nom_module, nom_classe)
+                liste_classes_gestionnaires.append(classe)
 
-            self._logger.debug("Nom package: %s, Classe: %s" % (nom_module, nom_classe))
+        # Charger le fichier de configuration json
+        if self.args.configuration is not None:
+            self._logger.info("Charger la configuration a partir du fichier: %s" % self.args.configuration)
 
-            classe_processus = __import__(nom_module, fromlist=[nom_classe])
-            classe = getattr(classe_processus, nom_classe)
+            with open(self.args.configuration) as json_config:
+                configuration_json = json.load(json_config)
 
+            domaines = configuration_json['domaines']
+            for domaine in domaines:
+                classe = self.importer_classe_gestionnaire(
+                    domaine['module'],
+                    domaine['classe']
+                )
+            liste_classes_gestionnaires.append(classe)
+
+        self._logger.info("%d classes de gestionnaires a charger" % len(liste_classes_gestionnaires))
+
+        # On prepare et configure une instance de chaque gestionnaire
+        for classe_gestionnaire in liste_classes_gestionnaires:
             # Preparer une instance du gestionnaire
-            instance = classe(self.configuration, self.message_dao, self.document_dao)
+            instance = classe_gestionnaire(self.configuration, self.message_dao, self.document_dao)
             instance.configurer()  # Executer la configuration du gestionnaire de domaine
             self._gestionnaires.append(instance)
+
+    def importer_classe_gestionnaire(self, nom_module, nom_classe):
+        self._logger.info("Nom package: %s, Classe: %s" % (nom_module, nom_classe))
+        classe_processus = __import__(nom_module, fromlist=[nom_classe])
+        classe = getattr(classe_processus, nom_classe)
+        return classe
 
     def demarrer_execution_domaines(self):
         for gestionnaire in self._gestionnaires:
@@ -88,7 +124,11 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
 
         self.charger_domaines()
 
-        self.demarrer_execution_domaines()
+        if len(self._gestionnaires) > 0:
+            self.demarrer_execution_domaines()
+        else:
+            self._stop_event.set()
+            self._logger.fatal("Aucun gestionnaire de domaine n'a ete charge. Execution interrompue.")
 
         # Surveiller les gestionnaires - si un gestionnaire termine son execution, on doit tout fermer
         while not self._stop_event.is_set():
