@@ -6,19 +6,40 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageD
 import logging
 
 
-# Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine.
-class GestionnaireDomaine(ModeleAvecDocumentMessageDAO):
+# Classe qui agit comme gestionnaire centralise de plusieurs domaines MilleGrilles.
+# Cette classe s'occupe des DAOs et du cycle de vie du programme.
+class GestionnaireDomainesMilleGrille(ModeleAvecDocumentMessageDAO):
 
     def __init__(self):
         super().__init__()
-        self.demarreur_processus = None
-        self.json_helper = JSONHelper()
-        self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
+        self._logger = logging.getLogger("%s.GestionnaireDomainesMilleGrille" % __name__)
 
     ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     def initialiser(self):
         super().initialiser()
         self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
+
+    ''' Charge les domaines listes en parametre '''
+    def charger_domaines(self):
+        domaine_test = 'mgdomaines.appareils.SenseursPassifs.GestionnaireSenseursPassifs'
+
+
+
+# Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine.
+class GestionnaireDomaine():
+
+    def __init__(self, configuration, message_dao, document_dao):
+        self.configuration = configuration
+        self.message_dao = message_dao
+        self.document_dao = document_dao
+
+        self.demarreur_processus = None
+        self.json_helper = JSONHelper()
+        self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
+
+    # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
+    # def initialiser(self):
+    #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     ''' Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. '''
     def configurer(self):
@@ -43,7 +64,7 @@ class GestionnaireDomaine(ModeleAvecDocumentMessageDAO):
     def arreter_traitement_messages(self):
         pass
 
-    def demarrer_processus(self, processus, parametres):
+    def demarrer(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
 
     '''
@@ -54,11 +75,11 @@ class GestionnaireDomaine(ModeleAvecDocumentMessageDAO):
     def get_nom_queue(self):
         raise NotImplementedError("Methode non-implementee")
 
-    '''
-    Methode qui peut etre invoquee pour demarrer l'execution du gestionnaire.
-    '''
-    def executer_gestionnaire(self):
-        self.main()
+    # '''
+    # Methode qui peut etre invoquee pour demarrer l'execution du gestionnaire.
+    # '''
+    # def executer_gestionnaire(self):
+    #     self.main()
 
     def executer(self):
         # Doit creer le demarreur ici parce que la connexion a Mongo n'est pas prete avant
@@ -70,7 +91,11 @@ class GestionnaireDomaine(ModeleAvecDocumentMessageDAO):
         except Exception as e:
             logging.exception("Interruption du gestionnaire, erreur: %s" % str(e))
 
-    def exit_gracefully(self, signum=None, frame=None):
-        self._logger.warning("Arret de MGProcessusControleur, signal=%s" % str(signum))
+    # def exit_gracefully(self, signum=None, frame=None):
+    #     self._logger.warning("Arret de MGProcessusControleur, signal=%s" % str(signum))
+    #     self.arreter_traitement_messages()
+    #     super().exit_gracefully(signum, frame)
+
+    def arreter(self):
+        self._logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
-        super().exit_gracefully(signum, frame)
