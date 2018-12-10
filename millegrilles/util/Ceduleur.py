@@ -27,6 +27,11 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
             help="Active le debugging (logger)"
         )
 
+        self.parser.add_argument(
+            '--test_indicateurs', action="store_true", required=False,
+            help="Transmet tous les indicateurs a toutes les minutes (pour tester logique)"
+        )
+
     def transmettre_evenement_ceduleur(self):
 
         timestamp_utc = datetime.datetime.now(tz=pytz.UTC)
@@ -61,17 +66,21 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
         self.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
 
     def get_indicateurs(self, timestamp):
-        # Calculer quels indicateurs on doit inclure
+
         indicateurs = []
-        if timestamp.minute == 0:
-            if timestamp.hour == 0:
-                indicateurs.append('jour')
-                if timestamp.day == 1:
-                    indicateurs.append('mois')
-                    if timestamp.month == 1:
-                        indicateurs.append('annee')
-                if timestamp.weekday() == 0:
-                    indicateurs.append('semaine')
+        if not self.args.test_indicateurs:
+            # Calculer quels indicateurs on doit inclure
+            if timestamp.minute == 0:
+                if timestamp.hour == 0:
+                    indicateurs.append('jour')
+                    if timestamp.day == 1:
+                        indicateurs.append('mois')
+                        if timestamp.month == 1:
+                            indicateurs.append('annee')
+                    if timestamp.weekday() == 0:
+                        indicateurs.append('semaine')
+        else:
+            indicateurs = ['heure', 'jour', 'mois', 'annee', 'semaine']
 
         return indicateurs
 

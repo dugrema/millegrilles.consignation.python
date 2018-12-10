@@ -171,6 +171,7 @@ class GestionnaireDomaine:
         self.connexion_mq = None
         self.channel_mq = None
         self._arret_en_cours = False
+        self._stop_event = Event()
 
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
@@ -217,6 +218,7 @@ class GestionnaireDomaine:
     ''' Arrete le traitement des messages pour le domaine '''
     def arreter_traitement_messages(self):
         self._arret_en_cours = True
+        self._stop_event.set()
         if self.channel_mq is not None:
             self.channel_mq.close()
 
@@ -236,11 +238,18 @@ class GestionnaireDomaine:
         # Doit creer le demarreur ici parce que la connexion a Mongo n'est pas prete avant
         self.demarreur_processus = MGPProcessusDemarreur(self.message_dao, self.document_dao)
 
-        try:
-            self.traiter_backlog()
-            self.demarrer_traitement_messages_blocking(self.get_nom_queue())
-        except Exception as e:
-            logging.exception("Interruption du gestionnaire, erreur: %s" % str(e))
+        self.traiter_backlog()
+        while not self._stop_event.is_set():
+            try:
+                self.demarrer_traitement_messages_blocking(self.get_nom_queue())
+            except Exception as e:
+                self._logger.exception(
+                    "Erreur durant reception message - on va tenter de se reconnecter: %s" % str(e)
+                )
+                if not self._stop_event.is_set():
+                    self._stop_event.wait(30)
+
+        # Indiquer au gestionnaire millegrilles que ce domaine a termine
 
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
