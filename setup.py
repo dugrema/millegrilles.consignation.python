@@ -8,7 +8,10 @@ setup(
         'millegrilles.dao',
         'millegrilles.processus',
         'millegrilles.transaction',
-        'millegrilles.util'
+        'millegrilles.util',
+        'mgdomaines',
+        'mgdomaines.appareils',
+        'mgdomaines.web'
     ],
     url='',
     license='',
