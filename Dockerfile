@@ -8,7 +8,8 @@ ENV BUILD_FOLDER=/opt/millegrilles/build \
     SRC_FOLDER=/opt/millegrilles/build/src \
     PYTHONPATH=/opt/millegrilles/dist \
     MG_MQ_HOST=mq \
-    MG_MONGO_HOST=mongo
+    MG_MONGO_HOST=mongo \
+    MG_DOMAINES_JSON=$BUNDLE_FOLDER/domaines.json
 
 COPY scripts/ $BUILD_FOLDER/scripts
 COPY ./ $SRC_FOLDER/MilleGrilles.consignation.python/
