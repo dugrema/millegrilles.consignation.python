@@ -5,6 +5,9 @@ import certifi
 import logging
 import feedparser
 
+from urllib.error import HTTPError
+from urllib.request import Request
+
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -57,7 +60,10 @@ class WebPollConstantes:
         'heure%12': [],
         'jour': [],
         'semaine': [],
-        'mois': []
+        'mois': [],
+        'source_lastmodified': {
+            'exemple1': "ISODate()"
+        }
     }
 
 
@@ -171,11 +177,26 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         for tache in taches:
             try:
                 description_tache = document_configuration['taches'][tache]
-                self.telecharger(description_tache)
+                web_lastmodified = document_configuration.get('web_lastmodified')
+                lastmodified = None
+                if web_lastmodified is not None:
+                    lastmodified = web_lastmodified.get(tache)
+                resultat = self.telecharger(description_tache, lastmodified)
+
+                if resultat.get('last-modified') is not None:
+                    # On doit mettre a jour la date dans le document
+                    filtre = {'_id': document_configuration['_id']}
+                    operations = {
+                        '$set': {'web_lastmodified.%s' % tache: resultat['last-modified']}
+                    }
+                    self._logger.debug("Update document configuration web_lastmodified: %s, %s" % (filtre, operations))
+                    collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_NOM)
+                    collection_webpoll.update_one(filtre, operations)
+
             except Exception as e:
                 self._logger.exception('Erreur traitement tache "%s" dans cedule: %s' % (tache, str(e)))
 
-    def telecharger(self, parametres):
+    def telecharger(self, parametres, lastmodified=None):
         type_transaction = parametres.get('type')
         if type_transaction is None:
             type_transaction = 'page'
@@ -187,9 +208,11 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         downloader = self._downloaders[type_transaction]
 
         if domaine is not None:
-            downloader.produire_transaction(url, domaine)
+            resultat = downloader.produire_transaction(url, lastmodified, domaine)
         else:
-            downloader.produire_transaction(url)
+            resultat = downloader.produire_transaction(url, lastmodified)
+
+        return resultat
 
     def get_document_configuration(self):
         collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_NOM)
@@ -235,35 +258,71 @@ class WebPageDownload:
         self._limit_bytes = limit_bytes  # Taille limite du download
 
         self.url = None
+        self.lastmodified = None
+        self.resultat = None
         self.contenu = None
         self.domaine = None
 
         self._logger = logging.getLogger("%s.WebPageDownload" % __name__)
 
-    def produire_transaction(self, url, domaine=TRANSACTION_VALEUR_DOMAINE):
+    def produire_transaction(self, url, lastmodified=None, domaine=TRANSACTION_VALEUR_DOMAINE):
         self.url = url
+        self.lastmodified = lastmodified
         self.domaine = domaine
-        self.contenu = self.telecharger(url)
-        self._logger.debug("Contenu telecharge: %s" % str(self.contenu))
-        if len(self.contenu) > self._limit_bytes:
-            raise ValueError("Contenu telecharge est trop grand (%d bytes > limite %d bytes)" %
-                             (len(self.contenu), self._limit_bytes))
+        self.resultat = self.telecharger(url, lastmodified)
 
-        contenu_dict = self.traiter_contenu(self.contenu)
-        self._generateur_transaction.soumettre_transaction(contenu_dict, domaine)
+        if self.resultat['response_code'] == 200:
+            contenu = self.resultat['contenu']
+            self._logger.debug("Contenu telecharge: %s" % str(self.resultat))
+            if len(contenu) > self._limit_bytes:
+                raise ValueError("Contenu telecharge est trop grand (%d bytes > limite %d bytes)" %
+                                 (len(contenu), self._limit_bytes))
 
-    def telecharger(self, url):
+            contenu_dict = self.traiter_contenu(self.resultat)
+            self._generateur_transaction.soumettre_transaction(contenu_dict, domaine)
+        else:
+            self._logger.warning("Code reponse %d pour url: %s" % (self.resultat['response_code'], url))
+            contenu_dict = {}
+
+        return contenu_dict
+
+    def telecharger(self, url, lastmodified=None):
         self._logger.debug("certifi: Certificats utilises pour telecharger: %s" % certifi.where())
         self._logger.debug("Telechargement du URL: %s" % url)
-        with urllib.request.urlopen(url, cafile=certifi.where()) as response:
-            contenu = response.read()
-        return contenu
 
-    def traiter_contenu(self, contenu):
+        # derniere_modification = 'Tue, 11 Dec 2018 00:06:37 GMT';
+
+        headers = dict()
+        if lastmodified is not None:
+            self._logger.debug("Utilisation lastmodified %s" % lastmodified)
+            headers['If-Modified-Since'] = lastmodified
+            request = Request(url, headers=headers)
+        else:
+            request = Request(url)
+
+        try:
+            with urllib.request.urlopen(request, cafile=certifi.where()) as response:
+                response_code = response.getcode()
+                contenu = response.read()
+                last_modified = response.headers['last-modified']
+            resultat = {"contenu": contenu, "last-modified": last_modified, 'response_code': response_code}
+        except HTTPError as he:
+            if he.code == 304:
+                self._logger.debug("Code HTTP 304, url pas modified: %s depuis %s" % (url, lastmodified))
+                resultat = {"response_code": 304}
+            else:
+                raise he  # On relance l'erreur
+
+        return resultat
+
+    def traiter_contenu(self, resultat):
         contenu_dict = {
             "url": self.url,
-            "text": str(contenu)
+            "text": str(resultat['contenu']),
         }
+        if resultat.get('last-modified') is not None:
+            contenu_dict['last-modified'] = resultat.get('last-modified')
+
         return contenu_dict
 
 
@@ -275,18 +334,18 @@ class RSSFeedDownload(WebPageDownload):
     def __init__(self, configuration, message_dao, limit_bytes=100*1024):
         super().__init__(configuration, message_dao, limit_bytes)
 
-    def traiter_contenu(self, contenu):
-        contenu_dict = super().traiter_contenu(contenu)
+    def traiter_contenu(self, resultat):
+        contenu_dict = super().traiter_contenu(resultat)
 
         # Parser le feed
-        feed_content = feedparser.parse(contenu)
+        feed_content = feedparser.parse(resultat['contenu'])
         contenu_dict['rss'] = feed_content
         del contenu_dict['text']  # On enleve le contenu purement string
 
         return contenu_dict
 
-    def produire_transaction(self, url, domaine=TRANSACTION_VALEUR_DOMAINE):
-        super().produire_transaction(url, domaine)
+    def produire_transaction(self, url, lastmodified=None, domaine=TRANSACTION_VALEUR_DOMAINE):
+        return super().produire_transaction(url, lastmodified, domaine)
 
 
 class ProcessusTransactionDownloadPageWeb(MGProcessusTransaction):
