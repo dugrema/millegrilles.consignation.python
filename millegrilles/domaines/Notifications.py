@@ -23,7 +23,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
 
     def __init__(self, configuration, message_dao, document_dao):
         super().__init__(configuration, message_dao, document_dao)
-        self._traitement_message = TraitementMessageWebPoll(self)
+        self._traitement_message = None
 
     def get_nom_queue(self):
         nom_millegrille = self.configuration.nom_millegrille
@@ -31,17 +31,47 @@ class GestionnaireNotifications(GestionnaireDomaine):
         return nom_queue
 
     def traiter_transaction(self, ch, method, properties, body):
-        self._traitement_message.traiter_message(ch, method, properties, body)
+        self._traitement_message.callbackAvecAck(ch, method, properties, body)
 
     def traiter_cedule(self):
         pass
 
     def traiter_notification(self, notification):
         processus = "millegrilles_domaines_Notifications:ProcessusNotificationRecue"
-        self._gestionnaire.demarrer_processus(processus, notification)
+        self.demarrer_processus(processus, notification)
+
+    def configurer(self):
+        super().configurer()
+        self._traitement_message = TraitementMessageNotification(self)
+
+        nom_millegrille = self.configuration.nom_millegrille
+        nom_queue_notification = self.get_nom_queue()
+
+        # Configurer la Queue pour les notifications sur RabbitMQ
+        self.message_dao.channel.queue_declare(
+            queue=nom_queue_notification,
+            durable=True)
+
+        self.message_dao.channel.queue_bind(
+            exchange=self.configuration.exchange_evenements,
+            queue=nom_queue_notification,
+            routing_key='%s.notification.#' % nom_millegrille
+        )
+
+        self.message_dao.channel.queue_bind(
+            exchange=self.configuration.exchange_evenements,
+            queue=nom_queue_notification,
+            routing_key='%s.destinataire.domaine.%s.#' % (nom_millegrille, NotificationsConstantes.QUEUE_SUFFIXE)
+        )
+
+        self.message_dao.channel.queue_bind(
+            exchange=self.configuration.exchange_evenements,
+            queue=nom_queue_notification,
+            routing_key='%s.ceduleur.#' % nom_millegrille
+        )
 
 
-class TraitementMessageWebPoll(BaseCallback):
+class TraitementMessageNotification(BaseCallback):
     """ Classe helper pour traiter les transactions de la queue de notifications """
 
     def __init__(self, gestionnaire):
@@ -72,6 +102,13 @@ class ProcessusNotificationRecue(MGProcessus):
         parametres = self.parametres
         self._logger.debug("Traitement notification: %s" % str(parametres))
 
+        # Verifier si on concatene l'information a un document existant ou si on cree un nouveau document
+        self.set_etape_suivante(ProcessusNotificationRecue.sauvegarder_notification.__name__)
+
+    def sauvegarder_notification(self):
+        self.set_etape_suivante(ProcessusNotificationRecue.avertir_usager.__name__)
+
+    def avertir_usager(self):
         self.set_etape_suivante()  # Termine le processus
 
 

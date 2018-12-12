@@ -7,6 +7,8 @@ import threading
 import logging
 import datetime
 
+from threading import Lock
+
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials
 
@@ -19,7 +21,7 @@ Connection a un moteur de messagerie via Pika.
 class PikaDAO:
 
     def __init__(self, configuration):
-        self._lock_transmettre_message = threading.Lock()
+        self._lock_transmettre_message = Lock()
 
         self.configuration = configuration
         self.connectionmq = None
@@ -323,9 +325,10 @@ class PikaDAO:
                        nom_processus,
                        nom_etape)
 
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                   routing_key=routing_key,
-                                   body=message_utf8)
+        with self._lock_transmettre_message:
+            self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                                       routing_key=routing_key,
+                                       body=message_utf8)
 
     '''
     Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.

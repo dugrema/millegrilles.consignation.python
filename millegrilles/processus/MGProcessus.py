@@ -397,7 +397,8 @@ def exit_gracefully(signum, frame):
 
 def main():
     logging.basicConfig(format='%(asctime)s %(message)s')
-#    logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
+    logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
+    logging.getLogger('millegrilles').setLevel(logging.DEBUG)
     logging.info("Demarrage de MGProcessusControleur")
 
     signal.signal(signal.SIGINT, exit_gracefully)
