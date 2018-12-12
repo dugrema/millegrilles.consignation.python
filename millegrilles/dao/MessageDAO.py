@@ -245,10 +245,11 @@ class PikaDAO:
         else:
             routing_key = '%s.transaction.persistee' % self.configuration.nom_millegrille
 
-        self.channel.basic_publish(
-            exchange='millegrilles.evenements',
-            routing_key=routing_key,
-            body=message_utf8)
+        with self._lock_transmettre_message:
+            self.channel.basic_publish(
+                exchange='millegrilles.evenements',
+                routing_key=routing_key,
+                body=message_utf8)
 
     ''' 
     Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
@@ -296,10 +297,11 @@ class PikaDAO:
             ind_routing_key = '.%s' % ind_routing_key
         routing_key = '%s.ceduleur.minute%s' % (self.configuration.nom_millegrille, ind_routing_key)
 
-        self.channel.basic_publish(
-            exchange='millegrilles.evenements',
-            routing_key=routing_key,
-            body=message_utf8)
+        with self._lock_transmettre_message:
+            self.channel.basic_publish(
+                exchange='millegrilles.evenements',
+                routing_key=routing_key,
+                body=message_utf8)
 
     '''
     Transmet un declencheur pour une etape de processus MilleGrilles.
@@ -352,9 +354,10 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                   routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
-                                   body=message_utf8)
+        with self._lock_transmettre_message:
+            self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                                       routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
+                                       body=message_utf8)
 
     '''
      Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
@@ -378,9 +381,10 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                   routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
-                                   body=message_utf8)
+        with self._lock_transmettre_message:
+            self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+                                       routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
+                                       body=message_utf8)
 
     # def transmettre_evenement_generateur_documents(self, message):
     #

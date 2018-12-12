@@ -7,6 +7,10 @@
     {
       "module": "mgdomaines.web.WebPoll",
       "classe": "GestionnaireWebPoll"
+    },
+    {
+      "module": "millegrilles.domaines.Notifications",
+      "classe": "GestionnaireNotifications"
     }
   ]
 }
