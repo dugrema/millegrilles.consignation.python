@@ -201,8 +201,8 @@ class ContexteRessourcesMilleGrilles:
         :raises: ValueError is le message dao n'a pas ete defini.
         """
 
-        if self._message_dao is None:
-            raise ValueError("MessageDAO n'est pas initialise")
+        # if self._message_dao is None:
+        #     raise ValueError("MessageDAO n'est pas initialise")
         return self._message_dao
 
     @property
@@ -214,6 +214,6 @@ class ContexteRessourcesMilleGrilles:
         :raises: ValueError si document_dao n'a pas ete defini.
         """
 
-        if self._document_dao is None:
-            raise ValueError("DocumentDAO n'est pas initialise")
+        # if self._document_dao is None:
+        #     raise ValueError("DocumentDAO n'est pas initialise")
         return self._document_dao

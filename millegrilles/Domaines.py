@@ -2,6 +2,7 @@
 from millegrilles.dao.MessageDAO import JSONHelper
 from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 import logging
 import json
@@ -159,10 +160,12 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
 class GestionnaireDomaine:
     """ Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine. """
 
-    def __init__(self, configuration, message_dao, document_dao):
-        self.configuration = configuration
-        self.message_dao = message_dao
-        self.document_dao = document_dao
+    def __init__(self, configuration=None, message_dao=None, document_dao=None, contexte=None):
+
+        # Nouvelle approche, utilisation classe contexte pour obtenir les ressources
+        self._contexte = contexte
+        if contexte is None:
+            self._contexte = ContexteRessourcesMilleGrilles(configuration, message_dao, document_dao)
 
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
@@ -254,3 +257,19 @@ class GestionnaireDomaine:
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
+
+    @property
+    def configuration(self):
+        return self._contexte.configuration
+
+    @property
+    def message_dao(self):
+        return self._contexte.message_dao
+
+    @property
+    def document_dao(self):
+        return self._contexte.document_dao
+
+    @property
+    def contexte(self):
+        return self._contexte
