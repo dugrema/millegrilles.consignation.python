@@ -4,6 +4,8 @@ import os
 import json
 import logging
 from millegrilles import Constantes
+from millegrilles.dao.MessageDAO import PikaDAO
+from millegrilles.dao.DocumentDAO import MongoDAO
 
 
 class TransactionConfiguration:
@@ -147,3 +149,71 @@ class TransactionConfiguration:
     @property
     def domaines_json(self):
         return self._domaines_config[Constantes.CONFIG_DOMAINES_CONFIGURATION]
+
+
+class ContexteRessourcesMilleGrilles:
+    """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """
+
+    def __init__(self, configuration=None, message_dao=None, document_dao=None):
+        """
+        Init classe. Fournir les ressources deja initialisee ou utiliser methode initialiser().
+
+        :param configuration: Optionnel, configuration MilleGrilles deja initialisee.
+        :param message_dao: Optionnel, message_dao deja initialise.
+        :param document_dao: Optionnel, document_dao deja initialise.
+        """
+
+        self._configuration = configuration
+        self._message_dao = message_dao
+        self._document_dao = document_dao
+
+    def initialiser(self, init_message=False, init_document=False):
+        """
+        Initialise/reinitialise le contexte et connecte les DAOs.
+
+        :param init_message: Si True, initialise et connecte PikaDAO
+        :param init_document: Si True, initialise et connecte MongoDAO
+        """
+
+        self._configuration = TransactionConfiguration()
+        self._configuration.loadEnvironment()
+        self._message_dao = None
+        self._document_dao = None
+
+        if init_message:
+            self._message_dao = PikaDAO(self._configuration)
+            self._message_dao.connecter()
+
+        if init_document:
+            self._document_dao = MongoDAO(self._configuration)
+            self._document_dao.connecter()
+
+    @property
+    def configuration(self):
+        return self._configuration
+
+    @property
+    def message_dao(self):
+        """
+        Retourne un message_dao.
+
+        :return: Message dao.
+        :raises: ValueError is le message dao n'a pas ete defini.
+        """
+
+        if self._message_dao is None:
+            raise ValueError("MessageDAO n'est pas initialise")
+        return self._message_dao
+
+    @property
+    def document_dao(self):
+        """
+        Retourne un document_dao.
+
+        :return: Document dao.
+        :raises: ValueError si document_dao n'a pas ete defini.
+        """
+
+        if self._document_dao is None:
+            raise ValueError("DocumentDAO n'est pas initialise")
+        return self._document_dao
