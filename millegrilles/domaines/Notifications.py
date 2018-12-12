@@ -13,11 +13,16 @@ class NotificationsConstantes:
     COLLECTION_NOM = 'mgdomaines_web_WebPoll'
     QUEUE_SUFFIXE = 'millegrilles.domaines.Notifications'
 
+    # Niveaux d'une notification
+    INFORMATION = 'information'      # Plus bas niveau
+    AVERTISSEMENT = 'avertissement'  # Niveau par defaut
+    ALERTE = 'alerte'                # Plus haut niveau
+
 
 class GestionnaireNotifications(GestionnaireDomaine):
 
-    def __init__(self, contexte):
-        super().__init__(contexte=contexte)
+    def __init__(self, configuration, message_dao, document_dao):
+        super().__init__(configuration, message_dao, document_dao)
         self._traitement_message = TraitementMessageWebPoll(self)
 
     def get_nom_queue(self):

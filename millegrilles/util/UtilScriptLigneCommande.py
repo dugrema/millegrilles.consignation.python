@@ -4,7 +4,7 @@ import argparse
 import signal
 import logging
 
-from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
 
@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)  # Define module logger
 class ModeleConfiguration:
 
     def __init__(self):
+        self._contexte = None
         self.configuration = None
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
@@ -26,6 +27,7 @@ class ModeleConfiguration:
 
             self.configuration = TransactionConfiguration()
             self.configuration.loadEnvironment()
+            self._contexte = ContexteRessourcesMilleGrilles(self.configuration)
 
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
@@ -71,6 +73,10 @@ class ModeleConfiguration:
         finally:
             self.exit_gracefully()
 
+    @property
+    def contexte(self):
+        return self._contexte
+
 
 class ModeleAvecMessageDAO(ModeleConfiguration):
 
@@ -81,6 +87,7 @@ class ModeleAvecMessageDAO(ModeleConfiguration):
     def initialiser(self):
         super().initialiser()
         self.message_dao = PikaDAO(self.configuration)
+        self.contexte.message_dao = self.message_dao
 
     def connecter(self):
         self.message_dao.connecter()
@@ -102,6 +109,7 @@ class ModeleAvecDocumentDAO(ModeleConfiguration):
     def initialiser(self):
         super().initialiser()
         self.document_dao = MongoDAO(self.configuration)
+        self.contexte.document_dao = self.document_dao
 
     def connecter(self):
         self.document_dao.connecter()

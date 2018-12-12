@@ -8,7 +8,7 @@ from millegrilles.Domaines import GestionnaireDomaine, MGPProcessusDemarreur
 from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles.domaines.Notifications import FormatteurEvenementNotification
+from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
 from bson.objectid import ObjectId
 
 
@@ -583,24 +583,21 @@ class VerificateurNotificationsSenseursPassifs:
                 except Exception as e:
                     self._logger.exception("Erreur notification")
 
-    def transmettre_notification(self, nom_regle, parametres, message):
+    def transmettre_notification(self, nom_regle, parametres, message, niveau=NotificationsConstantes.AVERTISSEMENT):
+        """
+        Formatte et transmet une notification.
+
+        :param nom_regle: Nom de la regle enfreinte
+        :param parametres: Parametres de la regle enfreinte (copie de la regle)
+        :param message: Valeurs du senseur au moment de l'execution de la regle.
+        :param niveau: Niveau de la notification (voir classe NotificationsConstantes)
+        """
         notification_formattee = self._formatteur_notification.formatter_notification(
             self.doc_senseur['_id'],
             {nom_regle: parametres},
             message
         )
-
-        sub_routing_key = '%s.%s' % (SenseursPassifsConstantes.DOMAINE_NOM, nom_regle)
-
-        # message_copy = message.copy()
-        # message['_id'] = str(self.doc_senseur['_id'])
-        # message_copy['date'] = int(datetime.datetime.utcnow().timestamp())
-        # message['noeud'] = self.doc_senseur['noeud']
-        # message['senseur'] = self.doc_senseur['senseur']
-        # message['regle'] = nom_regle
-        # message['domaine'] = sub_routing_key
-
-        self.message_dao.transmettre_notification(notification_formattee, sub_routing_key)
+        self.message_dao.transmettre_notification(notification_formattee, niveau)
 
     ''' Regle qui envoit une notification si la valeur du senseur sort de l'intervalle. '''
     def avertissement_hors_intervalle(self, parametres):

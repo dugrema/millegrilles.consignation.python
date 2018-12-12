@@ -205,6 +205,10 @@ class ContexteRessourcesMilleGrilles:
         #     raise ValueError("MessageDAO n'est pas initialise")
         return self._message_dao
 
+    @message_dao.setter
+    def message_dao(self, message_dao):
+        self._message_dao = message_dao
+
     @property
     def document_dao(self):
         """
@@ -217,3 +221,7 @@ class ContexteRessourcesMilleGrilles:
         # if self._document_dao is None:
         #     raise ValueError("DocumentDAO n'est pas initialise")
         return self._document_dao
+
+    @document_dao.setter
+    def document_dao(self, document_dao):
+        self._document_dao = document_dao
