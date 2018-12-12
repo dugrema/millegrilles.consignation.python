@@ -1,7 +1,7 @@
 pika==0.12
 mongo==0.2
-pymongo
-bson
-pytz
-feedparser
-certifi
+pymongo==3.7.1
+bson==0.5.7
+pytz==2018.7
+feedparser==5.2.1
+certifi==2018.11.29
