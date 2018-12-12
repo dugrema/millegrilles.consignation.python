@@ -33,7 +33,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
 
-    def traiter_cedule(self):
+    def traiter_cedule(self, message):
         pass
 
     def traiter_notification(self, notification):
