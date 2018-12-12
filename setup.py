@@ -6,6 +6,7 @@ setup(
     packages=[
         'millegrilles',
         'millegrilles.dao',
+        'millegrilles.domaines',
         'millegrilles.processus',
         'millegrilles.transaction',
         'millegrilles.util',
