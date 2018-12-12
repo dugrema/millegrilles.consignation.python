@@ -1,4 +1,4 @@
-from mgdomaines.appareils import ProducteurTransactionSenseursPassifs
+from mgdomaines.appareils.SenseursPassifs import ProducteurTransactionSenseursPassifs
 import datetime
 
 

@@ -161,6 +161,8 @@ class MGProcessus:
         self._methode_etape_courante = None
         self._processus_complete = False
 
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
     '''
     Utilise le message pour identifier l'etape courante qui doit etre executee. 
     
@@ -274,6 +276,22 @@ class MGProcessus:
 
     def document_dao(self):
         return self._controleur.document_dao()
+
+    @property
+    def document_processus(self):
+        """
+        Retourne le document pour ce processus.
+        :return: Document de processus
+        """
+        return self._document_processus
+
+    @property
+    def parametres(self):
+        """
+        Retourne le document des parametres courants (read-only - les changements sont ignores).
+        :return: Document de parametres.
+        """
+        return self._document_processus['parametres']
 
 
 # Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction

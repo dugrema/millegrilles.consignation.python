@@ -8,6 +8,7 @@ from millegrilles.Domaines import GestionnaireDomaine, MGPProcessusDemarreur
 from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.domaines.Notifications import FormatteurEvenementNotification
 from bson.objectid import ObjectId
 
 
@@ -557,6 +558,10 @@ class VerificateurNotificationsSenseursPassifs:
         self.regles = regles
         self.doc_senseur = doc_senseur
         self._logger = logging.getLogger('%s.VerificateurNotificationsSenseursPassifs' % __name__)
+        self._formatteur_notification = FormatteurEvenementNotification(
+            SenseursPassifsConstantes.DOMAINE_NOM,
+            SenseursPassifsConstantes.COLLECTION_NOM
+        )
 
     ''' Traite les regles et envoit les notifications au besoin. '''
     def traiter_regles(self):
@@ -578,18 +583,24 @@ class VerificateurNotificationsSenseursPassifs:
                 except Exception as e:
                     self._logger.exception("Erreur notification")
 
-    def transmettre_notification(self, nom_regle, message):
-        sub_routing_key = 'mgdomaines.appareils.SenseursPassifs.%s' % nom_regle
+    def transmettre_notification(self, nom_regle, parametres, message):
+        notification_formattee = self._formatteur_notification.formatter_notification(
+            self.doc_senseur['_id'],
+            {nom_regle: parametres},
+            message
+        )
 
-        message_copy = message.copy()
-        message['_id'] = str(self.doc_senseur['_id'])
-        message_copy['date'] = int(datetime.datetime.utcnow().timestamp())
-        message['noeud'] = self.doc_senseur['noeud']
-        message['senseur'] = self.doc_senseur['senseur']
-        message['regle'] = nom_regle
-        message['domaine'] = sub_routing_key
+        sub_routing_key = '%s.%s' % (SenseursPassifsConstantes.DOMAINE_NOM, nom_regle)
 
-        self.message_dao.transmettre_notification(message, sub_routing_key)
+        # message_copy = message.copy()
+        # message['_id'] = str(self.doc_senseur['_id'])
+        # message_copy['date'] = int(datetime.datetime.utcnow().timestamp())
+        # message['noeud'] = self.doc_senseur['noeud']
+        # message['senseur'] = self.doc_senseur['senseur']
+        # message['regle'] = nom_regle
+        # message['domaine'] = sub_routing_key
+
+        self.message_dao.transmettre_notification(notification_formattee, sub_routing_key)
 
     ''' Regle qui envoit une notification si la valeur du senseur sort de l'intervalle. '''
     def avertissement_hors_intervalle(self, parametres):
@@ -603,9 +614,11 @@ class VerificateurNotificationsSenseursPassifs:
                 "Valeur %s hors des limites (%f), on transmet une notification" % (nom_element, valeur_courante)
             )
             nom_regle = 'avertissement_hors_intervalle'
-            message = parametres.copy()
-            message['valeur'] = valeur_courante
-            self.transmettre_notification(nom_regle, message)
+            message = {
+                'element': nom_element,
+                'valeur': valeur_courante
+            }
+            self.transmettre_notification(nom_regle, parametres, message)
 
     ''' Regle qui envoit une notification si la valeur du senseur est dans l'intervalle. '''
     def avertissement_dans_intervalle(self, parametres):
@@ -619,9 +632,11 @@ class VerificateurNotificationsSenseursPassifs:
                 "Valeur %s dans les limites (%f), on transmet une notification" % (nom_element, valeur_courante)
             )
             nom_regle = 'avertissement_dans_intervalle'
-            message = parametres.copy()
-            message['valeur'] = valeur_courante
-            self.transmettre_notification(nom_regle, message)
+            message = {
+                'element': nom_element,
+                'valeur': valeur_courante
+            }
+            self.transmettre_notification(nom_regle, parametres, message)
 
     ''' Regle qui envoit une notification si la valeur du senseur est inferieure. '''
     def avertissement_inferieur(self, parametres):
@@ -634,9 +649,11 @@ class VerificateurNotificationsSenseursPassifs:
                 "Valeur %s sous la limite (%f), on transmet une notification" % (nom_element, valeur_courante)
             )
             nom_regle = 'avertissement_inferieur'
-            message = parametres.copy()
-            message['valeur'] = valeur_courante
-            self.transmettre_notification(nom_regle, message)
+            message = {
+                'element': nom_element,
+                'valeur': valeur_courante
+            }
+            self.transmettre_notification(nom_regle, parametres, message)
 
     ''' Regle qui envoit une notification si la valeur du senseur est inferieure. '''
     def avertissement_superieur(self, parametres):
@@ -649,9 +666,11 @@ class VerificateurNotificationsSenseursPassifs:
                 "Valeur %s au-dessus de la limite (%f), on transmet une notification" % (nom_element, valeur_courante)
             )
             nom_regle = 'avertissement_superieur'
-            message = parametres.copy()
-            message['valeur'] = valeur_courante
-            self.transmettre_notification(nom_regle, message)
+            message = {
+                'element': nom_element,
+                'valeur': valeur_courante
+            }
+            self.transmettre_notification(nom_regle, parametres, message)
 
 
 # Processus pour enregistrer une transaction d'un senseur passif
