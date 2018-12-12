@@ -10,7 +10,7 @@ import datetime
 
 class NotificationsConstantes:
 
-    COLLECTION_NOM = 'mgdomaines_web_WebPoll'
+    COLLECTION_NOM = 'millegrilles_domaines_Notifications'
     QUEUE_SUFFIXE = 'millegrilles.domaines.Notifications'
 
     # Niveaux d'une notification
@@ -106,7 +106,49 @@ class ProcessusNotificationRecue(MGProcessus):
         self.set_etape_suivante(ProcessusNotificationRecue.sauvegarder_notification.__name__)
 
     def sauvegarder_notification(self):
+        parametres = self.parametres
+        self._logger.debug("sauvegarder_notification %s" % (str(parametres)))
+        collection = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_NOM)
+
+        nouveaux_documents_notification = []
+
+        for regle in parametres['regles']:
+            self._logger.debug("Traitement document %s regle %s" % (str(parametres['source']), str(regle)))
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE,
+                'regle': regle,
+                'source': parametres['source']
+            }
+
+            self._logger.debug("Verifier si document existe: %s" % str(filtre))
+            document_notification = collection.find_one(filtre)
+
+            if document_notification is None:
+                self._logger.debug("Document n'existe pas, on l'ajoute")
+                document_notification = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE,
+                    Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: datetime.datetime.utcnow(),
+                    'source': parametres['source'],
+                    'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
+                    'regle': regle,
+                    'valeurs': parametres['valeurs']
+                }
+                resultat = collection.insert(document_notification)
+                self._logger.debug("Resultat insertion %s: %s" % (str(document_notification), str(resultat)))
+                if resultat is not None:
+                    nouveaux_documents_notification.append(resultat)
+                else:
+                    self._logger.error("Erreur insertion notification: %s" % str(document_notification))
+            else:
+                self._logger.debug("Document existant: %s" % str(document_notification))
+
         self.set_etape_suivante(ProcessusNotificationRecue.avertir_usager.__name__)
+
+        resultat_etape = dict()
+        if len(nouveaux_documents_notification) > 0:
+            resultat_etape['nouveaux_documents'] = nouveaux_documents_notification
+
+        return resultat_etape
 
     def avertir_usager(self):
         self.set_etape_suivante()  # Termine le processus
