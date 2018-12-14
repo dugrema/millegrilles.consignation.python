@@ -87,6 +87,9 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Ajouter messages declencheurs pour refaire les calculs horaires et quoditiens (moyennes, extremes)
         traitement_backlog_lectures.declencher_calculs()
 
+        # Appliquer transactions de mise a jour manuelles en ordre.
+        traitement_backlog_lectures.declencher_maj_manuelle()
+
     def traiter_transaction(self, ch, method, properties, body):
         # Note: Cette methode est remplacee dans la configuration (self.traiter_transaction = self._traitement...)
         raise NotImplementedError("N'est pas implemente")
@@ -878,6 +881,7 @@ class TraitementBacklogLecturesSenseursPassifs:
 
         for transaction_senseur in liste_senseurs:
             filtre = {
+                'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
                 'charge-utile.noeud': transaction_senseur['noeud'],
                 'charge-utile.senseur': transaction_senseur['senseur'],
                 'charge-utile.temps_lecture': transaction_senseur['temps_lecture']
@@ -908,12 +912,37 @@ class TraitementBacklogLecturesSenseursPassifs:
                 collection_transactions.update_many(filter=filtre, update=operation)
 
     def declencher_calculs(self):
-        # Declencher le calcule des moyennes horaires
+        """ Declencher le calcul des moyennes horaires """
+
         processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
         self.demarreur_processus.demarrer_processus(processus, {})
 
         processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
         self.demarreur_processus.demarrer_processus(processus, {})
+
+    def declencher_maj_manuelle(self):
+        """ Re-declencher les transactions de mise a jour manuelles qui n'ont pas ete executees. """
+
+        collection_transactions = self._document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        filtre = {
+            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_MAJMANUELLE,
+            'evenements.transaction_traitee': {'$exists': False}
+        }
+        projection = {
+            '_id': 1,
+            'info-transaction.uuid-transaction': 1
+        }
+        tri = [
+            ('info-transaction.estampille', 1)
+        ]
+
+        curseur = collection_transactions.find(filtre, projection, sort=tri)
+
+        processus = "mgdomaines_appareils_SenseursPassifs:ProcessusMajManuelle"
+        for transaction in curseur:
+            transaction['_id-transaction'] = transaction['_id']  # Copier le _id pour que le processus ait la bonne cle
+            self._logger.debug("Redemarrer processus pour ProcessusMajManuelle _id:%s" % transaction['_id'])
+            self.demarreur_processus.demarrer_processus(processus, transaction)
 
 
 # Processus pour mettre a jour un document de noeud suite a une transaction de senseur passif
