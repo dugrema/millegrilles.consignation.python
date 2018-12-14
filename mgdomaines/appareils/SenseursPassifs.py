@@ -26,7 +26,8 @@ class SenseursPassifsConstantes:
     TRANSACTION_ID_SENSEUR = 'senseur'
     TRANSACTION_DATE_LECTURE = 'temps_lecture'
     TRANSACTION_LOCATION = 'location'
-    TRANSACTION_VALEUR_DOMAINE = '%s.lecture' % DOMAINE_NOM
+    TRANSACTION_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
+    TRANSACTION_DOMAINE_MAJMANUELLE = '%s.modificationManuelle' % DOMAINE_NOM
     SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
 
     EVENEMENT_MAJ_HORAIRE = 'miseajour.horaire'
@@ -160,12 +161,25 @@ class TraitementMessageLecture(BaseCallback):
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get("evenements")
 
         if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
-            processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
+            # Verifier quel processus demarrer.
+            routing_key_sansprefixe = routing_key.replace(
+                '%s.destinataire.domaine.' % self._configuration.nom_millegrille,
+                ''
+            )
+            if routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:
+                processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
+                self._gestionnaire.demarrer_processus(processus, message_dict)
+            elif routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_MAJMANUELLE:
+                processus = "mgdomaines_appareils_SenseursPassifs:ProcessusMajManuelle"
+                self._gestionnaire.demarrer_processus(processus, message_dict)
+            else:
+                # Type de transaction inconnue, on lance une exception
+                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
         elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
             processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
             self._gestionnaire.demarrer_processus(processus, message_dict)
@@ -290,7 +304,7 @@ class ProducteurDocumentSenseurPassif:
         self._logger.debug("Requete time range %d a %d" % (time_range_from, time_range_to))
 
         selection = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_VALEUR_DOMAINE,
+            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
             'charge-utile.temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
             'charge-utile.senseur': no_senseur,
             'charge-utile.noeud': noeud
@@ -403,7 +417,7 @@ class ProducteurDocumentSenseurPassif:
         time_range_from = int(time_range_from.timestamp())
 
         selection = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_VALEUR_DOMAINE,
+            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
             'charge-utile.temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
             'charge-utile.senseur': no_senseur,
             'charge-utile.noeud': noeud
@@ -815,7 +829,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     '''
     def run_requete_plusrecentetransactionlecture_parsenseur(self):
         filtre = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_VALEUR_DOMAINE,
+            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
             'evenements.transaction_traitee': {'$exists': False}
         }
 
@@ -909,8 +923,49 @@ class ProcessusMAJNoeudsSenseurPassif(MGProcessus):
         super().__init__(controleur, evenement)
 
 
-# Producteur de transactions pour les SenseursPassifs.
+class ProcessusMajManuelle(MGProcessusTransaction):
+    """ Processus de modification d'un senseur par un usager """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour le document de senseur """
+
+        document_transaction = self.charger_transaction()
+        charge_utile = document_transaction['charge-utile']
+        collection_transactions = self.document_dao().get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+
+        filtre = charge_utile['filtre']
+        valeurs = {
+            '$set': charge_utile['set'],
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
+        document = collection_transactions.find_one_and_update(filtre, valeurs)
+
+        if document is None:
+            message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
+            self._logger.error(message_erreur)
+            raise AssertionError(message_erreur)
+
+        self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
+
+        # Retourner l'id du document pour mettre a jour le noeud
+        return {'id_document_senseur': document['_id']}
+
+    def modifier_noeud(self):
+        """ Appliquer les modifications au noeud """
+        id_document_senseur = self._document_processus['parametres']['id_document_senseur']
+        producteur_document = ProducteurDocumentNoeud(self.message_dao(), self.document_dao())
+        producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
+
+        self.set_etape_suivante()  # Termine
+
+
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
+    """ Producteur de transactions pour les SenseursPassifs. """
 
     def __init__(self, configuration=None, message_dao=None, noeud=socket.getfqdn()):
         super().__init__(configuration, message_dao)
@@ -932,6 +987,6 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         if message.get(SenseursPassifsConstantes.TRANSACTION_NOEUD) is None:
             message[SenseursPassifsConstantes.TRANSACTION_NOEUD] = self._noeud
 
-        uuid_transaction = self.soumettre_transaction(message, SenseursPassifsConstantes.TRANSACTION_VALEUR_DOMAINE)
+        uuid_transaction = self.soumettre_transaction(message, SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE)
 
         return uuid_transaction
