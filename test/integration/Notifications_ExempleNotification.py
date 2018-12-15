@@ -22,17 +22,21 @@ class NotificationExempleTest:
 
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
         notification = dict({
+            '_mg-libelle': 'regle_simple',
             'evenements': Constantes.EVENEMENT_NOTIFICATION,
             'source': {
-                'collection': 'mgdomaines_appareils_SenseursPassifs',
+                '_collection': 'mgdomaines_appareils_SenseursPassifs',
                 '_id': "5bef31be82cc2cb5ab0d57fe"
             },
             'regles': [
-                {"pasbonne_3": {"vraimentpas": False}}
+                {"pasbonne_8": {
+                    "element": "temperature"
+                }}
             ],
             "date": int(datetime.datetime.utcnow().timestamp()),
             'valeurs': {
-                "temperature": 24.6
+                "element": "temperature",
+                "valeur": 24.6
             }
         })
 
