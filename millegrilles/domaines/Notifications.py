@@ -24,6 +24,7 @@ class NotificationsConstantes:
 
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
+    LIBELLE_NIVEAU_NOTIFICATION = 'niveau'  # Niveau d'urgence de la notification
     LIBELLE_ACTION = 'action'  # Libelle (etiquette) de l'action a faire
     ACTION_VUE = 'vue'         # La notification a ete vue, pas d'autres action requise
     ACTION_RAPPEL = 'rappel'   # L'usager demande un rappel apres une periode de temps. Cachee en attendant.
@@ -34,9 +35,9 @@ class NotificationsConstantes:
     LIBELLE_PERIODE_ATTENTE = 'periode_attente'
     LIBELLE_DATE_ACTION = 'date_action'  # Date de prise d'action
     LIBELLE_DATE_ATTENTE_ACTION = 'date_attente_action'  # Date a partir de laquelle on fait un rappel, de-snooze, etc.
+    ETAT_ACTIVE = 'active'        # Notification active, pas encore actionee par l'usager
     ETAT_COMPLETEE = 'completee'  # La notification a ete actionnee par l'usager, plus rien a faire.
     ETAT_RAPPEL = 'rappel'        # En attente de rappel aupres de l'usager. Cachee en attendant.
-    ETAT_ACTIVE = 'active'        # Notification active, pas encore actionee par l'usager
     ETAT_SURVEILLE = 'surveille'  # Notification surveille, va etre escaladee si survient a nouveau. Sinon elle se complete.
 
 
@@ -200,6 +201,8 @@ class ProcessusNotificationRecue(MGProcessus):
             Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_creation,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_creation,
+            NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE,
+            NotificationsConstantes.LIBELLE_NIVEAU_NOTIFICATION: NotificationsConstantes.INFORMATION,
             'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
             'valeurs': parametres['valeurs'],
             'source': parametres['source']
@@ -224,10 +227,28 @@ class ProcessusNotificationRecue(MGProcessus):
             },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
-        resultat_update = collection.update_one(filtre, operations)
+        resultat_update = collection.find_one_and_update(filtre, operations)
         self._logger.debug("Resultat update %s: %s" % (str(filtre), str(resultat_update)))
 
+        if resultat_update is None:
+            raise ValueError("Update notification inexistante: %s" % str(filtre))
+
         # Verifier si la notification a une action / regle, ou un workflow en cours
+        # Pour etat complet, on reactive. Sinon rien a faire.
+        etat_precedent = resultat_update[NotificationsConstantes.LIBELLE_ETAT]
+        etats_reactive = [NotificationsConstantes.ETAT_COMPLETEE, NotificationsConstantes.ETAT_SURVEILLE]
+        if etat_precedent in etats_reactive:
+            # On va reouvrir la notification
+            collection.update_one(filtre, {
+                '$set': {
+                    NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE
+                },
+                '$unset': {
+                    NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
+                }
+            })
+
+            # Il faudrait aussi envoyer une notification a l'usager
 
 
 class ProcessusActionUsagerNotification(MGProcessusTransaction):
@@ -249,6 +270,7 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
         operations_set = {
             NotificationsConstantes.LIBELLE_DERNIERE_ACTION: action_usager
         }
+        operations_unset = dict()
         operations = {
             '$set': operations_set,
             '$currentDate': {
@@ -261,6 +283,7 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
             # Marquer la notification comme vue. A moins qu'une autre notification soit recue,
             # l'usager a fait ce qu'il avait a faire au sujet de cette notification.
             operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_COMPLETEE
+            operations_unset[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = ''
 
         elif action_usager == NotificationsConstantes.ACTION_RAPPEL:
             # Calculer la date de rappel
@@ -274,6 +297,8 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
             operations_set[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
             operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_SURVEILLE
 
+        if len(operations_unset) > 0:
+            operations['$unset'] = operations_unset
         document_notification = collection_notifications.find_one_and_update(filtre_notification, operations)
 
         if document_notification is None:

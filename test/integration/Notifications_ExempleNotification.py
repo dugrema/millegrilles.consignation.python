@@ -28,11 +28,11 @@ class NotificationExempleTest:
                 '_id': "5bef31be82cc2cb5ab0d57fe"
             },
             'regles': [
-                {"pasbonne": {"vraimentpas": False}}
+                {"pasbonne_3": {"vraimentpas": False}}
             ],
             "date": int(datetime.datetime.utcnow().timestamp()),
             'valeurs': {
-                "temperature": 24.7
+                "temperature": 24.6
             }
         })
 

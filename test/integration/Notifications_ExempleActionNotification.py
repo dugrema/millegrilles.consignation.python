@@ -27,8 +27,8 @@ class NotificationActionExempleTest:
         domaine = NotificationsConstantes.TRANSACTION_ACTION_NOTIFICATION
 
         transaction_message = dict({
-            NotificationsConstantes.LIBELLE_ID_NOTIFICATION: '5c150ed2e094093ea4bac15a',
-            NotificationsConstantes.LIBELLE_ACTION: NotificationsConstantes.ACTION_SURVEILLE,
+            NotificationsConstantes.LIBELLE_ID_NOTIFICATION: '5c15217ce094095d8c8d314b',
+            NotificationsConstantes.LIBELLE_ACTION: NotificationsConstantes.ACTION_RAPPEL,
             NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: 180
         })
 

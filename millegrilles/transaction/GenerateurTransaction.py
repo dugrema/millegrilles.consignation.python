@@ -1,5 +1,5 @@
 import uuid
-import time
+import datetime
 import getpass
 import socket
 
@@ -62,7 +62,7 @@ class GenerateurTransaction:
         meta = dict()
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME] = identificateur_systeme
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(time.time())
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = ""
         if domaine is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
