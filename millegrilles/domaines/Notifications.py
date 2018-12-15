@@ -3,7 +3,9 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.processus.MGProcessus import MGProcessus
+from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
+
+from bson import ObjectId
 
 import datetime
 
@@ -12,6 +14,8 @@ class NotificationsConstantes:
 
     COLLECTION_NOM = 'millegrilles_domaines_Notifications'
     QUEUE_SUFFIXE = 'millegrilles.domaines.Notifications'
+
+    TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Notifications.actionUsager'
 
     # Niveaux d'une notification
     INFORMATION = 'information'      # Plus bas niveau
@@ -102,6 +106,19 @@ class TraitementMessageNotification(BaseCallback):
         elif evenement == Constantes.EVENEMENT_NOTIFICATION:
             # Notification recue
             self._gestionnaire.traiter_notification(message_dict)
+        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+            # Verifier quel processus demarrer. On match la valeur dans la routing key.
+            routing_key = method.routing_key
+            routing_key_sansprefixe = routing_key.replace(
+                '%s.destinataire.domaine.' % self._configuration.nom_millegrille,
+                ''
+            )
+            if routing_key_sansprefixe == NotificationsConstantes.TRANSACTION_ACTION_NOTIFICATION:
+                processus = "millegrilles_domaines_Notifications:ProcessusActionUsagerNotification"
+                self._gestionnaire.demarrer_processus(processus, message_dict)
+            else:
+                # Type de transaction inconnue, on lance une exception
+                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % evenement)
@@ -175,9 +192,11 @@ class ProcessusNotificationRecue(MGProcessus):
         parametres = self.parametres
 
         self._logger.debug("Document n'existe pas, on l'ajoute")
+        date_creation = datetime.datetime.utcnow()
         document_notification = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE,
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: datetime.datetime.utcnow(),
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_creation,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_creation,
             'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
             'valeurs': parametres['valeurs'],
             'source': parametres['source']
@@ -208,19 +227,52 @@ class ProcessusNotificationRecue(MGProcessus):
         # Verifier si la notification a une action / regle, ou un workflow en cours
 
 
-class ProcessusActionUsagerNotification(MGProcessus):
+class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
         parametres = self.parametres
+        collection_notifications = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_NOM)
+
+        self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
+        id_notification = parametres['id_notification']
         action_usager = parametres[NotificationsConstantes.LIBELLE_ACTION]
+
+        filtre_notification = {'_id': ObjectId(id_notification)}
+        operations = {
+            '$set': {
+                NotificationsConstantes.LIBELLE_ETAT: action_usager
+            },
+            '$currentDate': {
+                NotificationsConstantes.LIBELLE_DATE_ACTION: True
+            }
+        }
 
         if action_usager == NotificationsConstantes.ACTION_VUE:
             # Marquer la notification comme vue. A moins qu'une autre notification soit recue,
             # l'usager a fait ce qu'il avait a faire au sujet de cette notification.
             pass
+        elif action_usager == NotificationsConstantes.ACTION_RAPPEL:
+            # Calculer la date de rappel (A faire: Supporter autre que +1 jour)
+            date_prochaine_action = datetime.datetime.now().timestamp() + datetime.timedelta(days=1)
+            operations['$set'][NotificationsConstantes.LIBELLE_DATE_ACTION] = date_prochaine_action
+        elif action_usager == NotificationsConstantes.ACTION_SURVEILLE:
+            # Calculer la date de rappel (A faire: Supporter autre que +1 jour)
+            date_prochaine_action = datetime.datetime.now().timestamp() + datetime.timedelta(days=1)
+            operations['$set'][NotificationsConstantes.LIBELLE_DATE_ACTION] = date_prochaine_action
+
+        document_notification = collection_notifications.find_one_and_update(filtre_notification, operations)
+
+        if document_notification is None:
+            raise ValueError("Document notification _id:%s n'a pas ete trouve" % id_notification)
+
+        # Selon la valeur precedente ou association a un workflow, il pourrait falloir prendre
+        # differentss actions.
+        self.set_etape_suivante()  # Termine
+
+        return {"notification_precedente": document_notification}
 
 
 class FormatteurEvenementNotification:

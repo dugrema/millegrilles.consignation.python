@@ -1,0 +1,54 @@
+from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO
+from millegrilles.domaines.Notifications import NotificationsConstantes
+from millegrilles import Constantes
+
+import datetime
+
+
+class NotificationExempleTest:
+
+    def __init__(self):
+        self.configuration = TransactionConfiguration()
+        self.configuration.loadEnvironment()
+
+        self.message_dao = PikaDAO(self.configuration)
+        self.message_dao.connecter()
+
+    def deconnecter(self):
+        self.message_dao.deconnecter()
+
+    def test1(self):
+
+        # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
+        notification = dict({
+            'evenements': Constantes.EVENEMENT_NOTIFICATION,
+            'source': {
+                'collection': 'mgdomaines_appareils_SenseursPassifs',
+                '_id': "5bef31be82cc2cb5ab0d57fe"
+            },
+            'regles': [
+                {"pasbonne": {"vraimentpas": False}}
+            ],
+            "date": int(datetime.datetime.utcnow().timestamp()),
+            'valeurs': {
+                "temperature": 24.7
+            }
+        })
+
+        self.message_dao.transmettre_notification(notification, NotificationsConstantes.AVERTISSEMENT)
+
+        print("Sent notification: %s" % notification)
+
+
+test = NotificationExempleTest()
+
+try:
+    # TEST
+    print("Envoyer notification")
+    test.test1()
+finally:
+    test.deconnecter()
+
+# FIN TEST
+
