@@ -263,6 +263,7 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
         collection_notifications = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_NOM)
 
         self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
+        self._logger.debug("Message de l'action usager: %s" % str(transaction_chargeutile))
         id_notification = transaction_chargeutile[NotificationsConstantes.LIBELLE_ID_NOTIFICATION]
         action_usager = transaction_chargeutile[NotificationsConstantes.LIBELLE_ACTION]
 
