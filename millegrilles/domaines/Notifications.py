@@ -18,6 +18,20 @@ class NotificationsConstantes:
     AVERTISSEMENT = 'avertissement'  # Niveau par defaut
     ALERTE = 'alerte'                # Plus haut niveau
 
+    # Action posee par l'usager sur la notification
+    LIBELLE_ACTION = 'action'  # Libelle (etiquette) de l'action a faire
+    ACTION_VUE = 'vue'         # La notification a ete vue, pas d'autres action requise
+    ACTION_RAPPEL = 'rappel'   # L'usager demande un rappel apres une periode de temps. Cachee en attendant.
+    ACTION_SURVEILLE = 'surveille'  # L'usager demande de ne pas etre informe (cacher la notif) si l'evenement ne survient pas a nouveau
+
+    LIBELLE_ETAT = 'etat_action'
+    LIBELLE_DATE_ACTION = 'date_action'  # Date de prise d'action
+    LIBELLE_DATE_ATTENTE_ACTION = 'date_attente_action'  # Date a partir de laquelle on fait un rappel, de-snooze, etc.
+    ETAT_COMPLETEE = 'completee'  # La notification a ete actionnee par l'usager, plus rien a faire.
+    ETAT_RAPPEL = 'rappel'        # En attente de rappel aupres de l'usager. Cachee en attendant.
+    ETAT_ACTIVE = 'active'        # Notification active, pas encore actionee par l'usager
+    ETAT_SURVEILLE = 'surveille'  # Notification surveille, va etre escaladee si survient a nouveau. Sinon elle se complete.
+
 
 class GestionnaireNotifications(GestionnaireDomaine):
 
@@ -193,6 +207,20 @@ class ProcessusNotificationRecue(MGProcessus):
 
         # Verifier si la notification a une action / regle, ou un workflow en cours
 
+
+class ProcessusActionUsagerNotification(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        parametres = self.parametres
+        action_usager = parametres[NotificationsConstantes.LIBELLE_ACTION]
+
+        if action_usager == NotificationsConstantes.ACTION_VUE:
+            # Marquer la notification comme vue. A moins qu'une autre notification soit recue,
+            # l'usager a fait ce qu'il avait a faire au sujet de cette notification.
+            pass
 
 
 class FormatteurEvenementNotification:
