@@ -23,12 +23,15 @@ class NotificationsConstantes:
     ALERTE = 'alerte'                # Plus haut niveau
 
     # Action posee par l'usager sur la notification
+    LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
     LIBELLE_ACTION = 'action'  # Libelle (etiquette) de l'action a faire
     ACTION_VUE = 'vue'         # La notification a ete vue, pas d'autres action requise
     ACTION_RAPPEL = 'rappel'   # L'usager demande un rappel apres une periode de temps. Cachee en attendant.
     ACTION_SURVEILLE = 'surveille'  # L'usager demande de ne pas etre informe (cacher la notif) si l'evenement ne survient pas a nouveau
 
-    LIBELLE_ETAT = 'etat_action'
+    LIBELLE_ETAT = 'etat_notification'
+    LIBELLE_DERNIERE_ACTION = 'derniere_action'
+    LIBELLE_PERIODE_ATTENTE = 'periode_attente'
     LIBELLE_DATE_ACTION = 'date_action'  # Date de prise d'action
     LIBELLE_DATE_ATTENTE_ACTION = 'date_attente_action'  # Date a partir de laquelle on fait un rappel, de-snooze, etc.
     ETAT_COMPLETEE = 'completee'  # La notification a ete actionnee par l'usager, plus rien a faire.
@@ -234,34 +237,42 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
     def initiale(self):
         parametres = self.parametres
+        transaction = self.charger_transaction()
+        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
         collection_notifications = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_NOM)
 
         self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
-        id_notification = parametres['id_notification']
-        action_usager = parametres[NotificationsConstantes.LIBELLE_ACTION]
+        id_notification = transaction_chargeutile[NotificationsConstantes.LIBELLE_ID_NOTIFICATION]
+        action_usager = transaction_chargeutile[NotificationsConstantes.LIBELLE_ACTION]
 
         filtre_notification = {'_id': ObjectId(id_notification)}
+        operations_set = {
+            NotificationsConstantes.LIBELLE_DERNIERE_ACTION: action_usager
+        }
         operations = {
-            '$set': {
-                NotificationsConstantes.LIBELLE_ETAT: action_usager
-            },
+            '$set': operations_set,
             '$currentDate': {
-                NotificationsConstantes.LIBELLE_DATE_ACTION: True
+                NotificationsConstantes.LIBELLE_DATE_ACTION: True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             }
         }
 
         if action_usager == NotificationsConstantes.ACTION_VUE:
             # Marquer la notification comme vue. A moins qu'une autre notification soit recue,
             # l'usager a fait ce qu'il avait a faire au sujet de cette notification.
-            pass
+            operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_COMPLETEE
+
         elif action_usager == NotificationsConstantes.ACTION_RAPPEL:
-            # Calculer la date de rappel (A faire: Supporter autre que +1 jour)
-            date_prochaine_action = datetime.datetime.now().timestamp() + datetime.timedelta(days=1)
-            operations['$set'][NotificationsConstantes.LIBELLE_DATE_ACTION] = date_prochaine_action
+            # Calculer la date de rappel
+            date_prochaine_action = self._calculer_periode_attente(transaction)
+            operations_set[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
+            operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_RAPPEL
+
         elif action_usager == NotificationsConstantes.ACTION_SURVEILLE:
-            # Calculer la date de rappel (A faire: Supporter autre que +1 jour)
-            date_prochaine_action = datetime.datetime.now().timestamp() + datetime.timedelta(days=1)
-            operations['$set'][NotificationsConstantes.LIBELLE_DATE_ACTION] = date_prochaine_action
+            # Calculer la date d'arret de surveillance
+            date_prochaine_action = self._calculer_periode_attente(transaction)
+            operations_set[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
+            operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_SURVEILLE
 
         document_notification = collection_notifications.find_one_and_update(filtre_notification, operations)
 
@@ -273,6 +284,22 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {"notification_precedente": document_notification}
+
+    def _calculer_periode_attente(self, transaction):
+        """ Calcule le delai d'attente pour une action. Utilise l'estampille de la transaction pour calculer
+            le delai. """
+
+        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
+        estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+
+        attente_secondes = transaction_chargeutile.get(NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION)
+        if attente_secondes is None:
+            # Defaut 24h
+            attente_secondes = 24 * 60 * 60
+
+        prochaine_action = estampille + datetime.timedelta(seconds=attente_secondes)
+
+        return prochaine_action
 
 
 class FormatteurEvenementNotification:
