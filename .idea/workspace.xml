@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -13,90 +13,11 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="FUSProjectUsageTrigger">
-    <session id="-1818189876">
-      <usages-collector id="statistics.lifecycle.project">
-        <counts>
-          <entry key="project.closed" value="45" />
-          <entry key="project.open.time.0" value="7" />
-          <entry key="project.open.time.1" value="3" />
-          <entry key="project.open.time.10" value="2" />
-          <entry key="project.open.time.11" value="3" />
-          <entry key="project.open.time.12" value="1" />
-          <entry key="project.open.time.15" value="1" />
-          <entry key="project.open.time.22" value="1" />
-          <entry key="project.open.time.3" value="2" />
-          <entry key="project.open.time.4" value="7" />
-          <entry key="project.open.time.5" value="5" />
-          <entry key="project.open.time.6" value="3" />
-          <entry key="project.open.time.7" value="2" />
-          <entry key="project.open.time.8" value="4" />
-          <entry key="project.open.time.9" value="5" />
-          <entry key="project.opened" value="46" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.extensions.edit">
-        <counts>
-          <entry key="Python Console" value="3" />
-          <entry key="dummy" value="168" />
-          <entry key="py" value="84323" />
-          <entry key="txt" value="9728" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.types.edit">
-        <counts>
-          <entry key="PLAIN_TEXT" value="9896" />
-          <entry key="Python" value="84133" />
-          <entry key="Scratch" value="193" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.extensions.open">
-        <counts>
-          <entry key="cfg" value="1" />
-          <entry key="json" value="1" />
-          <entry key="pth" value="1" />
-          <entry key="py" value="409" />
-          <entry key="pyi" value="1" />
-          <entry key="testfile" value="1" />
-          <entry key="txt" value="7" />
-        </counts>
-      </usages-collector>
-      <usages-collector id="statistics.file.types.open">
-        <counts>
-          <entry key="Ini" value="1" />
-          <entry key="JSON" value="1" />
-          <entry key="PLAIN_TEXT" value="9" />
-          <entry key="Python" value="407" />
-          <entry key="PythonStub" value="1" />
-          <entry key="Scratch" value="2" />
-        </counts>
-      </usages-collector>
-    </session>
-  </component>
   <component name="FavoritesManager">
     <favorites_list name="MilleGrilles.consignation.python" />
   </component>
   <component name="FileEditorManager">
-    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="450">
-              <caret line="101" column="58" selection-start-line="101" selection-start-column="58" selection-end-line="101" selection-end-column="58" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="480">
-              <caret line="35" selection-start-line="35" selection-end-line="35" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-    </leaf>
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -118,6 +39,7 @@
     </findStrings>
   </component>
   <component name="Git.Settings">
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="IdeDocumentHistory">
@@ -178,10 +100,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="2338" />
-    <option name="y" value="428" />
-    <option name="width" value="1490" />
-    <option name="height" value="1000" />
+    <option name="x" value="1920" />
+    <option name="y" value="410" />
+    <option name="width" value="1920" />
+    <option name="height" value="1017" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
@@ -194,30 +116,13 @@
         <subPane>
           <expand>
             <path>
-              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
               <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
             </path>
             <path>
-              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
               <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
-              <item name="MilleGrilles.consignation.python" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
-              <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
-              <item name="MilleGrilles.consignation.python" type="462c0819:PsiDirectoryNode" />
-              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
-              <item name="MilleGrilles.consignation" type="9c53a853:ProjectViewModuleGroupNode" />
-              <item name="MilleGrilles.consignation.python" type="462c0819:PsiDirectoryNode" />
-              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
-              <item name="transaction" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="MilleGrilles.consignation.python" type="b2602c69:ProjectViewProjectNode" />
-              <item name="python" type="462c0819:PsiDirectoryNode" />
+              <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -251,7 +156,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.MariaDB_export_json">
+  <component name="RunManager" selected="Python.MGProcessus">
     <configuration name="ConsignateurTransaction" type="PythonConfigurationType" factoryName="Python">
       <module name="MilleGrilles.consignation.python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -276,98 +181,6 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="EnvoyerMessageSample" type="PythonConfigurationType" factoryName="Python">
-      <module name="MilleGrilles.consignation.python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MQ_HOST" value="dev2" />
-        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/EnvoyerMessageSample.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="EnvoyerMessage_ProcessusTest" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="MilleGrilles.consignation.python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MQ_HOST" value="127.0.1.1" />
-        <env name="MG_MONGO_HOST" value="127.0.1.1" />
-        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/EnvoyerMessage_ProcessusTest.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="GestionnaireGenerateurs" type="PythonConfigurationType" factoryName="Python">
-      <module name="MilleGrilles.consignation.python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MONGO_HOST" value="dev2" />
-        <env name="MG_MQ_HOST" value="dev2" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/rapport" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/rapport/GestionnaireGenerateurs.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="Integration_InformationDocumentHelper" type="PythonConfigurationType" factoryName="Python">
-      <module name="MilleGrilles.consignation.python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MONGO_HOST" value="dev2" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/Integration_InformationDocumentHelper.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
     <configuration name="MGProcessus" type="PythonConfigurationType" factoryName="Python">
       <module name="MilleGrilles.consignation.python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -377,6 +190,8 @@
         <env name="MG_MONGO_HOST" value="127.0.1.1" />
         <env name="MG_MQ_HOST" value="127.0.1.1" />
         <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+        <env name="MG_MQ_PASSWORD" value="gopEM219umESS4" />
+        <env name="MG_MONGO_SSL" value="nocert" />
       </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/processus" />
@@ -384,51 +199,6 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/processus/MGProcessus.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="MariaDB_export_json" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$USER_HOME$/git/MilleGrilles.consignation/util/python" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="OrienteurTransaction" type="PythonConfigurationType" factoryName="Python">
-      <module name="MilleGrilles.consignation.python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MQ_HOST" value="dev2" />
-        <env name="MG_MONGO_HOST" value="dev2" />
-        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/transaction" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -446,6 +216,8 @@
         <env name="MG_MQ_HOST" value="127.0.1.1" />
         <env name="MG_MONGO_HOST" value="127.0.1.1" />
         <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+        <env name="MG_MQ_PASSWORD" value="gopEM219umESS4" />
+        <env name="MG_MONGO_SSL" value="nocert" />
       </envs>
       <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
       <option name="WORKING_DIRECTORY" value="" />
@@ -453,54 +225,6 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="date_tests" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MQ_HOST" value="127.0.1.1" />
-        <env name="MG_MONGO_HOST" value="127.0.1.1" />
-        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
-      </envs>
-      <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
-      <option name="WORKING_DIRECTORY" value="$USER_HOME$/git/MilleGrilles.consignation/util/python" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/date_tests.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="test_divers" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="MilleGrilles.consignation.python" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-        <env name="MG_MQ_HOST" value="127.0.1.1" />
-        <env name="MG_MONGO_HOST" value="127.0.1.1" />
-        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
-      </envs>
-      <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/test_divers.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -524,24 +248,12 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.MGProcessus" />
-      <item itemvalue="Python.OrienteurTransaction" />
-      <item itemvalue="Python.EnvoyerMessageSample" />
       <item itemvalue="Python.ConsignateurTransaction" />
-      <item itemvalue="Python.GestionnaireGenerateurs" />
-      <item itemvalue="Python.Integration_InformationDocumentHelper" />
-      <item itemvalue="Python.MariaDB_export_json" />
-      <item itemvalue="Python.EnvoyerMessage_ProcessusTest" />
+      <item itemvalue="Python.MGProcessus" />
       <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
-      <item itemvalue="Python.test_divers" />
-      <item itemvalue="Python.date_tests" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.MariaDB_export_json" />
-        <item itemvalue="Python.date_tests" />
-        <item itemvalue="Python.EnvoyerMessage_ProcessusTest" />
-        <item itemvalue="Python.test_divers" />
         <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
       </list>
     </recent_temporary>
@@ -936,15 +648,15 @@
     </history-entry>
   </component>
   <component name="ToolWindowManager">
-    <frame x="2338" y="428" width="1490" height="1000" extended-state="0" />
-    <editor active="true" />
+    <frame x="1920" y="410" width="1920" height="1017" extended-state="0" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.23417291" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.18114798" />
       <window_info id="Structure" order="1" sideWeight="0.5016575" side_tool="true" weight="0.23417291" />
       <window_info id="Favorites" order="2" sideWeight="0.5005525" side_tool="true" weight="0.24945612" />
+      <window_info anchor="bottom" id="Docker" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32928178" />
-      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49963742" weight="0.32928178" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" sideWeight="0.49963742" visible="true" weight="0.32827735" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -985,9 +697,20 @@
         </entry>
       </map>
     </option>
-  </component>
-  <component name="VcsContentAnnotationSettings">
-    <option name="myLimit" value="2678400000" />
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list />
+          </value>
+        </entry>
+        <entry key="User">
+          <value>
+            <list />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Sauvegarde des rapports d'aggregation." />
@@ -1018,20 +741,6 @@
     <option name="LAST_COMMIT_MESSAGE" value="Transformation de l'estampille vers format date ISO pour Mongo." />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/message.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="193">
-          <caret line="678" selection-start-line="678" selection-end-line="678" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/common.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="193">
-          <caret line="443" selection-start-line="443" selection-end-line="443" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/processus/Senseur.py" />
     <entry file="file://$PROJECT_DIR$/mgdomaine/__init__.py" />
     <entry file="file://$PROJECT_DIR$/venv/lib/python3.5/site-packages/pymongo/helpers.py">
@@ -1075,9 +784,7 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/util/MariaDBImport.py" />
-    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/Validation.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/Validation.py" />
     <entry file="file://$PROJECT_DIR$/mgdomaine/appareils/Appareils.py" />
     <entry file="file://$PROJECT_DIR$/mgdomaine/appareils/SenseurLecture.py" />
     <entry file="file://$PROJECT_DIR$/test/execution/ConversionJSON.py">
@@ -1118,13 +825,7 @@
     <entry file="file://$PROJECT_DIR$/test/execution/RunTransactionListener.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/../MilleGrilles.domaines.python/test/mgdomaines/AppareilInformationDocumentHelper_Test.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="105">
-          <caret line="9" column="21" lean-forward="true" selection-start-line="9" selection-start-column="21" selection-end-line="9" selection-end-column="21" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../MilleGrilles.domaines.python/test/mgdomaines/AppareilInformationDocumentHelper_Test.py" />
     <entry file="file://$PROJECT_DIR$/test/rapport/InformationGenereeDocumentHelper_Integration.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="2415">
@@ -1228,20 +929,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/dao/InformationDocumentHelper.py" />
     <entry file="file://$PROJECT_DIR$/millegrilles/dao/InformationGenereeDocumentHelper.py" />
-    <entry file="file://$PROJECT_DIR$/millegrilles/rapport/GenerateurRapports.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2010">
-          <caret line="135" column="6" selection-start-line="135" selection-start-column="6" selection-end-line="135" selection-end-column="6" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/millegrilles/rapport/GestionnaireGenerateurs.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="120">
-          <caret line="9" column="91" lean-forward="true" selection-start-line="9" selection-start-column="91" selection-end-line="9" selection-end-column="91" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/rapport/GenerateurRapports.py" />
+    <entry file="file://$PROJECT_DIR$/millegrilles/rapport/GestionnaireGenerateurs.py" />
     <entry file="file://$PROJECT_DIR$/millegrilles/transaction/GenerateurTransaction.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="195">
@@ -1252,13 +941,7 @@
     <entry file="file://$USER_HOME$/git/MilleGrilles.domaines.python/venv/pyvenv.cfg">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$USER_HOME$/git/MilleGrilles.domaines.python/mgdomaines/appareils/SenseurLecture.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="120">
-          <caret line="8" selection-start-line="8" selection-end-line="8" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$USER_HOME$/git/MilleGrilles.domaines.python/mgdomaines/appareils/SenseurLecture.py" />
     <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/date_tests.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="60">
@@ -1276,7 +959,7 @@
     <entry file="file://$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="450">
-          <caret line="101" column="58" selection-start-line="101" selection-start-column="58" selection-end-line="101" selection-end-column="58" />
+          <caret line="101" column="44" selection-start-line="101" selection-start-column="44" selection-end-line="101" selection-end-column="44" />
         </state>
       </provider>
     </entry>
@@ -1286,6 +969,12 @@
           <caret line="35" selection-start-line="35" selection-end-line="35" />
         </state>
       </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/setup.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/image_info.txt">
+      <provider selected="true" editor-type-id="text-editor" />
     </entry>
   </component>
   <component name="masterDetails">
