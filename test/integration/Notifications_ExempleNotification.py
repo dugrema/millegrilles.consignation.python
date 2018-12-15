@@ -29,7 +29,7 @@ class NotificationExempleTest:
                 '_id': "5bef31be82cc2cb5ab0d57fe"
             },
             'regles': [
-                {"pasbonne_8": {
+                {"pasbonne_9": {
                     "element": "temperature"
                 }}
             ],

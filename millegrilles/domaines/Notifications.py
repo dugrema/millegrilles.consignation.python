@@ -25,6 +25,7 @@ class NotificationsConstantes:
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
     LIBELLE_NIVEAU_NOTIFICATION = 'niveau'  # Niveau d'urgence de la notification
+    LIBELLE_COMPTEUR = 'compteur'  # Compte le nombre de fois que la notification est survenue
     LIBELLE_ACTION = 'action'  # Libelle (etiquette) de l'action a faire
     ACTION_VUE = 'vue'         # La notification a ete vue, pas d'autres action requise
     ACTION_RAPPEL = 'rappel'   # L'usager demande un rappel apres une periode de temps. Cachee en attendant.
@@ -56,7 +57,10 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
 
     def traiter_cedule(self, message):
-        pass
+        indicateurs = message['indicateurs']
+        self._logger.debug("Cedule GestionnaireNotifications: %s" % str(indicateurs))
+        # Declencher la verification des actions sur notifications
+        self.verifier_notifications_actionsdues(message)
 
     def traiter_notification(self, notification):
         processus = "millegrilles_domaines_Notifications:ProcessusNotificationRecue"
@@ -91,6 +95,44 @@ class GestionnaireNotifications(GestionnaireDomaine):
             queue=nom_queue_notification,
             routing_key='%s.ceduleur.#' % nom_millegrille
         )
+
+    def verifier_notifications_actionsdues(self, message):
+        collection_notifications = self.document_dao.get_collection(NotificationsConstantes.COLLECTION_NOM)
+
+        filtre = {
+            'date_attente_action': {'$lt': datetime.datetime.utcnow()}
+        }
+        curseur = collection_notifications.find(filtre)
+
+        operations_template = {
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            },
+            '$unset': {
+                NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
+            }
+        }
+
+        for notification in curseur:
+            etat_notification = notification['etat_notification']
+
+            if etat_notification == NotificationsConstantes.ETAT_SURVEILLE:
+                # La notification est completee (aucun changement depuis qu'elle est en etat de surveillance)
+                operations = operations_template.copy()
+                operations['$set'] = {
+                    NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_COMPLETEE
+                }
+                self._logger.debug("Completer notification (surveillee): %s" % str(notification))
+                collection_notifications.update_one({'_id': notification['_id']}, operations)
+
+            elif etat_notification == NotificationsConstantes.ETAT_RAPPEL:
+                # C'est l'heure du rappel. On remet la notification au mode actif.
+                operations = operations_template.copy()
+                operations['$set'] = {
+                    NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE
+                }
+                self._logger.debug("Rappeler notification: %s" % str(notification))
+                collection_notifications.update_one({'_id': notification['_id']}, operations)
 
 
 class TraitementMessageNotification(BaseCallback):
@@ -203,6 +245,7 @@ class ProcessusNotificationRecue(MGProcessus):
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_creation,
             NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE,
             NotificationsConstantes.LIBELLE_NIVEAU_NOTIFICATION: NotificationsConstantes.INFORMATION,
+            NotificationsConstantes.LIBELLE_COMPTEUR: 1,
             'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
             'valeurs': parametres['valeurs'],
             'source': parametres['source']
@@ -225,7 +268,10 @@ class ProcessusNotificationRecue(MGProcessus):
                 'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
                 'valeurs': parametres['valeurs']
             },
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$inc': {
+                NotificationsConstantes.LIBELLE_COMPTEUR: 1
+            }
         }
         resultat_update = collection.find_one_and_update(filtre, operations)
         self._logger.debug("Resultat update %s: %s" % (str(filtre), str(resultat_update)))
@@ -238,11 +284,16 @@ class ProcessusNotificationRecue(MGProcessus):
         etat_precedent = resultat_update[NotificationsConstantes.LIBELLE_ETAT]
         etats_reactive = [NotificationsConstantes.ETAT_COMPLETEE, NotificationsConstantes.ETAT_SURVEILLE]
         if etat_precedent in etats_reactive:
+            operations_set = {
+                NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE
+            }
+            if etat_precedent == NotificationsConstantes.ETAT_COMPLETEE:
+                # Reset le compteur, la notification etait completee.
+                operations_set[NotificationsConstantes.LIBELLE_COMPTEUR] = 1
+
             # On va reouvrir la notification
             collection.update_one(filtre, {
-                '$set': {
-                    NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE
-                },
+                '$set': operations_set,
                 '$unset': {
                     NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
                 }
