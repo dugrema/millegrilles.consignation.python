@@ -17,6 +17,7 @@ class SenseursPassifsConstantes:
 
     COLLECTION_NOM = 'mgdomaines_appareils_SenseursPassifs'
     DOMAINE_NOM = 'mgdomaines.appareils.SenseursPassifs'
+    QUEUE_NOM = 'mgdomaines.appareils.SenseursPassifs'
 
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
@@ -52,7 +53,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
 
         nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_senseurspassifs = self.get_nom_queue()
+        nom_queue_senseurspassifs = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
 
         # Configurer la Queue pour SenseursPassifs sur RabbitMQ
         self.message_dao.channel.queue_declare(
@@ -95,9 +96,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         raise NotImplementedError("N'est pas implemente")
 
     def get_nom_queue(self):
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_senseurspassifs = 'mg.%s.mgdomaines.appareils.SenseursPassifs' % nom_millegrille
-        return nom_queue_senseurspassifs
+        return SenseursPassifsConstantes.QUEUE_NOM
 
     ''' Traite les evenements sur cedule. '''
     def traiter_cedule(self, evenement):

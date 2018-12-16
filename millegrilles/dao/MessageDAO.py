@@ -140,17 +140,6 @@ class PikaDAO:
             routing_key='%s.processus.erreur' % nom_millegrille
         )
 
-        # # Creer la Q pour le gestionnaire de generateurs de documents
-        # self.channel.queue_declare(
-        #     queue=nom_q_generateur_documents,
-        #     durable=True)
-        #
-        # self.channel.queue_bind(
-        #     exchange=nom_echange_evenements,
-        #     queue=nom_q_generateur_documents,
-        #     routing_key='%s.generateurdocuments.#' % nom_millegrille
-        # )
-
         # Creer la Q et bindings pour les notifications
         self.channel.queue_declare(
             queue=nom_q_notifications,
@@ -162,41 +151,32 @@ class PikaDAO:
             routing_key='%s.notification.#' % nom_millegrille
         )
 
-    ''' Prepare la reception de message '''
-
-    def demarrer_lecture_nouvelles_transactions(self, callback):
-
-        queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions)
-
-        self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
-
+    def start_consuming(self):
+        """ Demarre la lecture de messages RabbitMQ """
         try:
             self.channel.start_consuming()
 
         except OSError as oserr:
             logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
-    ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
+    ''' Prepare la reception de message '''
+
+    def enregistrer_callback(self, queue, callback):
+        queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, queue)
+        self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
+
+    def demarrer_lecture_nouvelles_transactions(self, callback):
+        queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions)
+        self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
+        self.start_consuming()
 
     def demarrer_lecture_etape_processus(self, callback):
+        """ Demarre la lecture de la queue mgp_processus. Appel bloquant. """
+
         self.channel.basic_consume(callback,
                                    queue=self.queuename_mgp_processus(),
                                    no_ack=False)
-        try:
-            self.channel.start_consuming()
-        except OSError as oserr:
-            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
-
-    ''' Demarre la lecture de la queue mgp_processus. Appel bloquant. '''
-
-    def demarrer_lecture_generateur_documents(self, callback):
-        self.channel.basic_consume(callback,
-                                   queue=self.queuename_generateur_documents(),
-                                   no_ack=False)
-        try:
-            self.channel.start_consuming()
-        except OSError as oserr:
-            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+        self.start_consuming()
 
     ''' 
     Methode generique pour transmettre un evenement JSON avec l'echange millegrilles
@@ -385,22 +365,6 @@ class PikaDAO:
             self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
                                        routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
                                        body=message_utf8)
-
-    # def transmettre_evenement_generateur_documents(self, message):
-    #
-    #     chemin = message.get(Constantes.DOCUMENT_INFODOC_CHEMIN)
-    #     if chemin is not None:
-    #         chemin = '.%s' % '.'.join(chemin)
-    #     else:
-    #         chemin = ''
-    #
-    #     message_utf8 = self.json_helper.dict_vers_json(message)
-    #
-    #     self.channel.basic_publish(
-    #         exchange=self.configuration.exchange_evenements,
-    #         routing_key='%s.generateurdocuments%s' % (
-    #             self.configuration.nom_millegrille, chemin),
-    #         body=message_utf8)
 
     # Mettre la classe en etat d'erreur
     def enter_error_state(self):

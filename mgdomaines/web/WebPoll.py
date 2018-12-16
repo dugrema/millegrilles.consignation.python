@@ -18,6 +18,7 @@ from millegrilles.processus.MGProcessus import MGProcessusTransaction
 class WebPollConstantes:
 
     COLLECTION_NOM = 'mgdomaines_web_WebPoll'
+    QUEUE_NOM = 'mgdomaines.web.WebPoll'
 
     # Document de configuration de reference s'il n'existe pas deja
     # Se document se trouve dans la collection mgdomaines_web_WebPoll, _mg-libelle: configuration.
@@ -84,7 +85,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck
 
         nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_webpoll = self.get_nom_queue()
+        nom_queue_webpoll = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
 
         # Configurer la Queue pour WebPoll sur RabbitMQ
         self.message_dao.channel.queue_declare(
@@ -129,9 +130,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         pass
 
     def get_nom_queue(self):
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_senseurspassifs = 'mg.%s.mgdomaines.web.WebPoll' % nom_millegrille
-        return nom_queue_senseurspassifs
+        return WebPollConstantes.QUEUE_NOM
 
     ''' Traite les evenements sur cedule. '''
     def traiter_cedule(self, evenement):

@@ -49,9 +49,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self._traitement_message = None
 
     def get_nom_queue(self):
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue = 'mg.%s.%s' % (nom_millegrille, NotificationsConstantes.QUEUE_SUFFIXE)
-        return nom_queue
+        return NotificationsConstantes.QUEUE_SUFFIXE
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
@@ -71,7 +69,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self._traitement_message = TraitementMessageNotification(self)
 
         nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_notification = self.get_nom_queue()
+        nom_queue_notification = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
 
         # Configurer la Queue pour les notifications sur RabbitMQ
         self.message_dao.channel.queue_declare(
