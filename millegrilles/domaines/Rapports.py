@@ -114,13 +114,14 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
         entries = contenu_rss['entries']
 
         date_maj = dateutil.parser.parse(contenu_rss['feed']['updated'])
+        titre_previsions = contenu_rss['feed']['title']
         watches = entries[0]['summary']
         courant = entries[1]['summary']
         previsions = []
-        for prevision in entries[2:4]:
+        for prevision in entries[2:3]:
             prevision_texte = prevision['summary']
             previsions.append(prevision_texte)
-        for prevision in entries[4:]:
+        for prevision in entries[3:]:
             prevision_texte = prevision['title']
             previsions.append(prevision_texte)
 
@@ -130,6 +131,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
         }
 
         operation_set = {
+            'titre': titre_previsions,
             'avertissements': watches,
             'previsions_courantes': courant,
             'previsions': previsions,

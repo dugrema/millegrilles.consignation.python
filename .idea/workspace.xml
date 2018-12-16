@@ -6,9 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/MGProcessus.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/MGProcessus.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/date_timezones_test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test/date_timezones_test.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -24,22 +22,10 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Rapports.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="210">
-              <caret line="115" column="23" selection-start-line="115" selection-start-column="23" selection-end-line="115" selection-end-column="23" />
+            <state relative-caret-position="330">
+              <caret line="123" selection-start-line="123" selection-end-line="123" />
               <folding>
                 <element signature="e#49#102#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/test/date_timezones_test.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="285">
-              <caret line="19" column="25" lean-forward="true" selection-start-line="19" selection-start-column="25" selection-end-line="19" selection-end-column="25" />
-              <folding>
-                <element signature="e#0#15#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -584,13 +570,6 @@
       <option name="presentableId" value="Default" />
       <updated>1536693472080</updated>
     </task>
-    <task id="LOCAL-00088" summary="Ajout fonction d'aggregation par groupe de champs.">
-      <created>1537721970108</created>
-      <option name="number" value="00088" />
-      <option name="presentableId" value="LOCAL-00088" />
-      <option name="project" value="LOCAL" />
-      <updated>1537721970108</updated>
-    </task>
     <task id="LOCAL-00089" summary="Travail sur aggregation.">
       <created>1537729423708</created>
       <option name="number" value="00089" />
@@ -927,7 +906,14 @@
       <option name="project" value="LOCAL" />
       <updated>1544978373535</updated>
     </task>
-    <option name="localTasksCounter" value="137" />
+    <task id="LOCAL-00137" summary="Ajout rapport sommaire pour previsions meteo Ottawa.">
+      <created>1544997971857</created>
+      <option name="number" value="00137" />
+      <option name="presentableId" value="LOCAL-00137" />
+      <option name="project" value="LOCAL" />
+      <updated>1544997971858</updated>
+    </task>
+    <option name="localTasksCounter" value="138" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -1029,7 +1015,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Ajout flag _actif." />
     <MESSAGE value="Deplacement du processus dans Appareils.py vers repertoire domaine.&#10;&#10;Il va rester a corriger le chargement des processus pour supporter l'utilisation de package global." />
     <MESSAGE value="Suppression Appareils.py, le code est maintenant sous SenseurLecture." />
     <MESSAGE value="Cleanup, deplacement fichiers mgdomaines vers nouveau git rep." />
@@ -1054,7 +1039,8 @@
     <MESSAGE value="Fix bug notification, set etape finale par defaut si aucun avertissement necessaire." />
     <MESSAGE value="Refactoring packages.&#10;&#10;Supprime package processus (MGProcessus deplace vers package millegrilles).&#10;Deplace TestMGPProcessus vers repertoire unit tests." />
     <MESSAGE value="Version 0.10.2." />
-    <option name="LAST_COMMIT_MESSAGE" value="Version 0.10.2." />
+    <MESSAGE value="Ajout rapport sommaire pour previsions meteo Ottawa." />
+    <option name="LAST_COMMIT_MESSAGE" value="Ajout rapport sommaire pour previsions meteo Ottawa." />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
@@ -1364,8 +1350,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Rapports.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="210">
-          <caret line="115" column="23" selection-start-line="115" selection-start-column="23" selection-end-line="115" selection-end-column="23" />
+        <state relative-caret-position="330">
+          <caret line="123" selection-start-line="123" selection-end-line="123" />
           <folding>
             <element signature="e#49#102#0" expanded="true" />
           </folding>
