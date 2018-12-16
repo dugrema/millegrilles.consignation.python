@@ -2,12 +2,11 @@ from setuptools import setup
 
 setup(
     name='MilleGrilles.consignation.python',
-    version='0.10.2',
+    version='0.10.3',
     packages=[
         'millegrilles',
         'millegrilles.dao',
         'millegrilles.domaines',
-        'millegrilles.processus',
         'millegrilles.transaction',
         'millegrilles.util',
         'mgdomaines',
