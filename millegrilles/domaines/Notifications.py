@@ -6,8 +6,10 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
 
 from bson import ObjectId
+from email.message import EmailMessage
 
 import datetime
+import smtplib
 
 
 class NotificationsConstantes:

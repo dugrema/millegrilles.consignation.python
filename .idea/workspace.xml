@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/execution/MailSend.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/domaines.json" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/domaines.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -20,11 +20,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Rapports.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="435">
-              <caret line="47" lean-forward="true" selection-start-line="47" selection-end-line="47" />
+            <state relative-caret-position="75">
+              <caret line="5" lean-forward="true" selection-start-line="5" selection-end-line="5" />
               <folding>
                 <element signature="e#49#102#0" expanded="true" />
               </folding>
@@ -44,8 +44,20 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="315">
-              <caret line="55" lean-forward="true" selection-start-line="54" selection-end-line="55" />
+            <state relative-caret-position="135">
+              <caret line="9" selection-start-line="9" selection-end-line="9" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/test/execution/MailSend.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="165">
+              <caret line="11" column="50" selection-start-line="11" selection-start-column="50" selection-end-line="11" selection-end-column="50" />
+              <folding>
+                <element signature="e#0#14#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -87,7 +99,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/millegrilles/transaction/Configuration.py" />
         <option value="$PROJECT_DIR$/test/execution/ConfigurerRabbitMQ.py" />
         <option value="$PROJECT_DIR$/millegrilles/transaction/DocumentDAO.py" />
         <option value="$PROJECT_DIR$/test/execution/RunTransactionListener.py" />
@@ -130,14 +141,15 @@
         <option value="$USER_HOME$/git/MilleGrilles.consignation/util/python/MariaDB_export_json.py" />
         <option value="$PROJECT_DIR$/test/integration/Notifications_ExempleNotification.py" />
         <option value="$PROJECT_DIR$/millegrilles/dao/MessageDAO.py" />
-        <option value="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" />
         <option value="$PROJECT_DIR$/mgdomaines/web/WebPoll.py" />
-        <option value="$PROJECT_DIR$/requirements.txt" />
         <option value="$PROJECT_DIR$/../MilleGrilles.consignation.python/venv/lib/python3.5/site-packages/certifi/cacert.pem" />
         <option value="$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py" />
         <option value="$PROJECT_DIR$/millegrilles/Domaines.py" />
         <option value="$PROJECT_DIR$/scripts/domaines.json" />
         <option value="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" />
+        <option value="$PROJECT_DIR$/requirements.txt" />
+        <option value="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" />
+        <option value="$PROJECT_DIR$/test/execution/MailSend.py" />
       </list>
     </option>
   </component>
@@ -182,6 +194,17 @@
               <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
               <item name="scripts" type="462c0819:PsiDirectoryNode" />
             </path>
+            <path>
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="execution" type="462c0819:PsiDirectoryNode" />
+            </path>
           </expand>
           <select />
         </subPane>
@@ -222,7 +245,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.Notifications_ExempleNotification">
+  <component name="RunManager" selected="Python.MailSend">
     <configuration name="Ceduleur" type="PythonConfigurationType" factoryName="Python">
       <module name="MilleGrilles.consignation.python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -353,6 +376,32 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="MailSend" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="MilleGrilles.consignation.python" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="MG_MQ_HOST" value="127.0.1.1" />
+        <env name="MG_MONGO_HOST" value="127.0.1.1" />
+        <env name="MG_NOM_MILLEGRILLE" value="sansnom" />
+        <env name="MG_MQ_PASSWORD" value="gopEM219umESS4" />
+        <env name="MG_MONGO_SSL" value="nocert" />
+      </envs>
+      <option name="SDK_HOME" value="$USER_HOME$/git/MilleGrilles.consignation/util/python/venv/bin/python" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/test/execution" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test/execution/MailSend.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="Notifications_ExempleNotification" type="PythonConfigurationType" factoryName="Python">
       <module name="MilleGrilles.consignation.python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -427,9 +476,11 @@
       <item itemvalue="Python.ConsignateurTransaction" />
       <item itemvalue="Python.Notifications_ExempleNotification" />
       <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
+      <item itemvalue="Python.MailSend" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.MailSend" />
         <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
       </list>
     </recent_temporary>
@@ -444,13 +495,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1536693472080</updated>
-    </task>
-    <task id="LOCAL-00078" summary="Ajout evenement transaction_traitee lors de la fin d'un processus.&#10;&#10;S'applique a toutes les transactions.">
-      <created>1537625478701</created>
-      <option name="number" value="00078" />
-      <option name="presentableId" value="LOCAL-00078" />
-      <option name="project" value="LOCAL" />
-      <updated>1537625478701</updated>
     </task>
     <task id="LOCAL-00079" summary="Refactoring methodes transaction vers Helper.&#10;&#10;Methode: sauvegarder_nouvelle_transaction">
       <created>1537625941568</created>
@@ -788,7 +832,14 @@
       <option name="project" value="LOCAL" />
       <updated>1544919221152</updated>
     </task>
-    <option name="localTasksCounter" value="127" />
+    <task id="LOCAL-00127" summary="Ajout gestionnaire de domaine des Rapports.">
+      <created>1544924251762</created>
+      <option name="number" value="00127" />
+      <option name="presentableId" value="LOCAL-00127" />
+      <option name="project" value="LOCAL" />
+      <updated>1544924251762</updated>
+    </task>
+    <option name="localTasksCounter" value="128" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -890,7 +941,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Creation evenements sur modification information-documents." />
     <MESSAGE value="Fix evenement document maj.&#10;&#10;Pour un upsert, le document va etre rapporte comme ajoute plutot que maj." />
     <MESSAGE value="Ajout gestionnaire de generateurs, main() et connexion Q." />
     <MESSAGE value="Implementation GestionnaireGenerateur et chargement generateur noeud.&#10;&#10;Hard-coding du chargement du generateur pour noeud de senseurs." />
@@ -915,12 +965,10 @@
     <MESSAGE value="Ajout environnement test." />
     <MESSAGE value="Changement utilisation MQ pour domaines. 1 seule thread.&#10;&#10;L'approche d'avoir plusieurs threads avec une ou plusieurs connexions MQ ne fonctionnait pas bien. Maintenant une seule thread est utilise par connexion. Et une connexion pour tous les gestionnaires de domaines." />
     <MESSAGE value="Retrait projet consignation (pas Python)." />
-    <option name="LAST_COMMIT_MESSAGE" value="Retrait projet consignation (pas Python)." />
+    <MESSAGE value="Ajout gestionnaire de domaine des Rapports." />
+    <option name="LAST_COMMIT_MESSAGE" value="Ajout gestionnaire de domaine des Rapports." />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/test/execution/ConversionJSON.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/test/execution/ConfigurerRabbitMQ.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="90">
@@ -1138,13 +1186,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/requirements.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="105">
-          <caret line="7" selection-start-line="7" selection-end-line="7" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/mgdomaines/web/WebPoll.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-945">
@@ -1180,19 +1221,36 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
+    <entry file="file://$PROJECT_DIR$/requirements.txt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="315">
-          <caret line="55" lean-forward="true" selection-start-line="54" selection-end-line="55" />
+        <state relative-caret-position="90">
+          <caret line="6" column="19" lean-forward="true" selection-start-line="6" selection-start-column="19" selection-end-line="6" selection-end-column="19" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Rapports.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="435">
-          <caret line="47" lean-forward="true" selection-start-line="47" selection-end-line="47" />
+        <state relative-caret-position="75">
+          <caret line="5" lean-forward="true" selection-start-line="5" selection-end-line="5" />
           <folding>
             <element signature="e#49#102#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="135">
+          <caret line="9" selection-start-line="9" selection-end-line="9" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/execution/MailSend.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="165">
+          <caret line="11" column="50" selection-start-line="11" selection-start-column="50" selection-end-line="11" selection-end-column="50" />
+          <folding>
+            <element signature="e#0#14#0" expanded="true" />
           </folding>
         </state>
       </provider>
