@@ -45,6 +45,15 @@ class TransactionConfiguration:
             Constantes.CONFIG_NOM_MILLEGRILLE: Constantes.DEFAUT_NOM_MILLEGRILLE # Nom de la MilleGrille
         }
 
+        self._email_config = {
+            Constantes.CONFIG_EMAIL_HOST: None,
+            Constantes.CONFIG_EMAIL_PORT: None,
+            Constantes.CONFIG_EMAIL_USER: None,
+            Constantes.CONFIG_EMAIL_PASSWORD: None,
+            Constantes.CONFIG_EMAIL_TO: None,
+            Constantes.CONFIG_EMAIL_FROM: None
+        }
+
     def loadEnvironment(self):
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
@@ -56,7 +65,13 @@ class TransactionConfiguration:
                 # logging.debug("Config JSON: %s" % str(dict_fichier_json))
 
         # Faire la liste des dictionnaires de configuration a charger
-        configurations = [self._mq_config, self._mongo_config, self._millegrille_config, self._domaines_config]
+        configurations = [
+            self._mq_config,
+            self._mongo_config,
+            self._millegrille_config,
+            self._domaines_config,
+            self._email_config
+        ]
 
         for config_dict in configurations:
 
@@ -150,6 +165,29 @@ class TransactionConfiguration:
     def domaines_json(self):
         return self._domaines_config[Constantes.CONFIG_DOMAINES_CONFIGURATION]
 
+    @property
+    def email_host(self):
+        return self._email_config[Constantes.CONFIG_EMAIL_HOST]
+
+    @property
+    def email_port(self):
+        return self._email_config[Constantes.CONFIG_EMAIL_PORT]
+
+    @property
+    def email_user(self):
+        return self._email_config[Constantes.CONFIG_EMAIL_USER]
+
+    @property
+    def email_password(self):
+        return self._email_config[Constantes.CONFIG_EMAIL_PASSWORD]
+
+    @property
+    def email_to(self):
+        return self._email_config[Constantes.CONFIG_EMAIL_TO]
+
+    @property
+    def email_from(self):
+        return self._email_config[Constantes.CONFIG_EMAIL_FROM]
 
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """

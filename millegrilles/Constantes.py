@@ -39,6 +39,14 @@ CONFIG_NOM_MILLEGRILLE = 'nom_millegrille'
 # Domaines
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
 
+# Email notifications
+CONFIG_EMAIL_HOST = 'email_host'
+CONFIG_EMAIL_PORT = 'email_port'
+CONFIG_EMAIL_USER = 'email_user'
+CONFIG_EMAIL_PASSWORD = 'email_password'
+CONFIG_EMAIL_TO = 'email_to'
+CONFIG_EMAIL_FROM = 'email_from'
+
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'
 DEFAUT_NOM_MILLEGRILLE = 'sansnom'
