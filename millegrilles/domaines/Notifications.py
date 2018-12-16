@@ -199,7 +199,7 @@ class ProcessusNotificationRecue(MGProcessus):
             filtre[cle] = parametres['source'][source_val]
 
         # L'etape suivante est determine par l'etat des notifications (nouvelles, existantes, rappel, etc.)
-        etape_suivante = None
+        etape_suivante = 'finale'
         for regle in parametres['regles']:
             self._logger.debug("Traitement document %s regle %s" % (str(parametres['source']), str(regle)))
             filtre_regle = filtre.copy()

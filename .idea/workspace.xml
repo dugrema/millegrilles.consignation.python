@@ -6,15 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py" beforeDir="false" afterPath="$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mgdomaines/web/WebPoll.py" beforeDir="false" afterPath="$PROJECT_DIR$/mgdomaines/web/WebPoll.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/Constantes.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/Constantes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/Declencheur.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/Declencheur.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/dao/Configuration.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/dao/Configuration.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/dao/MessageDAO.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/dao/MessageDAO.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -27,11 +19,23 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/millegrilles/dao/MessageDAO.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="90">
               <caret line="6" lean-forward="true" selection-start-line="6" selection-end-line="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="15">
+              <caret line="201" selection-start-line="201" selection-end-line="201" />
+              <folding>
+                <element signature="e#40#75#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -112,10 +116,10 @@
         <option value="$PROJECT_DIR$/millegrilles/dao/TransactionDocumentHelper.py" />
         <option value="$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py" />
         <option value="$PROJECT_DIR$/mgdomaines/web/WebPoll.py" />
-        <option value="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" />
         <option value="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" />
         <option value="$PROJECT_DIR$/millegrilles/Declencheur.py" />
         <option value="$PROJECT_DIR$/millegrilles/dao/MessageDAO.py" />
+        <option value="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" />
       </list>
     </option>
   </component>
@@ -148,6 +152,12 @@
               <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
               <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
               <item name="dao" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
+              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
+              <item name="domaines" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -458,13 +468,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1536693472080</updated>
-    </task>
-    <task id="LOCAL-00084" summary="Creation methode distinct pour trouver groupes dans info-doc.">
-      <created>1537639280627</created>
-      <option name="number" value="00084" />
-      <option name="presentableId" value="LOCAL-00084" />
-      <option name="project" value="LOCAL" />
-      <updated>1537639280627</updated>
     </task>
     <task id="LOCAL-00085" summary="Generation de rapport et sauvegarde des resultats.">
       <created>1537643841103</created>
@@ -802,7 +805,14 @@
       <option name="project" value="LOCAL" />
       <updated>1544970551804</updated>
     </task>
-    <option name="localTasksCounter" value="133" />
+    <task id="LOCAL-00133" summary="Refactoring RabbitMQ, utilisation vhost par millegrille.&#10;&#10;Permet d'utiliser des routing keys/nom queue statiques, ils sont uniques par vhost.">
+      <created>1544972944833</created>
+      <option name="number" value="00133" />
+      <option name="presentableId" value="LOCAL-00133" />
+      <option name="project" value="LOCAL" />
+      <updated>1544972944833</updated>
+    </task>
+    <option name="localTasksCounter" value="134" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -839,13 +849,14 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="1920" y="410" width="1920" height="1017" extended-state="0" />
+    <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.18114798" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.18114798" />
       <window_info id="Structure" order="1" sideWeight="0.5016575" side_tool="true" weight="0.23417291" />
       <window_info id="Favorites" order="2" sideWeight="0.5005525" side_tool="true" weight="0.24945612" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32827735" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" sideWeight="0.49963742" visible="true" weight="0.32827735" />
+      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49963742" visible="true" weight="0.32827735" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -903,7 +914,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Fix rapport aggregation, utilisait la mauvaise classe de base.&#10;&#10;Creation 2 generateurs: dernier jour et dernier mois pour les senseurs." />
     <MESSAGE value="Change QoS Pika a 1 message.&#10;&#10;Quand un grand volume etait envoye, tous les messages etaient lus en meme temps et les ACK ne se rendaient pas." />
     <MESSAGE value="Ajout message persistance pour transactions." />
     <MESSAGE value="Update QoS (5 messages), desactivation rapports.&#10;&#10;Les rapports statistiques doivent etre cedules, ils ne devraient pas etre mis a jour pour chaque changement de document." />
@@ -928,7 +938,8 @@
     <MESSAGE value="Ajout email aux notifications (nouvelle, surveillee)." />
     <MESSAGE value="Version 0.10.1." />
     <MESSAGE value="Cleanup fichiers demarrage, vieux scripts." />
-    <option name="LAST_COMMIT_MESSAGE" value="Cleanup fichiers demarrage, vieux scripts." />
+    <MESSAGE value="Refactoring RabbitMQ, utilisation vhost par millegrille.&#10;&#10;Permet d'utiliser des routing keys/nom queue statiques, ils sont uniques par vhost." />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactoring RabbitMQ, utilisation vhost par millegrille.&#10;&#10;Permet d'utiliser des routing keys/nom queue statiques, ils sont uniques par vhost." />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/test/processus/TestMGPProcessus.py">
@@ -1184,16 +1195,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="282">
-          <caret line="243" column="93" selection-start-line="243" selection-start-column="78" selection-end-line="243" selection-end-column="93" />
-          <folding>
-            <element signature="e#40#75#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Rapports.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="558">
@@ -1262,6 +1263,16 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="90">
           <caret line="6" lean-forward="true" selection-start-line="6" selection-end-line="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="15">
+          <caret line="201" selection-start-line="201" selection-end-line="201" />
+          <folding>
+            <element signature="e#40#75#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
