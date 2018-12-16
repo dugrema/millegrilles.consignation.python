@@ -128,6 +128,10 @@ class MGPProcessusControleur(BaseCallback):
     def message_dao(self):
         return self._message_dao
 
+    @property
+    def configuration(self):
+        return self._configuration
+
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
     

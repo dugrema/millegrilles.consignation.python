@@ -4,6 +4,7 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.dao.EmailDAO import SmtpDAO
 
 from bson import ObjectId
 from email.message import EmailMessage
@@ -198,6 +199,8 @@ class ProcessusNotificationRecue(MGProcessus):
             cle = 'source.%s' % source_val
             filtre[cle] = parametres['source'][source_val]
 
+        # L'etape suivante est determine par l'etat des notifications (nouvelles, existantes, rappel, etc.)
+        etape_suivante = None
         for regle in parametres['regles']:
             self._logger.debug("Traitement document %s regle %s" % (str(parametres['source']), str(regle)))
             filtre_regle = filtre.copy()
@@ -219,11 +222,15 @@ class ProcessusNotificationRecue(MGProcessus):
                 id_doc = self._creer_nouveau_document_(collection, {'regle': regle})
                 if id_doc is not None:
                     nouveaux_documents_notification.append(id_doc)
+                etape_suivante = ProcessusNotificationRecue.avertir_usager.__name__
             else:
                 self._logger.debug("Document existant: %s" % str(document_notification))
-                self._traiter_notification_existante(collection, document_notification, regle)
+                resultat = self._traiter_notification_existante(collection, document_notification, regle)
+                if 'notification_requise' in resultat:
+                    self._logger.debug("Notification requise, on va envoyer courriel")
+                    etape_suivante = ProcessusNotificationRecue.avertir_usager.__name__
 
-        self.set_etape_suivante(ProcessusNotificationRecue.avertir_usager.__name__)
+        self.set_etape_suivante(etape_suivante)
 
         resultat_etape = dict()
         if len(nouveaux_documents_notification) > 0:
@@ -232,6 +239,16 @@ class ProcessusNotificationRecue(MGProcessus):
         return resultat_etape
 
     def avertir_usager(self):
+        configuration = self._controleur.configuration
+
+        sujet = "Notification %s" % configuration.nom_millegrille
+        contenu = "Nouvelle notification pour MilleGrille %s" % configuration.nom_millegrille
+
+        self._logger.info("Transmission notifcation par courriel: %s" % contenu)
+
+        smtp_dao = SmtpDAO(self._controleur.configuration)
+        smtp_dao.envoyer_notification(sujet, contenu)
+
         self.set_etape_suivante()  # Termine le processus
 
     def _creer_nouveau_document_(self, collection, filtre):
@@ -261,6 +278,8 @@ class ProcessusNotificationRecue(MGProcessus):
 
     def _traiter_notification_existante(self, collection, document_notification, regle):
         parametres = self.parametres
+
+        resultats = dict()
 
         filtre = {'_id': document_notification['_id']}
         operations = {
@@ -300,7 +319,9 @@ class ProcessusNotificationRecue(MGProcessus):
             })
 
             # Il faudrait aussi envoyer une notification a l'usager
+            resultats['notification_requise'] = True
 
+        return resultats
 
 class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
