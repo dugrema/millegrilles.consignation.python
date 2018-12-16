@@ -3,6 +3,9 @@
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles import Constantes
+from millegrilles.MGProcessus import MGProcessusTransaction
+
+import dateutil.parser
 
 
 class RapportsConstantes:
@@ -51,9 +54,23 @@ class GestionnaireRapports(GestionnaireDomaine):
     def get_nom_queue(self):
         return RapportsConstantes.QUEUE_NOM
 
+    def declencher_processus_persistance(self, routing_key, evenement):
+        routing_key_list = routing_key.split('.')
+
+        for nom_cle in TraitementMessageRapports.MAPPING_PROCESSUS:
+            if nom_cle in routing_key_list:
+                nom_processus = TraitementMessageRapports.MAPPING_PROCESSUS[nom_cle]
+                parametres = evenement.copy()
+                parametres['type_rapport'] = routing_key_list[-1]
+                self.demarrer_processus(nom_processus, parametres)
+
 
 class TraitementMessageRapports(BaseCallback):
     """ Classe helper pour traiter les transactions de la queue de notifications """
+
+    MAPPING_PROCESSUS = {
+        'SommaireRSS': 'millegrilles.domaines.Rapports:ProcessusSommaireRSS'
+    }
 
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.configuration)
@@ -66,6 +83,68 @@ class TraitementMessageRapports(BaseCallback):
         if evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
             self._gestionnaire.traiter_cedule(message_dict)
+        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+            # Verifier quel processus demarrer. On match la valeur dans la routing key.
+            routing_key = method.routing_key
+            routing_key_sansprefixe = routing_key.replace(
+                'destinataire.domaine.',
+                ''
+            )
+            # Trouver le processus a demarrer
+            self._gestionnaire.declencher_processus_persistance(routing_key_sansprefixe, message_dict)
+
         else:
             # Type d'evenement inconnu, on lance une exception
-            raise ValueError("Type d'evenement inconnu: %s" % evenement)
+            raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
+
+
+class ProcessusSommaireRSS(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        parametres = self.parametres
+        self._logger.debug('Rapport RSS processing, parametres: %s' % parametres)
+        doc_transaction = self.charger_transaction()
+
+        # Faire le rapport
+        url = doc_transaction['charge-utile']['url']
+        contenu_rss = doc_transaction['charge-utile']['rss']
+        entries = contenu_rss['entries']
+
+        date_maj = dateutil.parser.parse(contenu_rss['feed']['updated'])
+        watches = entries[0]['summary']
+        courant = entries[1]['summary']
+        previsions = []
+        for prevision in entries[2:4]:
+            prevision_texte = prevision['summary']
+            previsions.append(prevision_texte)
+        for prevision in entries[4:]:
+            prevision_texte = prevision['title']
+            previsions.append(prevision_texte)
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: str(parametres['type_rapport']),
+            'url': url
+        }
+
+        operation_set = {
+            'avertissements': watches,
+            'previsions_courantes': courant,
+            'previsions': previsions,
+            'mis_a_jour': date_maj
+        }
+
+        operations = {
+            '$set': operation_set,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': filtre
+        }
+
+        collection_rapports = self.document_dao().get_collection(RapportsConstantes.COLLECTION_NOM)
+        collection_rapports.update_one(filtre, operations, upsert=True)
+
+        self._logger.debug("Previsions: %s" % str(operation_set))
+
+        self.set_etape_suivante()
