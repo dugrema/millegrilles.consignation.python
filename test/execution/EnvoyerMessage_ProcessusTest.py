@@ -4,7 +4,7 @@
 
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.MessageDAO import PikaDAO
-from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
+from millegrilles.MGProcessus import MGPProcessusDemarreur
 from millegrilles.dao.DocumentDAO import MongoDAO
 
 def message_test():

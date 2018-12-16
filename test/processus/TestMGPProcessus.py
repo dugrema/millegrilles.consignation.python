@@ -1,6 +1,6 @@
 import unittest
-from millegrilles.processus.MGProcessus import MGPProcessusControleur, ErreurEtapeInconnue
-from millegrilles.processus.ProcessusTest import TestOrienteur
+from millegrilles.MGProcessus import MGPProcessusControleur, ErreurEtapeInconnue
+from test.processus.ProcessusTest import TestOrienteur
 from millegrilles import Constantes
 
 class MGPProcessusTest(unittest.TestCase):

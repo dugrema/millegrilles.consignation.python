@@ -3,14 +3,12 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.EmailDAO import SmtpDAO
 
 from bson import ObjectId
-from email.message import EmailMessage
 
 import datetime
-import smtplib
 
 
 class NotificationsConstantes:

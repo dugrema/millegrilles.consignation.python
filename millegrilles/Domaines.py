@@ -1,6 +1,6 @@
 # Module avec utilitaires generiques pour mgdomaines
 from millegrilles.dao.MessageDAO import JSONHelper
-from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
+from millegrilles.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
@@ -9,7 +9,7 @@ import json
 
 from pika.exceptions import ChannelClosed
 
-from threading import Thread, Event
+from threading import Event
 
 
 class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):

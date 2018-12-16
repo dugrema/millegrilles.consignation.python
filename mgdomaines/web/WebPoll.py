@@ -12,7 +12,7 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles import Constantes
-from millegrilles.processus.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 
 class WebPollConstantes:

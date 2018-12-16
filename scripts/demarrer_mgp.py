@@ -1,13 +1,15 @@
 import signal
 
-from millegrilles.processus.MGProcessus import MGPProcessusControleur
+from millegrilles.MGProcessus import MGPProcessusControleur
 
 # --- MAIN ---
 controleur = MGPProcessusControleur()
 
+
 def exit_gracefully(signum, frame):
     print("Arret de MGProcessusControleur")
     controleur.deconnecter()
+
 
 def main():
 
@@ -25,6 +27,7 @@ def main():
         exit_gracefully(None, None)
 
     print("MGProcessusControleur est arrete")
+
 
 if __name__=="__main__":
     main()
