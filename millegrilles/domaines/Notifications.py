@@ -71,8 +71,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         super().configurer()
         self._traitement_message = TraitementMessageNotification(self)
 
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_notification = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
+        nom_queue_notification = self.get_nom_queue()
 
         # Configurer la Queue pour les notifications sur RabbitMQ
         self.message_dao.channel.queue_declare(
@@ -82,19 +81,19 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_notification,
-            routing_key='%s.notification.#' % nom_millegrille
+            routing_key='notification.#'
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_notification,
-            routing_key='%s.destinataire.domaine.%s.#' % (nom_millegrille, NotificationsConstantes.QUEUE_SUFFIXE)
+            routing_key='destinataire.domaine.%s.#' % NotificationsConstantes.QUEUE_SUFFIXE
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_notification,
-            routing_key='%s.ceduleur.#' % nom_millegrille
+            routing_key='ceduleur.#'
         )
 
     def verifier_notifications_actionsdues(self, message):
@@ -157,7 +156,7 @@ class TraitementMessageNotification(BaseCallback):
             # Verifier quel processus demarrer. On match la valeur dans la routing key.
             routing_key = method.routing_key
             routing_key_sansprefixe = routing_key.replace(
-                '%s.destinataire.domaine.' % self._configuration.nom_millegrille,
+                'destinataire.domaine.',
                 ''
             )
             if routing_key_sansprefixe == NotificationsConstantes.TRANSACTION_ACTION_NOTIFICATION:

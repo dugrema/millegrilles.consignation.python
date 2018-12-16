@@ -23,8 +23,7 @@ class GestionnaireRapports(GestionnaireDomaine):
         super().configurer()
         self._traitement_message = TraitementMessageRapports(self)
 
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_rapports = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
+        nom_queue_rapports = self.get_nom_queue()
 
         # Configurer la Queue pour les rapports sur RabbitMQ
         self.message_dao.channel.queue_declare(
@@ -34,13 +33,13 @@ class GestionnaireRapports(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_rapports,
-            routing_key='%s.destinataire.domaine.%s.#' % (nom_millegrille, RapportsConstantes.QUEUE_NOM)
+            routing_key='destinataire.domaine.%s.#' % RapportsConstantes.QUEUE_NOM
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_rapports,
-            routing_key='%s.ceduleur.#' % nom_millegrille
+            routing_key='ceduleur.#'
         )
 
     def traiter_transaction(self, ch, method, properties, body):

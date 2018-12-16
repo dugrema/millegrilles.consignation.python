@@ -15,6 +15,7 @@ class TransactionConfiguration:
         self._mq_config = {
             Constantes.CONFIG_MQ_HOST: 'localhost',
             Constantes.CONFIG_MQ_PORT: '5671',
+            Constantes.CONFIG_MQ_VIRTUAL_HOST: Constantes.DEFAUT_MQ_VIRTUAL_HOST,
             Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_ERREURS_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
@@ -96,6 +97,10 @@ class TransactionConfiguration:
     @property
     def mq_port(self):
         return int(self._mq_config[Constantes.CONFIG_MQ_PORT])
+
+    @property
+    def mq_virtual_host(self):
+        return self._mq_config[Constantes.CONFIG_MQ_VIRTUAL_HOST]
 
     @property
     def mq_user(self):

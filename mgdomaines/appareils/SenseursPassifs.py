@@ -52,8 +52,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self._traitement_lecture = TraitementMessageLecture(self)
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
 
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_senseurspassifs = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
+        nom_queue_senseurspassifs = self.get_nom_queue()
 
         # Configurer la Queue pour SenseursPassifs sur RabbitMQ
         self.message_dao.channel.queue_declare(
@@ -68,13 +67,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_senseurspassifs,
-            routing_key='%s.destinataire.domaine.mgdomaines.appareils.SenseursPassifs.#' % nom_millegrille
+            routing_key='destinataire.domaine.mgdomaines.appareils.SenseursPassifs.#'
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_senseurspassifs,
-            routing_key='%s.ceduleur.#' % nom_millegrille
+            routing_key='ceduleur.#'
         )
 
     def traiter_backlog(self):
@@ -151,8 +150,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
      :param domaine: Domaine millegrilles    
      '''
     def transmettre_declencheur_domaine(self, domaine, dict_message):
-        nom_millegrille = self.configuration.nom_millegrille
-        routing_key = '%s.destinataire.domaine.%s' % (nom_millegrille, domaine)
+        routing_key = 'destinataire.domaine.%s' % domaine
         self.message_dao.transmettre_message(dict_message, routing_key)
 
 
@@ -170,7 +168,7 @@ class TraitementMessageLecture(BaseCallback):
         if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer.
             routing_key_sansprefixe = routing_key.replace(
-                '%s.destinataire.domaine.' % self._configuration.nom_millegrille,
+                'destinataire.domaine.',
                 ''
             )
             if routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:

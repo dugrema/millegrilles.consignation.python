@@ -84,8 +84,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         self._traitement_lecture = TraitementMessageWebPoll(self)
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck
 
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_webpoll = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.get_nom_queue())
+        nom_queue_webpoll = self.get_nom_queue()
 
         # Configurer la Queue pour WebPoll sur RabbitMQ
         self.message_dao.channel.queue_declare(
@@ -100,13 +99,13 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_webpoll,
-            routing_key='%s.destinataire.domaine.mgdomaines.web.WebPoll.#' % nom_millegrille
+            routing_key='destinataire.domaine.mgdomaines.web.WebPoll.#'
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_webpoll,
-            routing_key='%s.ceduleur.#' % nom_millegrille
+            routing_key='ceduleur.#'
         )
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas

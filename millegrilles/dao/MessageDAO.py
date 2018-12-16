@@ -3,9 +3,7 @@ import codecs
 import pika
 import json
 import traceback
-import threading
 import logging
-import datetime
 
 from threading import Lock
 
@@ -54,6 +52,7 @@ class PikaDAO:
                 pika.ConnectionParameters(
                     host=self.configuration.mq_host,
                     port=self.configuration.mq_port,
+                    virtual_host=self.configuration.nom_millegrille,
                     heartbeat=60,
                     credentials=credentials,
                     ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
@@ -79,15 +78,11 @@ class PikaDAO:
 
         # S'assurer que toutes les queues durables existes. Ces queues doivent toujours exister
         # pour eviter que des messages de donnees originales ne soient perdus.
-        nom_millegrille = self.configuration.nom_millegrille
         nom_echange_evenements = self.configuration.exchange_evenements
         nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
         nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
         nom_q_mgp_processus = self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
-
-        # nom_q_generateur_documents = self.queuename_generateur_documents()
-        nom_q_notifications = self.queuename_notifications()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
         self.channel.exchange_declare(
@@ -104,7 +99,7 @@ class PikaDAO:
         self.channel.queue_bind(
             exchange=nom_echange_evenements,
             queue=nom_q_nouvelles_transactions,
-            routing_key='%s.transaction.nouvelle' % nom_millegrille
+            routing_key='transaction.nouvelle'
         )
 
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
@@ -115,7 +110,7 @@ class PikaDAO:
         self.channel.queue_bind(
             exchange=nom_echange_evenements,
             queue=nom_q_mgp_processus,
-            routing_key='%s.mgpprocessus.#' % nom_millegrille
+            routing_key='mgpprocessus.#'
         )
 
         # Creer la Q d'erreurs dans les transactions pour cette MilleGrille
@@ -126,7 +121,7 @@ class PikaDAO:
         self.channel.queue_bind(
             exchange=nom_echange_evenements,
             queue=nom_q_erreurs_transactions,
-            routing_key='%s.transaction.erreur' % nom_millegrille
+            routing_key='transaction.erreur'
         )
 
         # Creer la Q d'erreurs dans les processus pour cette MilleGrille
@@ -137,18 +132,7 @@ class PikaDAO:
         self.channel.queue_bind(
             exchange=nom_echange_evenements,
             queue=nom_q_erreurs_processus,
-            routing_key='%s.processus.erreur' % nom_millegrille
-        )
-
-        # Creer la Q et bindings pour les notifications
-        self.channel.queue_declare(
-            queue=nom_q_notifications,
-            durable=True)
-
-        self.channel.queue_bind(
-            exchange=nom_echange_evenements,
-            queue=nom_q_notifications,
-            routing_key='%s.notification.#' % nom_millegrille
+            routing_key='processus.erreur'
         )
 
     def start_consuming(self):
@@ -162,11 +146,11 @@ class PikaDAO:
     ''' Prepare la reception de message '''
 
     def enregistrer_callback(self, queue, callback):
-        queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, queue)
+        queue_name = queue
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
-        queue_name = 'mg.%s.%s' % (self.configuration.nom_millegrille, self.configuration.queue_nouvelles_transactions)
+        queue_name = self.configuration.queue_nouvelles_transactions
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
         self.start_consuming()
 
@@ -200,12 +184,12 @@ class PikaDAO:
         self.in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction):
-        routing_key = '%s.transaction.nouvelle' % self.configuration.nom_millegrille
+        routing_key = 'transaction.nouvelle'
         # Utiliser delivery mode 2 (persistent) pour les transactions
         self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
 
     def transmettre_notification(self, document_transaction, sub_routing_key):
-        routing_key = '%s.notification.%s' % (self.configuration.nom_millegrille, sub_routing_key)
+        routing_key = 'notification.%s' % sub_routing_key
         # Utiliser delivery mode 2 (persistent) pour les notifications
         self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
 
@@ -221,9 +205,9 @@ class PikaDAO:
         if document_transaction is not None and document_transaction[
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine") is not None:
             nom_domaine = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine")
-            routing_key = '%s.destinataire.domaine.%s' % (self.configuration.nom_millegrille, nom_domaine)
+            routing_key = 'destinataire.domaine.%s' % nom_domaine
         else:
-            routing_key = '%s.transaction.persistee' % self.configuration.nom_millegrille
+            routing_key = 'transaction.persistee'
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(
@@ -275,7 +259,7 @@ class PikaDAO:
         ind_routing_key = '.'.join(indicateurs)
         if len(ind_routing_key) > 0:
             ind_routing_key = '.%s' % ind_routing_key
-        routing_key = '%s.ceduleur.minute%s' % (self.configuration.nom_millegrille, ind_routing_key)
+        routing_key = 'ceduleur.minute%s' % ind_routing_key
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(
@@ -302,9 +286,8 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        routing_key = '%s.mgpprocessus.%s.%s' % \
-                      (self.configuration.nom_millegrille,
-                       nom_processus,
+        routing_key = 'mgpprocessus.%s.%s' % \
+                      (nom_processus,
                        nom_etape)
 
         with self._lock_transmettre_message:
@@ -336,7 +319,7 @@ class PikaDAO:
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                       routing_key='%s.transaction.erreur' % self.configuration.nom_millegrille,
+                                       routing_key='transaction.erreur',
                                        body=message_utf8)
 
     '''
@@ -363,7 +346,7 @@ class PikaDAO:
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
-                                       routing_key='%s.processus.erreur' % self.configuration.nom_millegrille,
+                                       routing_key='processus.erreur',
                                        body=message_utf8)
 
     # Mettre la classe en etat d'erreur
@@ -392,26 +375,17 @@ class PikaDAO:
             self.channel = None
             self.connectionmq = None
 
-    def _queuename(self, nom_queue):
-        return "mg.%s.%s" % (self.configuration.nom_millegrille, nom_queue)
-
     def queuename_nouvelles_transactions(self):
-        return self._queuename(self.configuration.queue_nouvelles_transactions)
+        return self.configuration.queue_nouvelles_transactions
 
     def queuename_erreurs_transactions(self):
-        return self._queuename(self.configuration.queue_erreurs_transactions)
+        return self.configuration.queue_erreurs_transactions
 
     def queuename_erreurs_processus(self):
-        return self._queuename(self.configuration.queue_erreurs_processus)
+        return self.configuration.queue_erreurs_processus
 
     def queuename_mgp_processus(self):
-        return self._queuename(self.configuration.queue_mgp_processus)
-
-    def queuename_generateur_documents(self):
-        return self._queuename(self.configuration.queue_generateur_documents)
-
-    def queuename_notifications(self):
-        return self._queuename(self.configuration.queue_notifications)
+        return self.configuration.queue_mgp_processus
 
 
 # Classe avec utilitaires pour JSON
@@ -469,7 +443,7 @@ class BaseCallback:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         ch.basic_publish(exchange=self._configuration.exchange_evenements,
-                         routing_key='%s.processus.erreur' % self._configuration.nom_millegrille,
+                         routing_key='processus.erreur',
                          body=message_utf8)
 
     ''' Methode qui peut etre remplacee dans la sous-classe '''

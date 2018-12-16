@@ -26,7 +26,6 @@ class TransactionHelper:
         if resultat.modified_count != 1:
             raise Exception("Erreur ajout evenement transaction: %s" % str(resultat))
 
-
     def sauvegarder_nouvelle_transaction(self, _collection_transactions, enveloppe_transaction):
 
         # Ajouter l'element evenements et l'evenement de persistance
@@ -40,5 +39,6 @@ class TransactionHelper:
         }
 
         resultat = _collection_transactions.insert_one(enveloppe_transaction)
-        id = resultat.inserted_id
-        return id
+        doc_id = resultat.inserted_id
+
+        return doc_id
