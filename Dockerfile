@@ -18,4 +18,4 @@ RUN $BUILD_FOLDER/scripts/setup.sh
 
 WORKDIR /opt/millegrilles/dist
 ENTRYPOINT ["python3"]
-CMD ["demarrer.py"]
+CMD ["demarrer_transaction.py"]
