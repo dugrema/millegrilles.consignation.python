@@ -5,8 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" beforeDir="false" afterPath="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/image_info.txt" beforeDir="false" afterPath="$PROJECT_DIR$/image_info.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -19,23 +19,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/millegrilles/dao/MessageDAO.py">
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/image_info.txt">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="90">
-              <caret line="6" lean-forward="true" selection-start-line="6" selection-end-line="6" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="15">
-              <caret line="201" selection-start-line="201" selection-end-line="201" />
-              <folding>
-                <element signature="e#40#75#0" expanded="true" />
-              </folding>
+              <caret line="6" column="7" selection-start-line="6" selection-start-column="7" selection-end-line="6" selection-end-column="7" />
             </state>
           </provider>
         </entry>
@@ -69,7 +57,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/millegrilles/transaction/GenerateurTransaction.py" />
         <option value="$PROJECT_DIR$/test/processus/TestOrienteurTransaction.py" />
         <option value="$PROJECT_DIR$/millegrilles/processus/OrienteurTransaction.py" />
         <option value="$PROJECT_DIR$/millegrilles/processus/Senseur.py" />
@@ -95,7 +82,6 @@
         <option value="$PROJECT_DIR$/mgdomaine/appareils/SenseurLecture.py" />
         <option value="$PROJECT_DIR$/millegrilles/transaction/ConsignateurTransaction.py" />
         <option value="$PROJECT_DIR$/millegrilles/processus/ProcessusTest.py" />
-        <option value="$PROJECT_DIR$/test/processus/TestMGPProcessus.py" />
         <option value="$PROJECT_DIR$/test/execution/test_divers.py" />
         <option value="$PROJECT_DIR$/test/execution/EnvoyerMessage_ProcessusTest.py" />
         <option value="$USER_HOME$/git/MilleGrilles.consignation/util/python/date_tests.py" />
@@ -108,8 +94,6 @@
         <option value="$PROJECT_DIR$/test/execution/MailSend.py" />
         <option value="$PROJECT_DIR$/millegrilles/dao/EmailDAO.py" />
         <option value="$PROJECT_DIR$/millegrilles/processus/MGProcessus.py" />
-        <option value="$PROJECT_DIR$/image_info.txt" />
-        <option value="$PROJECT_DIR$/setup.py" />
         <option value="$PROJECT_DIR$/Dockerfile" />
         <option value="$PROJECT_DIR$/millegrilles/Constantes.py" />
         <option value="$PROJECT_DIR$/millegrilles/dao/Configuration.py" />
@@ -120,6 +104,10 @@
         <option value="$PROJECT_DIR$/millegrilles/Declencheur.py" />
         <option value="$PROJECT_DIR$/millegrilles/dao/MessageDAO.py" />
         <option value="$PROJECT_DIR$/millegrilles/domaines/Notifications.py" />
+        <option value="$PROJECT_DIR$/test/processus/TestMGPProcessus.py" />
+        <option value="$PROJECT_DIR$/scripts/demarrer_mgp.py" />
+        <option value="$PROJECT_DIR$/setup.py" />
+        <option value="$PROJECT_DIR$/image_info.txt" />
       </list>
     </option>
   </component>
@@ -150,14 +138,18 @@
             <path>
               <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
               <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
-              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
-              <item name="dao" type="462c0819:PsiDirectoryNode" />
+              <item name="scripts" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
               <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
-              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
-              <item name="domaines" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
+              <item name="test" type="462c0819:PsiDirectoryNode" />
+              <item name="processus" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -182,10 +174,11 @@
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/millegrilles" />
+      <recent name="$PROJECT_DIR$/test/processus" />
       <recent name="$PROJECT_DIR$/mgdomaine/appareils" />
       <recent name="$PROJECT_DIR$/millegrilles/transaction" />
       <recent name="$PROJECT_DIR$/millegrilles/dao" />
-      <recent name="$PROJECT_DIR$/test/execution" />
     </key>
   </component>
   <component name="RunDashboard">
@@ -200,7 +193,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.Notifications_ExempleNotification">
+  <component name="RunManager" selected="Python.Domaines">
     <configuration name="Ceduleur" type="PythonConfigurationType" factoryName="Python">
       <module name="MilleGrilles.consignation.python" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -330,11 +323,11 @@
         <env name="MG_EMAIL_TO" value="mathieu.dugre@me.com" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles/processus" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/millegrilles" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/processus/MGProcessus.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/millegrilles/MGProcessus.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -468,20 +461,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1536693472080</updated>
-    </task>
-    <task id="LOCAL-00085" summary="Generation de rapport et sauvegarde des resultats.">
-      <created>1537643841103</created>
-      <option name="number" value="00085" />
-      <option name="presentableId" value="LOCAL-00085" />
-      <option name="project" value="LOCAL" />
-      <updated>1537643841103</updated>
-    </task>
-    <task id="LOCAL-00086" summary="Suppression module Senseurs dans processus, jamais utilise.">
-      <created>1537644005636</created>
-      <option name="number" value="00086" />
-      <option name="presentableId" value="LOCAL-00086" />
-      <option name="project" value="LOCAL" />
-      <updated>1537644005636</updated>
     </task>
     <task id="LOCAL-00087" summary="Ajout GenerateurPageNoeudsSenseurs.">
       <created>1537662040014</created>
@@ -812,7 +791,21 @@
       <option name="project" value="LOCAL" />
       <updated>1544972944833</updated>
     </task>
-    <option name="localTasksCounter" value="134" />
+    <task id="LOCAL-00134" summary="Fix bug notification, set etape finale par defaut si aucun avertissement necessaire.">
+      <created>1544973715481</created>
+      <option name="number" value="00134" />
+      <option name="presentableId" value="LOCAL-00134" />
+      <option name="project" value="LOCAL" />
+      <updated>1544973715481</updated>
+    </task>
+    <task id="LOCAL-00135" summary="Refactoring packages.&#10;&#10;Supprime package processus (MGProcessus deplace vers package millegrilles).&#10;Deplace TestMGPProcessus vers repertoire unit tests.">
+      <created>1544978267832</created>
+      <option name="number" value="00135" />
+      <option name="presentableId" value="LOCAL-00135" />
+      <option name="project" value="LOCAL" />
+      <updated>1544978267832</updated>
+    </task>
+    <option name="localTasksCounter" value="136" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -914,8 +907,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Change QoS Pika a 1 message.&#10;&#10;Quand un grand volume etait envoye, tous les messages etaient lus en meme temps et les ACK ne se rendaient pas." />
-    <MESSAGE value="Ajout message persistance pour transactions." />
     <MESSAGE value="Update QoS (5 messages), desactivation rapports.&#10;&#10;Les rapports statistiques doivent etre cedules, ils ne devraient pas etre mis a jour pour chaque changement de document." />
     <MESSAGE value="Ajout flag _actif." />
     <MESSAGE value="Deplacement du processus dans Appareils.py vers repertoire domaine.&#10;&#10;Il va rester a corriger le chargement des processus pour supporter l'utilisation de package global." />
@@ -939,23 +930,11 @@
     <MESSAGE value="Version 0.10.1." />
     <MESSAGE value="Cleanup fichiers demarrage, vieux scripts." />
     <MESSAGE value="Refactoring RabbitMQ, utilisation vhost par millegrille.&#10;&#10;Permet d'utiliser des routing keys/nom queue statiques, ils sont uniques par vhost." />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactoring RabbitMQ, utilisation vhost par millegrille.&#10;&#10;Permet d'utiliser des routing keys/nom queue statiques, ils sont uniques par vhost." />
+    <MESSAGE value="Fix bug notification, set etape finale par defaut si aucun avertissement necessaire." />
+    <MESSAGE value="Refactoring packages.&#10;&#10;Supprime package processus (MGProcessus deplace vers package millegrilles).&#10;Deplace TestMGPProcessus vers repertoire unit tests." />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactoring packages.&#10;&#10;Supprime package processus (MGProcessus deplace vers package millegrilles).&#10;Deplace TestMGPProcessus vers repertoire unit tests." />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/test/processus/TestMGPProcessus.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-465">
-          <caret line="14" column="12" selection-start-line="14" selection-start-column="12" selection-end-line="14" selection-end-column="12" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/execution/test_divers.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="6" column="59" selection-start-line="6" selection-start-column="59" selection-end-line="6" selection-end-column="59" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/test/execution/EnvoyerMessage_ProcessusTest.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="240">
@@ -1066,13 +1045,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/setup.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="60">
-          <caret line="4" column="19" selection-start-line="4" selection-start-column="19" selection-end-line="4" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/scripts/setup.sh">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="135">
@@ -1080,24 +1052,8 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/image_info.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="6" column="7" selection-start-line="6" selection-start-column="7" selection-end-line="6" selection-end-column="7" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/mgdomaines/appareils/AffichagesPassifs.py">
       <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/mgdomaines/appareils/ProtocoleSenseurs.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <folding>
-            <element signature="e#0#13#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/scripts/demarrer_declencheur.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -1181,13 +1137,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1139">
-          <caret line="154" lean-forward="true" selection-start-line="154" selection-end-line="154" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/mgdomaines/web/WebPoll.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-2979">
@@ -1205,14 +1154,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/millegrilles/processus/MGProcessus.py">
+    <entry file="file://$PROJECT_DIR$/millegrilles/MGProcessus.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="5268">
           <caret line="366" column="30" selection-start-line="366" selection-start-column="30" selection-end-line="366" selection-end-column="30" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/millegrilles/processus/ProcessusTest.py">
+    <entry file="file://$PROJECT_DIR$/test/processus/ProcessusTest.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="345">
           <caret line="25" column="16" selection-start-line="25" selection-start-column="13" selection-end-line="25" selection-end-column="16" />
@@ -1268,11 +1217,58 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="15">
-          <caret line="201" selection-start-line="201" selection-end-line="201" />
+        <state relative-caret-position="285">
+          <caret line="231" column="47" lean-forward="true" selection-start-line="231" selection-start-column="47" selection-end-line="231" selection-end-column="47" />
           <folding>
             <element signature="e#40#75#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="992" column="42" selection-start-line="992" selection-start-column="6" selection-end-line="992" selection-end-column="42" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mgdomaines/appareils/ProtocoleSenseurs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <folding>
+            <element signature="e#0#13#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/processus/TestMGPProcessus.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="54" selection-start-line="2" selection-start-column="41" selection-end-line="2" selection-end-column="54" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/scripts/demarrer_mgp.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="165">
+          <caret line="11" lean-forward="true" selection-start-line="11" selection-end-line="11" />
+          <folding>
+            <element signature="e#0#13#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/setup.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="4" column="19" selection-start-line="4" selection-start-column="19" selection-end-line="4" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/image_info.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="6" column="7" selection-start-line="6" selection-start-column="7" selection-end-line="6" selection-end-column="7" />
         </state>
       </provider>
     </entry>
