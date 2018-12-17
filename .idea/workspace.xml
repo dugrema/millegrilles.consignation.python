@@ -4,7 +4,7 @@
     <option name="SCOPE_TYPE" value="3" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="v0.10.4.">
+    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="Workspace changes.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -17,7 +17,17 @@
     <favorites_list name="MilleGrilles.consignation.python" />
   </component>
   <component name="FileEditorManager">
-    <leaf />
+    <leaf>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/.gitignore">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="60">
+              <caret line="4" lean-forward="true" selection-start-line="4" selection-end-line="4" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+    </leaf>
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -46,7 +56,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/millegrilles/processus/Senseur.py" />
         <option value="$PROJECT_DIR$/mg_domaine/appareils/AppareilInformationDocumentHelper.py" />
         <option value="$PROJECT_DIR$/test/mg_domaine/AppareilInformationDocumentHelper_Test.py" />
         <option value="$PROJECT_DIR$/test/mgdomaine/AppareilInformationDocumentHelper_Test.py" />
@@ -97,6 +106,7 @@
         <option value="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" />
         <option value="$PROJECT_DIR$/image_info.txt" />
         <option value="$PROJECT_DIR$/setup.py" />
+        <option value="$PROJECT_DIR$/.gitignore" />
       </list>
     </option>
   </component>
@@ -112,7 +122,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -135,6 +144,7 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -477,13 +487,6 @@
       <option name="presentableId" value="Default" />
       <updated>1536693472080</updated>
     </task>
-    <task id="LOCAL-00092" summary="Exploration des formats d'aggregation.">
-      <created>1537734153170</created>
-      <option name="number" value="00092" />
-      <option name="presentableId" value="LOCAL-00092" />
-      <option name="project" value="LOCAL" />
-      <updated>1537734153170</updated>
-    </task>
     <task id="LOCAL-00093" summary="Identification methode pour avoir une fenetre de temps pour aggregation.">
       <created>1537734987898</created>
       <option name="number" value="00093" />
@@ -820,7 +823,14 @@
       <option name="project" value="LOCAL" />
       <updated>1545001856973</updated>
     </task>
-    <option name="localTasksCounter" value="141" />
+    <task id="LOCAL-00141" summary="Workspace changes.">
+      <created>1545057654317</created>
+      <option name="number" value="00141" />
+      <option name="presentableId" value="LOCAL-00141" />
+      <option name="project" value="LOCAL" />
+      <updated>1545057654318</updated>
+    </task>
+    <option name="localTasksCounter" value="142" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -857,6 +867,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="1920" y="410" width="1920" height="1017" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.18114798" />
       <window_info id="Structure" order="1" sideWeight="0.5016575" side_tool="true" weight="0.23417291" />
@@ -921,7 +932,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Creation utilitaire MariaDB pour exporter lectures senseurs." />
     <MESSAGE value="Retrait de la notion d'entree de processus (Q)." />
     <MESSAGE value="Changement de l'encodage du nom du processus. &#10;&#10;Maintenant selon la forme mgdomaines_appareils_senseurs:SenseurTemp." />
     <MESSAGE value="Creation test pour envoyer message initialisation.&#10;&#10;Fix du ProcessusHelper, ne chargeait pas documentdao._mg_database" />
@@ -946,10 +956,10 @@
     <MESSAGE value="Utilisation titre plutot que summary pour apres prochains 12 heures." />
     <MESSAGE value="Fix setup (enleve processus), v0.10.3." />
     <MESSAGE value="v0.10.4." />
-    <option name="LAST_COMMIT_MESSAGE" value="v0.10.4." />
+    <MESSAGE value="Workspace changes." />
+    <option name="LAST_COMMIT_MESSAGE" value="Workspace changes." />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
     <entry file="file://$PROJECT_DIR$/test/processus/TestOrienteurTransaction.py" />
     <entry file="file://$PROJECT_DIR$/millegrilles/dao/InformationDocumentHelper.py" />
     <entry file="file://$PROJECT_DIR$/millegrilles/dao/InformationGenereeDocumentHelper.py" />
@@ -1261,6 +1271,13 @@
           <folding>
             <element signature="e#40#75#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/.gitignore">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="4" lean-forward="true" selection-start-line="4" selection-end-line="4" />
         </state>
       </provider>
     </entry>
