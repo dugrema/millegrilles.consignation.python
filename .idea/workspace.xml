@@ -4,10 +4,8 @@
     <option name="SCOPE_TYPE" value="3" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="Utilisation titre plutot que summary pour apres prochains 12 heures.">
+    <list default="true" id="b76f85d2-5ee3-4415-8686-5769d1bf6b86" name="Default Changelist" comment="v0.10.4.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/image_info.txt" beforeDir="false" afterPath="$PROJECT_DIR$/image_info.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -19,26 +17,7 @@
     <favorites_list name="MilleGrilles.consignation.python" />
   </component>
   <component name="FileEditorManager">
-    <leaf>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/setup.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="60">
-              <caret line="4" column="19" selection-start-line="4" selection-start-column="19" selection-end-line="4" selection-end-column="19" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/image_info.txt">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
-              <caret line="6" column="7" selection-start-line="6" selection-start-column="7" selection-end-line="6" selection-end-column="7" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-    </leaf>
+    <leaf />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -116,8 +95,8 @@
         <option value="$PROJECT_DIR$/requirements.txt" />
         <option value="$PROJECT_DIR$/test/date_timezones_test.py" />
         <option value="$PROJECT_DIR$/millegrilles/domaines/Rapports.py" />
-        <option value="$PROJECT_DIR$/setup.py" />
         <option value="$PROJECT_DIR$/image_info.txt" />
+        <option value="$PROJECT_DIR$/setup.py" />
       </list>
     </option>
   </component>
@@ -133,6 +112,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -145,11 +125,16 @@
               <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
               <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
             </path>
+            <path>
+              <item name="MilleGrilles.consignation.python_2" type="b2602c69:ProjectViewProjectNode" />
+              <item name="MilleGrilles.consignation.python_2" type="462c0819:PsiDirectoryNode" />
+              <item name="millegrilles" type="462c0819:PsiDirectoryNode" />
+              <item name="domaines" type="462c0819:PsiDirectoryNode" />
+            </path>
           </expand>
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -470,8 +455,8 @@
       <item itemvalue="Python.ConsignateurTransaction" />
       <item itemvalue="Python.Notifications_ExempleNotification" />
       <item itemvalue="Python.MailSend" />
-      <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
       <item itemvalue="Python.date_timezones_test" />
+      <item itemvalue="Python tests.Unittests in TestMGPProcessus.py" />
     </list>
     <recent_temporary>
       <list>
@@ -491,20 +476,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1536693472080</updated>
-    </task>
-    <task id="LOCAL-00090" summary="Modification approche aux documents historiques.&#10;&#10;Mettre chemin courant pour document courant, historique pour tous les documents recus. Il n'y a plus d'aggregation des documents historiques par jour.">
-      <created>1537731030266</created>
-      <option name="number" value="00090" />
-      <option name="presentableId" value="LOCAL-00090" />
-      <option name="project" value="LOCAL" />
-      <updated>1537731030266</updated>
-    </task>
-    <task id="LOCAL-00091" summary="Test nouvelle approche historique.">
-      <created>1537731206712</created>
-      <option name="number" value="00091" />
-      <option name="presentableId" value="LOCAL-00091" />
-      <option name="project" value="LOCAL" />
-      <updated>1537731206712</updated>
     </task>
     <task id="LOCAL-00092" summary="Exploration des formats d'aggregation.">
       <created>1537734153170</created>
@@ -835,7 +806,21 @@
       <option name="project" value="LOCAL" />
       <updated>1544998269055</updated>
     </task>
-    <option name="localTasksCounter" value="139" />
+    <task id="LOCAL-00139" summary="Fix setup (enleve processus), v0.10.3.">
+      <created>1545001164100</created>
+      <option name="number" value="00139" />
+      <option name="presentableId" value="LOCAL-00139" />
+      <option name="project" value="LOCAL" />
+      <updated>1545001164100</updated>
+    </task>
+    <task id="LOCAL-00140" summary="v0.10.4.">
+      <created>1545001856972</created>
+      <option name="number" value="00140" />
+      <option name="presentableId" value="LOCAL-00140" />
+      <option name="project" value="LOCAL" />
+      <updated>1545001856973</updated>
+    </task>
+    <option name="localTasksCounter" value="141" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -872,7 +857,6 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="1920" y="410" width="1920" height="1017" extended-state="0" />
-    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49834254" visible="true" weight="0.18114798" />
       <window_info id="Structure" order="1" sideWeight="0.5016575" side_tool="true" weight="0.23417291" />
@@ -937,8 +921,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Suppression Appareils.py, le code est maintenant sous SenseurLecture." />
-    <MESSAGE value="Cleanup, deplacement fichiers mgdomaines vers nouveau git rep." />
     <MESSAGE value="Creation utilitaire MariaDB pour exporter lectures senseurs." />
     <MESSAGE value="Retrait de la notion d'entree de processus (Q)." />
     <MESSAGE value="Changement de l'encodage du nom du processus. &#10;&#10;Maintenant selon la forme mgdomaines_appareils_senseurs:SenseurTemp." />
@@ -962,7 +944,9 @@
     <MESSAGE value="Version 0.10.2." />
     <MESSAGE value="Ajout rapport sommaire pour previsions meteo Ottawa." />
     <MESSAGE value="Utilisation titre plutot que summary pour apres prochains 12 heures." />
-    <option name="LAST_COMMIT_MESSAGE" value="Utilisation titre plutot que summary pour apres prochains 12 heures." />
+    <MESSAGE value="Fix setup (enleve processus), v0.10.3." />
+    <MESSAGE value="v0.10.4." />
+    <option name="LAST_COMMIT_MESSAGE" value="v0.10.4." />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/millegrilles/transaction/OrienteurTransaction.py" />
@@ -1201,16 +1185,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="540">
-          <caret line="159" selection-start-line="152" selection-end-line="159" />
-          <folding>
-            <element signature="e#40#75#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/mgdomaines/appareils/SenseursPassifs.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="507">
@@ -1266,6 +1240,13 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/image_info.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="90">
+          <caret line="6" column="7" selection-start-line="6" selection-start-column="7" selection-end-line="6" selection-end-column="7" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/setup.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="60">
@@ -1273,10 +1254,13 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/image_info.txt">
+    <entry file="file://$PROJECT_DIR$/millegrilles/domaines/Notifications.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="6" column="7" selection-start-line="6" selection-start-column="7" selection-end-line="6" selection-end-column="7" />
+        <state relative-caret-position="648">
+          <caret line="132" column="93" lean-forward="true" selection-start-line="132" selection-start-column="93" selection-end-line="132" selection-end-column="93" />
+          <folding>
+            <element signature="e#40#75#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
