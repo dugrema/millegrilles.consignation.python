@@ -128,6 +128,10 @@ class MGPProcessusControleur(BaseCallback):
     def message_dao(self):
         return self._message_dao
 
+    @property
+    def configuration(self):
+        return self._configuration
+
     """ 
     Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs. 
     
@@ -338,14 +342,20 @@ class MGPProcessusDemarreur:
 
         self._processus_helper = ProcessusHelper(document_dao._mg_database)
 
-    ''' Demarre un processus - par defaut c'est un MGPProcessus
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    :param processus_a_declencher: Pour un MGPProcessus, nom qualifie d'une classe selon: modA_modB[_...]:Classe
-    :param dictionnaire_evenement: Le message qui declenche ce processus.
-    :param moteur: Nom du moteur (si autre que MGPProcessus)
-    '''
     def demarrer_processus(self, processus_a_declencher, dictionnaire_evenement, moteur="MGPProcessus"):
+        """
+        Demarre un processus - par defaut c'est un MGPProcessus
 
+        :param processus_a_declencher: Pour un MGPProcessus, nom qualifie d'une classe selon: modA_modB[_...]:Classe
+        :param dictionnaire_evenement: Le message qui declenche ce processus.
+        :param moteur: Nom du moteur (si autre que MGPProcessus)
+        :return:
+        """
+
+        self._logger.debug(
+            "Demarrer processus: %s. Parametres: %s" % (processus_a_declencher, str(dictionnaire_evenement)))
         id_document = dictionnaire_evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO)
 
         try:

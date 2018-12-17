@@ -1,6 +1,6 @@
 # Module avec utilitaires generiques pour mgdomaines
 from millegrilles.dao.MessageDAO import JSONHelper
-from millegrilles.processus.MGProcessus import MGPProcessusDemarreur
+from millegrilles.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
@@ -9,7 +9,7 @@ import json
 
 from pika.exceptions import ChannelClosed
 
-from threading import Thread, Event
+from threading import Event
 
 
 class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
@@ -123,7 +123,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
             try:
                 gestionnaire.arreter()
             except ChannelClosed as ce:
-                self._logger.debug("Channel already closed: %s" % str(ce))
+                self._logger.debug("Channel deja ferme: %s" % str(ce))
             except Exception as e:
                 self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__name__, str(e)))
 
@@ -143,8 +143,10 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
 
         # Surveiller les gestionnaires - si un gestionnaire termine son execution, on doit tout fermer
         while not self._stop_event.is_set():
+            self.message_dao.start_consuming()  # Blocking
+            self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
 
-            self._stop_event.wait(20)  # Boucler toutes les 20 secondes
+            self._stop_event.wait(5)  # Boucler toutes les 20 secondes
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """
@@ -182,38 +184,24 @@ class GestionnaireDomaine:
 
     def configurer(self):
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
-        pass
+        self.demarreur_processus = MGPProcessusDemarreur(self.message_dao, self.document_dao)
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
         self._logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
-        self._thread = Thread(target=self.executer)
-        self._thread.start()
-        self._logger.debug("Debut demarree pour gestionnaire %s" % self.__class__.__name__)
+        self.configurer()
+        self.traiter_backlog()
+        self._logger.info("Backlog traite, on enregistre la queue %s" % self.get_nom_queue())
+        self.enregistrer_queue(self.get_nom_queue())
 
     def traiter_backlog(self):
         """ Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. """
         pass
 
     ''' Demarre le traitement des messages pour le domaine '''
-    def demarrer_traitement_messages_blocking(self, queue_name):
-        with self.message_dao.connecter(separer=True) as connexion_mq:
-            self.connexion_mq = connexion_mq  # Garde une copie pour permettre de fermer de l'exterieur
-            self.channel_mq = connexion_mq.channel()
-            try:
-                self.channel_mq.basic_consume(self.traiter_transaction, queue=queue_name, no_ack=False)
-                self._logger.info("Debut ecoute sur queue %s" % queue_name)
-                self.channel_mq.start_consuming()
-
-                if not self._arret_en_cours:
-                    self._logger.warning("Retour de queue %s start_consuming()" % queue_name)
-            except OSError as oserr:
-                if not self._arret_en_cours:
-                    self._logger.exception(
-                        "erreur start_consuming, probablement du a la fermeture de la queue: %s" % str(oserr)
-                    )
-        self.channel_mq = None
-        self.connexion_mq = None
+    def enregistrer_queue(self, queue_name):
+        self._logger.info("Enregistrement queue %s" % queue_name)
+        self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_transaction)
 
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
@@ -235,24 +223,6 @@ class GestionnaireDomaine:
     '''
     def get_nom_queue(self):
         raise NotImplementedError("Methode non-implementee")
-
-    def executer(self):
-        self._logger.info("Debut execution gestionnaire de domaine %s" % self.__class__.__name__)
-        # Doit creer le demarreur ici parce que la connexion a Mongo n'est pas prete avant
-        self.demarreur_processus = MGPProcessusDemarreur(self.message_dao, self.document_dao)
-
-        self.traiter_backlog()
-        while not self._stop_event.is_set():
-            try:
-                self.demarrer_traitement_messages_blocking(self.get_nom_queue())
-            except Exception as e:
-                self._logger.exception(
-                    "Erreur durant reception message - on va tenter de se reconnecter: %s" % str(e)
-                )
-                if not self._stop_event.is_set():
-                    self._stop_event.wait(30)
-
-        # Indiquer au gestionnaire millegrilles que ce domaine a termine
 
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")

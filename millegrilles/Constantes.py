@@ -5,6 +5,7 @@ CONFIG_FICHIER_JSON = 'mg_config_json'  # Fichier de configuration JSON a combin
 # Configuration MQ
 CONFIG_MQ_HOST = 'mq_host'
 CONFIG_MQ_PORT = 'mq_port'
+CONFIG_MQ_VIRTUAL_HOST = 'mq_virtual_host'
 CONFIG_MQ_EXCHANGE_EVENEMENTS = 'mq_exchange_evenements'
 CONFIG_MQ_USER = 'mq_user'
 CONFIG_MQ_PASSWORD = 'mq_password'
@@ -17,6 +18,7 @@ CONFIG_QUEUE_GENERATEUR_DOCUMENTS = 'mq_queue_generateur_documents'
 CONFIG_QUEUE_NOTIFICATIONS = 'mq_queue_notifications'
 
 DEFAUT_MQ_EXCHANGE_EVENEMENTS = 'millegrilles.evenements'
+DEFAUT_MQ_VIRTUAL_HOST = '/'
 DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS = 'nouvelles_transactions'
 DEFAUT_QUEUE_ERREURS_TRANSACTIONS = 'erreurs_transactions'
 DEFAUT_QUEUE_MGP_PROCESSUS = 'mgp_processus'
@@ -38,6 +40,14 @@ CONFIG_NOM_MILLEGRILLE = 'nom_millegrille'
 
 # Domaines
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
+
+# Email notifications
+CONFIG_EMAIL_HOST = 'email_host'
+CONFIG_EMAIL_PORT = 'email_port'
+CONFIG_EMAIL_USER = 'email_user'
+CONFIG_EMAIL_PASSWORD = 'email_password'
+CONFIG_EMAIL_TO = 'email_to'
+CONFIG_EMAIL_FROM = 'email_from'
 
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'

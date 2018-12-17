@@ -1,5 +1,5 @@
 # Module de Processus a utiliser pour tester MilleGrilles
-from millegrilles.processus.MGProcessus import MGProcessus
+from millegrilles.MGProcessus import MGProcessus
 from millegrilles import Constantes
 import time
 

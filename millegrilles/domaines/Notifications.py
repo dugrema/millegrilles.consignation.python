@@ -3,7 +3,8 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.dao.EmailDAO import SmtpDAO
 
 from bson import ObjectId
 
@@ -49,9 +50,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self._traitement_message = None
 
     def get_nom_queue(self):
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue = 'mg.%s.%s' % (nom_millegrille, NotificationsConstantes.QUEUE_SUFFIXE)
-        return nom_queue
+        return NotificationsConstantes.QUEUE_SUFFIXE
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
@@ -70,7 +69,6 @@ class GestionnaireNotifications(GestionnaireDomaine):
         super().configurer()
         self._traitement_message = TraitementMessageNotification(self)
 
-        nom_millegrille = self.configuration.nom_millegrille
         nom_queue_notification = self.get_nom_queue()
 
         # Configurer la Queue pour les notifications sur RabbitMQ
@@ -81,19 +79,19 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_notification,
-            routing_key='%s.notification.#' % nom_millegrille
+            routing_key='notification.#'
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_notification,
-            routing_key='%s.destinataire.domaine.%s.#' % (nom_millegrille, NotificationsConstantes.QUEUE_SUFFIXE)
+            routing_key='destinataire.domaine.%s.#' % NotificationsConstantes.QUEUE_SUFFIXE
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_notification,
-            routing_key='%s.ceduleur.#' % nom_millegrille
+            routing_key='ceduleur.#'
         )
 
     def verifier_notifications_actionsdues(self, message):
@@ -156,7 +154,7 @@ class TraitementMessageNotification(BaseCallback):
             # Verifier quel processus demarrer. On match la valeur dans la routing key.
             routing_key = method.routing_key
             routing_key_sansprefixe = routing_key.replace(
-                '%s.destinataire.domaine.' % self._configuration.nom_millegrille,
+                'destinataire.domaine.',
                 ''
             )
             if routing_key_sansprefixe == NotificationsConstantes.TRANSACTION_ACTION_NOTIFICATION:
@@ -198,6 +196,8 @@ class ProcessusNotificationRecue(MGProcessus):
             cle = 'source.%s' % source_val
             filtre[cle] = parametres['source'][source_val]
 
+        # L'etape suivante est determine par l'etat des notifications (nouvelles, existantes, rappel, etc.)
+        etape_suivante = 'finale'
         for regle in parametres['regles']:
             self._logger.debug("Traitement document %s regle %s" % (str(parametres['source']), str(regle)))
             filtre_regle = filtre.copy()
@@ -219,11 +219,15 @@ class ProcessusNotificationRecue(MGProcessus):
                 id_doc = self._creer_nouveau_document_(collection, {'regle': regle})
                 if id_doc is not None:
                     nouveaux_documents_notification.append(id_doc)
+                etape_suivante = ProcessusNotificationRecue.avertir_usager.__name__
             else:
                 self._logger.debug("Document existant: %s" % str(document_notification))
-                self._traiter_notification_existante(collection, document_notification, regle)
+                resultat = self._traiter_notification_existante(collection, document_notification, regle)
+                if 'notification_requise' in resultat:
+                    self._logger.debug("Notification requise, on va envoyer courriel")
+                    etape_suivante = ProcessusNotificationRecue.avertir_usager.__name__
 
-        self.set_etape_suivante(ProcessusNotificationRecue.avertir_usager.__name__)
+        self.set_etape_suivante(etape_suivante)
 
         resultat_etape = dict()
         if len(nouveaux_documents_notification) > 0:
@@ -232,6 +236,16 @@ class ProcessusNotificationRecue(MGProcessus):
         return resultat_etape
 
     def avertir_usager(self):
+        configuration = self._controleur.configuration
+
+        sujet = "Notification %s" % configuration.nom_millegrille
+        contenu = "Nouvelle notification pour MilleGrille %s" % configuration.nom_millegrille
+
+        self._logger.info("Transmission notifcation par courriel: %s" % contenu)
+
+        smtp_dao = SmtpDAO(self._controleur.configuration)
+        smtp_dao.envoyer_notification(sujet, contenu)
+
         self.set_etape_suivante()  # Termine le processus
 
     def _creer_nouveau_document_(self, collection, filtre):
@@ -261,6 +275,8 @@ class ProcessusNotificationRecue(MGProcessus):
 
     def _traiter_notification_existante(self, collection, document_notification, regle):
         parametres = self.parametres
+
+        resultats = dict()
 
         filtre = {'_id': document_notification['_id']}
         operations = {
@@ -300,7 +316,9 @@ class ProcessusNotificationRecue(MGProcessus):
             })
 
             # Il faudrait aussi envoyer une notification a l'usager
+            resultats['notification_requise'] = True
 
+        return resultats
 
 class ProcessusActionUsagerNotification(MGProcessusTransaction):
 

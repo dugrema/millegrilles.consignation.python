@@ -5,7 +5,7 @@ import logging
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine, MGPProcessusDemarreur
-from millegrilles.processus.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
@@ -17,6 +17,7 @@ class SenseursPassifsConstantes:
 
     COLLECTION_NOM = 'mgdomaines_appareils_SenseursPassifs'
     DOMAINE_NOM = 'mgdomaines.appareils.SenseursPassifs'
+    QUEUE_NOM = 'mgdomaines.appareils.SenseursPassifs'
 
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
@@ -51,7 +52,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self._traitement_lecture = TraitementMessageLecture(self)
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
 
-        nom_millegrille = self.configuration.nom_millegrille
         nom_queue_senseurspassifs = self.get_nom_queue()
 
         # Configurer la Queue pour SenseursPassifs sur RabbitMQ
@@ -67,13 +67,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_senseurspassifs,
-            routing_key='%s.destinataire.domaine.mgdomaines.appareils.SenseursPassifs.#' % nom_millegrille
+            routing_key='destinataire.domaine.mgdomaines.appareils.SenseursPassifs.#'
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_senseurspassifs,
-            routing_key='%s.ceduleur.#' % nom_millegrille
+            routing_key='ceduleur.#'
         )
 
     def traiter_backlog(self):
@@ -95,9 +95,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         raise NotImplementedError("N'est pas implemente")
 
     def get_nom_queue(self):
-        nom_millegrille = self.configuration.nom_millegrille
-        nom_queue_senseurspassifs = 'mg.%s.mgdomaines.appareils.SenseursPassifs' % nom_millegrille
-        return nom_queue_senseurspassifs
+        return SenseursPassifsConstantes.QUEUE_NOM
 
     ''' Traite les evenements sur cedule. '''
     def traiter_cedule(self, evenement):
@@ -152,8 +150,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
      :param domaine: Domaine millegrilles    
      '''
     def transmettre_declencheur_domaine(self, domaine, dict_message):
-        nom_millegrille = self.configuration.nom_millegrille
-        routing_key = '%s.destinataire.domaine.%s' % (nom_millegrille, domaine)
+        routing_key = 'destinataire.domaine.%s' % domaine
         self.message_dao.transmettre_message(dict_message, routing_key)
 
 
@@ -171,7 +168,7 @@ class TraitementMessageLecture(BaseCallback):
         if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer.
             routing_key_sansprefixe = routing_key.replace(
-                '%s.destinataire.domaine.' % self._configuration.nom_millegrille,
+                'destinataire.domaine.',
                 ''
             )
             if routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:

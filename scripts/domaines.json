@@ -11,6 +11,10 @@
     {
       "module": "millegrilles.domaines.Notifications",
       "classe": "GestionnaireNotifications"
+    },
+    {
+      "module": "millegrilles.domaines.Rapports",
+      "classe": "GestionnaireRapports"
     }
   ]
 }
