@@ -6,6 +6,7 @@ from millegrilles import Constantes
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 import dateutil.parser
+import logging
 
 
 class RapportsConstantes:
@@ -21,6 +22,8 @@ class GestionnaireRapports(GestionnaireDomaine):
     def __init__(self, configuration=None, message_dao=None, document_dao=None, contexte=None):
         super().__init__(configuration, message_dao, document_dao, contexte)
         self._traitement_message = None
+
+        self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
 
     def configurer(self):
         super().configurer()
