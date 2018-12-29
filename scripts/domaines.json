@@ -15,6 +15,10 @@
     {
       "module": "millegrilles.domaines.Rapports",
       "classe": "GestionnaireRapports"
+    },
+    {
+      "module": "millegrilles.domaines.Principale",
+      "classe": "GestionnairePrincipale"
     }
   ]
 }
