@@ -97,7 +97,7 @@ class GestionnairePrincipale(GestionnaireDomaine):
         else:
             self._logger.info("Document de configuration de principale: %s" % str(document_configuration))
 
-    def _traiter_cedule(self, evenement):
+    def traiter_cedule(self, evenement):
         pass
 
     def traiter_transaction(self, ch, method, properties, body):
