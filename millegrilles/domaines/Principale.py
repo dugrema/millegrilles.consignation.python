@@ -21,6 +21,28 @@ class ConstantesPrincipale:
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
         'nom_millegrille': 'Sansnom',
         'adresse_url_base': 'sansnom.millegrilles.com',
+        'domaines': {
+            'SenseursPassifs': {
+                'rang': 1,
+                'description': 'SenseursPassifs'
+            },
+            'Notifications': {
+                'rang': 2,
+                'description': 'Notifications'
+            },
+            'WebPoll': {
+                'rang': 3,
+                'description': 'WebPoll'
+            },
+            'Rapports': {
+                'rang': 4,
+                'description': 'Rapports'
+            },
+            'Principale': {
+                'rang': 5,
+                'description': 'Principale'
+            }
+        }
     }
 
 
