@@ -19,6 +19,7 @@ class ConstantesPrincipale:
     LIBVAL_ALERTES = 'alertes'
 
     TRANSACTION_ACTION_FERMERALERTE = 'fermerAlerte'
+    TRANSACTION_ACTION_CREERALERTE = 'creerAlerte'
 
     DOCUMENT_ALERTES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
@@ -145,6 +146,9 @@ class TraitementMessagePrincipale(BaseCallback):
             if routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_FERMERALERTE:
                 processus = "millegrilles_domaines_Principale:ProcessusFermerAlerte"
                 self._gestionnaire.demarrer_processus(processus, message_dict)
+            elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREERALERTE:
+                processus = "millegrilles_domaines_Principale:ProcessusCreerAlerte"
+                self._gestionnaire.demarrer_processus(processus, message_dict)
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
@@ -173,5 +177,33 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
 
         if resultat['nModified'] != 1:
             raise ValueError("L'alerte n'a pas ete trouvee, elle ne peut pas etre fermee.")
+
+        self.set_etape_suivante()  # Marque transaction comme traitee
+
+
+class ProcessusCreerAlerte(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
+
+        if transaction_chargeutile.get('message') is None:
+            raise ValueError("L'alerte doit avoir un element 'message'")
+
+        if transaction_chargeutile.get('ts') is None:
+            transaction_chargeutile['ts'] = int(datetime.datetime.utcnow().timestamp() * 1000)
+
+        # Ajouter au document d'alerte
+        collection_domaine = self.document_dao().get_collection(ConstantesPrincipale.COLLECTION_NOM)
+
+        filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
+        operation = {'$push': {'alertes': transaction_chargeutile}}
+        resultat = collection_domaine.update(filtre, operation)
+
+        if resultat['nModified'] != 1:
+            raise ValueError("L'alerte n'a pas ete ajoutee.")
 
         self.set_etape_suivante()  # Marque transaction comme traitee
