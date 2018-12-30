@@ -331,6 +331,11 @@ class MGProcessusTransaction(MGProcessus):
     def marquer_transaction_intraitable(self):
         pass
 
+    @property
+    def transaction(self):
+        if self._transaction is None:
+            return self.charger_transaction()
+        return self._transaction
 
 # Classe qui sert a demarrer un processus
 class MGPProcessusDemarreur:

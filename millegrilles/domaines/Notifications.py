@@ -320,6 +320,7 @@ class ProcessusNotificationRecue(MGProcessus):
 
         return resultats
 
+
 class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):

@@ -2,6 +2,7 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 import logging
 import datetime
@@ -15,6 +16,16 @@ class ConstantesPrincipale:
     QUEUE_NOM = 'millegrilles.domaines.Principale'
 
     LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_ALERTES = 'alertes'
+
+    TRANSACTION_ACTION_FERMERALERTE = 'fermerAlerte'
+
+    DOCUMENT_ALERTES = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
+        'alertes': [
+            {'message': "Interface principale initialisee", 'ts': int(datetime.datetime.utcnow().timestamp()*1000)}
+        ]
+    }
 
     # Document par defaut pour la configuration de l'interface principale
     DOCUMENT_DEFAUT = {
@@ -77,25 +88,8 @@ class GestionnairePrincipale(GestionnaireDomaine):
             routing_key='ceduleur.#'
         )
 
-        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
-
-        # Trouver le document de configuration
-        document_configuration = collection_domaine.find_one(
-            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_CONFIGURATION}
-        )
-        if document_configuration is None:
-            self._logger.info("On insere le document de configuration de reference pour domaine Principale")
-
-            # Preparation document de configuration pour le domaine
-            configuration_initiale = ConstantesPrincipale.DOCUMENT_DEFAUT.copy()
-            maintenant = datetime.datetime.utcnow()
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
-
-            collection_domaine.insert(configuration_initiale)
-        else:
-            self._logger.info("Document de configuration de principale: %s" % str(document_configuration))
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
 
     def traiter_cedule(self, evenement):
         pass
@@ -105,6 +99,27 @@ class GestionnairePrincipale(GestionnaireDomaine):
 
     def get_nom_queue(self):
         return ConstantesPrincipale.QUEUE_NOM
+
+    def initialiser_document(self, mg_libelle, doc_defaut):
+        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
+        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
+
+        # Trouver le document de configuration
+        document_configuration = collection_domaine.find_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}
+        )
+        if document_configuration is None:
+            self._logger.info("On insere le document %s pour domaine Principale" % mg_libelle)
+
+            # Preparation document de configuration pour le domaine
+            configuration_initiale = doc_defaut.copy()
+            maintenant = datetime.datetime.utcnow()
+            configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
+            configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+
+            collection_domaine.insert(configuration_initiale)
+        else:
+            self._logger.info("Document de %s pour principale: %s" % (mg_libelle, str(document_configuration)))
 
 
 class TraitementMessagePrincipale(BaseCallback):
@@ -120,6 +135,43 @@ class TraitementMessagePrincipale(BaseCallback):
         if evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
             self._gestionnaire.traiter_cedule(message_dict)
+        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+            # Verifier quel processus demarrer. On match la valeur dans la routing key.
+            routing_key = method.routing_key
+            routing_key_sansprefixe = routing_key.replace(
+                'destinataire.domaine.millegrilles.domaines.Principale.',
+                ''
+            )
+            if routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_FERMERALERTE:
+                processus = "millegrilles_domaines_Principale:ProcessusFermerAlerte"
+                self._gestionnaire.demarrer_processus(processus, message_dict)
+            else:
+                # Type de transaction inconnue, on lance une exception
+                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
+
+
+class ProcessusFermerAlerte(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
+
+        ts_alerte = transaction_chargeutile['alerte']['ts']
+
+        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
+        collection_domaine = self.document_dao().get_collection(ConstantesPrincipale.COLLECTION_NOM)
+
+        filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
+        operation = {'$pull': {'alertes': {'ts': ts_alerte}}}
+        resultat = collection_domaine.update(filtre, operation)
+
+        if resultat['nModified'] != 1:
+            raise ValueError("L'alerte n'a pas ete trouvee, elle ne peut pas etre fermee.")
+
+        self.set_etape_suivante()  # Marque transaction comme traitee
