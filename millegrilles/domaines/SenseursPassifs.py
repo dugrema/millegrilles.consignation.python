@@ -76,9 +76,22 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             routing_key='ceduleur.#'
         )
 
+        # Index collection domaine
+        collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        # Index noeud, _mg-libelle
+        collection_domaine.create_index([
+            (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index senseur, noeud, _mg-libelle
+        collection_domaine.create_index([
+            (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
+            (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
         # Ajouter les index dans la collection de transactions
-        collection = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
-        collection.create_index([
+        collection_transactions = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions.create_index([
             ('%s.%s' %
              (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE),
              1),
@@ -87,7 +100,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
              1),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
-        collection.create_index([
+        collection_transactions.create_index([
             ('%s.%s' %
              (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR),
              1),
