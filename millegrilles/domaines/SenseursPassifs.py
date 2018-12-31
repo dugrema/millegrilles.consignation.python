@@ -1,4 +1,4 @@
-# Module avec les classes de donnees, processus et gestionnaire de sous domaine mgdomaines.appareils.SenseursPassifs
+# Module avec les classes de donnees, processus et gestionnaire de sous domaine millegrilles.domaines.SenseursPassifs
 import datetime
 import socket
 import logging
@@ -15,9 +15,9 @@ from bson.objectid import ObjectId
 # Constantes pour SenseursPassifs
 class SenseursPassifsConstantes:
 
-    COLLECTION_NOM = 'mgdomaines_appareils_SenseursPassifs'
-    DOMAINE_NOM = 'mgdomaines.appareils.SenseursPassifs'
-    QUEUE_NOM = 'mgdomaines.appareils.SenseursPassifs'
+    COLLECTION_NOM = 'millegrilles_domaines_SenseursPassifs'
+    DOMAINE_NOM = 'millegrilles.domaines.SenseursPassifs'
+    QUEUE_NOM = 'millegrilles.domaines.SenseursPassifs'
 
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
@@ -35,7 +35,7 @@ class SenseursPassifsConstantes:
     EVENEMENT_MAJ_QUOTIDIENNE = 'miseajour.quotidienne'
 
 
-# Gestionnaire pour le domaine mgdomaines.appareils.SenseursPassifs.
+# Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
 class GestionnaireSenseursPassifs(GestionnaireDomaine):
 
     def __init__(self, configuration, message_dao, document_dao):
@@ -67,7 +67,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_senseurspassifs,
-            routing_key='destinataire.domaine.mgdomaines.appareils.SenseursPassifs.#'
+            routing_key='destinataire.domaine.millegrilles.domaines.SenseursPassifs.#'
         )
 
         self.message_dao.channel.queue_bind(
@@ -196,19 +196,19 @@ class TraitementMessageLecture(BaseCallback):
                 ''
             )
             if routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:
-                processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
+                processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
                 self._gestionnaire.demarrer_processus(processus, message_dict)
             elif routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_MAJMANUELLE:
-                processus = "mgdomaines_appareils_SenseursPassifs:ProcessusMajManuelle"
+                processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajManuelle"
                 self._gestionnaire.demarrer_processus(processus, message_dict)
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
         elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
-            processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
-            processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
             self._gestionnaire.traiter_cedule(message_dict)
@@ -915,7 +915,7 @@ class TraitementBacklogLecturesSenseursPassifs:
             for res in resultat_curseur:
                 # Preparer un message pour declencher la transaction
                 self._logger.debug("Transaction a declencher: _id = %s" % str(res['_id']))
-                processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
+                processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
                 message_dict = {
                     Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(res['_id']),
                     'senseur': transaction_senseur
@@ -935,10 +935,10 @@ class TraitementBacklogLecturesSenseursPassifs:
     def declencher_calculs(self):
         """ Declencher le calcul des moyennes horaires """
 
-        processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
+        processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
         self.demarreur_processus.demarrer_processus(processus, {})
 
-        processus = "mgdomaines_appareils_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
+        processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
         self.demarreur_processus.demarrer_processus(processus, {})
 
     def declencher_maj_manuelle(self):
@@ -959,7 +959,7 @@ class TraitementBacklogLecturesSenseursPassifs:
 
         curseur = collection_transactions.find(filtre, projection, sort=tri)
 
-        processus = "mgdomaines_appareils_SenseursPassifs:ProcessusMajManuelle"
+        processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajManuelle"
         for transaction in curseur:
             transaction['_id-transaction'] = transaction['_id']  # Copier le _id pour que le processus ait la bonne cle
             self._logger.debug("Redemarrer processus pour ProcessusMajManuelle _id:%s" % transaction['_id'])

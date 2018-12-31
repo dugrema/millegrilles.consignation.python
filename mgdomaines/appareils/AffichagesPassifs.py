@@ -7,7 +7,7 @@ from threading import Thread, Event
 from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
 from bson import ObjectId
 
-from mgdomaines.appareils.SenseursPassifs import SenseursPassifsConstantes
+from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
 
 
 # Affichage qui se connecte a un ou plusieurs documents et recoit les changements live

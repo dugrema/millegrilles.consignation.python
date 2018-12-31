@@ -19,7 +19,7 @@ def envoyer_message_test_senseur_lecture():
         'temperature': 21.00
     }
 
-    enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'mgdomaines.appareils.SenseursPassifs.lecture')
+    enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'millegrilles.domaines.SenseursPassifs.lecture')
 
     return enveloppe_val
 

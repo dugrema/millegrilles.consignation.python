@@ -39,6 +39,17 @@ class MGPProcessusControleur(BaseCallback):
         # Executer la configuration pour RabbitMQ
         self._message_dao.configurer_rabbitmq()
 
+        # Configuration pour les processus
+        self.configurer()
+
+    def configurer(self):
+        collection = self.document_dao().get_collection(Constantes.DOCUMENT_COLLECTION_PROCESSUS)
+        collection.create_index([
+            (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
+            (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
+            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+        ])
+
     def deconnecter(self):
         self._document_dao.deconnecter()
         self._message_dao.deconnecter()

@@ -1,4 +1,4 @@
-from mgdomaines.appareils.SenseursPassifs import ProducteurTransactionSenseursPassifs
+from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursPassifs
 import datetime
 
 

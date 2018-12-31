@@ -1,7 +1,7 @@
 {
   "domaines": [
     {
-      "module": "mgdomaines.appareils.SenseursPassifs",
+      "module": "millegrilles.domaines.SenseursPassifs",
       "classe": "GestionnaireSenseursPassifs"
     },
     {
