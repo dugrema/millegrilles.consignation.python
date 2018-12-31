@@ -48,6 +48,17 @@ class GestionnaireRapports(GestionnaireDomaine):
             routing_key='ceduleur.#'
         )
 
+        # Creer index _mg-libelle
+        collection_domaine = self.document_dao.get_collection(RapportsConstantes.COLLECTION_NOM)
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index _mg-libelle, url
+        collection_domaine.create_index([
+            ('url', 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
 

@@ -17,8 +17,8 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 
 class WebPollConstantes:
 
-    COLLECTION_NOM = 'mgdomaines_web_WebPoll'
-    QUEUE_NOM = 'mgdomaines.web.WebPoll'
+    COLLECTION_NOM = 'millegrilles_domaines_WebPoll'
+    QUEUE_NOM = 'millegrilles.domaines.WebPoll'
 
     # Document de configuration de reference s'il n'existe pas deja
     # Se document se trouve dans la collection mgdomaines_web_WebPoll, _mg-libelle: configuration.
@@ -29,13 +29,13 @@ class WebPollConstantes:
                 'commentaire': 'Ceci est une tache de telechargement exemple. Voir parametres de ce dictionnaire',
                 'url': 'https://redmine.maple.mdugre.info/projects.atom?key=85de669522c8...',
                 'type': 'rss',
-                'domaine': 'mgdomaines.web.WebPoll.RSS'
+                'domaine': 'millegrilles.domaines.WebPoll.RSS'
             },
             'exemple2': {
                 'commentaire': 'Ceci est une tache de telechargement de page',
                 'url': 'https://www.maple.mdugre.info/',
                 'type': 'page',
-                'domaine': 'mgdomaines.web.WebPoll.WebPageDownload.informationspeciale.mathieu'
+                'domaine': 'millegrilles.domaines.WebPoll.WebPageDownload.informationspeciale.mathieu'
             },
             'minimal': {
                 'url': 'http://exemple.minimal'
@@ -44,7 +44,7 @@ class WebPollConstantes:
                 "commentaire": "Telechargement previsions meteo Environnement Canada pour Ottawa-Metcalfe",
                 "url": "https://weather.gc.ca/rss/city/on-52_e.xml",
                 "type": "rss",
-                "domaine": "mgdomaines.web.WebPoll.RSS.weather_gc_ca.russell"
+                "domaine": "millegrilles.domaines.WebPoll.RSS.weather_gc_ca.russell"
             }
         },
         'minute': ['exemple1'],
@@ -99,7 +99,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_evenements,
             queue=nom_queue_webpoll,
-            routing_key='destinataire.domaine.mgdomaines.web.WebPoll.#'
+            routing_key='destinataire.domaine.millegrilles.domaines.WebPoll.#'
         )
 
         self.message_dao.channel.queue_bind(
@@ -120,6 +120,11 @@ class GestionnaireWebPoll(GestionnaireDomaine):
             collection_webpoll.insert(WebPollConstantes.document_configuration_reference)
         else:
             self._logger.info("Document de configuration de telechargement: %s" % str(document_configuration))
+
+        # Creer index _mg-libelle
+        collection_webpoll.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
 
         self._downloaders['page'] = WebPageDownload(self.configuration, self.message_dao)
         self._downloaders['rss'] = RSSFeedDownload(self.configuration, self.message_dao)
@@ -247,7 +252,7 @@ class TraitementMessageWebPoll(BaseCallback):
 class WebPageDownload:
     """ Classe qui permet de telecharger une page web et la transmettre comme nouvelle transaction. """
 
-    TRANSACTION_VALEUR_DOMAINE = 'mgdomaines.web.WebPoll.WebPageDownload'
+    TRANSACTION_VALEUR_DOMAINE = 'millegrilles.domaines.WebPoll.WebPageDownload'
 
     def __init__(self, configuration, message_dao, limit_bytes=50*1024):
         self._generateur_transaction = GenerateurTransaction(configuration, message_dao)
@@ -327,7 +332,7 @@ class WebPageDownload:
 # Classe qui va parser le contenu text en un dictionnaire Python
 class RSSFeedDownload(WebPageDownload):
 
-    TRANSACTION_VALEUR_DOMAINE = 'mgdomaines.web.WebPoll.RSS'
+    TRANSACTION_VALEUR_DOMAINE = 'millegrilles.domaines.WebPoll.RSS'
 
     def __init__(self, configuration, message_dao, limit_bytes=100*1024):
         super().__init__(configuration, message_dao, limit_bytes)

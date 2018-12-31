@@ -5,7 +5,7 @@
       "classe": "GestionnaireSenseursPassifs"
     },
     {
-      "module": "mgdomaines.web.WebPoll",
+      "module": "millegrilles.domaines.WebPoll",
       "classe": "GestionnaireWebPoll"
     },
     {

@@ -33,6 +33,18 @@ class ConsignateurTransaction(BaseCallback):
 
         self._transaction_helper = self.document_dao.transaction_helper()
 
+        # Creer index: _mg-libelle
+        collection = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index domaine, _mg-libelle
+        collection.create_index([
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+             1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
         logging.info("Configuration et connection completee")
 
     def executer(self):

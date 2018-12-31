@@ -76,6 +76,30 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             routing_key='ceduleur.#'
         )
 
+        # Ajouter les index dans la collection de transactions
+        collection = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection.create_index([
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE),
+             1),
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+             1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        collection.create_index([
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR),
+             1),
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_NOEUD),
+             1),
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+             1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+
     def traiter_backlog(self):
         # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
         # de persistance.
