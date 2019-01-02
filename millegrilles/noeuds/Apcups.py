@@ -12,7 +12,7 @@ import os
 import errno
 import logging
 
-from threading import Thread
+from threading import Thread, Event
 
 from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursPassifs, SenseursPassifsConstantes
 
@@ -33,7 +33,7 @@ class ApcupsConstantes:
 class ApcupsdCollector:
     """ Copie de https://github.com/python-diamond/Diamond/blob/master/src/collectors/apcupsd/apcupsd.py """
 
-    def __init__(self, no_senseur, hostname='localhost', port=3551, pipe_path='/run/mg_apcupsd_messages'):
+    def __init__(self, no_senseur, hostname='localhost', port=3551, pipe_path='/run/mg_apcupsd_messages', config=None):
         self._config = {
             'no_senseur': no_senseur,
             'path':     'apcupsd',
@@ -44,11 +44,16 @@ class ApcupsdCollector:
                         'NUMXFERS', 'TONBATT', 'MAXLINEV', 'MINLINEV',
                         'OUTPUTV', 'ITEMP', 'LINEFREQ', 'CUMONBATT', ],
         }
+        if config:
+            self._config.update(config)
+
         self._dernier_evenement = datetime.datetime.now(tz=datetime.timezone.utc)
         self._callback_soumettre = None
         # self._producteur_transactions = ProducteurTransactionSenseursPassifs()
 
+        self.thread_etat = Thread(target=self.produire_etat)
         self.thread_events = Thread(target=self.ecouter_evenements)
+        self._lecture_etat_actif = Event()
         self._lecture_evenements_actif = False
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
@@ -58,8 +63,12 @@ class ApcupsdCollector:
 
         self._callback_soumettre = callback_soumettre
         self.thread_events.start()  # Demarrer thread evenements
+        self.thread_etat.start()  # Demarrer thread etat
 
     def fermer(self):
+        self._lecture_etat_actif.set()  # Va fermer thread etat
+
+        # Fermer thread evenements
         self._lecture_evenements_actif = False
         with open(self._config['pipe_path'], 'w') as pipe:
             pipe.write('FERMER')
@@ -118,6 +127,13 @@ class ApcupsdCollector:
                 })
 
         return contenu
+
+    def produire_etat(self):
+        """ Thread pour transmettre l'etat du UPS regulierement """
+
+        while not self._lecture_etat_actif.is_set():
+            self.transmettre_etat()
+            self._lecture_etat_actif.wait(300)  # Transmettre aux 5 minutes
 
     def ecouter_evenements(self):
         # Ouvrir un pipe utilise pour recevoir l'etat de APCUPSD

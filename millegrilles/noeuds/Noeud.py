@@ -1,4 +1,5 @@
 # Module qui permet de demarrer les appareils sur un Raspberry Pi
+# Module qui permet de demarrer les appareils sur un Raspberry Pi
 import traceback
 import argparse
 import logging
@@ -12,20 +13,22 @@ from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursP
 
 from millegrilles.util.Daemon import Daemon
 
-logger = logging.getLogger(__name__)
-
 
 class DemarreurNoeud(Daemon):
 
     def __init__(
             self,
-            pidfile='/run/mg-demarreur-rpi.pid',
+            pidfile='/run/mg-noeud.pid',
             stdin='/dev/null',
-            stdout='/var/log/mg-demarreur-rpi.log',
-            stderr='/var/log/mg-demarreur-rpi.err'
+            stdout='/var/log/mg-noeud.log',
+            stderr='/var/log/mg-noeud.err'
     ):
         # Call superclass init
         Daemon.__init__(self, pidfile, stdin, stdout, stderr)
+
+        logging.basicConfig(level=logging.WARNING)
+
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
         logging.getLogger().setLevel(logging.WARNING)
         logging.getLogger('millegrilles.noeuds').setLevel(logging.INFO)
@@ -69,6 +72,10 @@ class DemarreurNoeud(Daemon):
             help="Port du serveur UPS APC (apcupsd)."
         )
         self._parser.add_argument(
+            '--apcupsd_pipe', type=str, nargs=1, required=False,
+            help="Path pour le pipe d'evenements pour les scripts apcupsd."
+        )
+        self._parser.add_argument(
             '--maint', type=int, nargs=1, default=60,
             required=False, help="Change le nombre de secondes entre les verifications de connexions"
         )
@@ -102,7 +109,7 @@ class DemarreurNoeud(Daemon):
         Daemon.restart(self)
 
     def run(self):
-        print("Demarrage Daemon")
+        self._logger.info("Demarrage Daemon")
         self.setup_modules()
 
         if self._chargement_reussi:
@@ -113,13 +120,13 @@ class DemarreurNoeud(Daemon):
             try:
                 self.traiter_backlog_messages()
             except Exception:
-                logger.exception("Erreur traitement backlog de messages")
+                self._logger.exception("Erreur traitement backlog de messages")
 
             self.verifier_connexion_document()
 
             # Sleep
             self._stop_event.wait(self._intervalle_entretien)
-        print("Fin execution Daemon")
+        self._logger.info("Fin execution Daemon")
 
     def setup_modules(self):
         # Charger la configuration et les DAOs
@@ -138,25 +145,11 @@ class DemarreurNoeud(Daemon):
         self._intervalle_entretien = self._args.maint
         self._max_backlog = self._args.backlog
 
-        if self._args.lcddoc:
+        if self._args.apcupsd:
             try:
-                self.inclure_lcd()
+                self.inclure_apcupsd()
             except Exception as erreur_lcd:
-                print("Erreur chargement ecran LCD: %s" % str(erreur_lcd))
-                traceback.print_exc()
-
-        if self._args.nrf24:
-            try:
-                self.inclure_nrf24l01()
-            except Exception as erreur_nrf24:
-                print("Erreur chargement hub nRF24L01: %s" % str(erreur_nrf24))
-                traceback.print_exc()
-
-        if self._args.am2302:
-            try:
-                self.inclure_am2302()
-            except Exception as erreur_nrf24:
-                print("Erreur chargement AM2302 sur pin %d: %s" % (self._args.am2302[1], str(erreur_nrf24)))
+                self._logger.exception("Erreur chargement apcupsd: %s" % str(erreur_lcd))
                 traceback.print_exc()
 
     def fermer(self):
@@ -166,40 +159,28 @@ class DemarreurNoeud(Daemon):
             self._message_dao.deconnecter()
             self._document_dao.deconnecter()
         except Exception as edao:
-            print("Erreur deconnexion DAOs: %s" % str(edao))
+            self._logger.info("Erreur deconnexion DAOs: %s" % str(edao))
 
-        if self._hub_nrf24l01 is not None:
+        if self._apcupsd is not None:
             try:
-                self._hub_nrf24l01.fermer()
+                self._apcupsd.fermer()
             except Exception as enrf:
-                print("erreur fermeture NRF24L01: %s" % str(enrf))
-
-        if self._affichage_lcd is not None:
-            try:
-                self._affichage_lcd.fermer()
-            except Exception as elcd:
-                print("erreur fermeture LCD: %s" % str(elcd))
-
-        if self._am2302 is not None:
-            try:
-                self._am2302.fermer()
-            except Exception as eam:
-                print("erreur fermeture AM2302: %s" % str(eam))
+                self._logger.info("erreur fermeture apcupsd: %s" % str(enrf))
 
     def inclure_apcupsd(self):
-        print("Activer apcupsd via nis")
-        from millegrilles.noeuds.NRF24L import HubNRF24L
-        self._hub_nrf24l01 = HubNRF24L()
-        self._hub_nrf24l01.start(self.transmettre_lecture_callback)
-        self._chargement_reussi = True
-
-    def inclure_am2302(self):
-        no_senseur = self._args.am2302[0]
-        pin = self._args.am2302[1]
-        print("Activer AS2302 sur pin %d" % pin)
-        from mgraspberry.raspberrypi.AdafruitDHT import ThermometreAdafruitGPIO
-        self._am2302 = ThermometreAdafruitGPIO(no_senseur=no_senseur, pin=pin)
-        self._am2302.start(self.transmettre_lecture_callback)
+        self._logger.info("Activer apcupsd via nis")
+        from millegrilles.noeuds.Apcups import ApcupsdCollector
+        no_senseur = self._args.apcupsd[0]
+        config = {}
+        if self._args.apcupsd_host:
+            config['hostname'] = self._args.apcupsd_host[0]
+        if self._args.apcupsd_port:
+            config['port'] = self._args.apcupsd_port[0]
+        if self._args.apcupsd_pipe:
+            config['pipe_path'] = self._args.apcupsd_pipe[0]
+        self._logger.info("Configuration apcupsd: %s" % config)
+        self._apcupsd = ApcupsdCollector(no_senseur=no_senseur, config=config)
+        self._apcupsd.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
     def transmettre_lecture_callback(self, dict_lecture):
@@ -207,11 +188,11 @@ class DemarreurNoeud(Daemon):
             if not self._message_dao.in_error:
                 self._producteur_transaction.transmettre_lecture_senseur(dict_lecture)
             else:
-                print("Message ajoute au backlog: %s" % str(dict_lecture))
+                self._logger.info("Message ajoute au backlog: %s" % str(dict_lecture))
                 if len(self._backlog_messages) < 1000:
                     self._backlog_messages.append(dict_lecture)
                 else:
-                    print("Backlog > 1000, message perdu: %s" % str(dict_lecture))
+                    self._logger.warning("Backlog > 1000, message perdu: %s" % str(dict_lecture))
 
         except ExceptionConnectionFermee as e:
             # Erreur, la connexion semble fermee. On va tenter une reconnexion
@@ -226,7 +207,7 @@ class DemarreurNoeud(Daemon):
                 try:
                     self._message_dao.connecter()
                 except:
-                    logger.exception("Erreur connexion MQ")
+                    self._logger.exception("Erreur connexion MQ")
 
             # La seule facon de confirmer la connexion et d'envoyer un message
             # On tente de passer le backlog en remettant le message dans la liste en cas d'echec
@@ -236,9 +217,9 @@ class DemarreurNoeud(Daemon):
                 while len(self._backlog_messages) > 0:
                     message = self._backlog_messages.pop()
                     self._producteur_transaction.transmettre_lecture_senseur(message)
-                print("Traitement backlog complete")
+                self._logger.info("Traitement backlog complete")
             except Exception as e:
-                print("Erreur traitement backlog, on push le message: %s" % str(e))
+                self._logger.warning("Erreur traitement backlog, on push le message: %s" % str(e))
                 self._backlog_messages.append(message)
                 traceback.print_exc()
 
@@ -247,9 +228,9 @@ class DemarreurNoeud(Daemon):
         if not self._document_dao.est_enligne():
             try:
                 self._document_dao.connecter()
-                print("DemarreurRaspberryPi: Connexion a Mongo re-etablie")
+                self._logger.info("DemarreurNoeud: Connexion a Mongo re-etablie")
             except Exception as ce:
-                print("DemarreurRaspberryPi: Erreur reconnexion Mongo: %s" % str(ce))
+                self._logger.exception("DemarreurNoeud: Erreur reconnexion Mongo: %s" % str(ce))
                 traceback.print_exc()
 
 
@@ -267,5 +248,5 @@ def main():
 
 
 if __name__ == "__main__":
-    demarreur = DemarreurRaspberryPi()
+    demarreur = DemarreurNoeud()
     main()
