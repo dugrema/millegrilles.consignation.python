@@ -132,7 +132,10 @@ class ApcupsdCollector:
         """ Thread pour transmettre l'etat du UPS regulierement """
 
         while not self._lecture_etat_actif.is_set():
-            self.transmettre_etat()
+            try:
+                self.transmettre_etat()
+            except Exception as e:
+                self._logger.exception("Erreur traitement etat UPS: %s" % str(e))
             self._lecture_etat_actif.wait(300)  # Transmettre aux 5 minutes
 
     def ecouter_evenements(self):
@@ -151,20 +154,23 @@ class ApcupsdCollector:
         while self._lecture_evenements_actif:
             with open(pipe_fichier, 'r') as pipe:
                 while self._lecture_evenements_actif:
-                    line = pipe.read().strip()
-                    self._logger.debug("Pipe event: %s" % line)
-                    if line == 'FERMER':
-                        self._lecture_evenements_actif = False
-                    elif line in ApcupsConstantes.MAP_EVENEMENTS.values():
-                        self.transmettre_evenements()
-                    else:
-                        self._logger.warning("Commande UPS inconne: %s" % line)
+                    try:
+                        line = pipe.read().strip()
+                        self._logger.debug("Pipe event: %s" % line)
+                        if line == 'FERMER':
+                            self._lecture_evenements_actif = False
+                        elif line in ApcupsConstantes.MAP_EVENEMENTS.values():
+                            self.transmettre_evenements()
+                        else:
+                            self._logger.warning("Commande UPS inconne: %s" % line)
 
-                    if len(line) == 0:
-                        self._logger.debug("Reouvrir le pipe")
-                        break  # Va reouvrir le pipe et bloquer
+                        if len(line) == 0:
+                            self._logger.debug("Reouvrir le pipe")
+                            break  # Va reouvrir le pipe et bloquer
 
-                    self._logger.debug("Contenu: %s" % str(line))
+                        self._logger.debug("Contenu: %s" % str(line))
+                    except Exception as e:
+                        self._logger.exception("Erreur lecture evenements %s" % str(e))
 
         self._logger.info("Fermeture thread lecture evenements sur pipe %s" % pipe_fichier)
 
@@ -256,7 +262,7 @@ class ApcupsdCollector:
             contenu_message.update(etat)
 
             # Convertir certains elements en format standard
-            contenu_message['millivolt'] = contenu_message['BATTV']
+            contenu_message['millivolt'] = contenu_message.get('BATTV')
 
         # self._producteur_transactions.transmettre_lecture_senseur(contenu_message)
         self._callback_soumettre(contenu_message)
