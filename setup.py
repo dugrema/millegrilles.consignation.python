@@ -10,8 +10,7 @@ setup(
         'millegrilles.transaction',
         'millegrilles.util',
         'mgdomaines',
-        'mgdomaines.appareils',
-        'mgdomaines.web'
+        'mgdomaines.appareils'
     ],
     url='',
     license='',
