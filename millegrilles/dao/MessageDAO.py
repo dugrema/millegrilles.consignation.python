@@ -53,7 +53,7 @@ class PikaDAO:
                     host=self.configuration.mq_host,
                     port=self.configuration.mq_port,
                     virtual_host=self.configuration.nom_millegrille,
-                    heartbeat=60,
+                    heartbeat=20,
                     credentials=credentials,
                     ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
                 )
