@@ -1033,6 +1033,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
     def __init__(self, configuration=None, message_dao=None, noeud=socket.getfqdn()):
         super().__init__(configuration, message_dao)
         self._noeud = noeud
+        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
     def transmettre_lecture_senseur(self, dict_lecture):
         # Preparer le dictionnaire a transmettre pour la lecture
@@ -1049,6 +1050,8 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         # Ajouter le noeud s'il n'a pas ete fourni
         if message.get(SenseursPassifsConstantes.TRANSACTION_NOEUD) is None:
             message[SenseursPassifsConstantes.TRANSACTION_NOEUD] = self._noeud
+
+        self._logger.debug("Message a transmettre: %s" % str(message))
 
         uuid_transaction = self.soumettre_transaction(message, SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE)
 
