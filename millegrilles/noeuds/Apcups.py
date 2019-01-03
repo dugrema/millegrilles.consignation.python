@@ -82,7 +82,7 @@ class ApcupsdCollector:
         s.send(pack('xb6s', 6, b'status'))
 
         # Ditch the header
-        s.recv(1024)
+        # s.recv(1024)
 
         data = bytearray()
         while data.find(b'END APC') < 0:
