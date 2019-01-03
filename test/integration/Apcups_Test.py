@@ -44,7 +44,7 @@ def tester():
 
     for i in range(1, 10):
         test_apc.transmettre_etat()
-        time.sleep(120)
+        time.sleep(5)
 
     test_apc.deconnecter()
 

@@ -83,7 +83,7 @@ class ApcupsdCollector:
 
         # Ditch the header
         s.recv(1024)
-        time.sleep(.4)
+        #time.sleep(.05)
         data = s.recv(4096)
 
         # We're done. Close the socket
