@@ -9,6 +9,7 @@ setup(
         'millegrilles.domaines',
         'millegrilles.transaction',
         'millegrilles.util',
+        'millegrilles.noeuds',
         'mgdomaines',
         'mgdomaines.appareils'
     ],
