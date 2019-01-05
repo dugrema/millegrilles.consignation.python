@@ -29,9 +29,11 @@ DEFAUT_QUEUE_NOTIFICATIONS = 'notifications'
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
 CONFIG_MONGO_PORT = 'mongo_port'
-CONFIG_MONGO_USER = 'mongo_user'
+CONFIG_MONGO_USER = 'mongo_username'
 CONFIG_MONGO_PASSWORD = 'mongo_password'
 CONFIG_MONGO_SSL = 'mongo_ssl'
+CONFIG_MONGO_SSL_CAFILE = 'mongo_ssl_ca_certs'
+CONFIG_MONGO_SSL_KEYFILE = 'mongo_ssl_certfile'
 
 MONGO_DOC_ID = '_id'
 

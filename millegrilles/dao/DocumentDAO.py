@@ -30,27 +30,21 @@ class MongoDAO:
 
         self._logger = logging.getLogger("%s.MongoDAO" % __name__)
 
-    @staticmethod
-    def _use_cert(ssl_option):
-        if ssl_option == "nocert":
-            return ssl.CERT_NONE
-        elif ssl_option == 'on':
-            return ssl.CERT_REQUIRED
-        else:
-            return None
-
     def connecter(self):
-        ssl_option = self._configuration.mongo_ssl
+        configuration_mongo = self._configuration.format_mongo_config()
+        self._client = MongoClient(**configuration_mongo)
 
-        if ssl_option == "off" or "on":
-            self._client = MongoClient(
-                self._configuration.mongo_host,
-                self._configuration.mongo_port,
-                username=self._configuration.mongo_user,
-                password=self._configuration.mongo_password,
-                ssl=(ssl_option == "on" or ssl_option == "nocert"),
-                ssl_cert_reqs=MongoDAO._use_cert(ssl_option)
-            )
+        # ssl_option = self._configuration.mongo_ssl
+        #
+        # if ssl_option == "off" or "on":
+        #     self._client = MongoClient(
+        #         self._configuration.mongo_host,
+        #         self._configuration.mongo_port,
+        #         username=self._configuration.mongo_user,
+        #         password=self._configuration.mongo_password,
+        #         ssl=(ssl_option == "on" or ssl_option == "nocert"),
+        #         ssl_cert_reqs=MongoDAO._use_cert(ssl_option)
+        #     )
 
         self._logger.debug("Verify if connection established")
         self._client.admin.command('ismaster')

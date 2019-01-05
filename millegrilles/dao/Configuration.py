@@ -3,6 +3,8 @@
 import os
 import json
 import logging
+import ssl
+
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
@@ -34,7 +36,9 @@ class TransactionConfiguration:
             Constantes.CONFIG_MONGO_PORT: '27017',
             Constantes.CONFIG_MONGO_USER: 'root',
             Constantes.CONFIG_MONGO_PASSWORD: 'example',
-            Constantes.CONFIG_MONGO_SSL: 'on'   # Options on, off, nocert
+            Constantes.CONFIG_MONGO_SSL: 'on',   # Options on, off, nocert
+            Constantes.CONFIG_MONGO_SSL_CAFILE: '/usr/local/etc/millegrilles/certs/millegrilles.authority.pem',
+            Constantes.CONFIG_MONGO_SSL_KEYFILE: '/usr/local/etc/millegrilles/certs/keys/millegrilles.pem.key_cert'
         }
 
         self._domaines_config = {
@@ -89,6 +93,35 @@ class TransactionConfiguration:
         env_value = os.environ[env_name]
         if env_value is not None:
             map[property] = env_value
+
+    def format_mongo_config(self):
+        """ Formatte la configuration pour connexion a Mongo """
+
+        config_mongo = dict()
+        parametres_mongo = ['host', 'username', 'password']
+        parametres_mongo_int = ['port']
+
+        # Configuration specifique pour ssl
+        mongo_ssl_param = self._mongo_config.get(Constantes.CONFIG_MONGO_SSL)
+        config_mongo['ssl'] = mongo_ssl_param in ['on', 'nocert']  # Mettre ssl=True ou ssl=False
+        if mongo_ssl_param == 'on':
+            config_mongo['ssl'] = True
+            config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
+            parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
+        elif mongo_ssl_param == 'nocert':
+            config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
+
+        # Copier toutes les valeurs necessaires, enlever le prefixe mongo_ de chaque cle.
+        for cle in self._mongo_config:
+            cle_mongo = cle.replace('mongo_', '')
+            if cle_mongo in parametres_mongo_int:
+                valeur = int(self._mongo_config[cle])
+                config_mongo[cle_mongo] = valeur
+            elif cle_mongo in parametres_mongo:
+                valeur = self._mongo_config[cle]
+                config_mongo[cle_mongo] = valeur
+
+        return config_mongo
 
     @property
     def mq_host(self):
