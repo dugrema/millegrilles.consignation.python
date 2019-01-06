@@ -227,6 +227,7 @@ class TransactionConfiguration:
     def email_from(self):
         return self._email_config[Constantes.CONFIG_EMAIL_FROM]
 
+
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """
 
