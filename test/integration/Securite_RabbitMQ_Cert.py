@@ -5,6 +5,8 @@ import ssl
 from pika.credentials import PlainCredentials
 
 from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO
+
 
 class TestCertificatsRabbitMQ:
 
@@ -13,10 +15,13 @@ class TestCertificatsRabbitMQ:
         self.connectionmq = None
         self.channel = None
 
+        self.message_dao = None
+
     def configurer(self):
         self.configuration.loadEnvironment()
+        self.message_dao = PikaDAO(self.configuration)
 
-    def connecter(self):
+    def preparer_connexion(self):
         connection_parameters = {
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
@@ -45,7 +50,14 @@ class TestCertificatsRabbitMQ:
             connection_parameters['ssl'] = True
             connection_parameters['ssl_options'] = ssl_options
 
-        self.connectionmq = pika.BlockingConnection(pika.ConnectionParameters(**connection_parameters))
+        return connection_parameters
+
+    def connecter_test(self):
+        connection_parameters = pika.ConnectionParameters(** self.preparer_connexion())
+        self.connectionmq = pika.BlockingConnection(connection_parameters)
+
+    def connecter_dao(self):
+        self.connectionmq = self.message_dao.connecter()
 
     def verifier_connexion(self):
         self.channel = self.connectionmq.channel()
@@ -64,7 +76,8 @@ def tester():
 
     test = TestCertificatsRabbitMQ()
     test.configurer()
-    test.connecter()
+    # test.connecter_test()
+    test.connecter_dao()
     test.verifier_connexion()
     test.fermer()
 

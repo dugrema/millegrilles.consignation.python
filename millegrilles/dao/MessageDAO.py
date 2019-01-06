@@ -4,6 +4,7 @@ import pika
 import json
 import traceback
 import logging
+import ssl
 
 from threading import Lock
 
@@ -30,6 +31,37 @@ class PikaDAO:
 
         self.json_helper = JSONHelper()
 
+    def preparer_connexion(self):
+        """ Retourne un dictionnaire avec les parametres de connexion a RabbitMQ """
+
+        connection_parameters = {
+            'host': self.configuration.mq_host,
+            'port': self.configuration.mq_port,
+            'virtual_host': self.configuration.nom_millegrille,
+            'heartbeat': self.configuration.mq_heartbeat
+        }
+
+        credentials = {
+            'username': self.configuration.mq_user,
+            'password': self.configuration.mq_password,
+            'erase_on_connect': True
+        }
+        connection_parameters['credentials'] = PlainCredentials(**credentials)
+
+        if self.configuration.mq_ssl == 'on':
+            ssl_options = {
+                'ssl_version': ssl.PROTOCOL_TLSv1_2,
+                'keyfile': self.configuration.mq_keyfile,
+                'certfile': self.configuration.mq_certfile,
+                'ca_certs': self.configuration.mq_cafile,
+                'cert_reqs': ssl.CERT_REQUIRED
+            }
+
+            connection_parameters['ssl'] = True
+            connection_parameters['ssl_options'] = ssl_options
+
+        return connection_parameters
+
     def connecter(self, separer=False):
         """
         Connecter au serveur RabbitMQ
@@ -41,23 +73,8 @@ class PikaDAO:
         """
 
         try:
-            credentials = PlainCredentials(
-                self.configuration.mq_user,
-                self.configuration.mq_password,
-                erase_on_connect=True
-            )
-
-            ssl_option = self.configuration.mq_ssl
-            connectionmq = pika.BlockingConnection(
-                pika.ConnectionParameters(
-                    host=self.configuration.mq_host,
-                    port=self.configuration.mq_port,
-                    virtual_host=self.configuration.nom_millegrille,
-                    heartbeat=300,
-                    credentials=credentials,
-                    ssl=ssl_option == 'on'  # Mettre SSL lorsque ca fonctionnera avec RabbitMQ
-                )
-            )
+            parametres = pika.ConnectionParameters(**self.preparer_connexion())
+            connectionmq = pika.BlockingConnection(parametres)
             channel = connectionmq.channel()
             channel.basic_qos(prefetch_count=1)
 

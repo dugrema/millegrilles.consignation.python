@@ -15,8 +15,9 @@ class TransactionConfiguration:
     def __init__(self):
         # Configuration de connection a RabbitMQ
         self._mq_config = {
-            Constantes.CONFIG_MQ_HOST: 'localhost',
+            Constantes.CONFIG_MQ_HOST: Constantes.DEFAUT_HOSTNAME,
             Constantes.CONFIG_MQ_PORT: '5671',
+            Constantes.CONFIG_MQ_HEARTBEAT: Constantes.DEFAUT_MQ_HEARTBEAT,
             Constantes.CONFIG_MQ_VIRTUAL_HOST: Constantes.DEFAUT_MQ_VIRTUAL_HOST,
             Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_ERREURS_TRANSACTIONS,
@@ -27,18 +28,21 @@ class TransactionConfiguration:
             Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS,
             Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
             Constantes.CONFIG_MQ_PASSWORD: None,
-            Constantes.CONFIG_MQ_SSL: 'on'  # Options on, off.
+            Constantes.CONFIG_MQ_SSL: 'on',  # Options on, off.
+            Constantes.CONFIG_MQ_KEYFILE: Constantes.DEFAUT_KEYFILE,
+            Constantes.CONFIG_MQ_CERTFILE: Constantes.DEFAUT_CERTFILE,
+            Constantes.CONFIG_MQ_CA_CERTS: Constantes.DEFAUT_CA_CERTS
         }
 
         # Configuration de connection a MongoDB
         self._mongo_config = {
-            Constantes.CONFIG_MONGO_HOST: 'localhost',
+            Constantes.CONFIG_MONGO_HOST: Constantes.DEFAUT_HOSTNAME,
             Constantes.CONFIG_MONGO_PORT: '27017',
             Constantes.CONFIG_MONGO_USER: 'root',
             Constantes.CONFIG_MONGO_PASSWORD: 'example',
             Constantes.CONFIG_MONGO_SSL: 'on',   # Options on, off, nocert
-            Constantes.CONFIG_MONGO_SSL_CAFILE: '/usr/local/etc/millegrilles/certs/millegrilles.authority.pem',
-            Constantes.CONFIG_MONGO_SSL_KEYFILE: '/usr/local/etc/millegrilles/certs/keys/millegrilles.pem.key_cert'
+            Constantes.CONFIG_MONGO_SSL_CAFILE: Constantes.DEFAUT_CA_CERTS,
+            Constantes.CONFIG_MONGO_SSL_KEYFILE: Constantes.DEFAUT_KEYCERTFILE
         }
 
         self._domaines_config = {
@@ -144,8 +148,24 @@ class TransactionConfiguration:
         return self._mq_config[Constantes.CONFIG_MQ_PASSWORD]
 
     @property
+    def mq_heartbeat(self):
+        return int(self._mq_config[Constantes.CONFIG_MQ_HEARTBEAT])
+
+    @property
     def mq_ssl(self):
         return self._mq_config[Constantes.CONFIG_MQ_SSL]
+
+    @property
+    def mq_keyfile(self):
+        return self._mq_config[Constantes.CONFIG_MQ_KEYFILE]
+
+    @property
+    def mq_certfile(self):
+        return self._mq_config[Constantes.CONFIG_MQ_CERTFILE]
+
+    @property
+    def mq_cafile(self):
+        return self._mq_config[Constantes.CONFIG_MQ_CA_CERTS]
 
     @property
     def nom_millegrille(self):
