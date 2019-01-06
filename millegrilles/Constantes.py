@@ -17,7 +17,7 @@ CONFIG_MQ_CA_CERTS = 'mq_ca_certs'
 
 CONFIG_QUEUE_NOUVELLES_TRANSACTIONS = 'mq_queue_nouvelles_transactions'
 CONFIG_QUEUE_ERREURS_TRANSACTIONS = 'mq_queue_erreurs_transactions'
-CONFIG_QUEUE_MGP_PROCESSUS =  'mq_queue_mgp_processus'
+CONFIG_QUEUE_MGP_PROCESSUS = 'mq_queue_mgp_processus'
 CONFIG_QUEUE_ERREURS_PROCESSUS = 'mq_queue_erreurs_processus'
 CONFIG_QUEUE_GENERATEUR_DOCUMENTS = 'mq_queue_generateur_documents'
 CONFIG_QUEUE_NOTIFICATIONS = 'mq_queue_notifications'
