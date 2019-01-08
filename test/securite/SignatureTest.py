@@ -64,21 +64,43 @@ class SignateurTest:
             self.certificat = certificat
             self._logger.debug("Certificat charge: %s" % str(certificat))
 
+    def _verifier_certificat(self, dict_message):
         # S'assurer que ce certificat set bien a signer
-        basic_constraints = certificat.extensions.get_extension_for_class(x509.BasicConstraints)
+        basic_constraints = self.certificat.extensions.get_extension_for_class(x509.BasicConstraints)
         self._logger.debug("Basic Constraints: %s" % str(basic_constraints))
-        key_usage = certificat.extensions.get_extension_for_class(x509.KeyUsage).value
+        key_usage = self.certificat.extensions.get_extension_for_class(x509.KeyUsage).value
         self._logger.debug("Key usage: %s" % str(key_usage))
 
         supporte_signature_numerique = key_usage.digital_signature
         if not supporte_signature_numerique:
             raise Exception('Le certificat ne supporte pas les signatures numeriques')
 
+        sujet = self.certificat.subject
+        self._logger.debug('Sujet du certificat')
+        for elem in sujet:
+            self._logger.debug("%s" % str(elem))
+
+        cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+        self._logger.debug("Common Name: %s" % cn)
+
+        message_noeud = dict_message['en_tete'].get('noeud')
+        if '@' in message_noeud:
+            message_noeud = message_noeud.split('@')[1]
+
+        resultat_comparaison = (cn == message_noeud)
+        if not resultat_comparaison:
+            raise Exception(
+                "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
+                (message_noeud, cn)
+            )
+
     def signer_json(self, dict_message):
         # Copier la base du message et l'en_tete puisqu'ils seront modifies
         dict_message_effectif = dict_message.copy()
         en_tete = dict_message['en_tete'].copy()
         dict_message_effectif['en_tete'] = en_tete
+
+        self._verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
 
         # Ajouter information du certification dans l'en_tete
         fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA512())
