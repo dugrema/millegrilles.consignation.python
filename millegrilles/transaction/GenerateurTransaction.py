@@ -63,12 +63,14 @@ class GenerateurTransaction:
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME] = identificateur_systeme
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = ""
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_COURANTE
         if domaine is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
 
         enveloppe = dict()
         enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
-        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE] = message_dict
+        enveloppe.update(message_dict)
+
+        # Signer le message avec le certificat du noeud
 
         return enveloppe
