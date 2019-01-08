@@ -1,7 +1,11 @@
 import logging
 import json
-import binascii
+import re
 import base64
+import datetime
+import uuid
+import getpass
+import socket
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -9,6 +13,25 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
+from cryptography.x509.name import NameOID
+
+class PreparateurMessage:
+
+    def __init__(self):
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self._identificateur_systeme = '%s@%s' % (getpass.getuser(), socket.getfqdn())
+
+    def generer_entete(self, domaine):
+        message_ref = {
+            "en_tete": {
+                "domaine": domaine,
+                "estampille": int(datetime.datetime.utcnow().timestamp()),
+                "noeud": self._identificateur_systeme,
+                "uuid": str(uuid.uuid4())
+            }
+        }
+
+        return message_ref
 
 class SignateurTest:
 
@@ -16,13 +39,14 @@ class SignateurTest:
 
     def __init__(self):
         self.cle = None
+        self.certificat = None
         self._logger = logging.getLogger(self.__class__.__name__)
         self.signature = None
 
         self._hash_function = hashes.SHA512
 
     def load_cle(self):
-        with open('%s/privkeys/dev1.pem' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/privkeys/think003.pivoine.mdugre.info.pem.20190105' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             cle = serialization.load_pem_private_key(
                 key_file.read(),
                 password=None,
@@ -31,8 +55,31 @@ class SignateurTest:
             self.cle = cle
             self._logger.debug("Cle privee chargee")
 
+    def load_certificat(self):
+        with open('%s/certs/think003.pivoine.mdugre.info.cert.pem.20190105' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+            certificat = x509.load_pem_x509_certificate(
+                key_file.read(),
+                backend=default_backend()
+            )
+            self.certificat = certificat
+            self._logger.debug("Certificat charge: %s" % str(certificat))
+
     def signer_json(self, dict_message):
-        self.signature = self._produire_signature(dict_message)
+        # Copier la base du message et l'en_tete puisqu'ils seront modifies
+        dict_message_effectif = dict_message.copy()
+        en_tete = dict_message['en_tete'].copy()
+        dict_message_effectif['en_tete'] = en_tete
+
+        # Ajouter information du certification dans l'en_tete
+        fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA512())
+        fingerprint_cert = str(base64.b64encode(fingerprint_cert_bytes), 'utf-8')
+        self._logger.debug("Fingerprint: %s" % str(fingerprint_cert))
+        en_tete['certificat'] = fingerprint_cert
+
+        self.signature = self._produire_signature(dict_message_effectif)
+        dict_message_effectif['_signature'] = self.signature
+
+        return dict_message_effectif
 
     def _produire_signature(self, dict_message):
         message_json = json.dumps(dict_message, sort_keys=True)
@@ -62,7 +109,7 @@ class Verificateur:
         self._hash_function = hashes.SHA512
 
     def load_certificat(self):
-        with open('%s/certs/dev1.cert.pem' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/certs/think003.pivoine.mdugre.info.cert.pem.20190105' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             certificat = x509.load_pem_x509_certificate(
                 key_file.read(),
                 backend=default_backend()
@@ -70,41 +117,95 @@ class Verificateur:
             self.certificat = certificat
             self._logger.debug("Certificat charge: %s" % str(certificat))
 
-    def verifier_signature(self, dict_message, signature):
+    def verifier_message(self, message):
+        dict_message = json.loads(message)
+        signature = dict_message['_signature']
+
+        regex_ignorer = re.compile('^_.+')
+        keys = list()
+        keys.extend(dict_message.keys())
+        for cle in keys:
+            m = regex_ignorer.match(cle)
+            if m:
+                del dict_message[cle]
+                self._logger.debug("Enlever cle: %s" % cle)
+
+        self._logger.debug("Message nettoye: %s" % str(dict_message))
+
+        self._verifier_sujet(dict_message)
+        self._verifier_signature(dict_message, signature)
+
+    def _verifier_signature(self, dict_message, signature):
+        """
+        Verifie la signature du message avec le certificat.
+
+        :param dict_message:
+        :param signature:
+        :raises InvalidSignature: Lorsque la signature est invalide
+        :return:
+        """
         signature_bytes = base64.b64decode(signature)
         message_json = json.dumps(dict_message, sort_keys=True)
         message_bytes = bytes(message_json, 'utf-8')
 
         cle_publique = self.certificat.public_key()
-        try:
-            cle_publique.verify(
-                signature_bytes,
-                message_bytes,
-                padding.PSS(
-                    mgf=padding.MGF1(self._hash_function()),
-                    salt_length=padding.PSS.MAX_LENGTH
-                ),
-                self._hash_function()
+        cle_publique.verify(
+            signature_bytes,
+            message_bytes,
+            padding.PSS(
+                mgf=padding.MGF1(self._hash_function()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            self._hash_function()
+        )
+        self._logger.exception("Signature OK")
+
+    def _verifier_sujet(self, dict_message):
+        sujet = self.certificat.subject
+        self._logger.debug('Sujet du certificat')
+        for elem in sujet:
+            self._logger.debug("%s" % str(elem))
+
+        cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+        self._logger.debug("Common Name: %s" % cn)
+
+        message_noeud = dict_message['en_tete'].get('noeud')
+        if '@' in message_noeud:
+            message_noeud = message_noeud.split('@')[1]
+
+        resultat_comparaison = (cn == message_noeud)
+        if not resultat_comparaison:
+            raise Exception(
+                "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
+                (message_noeud, cn)
             )
-        except InvalidSignature:
-            self._logger.exception("Signature invalide")
-
-        self._logger.debug('Verification completee')
-
 
 def test():
     logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger('test')
+    logger.setLevel(logging.DEBUG)
     logging.getLogger('SignateurTest').setLevel(logging.DEBUG)
     logging.getLogger('Verificateur').setLevel(logging.DEBUG)
 
+    preparateur = PreparateurMessage()
+    message = preparateur.generer_entete('millegrilles.domaines.SenseursPassifs.lecture')
+    message.update({
+        'cle': 'valeur',
+        'nombre': 24
+    })
+
     signateur = SignateurTest()
     signateur.load_cle()
-    message = {'cle': 'valeur', 'nombre': 24}
-    signateur.signer_json(message)
+    signateur.load_certificat()
+    message_maj = signateur.signer_json(message)
+
+    message_maj_json = json.dumps(message_maj)
+    logger.debug("Message signe: %s" % message_maj_json)
 
     verificateur = Verificateur()
     verificateur.load_certificat()
-    verificateur.verifier_signature(message, signateur.signature)
+    verificateur.verifier_message(message_maj_json)
+    # verificateur.verifier_signature(message_maj, signateur.signature)
 
 
 # Main
