@@ -64,6 +64,16 @@ class SignateurTest:
             self.certificat = certificat
             self._logger.debug("Certificat charge: %s" % str(certificat))
 
+        # S'assurer que ce certificat set bien a signer
+        basic_constraints = certificat.extensions.get_extension_for_class(x509.BasicConstraints)
+        self._logger.debug("Basic Constraints: %s" % str(basic_constraints))
+        key_usage = certificat.extensions.get_extension_for_class(x509.KeyUsage).value
+        self._logger.debug("Key usage: %s" % str(key_usage))
+
+        supporte_signature_numerique = key_usage.digital_signature
+        if not supporte_signature_numerique:
+            raise Exception('Le certificat ne supporte pas les signatures numeriques')
+
     def signer_json(self, dict_message):
         # Copier la base du message et l'en_tete puisqu'ils seront modifies
         dict_message_effectif = dict_message.copy()
