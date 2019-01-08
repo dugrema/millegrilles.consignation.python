@@ -2,10 +2,13 @@ import logging
 import json
 import re
 import base64
+import binascii
 import datetime
 import uuid
 import getpass
 import socket
+import subprocess
+import os
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -14,6 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.x509.name import NameOID
+
 
 class PreparateurMessage:
 
@@ -65,6 +69,10 @@ class SignateurTest:
             self._logger.debug("Certificat charge: %s" % str(certificat))
 
     def _verifier_certificat(self, dict_message):
+        self._verifier_usage()
+        self._verifier_cn(dict_message)
+
+    def _verifier_usage(self):
         # S'assurer que ce certificat set bien a signer
         basic_constraints = self.certificat.extensions.get_extension_for_class(x509.BasicConstraints)
         self._logger.debug("Basic Constraints: %s" % str(basic_constraints))
@@ -75,6 +83,7 @@ class SignateurTest:
         if not supporte_signature_numerique:
             raise Exception('Le certificat ne supporte pas les signatures numeriques')
 
+    def _verifier_cn(self, dict_message):
         sujet = self.certificat.subject
         self._logger.debug('Sujet du certificat')
         for elem in sujet:
@@ -103,8 +112,8 @@ class SignateurTest:
         self._verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
 
         # Ajouter information du certification dans l'en_tete
-        fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA512())
-        fingerprint_cert = str(base64.b64encode(fingerprint_cert_bytes), 'utf-8')
+        fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA1())
+        fingerprint_cert = str(binascii.hexlify(fingerprint_cert_bytes), 'utf-8')
         self._logger.debug("Fingerprint: %s" % str(fingerprint_cert))
         en_tete['certificat'] = fingerprint_cert
 
@@ -135,6 +144,8 @@ class SignateurTest:
 
 class Verificateur:
 
+    PATH_CERTIFICATS_TEMP = '/home/mathieu/certificates/verification'
+
     def __init__(self):
         self.certificat = None
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -148,6 +159,39 @@ class Verificateur:
             )
             self.certificat = certificat
             self._logger.debug("Certificat charge: %s" % str(certificat))
+
+    def _verifier_chaine_certificats(self):
+        """ Verifie que la chaine de certicats remonte a un trusted CA """
+        trusted_ca_file = '/etc/ssl/certs/millegrilles_CA.pem'
+        bundle_signing = '%s/certs/millegrilles_signing_cert.pem' % SignateurTest.CERT_FOLDER
+
+        # Verifier si le certificat existe deja sur le disque
+        fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA1())
+        fingerprint_cert = str(binascii.hexlify(fingerprint_cert_bytes), 'utf-8')
+
+        if not os.path.isdir(Verificateur.PATH_CERTIFICATS_TEMP):
+            os.mkdir(Verificateur.PATH_CERTIFICATS_TEMP)
+        certificat_a_verifier = '%s/%s.pem' % (Verificateur.PATH_CERTIFICATS_TEMP, fingerprint_cert)
+        if not os.path.isfile(certificat_a_verifier):
+            self._logger.debug("Fichier certificat va etre sauvegarde: %s" % fingerprint_cert)
+            with open(certificat_a_verifier, "wb") as f:
+                f.write(self.certificat.public_bytes(serialization.Encoding.PEM))
+
+        # Utiliser openssl directement pour verifier la chaine de certification
+        resultat = subprocess.call([
+            'openssl', 'verify',
+            '-CAfile', trusted_ca_file,
+            '-untrusted', bundle_signing,
+            certificat_a_verifier
+        ])
+
+        self._logger.debug("Resultat verification chaine certificat: %d" % resultat)
+
+        if resultat == 2:
+            raise Exception("Certificat invalide, la chaine est incomplete")
+        elif resultat != 0:
+            raise Exception("Certificat invalide, code %d" % resultat)
+
 
     def verifier_message(self, message):
         dict_message = json.loads(message)
@@ -165,6 +209,7 @@ class Verificateur:
         self._logger.debug("Message nettoye: %s" % str(dict_message))
 
         self._verifier_sujet(dict_message)
+        self._verifier_chaine_certificats()
         self._verifier_signature(dict_message, signature)
 
     def _verifier_signature(self, dict_message, signature):
