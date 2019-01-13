@@ -92,21 +92,15 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Ajouter les index dans la collection de transactions
         collection_transactions = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
         collection_transactions.create_index([
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE),
-             1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 1),
             ('%s.%s' %
              (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
              1),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
         collection_transactions.create_index([
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR),
-             1),
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE, SenseursPassifsConstantes.TRANSACTION_NOEUD),
-             1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
             ('%s.%s' %
              (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
              1),
@@ -200,7 +194,7 @@ class TraitementMessageLecture(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get("evenements")
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
         if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer.
@@ -247,14 +241,13 @@ class ProducteurDocumentSenseurPassif:
     def maj_document_senseur(self, transaction):
 
         # Verifier si toutes les cles sont presentes
-        contenu_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE].copy()
-        noeud = contenu_transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD]
-        id_appareil = contenu_transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-        date_lecture_epoch = contenu_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
+        noeud = transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD]
+        id_appareil = transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+        date_lecture_epoch = transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
 
         # Transformer les donnees en format natif (plus facile a utiliser plus tard)
         date_lecture = datetime.datetime.fromtimestamp(date_lecture_epoch)   # Mettre en format date standard
-        contenu_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
+        transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
 
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         selection = {
@@ -272,13 +265,13 @@ class ProducteurDocumentSenseurPassif:
         }
 
         # Si location existe, s'assurer de l'ajouter uniquement lors de l'insertion (possible de changer manuellement)
-        if contenu_transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION) is not None:
+        if transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION) is not None:
             operation['$setOnInsert'][SenseursPassifsConstantes.TRANSACTION_LOCATION] = \
-                contenu_transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
-            del contenu_transaction[SenseursPassifsConstantes.TRANSACTION_LOCATION]
+                transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
+            del transaction[SenseursPassifsConstantes.TRANSACTION_LOCATION]
 
         # Mettre a jour les informations du document en copiant ceux de la transaction
-        operation['$set'] = contenu_transaction
+        operation['$set'] = transaction
 
         self._logger.debug("Donnees senseur passif: selection=%s, operation=%s" % (str(selection), str(operation)))
 

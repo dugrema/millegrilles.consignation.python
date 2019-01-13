@@ -131,7 +131,7 @@ class TraitementMessagePrincipale(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get("evenements")
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
         if evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
@@ -164,9 +164,8 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
 
-        ts_alerte = transaction_chargeutile['alerte']['ts']
+        ts_alerte = transaction['alerte']['ts']
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
         collection_domaine = self.document_dao().get_collection(ConstantesPrincipale.COLLECTION_NOM)
@@ -188,19 +187,18 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
 
-        if transaction_chargeutile.get('message') is None:
+        if transaction.get('message') is None:
             raise ValueError("L'alerte doit avoir un element 'message'")
 
-        if transaction_chargeutile.get('ts') is None:
-            transaction_chargeutile['ts'] = int(datetime.datetime.utcnow().timestamp() * 1000)
+        if transaction.get('ts') is None:
+            transaction['ts'] = int(datetime.datetime.utcnow().timestamp() * 1000)
 
         # Ajouter au document d'alerte
         collection_domaine = self.document_dao().get_collection(ConstantesPrincipale.COLLECTION_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
-        operation = {'$push': {'alertes': transaction_chargeutile}}
+        operation = {'$push': {'alertes': transaction}}
         resultat = collection_domaine.update(filtre, operation)
 
         if resultat['nModified'] != 1:

@@ -6,6 +6,7 @@ import socket
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.SecuritePKI import SignateurTransaction
 
 
 # Generateur de transaction - peut etre reutilise.
@@ -24,6 +25,9 @@ class GenerateurTransaction:
         else:
             self._message_dao = message_dao
 
+        self.signateur_transaction = SignateurTransaction(configuration)
+        self.signateur_transaction.initialiser()
+
     def connecter(self):
         self._message_dao.connecter()
 
@@ -39,7 +43,7 @@ class GenerateurTransaction:
     '''
     def soumettre_transaction(self, message_dict, domaine=None):
         # Preparer la structure du message reconnue par MilleGrilles
-        enveloppe = GenerateurTransaction.preparer_enveloppe(message_dict, domaine)
+        enveloppe = self.preparer_enveloppe(message_dict, domaine)
 
         # Extraire le UUID pour le retourner a l'invoqueur de la methode. Utilise pour retracer une soumission.
         uuid_transaction = enveloppe.get(
@@ -50,8 +54,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    @staticmethod
-    def preparer_enveloppe(message_dict, domaine=None):
+    def preparer_enveloppe(self, message_dict, domaine=None):
 
         # Identifier usager du systeme, nom de domaine
         identificateur_systeme = '%s@%s' % (getpass.getuser(), socket.getfqdn())
@@ -72,5 +75,6 @@ class GenerateurTransaction:
         enveloppe.update(message_dict)
 
         # Signer le message avec le certificat du noeud
+        message_signe = self.signateur_transaction.signer(enveloppe)
 
-        return enveloppe
+        return message_signe

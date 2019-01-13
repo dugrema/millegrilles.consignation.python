@@ -28,16 +28,6 @@ class TransactionHelper:
 
     def sauvegarder_nouvelle_transaction(self, _collection_transactions, enveloppe_transaction):
 
-        # Ajouter l'element evenements et l'evenement de persistance
-        estampille = enveloppe_transaction['info-transaction']['estampille']
-        # Changer estampille du format epoch en un format date
-        date_estampille = datetime.datetime.fromtimestamp(estampille)
-        enveloppe_transaction['info-transaction']['estampille'] = date_estampille
-        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
-            Constantes.EVENEMENT_TRANSACTION_NOUVELLE: [date_estampille],
-            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.utcnow()]
-        }
-
         resultat = _collection_transactions.insert_one(enveloppe_transaction)
         doc_id = resultat.inserted_id
 

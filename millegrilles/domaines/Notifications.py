@@ -142,7 +142,7 @@ class TraitementMessageNotification(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get("evenements")
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
         if evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
@@ -329,13 +329,12 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
     def initiale(self):
         parametres = self.parametres
         transaction = self.charger_transaction()
-        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
         collection_notifications = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_NOM)
 
         self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
-        self._logger.debug("Message de l'action usager: %s" % str(transaction_chargeutile))
-        id_notification = transaction_chargeutile[NotificationsConstantes.LIBELLE_ID_NOTIFICATION]
-        action_usager = transaction_chargeutile[NotificationsConstantes.LIBELLE_ACTION]
+        self._logger.debug("Message de l'action usager: %s" % str(transaction))
+        id_notification = transaction[NotificationsConstantes.LIBELLE_ID_NOTIFICATION]
+        action_usager = transaction[NotificationsConstantes.LIBELLE_ACTION]
 
         filtre_notification = {'_id': ObjectId(id_notification)}
         operations_set = {
@@ -385,10 +384,9 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
         """ Calcule le delai d'attente pour une action. Utilise l'estampille de la transaction pour calculer
             le delai. """
 
-        transaction_chargeutile = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE]
         estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
 
-        attente_secondes = transaction_chargeutile.get(NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION)
+        attente_secondes = transaction.get(NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION)
         if attente_secondes is None:
             # Defaut 24h
             attente_secondes = 24 * 60 * 60

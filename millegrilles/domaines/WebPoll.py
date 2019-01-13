@@ -236,7 +236,7 @@ class TraitementMessageWebPoll(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get("evenements")
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
         if evenement == Constantes.EVENEMENT_CEDULEUR:
             self._gestionnaire.traiter_cedule(message_dict)

@@ -33,10 +33,10 @@ DEFAUT_QUEUE_GENERATEUR_DOCUMENTS = 'generateur_documents'
 DEFAUT_QUEUE_NOTIFICATIONS = 'notifications'
 
 DEFAUT_HOSTNAME = 'localhost'
-DEFAUT_KEYFILE = '/usr/local/etc/millegrilles/certs/keys/millegrilles.pem'
-DEFAUT_KEYCERTFILE = '/usr/local/etc/millegrilles/certs/keys/millegrilles.pem.key_cert'
-DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/millegrilles.cert.pem'
-DEFAUT_CA_CERTS = '/usr/local/etc/millegrilles/certs/millegrilles.authority.pem'
+DEFAUT_KEYFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'
+DEFAUT_KEYCERTFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key_cert'
+DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert'
+DEFAUT_CA_CERTS = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.CAchain'
 
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
@@ -73,20 +73,16 @@ PREFIXE_ENV_MG = 'MG_'
 TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME = 'source-systeme'
 TRANSACTION_MESSAGE_LIBELLE_ID_MONGO = '_id-transaction'
 TRANSACTION_MESSAGE_LIBELLE_UUID = 'uuid-transaction'
-TRANSACTION_MESSAGE_LIBELLE_EVENEMENT = '_evenements'  # Precedemment evenements (sans underscore)
+TRANSACTION_MESSAGE_LIBELLE_EVENEMENT = '_evenement'  # Precedemment evenements (sans underscore)
 TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE = 'estampille'
 TRANSACTION_MESSAGE_LIBELLE_SIGNATURE = '_signature'
 TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION = 'en-tete'  # Precedemment info-transaction
 TRANSACTION_MESSAGE_LIBELLE_EN_TETE = 'en-tete'
-TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE = 'charge-utile'  # Deprecated
+# TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE = 'charge-utile'  # Deprecated
 TRANSACTION_MESSAGE_LIBELLE_DOMAINE = 'domaine'
 TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT = 'certificat'
 TRANSACTION_MESSAGE_LIBELLE_VERSION = 'version'
 TRANSACTION_MESSAGE_LIBELLE_VERSION_COURANTE = 2
-
-# Constantes de processus
-PROCESSUS_ETAPE_INITIALE = 'initiale'
-PROCESSUS_ETAPE_FINALE = 'finale'
 
 PROCESSUS_DOCUMENT_LIBELLE_MOTEUR = 'moteur'
 PROCESSUS_MESSAGE_LIBELLE_PROCESSUS = 'processus'
@@ -115,7 +111,7 @@ DOCUMENT_INFODOC_DERNIERE_MODIFICATION = '_mg-derniere-modification'
 DOCUMENT_INFODOC_DATE_CREATION = '_mg-creation'
 
 # Evenements
-EVENEMENT_MESSAGE_EVENEMENT = 'evenement'
+EVENEMENT_MESSAGE_EVENEMENT = TRANSACTION_MESSAGE_LIBELLE_EVENEMENT
 EVENEMENT_TRANSACTION_NOUVELLE = 'transaction_nouvelle'
 EVENEMENT_TRANSACTION_TRAITEE = 'transaction_traitee'
 EVENEMENT_TRANSACTION_PERSISTEE = 'transaction_persistee'
