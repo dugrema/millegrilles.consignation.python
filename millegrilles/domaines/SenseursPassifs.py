@@ -161,7 +161,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Declencher l'aggregation horaire des lectures
         domaine = '%s.MAJHoraire' % SenseursPassifsConstantes.DOMAINE_NOM
         dict_message = {
-            'evenements': SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE,
             'timestamp': datetime.datetime.utcnow().isoformat()
         }
         self.transmettre_declencheur_domaine(domaine, dict_message)
@@ -171,7 +171,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Declencher l'aggregation quotidienne des lectures
         domaine = '%s.MAJQuotidienne' % SenseursPassifsConstantes.DOMAINE_NOM
         dict_message = {
-            'evenements': SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE,
             'timestamp': datetime.datetime.utcnow().isoformat()
         }
         self.transmettre_declencheur_domaine(domaine, dict_message)
