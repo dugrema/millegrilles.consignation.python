@@ -400,7 +400,7 @@ class FormatteurEvenementNotification:
 
     TEMPLATE_NOTIFICATION = {
         "domaine": None,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_NOTIFICATION,
+        Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_NOTIFICATION,
         "source": {
             "_collection": None,
             "_id": None

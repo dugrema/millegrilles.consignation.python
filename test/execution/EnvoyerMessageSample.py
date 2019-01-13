@@ -1,5 +1,7 @@
 # Script de test pour transmettre message de transaction
 
+import datetime
+
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
@@ -10,13 +12,13 @@ def envoyer_message_test_senseur_lecture():
     lecture_modele = {
         'millivolt': 2911,
         'version': 6,
-        'temps_lecture': 1537504060,
-        'humidite': 54.9,
-        'location': 'NA',
-        'pression': 101.5,
+        'temps_lecture': int(datetime.datetime.utcnow().timestamp()),
+        'humidite': 54.8,
+        'location': 'CUISINE',
+        'pression': 101.6,
         'senseur': 16,
         'noeud': 'test',
-        'temperature': 21.00
+        'temperature': 21.60
     }
 
     enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'millegrilles.domaines.SenseursPassifs.lecture')

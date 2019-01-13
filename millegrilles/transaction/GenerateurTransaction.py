@@ -2,6 +2,7 @@ import uuid
 import datetime
 import getpass
 import socket
+import re
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
@@ -78,3 +79,20 @@ class GenerateurTransaction:
         message_signe = self.signateur_transaction.signer(enveloppe)
 
         return message_signe
+
+
+class TransactionOperations:
+
+    def __init__(self):
+        pass
+
+    def enlever_champsmeta(self, transaction):
+        copie = transaction.copy()
+
+        regex_ignorer = re.compile('^_.+')
+        for cle in transaction.keys():
+            m = regex_ignorer.match(cle)
+            if m:
+                del copie[cle]
+
+        return copie

@@ -9,6 +9,7 @@ from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
+from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
 
 
@@ -241,13 +242,16 @@ class ProducteurDocumentSenseurPassif:
     def maj_document_senseur(self, transaction):
 
         # Verifier si toutes les cles sont presentes
-        noeud = transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD]
-        id_appareil = transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-        date_lecture_epoch = transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
+        operations = TransactionOperations()
+        copie_transaction = operations.enlever_champsmeta(transaction)
+
+        noeud = copie_transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD]
+        id_appareil = copie_transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+        date_lecture_epoch = copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
 
         # Transformer les donnees en format natif (plus facile a utiliser plus tard)
         date_lecture = datetime.datetime.fromtimestamp(date_lecture_epoch)   # Mettre en format date standard
-        transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
+        copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
 
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         selection = {
@@ -265,13 +269,13 @@ class ProducteurDocumentSenseurPassif:
         }
 
         # Si location existe, s'assurer de l'ajouter uniquement lors de l'insertion (possible de changer manuellement)
-        if transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION) is not None:
+        if copie_transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION) is not None:
             operation['$setOnInsert'][SenseursPassifsConstantes.TRANSACTION_LOCATION] = \
-                transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
-            del transaction[SenseursPassifsConstantes.TRANSACTION_LOCATION]
+                copie_transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
+            del copie_transaction[SenseursPassifsConstantes.TRANSACTION_LOCATION]
 
         # Mettre a jour les informations du document en copiant ceux de la transaction
-        operation['$set'] = transaction
+        operation['$set'] = copie_transaction
 
         self._logger.debug("Donnees senseur passif: selection=%s, operation=%s" % (str(selection), str(operation)))
 

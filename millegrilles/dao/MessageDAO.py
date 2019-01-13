@@ -215,7 +215,7 @@ class PikaDAO:
         message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: "transaction_persistee"
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee"
         }
         message_utf8 = self.json_helper.dict_vers_json(message)
 
@@ -266,7 +266,7 @@ class PikaDAO:
     def transmettre_evenement_ceduleur(self, ts_dict, indicateurs):
 
         message = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_CEDULEUR,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_CEDULEUR,
             'timestamp': ts_dict,
             'indicateurs': indicateurs
         }
