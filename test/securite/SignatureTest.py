@@ -208,7 +208,7 @@ class Verificateur:
 
         self._logger.debug("Message nettoye: %s" % str(dict_message))
 
-        #self._verifier_sujet(dict_message)
+        self._verifier_sujet(dict_message)
         #self._verifier_chaine_certificats()
         self._verifier_signature(dict_message, signature)
 

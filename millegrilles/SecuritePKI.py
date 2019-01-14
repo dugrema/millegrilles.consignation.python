@@ -69,7 +69,7 @@ class SignateurTransaction:
 
         message_noeud = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME)
-        if message_noeud is not None and  '@' in message_noeud:
+        if message_noeud is not None and '@' in message_noeud:
             message_noeud = message_noeud.split('@')[1]
 
         resultat_comparaison = (cn == message_noeud)
