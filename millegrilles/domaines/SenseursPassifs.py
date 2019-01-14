@@ -88,12 +88,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         collection_domaine.create_index([
             (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
             (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
         ])
         # Ajouter les index dans la collection de transactions
         collection_transactions = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
         collection_transactions.create_index([
-            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
             ('%s.%s' %
              (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
              1),
