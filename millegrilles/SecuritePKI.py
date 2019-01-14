@@ -4,10 +4,7 @@ import json
 import re
 import base64
 import binascii
-import datetime
-import uuid
 import getpass
-import socket
 import subprocess
 import os
 
@@ -16,14 +13,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
-from cryptography.exceptions import InvalidSignature
 from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
 
 
-class SignateurTransaction:
-    """ Signe une transaction avec le certificat du noeud. """
+class UtilCertificats:
 
     def __init__(self, configuration):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
@@ -43,9 +38,51 @@ class SignateurTransaction:
 
         self.enveloppe = EnveloppeCertificat(self.certificat)
 
-    def _verifier_certificat(self, dict_message):
+    def preparer_transaction_bytes(self, transaction_dict):
+        """
+        Prepare une transaction (dictionnaire) pour la signature ou la verification. Retourne des bytes.
+
+        :param transaction_dict: Dictionnaire de la transaction a verifier.
+        :return: Transaction nettoyee en bytes.
+        """
+
+        transaction_temp = transaction_dict.copy()
+        regex_ignorer = re.compile('^_.+')
+        keys = list()
+        keys.extend(transaction_temp.keys())
+        for cle in keys:
+            m = regex_ignorer.match(cle)
+            if m:
+                del transaction_temp[cle]
+                self._logger.debug("Enlever cle: %s" % cle)
+
+        self._logger.debug("Message nettoye: %s" % str(transaction_temp))
+        message_json = json.dumps(transaction_temp, sort_keys=True, separators=(',', ':'))
+        message_bytes = bytes(message_json, 'utf-8')
+
+        return message_bytes
+
+    def verifier_certificat(self, dict_message):
         # self._verifier_usage()  # Deja fait au chargement
         self._verifier_cn(dict_message)
+
+    def _charger_certificat(self):
+        certfile_path = self.configuration.mq_certfile
+        with open(certfile_path, "rb") as certfile:
+            self.certificat = x509.load_pem_x509_certificate(
+                certfile.read(),
+                backend=default_backend()
+            )
+
+    def _charger_cle_privee(self):
+        keyfile_path = self.configuration.mq_keyfile
+        with open(keyfile_path, "rb") as keyfile:
+            cle = serialization.load_pem_private_key(
+                keyfile.read(),
+                password=None,
+                backend=default_backend()
+            )
+            self._cle = cle
 
     def _verifier_usage(self):
         # S'assurer que ce certificat set bien a signer
@@ -79,6 +116,45 @@ class SignateurTransaction:
                 (message_noeud, cn)
             )
 
+    # def _verifier_chaine_certificats(self):
+    #     """ Verifie que la chaine de certicats remonte a un trusted CA """
+        # trusted_ca_file = '/usr/local/etc/millegrilles/certs/millegrilles.RootCA.pem'
+        # bundle_signing = '%s/pki.millegrilles.ssl.CAchain' % SignateurTest.CERT_FOLDER
+
+        # Verifier si le certificat existe deja sur le disque
+        # fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA1())
+        # fingerprint_cert = str(binascii.hexlify(fingerprint_cert_bytes), 'utf-8')
+
+        # if not os.path.isdir(Verificateur.PATH_CERTIFICATS_TEMP):
+        #     os.mkdir(Verificateur.PATH_CERTIFICATS_TEMP)
+        # certificat_a_verifier = '%s/%s.pem' % (Verificateur.PATH_CERTIFICATS_TEMP, fingerprint_cert)
+        # if not os.path.isfile(certificat_a_verifier):
+        #     self._logger.debug("Fichier certificat va etre sauvegarde: %s" % fingerprint_cert)
+        #     with open(certificat_a_verifier, "wb") as f:
+        #         f.write(self.certificat.public_bytes(serialization.Encoding.PEM))
+
+        # Utiliser openssl directement pour verifier la chaine de certification
+        # resultat = subprocess.call([
+        #     'openssl', 'verify',
+        #     '-CAfile', trusted_ca_file,
+        #     '-untrusted', bundle_signing,
+        #     certificat_a_verifier
+        # ])
+        #
+        # self._logger.debug("Resultat verification chaine certificat: %d" % resultat)
+        #
+        # if resultat == 2:
+        #     raise Exception("Certificat invalide, la chaine est incomplete")
+        # elif resultat != 0:
+        #     raise Exception("Certificat invalide, code %d" % resultat)
+
+class SignateurTransaction(UtilCertificats):
+    """ Signe une transaction avec le certificat du noeud. """
+
+    def __init__(self, configuration):
+        super().__init__(configuration)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
     def signer(self, dict_message):
         """
         Signe le message et retourne une nouvelle version. Ajout l'information pour le certificat.
@@ -92,7 +168,7 @@ class SignateurTransaction:
         en_tete = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].copy()
         dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = en_tete
 
-        self._verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
+        self.verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
 
         # Ajouter information du certification dans l'en_tete
         fingerprint_cert = self.enveloppe.fingerprint_ascii
@@ -105,9 +181,8 @@ class SignateurTransaction:
         return dict_message_effectif
 
     def _produire_signature(self, dict_message):
-        message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
-        message_bytes = bytes(message_json, 'utf-8')
-        self._logger.debug("Message en format json: %s" % message_json)
+        message_bytes = self.preparer_transaction_bytes(dict_message)
+        self._logger.debug("Message en format json: %s" % message_bytes)
 
         signature = self._cle.sign(
             message_bytes,
@@ -123,34 +198,77 @@ class SignateurTransaction:
 
         return signature_texte_utf8
 
-    def _charger_certificat(self):
-        certfile_path = self.configuration.mq_certfile
-        with open(certfile_path, "rb") as certfile:
-            self.certificat = x509.load_pem_x509_certificate(
-                certfile.read(),
-                backend=default_backend()
-            )
 
-    def _charger_cle_privee(self):
-        keyfile_path = self.configuration.mq_keyfile
-        with open(keyfile_path, "rb") as keyfile:
-            cle = serialization.load_pem_private_key(
-                keyfile.read(),
-                password=None,
-                backend=default_backend()
-            )
-            self._cle = cle
-
-
-class VerificateurTransaction:
+class VerificateurTransaction(UtilCertificats):
     """ Verifie la signature des transactions. """
 
-    def __init__(self):
+    def __init__(self, configuration):
+        super().__init__(configuration)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def charger_certificat(self):
-        pass
+    def verifier(self, transaction):
+        """
+        Verifie la signature d'une transaction.
 
+        :param transaction: Transaction str ou dict.
+        :raises: InvalidSignature si la signature est invalide.
+        :return: True si valide.
+        """
+
+        if transaction is str:
+            dict_message = json.loads(transaction)
+        elif transaction is dict:
+            dict_message = transaction
+        else:
+            raise TypeError("La transaction doit etre en format str ou dict")
+
+        signature = dict_message['_signature']
+
+        if signature is None:
+            raise ValueError("La _signature n'existe pas sur la transaction")
+
+        regex_ignorer = re.compile('^_.+')
+        keys = list()
+        keys.extend(dict_message.keys())
+        for cle in keys:
+            m = regex_ignorer.match(cle)
+            if m:
+                del dict_message[cle]
+                self._logger.debug("Enlever cle: %s" % cle)
+
+        self._logger.debug("Message nettoye: %s" % str(dict_message))
+
+        self._verifier_cn(dict_message)
+        #self._verifier_chaine_certificats()
+        self._verifier_signature(dict_message, signature)
+
+        return True
+
+    def _verifier_signature(self, dict_message, signature):
+        """
+        Verifie la signature du message avec le certificat.
+
+        :param dict_message:
+        :param signature:
+        :raises InvalidSignature: Lorsque la signature est invalide
+        :return:
+        """
+        signature_bytes = base64.b64decode(signature)
+        message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
+        message_bytes = bytes(message_json, 'utf-8')
+        self._logger.debug("Message pour verifier signature: %s" % str(message_json))
+
+        cle_publique = self.certificat.public_key()
+        cle_publique.verify(
+            signature_bytes,
+            message_bytes,
+            padding.PSS(
+                mgf=padding.MGF1(self._hash_function()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            self._hash_function()
+        )
+        self._logger.debug("Signature OK")
 
 class VerificateurCertificats:
     """

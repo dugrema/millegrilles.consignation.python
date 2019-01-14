@@ -236,7 +236,7 @@ class Verificateur:
             ),
             self._hash_function()
         )
-        self._logger.exception("Signature OK")
+        self._logger.debug("Signature OK")
 
     def _verifier_sujet(self, dict_message):
         sujet = self.certificat.subject
