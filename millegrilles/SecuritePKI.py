@@ -105,7 +105,7 @@ class SignateurTransaction:
         return dict_message_effectif
 
     def _produire_signature(self, dict_message):
-        message_json = json.dumps(dict_message, sort_keys=True)
+        message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
         message_bytes = bytes(message_json, 'utf-8')
         self._logger.debug("Message en format json: %s" % message_json)
 

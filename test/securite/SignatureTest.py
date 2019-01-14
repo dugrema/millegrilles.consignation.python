@@ -39,7 +39,7 @@ class PreparateurMessage:
 
 class SignateurTest:
 
-    CERT_FOLDER = '/home/mathieu/certificates/millegrilles'
+    CERT_FOLDER = '/usr/local/etc/millegrilles'
 
     def __init__(self):
         self.cle = None
@@ -50,7 +50,7 @@ class SignateurTest:
         self._hash_function = hashes.SHA512
 
     def load_cle(self):
-        with open('%s/privkeys/think003.pivoine.mdugre.info.pem.20190105' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/pki.millegrilles.ssl.key' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             cle = serialization.load_pem_private_key(
                 key_file.read(),
                 password=None,
@@ -60,7 +60,7 @@ class SignateurTest:
             self._logger.debug("Cle privee chargee")
 
     def load_certificat(self):
-        with open('%s/certs/think003.pivoine.mdugre.info.cert.pem.20190105' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/pki.millegrilles.ssl.cert' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             certificat = x509.load_pem_x509_certificate(
                 key_file.read(),
                 backend=default_backend()
@@ -123,7 +123,7 @@ class SignateurTest:
         return dict_message_effectif
 
     def _produire_signature(self, dict_message):
-        message_json = json.dumps(dict_message, sort_keys=True)
+        message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
         message_bytes = bytes(message_json, 'utf-8')
         self._logger.debug("Message en format json: %s" % message_json)
 
@@ -144,7 +144,7 @@ class SignateurTest:
 
 class Verificateur:
 
-    PATH_CERTIFICATS_TEMP = '/home/mathieu/certificates/verification'
+    PATH_CERTIFICATS_TEMP = '/usr/local/etc/millegrilles'
 
     def __init__(self):
         self.certificat = None
@@ -152,7 +152,7 @@ class Verificateur:
         self._hash_function = hashes.SHA512
 
     def load_certificat(self):
-        with open('%s/certs/think003.pivoine.mdugre.info.cert.pem.20190105' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
+        with open('%s/pki.millegrilles.ssl.cert' % SignateurTest.CERT_FOLDER, 'rb') as key_file:
             certificat = x509.load_pem_x509_certificate(
                 key_file.read(),
                 backend=default_backend()
@@ -162,8 +162,8 @@ class Verificateur:
 
     def _verifier_chaine_certificats(self):
         """ Verifie que la chaine de certicats remonte a un trusted CA """
-        trusted_ca_file = '/etc/ssl/certs/millegrilles_CA.pem'
-        bundle_signing = '%s/certs/millegrilles_signing_cert.pem' % SignateurTest.CERT_FOLDER
+        trusted_ca_file = '/usr/local/etc/millegrilles/certs/millegrilles.RootCA.pem'
+        bundle_signing = '%s/pki.millegrilles.ssl.CAchain' % SignateurTest.CERT_FOLDER
 
         # Verifier si le certificat existe deja sur le disque
         fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA1())
@@ -174,8 +174,8 @@ class Verificateur:
         certificat_a_verifier = '%s/%s.pem' % (Verificateur.PATH_CERTIFICATS_TEMP, fingerprint_cert)
         if not os.path.isfile(certificat_a_verifier):
             self._logger.debug("Fichier certificat va etre sauvegarde: %s" % fingerprint_cert)
-            with open(certificat_a_verifier, "wb") as f:
-                f.write(self.certificat.public_bytes(serialization.Encoding.PEM))
+#            with open(certificat_a_verifier, "wb") as f:
+#                f.write(self.certificat.public_bytes(serialization.Encoding.PEM))
 
         # Utiliser openssl directement pour verifier la chaine de certification
         resultat = subprocess.call([
@@ -208,8 +208,8 @@ class Verificateur:
 
         self._logger.debug("Message nettoye: %s" % str(dict_message))
 
-        self._verifier_sujet(dict_message)
-        self._verifier_chaine_certificats()
+        #self._verifier_sujet(dict_message)
+        #self._verifier_chaine_certificats()
         self._verifier_signature(dict_message, signature)
 
     def _verifier_signature(self, dict_message, signature):
@@ -222,8 +222,9 @@ class Verificateur:
         :return:
         """
         signature_bytes = base64.b64decode(signature)
-        message_json = json.dumps(dict_message, sort_keys=True)
+        message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
         message_bytes = bytes(message_json, 'utf-8')
+        self._logger.debug("Message pour verifier signature: %s" % str(message_json))
 
         cle_publique = self.certificat.public_key()
         cle_publique.verify(
@@ -246,8 +247,8 @@ class Verificateur:
         cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
         self._logger.debug("Common Name: %s" % cn)
 
-        message_noeud = dict_message['en_tete'].get('noeud')
-        if '@' in message_noeud:
+        message_noeud = dict_message['en-tete'].get('source-systeme')
+        if message_noeud is not None and '@' in message_noeud:
             message_noeud = message_noeud.split('@')[1]
 
         resultat_comparaison = (cn == message_noeud)
@@ -285,5 +286,19 @@ def test():
     # verificateur.verifier_signature(message_maj, signateur.signature)
 
 
+def test_load_message():
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger('test')
+    logging.getLogger('Verificateur').setLevel(logging.DEBUG)
+
+    with open('/home/mathieu/message.json', 'r') as f:
+        message = f.read()
+
+    verificateur = Verificateur()
+    verificateur.load_certificat()
+    verificateur.verifier_message(message)
+
+
 # Main
-test()
+#test()
+test_load_message()
