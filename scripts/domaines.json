@@ -19,6 +19,10 @@
     {
       "module": "millegrilles.domaines.Principale",
       "classe": "GestionnairePrincipale"
+    },
+    {
+      "module": "millegrilles.domaines.Pki",
+      "classe": "GestionnairePki"
     }
   ]
 }

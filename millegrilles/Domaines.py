@@ -1,4 +1,5 @@
 # Module avec utilitaires generiques pour mgdomaines
+from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper
 from millegrilles.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
@@ -6,6 +7,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 import logging
 import json
+import datetime
 
 from pika.exceptions import ChannelClosed
 
@@ -206,6 +208,9 @@ class GestionnaireDomaine:
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
+    def traiter_cedule(self, message):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
     ''' Arrete le traitement des messages pour le domaine '''
     def arreter_traitement_messages(self):
         self._arret_en_cours = True
@@ -216,6 +221,35 @@ class GestionnaireDomaine:
     def demarrer_processus(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
 
+    def initialiser_document(self, mg_libelle, doc_defaut):
+        """
+        Insere un document de configuration du domaine, au besoin. Le libelle doit etre unique dans la collection.
+        :param mg_libelle: Libelle a donner au document
+        :param doc_defaut: Document a inserer.
+        :return:
+        """
+        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
+        collection_domaine = self.get_collection()
+
+        # Trouver le document de configuration
+        document_configuration = collection_domaine.find_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}
+        )
+        if document_configuration is None:
+            self._logger.info("On insere le document %s pour domaine Principale" % mg_libelle)
+
+            # Preparation document de configuration pour le domaine
+            configuration_initiale = doc_defaut.copy()
+            maintenant = datetime.datetime.utcnow()
+            configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
+            configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+
+            collection_domaine.insert(configuration_initiale)
+        else:
+            self._logger.info("Document de %s pour %s: %s" % (
+                mg_libelle, str(document_configuration), self.__class__.__name__
+            ))
+
     '''
     Implementer cette methode pour retourner le nom de la queue.
     
@@ -223,6 +257,12 @@ class GestionnaireDomaine:
     '''
     def get_nom_queue(self):
         raise NotImplementedError("Methode non-implementee")
+
+    def get_nom_collection(self):
+        raise NotImplementedError("Methode non-implementee")
+
+    def get_collection(self):
+        return self.document_dao.get_collection(self.get_nom_collection())
 
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
