@@ -27,11 +27,12 @@ class PreparateurMessage:
 
     def generer_entete(self, domaine):
         message_ref = {
-            "en_tete": {
+            "en-tete": {
                 "domaine": domaine,
                 "estampille": int(datetime.datetime.utcnow().timestamp()),
                 "noeud": self._identificateur_systeme,
-                "uuid": str(uuid.uuid4())
+                "uuid": str(uuid.uuid4()),
+                "source-systeme": "test@dev2.maple.mdugre.info"
             }
         }
 
@@ -74,10 +75,17 @@ class SignateurTest:
 
     def _verifier_usage(self):
         # S'assurer que ce certificat set bien a signer
+        self._logger.debug("Certificat extensions: %s" % str(self.certificat.extensions))
+
         basic_constraints = self.certificat.extensions.get_extension_for_class(x509.BasicConstraints)
         self._logger.debug("Basic Constraints: %s" % str(basic_constraints))
         key_usage = self.certificat.extensions.get_extension_for_class(x509.KeyUsage).value
         self._logger.debug("Key usage: %s" % str(key_usage))
+        subjectKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
+        authorityKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
+        self._logger.debug("Certificate Subject Key Identifier: %s" % subjectKeyIdentifier)
+        self._logger.debug("Certificate issuer: %s" % binascii.hexlify(authorityKeyIdentifier.value.key_identifier))
+        self._logger.debug("Subject key identifier: %s" % binascii.hexlify(subjectKeyIdentifier.value.digest))
 
         supporte_signature_numerique = key_usage.digital_signature
         if not supporte_signature_numerique:
@@ -92,7 +100,7 @@ class SignateurTest:
         cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
         self._logger.debug("Common Name: %s" % cn)
 
-        message_noeud = dict_message['en_tete'].get('noeud')
+        message_noeud = dict_message['en-tete'].get('noeud')
         if '@' in message_noeud:
             message_noeud = message_noeud.split('@')[1]
 
@@ -106,8 +114,8 @@ class SignateurTest:
     def signer_json(self, dict_message):
         # Copier la base du message et l'en_tete puisqu'ils seront modifies
         dict_message_effectif = dict_message.copy()
-        en_tete = dict_message['en_tete'].copy()
-        dict_message_effectif['en_tete'] = en_tete
+        en_tete = dict_message['en-tete'].copy()
+        dict_message_effectif['en-tete'] = en_tete
 
         self._verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
 
@@ -300,5 +308,5 @@ def test_load_message():
 
 
 # Main
-#test()
-test_load_message()
+test()
+#test_load_message()

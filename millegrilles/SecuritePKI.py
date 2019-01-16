@@ -148,6 +148,7 @@ class UtilCertificats:
         # elif resultat != 0:
         #     raise Exception("Certificat invalide, code %d" % resultat)
 
+
 class SignateurTransaction(UtilCertificats):
     """ Signe une transaction avec le certificat du noeud. """
 
@@ -270,7 +271,8 @@ class VerificateurTransaction(UtilCertificats):
         )
         self._logger.debug("Signature OK")
 
-class VerificateurCertificats:
+
+class VerificateurCertificats(UtilCertificats):
     """
     Verifie les certificats en utilisant les certificats CA et openssl.
 
@@ -280,6 +282,7 @@ class VerificateurCertificats:
     """
 
     def __init__(self, contexte):
+        super().__init__(contexte.configuration)
         self._contexte = contexte
         self._cache_certificats = dict()
 
@@ -289,46 +292,43 @@ class VerificateurCertificats:
         # Valider le certificat
         self._cache_certificats[fingerprint] = EnveloppeCertificat(fingerprint, certificat)
 
-    def _charger_certificat(self, fingerprint):
-        certificat = self._cache_certificats.get(fingerprint)
+    def charger_certificat(self, fichier=None, fingerprint=None):
+        # Tenter de charger a partir d'une copie locale
+        if os.path.isfile(fichier):
+            with open(fichier, "rb") as certfile:
+                certificat = x509.load_pem_x509_certificate(
+                    certfile.read(),
+                    backend=default_backend()
+                )
 
-        if certificat is None:
-            # Tenter de charger a partir d'une copie locale
-            fichier = '%s' % fingerprint
-            if os.path.isfile(fichier):
-                with open(fichier, "rb") as certfile:
-                    certificat = x509.load_pem_x509_certificate(
-                        certfile.read(),
-                        backend=default_backend()
-                    )
+        enveloppe = EnveloppeCertificat(certificat)
 
-            if certificat is None:
-                # Tenter de charger a partir de MongoDB.
-                pass
-
-                if certificat is None:
-                    raise CertificatInconnu("Certificat inconnu: %s" % fingerprint)
-
-        return certificat
+        return enveloppe
 
 
 class EnveloppeCertificat:
     """ Encapsule un certificat. """
 
-    def __init__(self, certificat, fingerprint=None):
+    def __init__(self, certificat=None, certificat_pem=None, fingerprint=None):
         """
         :param fingerprint: Fingerprint en binascii (lowercase, pas de :) du certificat
         """
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self._certificat = certificat
+        if certificat_pem is not None:
+            self._certificat = x509.load_pem_x509_certificate(
+                certificat_pem,
+                backend=default_backend()
+            )
+        else:
+            self._certificat = certificat
         self._repertoire_certificats = None
 
         if fingerprint is not None:
             self._fingerprint = fingerprint
         else:
-            self._fingerprint = EnveloppeCertificat.calculer_fingerprint(certificat)
+            self._fingerprint = EnveloppeCertificat.calculer_fingerprint(self._certificat)
 
     @staticmethod
     def calculer_fingerprint(certificat):
@@ -345,6 +345,43 @@ class EnveloppeCertificat:
     @property
     def certificat(self):
         return self._certificat
+
+    @property
+    def subject_organizational_unit_name(self):
+        return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
+
+    @property
+    def not_valid_before(self):
+        return self._certificat.not_valid_before
+
+    @property
+    def not_valid_after(self):
+        return self._certificat.not_valid_after
+
+    @property
+    def subject_key_identifier(self):
+        subjectKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
+        self._logger.debug("Certificate Subject Key Identifier: %s" % subjectKeyIdentifier)
+        key_id = bytes.hex(subjectKeyIdentifier.value.digest)
+        self._logger.debug("Subject key identifier: %s" % key_id)
+        return key_id
+
+    @property
+    def authority_key_identifier(self):
+        authorityKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
+        key_id = bytes.hex(authorityKeyIdentifier.value.key_identifier)
+        self._logger.debug("Certificate issuer: %s" % key_id)
+        return key_id
+
+    def formatter_subject(self):
+        sujet_dict = {}
+
+        sujet = self.certificat.subject
+        for elem in sujet:
+            self._logger.debug("%s" % str(elem))
+            sujet_dict[elem.oid._name] = elem.value
+
+        return sujet_dict
 
 
 class CertificatInconnu(Exception):
