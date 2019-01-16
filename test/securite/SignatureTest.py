@@ -78,7 +78,7 @@ class SignateurTest:
         self._logger.debug("Certificat extensions: %s" % str(self.certificat.extensions))
 
         basic_constraints = self.certificat.extensions.get_extension_for_class(x509.BasicConstraints)
-        self._logger.debug("Basic Constraints: %s" % str(basic_constraints))
+        self._logger.debug("Basic Constraints: %s, isCa: %s, path length: %s" % (str(basic_constraints), basic_constraints.value.ca, basic_constraints.value.path_length))
         key_usage = self.certificat.extensions.get_extension_for_class(x509.KeyUsage).value
         self._logger.debug("Key usage: %s" % str(key_usage))
         subjectKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)

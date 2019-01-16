@@ -297,6 +297,7 @@ class VerificateurCertificats(UtilCertificats):
         self._contexte = contexte
         self._cache_certificats_ca = dict()
         self._cache_certificats_fingerprint = dict()
+        self._root_ca = list()
 
         self._charger_ca()
 
@@ -330,16 +331,21 @@ class VerificateurCertificats(UtilCertificats):
         for cert in certificats_ca:
             certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cert)
             enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
-            self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
+            if enveloppe.is_CA:
+                self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
-            # Puisque c'est un certificat CA, on l'ajoute aussi a l'index des CA pour faire une verification
-            # de la chaine.
-            liste_ca_identifier = self._cache_certificats_ca.get(enveloppe.subject_key_identifier)
-            if liste_ca_identifier is None:
-                liste_ca_identifier = list()
-                self._cache_certificats_ca[enveloppe.subject_key_identifier] = liste_ca_identifier
-            liste_ca_identifier.append(enveloppe)
+                # Puisque c'est un certificat CA, on l'ajoute aussi a l'index des CA pour faire une verification
+                # de la chaine.
+                liste_ca_identifier = self._cache_certificats_ca.get(enveloppe.subject_key_identifier)
+                if liste_ca_identifier is None:
+                    liste_ca_identifier = list()
+                    self._cache_certificats_ca[enveloppe.subject_key_identifier] = liste_ca_identifier
+                liste_ca_identifier.append(enveloppe)
 
+                if enveloppe.is_rootCA:
+                    self._root_ca.append(enveloppe)  # Conserver le certificat en tant que root
+
+        self._logger.debug("Certificats ROOT: %s" % str(self._root_ca))
         self._logger.debug("Certificats cache CA (%d): %s" % (len(self._cache_certificats_ca), str(self._cache_certificats_ca)))
         self._logger.debug("Certificats cache: %s" % str(self._cache_certificats_fingerprint))
 
@@ -347,15 +353,21 @@ class VerificateurCertificats(UtilCertificats):
         # Batir la chaine
         enveloppe_courante = enveloppe
 
-        while not enveloppe_courante.is_rootCA:
-            authority = enveloppe_courante.authority_key_identifier
+        correspond = False
+        cle_verifiee = [enveloppe.fingerprint_ascii]  # Utilise pour eviter les cycles dans la verification
+        while not correspond:
+            authority_key_id = enveloppe_courante.authority_key_identifier
 
-            liste_authority = self._cache_certificats_ca.get(authority)
-            correspond = False
+            liste_authority = self._cache_certificats_ca.get(authority_key_id)
             if liste_authority is not None:
-                for authority in liste_authority:
+                for authority_enveloppe in liste_authority:
+                    if authority_enveloppe.fingerprint_ascii not in cle_verifiee:
+                        cle_verifiee.append(authority_enveloppe.fingerprint_ascii)
+                    else:
+                        raise ValueError("Cycle detecte dans la verification des cles, abandon")
+
                     # Verifier si la signature correspond
-                    authority_public_key = authority.certificat.public_key()
+                    authority_public_key = authority_enveloppe.certificat.public_key()
                     cert_to_check = enveloppe_courante.certificat
 
                     authority_public_key.verify(
@@ -366,14 +378,15 @@ class VerificateurCertificats(UtilCertificats):
                         cert_to_check.signature_hash_algorithm,
                     )
 
-                    correspond = True
-                    enveloppe_courante = authority
+                    enveloppe_courante = authority_enveloppe
+                    correspond = enveloppe_courante in self._root_ca
+                    self._logger.debug("Certificat %s correspond a CA: %s" % (enveloppe_courante.subject_key_identifier, correspond))
 
-            if not correspond:
-                raise CertificatInconnu(
-                    'Chaine incomplete, il manque un certificat avec la bonne cle pour authority_key_identifier %s' % authority,
-                    key_subject_identifier=authority
-                )
+        if not correspond:
+            raise CertificatInconnu(
+                'Chaine incomplete, il manque un certificat avec la bonne cle pour authority_key_identifier %s' % authority_key_id,
+                key_subject_identifier=authority_key_id
+            )
 
         if not enveloppe_courante.is_rootCA:
             raise ValueError("")
@@ -447,7 +460,14 @@ class EnveloppeCertificat:
 
     @property
     def is_rootCA(self):
-        return self.certificat.issuer == self.certificat.subject
+        return self.is_CA and self.certificat.issuer == self.certificat.subject
+
+    @property
+    def is_CA(self):
+        basic_constraints = self.certificat.extensions.get_extension_for_class(x509.BasicConstraints)
+        if basic_constraints is not None:
+            return basic_constraints.value.ca
+        return False
 
     @property
     def _is_valid_at_current_time(self):
