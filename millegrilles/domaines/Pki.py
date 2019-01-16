@@ -60,11 +60,13 @@ class GestionnairePki(GestionnaireDomaine):
         super().__init__(configuration, message_dao, document_dao, contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
+        self._pki_document_helper = None
         self._traitement_message = None
 
     def configurer(self):
         super().configurer()
         self._traitement_message = TraitementMessagePki(self)
+        self._pki_document_helper = PKIDocumentHelper(self._contexte)
 
         nom_queue_domaine = self.get_nom_queue()
 
@@ -134,40 +136,53 @@ class GestionnairePki(GestionnaireDomaine):
             cles = contenu.split(ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS)[1:]
             self._logger.debug("Certificats ROOT configures: %s" % cles)
 
-        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
         for cle in cles:
             certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cle)
             enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
-            fingerprint = enveloppe.fingerprint_ascii
-            self._logger.debug("Verifier si certificat root %s existe deja dans MongoDB, inserer au besoin" % fingerprint)
-
             self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
+            self._pki_document_helper.inserer_certificat(enveloppe, upsert=True, trusted=True)
 
-            document_certca = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
-            maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
-            document_certca[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
-            document_certca[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
 
-            if enveloppe.certificat.issuer == enveloppe.certificat.subject:
-                document_certca[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
-            elif enveloppe.subject_organizational_unit_name == 'MilleGrille':
-                document_certca[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+class PKIDocumentHelper:
+
+    def __init__(self, contexte):
+        self._contexte = contexte
+
+    def inserer_certificat(self, enveloppe, upsert=False, trusted=False):
+        document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
+        fingerprint = enveloppe.fingerprint_ascii
+
+        maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
+        document_cert[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
+        document_cert[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+
+        document_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = enveloppe.certificat_pem
+        document_cert[ConstantesPki.LIBELLE_FINGERPRINT] = fingerprint
+        document_cert[ConstantesPki.LIBELLE_SUBJECT] = enveloppe.formatter_subject()
+        document_cert[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = enveloppe.not_valid_before
+        document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = enveloppe.not_valid_after
+        document_cert[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
+        document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
+
+        if enveloppe.is_CA:
+            if enveloppe.subject_organizational_unit_name == 'MilleGrille':
+                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
             else:
-                document_certca[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE
-            document_certca[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = certificat_pem
-            document_certca[ConstantesPki.LIBELLE_FINGERPRINT] = fingerprint
-            document_certca[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True  # Les certificats sont trusted implicitement
-            document_certca[ConstantesPki.LIBELLE_SUBJECT] = enveloppe.formatter_subject()
-            document_certca[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = enveloppe.not_valid_before
-            document_certca[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = enveloppe.not_valid_after
-            document_certca[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
-            document_certca[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
+                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE
 
-            filtre = {
-                ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
-            }
-            collection.update_one(filtre, {'$setOnInsert': document_certca}, upsert=True)
+            if trusted and enveloppe.is_rootCA:
+                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
+                document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True  # Le certificat root est trusted implicitement
 
+        filtre = {
+            ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
+        }
+
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        if upsert:
+            collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=upsert)
+        else:
+            collection.insert_one(document_cert)
 
 class TraitementMessagePki(BaseCallback):
 
