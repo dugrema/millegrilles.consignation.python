@@ -8,10 +8,10 @@ import logging
 from threading import Event
 from pika.exceptions import ConnectionClosed
 
-from millegrilles.util.UtilScriptLigneCommande import ModeleAvecMessageDAO
+from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 
-class CeduleurMilleGrilles(ModeleAvecMessageDAO):
+class CeduleurMilleGrilles(ModeleConfiguration):
 
     def __init__(self):
         super().__init__()
@@ -63,7 +63,7 @@ class CeduleurMilleGrilles(ModeleAvecMessageDAO):
 
         ts_dict['timezones'] = nom_timezones
 
-        self.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
+        self.contexte.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
 
     def get_indicateurs(self, timestamp):
 

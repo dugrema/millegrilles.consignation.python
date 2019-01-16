@@ -45,7 +45,6 @@ class MongoDAO:
         self._collection_information_documents = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS]
 
         # Generer les classes Helper
-        self._transaction_document_helper = TransactionHelper(self._mg_database)
         self._processus_document_helper = ProcessusHelper(self._mg_database)
 
     def deconnecter(self):

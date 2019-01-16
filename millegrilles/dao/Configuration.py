@@ -8,6 +8,7 @@ import ssl
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.SecuritePKI import VerificateurTransaction, SignateurTransaction
 
 
 class TransactionConfiguration:
@@ -264,12 +265,17 @@ class ContexteRessourcesMilleGrilles:
         self._message_dao = message_dao
         self._document_dao = document_dao
 
-    def initialiser(self, init_message=False, init_document=False):
+        self._email_dao = None
+        self._verificateur_transactions = None
+        self._signateur_transactions = None
+
+    def initialiser(self, init_message=True, init_document=True, connecter=True):
         """
         Initialise/reinitialise le contexte et connecte les DAOs.
 
         :param init_message: Si True, initialise et connecte PikaDAO
         :param init_document: Si True, initialise et connecte MongoDAO
+        :param connecter: Si true, la connexion aux DAOs est ouverte immediatement
         """
 
         self._configuration = TransactionConfiguration()
@@ -279,11 +285,15 @@ class ContexteRessourcesMilleGrilles:
 
         if init_message:
             self._message_dao = PikaDAO(self._configuration)
-            self._message_dao.connecter()
+            self._signateur_transactions = SignateurTransaction(self._configuration)
+            if connecter:
+                self._message_dao.connecter()
 
         if init_document:
             self._document_dao = MongoDAO(self._configuration)
-            self._document_dao.connecter()
+            self._verificateur_transactions = VerificateurTransaction(self._configuration)
+            if connecter:
+                self._document_dao.connecter()
 
     @property
     def configuration(self):

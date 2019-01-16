@@ -14,20 +14,20 @@ logger = logging.getLogger(__name__)  # Define module logger
 class ModeleConfiguration:
 
     def __init__(self):
-        self._contexte = None
-        self.configuration = None
+        self._contexte = ContexteRessourcesMilleGrilles()
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
 
-    def initialiser(self):
-        if self.configuration is None:
-            # Gerer les signaux OS, permet de deconnecter les ressources au besoin
-            signal.signal(signal.SIGINT, self.exit_gracefully)
-            signal.signal(signal.SIGTERM, self.exit_gracefully)
+    def initialiser(self, init_document=True, init_message=True, connecter=True):
+        # Gerer les signaux OS, permet de deconnecter les ressources au besoin
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-            self.configuration = TransactionConfiguration()
-            self.configuration.loadEnvironment()
-            self._contexte = ContexteRessourcesMilleGrilles(self.configuration)
+        self._contexte.initialiser(
+            init_document=init_document,
+            init_message=init_message,
+            connecter=False
+        )
 
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
@@ -45,10 +45,18 @@ class ModeleConfiguration:
         raise NotImplemented("Cette methode doit etre redefinie")
 
     def connecter(self):
-        pass
+        if self._contexte.message_dao is not None:
+            self._contexte.message_dao.connecter()
+
+        if self._contexte.document_dao is not None:
+            self._contexte.document_dao.connecter()
 
     def deconnecter(self):
-        pass
+        if self._contexte.message_dao is not None:
+            self._contexte.message_dao.deconnecter()
+
+        if self._contexte.document_dao is not None:
+            self._contexte.document_dao.deconnecter()
 
     def main(self):
 
@@ -76,66 +84,3 @@ class ModeleConfiguration:
     @property
     def contexte(self):
         return self._contexte
-
-
-class ModeleAvecMessageDAO(ModeleConfiguration):
-
-    def __init__(self):
-        super().__init__()
-        self.message_dao = None
-
-    def initialiser(self):
-        super().initialiser()
-        self.message_dao = PikaDAO(self.configuration)
-        self.contexte.message_dao = self.message_dao
-
-    def connecter(self):
-        self.message_dao.connecter()
-
-    def deconnecter(self):
-        try:
-            self.message_dao.deconnecter()
-        except Exception as em:
-            logging.warning("Erreur fermeture message dao: %s" % str(em))
-
-
-# Classe qui inclue la configuration pour les messages et les documents
-class ModeleAvecDocumentDAO(ModeleConfiguration):
-
-    def __init__(self):
-        super().__init__()
-        self.document_dao = None
-
-    def initialiser(self):
-        super().initialiser()
-        self.document_dao = MongoDAO(self.configuration)
-        self.contexte.document_dao = self.document_dao
-
-    def connecter(self):
-        self.document_dao.connecter()
-
-    def deconnecter(self):
-        try:
-            self.document_dao.deconnecter()
-        except Exception as ed:
-            logging.warning("Erreur fermeture document dao: %s" % str(ed))
-
-
-# Classe qui implemente a la fois les DAO de messages et documents
-class ModeleAvecDocumentMessageDAO(ModeleAvecMessageDAO, ModeleAvecDocumentDAO):
-
-    def __init__(self):
-        ModeleAvecMessageDAO.__init__(self)
-        ModeleAvecDocumentDAO.__init__(self)
-
-    def initialiser(self):
-        ModeleAvecMessageDAO.initialiser(self)
-        ModeleAvecDocumentDAO.initialiser(self)
-
-    def connecter(self):
-        ModeleAvecMessageDAO.connecter(self)
-        ModeleAvecDocumentDAO.connecter(self)
-
-    def deconnecter(self):
-        ModeleAvecMessageDAO.deconnecter(self)
-        ModeleAvecDocumentDAO.deconnecter(self)
