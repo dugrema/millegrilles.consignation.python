@@ -4,7 +4,7 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
-from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 
 import logging
 import datetime
@@ -15,10 +15,10 @@ from cryptography.hazmat.backends import default_backend
 class ConstantesPki:
 
     DOMAINE_NOM = 'millegrilles.domaines.Pki'
-    COLLECTION_NOM = 'millegrilles_domaines_Pki'
+    COLLECTION_NOM = ConstantesSecurityPki.COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
-    LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
+    LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = 'fingerprint'
     LIBELLE_FINGERPRINT_ISSUER = 'fingerprint_issuer'
     LIBELLE_DOCID_ISSUER = '_id_issuer'
@@ -118,8 +118,19 @@ class GestionnairePki(GestionnaireDomaine):
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
 
-    def traiter_cedule(self, message):
-        pass
+    def traiter_cedule(self, evenement):
+
+        indicateurs = evenement['indicateurs']
+        self._logger.debug("Cedule webPoll: %s" % str(indicateurs))
+
+        # Faire la liste des cedules a declencher
+        if 'heure' in indicateurs:
+            # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+            processus = "%s:%s" % (
+                ConstantesPki.DOMAINE_NOM,
+                ProcessusVerifierChaineCertificatsNonValides.__name__
+            )
+            self.demarrer_processus(processus, dict())
 
     def get_nom_queue(self):
         return ConstantesPki.QUEUE_NOM
@@ -172,7 +183,8 @@ class PKIDocumentHelper:
 
             if trusted and enveloppe.is_rootCA:
                 document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
-                document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True  # Le certificat root est trusted implicitement
+                # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
+                document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
 
         filtre = {
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
@@ -183,6 +195,47 @@ class PKIDocumentHelper:
             collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=upsert)
         else:
             collection.insert_one(document_cert)
+
+    def charger_certificat(self, fingerprint=None, subject=None):
+        filtre = dict()
+        if fingerprint is not None:
+            filtre[ConstantesPki.LIBELLE_FINGERPRINT] = fingerprint
+        if subject is not None:
+            filtre[ConstantesPki.LIBELLE_SUBJECT_KEY] = subject
+
+        # Lire les certificats et les charger dans des enveloppes
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        curseur = collection.find(filtre)
+        liste_certificats = list()
+        for certificat in curseur:
+            # Charger l'enveloppe
+            enveloppe = EnveloppeCertificat(certificat_pem=certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
+            liste_certificats.append(enveloppe)
+
+        return liste_certificats
+
+    def identifier_certificats_non_valide(self, authority_key=None):
+        """
+        Fait une liste des fingerprints de certificats qui ne sont pas encore valides.
+        :param authority_key: Optionnel, va charger tous les certificats pas encore valides associes a cette autorite.
+        :return: Liste de fingerprints
+        """
+        filtre = {
+            ConstantesPki.LIBELLE_CHAINE_COMPLETE: False
+        }
+
+        if authority_key is not None:
+            filtre[ConstantesPki.LIBELLE_AUTHORITY_KEY] = authority_key
+
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        curseur = collection.find(filtre)
+        fingerprints = list()
+        for certificat in curseur:
+            fingerprint = certificat[ConstantesPki.LIBELLE_FINGERPRINT]
+            fingerprints.append(fingerprint)
+
+        return fingerprints
+
 
 class TraitementMessagePki(BaseCallback):
 
@@ -253,8 +306,54 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusVerifierChaineCertificats(MGProcessus):
+class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
+
+    PARAM_A_VERIFIER = 'fingerprints_a_verifier'
+    PARAM_VALIDE = 'fingerprints_valides'
+    PARAM_INVALIDE = 'fingerprints_invalides'
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
 
+    def initiale(self):
+        helper = PKIDocumentHelper(self._controleur.contexte)
+        liste_fingerprints = helper.identifier_certificats_non_valide()
+
+        resultat = {}
+        if len(liste_fingerprints) > 0:
+            resultat[ProcessusVerifierChaineCertificatsNonValides.PARAM_A_VERIFIER] = liste_fingerprints
+            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.verifier_chaines.__name__)
+        else:
+            self.set_etape_suivante()
+
+        return resultat
+
+    def verifier_chaines(self):
+
+        parametres = self.parametres
+        fingerprints = parametres.get(ProcessusVerifierChaineCertificatsNonValides.PARAM_A_VERIFIER)
+
+        verificateur = VerificateurCertificats(self._controleur.contexte)
+
+        liste_valide = list()
+        liste_invalide = list()
+        for fingerprint in fingerprints:
+            # Charger le certificat et verifier si on peut valider la chaine
+            try:
+                enveloppe = verificateur.charger_certificat(fingerprint=fingerprint)
+                if enveloppe is not None:
+                    verificateur.verifier_chaine(enveloppe)
+                    liste_valide.append(fingerprint)
+            except Exception as e:
+                self._logger.exception("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
+
+            if fingerprint not in liste_valide:
+                liste_invalide.append(fingerprint)
+
+        resultat = {
+            ProcessusVerifierChaineCertificatsNonValides.PARAM_VALIDE: liste_valide,
+            ProcessusVerifierChaineCertificatsNonValides.PARAM_INVALIDE: liste_invalide
+        }
+
+        self.set_etape_suivante()
+        return resultat

@@ -20,6 +20,8 @@ from millegrilles import Constantes
 class ConstantesSecurityPki:
 
     DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
+    COLLECTION_NOM = 'millegrilles_domaines_Pki'
+    LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
 
 
 class UtilCertificats:
@@ -305,14 +307,23 @@ class VerificateurCertificats(UtilCertificats):
         super()._charger_certificat()
 
         # Tenter de charger a partir d'une copie locale
-        certificat = None
-        if os.path.isfile(fichier):
+        enveloppe = None
+        if fingerprint is not None:
+            collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
+            document_cert = collection.find_one({'fingerprint': fingerprint})
+            if document_cert is not None:
+                enveloppe = EnveloppeCertificat(
+                    certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+                )
+
+        elif os.path.isfile(fichier):
             certificat = self._charger_pem(fichier)
 
-        if certificat is not None:
-            enveloppe = EnveloppeCertificat(certificat)
+            if certificat is not None:
+                enveloppe = EnveloppeCertificat(certificat)
 
-            # Conserver l'enveloppe dans le cache
+        # Conserver l'enveloppe dans le cache
+        if enveloppe is not None:
             self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
         else:
@@ -389,7 +400,8 @@ class VerificateurCertificats(UtilCertificats):
             )
 
         if not enveloppe_courante.is_rootCA:
-            raise ValueError("")
+            raise ValueError("Le certificat en haut de la chaine n'est pas root, chaine invalide")
+
 
 class EnveloppeCertificat:
     """ Encapsule un certificat. """
@@ -402,6 +414,8 @@ class EnveloppeCertificat:
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
         if certificat_pem is not None:
+            if isinstance(certificat_pem, str):
+                certificat_pem = bytes(certificat_pem, 'utf-8')
             self._certificat = x509.load_pem_x509_certificate(
                 certificat_pem,
                 backend=default_backend()

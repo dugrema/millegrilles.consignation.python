@@ -3,7 +3,7 @@ import signal
 import logging
 
 from millegrilles import Constantes
-from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.MessageDAO import PikaDAO, BaseCallback, JSONHelper
 from millegrilles.dao.ProcessusDocumentHelper import ProcessusHelper
@@ -26,11 +26,18 @@ class MGPProcessusControleur(BaseCallback):
 
         self._document_dao = None
         self._message_dao = None
+        self._contexte = None
 
     def initialiser(self):
         self._configuration.loadEnvironment()
         self._document_dao = MongoDAO(self._configuration)
         self._message_dao = PikaDAO(self._configuration)
+
+        self._contexte = ContexteRessourcesMilleGrilles(
+            configuration=self._configuration,
+            document_dao=self._document_dao,
+            message_dao=self._message_dao
+        )
 
         # Connecter les DAOs
         self._document_dao.connecter()
@@ -138,6 +145,10 @@ class MGPProcessusControleur(BaseCallback):
 
     def message_dao(self):
         return self._message_dao
+
+    @property
+    def contexte(self):
+        return self._contexte
 
     @property
     def configuration(self):

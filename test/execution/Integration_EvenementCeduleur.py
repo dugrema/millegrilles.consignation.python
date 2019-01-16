@@ -3,45 +3,59 @@ import logging
 # import datetime
 # import signal
 # import argparse
+import pytz
+import datetime
 
-# from millegrilles.dao.MessageDAO import PikaDAO
-# from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.MessageDAO import PikaDAO
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 
 logger = logging.getLogger(__name__)
 
 
-# class CeduleurMessageTest:
-#
-#     def __init__(self):
-#         self.configuration = TransactionConfiguration()
-#         self.configuration.loadEnvironment()
-#
-#         self.message_dao = PikaDAO(self.configuration)
-#         self.message_dao.connecter()
-#
-#     def deconnecter(self):
-#         self.message_dao.deconnecter()
-#
-#     def transmettre_evenement_ceduleur(self):
-#         self.message_dao.transmettre_evenement_ceduleur()
-#
-#     def temps_restant_pourminute(self):
-#         # Note: on utilise 62 pour ajouter executer 2 secondes apres la minute
-#         time_sleep = 62 - (time.time()%60)
-#         return time_sleep
+class CeduleurMessageTest:
+
+    def __init__(self):
+        self.contexte = ContexteRessourcesMilleGrilles()
+        self.contexte.initialiser(init_message=True)
+
+    def deconnecter(self):
+        self.contexte.message_dao.deconnecter()
+
+    def transmettre_evenement_ceduleur(self):
+
+        timestamp_utc = datetime.datetime.now(tz=pytz.UTC)
+        ts_dict = {
+            'UTC': timestamp_utc.timetuple(),
+            'joursemaine': timestamp_utc.weekday()
+        }
+
+        # Faire la liste des timezones a inclure. La routing key va utiliser la version courte de la timezone.
+        timezones = [
+            pytz.UTC,
+        ]
+
+        indicateurs = ['heure']
+        nom_timezones = []
+        for tz in timezones:
+            local_tz_name = str(tz)
+            nom_timezones.append(local_tz_name)
+
+        ts_dict['timezones'] = nom_timezones
+
+        self.contexte.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
 
 
 # --- MAIN ---
-ceduleur = CeduleurMilleGrilles()
-ceduleur.main()
+#ceduleur = CeduleurMilleGrilles()
+#ceduleur.main()
 
-# logging.basicConfig(level=logging.WARNING, format="%(relativeCreated)6d %(threadName)s %(message)s")
-# logger.setLevel(logging.DEBUG)
-# logging.getLogger('mgdomaines').setLevel(logging.INFO)
-# test = CeduleurMessageTest()
-#
-#
+logging.basicConfig(level=logging.WARNING, format="%(relativeCreated)6d %(threadName)s %(message)s")
+logger.setLevel(logging.DEBUG)
+logging.getLogger('mgdomaines').setLevel(logging.INFO)
+test = CeduleurMessageTest()
+test.transmettre_evenement_ceduleur()
+
 # def exit_gracefully(self):
 #     test.deconnecter()
 #
