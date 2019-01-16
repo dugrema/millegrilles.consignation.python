@@ -108,6 +108,12 @@ class GestionnairePki(GestionnaireDomaine):
             (ConstantesPki.LIBELLE_CHAINE_COMPLETE, 2),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
+        # Index pour trouver l'autorite qui a signe un certificat (par son subject)
+        collection_domaine.create_index([
+            (ConstantesPki.LIBELLE_SUBJECT_KEY, 1),
+            (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
+            (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
+        ])
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
