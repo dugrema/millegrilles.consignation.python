@@ -4,9 +4,8 @@ import json
 import re
 import base64
 import binascii
-import getpass
-import subprocess
 import os
+import datetime
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -356,6 +355,17 @@ class VerificateurCertificats(UtilCertificats):
             if liste_authority is not None:
                 for authority in liste_authority:
                     # Verifier si la signature correspond
+                    authority_public_key = authority.certificat.public_key()
+                    cert_to_check = enveloppe_courante.certificat
+
+                    authority_public_key.verify(
+                        cert_to_check.signature,
+                        cert_to_check.tbs_certificate_bytes,
+                        # Depends on the algorithm used to create the certificate
+                        padding.PKCS1v15(),
+                        cert_to_check.signature_hash_algorithm,
+                    )
+
                     correspond = True
                     enveloppe_courante = authority
 
@@ -438,6 +448,11 @@ class EnveloppeCertificat:
     @property
     def is_rootCA(self):
         return self.certificat.issuer == self.certificat.subject
+
+    @property
+    def _is_valid_at_current_time(self):
+        now = datetime.datetime.utcnow()
+        return (now > self.certificat.not_valid_before) and (now < self.certificat.not_valid_after)
 
     def formatter_subject(self):
         sujet_dict = {}
