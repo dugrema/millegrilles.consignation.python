@@ -18,6 +18,11 @@ from cryptography.x509.name import NameOID
 from millegrilles import Constantes
 
 
+class ConstantesSecurityPki:
+
+    DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
+
+
 class UtilCertificats:
 
     def __init__(self, configuration):
@@ -68,11 +73,16 @@ class UtilCertificats:
 
     def _charger_certificat(self):
         certfile_path = self.configuration.mq_certfile
+        self.certificat = self._charger_pem(certfile_path)
+
+    def _charger_pem(self, certfile_path):
         with open(certfile_path, "rb") as certfile:
-            self.certificat = x509.load_pem_x509_certificate(
+            certificat = x509.load_pem_x509_certificate(
                 certfile.read(),
                 backend=default_backend()
             )
+
+        return certificat
 
     def _charger_cle_privee(self):
         keyfile_path = self.configuration.mq_keyfile
@@ -283,28 +293,80 @@ class VerificateurCertificats(UtilCertificats):
 
     def __init__(self, contexte):
         super().__init__(contexte.configuration)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
         self._contexte = contexte
-        self._cache_certificats = dict()
+        self._cache_certificats_ca = dict()
+        self._cache_certificats_fingerprint = dict()
 
-    def verifier_certificat(self, fingerprint):
-        certificat = self._charger_certificat(fingerprint)
-
-        # Valider le certificat
-        self._cache_certificats[fingerprint] = EnveloppeCertificat(fingerprint, certificat)
+        self._charger_ca()
 
     def charger_certificat(self, fichier=None, fingerprint=None):
-        # Tenter de charger a partir d'une copie locale
-        if os.path.isfile(fichier):
-            with open(fichier, "rb") as certfile:
-                certificat = x509.load_pem_x509_certificate(
-                    certfile.read(),
-                    backend=default_backend()
-                )
+        super()._charger_certificat()
 
-        enveloppe = EnveloppeCertificat(certificat)
+        # Tenter de charger a partir d'une copie locale
+        certificat = None
+        if os.path.isfile(fichier):
+            certificat = self._charger_pem(fichier)
+
+        if certificat is not None:
+            enveloppe = EnveloppeCertificat(certificat)
+
+            # Conserver l'enveloppe dans le cache
+            self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
+
+        else:
+            raise ValueError("Certificat ne peut pas etre charge")
 
         return enveloppe
 
+    def _charger_ca(self):
+        """ Initialise les root CA """
+        ca_file = self.configuration.mq_cafile
+        with open(ca_file) as f:
+            contenu = f.read()
+            certificats_ca = contenu.split(ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS)[1:]
+            self._logger.debug("Certificats CA configures: %s" % certificats_ca)
+
+        for cert in certificats_ca:
+            certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cert)
+            enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
+            self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
+
+            # Puisque c'est un certificat CA, on l'ajoute aussi a l'index des CA pour faire une verification
+            # de la chaine.
+            liste_ca_identifier = self._cache_certificats_ca.get(enveloppe.subject_key_identifier)
+            if liste_ca_identifier is None:
+                liste_ca_identifier = list()
+                self._cache_certificats_ca[enveloppe.subject_key_identifier] = liste_ca_identifier
+            liste_ca_identifier.append(enveloppe)
+
+        self._logger.debug("Certificats cache CA (%d): %s" % (len(self._cache_certificats_ca), str(self._cache_certificats_ca)))
+        self._logger.debug("Certificats cache: %s" % str(self._cache_certificats_fingerprint))
+
+    def verifier_chaine(self, enveloppe):
+        # Batir la chaine
+        enveloppe_courante = enveloppe
+
+        while not enveloppe_courante.is_rootCA:
+            authority = enveloppe_courante.authority_key_identifier
+
+            liste_authority = self._cache_certificats_ca.get(authority)
+            correspond = False
+            if liste_authority is not None:
+                for authority in liste_authority:
+                    # Verifier si la signature correspond
+                    correspond = True
+                    enveloppe_courante = authority
+
+            if not correspond:
+                raise CertificatInconnu(
+                    'Chaine incomplete, il manque un certificat avec la bonne cle pour authority_key_identifier %s' % authority,
+                    key_subject_identifier=authority
+                )
+
+        if not enveloppe_courante.is_rootCA:
+            raise ValueError("")
 
 class EnveloppeCertificat:
     """ Encapsule un certificat. """
@@ -373,6 +435,10 @@ class EnveloppeCertificat:
         self._logger.debug("Certificate issuer: %s" % key_id)
         return key_id
 
+    @property
+    def is_rootCA(self):
+        return self.certificat.issuer == self.certificat.subject
+
     def formatter_subject(self):
         sujet_dict = {}
 
@@ -385,6 +451,11 @@ class EnveloppeCertificat:
 
 
 class CertificatInconnu(Exception):
-    def __init__(self, message, errors):
-        super().init(message)
+    def __init__(self, message, errors=None, key_subject_identifier=None):
+        super().__init__(message, errors)
         self.errors = errors
+        self._key_subject_identifier = key_subject_identifier
+
+    @property
+    def key_subject_identifier(self):
+        return self._key_subject_identifier

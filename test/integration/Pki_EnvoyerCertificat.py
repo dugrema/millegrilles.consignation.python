@@ -30,6 +30,7 @@ class TransmettreCertificatTransactionTest:
 
         verificateur = VerificateurCertificats(self.contexte)
         self.enveloppe_certificat = verificateur.charger_certificat(fichier)
+        verificateur.verifier_chaine(self.enveloppe_certificat)
 
     def transmettre(self):
         certificat = self.enveloppe_certificat.certificat
@@ -49,6 +50,7 @@ class TransmettreCertificatTransactionTest:
 def test_transmettre_certificat():
     logging.basicConfig(level=logging.INFO)
     logging.getLogger('test').setLevel(logging.DEBUG)
+    logging.getLogger('millegrilles').setLevel(logging.DEBUG)
 
     transmetteur = TransmettreCertificatTransactionTest()
     transmetteur.charger_certificat(FICHIER_CERTIFICAT)

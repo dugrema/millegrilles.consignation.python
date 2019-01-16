@@ -3,8 +3,8 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.SecuritePKI import EnveloppeCertificat
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
 
 import logging
 import datetime
@@ -35,8 +35,6 @@ class ConstantesPki:
     LIBVAL_CERTIFICAT_INTERMEDIAIRE = 'certificat.intermediaire'
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
     LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
-
-    DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
 
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
@@ -133,12 +131,12 @@ class GestionnairePki(GestionnaireDomaine):
 
         with open(ca_file) as f:
             contenu = f.read()
-            cles = contenu.split(ConstantesPki.DELIM_DEBUT_CERTIFICATS)[1:]
+            cles = contenu.split(ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS)[1:]
             self._logger.debug("Certificats ROOT configures: %s" % cles)
 
         collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
         for cle in cles:
-            certificat_pem = '%s%s' % (ConstantesPki.DELIM_DEBUT_CERTIFICATS, cle)
+            certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cle)
             enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
             fingerprint = enveloppe.fingerprint_ascii
             self._logger.debug("Verifier si certificat root %s existe deja dans MongoDB, inserer au besoin" % fingerprint)
@@ -238,3 +236,10 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
 
     def verifier_chaine(self):
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusVerifierChaineCertificats(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
