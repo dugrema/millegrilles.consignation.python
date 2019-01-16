@@ -20,6 +20,7 @@ class ConsignateurTransaction(ModeleConfiguration):
     def __init__(self):
         super().__init__()
         self.json_helper = JSONHelper()
+        self.message_handler = None
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -29,14 +30,10 @@ class ConsignateurTransaction(ModeleConfiguration):
             help="Active le debugging (logger)"
         )
 
-        self.parser.add_argument(
-            '--test_indicateurs', action="store_true", required=False,
-            help="Transmet tous les indicateurs a toutes les minutes (pour tester logique)"
-        )
-
     # Initialise les DAOs, connecte aux serveurs.
     def configurer(self):
         self.contexte.initialiser()
+        self.message_handler = ConsignateurTransactionCallback(self.contexte)
 
         # Executer la configuration pour RabbitMQ
         self.contexte.message_dao.configurer_rabbitmq()
@@ -57,7 +54,7 @@ class ConsignateurTransaction(ModeleConfiguration):
 
     def executer(self):
         # Note: la methode demarrer_... est blocking
-        self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.callbackAvecAck)
+        self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
     def deconnecter(self):
         self.contexte.document_dao.deconnecter()

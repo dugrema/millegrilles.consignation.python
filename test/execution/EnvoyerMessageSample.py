@@ -18,7 +18,7 @@ def envoyer_message_test_senseur_lecture():
         'pression': 101.6,
         'senseur': 16,
         'noeud': 'test',
-        'temperature': 21.60
+        'temperature': 21.62
     }
 
     enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'millegrilles.domaines.SenseursPassifs.lecture')

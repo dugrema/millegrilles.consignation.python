@@ -26,7 +26,7 @@ class ModeleConfiguration:
         self._contexte.initialiser(
             init_document=init_document,
             init_message=init_message,
-            connecter=False
+            connecter=connecter
         )
 
     def configurer_parser(self):
