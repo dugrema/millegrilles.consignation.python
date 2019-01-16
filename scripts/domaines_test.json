@@ -1,0 +1,8 @@
+{
+  "domaines": [
+    {
+      "module": "millegrilles.domaines.Pki",
+      "classe": "GestionnairePki"
+    }
+  ]
+}

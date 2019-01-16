@@ -153,6 +153,14 @@ class GestionnairePki(GestionnaireDomaine):
             self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
             self._pki_document_helper.inserer_certificat(enveloppe, upsert=True, trusted=True)
 
+        # Demarrer validation des certificats
+        # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+        processus = "%s:%s" % (
+            ConstantesPki.DOMAINE_NOM,
+            ProcessusVerifierChaineCertificatsNonValides.__name__
+        )
+        self.demarrer_processus(processus, dict())
+
 
 class PKIDocumentHelper:
 
@@ -235,6 +243,21 @@ class PKIDocumentHelper:
             fingerprints.append(fingerprint)
 
         return fingerprints
+
+    def marquer_certificats_valides(self, fingerprints):
+
+        filtre = {
+            ConstantesPki.LIBELLE_FINGERPRINT: {'$in': fingerprints}
+        }
+
+        operation = {
+            '$set': {
+                ConstantesPki.LIBELLE_CHAINE_COMPLETE: True
+            }
+        }
+
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        collection.update(filtre, operation, multi=True)
 
 
 class TraitementMessagePki(BaseCallback):
@@ -355,5 +378,26 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
             ProcessusVerifierChaineCertificatsNonValides.PARAM_INVALIDE: liste_invalide
         }
 
-        self.set_etape_suivante()
+        if len(liste_valide) > 0:
+            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.marquer_certificats_valides.__name__)
+        elif len(liste_invalide) > 0:
+            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.chercher_certificats_invalides.__name__)
+        else:
+            self.set_etape_suivante()
+
         return resultat
+
+    def marquer_certificats_valides(self):
+        parametres = self.parametres
+        helper = PKIDocumentHelper(self._controleur.contexte)
+
+        fingerprints = parametres.get(ProcessusVerifierChaineCertificatsNonValides.PARAM_VALIDE)
+        helper.marquer_certificats_valides(fingerprints)
+
+        if len(parametres[ProcessusVerifierChaineCertificatsNonValides.PARAM_INVALIDE]) > 0:
+            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.chercher_certificats_invalides.__name__)
+        else:
+            self.set_etape_suivante()
+
+    def chercher_certificats_invalides(self):
+        self.set_etape_suivante()
