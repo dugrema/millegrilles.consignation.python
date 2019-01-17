@@ -21,7 +21,9 @@ class ConstantesSecurityPki:
 
     DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
     COLLECTION_NOM = 'millegrilles_domaines_Pki'
+
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
+    LIBELLE_FINGERPRINT = 'fingerprint'
 
 
 class UtilCertificats:
@@ -106,8 +108,11 @@ class UtilCertificats:
         if not supporte_signature_numerique:
             raise Exception('Le certificat ne supporte pas les signatures numeriques')
 
-    def _verifier_cn(self, dict_message):
-        sujet = self.certificat.subject
+    def _verifier_cn(self, dict_message, enveloppe=None):
+        if enveloppe is not None:
+            sujet = enveloppe.certificat.subject
+        else:
+            sujet = self.certificat.subject
         self._logger.debug('Sujet du certificat')
         for elem in sujet:
             self._logger.debug("%s" % str(elem))
@@ -214,8 +219,9 @@ class SignateurTransaction(UtilCertificats):
 class VerificateurTransaction(UtilCertificats):
     """ Verifie la signature des transactions. """
 
-    def __init__(self, configuration):
-        super().__init__(configuration)
+    def __init__(self, contexte):
+        super().__init__(contexte.configuration)
+        self._contexte = contexte
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def verifier(self, transaction):
@@ -229,7 +235,7 @@ class VerificateurTransaction(UtilCertificats):
 
         if transaction is str:
             dict_message = json.loads(transaction)
-        elif transaction is dict:
+        elif isinstance(transaction, dict):
             dict_message = transaction
         else:
             raise TypeError("La transaction doit etre en format str ou dict")
@@ -250,27 +256,35 @@ class VerificateurTransaction(UtilCertificats):
 
         self._logger.debug("Message nettoye: %s" % str(dict_message))
 
-        self._verifier_cn(dict_message)
-        #self._verifier_chaine_certificats()
-        self._verifier_signature(dict_message, signature)
+        enveloppe_certificat = self._identifier_certificat(dict_message)
+        self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
+        self._verifier_cn(dict_message, enveloppe=enveloppe_certificat)
+        self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
 
         return True
 
-    def _verifier_signature(self, dict_message, signature):
+    def _verifier_signature(self, dict_message, signature, enveloppe=None):
         """
         Verifie la signature du message avec le certificat.
 
         :param dict_message:
         :param signature:
+        :param enveloppe: Optionnel. Certificat a utiliser pour la verification de signature
         :raises InvalidSignature: Lorsque la signature est invalide
         :return:
         """
+        if enveloppe is not None:
+            certificat = enveloppe.certificat
+            self._logger.debug("Verifier signature, Certificat: %s" % enveloppe.fingerprint_ascii)
+        else:
+            certificat = self.certificat
+
         signature_bytes = base64.b64decode(signature)
         message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
         message_bytes = bytes(message_json, 'utf-8')
-        self._logger.debug("Message pour verifier signature: %s" % str(message_json))
+        self._logger.debug("Verifier signature, Message: %s" % str(message_json))
 
-        cle_publique = self.certificat.public_key()
+        cle_publique = certificat.public_key()
         cle_publique.verify(
             signature_bytes,
             message_bytes,
@@ -281,6 +295,20 @@ class VerificateurTransaction(UtilCertificats):
             self._hash_function()
         )
         self._logger.debug("Signature OK")
+
+    def _identifier_certificat(self, dict_message):
+        """
+        Identifie le certificat, tente de le charger au besoin.
+
+        :param dict_message:
+        :return:
+        """
+
+        fingerprint = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+        verificateur_certificats = self._contexte.verificateur_certificats
+
+        enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+        return enveloppe_certificat
 
 
 class VerificateurCertificats(UtilCertificats):
@@ -309,12 +337,16 @@ class VerificateurCertificats(UtilCertificats):
         # Tenter de charger a partir d'une copie locale
         enveloppe = None
         if fingerprint is not None:
-            collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-            document_cert = collection.find_one({'fingerprint': fingerprint})
-            if document_cert is not None:
-                enveloppe = EnveloppeCertificat(
-                    certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
-                )
+            # Verifier si le certificat est deja charge
+            enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
+
+            if enveloppe is None:
+                collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
+                document_cert = collection.find_one({'fingerprint': fingerprint})
+                if document_cert is not None:
+                    enveloppe = EnveloppeCertificat(
+                        certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+                    )
 
         elif os.path.isfile(fichier):
             certificat = self._charger_pem(fichier)
@@ -324,7 +356,11 @@ class VerificateurCertificats(UtilCertificats):
 
         # Conserver l'enveloppe dans le cache
         if enveloppe is not None:
-            self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
+
+            if not enveloppe.est_verifie:
+                # Verifier la chaine de ce certificat
+                self.verifier_chaine(enveloppe)
+                self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
         else:
             raise ValueError("Certificat ne peut pas etre charge")
@@ -357,7 +393,10 @@ class VerificateurCertificats(UtilCertificats):
                     self._root_ca.append(enveloppe)  # Conserver le certificat en tant que root
 
         self._logger.debug("Certificats ROOT: %s" % str(self._root_ca))
-        self._logger.debug("Certificats cache CA (%d): %s" % (len(self._cache_certificats_ca), str(self._cache_certificats_ca)))
+        self._logger.debug("Certificats cache CA (%d): %s" % (
+            len(self._cache_certificats_ca),
+            str(self._cache_certificats_ca)
+        ))
         self._logger.debug("Certificats cache: %s" % str(self._cache_certificats_fingerprint))
 
     def verifier_chaine(self, enveloppe):
@@ -395,12 +434,16 @@ class VerificateurCertificats(UtilCertificats):
 
         if not correspond:
             raise CertificatInconnu(
-                'Chaine incomplete, il manque un certificat avec la bonne cle pour authority_key_identifier %s' % authority_key_id,
+                'Chaine incomplete, il manque un certificat avec la bonne cle pour authority_key_identifier %s' %
+                authority_key_id,
                 key_subject_identifier=authority_key_id
             )
 
         if not enveloppe_courante.is_rootCA:
             raise ValueError("Le certificat en haut de la chaine n'est pas root, chaine invalide")
+
+        # Aucune erreur n'a ete identifiee, on marque le certificat comme verifie
+        enveloppe.set_est_verifie(True)
 
 
 class EnveloppeCertificat:
@@ -412,6 +455,8 @@ class EnveloppeCertificat:
         """
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self._est_verifie = False  # Flag qui est change une fois la chaine verifiee
 
         if certificat_pem is not None:
             if isinstance(certificat_pem, str):
@@ -491,6 +536,13 @@ class EnveloppeCertificat:
     def _is_valid_at_current_time(self):
         now = datetime.datetime.utcnow()
         return (now > self.certificat.not_valid_before) and (now < self.certificat.not_valid_after)
+
+    @property
+    def est_verifie(self):
+        return self._est_verifie
+
+    def set_est_verifie(self, flag):
+        self._est_verifie = flag
 
     def formatter_subject(self):
         sujet_dict = {}

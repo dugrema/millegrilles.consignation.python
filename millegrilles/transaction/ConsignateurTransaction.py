@@ -31,8 +31,12 @@ class ConsignateurTransaction(ModeleConfiguration):
         )
 
     # Initialise les DAOs, connecte aux serveurs.
-    def configurer(self):
-        self.contexte.initialiser()
+    def initialiser(self, init_document=True, init_message=True, connecter=True):
+        super().initialiser(init_document, init_message, connecter)
+
+        if self.args.debug:
+            logging.getLogger('millegrilles.SecuritePKI').setLevel(logging.DEBUG)
+
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
 
         # Executer la configuration pour RabbitMQ
@@ -68,37 +72,6 @@ class ConsignateurTransaction(ModeleConfiguration):
         uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         self.contexte.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction, message_dict)
 
-    def ajouter_evenement_transaction(self, id_transaction, evenement):
-        collection_transactions = self.contexte.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
-        libelle_transaction_traitee = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, evenement)
-        selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
-        operation = {
-            '$push': {libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc)}
-        }
-        resultat = collection_transactions.update_one(selection, operation)
-
-        if resultat.modified_count != 1:
-            raise Exception("Erreur ajout evenement transaction: %s" % str(resultat))
-
-    def sauvegarder_nouvelle_transaction(self, _collection_transactions, enveloppe_transaction):
-
-        # Verifier la signature de la transaction
-
-
-        # Ajouter l'element evenements et l'evenement de persistance
-        estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
-        # Changer estampille du format epoch en un format date et sauver l'evenement
-        date_estampille = datetime.datetime.fromtimestamp(estampille)
-        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
-            Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: [date_estampille],
-            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.now(tz=datetime.timezone.utc)]
-        }
-
-        resultat = _collection_transactions.insert_one(enveloppe_transaction)
-        doc_id = resultat.inserted_id
-
-        return doc_id
-
 
 class ConsignateurTransactionCallback(BaseCallback):
 
@@ -129,7 +102,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         collection_transactions = self.contexte.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
 
         # Verifier la signature de la transaction
-
+        self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
@@ -146,32 +119,33 @@ class ConsignateurTransactionCallback(BaseCallback):
         return doc_id
 
 
-consignateur = ConsignateurTransaction()
+#consignateur = ConsignateurTransaction()
 
 
-def exit_gracefully(signum, frame):
-    logging.debug("Arret de OrienteurTransaction")
-    consignateur.deconnecter()
+# def exit_gracefully(signum, frame):
+#     logging.debug("Arret de OrienteurTransaction")
+#     consignateur.deconnecter()
 
 
-def main():
-
-    logging.debug("Demarrage de ConsignateurTransaction")
-
-    signal.signal(signal.SIGINT, exit_gracefully)
-    signal.signal(signal.SIGTERM, exit_gracefully)
-
-    consignateur.configurer()
-
-    try:
-        logging.debug("ConsignateurTransaction est pret")
-        consignateur.executer()
-    finally:
-        logging.debug("Arret de ConsignateurTransaction")
-        consignateur.deconnecter()
-
-    logging.debug("ConsignateurTransaction est arrete")
+# def main():
+#
+#     logging.debug("Demarrage de ConsignateurTransaction")
+#
+#     signal.signal(signal.SIGINT, exit_gracefully)
+#     signal.signal(signal.SIGTERM, exit_gracefully)
+#
+#     consignateur.initialiser()
+#
+#     try:
+#         logging.debug("ConsignateurTransaction est pret")
+#         consignateur.executer()
+#     finally:
+#         logging.debug("Arret de ConsignateurTransaction")
+#         consignateur.deconnecter()
+#
+#     logging.debug("ConsignateurTransaction est arrete")
 
 
 if __name__=="__main__":
-    main()
+    consignateur = ConsignateurTransaction()
+    consignateur.main()

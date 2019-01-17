@@ -6,7 +6,6 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 from bson.objectid import ObjectId
 from millegrilles import Constantes
-from millegrilles.dao.TransactionDocumentHelper import TransactionHelper
 from millegrilles.dao.ProcessusDocumentHelper import ProcessusHelper
 
 '''

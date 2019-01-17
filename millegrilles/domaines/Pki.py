@@ -19,7 +19,7 @@ class ConstantesPki:
     QUEUE_NOM = DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
-    LIBELLE_FINGERPRINT = 'fingerprint'
+    LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
     LIBELLE_FINGERPRINT_ISSUER = 'fingerprint_issuer'
     LIBELLE_DOCID_ISSUER = '_id_issuer'
     LIBELLE_CHAINE_COMPLETE = 'chaine_complete'
