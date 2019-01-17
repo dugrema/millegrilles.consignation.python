@@ -5,21 +5,18 @@ import signal
 import logging
 
 from millegrilles import Constantes
-from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import PikaDAO
-from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 
 class ModeleConfiguration:
 
     def __init__(self):
         self._logger = logging.getLogger('%s' % self.__class__.__name__)
-        print("Logger %s" % str(self._logger.name))
         self._contexte = ContexteRessourcesMilleGrilles()
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
 
-    def initialiser(self, init_document=True, init_message=True, connecter=True):
+    def initialiser(self, init_document=True, init_message=True, connecter=False):
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
@@ -64,12 +61,14 @@ class ModeleConfiguration:
         try:
             # Preparer logging
             logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
+            self._logger.info("\n-----------\n\n-----------")
+            self._logger.info("Demarrage en cours\n-----------")
 
             # Faire le parsing des arguments pour verifier s'il en manque
             self.configurer_parser()
             self.parse()
 
-            self._logger.info("Initialisation en cours")
+            self._logger.info("Initialisation")
             self.initialiser()  # Initialiser toutes les
 
             self._logger.info("Connexion des DAOs")
