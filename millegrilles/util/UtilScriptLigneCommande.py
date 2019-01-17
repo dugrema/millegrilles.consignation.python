@@ -17,7 +17,7 @@ class ModeleConfiguration:
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
 
-    def initialiser(self, init_document=True, init_message=True, connecter=False):
+    def initialiser(self, init_document=True, init_message=True, connecter=True):
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
@@ -70,10 +70,7 @@ class ModeleConfiguration:
             self.parse()
 
             self._logger.info("Initialisation")
-            self.initialiser()  # Initialiser toutes les
-
-            self._logger.info("Connexion des DAOs")
-            self.connecter()  # Connecter les ressource (DAOs)
+            self.initialiser()  # Initialiser les ressources
 
             self._logger.info("Debut execution")
             self.executer()  # Executer le download et envoyer message
