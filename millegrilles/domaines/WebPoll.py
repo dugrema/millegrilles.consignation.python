@@ -71,8 +71,8 @@ class WebPollConstantes:
 class GestionnaireWebPoll(GestionnaireDomaine):
     """ Gestionnaire du domaine Web Poller. Telecharge des documents a frequence reguliere. """
 
-    def __init__(self, configuration, message_dao, document_dao):
-        super().__init__(configuration, message_dao, document_dao)
+    def __init__(self, contexte):
+        super().__init__(contexte)
         self._traitement_lecture = None
 
         self._downloaders = {}

@@ -2,7 +2,7 @@
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper
 from millegrilles.MGProcessus import MGPProcessusDemarreur
-from millegrilles.util.UtilScriptLigneCommande import ModeleAvecDocumentMessageDAO
+from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 import logging
@@ -14,7 +14,7 @@ from pika.exceptions import ChannelClosed
 from threading import Event
 
 
-class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
+class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     """
     Classe qui agit comme gestionnaire centralise de plusieurs domaines MilleGrilles.
     Cette classe s'occupe des DAOs et du cycle de vie du programme.
@@ -26,10 +26,9 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         self._gestionnaires = []
         self._stop_event = Event()
 
-    def initialiser(self):
+    def initialiser(self, init_document=True, init_message=True, connecter=True):
         """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
-        super().initialiser()
-        self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
+        super().initialiser(init_document, init_message, connecter)
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -79,7 +78,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         # Charger le fichier de configuration json
         chemin_fichier_configuration = self.args.configuration
         if chemin_fichier_configuration is None:
-            chemin_fichier_configuration = self.configuration.domaines_json
+            chemin_fichier_configuration = self.contexte.configuration.domaines_json
 
         if chemin_fichier_configuration is not None:
             self._logger.info("Charger la configuration a partir du fichier: %s" % chemin_fichier_configuration)
@@ -100,7 +99,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
         # On prepare et configure une instance de chaque gestionnaire
         for classe_gestionnaire in liste_classes_gestionnaires:
             # Preparer une instance du gestionnaire
-            instance = classe_gestionnaire(self.configuration, self.message_dao, self.document_dao)
+            instance = classe_gestionnaire(self.contexte)
             instance.configurer()  # Executer la configuration du gestionnaire de domaine
             self._gestionnaires.append(instance)
 
@@ -145,7 +144,7 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
 
         # Surveiller les gestionnaires - si un gestionnaire termine son execution, on doit tout fermer
         while not self._stop_event.is_set():
-            self.message_dao.start_consuming()  # Blocking
+            self.contexte.message_dao.start_consuming()  # Blocking
             self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
 
             self._stop_event.wait(5)  # Boucler toutes les 20 secondes
@@ -164,13 +163,10 @@ class GestionnaireDomainesMilleGrilles(ModeleAvecDocumentMessageDAO):
 class GestionnaireDomaine:
     """ Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine. """
 
-    def __init__(self, configuration=None, message_dao=None, document_dao=None, contexte=None):
+    def __init__(self, contexte):
 
         # Nouvelle approche, utilisation classe contexte pour obtenir les ressources
         self._contexte = contexte
-        if contexte is None:
-            self._contexte = ContexteRessourcesMilleGrilles(configuration, message_dao, document_dao)
-
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
         self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)

@@ -39,8 +39,8 @@ class SenseursPassifsConstantes:
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
 class GestionnaireSenseursPassifs(GestionnaireDomaine):
 
-    def __init__(self, configuration, message_dao, document_dao):
-        super().__init__(configuration, message_dao, document_dao)
+    def __init__(self, contexte):
+        super().__init__(contexte)
         self._traitement_lecture = None
         self.traiter_transaction = None   # Override de la methode super().traiter_transaction
         self._traitement_backlog_lectures = None

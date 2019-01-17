@@ -56,8 +56,8 @@ class ConstantesPki:
 
 class GestionnairePki(GestionnaireDomaine):
 
-    def __init__(self, configuration=None, message_dao=None, document_dao=None, contexte=None):
-        super().__init__(configuration, message_dao, document_dao, contexte)
+    def __init__(self, contexte):
+        super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
         self._pki_document_helper = None
