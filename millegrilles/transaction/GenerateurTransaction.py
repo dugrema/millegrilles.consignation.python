@@ -75,7 +75,8 @@ class GenerateurTransaction:
         enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
         enveloppe.update(message_dict)
 
-        # Signer le message avec le certificat du noeud
+        # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.signateur_transaction.hacher_contenu(enveloppe)
         message_signe = self.signateur_transaction.signer(enveloppe)
 
         return message_signe

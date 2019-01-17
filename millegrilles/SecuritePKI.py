@@ -31,7 +31,8 @@ class UtilCertificats:
     def __init__(self, configuration):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.configuration = configuration
-        self._hash_function = hashes.SHA512
+        self._sign_hash_function = hashes.SHA512
+        self._contenu_hash_function = hashes.SHA256
 
         self.certificat = None
         self._cle = None
@@ -132,37 +133,23 @@ class UtilCertificats:
                 (message_noeud, cn)
             )
 
-    # def _verifier_chaine_certificats(self):
-    #     """ Verifie que la chaine de certicats remonte a un trusted CA """
-        # trusted_ca_file = '/usr/local/etc/millegrilles/certs/millegrilles.RootCA.pem'
-        # bundle_signing = '%s/pki.millegrilles.ssl.CAchain' % SignateurTest.CERT_FOLDER
+    def hacher_contenu(self, dict_message):
+        """
+        Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete.
+        :param dict_message:
+        :return:
+        """
+        dict_message_effectif = dict_message.copy()
+        del dict_message_effectif['en-tete']  # Retirer l'en-tete, on ne fait que hacher le contenu du dict
+        message_bytes = self.preparer_transaction_bytes(dict_message_effectif)
 
-        # Verifier si le certificat existe deja sur le disque
-        # fingerprint_cert_bytes = self.certificat.fingerprint(hashes.SHA1())
-        # fingerprint_cert = str(binascii.hexlify(fingerprint_cert_bytes), 'utf-8')
+        digest = hashes.Hash(self._contenu_hash_function(), backend=default_backend())
+        digest.update(message_bytes)
+        resultat_digest = digest.finalize()
+        digest_base64 = str(base64.b64encode(resultat_digest), 'utf-8')
+        self._logger.debug("Resultat hash contenu: %s" % digest_base64)
 
-        # if not os.path.isdir(Verificateur.PATH_CERTIFICATS_TEMP):
-        #     os.mkdir(Verificateur.PATH_CERTIFICATS_TEMP)
-        # certificat_a_verifier = '%s/%s.pem' % (Verificateur.PATH_CERTIFICATS_TEMP, fingerprint_cert)
-        # if not os.path.isfile(certificat_a_verifier):
-        #     self._logger.debug("Fichier certificat va etre sauvegarde: %s" % fingerprint_cert)
-        #     with open(certificat_a_verifier, "wb") as f:
-        #         f.write(self.certificat.public_bytes(serialization.Encoding.PEM))
-
-        # Utiliser openssl directement pour verifier la chaine de certification
-        # resultat = subprocess.call([
-        #     'openssl', 'verify',
-        #     '-CAfile', trusted_ca_file,
-        #     '-untrusted', bundle_signing,
-        #     certificat_a_verifier
-        # ])
-        #
-        # self._logger.debug("Resultat verification chaine certificat: %d" % resultat)
-        #
-        # if resultat == 2:
-        #     raise Exception("Certificat invalide, la chaine est incomplete")
-        # elif resultat != 0:
-        #     raise Exception("Certificat invalide, code %d" % resultat)
+        return digest_base64
 
 
 class SignateurTransaction(UtilCertificats):
@@ -204,10 +191,10 @@ class SignateurTransaction(UtilCertificats):
         signature = self._cle.sign(
             message_bytes,
             padding.PSS(
-                mgf=padding.MGF1(self._hash_function()),
+                mgf=padding.MGF1(self._sign_hash_function()),
                 salt_length=padding.PSS.MAX_LENGTH
             ),
-            self._hash_function()
+            self._sign_hash_function()
         )
 
         signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')
@@ -240,10 +227,22 @@ class VerificateurTransaction(UtilCertificats):
         else:
             raise TypeError("La transaction doit etre en format str ou dict")
 
+        hachage = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
+        if hachage is None:
+            raise ValueError("Le %s n'existe pas sur la transaction" % Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE)
+
         signature = dict_message['_signature']
 
         if signature is None:
             raise ValueError("La _signature n'existe pas sur la transaction")
+
+        # Verifier le hachage du contenu
+        hachage_contenu_courant = self.hacher_contenu(dict_message)
+        if hachage != hachage_contenu_courant:
+            raise HachageInvalide("Le hachage %s ne correspond pas au contenu recu %s" % (
+                hachage, hachage_contenu_courant
+            ))
+        self._logger.debug("Hachage de la transaction est OK: %s" % hachage_contenu_courant)
 
         regex_ignorer = re.compile('^_.+')
         keys = list()
@@ -289,10 +288,10 @@ class VerificateurTransaction(UtilCertificats):
             signature_bytes,
             message_bytes,
             padding.PSS(
-                mgf=padding.MGF1(self._hash_function()),
+                mgf=padding.MGF1(self._sign_hash_function()),
                 salt_length=padding.PSS.MAX_LENGTH
             ),
-            self._hash_function()
+            self._sign_hash_function()
         )
         self._logger.debug("Signature OK")
 
@@ -560,6 +559,16 @@ class CertificatInconnu(Exception):
         super().__init__(message, errors)
         self.errors = errors
         self._key_subject_identifier = key_subject_identifier
+
+    @property
+    def key_subject_identifier(self):
+        return self._key_subject_identifier
+
+
+class HachageInvalide(Exception):
+    def __init__(self, message, errors=None):
+        super().__init__(message, errors)
+        self.errors = errors
 
     @property
     def key_subject_identifier(self):
