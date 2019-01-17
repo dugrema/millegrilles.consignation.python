@@ -1,5 +1,7 @@
 # Constantes de MilleGrillesPython
 
+LOGGING_FORMAT = '%(asctime)s %(threadName)s %(levelname)s: %(message)s'
+
 CONFIG_FICHIER_JSON = 'mg_config_json'  # Fichier de configuration JSON a combiner avec les autres configurations
 
 # Configuration MQ

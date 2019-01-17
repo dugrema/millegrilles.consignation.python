@@ -4,16 +4,17 @@ import argparse
 import signal
 import logging
 
+from millegrilles import Constantes
 from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
-
-logger = logging.getLogger(__name__)  # Define module logger
 
 
 class ModeleConfiguration:
 
     def __init__(self):
+        self._logger = logging.getLogger('%s' % self.__class__.__name__)
+        print("Logger %s" % str(self._logger.name))
         self._contexte = ContexteRessourcesMilleGrilles()
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
@@ -62,24 +63,30 @@ class ModeleConfiguration:
 
         try:
             # Preparer logging
-            logging.basicConfig(level=logging.WARNING)
+            logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
 
             # Faire le parsing des arguments pour verifier s'il en manque
             self.configurer_parser()
             self.parse()
 
+            self._logger.info("Initialisation en cours")
             self.initialiser()  # Initialiser toutes les
 
+            self._logger.info("Connexion des DAOs")
             self.connecter()  # Connecter les ressource (DAOs)
 
+            self._logger.info("Debut execution")
             self.executer()  # Executer le download et envoyer message
+            self._logger.info("Fin execution")
 
         except Exception as e:
             print("MAIN: Erreur fatale, voir log. Erreur %s" % str(e))
-            logger.exception("MAIN: Erreur")
+            self._logger.exception("MAIN: Erreur")
             self.print_help()
         finally:
             self.exit_gracefully()
+
+        self._logger.info("Main terminee, exit.")
 
     @property
     def contexte(self):

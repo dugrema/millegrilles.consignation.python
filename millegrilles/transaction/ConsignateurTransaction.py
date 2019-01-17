@@ -146,6 +146,7 @@ class ConsignateurTransactionCallback(BaseCallback):
 #     logging.debug("ConsignateurTransaction est arrete")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
+    logging.getLogger('ConsignateurTransaction').setLevel(logging.INFO)
     consignateur = ConsignateurTransaction()
     consignateur.main()
