@@ -1,16 +1,11 @@
-#!/usr/bin/python3
 # Programme principal pour transferer les nouvelles transactions vers MongoDB
 
-from millegrilles.dao.MessageDAO import PikaDAO, JSONHelper, BaseCallback
-from millegrilles.dao.DocumentDAO import MongoDAO
-from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
-from millegrilles.SecuritePKI import VerificateurTransaction
+from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 from millegrilles import Constantes
 from bson.objectid import ObjectId
 
-import signal
 import logging
 import datetime
 
@@ -117,36 +112,3 @@ class ConsignateurTransactionCallback(BaseCallback):
         doc_id = resultat.inserted_id
 
         return doc_id
-
-
-#consignateur = ConsignateurTransaction()
-
-
-# def exit_gracefully(signum, frame):
-#     logging.debug("Arret de OrienteurTransaction")
-#     consignateur.deconnecter()
-
-
-# def main():
-#
-#     logging.debug("Demarrage de ConsignateurTransaction")
-#
-#     signal.signal(signal.SIGINT, exit_gracefully)
-#     signal.signal(signal.SIGTERM, exit_gracefully)
-#
-#     consignateur.initialiser()
-#
-#     try:
-#         logging.debug("ConsignateurTransaction est pret")
-#         consignateur.executer()
-#     finally:
-#         logging.debug("Arret de ConsignateurTransaction")
-#         consignateur.deconnecter()
-#
-#     logging.debug("ConsignateurTransaction est arrete")
-
-
-if __name__ == "__main__":
-    logging.getLogger('ConsignateurTransaction').setLevel(logging.INFO)
-    consignateur = ConsignateurTransaction()
-    consignateur.main()

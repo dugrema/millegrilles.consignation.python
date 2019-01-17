@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import signal
 
 from millegrilles.MGProcessus import MGPProcessusControleur

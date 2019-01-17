@@ -12,6 +12,7 @@ class ModeleConfiguration:
 
     def __init__(self):
         self._logger = logging.getLogger('%s' % self.__class__.__name__)
+        self._logger.setLevel(logging.INFO)
         self._contexte = ContexteRessourcesMilleGrilles()
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
@@ -62,7 +63,7 @@ class ModeleConfiguration:
             # Preparer logging
             logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
             self._logger.info("\n-----------\n\n-----------")
-            self._logger.info("Demarrage en cours\n-----------")
+            self._logger.info("Demarrage de %s en cours\n-----------" % self.__class__.__name__)
 
             # Faire le parsing des arguments pour verifier s'il en manque
             self.configurer_parser()
