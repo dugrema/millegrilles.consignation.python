@@ -763,7 +763,7 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
 
         id_document_senseur = self._document_processus['parametres']['id_document_senseur']
 
-        producteur_document = ProducteurDocumentNoeud(self.message_dao(), self.document_dao())
+        producteur_document = ProducteurDocumentNoeud(self.contexte)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
         # Verifier si on doit executer les notifications
@@ -1027,7 +1027,7 @@ class ProcessusMajManuelle(MGProcessusTransaction):
     def modifier_noeud(self):
         """ Appliquer les modifications au noeud """
         id_document_senseur = self._document_processus['parametres']['id_document_senseur']
-        producteur_document = ProducteurDocumentNoeud(self.message_dao(), self.document_dao())
+        producteur_document = ProducteurDocumentNoeud(self.contexte)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
         self.set_etape_suivante()  # Termine
