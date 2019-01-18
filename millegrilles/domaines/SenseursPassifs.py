@@ -737,7 +737,7 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
         self._logger.debug("Document processus: %s" % self._document_processus)
         self._logger.debug("Document transaction: %s" % doc_transaction)
 
-        producteur_document = ProducteurDocumentSenseurPassif(self.message_dao(), self.document_dao())
+        producteur_document = ProducteurDocumentSenseurPassif(self.contexte)
         document_senseur = producteur_document.maj_document_senseur(doc_transaction)
 
         parametres = None
