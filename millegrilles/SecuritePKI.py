@@ -20,7 +20,7 @@ from millegrilles import Constantes
 class ConstantesSecurityPki:
 
     DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
-    COLLECTION_NOM = 'millegrilles_domaines_Pki'
+    COLLECTION_NOM = 'millegrilles.domaines.Pki'
 
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'

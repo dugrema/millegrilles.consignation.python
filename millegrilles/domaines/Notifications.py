@@ -13,8 +13,9 @@ import datetime
 
 class NotificationsConstantes:
 
-    COLLECTION_NOM = 'millegrilles_domaines_Notifications'
     QUEUE_SUFFIXE = 'millegrilles.domaines.Notifications'
+    COLLECTION_NOM = QUEUE_SUFFIXE
+    COLLECTION_DONNEES_NOM = '%s/%s' % (COLLECTION_NOM, 'donnees')
 
     TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Notifications.actionUsager'
 
@@ -51,6 +52,9 @@ class GestionnaireNotifications(GestionnaireDomaine):
 
     def get_nom_queue(self):
         return NotificationsConstantes.QUEUE_SUFFIXE
+
+    def get_nom_collection(self):
+        return NotificationsConstantes.COLLECTION_NOM
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
