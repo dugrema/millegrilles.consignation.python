@@ -104,6 +104,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         collection_transactions.create_index([
             ('%s' % SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
             ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
             ('%s.%s' %
              (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
              1),
