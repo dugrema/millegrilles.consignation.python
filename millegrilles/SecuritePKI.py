@@ -223,7 +223,7 @@ class VerificateurTransaction(UtilCertificats):
         if transaction is str:
             dict_message = json.loads(transaction)
         elif isinstance(transaction, dict):
-            dict_message = transaction
+            dict_message = transaction.copy()
         else:
             raise TypeError("La transaction doit etre en format str ou dict")
 

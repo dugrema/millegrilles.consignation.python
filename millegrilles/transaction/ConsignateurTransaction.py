@@ -8,6 +8,7 @@ from bson.objectid import ObjectId
 
 import logging
 import datetime
+import traceback
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -73,13 +74,44 @@ class ConsignateurTransactionCallback(BaseCallback):
     def __init__(self, contexte):
         super().__init__(contexte.configuration)
         self.contexte = contexte
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        id_document = self.sauvegarder_nouvelle_transaction(message_dict)
-        uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        self.contexte.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction, message_dict)
+
+        try:
+            id_document = self.sauvegarder_nouvelle_transaction(message_dict)
+            uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            self.contexte.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction, message_dict)
+        except Exception as e:
+            uuid_transaction = 'NA'
+            en_tete = message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
+            if en_tete is not None:
+                uuid_transaction = en_tete.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+            self._logger.exception(
+                'Erreur traitement transaction uuid=%s, transferee a transaction.staging',
+                uuid_transaction
+            )
+            message_traceback = traceback.format_exc()
+            self.traiter_erreur_persistance(message_dict, e, message_traceback)
+            raise e  # Relancer l'exception pour traitement independant
+
+    def traiter_erreur_persistance(self, dict_message, error, message_traceback):
+        document_staging = {
+            'transaction': dict_message,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: {
+                Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.now(tz=datetime.timezone.utc)]
+            },
+            'traceback': message_traceback,
+            'erreur': {
+                'message': str(error),
+                'classe': error.__class__.__name__
+            }
+
+        }
+        collection_erreurs = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
+        collection_erreurs.insert_one(document_staging)
 
     def ajouter_evenement_transaction(self, id_transaction, evenement):
         collection_transactions = self.contexte.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
@@ -94,7 +126,9 @@ class ConsignateurTransactionCallback(BaseCallback):
             raise Exception("Erreur ajout evenement transaction: %s" % str(resultat))
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
-        collection_transactions = self.contexte.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+
+        nom_collection = self._identifier_collection_domaine(enveloppe_transaction)
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
         # Verifier la signature de la transaction
         self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
@@ -103,12 +137,32 @@ class ConsignateurTransactionCallback(BaseCallback):
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
         # Changer estampille du format epoch en un format date et sauver l'evenement
         date_estampille = datetime.datetime.fromtimestamp(estampille)
+        evenements = {
+            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.now(tz=datetime.timezone.utc)],
+            Constantes.EVENEMENT_SIGNATURE_VERIFIEE: [datetime.datetime.now(tz=datetime.timezone.utc)]
+        }
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
-            Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: [date_estampille],
-            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.now(tz=datetime.timezone.utc)]
+            Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,
+            self.contexte.configuration.nom_millegrille: evenements
         }
 
         resultat = collection_transactions.insert_one(enveloppe_transaction)
         doc_id = resultat.inserted_id
 
         return doc_id
+
+    def _identifier_collection_domaine(self, enveloppe_transaction):
+
+        domaine_transaction = enveloppe_transaction[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE
+        ][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE
+        ]
+
+        domaine_split = domaine_transaction.split('.')
+
+        nom_collection = None
+        if domaine_split[0] == 'millegrilles' and domaine_split[1] == 'domaines':
+            nom_collection = '%s/%s' % ('.'.join(domaine_split[0:3]), 'donnees')
+
+        return nom_collection
