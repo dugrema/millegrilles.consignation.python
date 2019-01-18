@@ -39,9 +39,9 @@ class ConstantesSecurityPki:
 
 class UtilCertificats:
 
-    def __init__(self, configuration):
+    def __init__(self, contexte):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self.configuration = configuration
+        self._contexte = contexte
         self._sign_hash_function = hashes.SHA512
         self._contenu_hash_function = hashes.SHA256
 
@@ -170,12 +170,20 @@ class UtilCertificats:
     def enveloppe_certificat_courant(self):
         return self._enveloppe
 
+    @property
+    def configuration(self):
+        return self._contexte.configuration
+
+    @property
+    def contexte(self):
+        return self._contexte
+
 
 class SignateurTransaction(UtilCertificats):
     """ Signe une transaction avec le certificat du noeud. """
 
-    def __init__(self, configuration):
-        super().__init__(configuration)
+    def __init__(self, contexte):
+        super().__init__(contexte)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def signer(self, dict_message):

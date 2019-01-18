@@ -114,7 +114,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
         # de persistance.
         # Toutes les autres transactions non-traitees de SenseursPassifs.Lecture peuvent etre marquees comme traitees.
-        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.message_dao, self.document_dao)
+        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.contexte)
         liste_transactions = traitement_backlog_lectures.run_requete_plusrecentetransactionlecture_parsenseur()
         traitement_backlog_lectures.run_requete_genererdeclencheur_parsenseur(liste_transactions)
 
@@ -850,12 +850,11 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
 
 class TraitementBacklogLecturesSenseursPassifs:
 
-    def __init__(self, message_dao, document_dao):
-        self._message_dao = message_dao
-        self._document_dao = document_dao
+    def __init__(self, contexte):
+        self._contexte = contexte
         self._logger = logging.getLogger('%s.TraitementBacklogLecturesSenseursPassifs' % __name__)
 
-        self.demarreur_processus = MGPProcessusDemarreur(self._message_dao, self._document_dao)
+        self.demarreur_processus = MGPProcessusDemarreur(self._contexte)
 
     ''' 
     Identifie la transaction de lecture la plus recente pour chaque noeud/senseur. Cherche uniquement dans
@@ -885,7 +884,7 @@ class TraitementBacklogLecturesSenseursPassifs:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
+        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         liste_transaction_senseurs = []
@@ -910,7 +909,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     '''
     def run_requete_genererdeclencheur_parsenseur(self, liste_senseurs):
 
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
+        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
 
         for transaction_senseur in liste_senseurs:
             filtre = {
@@ -956,7 +955,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     def declencher_maj_manuelle(self):
         """ Re-declencher les transactions de mise a jour manuelles qui n'ont pas ete executees. """
 
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
+        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         filtre = {
             'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_MAJMANUELLE,
             'evenements.transaction_traitee': {'$exists': False}
@@ -976,6 +975,10 @@ class TraitementBacklogLecturesSenseursPassifs:
             transaction['_id-transaction'] = transaction['_id']  # Copier le _id pour que le processus ait la bonne cle
             self._logger.debug("Redemarrer processus pour ProcessusMajManuelle _id:%s" % transaction['_id'])
             self.demarreur_processus.demarrer_processus(processus, transaction)
+
+    @property
+    def contexte(self):
+        return self._contexte
 
 
 # Processus pour mettre a jour un document de noeud suite a une transaction de senseur passif

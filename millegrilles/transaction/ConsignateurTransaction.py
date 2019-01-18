@@ -66,7 +66,6 @@ class ConsignateurTransactionCallback(BaseCallback):
 
     def __init__(self, contexte):
         super().__init__(contexte)
-        self.contexte = contexte
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     # Methode pour recevoir le callback pour les nouvelles transactions.

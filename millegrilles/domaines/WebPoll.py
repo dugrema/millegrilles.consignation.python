@@ -127,8 +127,8 @@ class GestionnaireWebPoll(GestionnaireDomaine):
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
 
-        self._downloaders['page'] = WebPageDownload(self.configuration, self.message_dao)
-        self._downloaders['rss'] = RSSFeedDownload(self.configuration, self.message_dao)
+        self._downloaders['page'] = WebPageDownload(self.contexte)
+        self._downloaders['rss'] = RSSFeedDownload(self.contexte)
 
     def traiter_transaction(self, ch, method, properties, body):
         # self._traitement_lecture.callbackAvecAck(ch, method, properties, body)

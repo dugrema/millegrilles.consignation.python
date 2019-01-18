@@ -19,8 +19,8 @@ class GenerateurTransaction:
             self._contexte = ContexteRessourcesMilleGrilles()
             self._contexte.initialiser(init_message=True, init_document=False, connecter=True)
 
-        # Initialiser la configuraiton et dao au besoin
-        self.signateur_transaction = SignateurTransaction(self._contexte.configuration)
+        # Initialiser la configuration et dao au besoin
+        self.signateur_transaction = SignateurTransaction(self._contexte)
         self.signateur_transaction.initialiser()
 
         # Transmettre le certificat pour etre sur que tous les participants l'ont

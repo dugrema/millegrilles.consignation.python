@@ -351,12 +351,11 @@ class MGProcessusTransaction(MGProcessus):
 # Classe qui sert a demarrer un processus
 class MGPProcessusDemarreur:
 
-    def __init__(self, message_dao, document_dao):
-        self._message_dao = message_dao
-        self._document_dao = document_dao
+    def __init__(self, contexte):
+        self._contexte = contexte
         self._json_helper = JSONHelper()
 
-        self._processus_helper = ProcessusHelper(document_dao._mg_database)
+        self._processus_helper = ProcessusHelper(self.contexte.document_dao._mg_database)
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -379,14 +378,18 @@ class MGPProcessusDemarreur:
             id_doc_processus = self._processus_helper.sauvegarder_initialisation_processus(
                 moteur, processus_a_declencher, dictionnaire_evenement)
 
-            self._message_dao.transmettre_evenement_mgpprocessus(
+            self.contexte.message_dao.transmettre_evenement_mgpprocessus(
                 id_doc_processus,
                 nom_processus=processus_a_declencher
             )
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
-            self._message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
+            self.contexte.message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
+
+    @property
+    def contexte(self):
+        return self._contexte
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).

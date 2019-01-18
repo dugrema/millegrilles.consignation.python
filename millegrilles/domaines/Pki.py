@@ -3,7 +3,7 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction, MGPProcessusDemarreur
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 
 import logging
@@ -64,6 +64,7 @@ class GestionnairePki(GestionnaireDomaine):
 
         self._pki_document_helper = None
         self._traitement_message = None
+        self.demarreur_processus = MGPProcessusDemarreur(self.contexte)
 
     def configurer(self):
         super().configurer()
@@ -157,17 +158,18 @@ class GestionnairePki(GestionnaireDomaine):
 
         # Demarrer validation des certificats
         # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
-        processus = "%s:%s" % (
-            ConstantesPki.DOMAINE_NOM,
-            ProcessusVerifierChaineCertificatsNonValides.__name__
-        )
-        self.demarrer_processus(processus, dict())
+        # processus = "%s:%s" % (
+        #     ConstantesPki.DOMAINE_NOM,
+        #     ProcessusVerifierChaineCertificatsNonValides.__name__
+        # )
+        # self.demarrer_processus(processus, dict())
 
 
 class PKIDocumentHelper:
 
     def __init__(self, contexte):
         self._contexte = contexte
+        self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
 
     def inserer_certificat(self, enveloppe, upsert=False, trusted=False):
         document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
@@ -205,6 +207,14 @@ class PKIDocumentHelper:
             collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=upsert)
         else:
             collection.insert_one(document_cert)
+
+        # Demarrer validation des certificats
+        # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+        processus = "%s:%s" % (
+            ConstantesPki.DOMAINE_NOM,
+            ProcessusVerifierChaineCertificatsNonValides.__name__
+        )
+        self._mg_processus_demarreur.demarrer_processus(processus, dict())
 
     def charger_certificat(self, fingerprint=None, subject=None):
         filtre = dict()

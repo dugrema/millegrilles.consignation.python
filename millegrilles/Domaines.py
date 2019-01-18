@@ -182,7 +182,7 @@ class GestionnaireDomaine:
 
     def configurer(self):
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
-        self.demarreur_processus = MGPProcessusDemarreur(self.message_dao, self.document_dao)
+        self.demarreur_processus = MGPProcessusDemarreur(self.contexte)
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
