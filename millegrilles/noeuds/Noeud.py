@@ -10,6 +10,7 @@ from threading import Event
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
 from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursPassifs
+from millegrilles import Constantes
 
 from millegrilles.util.Daemon import Daemon
 
@@ -26,7 +27,9 @@ class DemarreurNoeud(Daemon):
         # Call superclass init
         Daemon.__init__(self, pidfile, stdin, stdout, stderr)
 
-        logging.basicConfig(level=logging.WARNING)
+        logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
+        self._logger.info("\n-----------\n\n-----------")
+        self._logger.info("Demarrage de %s en cours\n-----------" % self.__class__.__name__)
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
