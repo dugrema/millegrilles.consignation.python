@@ -6,6 +6,7 @@ from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
 from millegrilles.dao.ProcessusDocumentHelper import ProcessusHelper
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
+from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 
 
 class MGPProcessusControleur(ModeleConfiguration):
@@ -23,7 +24,7 @@ class MGPProcessusControleur(ModeleConfiguration):
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
         # Executer la configuration pour RabbitMQ
-        self.contexte.message_dao.configurer_rabbitmq()
+        self._contexte.message_dao.configurer_rabbitmq()
         self._message_handler = MGControlleurMessageHandler(self.contexte, self)
 
         # Configuration pour les processus
@@ -74,8 +75,8 @@ class MGPProcessusControleur(ModeleConfiguration):
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
 
-    def charger_transaction_par_id(self, id_transaction):
-        return self.contexte.document_dao.charger_transaction_par_id(id_transaction)
+    def charger_transaction_par_id(self, id_transaction, nom_collection):
+        return self.contexte.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
 
     def charger_document_processus(self, id_document_processus):
         return self.contexte.document_dao.charger_processus_par_id(id_document_processus)
@@ -86,9 +87,6 @@ class MGPProcessusControleur(ModeleConfiguration):
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
         self.contexte.message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
-
-    def transaction_helper(self):
-        return self.contexte.document_dao.transaction_helper()
 
     def processus_helper(self):
         return self.contexte.document_dao.processus_helper()
@@ -102,6 +100,10 @@ class MGPProcessusControleur(ModeleConfiguration):
 
     def message_dao(self):
         return self.contexte.message_dao
+
+    @property
+    def contexte(self):
+        return self._contexte
 
     @property
     def configuration(self):
@@ -307,13 +309,16 @@ class MGProcessusTransaction(MGProcessus):
         self._transaction = None
 
     def trouver_id_transaction(self):
-        id_transaction = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
-        return id_transaction
+        parametres = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES]
+        id_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        domaine = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine)
+        return {'id_transaction': id_transaction, 'nom_collection': collection}
 
-    def charger_transaction(self):
-        id_transaction = self.trouver_id_transaction()
-        self._transaction = self._controleur.charger_transaction_par_id(id_transaction)
+    def charger_transaction(self, nom_collection):
+        info_transaction = self.trouver_id_transaction()
+        id_transaction = info_transaction['id_transaction']
+        self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
         return self._transaction
 
     def finale(self):
@@ -323,9 +328,15 @@ class MGProcessusTransaction(MGProcessus):
 
     ''' Ajoute l'evenement 'traitee' dans la transaction '''
     def marquer_transaction_traitee(self):
-        id_transaction = self.trouver_id_transaction()
-        helper = self._controleur.transaction_helper()
-        helper.ajouter_evenement_transaction(id_transaction, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
+        info_transaction = self.trouver_id_transaction()
+        id_transaction = info_transaction['id_transaction']
+        nom_collection = info_transaction['nom_collection']
+        ConsignateurTransactionCallback.ajouter_evenement_transaction(
+            self._controleur.contexte,
+            id_transaction,
+            nom_collection,
+            Constantes.EVENEMENT_TRANSACTION_TRAITEE
+        )
 
     def marquer_transaction_intraitable(self):
         pass
@@ -335,6 +346,7 @@ class MGProcessusTransaction(MGProcessus):
         if self._transaction is None:
             return self.charger_transaction()
         return self._transaction
+
 
 # Classe qui sert a demarrer un processus
 class MGPProcessusDemarreur:

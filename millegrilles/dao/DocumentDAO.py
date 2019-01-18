@@ -24,7 +24,6 @@ class MongoDAO:
         self._collection_transactions = None
         self._collection_processus = None
         self._collection_information_documents = None
-        self._transaction_document_helper = None
         self._processus_document_helper = None
 
         self._logger = logging.getLogger("%s.MongoDAO" % __name__)
@@ -39,7 +38,6 @@ class MongoDAO:
         self._logger.info("Connection etablie, ouverture base de donnes %s" % self._configuration.nom_millegrille)
 
         self._mg_database = self._client[self._nom_millegrille]
-        self._collection_transactions = self._mg_database[Constantes.DOCUMENT_COLLECTION_TRANSACTIONS]
         self._collection_processus = self._mg_database[Constantes.DOCUMENT_COLLECTION_PROCESSUS]
         self._collection_information_documents = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS]
 
@@ -51,10 +49,8 @@ class MongoDAO:
             client = self._client
 
             self._mg_database = None
-            self._collection_transactions = None
             self._collection_processus = None
             self._collection_information_documents = None
-            self._transaction_document_helper = None
             self._processus_document_helper = None
 
             client.close()
@@ -82,16 +78,13 @@ class MongoDAO:
     :param id_doc: Numero unique du document dans MongoDB.
     :returns: Document ou None si aucun document ne correspond.
     '''
-    def charger_transaction_par_id(self, id_doc):
+    def charger_transaction_par_id(self, id_doc, collection):
         if not isinstance(id_doc, ObjectId):
             id_doc = ObjectId(id_doc)
-        return self._collection_transactions.find_one({Constantes.MONGO_DOC_ID: id_doc})
+        return self.get_collection(collection).find_one({Constantes.MONGO_DOC_ID: id_doc})
 
     def charger_processus_par_id(self, id_doc):
         return self._collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
-
-    def transaction_helper(self):
-        return self._transaction_document_helper
 
     def processus_helper(self):
         return self._processus_document_helper

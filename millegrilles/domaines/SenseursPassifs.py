@@ -16,9 +16,10 @@ from bson.objectid import ObjectId
 # Constantes pour SenseursPassifs
 class SenseursPassifsConstantes:
 
-    COLLECTION_NOM = 'millegrilles_domaines_SenseursPassifs'
     DOMAINE_NOM = 'millegrilles.domaines.SenseursPassifs'
-    QUEUE_NOM = 'millegrilles.domaines.SenseursPassifs'
+    COLLECTION_NOM = DOMAINE_NOM
+    COLLECTION_DONNEES_NOM = '%s/%s' % (DOMAINE_NOM, 'donnees')
+    QUEUE_NOM = DOMAINE_NOM
 
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
@@ -78,7 +79,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         )
 
         # Index collection domaine
-        collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         # Index noeud, _mg-libelle
         collection_domaine.create_index([
             (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
@@ -92,7 +93,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
         ])
         # Ajouter les index dans la collection de transactions
-        collection_transactions = self.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         collection_transactions.create_index([
             ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
             ('%s.%s' %
@@ -371,7 +372,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self._document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         resultat = []
@@ -494,7 +495,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self._document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         resultat = []
@@ -728,7 +729,7 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
 
     ''' Enregistrer l'information de la transaction dans le document du senseur '''
     def initiale(self):
-        doc_transaction = self.charger_transaction()
+        doc_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         self._logger.debug("Document processus: %s" % self._document_processus)
         self._logger.debug("Document transaction: %s" % doc_transaction)
 
@@ -884,7 +885,7 @@ class TraitementBacklogLecturesSenseursPassifs:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self._document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         liste_transaction_senseurs = []
@@ -909,7 +910,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     '''
     def run_requete_genererdeclencheur_parsenseur(self, liste_senseurs):
 
-        collection_transactions = self._document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
 
         for transaction_senseur in liste_senseurs:
             filtre = {
@@ -955,7 +956,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     def declencher_maj_manuelle(self):
         """ Re-declencher les transactions de mise a jour manuelles qui n'ont pas ete executees. """
 
-        collection_transactions = self._document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         filtre = {
             'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_MAJMANUELLE,
             'evenements.transaction_traitee': {'$exists': False}

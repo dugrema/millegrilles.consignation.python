@@ -158,7 +158,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         self._lignes_ecran = None
 
     def get_collection(self):
-        return self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        return self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
 
     def get_filtre(self):
         document_object_ids = []

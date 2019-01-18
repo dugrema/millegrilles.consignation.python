@@ -39,7 +39,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.contexte.message_dao.configurer_rabbitmq()
 
         # Creer index: _mg-libelle
-        collection = self.contexte.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
+        collection = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
         collection.create_index([
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
@@ -61,13 +61,6 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.contexte.message_dao.deconnecter()
         logging.info("Deconnexion completee")
 
-    # Methode pour recevoir le callback pour les nouvelles transactions.
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        id_document = self.sauvegarder_nouvelle_transaction(self.contexte.document_dao._collection_transactions, message_dict)
-        uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        self.contexte.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction, message_dict)
-
 
 class ConsignateurTransactionCallback(BaseCallback):
 
@@ -82,8 +75,11 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         try:
             id_document = self.sauvegarder_nouvelle_transaction(message_dict)
-            uuid_transaction = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            self.contexte.message_dao.transmettre_evenement_persistance(id_document, uuid_transaction, message_dict)
+            entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
+            uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            self.contexte.message_dao.transmettre_evenement_persistance(
+                id_document, uuid_transaction, domaine, message_dict)
         except Exception as e:
             uuid_transaction = 'NA'
             en_tete = message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
@@ -113,9 +109,14 @@ class ConsignateurTransactionCallback(BaseCallback):
         collection_erreurs = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
         collection_erreurs.insert_one(document_staging)
 
-    def ajouter_evenement_transaction(self, id_transaction, evenement):
-        collection_transactions = self.contexte.document_dao.get_collection(Constantes.DOCUMENT_COLLECTION_TRANSACTIONS)
-        libelle_transaction_traitee = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, evenement)
+    @staticmethod
+    def ajouter_evenement_transaction(contexte, id_transaction, nom_collection, evenement):
+        collection_transactions = contexte.document_dao.get_collection(nom_collection)
+        libelle_transaction_traitee = '%s.%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            contexte.configuration.nom_millegrille,
+            evenement
+        )
         selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
         operation = {
             '$push': {libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc)}
@@ -127,7 +128,12 @@ class ConsignateurTransactionCallback(BaseCallback):
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
 
-        nom_collection = self._identifier_collection_domaine(enveloppe_transaction)
+        domaine_transaction = enveloppe_transaction[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE
+        ][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE
+        ]
+        nom_collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine_transaction)
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
         # Verifier la signature de la transaction
@@ -151,15 +157,10 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         return doc_id
 
-    def _identifier_collection_domaine(self, enveloppe_transaction):
+    @staticmethod
+    def identifier_collection_domaine(domaine):
 
-        domaine_transaction = enveloppe_transaction[
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE
-        ][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE
-        ]
-
-        domaine_split = domaine_transaction.split('.')
+        domaine_split = domaine.split('.')
 
         nom_collection = None
         if domaine_split[0] == 'millegrilles' and domaine_split[1] == 'domaines':

@@ -210,21 +210,15 @@ class PikaDAO:
         # Utiliser delivery mode 2 (persistent) pour les notifications
         self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
 
-    def transmettre_evenement_persistance(self, id_document, id_transaction, document_transaction=None):
-
+    def transmettre_evenement_persistance(self, id_document, id_transaction, nom_domaine, document_transaction=None):
         message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
-            Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee"
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee",
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_domaine
         }
         message_utf8 = self.json_helper.dict_vers_json(message)
-
-        if document_transaction is not None and document_transaction[
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine") is not None:
-            nom_domaine = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION].get("domaine")
-            routing_key = 'destinataire.domaine.%s' % nom_domaine
-        else:
-            routing_key = 'transaction.persistee'
+        routing_key = 'destinataire.domaine.%s' % nom_domaine
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(
