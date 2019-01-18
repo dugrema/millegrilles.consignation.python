@@ -563,9 +563,8 @@ class ProducteurDocumentSenseurPassif:
 # Classe qui gere le document pour un noeud. Supporte une mise a jour incrementale des donnees.
 class ProducteurDocumentNoeud:
 
-    def __init__(self, message_dao, document_dao):
-        self._message_dao = message_dao
-        self._document_dao = document_dao
+    def __init__(self, contexte):
+        self._contexte = contexte
 
     '''
     Mise a jour du document de noeud par une transaction senseur passif
@@ -574,7 +573,7 @@ class ProducteurDocumentNoeud:
     '''
     def maj_document_noeud_senseurpassif(self, id_document_senseur):
 
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
         document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
 
         noeud = document_senseur['noeud']
@@ -603,6 +602,10 @@ class ProducteurDocumentNoeud:
         }
 
         collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
+
+    @property
+    def contexte(self):
+        return self._contexte
 
 
 class VerificateurNotificationsSenseursPassifs:
