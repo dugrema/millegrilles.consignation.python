@@ -276,11 +276,9 @@ class MGProcessus:
         self._etape_complete = True
         self._etape_suivante = etape_suivante
 
-    def message_dao(self):
-        return self._controleur.message_dao()
-
-    def document_dao(self):
-        return self._controleur.document_dao()
+    @property
+    def contexte(self):
+        return self._controleur.contexte
 
     @property
     def document_processus(self):

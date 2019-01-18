@@ -230,9 +230,8 @@ class TraitementMessageLecture(BaseCallback):
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
 class ProducteurDocumentSenseurPassif:
 
-    def __init__(self, message_dao, document_dao):
-        self._message_dao = message_dao
-        self._document_dao = document_dao
+    def __init__(self, contexte):
+        self._contexte = contexte
         self._logger = logging.getLogger("%s.ProducteurDocumentSenseurPassif" % __name__)
 
     ''' 
@@ -281,7 +280,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Donnees senseur passif: selection=%s, operation=%s" % (str(selection), str(operation)))
 
-        collection = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        collection = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
         document_senseur = collection.find_one_and_update(
             filter=selection, update=operation, upsert=False, fields="_id:1")
 
@@ -316,7 +315,7 @@ class ProducteurDocumentSenseurPassif:
         senseur_objectid_key = {"_id": ObjectId(id_document_senseur)}
 
         # Charger l'information du senseur
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
         document_senseur = collection_senseurs.find_one(senseur_objectid_key)
 
         self._logger.debug("Document charge: %s" % str(document_senseur))
@@ -325,9 +324,9 @@ class ProducteurDocumentSenseurPassif:
         no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
 
         regroupement_champs = {
-            'temperature-moyenne': {'$avg': '$charge-utile.temperature'},
-            'humidite-moyenne': {'$avg': '$charge-utile.humidite'},
-            'pression-moyenne': {'$avg': '$charge-utile.pression'}
+            'temperature-moyenne': {'$avg': '$temperature'},
+            'humidite-moyenne': {'$avg': '$humidite'},
+            'pression-moyenne': {'$avg': '$pression'}
         }
 
         # Creer l'intervalle pour les donnees. Utiliser timezone pour s'assurer de remonter un nombre d'heures correct
@@ -340,24 +339,24 @@ class ProducteurDocumentSenseurPassif:
         self._logger.debug("Requete time range %d a %d" % (time_range_from, time_range_to))
 
         selection = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            'charge-utile.temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
-            'charge-utile.senseur': no_senseur,
-            'charge-utile.noeud': noeud
+            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
+            'temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
+            'senseur': no_senseur,
+            'noeud': noeud
         }
 
         # Noter l'absence de timezone - ce n'est pas important pour le regroupement par heure.
         regroupement_periode = {
-            'year': {'$year': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}}},
-            'month': {'$month': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}}},
-            'day': {'$dayOfMonth': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}}},
-            'hour': {'$hour': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}}},
+            'year': {'$year': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
+            'month': {'$month': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
+            'day': {'$dayOfMonth': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
+            'hour': {'$hour': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
         }
 
         regroupement = {
             '_id': {
-                'noeud': '$charge-utile.noeud',
-                'senseur': '$charge-utile.senseur',
+                'noeud': '$noeud',
+                'senseur': '$senseur',
                 'periode': {
                     '$dateFromParts': regroupement_periode
                 }
@@ -372,7 +371,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
+        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         resultat = []
@@ -428,7 +427,7 @@ class ProducteurDocumentSenseurPassif:
         senseur_objectid_key = {"_id": ObjectId(id_document_senseur)}
 
         # Charger l'information du senseur
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
         document_senseur = collection_senseurs.find_one(senseur_objectid_key)
 
         self._logger.debug("Document charge: %s" % str(document_senseur))
@@ -437,12 +436,12 @@ class ProducteurDocumentSenseurPassif:
         no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
 
         regroupement_champs = {
-            'temperature-maximum': {'$max': '$charge-utile.temperature'},
-            'temperature-minimum': {'$min': '$charge-utile.temperature'},
-            'humidite-maximum': {'$max': '$charge-utile.humidite'},
-            'humidite-minimum': {'$min': '$charge-utile.humidite'},
-            'pression-maximum': {'$max': '$charge-utile.pression'},
-            'pression-minimum': {'$min': '$charge-utile.pression'}
+            'temperature-maximum': {'$max': '$temperature'},
+            'temperature-minimum': {'$min': '$temperature'},
+            'humidite-maximum': {'$max': '$humidite'},
+            'humidite-minimum': {'$min': '$humidite'},
+            'pression-maximum': {'$max': '$pression'},
+            'pression-minimum': {'$min': '$pression'}
         }
 
         # Creer l'intervalle pour les donnees
@@ -453,10 +452,10 @@ class ProducteurDocumentSenseurPassif:
         time_range_from = int(time_range_from.timestamp())
 
         selection = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            'charge-utile.temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
-            'charge-utile.senseur': no_senseur,
-            'charge-utile.noeud': noeud
+            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
+            'temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
+            'senseur': no_senseur,
+            'noeud': noeud
         }
 
         # Noter l'utilisation de la timezone pour le regroupement. Important pour faire la separation des donnees
@@ -464,23 +463,23 @@ class ProducteurDocumentSenseurPassif:
         # Noter l'absence de timezone - ce n'est pas important pour le regroupement par heure.
         regroupement_periode = {
             'year': {'$year': {
-                'date': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}},
+                'date': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}},
                 'timezone': 'America/Montreal'
             }},
             'month': {'$month': {
-                'date': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}},
+                'date': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}},
                 'timezone': 'America/Montreal'
             }},
             'day': {'$dayOfMonth': {
-                'date': {'$toDate': {'$multiply': ['$charge-utile.temps_lecture', 1000]}},
+                'date': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}},
                 'timezone': 'America/Montreal'
             }}
         }
 
         regroupement = {
             '_id': {
-                'noeud': '$charge-utile.noeud',
-                'senseur': '$charge-utile.senseur',
+                'noeud': '$noeud',
+                'senseur': '$senseur',
                 'periode': {
                     '$dateFromParts': regroupement_periode
                 }
@@ -495,7 +494,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
+        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         resultat = []
@@ -541,7 +540,7 @@ class ProducteurDocumentSenseurPassif:
     Retourne les _id de tous les documents de senseurs. 
     '''
     def trouver_id_documents_senseurs(self):
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
 
         selection = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
@@ -554,6 +553,10 @@ class ProducteurDocumentSenseurPassif:
             document_ids.append(str(doc['_id']))
 
         return document_ids
+
+    @property
+    def contexte(self):
+        return self._contexte
 
 
 # Classe qui gere le document pour un noeud. Supporte une mise a jour incrementale des donnees.
@@ -796,7 +799,7 @@ class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
 
     def initiale(self):
         # Faire liste des documents a mettre a jour
-        producteur = ProducteurDocumentSenseurPassif(self.message_dao(), self.document_dao())
+        producteur = ProducteurDocumentSenseurPassif(self.contexte)
         liste_documents = producteur.trouver_id_documents_senseurs()
 
         parametres = {}
@@ -809,7 +812,7 @@ class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
         return parametres
 
     def calculer_moyennes(self):
-        producteur = ProducteurDocumentSenseurPassif(self.message_dao(), self.document_dao())
+        producteur = ProducteurDocumentSenseurPassif(self.contexte)
 
         liste_documents = self._document_processus['parametres']['documents_senseurs']
         for doc_senseur in liste_documents:
@@ -825,7 +828,7 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
 
     def initiale(self):
         # Faire liste des documents a mettre a jour
-        producteur = ProducteurDocumentSenseurPassif(self.message_dao(), self.document_dao())
+        producteur = ProducteurDocumentSenseurPassif(self.contexte)
         liste_documents = producteur.trouver_id_documents_senseurs()
 
         parametres = {}
@@ -839,7 +842,7 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
         return parametres
 
     def calculer_valeurs_quotidiennes(self):
-        producteur = ProducteurDocumentSenseurPassif(self.message_dao(), self.document_dao())
+        producteur = ProducteurDocumentSenseurPassif(self.contexte)
 
         liste_documents = self._document_processus['parametres']['documents_senseurs']
         for doc_senseur in liste_documents:

@@ -22,7 +22,7 @@ class WebPollConstantes:
     COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
 
     # Document de configuration de reference s'il n'existe pas deja
-    # Se document se trouve dans la collection mgdomaines_web_WebPoll, _mg-libelle: configuration.
+    # Se document se trouve dans la collection millegrilles.domaines.WebPoll, _mg-libelle: configuration.
     document_configuration_reference = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration',
         'taches': {
@@ -243,7 +243,7 @@ class TraitementMessageWebPoll(BaseCallback):
             self._gestionnaire.traiter_cedule(message_dict)
         elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # On envoit la transaction au processus par defaut
-            processus = "mgdomaines_web_WebPoll:ProcessusTransactionDownloadPageWeb"
+            processus = "millegrilles_domaines_WebPoll:ProcessusTransactionDownloadPageWeb"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         else:
             # Type d'evenement inconnu, on lance une exception
