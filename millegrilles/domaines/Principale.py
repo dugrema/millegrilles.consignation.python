@@ -12,7 +12,7 @@ class ConstantesPrincipale:
     """ Constantes pour le domaine de l'interface principale """
 
     DOMAINE_NOM = 'millegrilles.domaines.Principale'
-    COLLECTION_NOM = 'millegrilles_domaines_Principale'
+    COLLECTION_NOM = DOMAINE_NOM
     QUEUE_NOM = 'millegrilles.domaines.Principale'
 
     LIBVAL_CONFIGURATION = 'configuration'

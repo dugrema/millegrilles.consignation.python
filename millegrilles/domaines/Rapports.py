@@ -4,6 +4,7 @@ from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles import Constantes
 from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.domaines.WebPoll import WebPollConstantes
 
 import dateutil.parser
 import logging
@@ -12,7 +13,8 @@ import logging
 class RapportsConstantes:
 
     DOMAINE_NOM = 'millegrilles.domaines.Rapports'
-    COLLECTION_NOM = 'millegrilles_domaines_Rapports'
+    COLLECTION_NOM = DOMAINE_NOM
+    COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
     QUEUE_NOM = 'millegrilles.domaines.Rapports'
 
 
@@ -120,7 +122,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
     def initiale(self):
         parametres = self.parametres
         self._logger.debug('Rapport RSS processing, parametres: %s' % parametres)
-        doc_transaction = self.charger_transaction()
+        doc_transaction = self.charger_transaction(WebPollConstantes.COLLECTION_DONNEES_NOM)
 
         # Faire le rapport
         url = doc_transaction['charge-utile']['url']

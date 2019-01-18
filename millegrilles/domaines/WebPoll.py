@@ -17,8 +17,9 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 
 class WebPollConstantes:
 
-    COLLECTION_NOM = 'millegrilles_domaines_WebPoll'
     QUEUE_NOM = 'millegrilles.domaines.WebPoll'
+    COLLECTION_NOM = QUEUE_NOM
+    COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
 
     # Document de configuration de reference s'il n'existe pas deja
     # Se document se trouve dans la collection mgdomaines_web_WebPoll, _mg-libelle: configuration.
