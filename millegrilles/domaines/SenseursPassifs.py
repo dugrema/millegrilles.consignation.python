@@ -629,7 +629,7 @@ class VerificateurNotificationsSenseursPassifs:
                     methode_regle = getattr(self, nom_regle)
                     methode_regle(parametres)
                 except AttributeError as ae:
-                    self._logger.error("Erreur regle de notification inconnue: %s" % nom_regle)
+                    self._logger.exception("Erreur regle de notification inconnue: %s" % nom_regle)
                 except Exception as e:
                     self._logger.exception("Erreur notification")
 
