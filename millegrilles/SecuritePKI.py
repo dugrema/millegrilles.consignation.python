@@ -29,6 +29,8 @@ class ConstantesSecurityPki:
     EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
     EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
 
+    REGLE_LIMITE_CHAINE = 4  # Longeur maximale de la chaine de certificats
+
     # Document utilise pour publier un certificat
     DOCUMENT_EVENEMENT_CERTIFICAT = {
         Constantes.EVENEMENT_MESSAGE_EVENEMENT: EVENEMENT_CERTIFICAT,
@@ -431,7 +433,11 @@ class VerificateurCertificats(UtilCertificats):
 
         correspond = False
         cle_verifiee = [enveloppe.fingerprint_ascii]  # Utilise pour eviter les cycles dans la verification
-        while not correspond:
+        limite_profondeur = ConstantesSecurityPki.REGLE_LIMITE_CHAINE
+        profondeur = 0
+        authority_key_id = None
+        while not correspond and profondeur < limite_profondeur:
+            profondeur += 1
             authority_key_id = enveloppe_courante.authority_key_identifier
 
             liste_authority = self._cache_certificats_ca.get(authority_key_id)
