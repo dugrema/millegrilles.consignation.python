@@ -28,13 +28,12 @@ class DemarreurNoeud(Daemon):
         Daemon.__init__(self, pidfile, stdin, stdout, stderr)
 
         logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
-        self._logger.info("\n-----------\n\n-----------")
-        self._logger.info("Demarrage de %s en cours\n-----------" % self.__class__.__name__)
-
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
         logging.getLogger().setLevel(logging.WARNING)
         logging.getLogger('millegrilles.noeuds').setLevel(logging.INFO)
+
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._logger.info("\n-----------\n\n-----------")
+        self._logger.info("Demarrage de %s en cours\n-----------" % self.__class__.__name__)
 
         self._parser = argparse.ArgumentParser(description="Demarrer un noeud MilleGrilles")
         self._args = None
