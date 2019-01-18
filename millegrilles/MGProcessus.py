@@ -124,7 +124,7 @@ class MGPProcessusControleur(ModeleConfiguration):
 class MGControlleurMessageHandler(BaseCallback):
 
     def __init__(self, contexte, controleur):
-        super().__init__(contexte.configuration)
+        super().__init__(contexte)
         self._contexte = contexte
         self._controleur = controleur
 

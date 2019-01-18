@@ -15,6 +15,7 @@ from cryptography import x509
 from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
+from millegrilles.dao.MessageDAO import BaseCallback
 
 
 class ConstantesSecurityPki:
@@ -25,6 +26,16 @@ class ConstantesSecurityPki:
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'
 
+    EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
+    EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
+
+    # Document utilise pour publier un certificat
+    DOCUMENT_EVENEMENT_CERTIFICAT = {
+        Constantes.EVENEMENT_MESSAGE_EVENEMENT: EVENEMENT_CERTIFICAT,
+        LIBELLE_FINGERPRINT: None,
+        LIBELLE_CERTIFICAT_PEM: None
+    }
+
 
 class UtilCertificats:
 
@@ -34,9 +45,9 @@ class UtilCertificats:
         self._sign_hash_function = hashes.SHA512
         self._contenu_hash_function = hashes.SHA256
 
-        self.certificat = None
+        self._certificat = None
         self._cle = None
-        self.enveloppe = None
+        self._enveloppe = None
 
     def initialiser(self):
         self._charger_cle_privee()
@@ -45,7 +56,7 @@ class UtilCertificats:
         # Verifier que le certificat peut bien etre utilise pour signer des transactions
         self._verifier_usage()
 
-        self.enveloppe = EnveloppeCertificat(self.certificat)
+        self._enveloppe = EnveloppeCertificat(self.certificat)
 
     def preparer_transaction_bytes(self, transaction_dict):
         """
@@ -77,7 +88,7 @@ class UtilCertificats:
 
     def _charger_certificat(self):
         certfile_path = self.configuration.mq_certfile
-        self.certificat = self._charger_pem(certfile_path)
+        self._certificat = self._charger_pem(certfile_path)
 
     def _charger_pem(self, certfile_path):
         with open(certfile_path, "rb") as certfile:
@@ -151,6 +162,14 @@ class UtilCertificats:
 
         return digest_base64
 
+    @property
+    def certificat(self):
+        return self._certificat
+
+    @property
+    def enveloppe_certificat_courant(self):
+        return self._enveloppe
+
 
 class SignateurTransaction(UtilCertificats):
     """ Signe une transaction avec le certificat du noeud. """
@@ -175,7 +194,7 @@ class SignateurTransaction(UtilCertificats):
         self.verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
 
         # Ajouter information du certification dans l'en_tete
-        fingerprint_cert = self.enveloppe.fingerprint_ascii
+        fingerprint_cert = self._enveloppe.fingerprint_ascii
         self._logger.debug("Fingerprint: %s" % fingerprint_cert)
         en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT] = fingerprint_cert
 
@@ -552,6 +571,31 @@ class EnveloppeCertificat:
             sujet_dict[elem.oid._name] = elem.value
 
         return sujet_dict
+
+
+class GestionnaireEvenementsCertificat(BaseCallback):
+
+    def __init__(self, contexte, gestionnaire_certificats):
+        super().__init__(contexte)
+        self._gestionnaire_certificats = gestionnaire_certificats
+
+    def transmettre_certificat(self):
+        enveloppe = self._gestionnaire_certificats.enveloppe_certificat_courant
+
+        message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
+        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii
+        message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = str(
+            enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
+        )
+
+        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
+        self.contexte.message_dao.transmettre_message(
+            message_evenement, routing
+        )
+
+    def traiter_message(self, ch, method, properties, body):
+        # Implementer la lecture de messages, specialement pour transmettre un certificat manquant
+        pass
 
 
 class CertificatInconnu(Exception):

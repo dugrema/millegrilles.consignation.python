@@ -1,4 +1,5 @@
-# Module qui permet de demarrer les appareils sur un Raspberry Pi
+#!/usr/bin/python3
+
 # Module qui permet de demarrer les appareils sur un Raspberry Pi
 import traceback
 import argparse
@@ -6,9 +7,8 @@ import logging
 
 from threading import Event
 
-from millegrilles.dao.Configuration import TransactionConfiguration
-from millegrilles.dao.MessageDAO import PikaDAO, ExceptionConnectionFermee
-from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
 from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursPassifs
 
 from millegrilles.util.Daemon import Daemon
@@ -40,9 +40,7 @@ class DemarreurNoeud(Daemon):
         self._max_backlog = None
         self._apcupsd = None
 
-        self._configuration = TransactionConfiguration()
-        self._message_dao = None
-        self._document_dao = None
+        self._contexte = ContexteRessourcesMilleGrilles()
         self._producteur_transaction = None
 
         self._chargement_reussi = False  # Vrai si au moins un module a ete charge
@@ -130,16 +128,10 @@ class DemarreurNoeud(Daemon):
 
     def setup_modules(self):
         # Charger la configuration et les DAOs
-        self._configuration.loadEnvironment()
-        self._message_dao = PikaDAO(self._configuration)
-        self._document_dao = MongoDAO(self._configuration)
+        doit_connecter = not self._args.noconnect
+        self._contexte.initialiser(connecter=doit_connecter)
 
-        # Se connecter aux ressources
-        if not self._args.noconnect:
-            self._message_dao.connecter()
-            self._document_dao.connecter()
-
-        self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._configuration, self._message_dao)
+        self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
 
         # Verifier les parametres
         self._intervalle_entretien = self._args.maint
@@ -156,8 +148,8 @@ class DemarreurNoeud(Daemon):
         self._stop_event.set()
 
         try:
-            self._message_dao.deconnecter()
-            self._document_dao.deconnecter()
+            self.contexte.message_dao.deconnecter()
+            self.contexte.document_dao.deconnecter()
         except Exception as edao:
             self._logger.info("Erreur deconnexion DAOs: %s" % str(edao))
 
@@ -185,7 +177,7 @@ class DemarreurNoeud(Daemon):
 
     def transmettre_lecture_callback(self, dict_lecture):
         try:
-            if not self._message_dao.in_error:
+            if not self.contexte.message_dao.in_error:
                 self._producteur_transaction.transmettre_lecture_senseur(dict_lecture)
             else:
                 self._logger.info("Message ajoute au backlog: %s" % str(dict_lecture))
@@ -197,15 +189,15 @@ class DemarreurNoeud(Daemon):
         except ExceptionConnectionFermee as e:
             # Erreur, la connexion semble fermee. On va tenter une reconnexion
             self._backlog_messages.append(dict_lecture)
-            self._message_dao.enter_error_state()
+            self.contexte.message_dao.enter_error_state()
 
     ''' Verifie s'il y a un backlog, tente de reconnecter au message_dao et transmettre au besoin. '''
     def traiter_backlog_messages(self):
         if len(self._backlog_messages) > 0:
             # Tenter de reconnecter a RabbitMQ
-            if self._message_dao.in_error:
+            if self.contexte.message_dao.in_error:
                 try:
-                    self._message_dao.connecter()
+                    self.contexte.message_dao.connecter()
                 except:
                     self._logger.exception("Erreur connexion MQ")
 
@@ -225,13 +217,17 @@ class DemarreurNoeud(Daemon):
 
     ''' Verifie la connexion au document_dao, reconnecte au besoin. '''
     def verifier_connexion_document(self):
-        if not self._document_dao.est_enligne():
+        if not self.contexte.document_dao.est_enligne():
             try:
-                self._document_dao.connecter()
+                self.contexte.document_dao.connecter()
                 self._logger.info("DemarreurNoeud: Connexion a Mongo re-etablie")
             except Exception as ce:
                 self._logger.exception("DemarreurNoeud: Erreur reconnexion Mongo: %s" % str(ce))
                 traceback.print_exc()
+
+    @property
+    def contexte(self):
+        return self._contexte
 
 
 # **** MAIN ****

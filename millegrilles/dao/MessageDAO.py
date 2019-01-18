@@ -422,13 +422,13 @@ Classe qui facilite l'implementation de callbacks avec ACK
 
 class BaseCallback:
 
-    def __init__(self, configuration):
+    def __init__(self, contexte):
 
-        if configuration is None:
+        if contexte is None:
             raise TypeError('configuration ne doit pas etre None')
 
         self.json_helper = JSONHelper()
-        self._configuration = configuration
+        self._contexte = contexte
 
     def callbackAvecAck(self, ch, method, properties, body):
         try:
@@ -453,7 +453,7 @@ class BaseCallback:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        ch.basic_publish(exchange=self._configuration.exchange_evenements,
+        ch.basic_publish(exchange=self._contexte.configuration.exchange_evenements,
                          routing_key='processus.erreur',
                          body=message_utf8)
 
@@ -461,6 +461,10 @@ class BaseCallback:
 
     def traiter_message(self, ch, method, properties, body):
         raise NotImplemented('traiter_message() methode doit etre implementee')
+
+    @property
+    def contexte(self):
+        return self._contexte
 
 
 class ExceptionConnectionFermee(Exception):

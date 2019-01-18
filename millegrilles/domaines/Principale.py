@@ -126,7 +126,7 @@ class GestionnairePrincipale(GestionnaireDomaine):
 class TraitementMessagePrincipale(BaseCallback):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.configuration)
+        super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):

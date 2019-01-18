@@ -38,8 +38,10 @@ class ConstantesPki:
 
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
-    EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
-    EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
+    # Indique que c'est un evenement avec un certificat (reference)
+    EVENEMENT_CERTIFICAT = ConstantesSecurityPki.EVENEMENT_CERTIFICAT
+    # Indique que c'est une requete pour trouver un certificat par fingerprint
+    EVENEMENT_REQUETE = ConstantesSecurityPki.EVENEMENT_REQUETE
 
     # Document par defaut pour la configuration de l'interface principale
     DOCUMENT_DEFAUT = {
@@ -263,8 +265,9 @@ class PKIDocumentHelper:
 class TraitementMessagePki(BaseCallback):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.configuration)
+        super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
+        self._pki_document_helper = PKIDocumentHelper(gestionnaire.contexte)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -287,9 +290,10 @@ class TraitementMessagePki(BaseCallback):
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-        elif evenement == Constantes.EVENEMENT_PKI:
-            routing_key = method.routing_key
-            routing_key_sansprefixe = routing_key.replace('pki.', '')
+        elif evenement == ConstantesPki.EVENEMENT_CERTIFICAT:
+            enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
+            # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
+            self._pki_document_helper.inserer_certificat(enveloppe, upsert=True)
 
         else:
             # Type d'evenement inconnu, on lance une exception

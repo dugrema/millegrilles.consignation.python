@@ -191,7 +191,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
 class TraitementMessageLecture(BaseCallback):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.configuration)
+        super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):
@@ -1029,8 +1029,8 @@ class ProcessusMajManuelle(MGProcessusTransaction):
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
     """ Producteur de transactions pour les SenseursPassifs. """
 
-    def __init__(self, configuration=None, message_dao=None, noeud=socket.getfqdn()):
-        super().__init__(configuration, message_dao)
+    def __init__(self, contexte, noeud=socket.getfqdn()):
+        super().__init__(contexte)
         self._noeud = noeud
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 

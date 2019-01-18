@@ -5,35 +5,33 @@ import socket
 import re
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import PikaDAO
-from millegrilles.dao.Configuration import TransactionConfiguration
-from millegrilles.SecuritePKI import SignateurTransaction
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.SecuritePKI import SignateurTransaction, GestionnaireEvenementsCertificat
 
 
 # Generateur de transaction - peut etre reutilise.
 class GenerateurTransaction:
 
-    def __init__(self, configuration=None, message_dao=None):
+    def __init__(self, contexte=None):
+        if contexte is not None:
+            self._contexte = contexte
+        else:
+            self._contexte = ContexteRessourcesMilleGrilles()
+            self._contexte.initialiser(init_message=True, init_document=False, connecter=True)
+
         # Initialiser la configuraiton et dao au besoin
-        if configuration is None:
-            self._configuration = TransactionConfiguration()
-            self._configuration.loadEnvironment()
-        else:
-            self._configuration = configuration
-
-        if message_dao is None:
-            self._message_dao = PikaDAO(self._configuration)
-        else:
-            self._message_dao = message_dao
-
-        self.signateur_transaction = SignateurTransaction(configuration)
+        self.signateur_transaction = SignateurTransaction(self._contexte.configuration)
         self.signateur_transaction.initialiser()
 
-    def connecter(self):
-        self._message_dao.connecter()
+        # Transmettre le certificat pour etre sur que tous les participants l'ont
+        gestionnaire_certificats = GestionnaireEvenementsCertificat(self._contexte, self.signateur_transaction)
+        gestionnaire_certificats.transmettre_certificat()
 
-    def deconnecter(self):
-        self._message_dao.deconnecter()
+    # def connecter(self):
+    #     self._message_dao.connecter()
+    #
+    # def deconnecter(self):
+    #     self._message_dao.deconnecter()
 
     ''' 
     Transmet un message. La connexion doit etre ouverte.
@@ -51,7 +49,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._message_dao.transmettre_nouvelle_transaction(enveloppe)
+        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe)
 
         return uuid_transaction
 

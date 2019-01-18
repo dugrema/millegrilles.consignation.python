@@ -141,7 +141,7 @@ class TraitementMessageNotification(BaseCallback):
     """ Classe helper pour traiter les transactions de la queue de notifications """
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.configuration)
+        super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):

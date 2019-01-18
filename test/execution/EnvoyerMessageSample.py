@@ -2,8 +2,7 @@
 
 import datetime
 
-from millegrilles.dao.Configuration import TransactionConfiguration
-from millegrilles.dao.MessageDAO import PikaDAO
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
@@ -27,14 +26,10 @@ def envoyer_message_test_senseur_lecture():
 
 
 # --- MAIN ---
-configuration = TransactionConfiguration()
-configuration.loadEnvironment()
-message_dao = PikaDAO(configuration)
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser(init_document=False)
 
-message_dao.connecter()
-message_dao.configurer_rabbitmq()
-
-generateur = GenerateurTransaction(configuration, message_dao)
+generateur = GenerateurTransaction(contexte)
 
 # TEST
 
@@ -44,4 +39,4 @@ enveloppe = envoyer_message_test_senseur_lecture()
 
 print("Sent: %s" % enveloppe)
 
-message_dao.deconnecter()
+contexte.message_dao.deconnecter()

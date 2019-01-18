@@ -232,7 +232,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
 class TraitementMessageWebPoll(BaseCallback):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.configuration)
+        super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):
@@ -255,8 +255,8 @@ class WebPageDownload:
 
     TRANSACTION_VALEUR_DOMAINE = 'millegrilles.domaines.WebPoll.WebPageDownload'
 
-    def __init__(self, configuration, message_dao, limit_bytes=50*1024):
-        self._generateur_transaction = GenerateurTransaction(configuration, message_dao)
+    def __init__(self, contexte, limit_bytes=50*1024):
+        self._generateur_transaction = GenerateurTransaction(contexte)
         # self._configuration = configuration
         # self._message_dao = message_dao
         self._limit_bytes = limit_bytes  # Taille limite du download
@@ -335,8 +335,8 @@ class RSSFeedDownload(WebPageDownload):
 
     TRANSACTION_VALEUR_DOMAINE = 'millegrilles.domaines.WebPoll.RSS'
 
-    def __init__(self, configuration, message_dao, limit_bytes=100*1024):
-        super().__init__(configuration, message_dao, limit_bytes)
+    def __init__(self, contexte, limit_bytes=100*1024):
+        super().__init__(contexte, limit_bytes)
 
     def traiter_contenu(self, resultat):
         contenu_dict = super().traiter_contenu(resultat)
