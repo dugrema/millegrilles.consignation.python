@@ -85,8 +85,13 @@ class TransactionOperations:
     def __init__(self):
         pass
 
-    def enlever_champsmeta(self, transaction):
+    def enlever_champsmeta(self, transaction, champs_a_exclure = None):
         copie = transaction.copy()
+
+        if champs_a_exclure is not None:
+            for champ in champs_a_exclure:
+                if copie.get(champ) is not None:
+                    del copie[champ]
 
         regex_ignorer = re.compile('^_.+')
         for cle in transaction.keys():

@@ -579,12 +579,11 @@ class ProducteurDocumentNoeud:
         noeud = document_senseur['noeud']
         no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
 
-        champs_a_copier = ['bat_mv', 'humidite', 'temperature', 'pression', 'temps_lecture', 'location']
-        valeurs = {}
-        for champ in champs_a_copier:
-            valeur = document_senseur.get(champ)
-            if valeur is not None:
-                valeurs[champ] = valeur
+        champs_a_exclure = ['en-tete', 'moyennes_dernier_jour', 'extremes_dernier_mois']
+
+        valeurs = document_senseur.copy()
+        operations_filtre = TransactionOperations()
+        valeurs = operations_filtre.enlever_champsmeta(valeurs, champs_a_exclure)
 
         donnees_senseur = {
             'dict_senseurs.%s' % str(no_senseur): valeurs

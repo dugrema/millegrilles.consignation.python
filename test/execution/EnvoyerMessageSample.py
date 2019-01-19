@@ -9,7 +9,7 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 def envoyer_message_test_senseur_lecture():
 
     lecture_modele = {
-        'millivolt': 2911,
+        'millivolt': 2878,
         'version': 6,
         'temps_lecture': int(datetime.datetime.utcnow().timestamp()),
         'humidite': 54.8,
@@ -17,7 +17,7 @@ def envoyer_message_test_senseur_lecture():
         'pression': 101.6,
         'senseur': 16,
         'noeud': 'test',
-        'temperature': 21.62
+        'temperature': 21.63
     }
 
     enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'millegrilles.domaines.SenseursPassifs.lecture')
