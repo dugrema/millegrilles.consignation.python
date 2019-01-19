@@ -14,9 +14,8 @@ from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
 class AfficheurDocumentMAJDirecte:
 
     # :params intervalle_secs: Intervalle (secondes) entre rafraichissements si watch ne fonctionne pas.
-    def __init__(self, configuration, document_dao, intervalle_secs=30):
-        self._configuration = configuration
-        self._document_dao = document_dao
+    def __init__(self, contexte, intervalle_secs=30):
+        self._contexte = contexte
         self._documents = dict()
         self._intervalle_secs = intervalle_secs
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
@@ -144,13 +143,17 @@ class AfficheurDocumentMAJDirecte:
 
                 self._stop_event.wait(self._intervalle_erreurs_secs)  # On attend avant de se reconnecter
 
+    @property
+    def contexte(self):
+        return self._contexte
+
 
 # Classe qui charge des senseurs pour afficher temperature, humidite, pression/tendance
 # pour quelques senseurs passifs.
 class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDirecte):
 
-    def __init__(self, configuration, document_dao, document_ids, intervalle_secs=30):
-        super().__init__(configuration, document_dao, intervalle_secs)
+    def __init__(self, contexte, document_ids, intervalle_secs=30):
+        super().__init__(contexte, intervalle_secs)
         self._document_ids = document_ids
         self._thread_affichage = None
         self._thread_horloge = None
@@ -158,7 +161,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         self._lignes_ecran = None
 
     def get_collection(self):
-        return self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
+        return self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
 
     def get_filtre(self):
         document_object_ids = []
