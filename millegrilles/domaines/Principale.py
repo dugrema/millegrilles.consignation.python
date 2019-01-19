@@ -13,6 +13,7 @@ class ConstantesPrincipale:
 
     DOMAINE_NOM = 'millegrilles.domaines.Principale'
     COLLECTION_NOM = DOMAINE_NOM
+    COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
     QUEUE_NOM = 'millegrilles.domaines.Principale'
 
     LIBVAL_CONFIGURATION = 'configuration'
@@ -163,7 +164,7 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.transaction
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_DONNEES_NOM)
 
         ts_alerte = transaction['alerte']['ts']
 
@@ -186,7 +187,7 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.transaction
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_DONNEES_NOM)
 
         if transaction.get('message') is None:
             raise ValueError("L'alerte doit avoir un element 'message'")

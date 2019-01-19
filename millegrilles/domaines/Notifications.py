@@ -332,7 +332,7 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
     def initiale(self):
         parametres = self.parametres
-        transaction = self.charger_transaction()
+        transaction = self.charger_transaction(NotificationsConstantes.COLLECTION_DONNEES_NOM)
         collection_notifications = self.contexte.document_dao.get_collection(NotificationsConstantes.COLLECTION_NOM)
 
         self._logger.debug("Parametres de l'action usager: %s" % str(parametres))

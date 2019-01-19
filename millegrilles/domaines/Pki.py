@@ -16,6 +16,7 @@ class ConstantesPki:
 
     DOMAINE_NOM = 'millegrilles.domaines.Pki'
     COLLECTION_NOM = ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_DONNEES_NOM = '%s/donnees' % ConstantesSecurityPki.COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
@@ -316,7 +317,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.transaction
+        transaction = self.charger_transaction(ConstantesPki.COLLECTION_DONNEES_NOM)
         fingerprint = transaction['fingerprint']
         self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
