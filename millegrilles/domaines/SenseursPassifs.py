@@ -1004,17 +1004,16 @@ class ProcessusMajManuelle(MGProcessusTransaction):
     def initiale(self):
         """ Mettre a jour le document de senseur """
 
-        document_transaction = self.charger_transaction()
-        charge_utile = document_transaction['charge-utile']
-        collection_transactions = self.document_dao().get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_DONNEES_NOM)
 
-        filtre = charge_utile['filtre']
+        filtre = document_transaction['filtre']
         valeurs = {
-            '$set': charge_utile['set'],
+            '$set': document_transaction['set'],
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
         self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
+        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
         document = collection_transactions.find_one_and_update(filtre, valeurs)
 
         if document is None:
