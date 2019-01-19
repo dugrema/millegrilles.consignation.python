@@ -168,7 +168,7 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
         ts_alerte = transaction['alerte']['ts']
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_domaine = self.document_dao().get_collection(ConstantesPrincipale.COLLECTION_NOM)
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
         operation = {'$pull': {'alertes': {'ts': ts_alerte}}}
@@ -195,7 +195,7 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
             transaction['ts'] = int(datetime.datetime.utcnow().timestamp() * 1000)
 
         # Ajouter au document d'alerte
-        collection_domaine = self.document_dao().get_collection(ConstantesPrincipale.COLLECTION_NOM)
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
         operation = {'$push': {'alertes': transaction}}

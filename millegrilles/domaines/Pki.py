@@ -321,7 +321,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
         # Verifier si on a deja les certificats
-        collection = self.document_dao().get_collection(ConstantesPki.COLLECTION_NOM)
+        collection = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
         certificat_existant = collection.find_one({'fingerprint': fingerprint})
 
         if certificat_existant is None:

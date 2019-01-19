@@ -160,7 +160,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
             '$setOnInsert': filtre
         }
 
-        collection_rapports = self.document_dao().get_collection(RapportsConstantes.COLLECTION_NOM)
+        collection_rapports = self.contexte.document_dao.get_collection(RapportsConstantes.COLLECTION_NOM)
         collection_rapports.update_one(filtre, operations, upsert=True)
 
         self._logger.debug("Previsions: %s" % str(operation_set))
