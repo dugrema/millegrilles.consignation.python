@@ -228,6 +228,9 @@ class GestionnaireWebPoll(GestionnaireDomaine):
 
         return document_configuration
 
+    def get_nom_collection(self):
+        return WebPollConstantes.COLLECTION_NOM
+
 
 class TraitementMessageWebPoll(BaseCallback):
 

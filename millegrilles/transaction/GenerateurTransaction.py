@@ -56,7 +56,8 @@ class GenerateurTransaction:
     def preparer_enveloppe(self, message_dict, domaine=None):
 
         # Identifier usager du systeme, nom de domaine
-        identificateur_systeme = '%s@%s' % (getpass.getuser(), socket.getfqdn())
+        common_name = self.signateur_transaction.enveloppe_certificat_courant.subject_common_name
+        identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
 
         # Ajouter identificateur unique et temps de la transaction
         uuid_transaction = uuid.uuid1()

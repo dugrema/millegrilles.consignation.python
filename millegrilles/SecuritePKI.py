@@ -531,6 +531,12 @@ class EnveloppeCertificat:
         return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
 
     @property
+    def subject_common_name(self):
+        sujet = self.certificat.subject
+        cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+        return cn
+
+    @property
     def not_valid_before(self):
         return self._certificat.not_valid_before
 
