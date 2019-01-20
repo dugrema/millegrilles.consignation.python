@@ -31,11 +31,10 @@ class AfficheurDocumentMAJDirecte:
             self.initialiser_documents()
         except ServerSelectionTimeoutError as sste:
             logging.error("AffichagesPassifs: Erreur de connexion a Mongo. "
-                  "On va demarrer quand meme et connecter plus tard. %s" % str(sste))
+                          "On va demarrer quand meme et connecter plus tard. %s" % str(sste))
         except TypeError as te:
             logging.error("AffichagesPassifs: Erreur de connexion a Mongo. "
-                  "On va demarrer quand meme et connecter plus tard. %s" % str(te))
-
+                          "On va demarrer quand meme et connecter plus tard. %s" % str(te))
 
         # Thread.start
         self._thread_maj_document = Thread(target=self.run_maj_document)
