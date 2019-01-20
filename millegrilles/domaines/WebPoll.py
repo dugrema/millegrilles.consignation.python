@@ -45,7 +45,7 @@ class WebPollConstantes:
                 "commentaire": "Telechargement previsions meteo Environnement Canada pour Ottawa-Metcalfe",
                 "url": "https://weather.gc.ca/rss/city/on-52_e.xml",
                 "type": "rss",
-                "domaine": "millegrilles.domaines.WebPoll.RSS.weather_gc_ca.russell"
+                "domaine": "millegrilles.domaines.Rapports.SommaireRSS.meteo_envcanada"
             }
         },
         'minute': ['exemple1'],

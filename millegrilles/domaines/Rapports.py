@@ -122,11 +122,11 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
     def initiale(self):
         parametres = self.parametres
         self._logger.debug('Rapport RSS processing, parametres: %s' % parametres)
-        doc_transaction = self.charger_transaction(WebPollConstantes.COLLECTION_DONNEES_NOM)
+        doc_transaction = self.charger_transaction(RapportsConstantes.COLLECTION_DONNEES_NOM)
 
         # Faire le rapport
-        url = doc_transaction['charge-utile']['url']
-        contenu_rss = doc_transaction['charge-utile']['rss']
+        url = doc_transaction['url']
+        contenu_rss = doc_transaction['rss']
         entries = contenu_rss['entries']
 
         date_maj = dateutil.parser.parse(contenu_rss['feed']['updated'])
