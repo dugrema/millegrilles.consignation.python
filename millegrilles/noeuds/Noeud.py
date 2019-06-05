@@ -131,7 +131,7 @@ class DemarreurNoeud(Daemon):
     def setup_modules(self):
         # Charger la configuration et les DAOs
         doit_connecter = not self._args.noconnect
-        self._contexte.initialiser(connecter=doit_connecter)
+        self._contexte.initialiser(init_document=False, connecter=doit_connecter)
 
         self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
 
@@ -151,7 +151,8 @@ class DemarreurNoeud(Daemon):
 
         try:
             self.contexte.message_dao.deconnecter()
-            self.contexte.document_dao.deconnecter()
+            if self.contexte.document_dao is not None:
+                self.contexte.document_dao.deconnecter()
         except Exception as edao:
             self._logger.info("Erreur deconnexion DAOs: %s" % str(edao))
 
@@ -219,7 +220,7 @@ class DemarreurNoeud(Daemon):
 
     ''' Verifie la connexion au document_dao, reconnecte au besoin. '''
     def verifier_connexion_document(self):
-        if not self.contexte.document_dao.est_enligne():
+        if self.contexte.document_dao is not None and not self.contexte.document_dao.est_enligne():
             try:
                 self.contexte.document_dao.connecter()
                 self._logger.info("DemarreurNoeud: Connexion a Mongo re-etablie")
