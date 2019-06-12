@@ -9,7 +9,7 @@ import ssl
 from threading import Lock
 
 from millegrilles import Constantes
-from pika.credentials import PlainCredentials
+from pika.credentials import PlainCredentials, ExternalCredentials
 
 ''' 
 DAO vers la messagerie
@@ -41,12 +41,15 @@ class PikaDAO:
             'heartbeat': self.configuration.mq_heartbeat
         }
 
-        credentials = {
-            'username': self.configuration.mq_user,
-            'password': self.configuration.mq_password,
-            'erase_on_connect': True
-        }
-        connection_parameters['credentials'] = PlainCredentials(**credentials)
+        if self.configuration.mq_auth_cert != 'on':
+            credentials = {
+                'username': self.configuration.mq_user,
+                'password': self.configuration.mq_password,
+                'erase_on_connect': True
+            }
+            connection_parameters['credentials'] = PlainCredentials(**credentials)
+        else:
+            connection_parameters['credentials'] = ExternalCredentials()
 
         if self.configuration.mq_ssl == 'on':
             ssl_options = {

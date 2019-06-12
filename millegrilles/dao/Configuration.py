@@ -30,6 +30,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
             Constantes.CONFIG_MQ_PASSWORD: None,
             Constantes.CONFIG_MQ_SSL: 'on',  # Options on, off.
+            Constantes.CONFIG_MQ_AUTH_CERT: 'off',  # Options on, off.
             Constantes.CONFIG_MQ_KEYFILE: Constantes.DEFAUT_KEYFILE,
             Constantes.CONFIG_MQ_CERTFILE: Constantes.DEFAUT_CERTFILE,
             Constantes.CONFIG_MQ_CA_CERTS: Constantes.DEFAUT_CA_CERTS
@@ -155,6 +156,10 @@ class TransactionConfiguration:
     @property
     def mq_ssl(self):
         return self._mq_config[Constantes.CONFIG_MQ_SSL]
+
+    @property
+    def mq_auth_cert(self):
+        return self._mq_config[Constantes.CONFIG_MQ_AUTH_CERT]
 
     @property
     def mq_keyfile(self):
