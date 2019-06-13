@@ -41,15 +41,16 @@ class PikaDAO:
             'heartbeat': self.configuration.mq_heartbeat
         }
 
-        if self.configuration.mq_auth_cert != 'on':
+        if self.configuration.mq_auth_cert == 'on':
+            # Va faire la connection via plugin configure dans MQ, normalement c'est rabbitmq_auth_mechanism_ssl
+            connection_parameters['credentials'] = ExternalCredentials()
+        else:
             credentials = {
                 'username': self.configuration.mq_user,
                 'password': self.configuration.mq_password,
                 'erase_on_connect': True
             }
             connection_parameters['credentials'] = PlainCredentials(**credentials)
-        else:
-            connection_parameters['credentials'] = ExternalCredentials()
 
         if self.configuration.mq_ssl == 'on':
             ssl_options = {
@@ -168,6 +169,15 @@ class PikaDAO:
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
+
+    def inscrire_topic(self, exchange, routing: list, callback):
+        resultat = self.channel.queue_declare(queue='', exclusive=True)
+        nom_queue = resultat.method.queue
+        print("Resultat creation queue: %s" % nom_queue)
+        for routing_key in routing:
+            self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
+        tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
+        print("Tag queue: %s" % tag_queue)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions

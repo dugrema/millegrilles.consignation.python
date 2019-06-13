@@ -1,6 +1,6 @@
 # Script de test pour transmettre message de transaction
 
-from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
@@ -20,14 +20,11 @@ def envoyer_message_test_alerte():
 
 
 # --- MAIN ---
-configuration = TransactionConfiguration()
-configuration.loadEnvironment()
-message_dao = PikaDAO(configuration)
 
-message_dao.connecter()
-message_dao.configurer_rabbitmq()
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser(init_document=False)
 
-generateur = GenerateurTransaction(configuration, message_dao)
+generateur = GenerateurTransaction(contexte)
 
 # TEST
 
@@ -37,4 +34,3 @@ enveloppe = envoyer_message_test_alerte()
 
 print("Sent: %s" % enveloppe)
 
-message_dao.deconnecter()
