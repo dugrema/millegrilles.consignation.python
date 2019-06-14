@@ -73,7 +73,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
 
         try:
-            id_document = self.sauvegarder_nouvelle_transaction(message_dict)
+            id_document = self.sauvegarder_nouvelle_transaction(message_dict, method.exchange)
             entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
             uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
@@ -125,7 +125,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         if resultat.modified_count != 1:
             raise Exception("Erreur ajout evenement transaction: %s" % str(resultat))
 
-    def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
+    def sauvegarder_nouvelle_transaction(self, enveloppe_transaction, exchange):
 
         domaine_transaction = enveloppe_transaction[
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE
@@ -136,7 +136,9 @@ class ConsignateurTransactionCallback(BaseCallback):
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
         # Verifier la signature de la transaction
-        self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
+            enveloppe_certificat.authority_key_identifier
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']

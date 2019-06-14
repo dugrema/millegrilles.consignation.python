@@ -289,7 +289,7 @@ class VerificateurTransaction(UtilCertificats):
         self._verifier_cn(dict_message, enveloppe=enveloppe_certificat)
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
 
-        return True
+        return enveloppe_certificat
 
     def _verifier_signature(self, dict_message, signature, enveloppe=None):
         """
