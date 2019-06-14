@@ -244,7 +244,7 @@ class PikaDAO:
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(
-                exchange='millegrilles.evenements',
+                exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
 
@@ -296,7 +296,7 @@ class PikaDAO:
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(
-                exchange='millegrilles.middleware',
+                exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
 
