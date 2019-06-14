@@ -19,7 +19,7 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         self._stop_event.set()
         self.logger = logging.getLogger('%s.CeduleurMilleGrilles' % __name__)
 
-    def initialiser(self, init_document=True, init_message=True, connecter=True):
+    def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
 
     def configurer_parser(self):
