@@ -79,13 +79,13 @@ class GestionnairePrincipale(GestionnaireDomaine):
             durable=True)
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='destinataire.domaine.%s.#' % nom_queue_domaine
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='ceduleur.#'
         )

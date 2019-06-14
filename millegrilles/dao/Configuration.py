@@ -26,7 +26,10 @@ class TransactionConfiguration:
             Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS: Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
             Constantes.CONFIG_QUEUE_GENERATEUR_DOCUMENTS: Constantes.DEFAUT_QUEUE_GENERATEUR_DOCUMENTS,
             Constantes.CONFIG_QUEUE_NOTIFICATIONS: Constantes.DEFAUT_QUEUE_NOTIFICATIONS,
-            Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS: Constantes.DEFAUT_MQ_EXCHANGE_EVENEMENTS,
+            Constantes.CONFIG_MQ_EXCHANGE_MIDDLEWARE: Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.CONFIG_MQ_EXCHANGE_INTER: Constantes.DEFAUT_MQ_EXCHANGE_INTER,
+            Constantes.CONFIG_MQ_EXCHANGE_NOEUDS: Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.CONFIG_MQ_EXCHANGE_PUBLIC: Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
             Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
             Constantes.CONFIG_MQ_PASSWORD: None,
             Constantes.CONFIG_MQ_SSL: 'on',  # Options on, off.
@@ -214,8 +217,20 @@ class TransactionConfiguration:
         return self._mq_config[Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS]
 
     @property
-    def exchange_evenements(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_EVENEMENTS]
+    def exchange_middleware(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_MIDDLEWARE]
+
+    @property
+    def exchange_inter(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_INTER]
+
+    @property
+    def exchange_noeuds(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_NOEUDS]
+
+    @property
+    def exchange_public(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_PUBLIC]
 
     @property
     def queue_generateur_documents(self):

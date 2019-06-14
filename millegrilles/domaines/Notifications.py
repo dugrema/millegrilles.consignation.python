@@ -81,19 +81,19 @@ class GestionnaireNotifications(GestionnaireDomaine):
             durable=True)
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_notification,
             routing_key='notification.#'
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_notification,
             routing_key='destinataire.domaine.%s.#' % NotificationsConstantes.QUEUE_SUFFIXE
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_notification,
             routing_key='ceduleur.#'
         )

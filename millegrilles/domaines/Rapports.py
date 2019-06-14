@@ -39,13 +39,13 @@ class GestionnaireRapports(GestionnaireDomaine):
             durable=True)
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_rapports,
             routing_key='destinataire.domaine.%s.#' % RapportsConstantes.QUEUE_NOM
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_rapports,
             routing_key='ceduleur.#'
         )

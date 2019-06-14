@@ -80,20 +80,20 @@ class GestionnairePki(GestionnaireDomaine):
             durable=True)
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='destinataire.domaine.%s.#' % nom_queue_domaine
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='ceduleur.#'
         )
 
         # Ecouter les evenements de type pki - servent a echanger certificats et requetes de certificats
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='pki.#'
         )

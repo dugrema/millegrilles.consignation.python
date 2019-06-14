@@ -99,29 +99,38 @@ class PikaDAO:
 
         # S'assurer que toutes les queues durables existes. Ces queues doivent toujours exister
         # pour eviter que des messages de donnees originales ne soient perdus.
-        nom_echange_evenements = self.configuration.exchange_evenements
+        # nom_echange_evenements = self.configuration.exchange_evenements
+        nom_echange_middleware = self.configuration.exchange_middleware
+        nom_echanges = [
+            nom_echange_middleware,
+            self.configuration.exchange_inter,
+            self.configuration.exchange_noeuds,
+            self.configuration.exchange_public
+        ]
         nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
         nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
         nom_q_mgp_processus = self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
-        self.channel.exchange_declare(
-            exchange=nom_echange_evenements,
-            exchange_type='topic',
-            durable=True
-        )
+        for nom_echange in nom_echanges:
+            self.channel.exchange_declare(
+                exchange=nom_echange,
+                exchange_type='topic',
+                durable=True
+            )
 
         # Creer la Q de nouvelles transactions pour cette MilleGrille
         self.channel.queue_declare(
             queue=nom_q_nouvelles_transactions,
             durable=True)
 
-        self.channel.queue_bind(
-            exchange=nom_echange_evenements,
-            queue=nom_q_nouvelles_transactions,
-            routing_key='transaction.nouvelle'
-        )
+        for nom_echange in nom_echanges:
+            self.channel.queue_bind(
+                exchange=nom_echange,
+                queue=nom_q_nouvelles_transactions,
+                routing_key='transaction.nouvelle'
+            )
 
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
         self.channel.queue_declare(
@@ -129,7 +138,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange=nom_echange_evenements,
+            exchange=nom_echange_middleware,
             queue=nom_q_mgp_processus,
             routing_key='mgpprocessus.#'
         )
@@ -140,7 +149,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange=nom_echange_evenements,
+            exchange=nom_echange_middleware,
             queue=nom_q_erreurs_transactions,
             routing_key='transaction.erreur'
         )
@@ -151,7 +160,7 @@ class PikaDAO:
             durable=True)
 
         self.channel.queue_bind(
-            exchange=nom_echange_evenements,
+            exchange=nom_echange_middleware,
             queue=nom_q_erreurs_processus,
             routing_key='processus.erreur'
         )
@@ -207,7 +216,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message_dict)
         with self._lock_transmettre_message:
             self.channel.basic_publish(
-                exchange=self.configuration.exchange_evenements,
+                exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8,
                 properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
@@ -287,7 +296,7 @@ class PikaDAO:
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(
-                exchange='millegrilles.evenements',
+                exchange='millegrilles.middleware',
                 routing_key=routing_key,
                 body=message_utf8)
 
@@ -315,7 +324,7 @@ class PikaDAO:
                        nom_etape)
 
         with self._lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key=routing_key,
                                        body=message_utf8)
 
@@ -342,7 +351,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         with self._lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key='transaction.erreur',
                                        body=message_utf8)
 
@@ -369,7 +378,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         with self._lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_evenements,
+            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key='processus.erreur',
                                        body=message_utf8)
 
@@ -466,7 +475,7 @@ class BaseCallback:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        ch.basic_publish(exchange=self._contexte.configuration.exchange_evenements,
+        ch.basic_publish(exchange=self._contexte.configuration.exchange_middleware,
                          routing_key='processus.erreur',
                          body=message_utf8)
 

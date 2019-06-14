@@ -27,7 +27,7 @@ reception = Reception()
 
 # TEST
 
-message_dao.inscrire_topic('millegrilles.evenements', ['transaction.nouvelle', 'topic.test'], reception.recevoir_message)
+message_dao.inscrire_topic('millegrilles.middleware', ['transaction.nouvelle', 'topic.test'], reception.recevoir_message)
 # message_dao.enregistrer_callback(queue='nouvelles_transactions', callback=reception.recevoir_message)
 
 # time.sleep(30)

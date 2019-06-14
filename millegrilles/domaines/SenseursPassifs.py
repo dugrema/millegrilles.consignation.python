@@ -67,13 +67,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_senseurspassifs,
             routing_key='destinataire.domaine.millegrilles.domaines.SenseursPassifs.#'
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_senseurspassifs,
             routing_key='ceduleur.#'
         )

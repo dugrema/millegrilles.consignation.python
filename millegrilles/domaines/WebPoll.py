@@ -98,13 +98,13 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_webpoll,
             routing_key='destinataire.domaine.millegrilles.domaines.WebPoll.#'
         )
 
         self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_evenements,
+            exchange=self.configuration.exchange_middleware,
             queue=nom_queue_webpoll,
             routing_key='ceduleur.#'
         )
