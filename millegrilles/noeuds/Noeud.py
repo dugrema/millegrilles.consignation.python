@@ -128,10 +128,10 @@ class DemarreurNoeud(Daemon):
             self._stop_event.wait(self._intervalle_entretien)
         self._logger.info("Fin execution Daemon")
 
-    def setup_modules(self):
+    def setup_modules(self, init_document=False):
         # Charger la configuration et les DAOs
         doit_connecter = not self._args.noconnect
-        self._contexte.initialiser(init_document=False, connecter=doit_connecter)
+        self._contexte.initialiser(init_document=init_document, connecter=doit_connecter)
 
         self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
 
