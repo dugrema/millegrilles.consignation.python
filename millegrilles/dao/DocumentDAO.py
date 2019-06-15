@@ -1,6 +1,7 @@
 # Gestion des documents.
-import ssl
+import json
 import logging
+import datetime
 
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -94,3 +95,16 @@ class MongoDAO:
 
     def get_database(self):
         return self._mg_database
+
+
+class MongoJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.timestamp()
+        elif isinstance(obj, ObjectId):
+            return str(obj)
+
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
+

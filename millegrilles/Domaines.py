@@ -1,6 +1,7 @@
 # Module avec utilitaires generiques pour mgdomaines
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper
+from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.MGProcessus import MGPProcessusDemarreur
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -343,6 +344,10 @@ class WatcherCollectionMongoThread:
                 self.__logger.info("Watcher event recu: %s" % str(change_event))
                 full_document = change_event['fullDocument']
                 self.__logger.info("Watcher document recu: %s" % str(full_document))
+
+                # Transmettre document sur MQ
+                self.__contexte.message_dao.transmettre_message(full_document, self.__routing_key, encoding=MongoJSONEncoder)
+
             else:
                 self.__stop_event.wait(5)  # Attendre 5 secondes, throttle
                 self.__logger.info("Creer pipeline %s" % self.__nom_collection_mongo)

@@ -26,6 +26,9 @@ class PikaDAO:
         self.connectionmq = None
         self.channel = None
 
+        self.connectionmq_envoi_async = None
+        self.channel_envoi_async = None
+
         self._actif = False
         self.in_error = True
 
@@ -82,12 +85,19 @@ class PikaDAO:
             channel = connectionmq.channel()
             channel.basic_qos(prefetch_count=1)
 
+            connectionmq_envoi_async = pika.BlockingConnection(parametres)
+            channel_envoi_async = connectionmq_envoi_async.channel()
+            channel_envoi_async.basic_qos(prefetch_count=1)
+
             if not separer:
                 # La connexion est pour l'instance de PikaDAO
                 self._actif = True
                 self.in_error = False
                 self.connectionmq = connectionmq
                 self.channel = channel
+
+                self.connectionmq_envoi_async = connectionmq_envoi_async
+                self.channel_envoi_async = channel_envoi_async
         except Exception as e:
             if not separer:
                 self.in_error = True
@@ -208,14 +218,14 @@ class PikaDAO:
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
 
-    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1):
+    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder):
 
         if self.connectionmq is None or self.connectionmq.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
-        message_utf8 = self.json_helper.dict_vers_json(message_dict)
+        message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
-            self.channel.basic_publish(
+            self.channel_envoi_async.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8,
@@ -404,9 +414,18 @@ class PikaDAO:
                     self.channel.close()
                 if self.connectionmq is not None:
                     self.connectionmq.close()
+
+            if self.connectionmq_envoi_async is not None:
+                if self.channel_envoi_async is not None:
+                    self.channel_envoi_async.close()
+                if self.connectionmq_envoi_async is not None:
+                    self.connectionmq_envoi_async.close()
+
         finally:
             self.channel = None
             self.connectionmq = None
+            self.channel_envoi_async = None
+            self.connectionmq_envoi_async = None
 
     def queuename_nouvelles_transactions(self):
         return self.configuration.queue_nouvelles_transactions
@@ -427,8 +446,8 @@ class JSONHelper:
     def __init__(self):
         self.reader = codecs.getreader("utf-8")
 
-    def dict_vers_json(self, enveloppe_dict):
-        message_utf8 = json.dumps(enveloppe_dict, sort_keys=True, ensure_ascii=False)
+    def dict_vers_json(self, enveloppe_dict, encoding=json.JSONEncoder):
+        message_utf8 = json.dumps(enveloppe_dict, sort_keys=True, ensure_ascii=False, cls=encoding)
         return message_utf8
 
     def bin_utf8_json_vers_dict(self, json_utf8):
@@ -487,7 +506,6 @@ class BaseCallback:
     @property
     def contexte(self):
         return self._contexte
-
 
 class ExceptionConnectionFermee(Exception):
     pass

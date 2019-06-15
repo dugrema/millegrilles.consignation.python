@@ -115,7 +115,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
     def demarrer(self):
         super().demarrer()
         self.demarrer_watcher_collection(
-            SenseursPassifsConstantes.COLLECTION_DONNEES_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
+            SenseursPassifsConstantes.COLLECTION_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
 
     def traiter_backlog(self):
         # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
