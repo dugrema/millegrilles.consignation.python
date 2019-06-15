@@ -190,11 +190,11 @@ class PikaDAO:
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
-        resultat = self.channel.queue_declare(queue='', exclusive=True)
+        resultat = self.channel_envoi_async.queue_declare(queue='', exclusive=True)
         nom_queue = resultat.method.queue
         print("Resultat creation queue: %s" % nom_queue)
         for routing_key in routing:
-            self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
+            self.channel_envoi_async.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
         tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
         print("Tag queue: %s" % tag_queue)
 
@@ -220,7 +220,7 @@ class PikaDAO:
 
     def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder):
 
-        if self.connectionmq is None or self.connectionmq.is_closed:
+        if self.connectionmq_envoi_async is None or self.connectionmq_envoi_async.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
