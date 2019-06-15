@@ -524,6 +524,9 @@ class BaseCallback:
     def traiter_message(self, ch, method, properties, body):
         raise NotImplemented('traiter_message() methode doit etre implementee')
 
+    def decoder_message_json(self, body):
+        return self.json_helper.bin_utf8_json_vers_dict(body)
+
     @property
     def contexte(self):
         return self._contexte

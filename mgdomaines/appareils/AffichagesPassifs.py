@@ -4,10 +4,12 @@ import datetime
 import logging
 from threading import Thread, Event
 
-from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
-from bson import ObjectId
+# from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
+# from bson import ObjectId
 
+from millegrilles import Constantes
 from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
+from millegrilles.dao.MessageDAO import BaseCallback
 
 
 # Affichage qui se connecte a un ou plusieurs documents et recoit les changements live
@@ -21,17 +23,24 @@ class AfficheurDocumentMAJDirecte:
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
 
-        self._collection = None
-        self._curseur_changements = None  # Si None, on fonctionne par timer
-        self._watch_desactive = False  # Si true, on utilise watch. Sinon on utilise le timer
+        # self._collection = None
+        # self._curseur_changements = None  # Si None, on fonctionne par timer
+        # self._watch_desactive = False  # Si true, on utilise watch. Sinon on utilise le timer
         self._thread_maj_document = None
+
+        self.traitement_callback = None
 
     def start(self):
         try:
+            # Enregistrer callback
+            self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
+            self._contexte.message_dao.inscrire_topic(
+                self._contexte.configuration.exchange_noeuds,
+                ["%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS],
+                self.traitement_callback.callbackAvecAck
+            )
             self.initialiser_documents()
-        except ServerSelectionTimeoutError as sste:
-            logging.error("AffichagesPassifs: Erreur de connexion a Mongo. "
-                          "On va demarrer quand meme et connecter plus tard. %s" % str(sste))
+
         except TypeError as te:
             logging.error("AffichagesPassifs: Erreur de connexion a Mongo. "
                           "On va demarrer quand meme et connecter plus tard. %s" % str(te))
@@ -44,46 +53,16 @@ class AfficheurDocumentMAJDirecte:
     def fermer(self):
         self._stop_event.set()
 
-    def get_collection(self):
-        raise NotImplemented('Doit etre implementee dans la sous-classe')
-
     def get_filtre(self):
         raise NotImplemented('Doit etre implementee dans la sous-classe')
 
     def initialiser_documents(self):
-        self._collection = self.get_collection()
-        filtre = self.get_filtre()
-
-        filtre_watch = dict()
-        # Rebatir le filtre avec fullDocument
-        for cle in filtre:
-            cle_watch = 'documentKey.%s' % cle
-            filtre_watch[cle_watch] = filtre[cle]
-
-        # Tenter d'activer watch par _id pour les documents
-        try:
-            match = {
-                '$match': filtre_watch
-             }
-            pipeline = [match]
-            logging.debug("Pipeline watch: %s" % str(pipeline))
-            self._curseur_changements = self._collection.watch(pipeline)
-            self._watch_desactive = False  # S'assurer qu'on utilise la fonctionnalite watch
-
-        except OperationFailure as opf:
-            logging.warning("Erreur activation watch, on fonctionne par timer: %s" % str(opf))
-            self._watch_desactive = True
-
         self.charger_documents()  # Charger une version initiale des documents
 
     def charger_documents(self):
         # Sauvegarder la version la plus recente de chaque document
         filtre = self.get_filtre()
-        curseur_documents = self._collection.find(filtre)
-        for document in curseur_documents:
-            # Sauvegarder le document le plus recent
-            self._documents[document.get('_id')] = document
-            logging.debug("#### Document rafraichi: %s" % str(document))
+        # A FAIRE
 
     def get_documents(self):
         return self._documents
@@ -92,53 +71,11 @@ class AfficheurDocumentMAJDirecte:
 
         while not self._stop_event.is_set():
             try:
-                # Verifier s'il faut se reconnecter
-                if self._collection is None:
-                    # Il faut se reconnecter
-                    self.initialiser_documents()  # Reconnecte la collection, watch et recharge les documents
-
-                # Executer la boucle de rafraichissement. Il y a deux comportements:
-                # Si on a un _curseur_changements, on fait juste ecouter les changements du replice sets
-                # Si on n'a pas de curseur, on utiliser un timer (_intervalle_sec) pour recharger avec Mongo
-                if not self._watch_desactive and self._curseur_changements is not None:
-                    logging.debug("Attente changement")
-                    valeur = next(self._curseur_changements)
-
-                    doc_id = valeur['documentKey']['_id']
-                    if valeur.get('fullDocument') is not None:
-                        logging.debug("Recu full document: %s" % str(valeur))
-                        self._documents[doc_id] = valeur['fullDocument']
-                    elif valeur.get('updateDescription') is not None:
-                        logging.debug("Recu MAJ: %s" % str(valeur))
-                        updated_fields = valeur['updateDescription']['updatedFields']
-                        self._documents[doc_id].update(updated_fields)
-                    else:
-                        # Mise a jour inconnue. On va recharger le document au complet pour le synchroniser
-                        logging.debug("Update de type inconnu, on recharge le document: %s" % str(valeur))
-                        full_documents = self._collection.find({'_id': doc_id})
-                        for full_document in full_documents:
-                            self._documents[doc_id] = full_document
-
-                else:
-                    self.charger_documents()
-                    self._stop_event.wait(self._intervalle_secs)
-
-            except ServerSelectionTimeoutError as sste:
-                logging.warning("AffichagesPassifs: perte de connexion a Mongo: %s" % str(sste))
-                # L'erreur vient de la connexion, on va tenter d'aller chercher la collection/curseur a nouveau
-                self._collection = None
-                self._curseur_changements = None
-
-                self._stop_event.wait(self._intervalle_erreurs_secs)  # On attend avant de se reconnecter
-
+                self._contexte.message_dao.start_consuming()
             except Exception as e:
+
                 logging.warning("AfficheurDocumentMAJDirecte: Exception %s" % str(e))
                 traceback.print_exc()
-
-                # L'erreur vient peut-etre de la connexion, on va tenter d'aller chercher
-                # la collection/curseur plus tard.
-                self._collection = None
-                self._curseur_changements = None
 
                 self._stop_event.wait(self._intervalle_erreurs_secs)  # On attend avant de se reconnecter
 
@@ -163,12 +100,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         return self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
 
     def get_filtre(self):
-        document_object_ids = []
-        for doc_id in self._document_ids:
-            document_object_ids.append(ObjectId(doc_id))
-
-        filtre = {"_id": {'$in': document_object_ids}}
-        return filtre
+        return self._document_ids
 
     def start(self):
         super().start()  # Demarre thread de lecture de documents
@@ -272,3 +204,21 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             lignes.append(contenu)
 
         return lignes
+
+
+class DocumentCallback(BaseCallback):
+    """
+    Sauvegarde le document recu s'il fait parti de la liste.
+    """
+
+    def __init__(self, contexte, documents, liste_ids):
+        super().__init__(contexte)
+        self.documents = documents
+        self.liste_ids = liste_ids
+
+    def traiter_message(self, ch, method, properties, body):
+        message_json = self.decoder_message_json(body)
+
+        doc_id = message_json.get("_id")
+        if doc_id in self.liste_ids:
+            self.documents[doc_id] = message_json

@@ -1,5 +1,5 @@
 from mgdomaines.appareils.AffichagesPassifs import AfficheurDocumentMAJDirecte
-from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
 from bson import ObjectId
 import time
@@ -8,17 +8,12 @@ import time
 class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
 
     def __init__(self):
-        configuration = TransactionConfiguration()
-        configuration.loadEnvironment()
-        document_dao = MongoDAO(configuration)
-        document_dao.connecter()
-        super().__init__(configuration, document_dao, intervalle_secs=5)
-
-    def get_collection(self):
-        return self._document_dao.get_collection('mathieu')
+        contexte = ContexteRessourcesMilleGrilles()
+        contexte.initialiser(init_document=False)
+        super().__init__(contexte, intervalle_secs=5)
 
     def get_filtre(self):
-        return {"_id": {'$in': [ObjectId("5bf80ce3e597dd0008fe557b")]}}
+        return ["5c42605524fb4ce929db094e"]
 
     def test(self):
         for document_id in self.get_documents():
@@ -32,12 +27,12 @@ try:
     print("Test debut")
     test.start()
 
-    test.test()
-    time.sleep(16)
+    for i in range(0, 30):
+        test.test()
+        time.sleep(1)
 
     print("Test termine")
 except Exception as e:
     print("Erreur main: %s" % e)
 finally:
     test.fermer()
-    test._document_dao.deconnecter()
