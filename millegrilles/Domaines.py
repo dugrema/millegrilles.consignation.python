@@ -337,16 +337,15 @@ class WatcherCollectionMongoThread:
 
         # Boucler tant que le stop event n'est pas active
         while not self.__stop_event.isSet():
-            self.__logger.info("Boucle watcher")
-
             if self.__curseur_changements is not None:
                 change_event = self.__curseur_changements.next()
-                self.__logger.info("Watcher event recu: %s" % str(change_event))
+                self.__logger.debug("Watcher event recu: %s" % str(change_event))
                 full_document = change_event['fullDocument']
-                self.__logger.info("Watcher document recu: %s" % str(full_document))
+                self.__logger.debug("Watcher document recu: %s" % str(full_document))
 
                 # Transmettre document sur MQ
-                self.__contexte.message_dao.transmettre_message(full_document, self.__routing_key, encoding=MongoJSONEncoder)
+                self.__contexte.message_dao.transmettre_message_noeuds(
+                    full_document, self.__routing_key, encoding=MongoJSONEncoder)
 
             else:
                 self.__stop_event.wait(5)  # Attendre 5 secondes, throttle

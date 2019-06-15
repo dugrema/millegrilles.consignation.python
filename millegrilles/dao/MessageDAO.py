@@ -232,6 +232,27 @@ class PikaDAO:
                 properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
         self.in_error = False
 
+    ''' 
+    Methode generique pour transmettre un evenement JSON avec l'echange millegrilles
+
+    :param routing_key: Routing key utilise pour distribuer le message.
+    :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
+    '''
+
+    def transmettre_message_noeuds(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder):
+
+        if self.connectionmq is None or self.connectionmq.is_closed:
+            raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
+        with self._lock_transmettre_message:
+            self.channel_envoi_async.basic_publish(
+                exchange=self.configuration.exchange_noeuds,
+                routing_key=routing_key,
+                body=message_utf8,
+                properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
+        self.in_error = False
+
     def transmettre_nouvelle_transaction(self, document_transaction):
         routing_key = 'transaction.nouvelle'
         # Utiliser delivery mode 2 (persistent) pour les transactions
