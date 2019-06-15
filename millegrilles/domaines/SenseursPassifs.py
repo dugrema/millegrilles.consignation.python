@@ -20,6 +20,7 @@ class SenseursPassifsConstantes:
     COLLECTION_NOM = DOMAINE_NOM
     COLLECTION_DONNEES_NOM = '%s/%s' % (DOMAINE_NOM, 'donnees')
     QUEUE_NOM = DOMAINE_NOM
+    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
 
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
@@ -110,6 +111,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
              1),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
+
+    def demarrer(self):
+        super().demarrer()
+        self.demarrer_watcher_collection(
+            SenseursPassifsConstantes.COLLECTION_DONNEES_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
 
     def traiter_backlog(self):
         # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction

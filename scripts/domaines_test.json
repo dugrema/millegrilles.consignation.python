@@ -1,8 +1,8 @@
 {
   "domaines": [
-    {
-      "module": "millegrilles.domaines.Pki",
-      "classe": "GestionnairePki"
+     {
+      "module": "millegrilles.domaines.SenseursPassifs",
+      "classe": "GestionnaireSenseursPassifs"
     }
   ]
 }

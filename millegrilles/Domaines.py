@@ -10,8 +10,9 @@ import json
 import datetime
 
 from pika.exceptions import ChannelClosed
+from pymongo.errors import OperationFailure
 
-from threading import Event
+from threading import Thread, Event
 
 
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
@@ -22,7 +23,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
     def __init__(self):
         super().__init__()
-        self._logger = logging.getLogger("%s.GestionnaireDomainesMilleGrilles" % __name__)
+        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
         self._gestionnaires = []
         self._stop_event = Event()
 
@@ -171,6 +172,7 @@ class GestionnaireDomaine:
         self.json_helper = JSONHelper()
         self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
         self._thread = None
+        self._watchers = list()
         self.connexion_mq = None
         self.channel_mq = None
         self._arret_en_cours = False
@@ -200,6 +202,19 @@ class GestionnaireDomaine:
     def enregistrer_queue(self, queue_name):
         self._logger.info("Enregistrement queue %s" % queue_name)
         self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_transaction)
+
+    def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
+        """
+        Enregistre un watcher et demarre une thread qui lit le pipeline dans MongoDB. Les documents sont
+        lus au complet et envoye avec la routing_key specifiee.
+        :param nom_collection_mongo: Nom de la collection dans MongoDB pour cette MilleGrille
+        :param routing_key: Nom du topic a enregistrer,
+               e.g. noeuds.source.millegrilles_domaines_SenseursPassifs.affichage.__nom_noeud__.__no_senseur__
+        :return:
+        """
+        watcher = WatcherCollectionMongoThread(self.contexte, self._stop_event, nom_collection_mongo, routing_key)
+        self._watchers.append(watcher)
+        watcher.start()
 
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
@@ -279,3 +294,70 @@ class GestionnaireDomaine:
     @property
     def contexte(self):
         return self._contexte
+
+
+class WatcherCollectionMongoThread:
+    """
+    Ecoute les changements sur une collection MongoDB et transmet les documents complets sur RabbitMQ.
+    """
+
+    def __init__(
+            self,
+            contexte: ContexteRessourcesMilleGrilles,
+            stop_event: Event,
+            nom_collection_mongo: str,
+            routing_key: str
+    ):
+        """
+        :param contexte:
+        :param stop_event: Stop event utilise par le gestionnaire.
+        :param nom_collection_mongo:
+        :param routing_key:
+        """
+        self.__logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
+
+        self.__contexte = contexte
+        self.__stop_event = stop_event
+        self.__nom_collection_mongo = nom_collection_mongo
+        self.__routing_key = routing_key
+
+        self.__collection_mongo = None
+        self.__thread = None
+        self.__curseur_changements = None
+
+    def start(self):
+        self.__logger.info("Demarrage thread watcher:%s vers routing:%s" % (
+            self.__nom_collection_mongo, self.__routing_key))
+        self.__thread = Thread(target=self.run)
+        self.__thread.start()
+
+    def run(self):
+        self.__logger.info("Thread watch: %s" % self.__nom_collection_mongo)
+
+        # Boucler tant que le stop event n'est pas active
+        while not self.__stop_event.isSet():
+            self.__logger.info("Boucle watcher")
+
+            if self.__curseur_changements is not None:
+                change_event = self.__curseur_changements.next()
+                self.__logger.info("Watcher event recu: %s" % str(change_event))
+                full_document = change_event['fullDocument']
+                self.__logger.info("Watcher document recu: %s" % str(full_document))
+            else:
+                self.__stop_event.wait(5)  # Attendre 5 secondes, throttle
+                self.__logger.info("Creer pipeline %s" % self.__nom_collection_mongo)
+                self._creer_pipeline()
+
+    def _creer_pipeline(self):
+        collection_mongo = self.__contexte.document_dao.get_collection(self.__nom_collection_mongo)
+
+        # Tenter d'activer watch par _id pour les documents
+        try:
+            option = {'full_document': 'updateLookup'}
+            pipeline = []
+            logging.info("Pipeline watch: %s" % str(pipeline))
+            self.__curseur_changements = collection_mongo.watch(pipeline, **option)
+
+        except OperationFailure as opf:
+            self.__logger.warning("Erreur activation watch, on fonctionne par timer: %s" % str(opf))
+            self.__curseur_changements = None
