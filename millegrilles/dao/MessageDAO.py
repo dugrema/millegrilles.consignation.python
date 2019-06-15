@@ -190,11 +190,11 @@ class PikaDAO:
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
-        resultat = self.channel_envoi_async.queue_declare(queue='', exclusive=True)
+        resultat = self.channel.queue_declare(queue='', exclusive=True)
         nom_queue = resultat.method.queue
         print("Resultat creation queue: %s" % nom_queue)
         for routing_key in routing:
-            self.channel_envoi_async.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
+            self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
         tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
         print("Tag queue: %s" % tag_queue)
 
