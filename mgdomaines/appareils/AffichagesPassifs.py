@@ -52,6 +52,7 @@ class AfficheurDocumentMAJDirecte:
 
     def fermer(self):
         self._stop_event.set()
+        self._contexte.message_dao.deconnecter()
 
     def get_filtre(self):
         raise NotImplemented('Doit etre implementee dans la sous-classe')

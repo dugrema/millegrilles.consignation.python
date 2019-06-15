@@ -279,6 +279,11 @@ class GestionnaireDomaine:
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
+        for watcher in self._watchers:
+            try:
+                watcher.stop()
+            except Exception as e:
+                self._logger.info("Erreur fermeture watcher: %s" % str(e))
 
     @property
     def configuration(self):
@@ -329,8 +334,11 @@ class WatcherCollectionMongoThread:
     def start(self):
         self.__logger.info("Demarrage thread watcher:%s vers routing:%s" % (
             self.__nom_collection_mongo, self.__routing_key))
-        self.__thread = Thread(target=self.run)
+        self.__thread = Thread(name="DocWatcher", target=self.run)
         self.__thread.start()
+
+    def stop(self):
+        self.__curseur_changements.close()
 
     def run(self):
         self.__logger.info("Thread watch: %s" % self.__nom_collection_mongo)
@@ -338,14 +346,17 @@ class WatcherCollectionMongoThread:
         # Boucler tant que le stop event n'est pas active
         while not self.__stop_event.isSet():
             if self.__curseur_changements is not None:
-                change_event = self.__curseur_changements.next()
-                self.__logger.debug("Watcher event recu: %s" % str(change_event))
-                full_document = change_event['fullDocument']
-                self.__logger.debug("Watcher document recu: %s" % str(full_document))
+                try:
+                    change_event = self.__curseur_changements.next()
+                    self.__logger.debug("Watcher event recu: %s" % str(change_event))
+                    full_document = change_event['fullDocument']
+                    self.__logger.debug("Watcher document recu: %s" % str(full_document))
 
-                # Transmettre document sur MQ
-                self.__contexte.message_dao.transmettre_message_noeuds(
-                    full_document, self.__routing_key, encoding=MongoJSONEncoder)
+                    # Transmettre document sur MQ
+                    self.__contexte.message_dao.transmettre_message_noeuds(
+                        full_document, self.__routing_key, encoding=MongoJSONEncoder)
+                except StopIteration:
+                    self.__logger.info("Arret watcher dans l'iteration courante")
 
             else:
                 self.__stop_event.wait(5)  # Attendre 5 secondes, throttle
@@ -357,7 +368,7 @@ class WatcherCollectionMongoThread:
 
         # Tenter d'activer watch par _id pour les documents
         try:
-            option = {'full_document': 'updateLookup'}
+            option = {'full_document': 'updateLookup', 'max_await_time_ms': 1000}
             pipeline = []
             logging.info("Pipeline watch: %s" % str(pipeline))
             self.__curseur_changements = collection_mongo.watch(pipeline, **option)
