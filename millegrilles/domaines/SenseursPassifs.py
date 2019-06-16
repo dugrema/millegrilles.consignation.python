@@ -20,6 +20,8 @@ class SenseursPassifsConstantes:
     COLLECTION_NOM = DOMAINE_NOM
     COLLECTION_DONNEES_NOM = '%s/%s' % (DOMAINE_NOM, 'donnees')
     QUEUE_NOM = DOMAINE_NOM
+    QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
+    QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
     QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
 
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
@@ -44,7 +46,10 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
     def __init__(self, contexte):
         super().__init__(contexte)
         self._traitement_lecture = None
+        self._traitement_requetes = None
         self.traiter_transaction = None   # Override de la methode super().traiter_transaction
+        self.traiter_requete_noeud = None  # Override de la methode super().traiter_transaction
+        self.traiter_requete_inter = None  # Override de la methode super().traiter_transaction
         self._traitement_backlog_lectures = None
 
         self._logger = logging.getLogger("%s.GestionnaireSenseursPassifs" % __name__)
@@ -52,26 +57,49 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
     def configurer(self):
         super().configurer()
 
+        # Configuration des callbacks pour traiter les messages
         self._traitement_lecture = TraitementMessageLecture(self)
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
 
+        self._traitement_requetes = TraitementMessageRequete(self)
+        self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
+        self.traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
+
         nom_queue_senseurspassifs = self.get_nom_queue()
 
-        # Configurer la Queue pour SenseursPassifs sur RabbitMQ
-        self.message_dao.channel.queue_declare(
-            queue=nom_queue_senseurspassifs,
-            durable=True)
+        queues_config = [
+            {
+                'nom': self.get_nom_queue(),
+                'routing': 'destinataire.domaine.millegrilles.domaines.SenseursPassifs.#',
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+            },
+            {
+                'nom': self.get_nom_queue_requetes_noeuds(),
+                'routing': 'noeuds.requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS
+            },
+            {
+                'nom': self.get_nom_queue_requetes_inter(),
+                'routing': 'inter.requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER
+            },
+        ]
 
-        # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
-        self.message_dao.channel.queue_purge(
-            queue=nom_queue_senseurspassifs
-        )
+        for queue_config in queues_config:
+            self.message_dao.channel.queue_declare(
+                queue=queue_config['nom'],
+                durable=True)
 
-        self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_senseurspassifs,
-            routing_key='destinataire.domaine.millegrilles.domaines.SenseursPassifs.#'
-        )
+            self.message_dao.channel.queue_bind(
+                exchange=queue_config['exchange'],
+                queue=queue_config['nom'],
+                routing_key=queue_config['routing']
+            )
+
+            # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
+            self.message_dao.channel.queue_purge(
+                queue=queue_config['nom']
+            )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
@@ -135,8 +163,20 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Note: Cette methode est remplacee dans la configuration (self.traiter_transaction = self._traitement...)
         raise NotImplementedError("N'est pas implemente")
 
+    def traiter_requete_noeud(self, ch, method, properties, body):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
+    def traiter_requete_inter(self, ch, method, properties, body):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
     def get_nom_queue(self):
         return SenseursPassifsConstantes.QUEUE_NOM
+
+    def get_nom_queue_requetes_inter(self):
+        return SenseursPassifsConstantes.QUEUE_INTER_NOM
+
+    def get_nom_queue_requetes_noeuds(self):
+        return SenseursPassifsConstantes.QUEUE_NOEUDS_NOM
 
     ''' Traite les evenements sur cedule. '''
     def traiter_cedule(self, evenement):
@@ -229,6 +269,33 @@ class TraitementMessageLecture(BaseCallback):
             self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
             self._gestionnaire.traiter_cedule(message_dict)
+        else:
+            # Type d'evenement inconnu, on lance une exception
+            raise ValueError("Type d'evenement inconnu: %s" % evenement)
+
+
+class TraitementMessageRequete(BaseCallback):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire.contexte)
+        self._gestionnaire = gestionnaire
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+            # Verifier quel processus demarrer.
+            routing_key_sansprefixe = routing_key.replace(
+                'destinataire.domaine.',
+                ''
+            )
+            if routing_key_sansprefixe == 'mongodb':
+                print("Requete! MongoDB! %s" % str(message_dict))
+            else:
+                # Type de transaction inconnue, on lance une exception
+                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % evenement)

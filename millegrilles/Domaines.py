@@ -204,6 +204,12 @@ class GestionnaireDomaine:
         self._logger.info("Enregistrement queue %s" % queue_name)
         self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_transaction)
 
+        if self.get_nom_queue_requetes_noeuds() is not None:
+            self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_requete_noeud)
+
+        if self.get_nom_queue_requetes_inter() is not None:
+            self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_requete_inter)
+
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """
         Enregistre un watcher et demarre une thread qui lit le pipeline dans MongoDB. Les documents sont
@@ -218,6 +224,12 @@ class GestionnaireDomaine:
         watcher.start()
 
     def traiter_transaction(self, ch, method, properties, body):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
+    def traiter_requete_noeud(self, ch, method, properties, body):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
+    def traiter_requete_inter(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
     def traiter_cedule(self, message):
@@ -269,6 +281,20 @@ class GestionnaireDomaine:
     '''
     def get_nom_queue(self):
         raise NotImplementedError("Methode non-implementee")
+
+    def get_nom_queue_requetes_noeuds(self):
+        """
+        Optionnel, le nom de la Q pour les requetes de noeuds.
+        :return: str Nom de la Q a utiliser
+        """
+        return None
+
+    def get_nom_queue_requetes_inter(self):
+        """
+        Optionnel, le nom de la Q pour les requetes inter millegrilles.
+        :return: str Nom de la Q a utiliser
+        """
+        return None
 
     def get_nom_collection(self):
         raise NotImplementedError("Methode non-implementee")
@@ -376,3 +402,12 @@ class WatcherCollectionMongoThread:
         except OperationFailure as opf:
             self.__logger.warning("Erreur activation watch, on fonctionne par timer: %s" % str(opf))
             self.__curseur_changements = None
+
+
+class TraiteurRequeteDomaineNoeud:
+    """
+    Execute les requetes faites par les noeuds sur le topic domaine._domaine_.requete.noeud
+    """
+
+    def __init__(self):
+        pass
