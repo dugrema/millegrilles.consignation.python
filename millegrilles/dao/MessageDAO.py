@@ -194,7 +194,7 @@ class PikaDAO:
         nom_queue = resultat.method.queue
         print("Resultat creation queue: %s" % nom_queue)
         bindings = routing.copy()
-        bindings.append('noeuds.reponse.%s' % nom_queue)
+        bindings.append('reponse.%s' % nom_queue)
         for routing_key in bindings:
             self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
         tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)

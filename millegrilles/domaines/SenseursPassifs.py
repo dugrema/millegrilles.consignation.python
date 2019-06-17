@@ -75,12 +75,12 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             },
             {
                 'nom': self.get_nom_queue_requetes_noeuds(),
-                'routing': 'noeuds.requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
+                'routing': 'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
                 'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS
             },
             {
                 'nom': self.get_nom_queue_requetes_inter(),
-                'routing': 'inter.requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
+                'routing': 'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
                 'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER
             },
         ]
