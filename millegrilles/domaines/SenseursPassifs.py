@@ -7,6 +7,7 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine, MGPProcessusDemarreur
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
@@ -279,7 +280,7 @@ class TraitementMessageRequete(BaseCallback):
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
-        self._generateur = GenerateurTransaction(gestionnaire.contexte)
+        self._generateur = GenerateurTransaction(gestionnaire.contexte, encodeur_json=MongoJSONEncoder)
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
@@ -289,10 +290,34 @@ class TraitementMessageRequete(BaseCallback):
         print("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
         for requete in message_dict['requetes']:
-            print("Requete: %s" % str(requete))
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
 
         # Genere message reponse
         self.transmettre_reponse(message_dict, resultats, message_dict['retour']['routage'], exchange)
+
+    def executer_requete(self, requete):
+        print("Requete: %s" % str(requete))
+        collection = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        print("Resultats: %s" % str(resultats))
+
+        return resultats
 
     def transmettre_reponse(self, requete, resultats, routing_key_reponse, exchange):
         # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')

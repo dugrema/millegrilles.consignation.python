@@ -3,6 +3,7 @@ import datetime
 import getpass
 import socket
 import re
+import json
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -12,7 +13,8 @@ from millegrilles.SecuritePKI import SignateurTransaction, GestionnaireEvenement
 # Generateur de transaction - peut etre reutilise.
 class GenerateurTransaction:
 
-    def __init__(self, contexte=None):
+    def __init__(self, contexte=None, encodeur_json=json.JSONEncoder):
+        self.encodeur_json = encodeur_json
         if contexte is not None:
             self._contexte = contexte
         else:
@@ -86,7 +88,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key)
+        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key, encoding=self.encodeur_json)
 
         return uuid_transaction
 
@@ -96,7 +98,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key)
+        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key, encoding=self.encodeur_json)
 
         return uuid_transaction
 

@@ -16,6 +16,7 @@ from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 
 class ConstantesSecurityPki:
@@ -79,7 +80,7 @@ class UtilCertificats:
                 self._logger.debug("Enlever cle: %s" % cle)
 
         self._logger.debug("Message nettoye: %s" % str(transaction_temp))
-        message_json = json.dumps(transaction_temp, sort_keys=True, separators=(',', ':'))
+        message_json = json.dumps(transaction_temp, sort_keys=True, separators=(',', ':'), cls=MongoJSONEncoder)
         message_bytes = bytes(message_json, 'utf-8')
 
         return message_bytes
