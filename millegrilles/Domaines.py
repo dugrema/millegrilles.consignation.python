@@ -205,10 +205,12 @@ class GestionnaireDomaine:
         self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_transaction)
 
         if self.get_nom_queue_requetes_noeuds() is not None:
-            self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_requete_noeud)
+            self.message_dao.enregistrer_callback(
+                queue=self.get_nom_queue_requetes_noeuds(), callback=self.traiter_requete_noeud)
 
         if self.get_nom_queue_requetes_inter() is not None:
-            self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_requete_inter)
+            self.message_dao.enregistrer_callback(
+                queue=self.get_nom_queue_requetes_inter(), callback=self.traiter_requete_inter)
 
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """

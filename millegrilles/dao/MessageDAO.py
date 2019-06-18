@@ -28,6 +28,7 @@ class PikaDAO:
 
         self.connectionmq_envoi_async = None
         self.channel_envoi_async = None
+        self._queue_reponse = None
 
         self._actif = False
         self.in_error = True
@@ -192,6 +193,7 @@ class PikaDAO:
     def inscrire_topic(self, exchange, routing: list, callback):
         resultat = self.channel.queue_declare(queue='', exclusive=True)
         nom_queue = resultat.method.queue
+        self._queue_reponse = nom_queue
         print("Resultat creation queue: %s" % nom_queue)
         bindings = routing.copy()
         bindings.append('reponse.%s' % nom_queue)
@@ -461,6 +463,10 @@ class PikaDAO:
 
     def queuename_mgp_processus(self):
         return self.configuration.queue_mgp_processus
+
+    @property
+    def queue_reponse(self):
+        return self._queue_reponse
 
 
 # Classe avec utilitaires pour JSON

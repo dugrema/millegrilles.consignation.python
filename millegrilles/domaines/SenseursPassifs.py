@@ -279,26 +279,30 @@ class TraitementMessageRequete(BaseCallback):
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
+        self._generateur = GenerateurTransaction(gestionnaire.contexte)
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
+        exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        print("Certificat: %s" % str(enveloppe_certificat))
+        resultats = list()
+        for requete in message_dict['requetes']:
+            print("Requete: %s" % str(requete))
 
-        if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
-            # Verifier quel processus demarrer.
-            routing_key_sansprefixe = routing_key.replace(
-                'destinataire.domaine.',
-                ''
-            )
-            if routing_key_sansprefixe == 'mongodb':
-                print("Requete! MongoDB! %s" % str(message_dict))
-            else:
-                # Type de transaction inconnue, on lance une exception
-                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-        else:
-            # Type d'evenement inconnu, on lance une exception
-            raise ValueError("Type d'evenement inconnu: %s" % evenement)
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, message_dict['retour']['routage'], exchange)
+
+    def transmettre_reponse(self, requete, resultats, routing_key_reponse, exchange):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        message_resultat = {
+            'resultats': resultats,
+            'uuid-requete': requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+        }
+
+        enveloppe_reponse = self._generateur.preparer_enveloppe(message_resultat, 'millegrilles.domaines.SenseursPassifs.reponse')
+        self._generateur.transmettre_reponse(enveloppe_reponse, routing_key_reponse, exchange)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.

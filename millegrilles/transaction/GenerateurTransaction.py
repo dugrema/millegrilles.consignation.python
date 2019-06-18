@@ -80,6 +80,26 @@ class GenerateurTransaction:
 
         return message_signe
 
+    def transmettre_requete(self, message_dict, routing_key, exchange):
+
+        uuid_transaction = message_dict.get(
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+
+        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key)
+
+        return uuid_transaction
+
+    def transmettre_reponse(self, message_dict, routing_key, exchange):
+
+        uuid_transaction = message_dict.get(
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+
+        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key)
+
+        return uuid_transaction
+
 
 class TransactionOperations:
 
