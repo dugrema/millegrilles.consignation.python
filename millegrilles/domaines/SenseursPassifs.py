@@ -279,6 +279,7 @@ class TraitementMessageRequete(BaseCallback):
 
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.contexte)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._gestionnaire = gestionnaire
         self._generateur = GenerateurTransaction(gestionnaire.contexte, encodeur_json=MongoJSONEncoder)
 
@@ -287,7 +288,7 @@ class TraitementMessageRequete(BaseCallback):
         exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
-        print("Certificat: %s" % str(enveloppe_certificat))
+        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
         for requete in message_dict['requetes']:
             resultat = self.executer_requete(requete)
@@ -297,7 +298,7 @@ class TraitementMessageRequete(BaseCallback):
         self.transmettre_reponse(message_dict, resultats, message_dict['retour']['routage'], exchange)
 
     def executer_requete(self, requete):
-        print("Requete: %s" % str(requete))
+        self._logger.debug("Requete: %s" % str(requete))
         collection = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_NOM)
         filtre = requete.get('filtre')
         projection = requete.get('projection')
@@ -315,7 +316,7 @@ class TraitementMessageRequete(BaseCallback):
         for resultat in curseur:
             resultats.append(resultat)
 
-        print("Resultats: %s" % str(resultats))
+        self._logger.debug("Resultats: %s" % str(resultats))
 
         return resultats
 

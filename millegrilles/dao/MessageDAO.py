@@ -20,6 +20,7 @@ Connection a un moteur de messagerie via Pika.
 class PikaDAO:
 
     def __init__(self, configuration):
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._lock_transmettre_message = Lock()
 
         self.configuration = configuration
@@ -194,13 +195,13 @@ class PikaDAO:
         resultat = self.channel.queue_declare(queue='', exclusive=True)
         nom_queue = resultat.method.queue
         self._queue_reponse = nom_queue
-        print("Resultat creation queue: %s" % nom_queue)
+        self._logger.debug("Resultat creation queue: %s" % nom_queue)
         bindings = routing.copy()
         bindings.append('reponse.%s' % nom_queue)
         for routing_key in bindings:
             self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key)
         tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
-        print("Tag queue: %s" % tag_queue)
+        self._logger.debug("Tag queue: %s" % tag_queue)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
