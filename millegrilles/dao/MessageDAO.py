@@ -254,7 +254,8 @@ class PikaDAO:
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
                 body=message_utf8,
-                properties=pika.BasicProperties(delivery_mode=delivery_mode_v))
+                properties=pika.BasicProperties(delivery_mode=delivery_mode_v),
+                mandatory=True)
         self.in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction):
