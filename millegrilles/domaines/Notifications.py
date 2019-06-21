@@ -14,8 +14,8 @@ import datetime
 class NotificationsConstantes:
 
     QUEUE_SUFFIXE = 'millegrilles.domaines.Notifications'
-    COLLECTION_NOM = QUEUE_SUFFIXE
-    COLLECTION_DONNEES_NOM = '%s/%s' % (COLLECTION_NOM, 'donnees')
+    COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
 
     TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Notifications.actionUsager'
 
@@ -54,7 +54,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         return NotificationsConstantes.QUEUE_SUFFIXE
 
     def get_nom_collection(self):
-        return NotificationsConstantes.COLLECTION_NOM
+        return NotificationsConstantes.COLLECTION_DOCUMENTS_NOM
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
@@ -99,7 +99,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         )
 
     def verifier_notifications_actionsdues(self, message):
-        collection_notifications = self.document_dao.get_collection(NotificationsConstantes.COLLECTION_NOM)
+        collection_notifications = self.document_dao.get_collection(NotificationsConstantes.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {
             'date_attente_action': {'$lt': datetime.datetime.utcnow()}
@@ -187,7 +187,7 @@ class ProcessusNotificationRecue(MGProcessus):
     def sauvegarder_notification(self):
         parametres = self.parametres
         self._logger.debug("sauvegarder_notification %s" % (str(parametres)))
-        collection = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_NOM)
+        collection = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_DOCUMENTS_NOM)
 
         nouveaux_documents_notification = []
 
@@ -332,8 +332,8 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
     def initiale(self):
         parametres = self.parametres
-        transaction = self.charger_transaction(NotificationsConstantes.COLLECTION_DONNEES_NOM)
-        collection_notifications = self.contexte.document_dao.get_collection(NotificationsConstantes.COLLECTION_NOM)
+        transaction = self.charger_transaction(NotificationsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_notifications = self.contexte.document_dao.get_collection(NotificationsConstantes.COLLECTION_DOCUMENTS_NOM)
 
         self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
         self._logger.debug("Message de l'action usager: %s" % str(transaction))

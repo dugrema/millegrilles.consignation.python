@@ -15,8 +15,8 @@ from cryptography.hazmat.backends import default_backend
 class ConstantesPki:
 
     DOMAINE_NOM = 'millegrilles.domaines.Pki'
-    COLLECTION_NOM = ConstantesSecurityPki.COLLECTION_NOM
-    COLLECTION_DONNEES_NOM = '%s/donnees' % ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_TRANSACTIONS_NOM = ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % ConstantesSecurityPki.COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
@@ -140,7 +140,7 @@ class GestionnairePki(GestionnaireDomaine):
         return ConstantesPki.QUEUE_NOM
 
     def get_nom_collection(self):
-        return ConstantesPki.COLLECTION_NOM
+        return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
 
     def initialiser_mgca(self):
         """ Initialise les root CA """
@@ -203,7 +203,7 @@ class PKIDocumentHelper:
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
         }
 
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         if upsert:
             collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=upsert)
         else:
@@ -225,7 +225,7 @@ class PKIDocumentHelper:
             filtre[ConstantesPki.LIBELLE_SUBJECT_KEY] = subject
 
         # Lire les certificats et les charger dans des enveloppes
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         curseur = collection.find(filtre)
         liste_certificats = list()
         for certificat in curseur:
@@ -248,7 +248,7 @@ class PKIDocumentHelper:
         if authority_key is not None:
             filtre[ConstantesPki.LIBELLE_AUTHORITY_KEY] = authority_key
 
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         curseur = collection.find(filtre)
         fingerprints = list()
         for certificat in curseur:
@@ -269,7 +269,7 @@ class PKIDocumentHelper:
             }
         }
 
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         collection.update(filtre, operation, multi=True)
 
 
@@ -317,12 +317,12 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.charger_transaction(ConstantesPki.COLLECTION_DONNEES_NOM)
+        transaction = self.charger_transaction(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         fingerprint = transaction['fingerprint']
         self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
         # Verifier si on a deja les certificats
-        collection = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_NOM)
+        collection = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         certificat_existant = collection.find_one({'fingerprint': fingerprint})
 
         if certificat_existant is None:

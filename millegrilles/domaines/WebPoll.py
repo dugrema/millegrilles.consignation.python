@@ -18,8 +18,8 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 class WebPollConstantes:
 
     QUEUE_NOM = 'millegrilles.domaines.WebPoll'
-    COLLECTION_NOM = QUEUE_NOM
-    COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
+    COLLECTION_TRANSACTIONS_NOM = QUEUE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
 
     # Document de configuration de reference s'il n'existe pas deja
     # Se document se trouve dans la collection millegrilles.domaines.WebPoll, _mg-libelle: configuration.
@@ -110,7 +110,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         )
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_NOM)
+        collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_DOCUMENTS_NOM)
 
         # Trouver le document de configuration
         document_configuration = collection_webpoll.find_one(
@@ -194,7 +194,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
                         '$set': {'web_lastmodified.%s' % tache: resultat['last-modified']}
                     }
                     self._logger.debug("Update document configuration web_lastmodified: %s, %s" % (filtre, operations))
-                    collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_NOM)
+                    collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_DOCUMENTS_NOM)
                     collection_webpoll.update_one(filtre, operations)
 
             except Exception as e:
@@ -219,7 +219,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         return resultat
 
     def get_document_configuration(self):
-        collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_NOM)
+        collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_DOCUMENTS_NOM)
 
         # Trouver le document de configuration
         document_configuration = collection_webpoll.find_one(
@@ -229,7 +229,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         return document_configuration
 
     def get_nom_collection(self):
-        return WebPollConstantes.COLLECTION_NOM
+        return WebPollConstantes.COLLECTION_DOCUMENTS_NOM
 
 
 class TraitementMessageWebPoll(BaseCallback):

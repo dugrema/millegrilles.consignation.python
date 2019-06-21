@@ -13,8 +13,8 @@ import logging
 class RapportsConstantes:
 
     DOMAINE_NOM = 'millegrilles.domaines.Rapports'
-    COLLECTION_NOM = DOMAINE_NOM
-    COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = 'millegrilles.domaines.Rapports'
 
 
@@ -51,7 +51,7 @@ class GestionnaireRapports(GestionnaireDomaine):
         )
 
         # Creer index _mg-libelle
-        collection_domaine = self.document_dao.get_collection(RapportsConstantes.COLLECTION_NOM)
+        collection_domaine = self.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.create_index([
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
@@ -122,7 +122,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
     def initiale(self):
         parametres = self.parametres
         self._logger.debug('Rapport RSS processing, parametres: %s' % parametres)
-        doc_transaction = self.charger_transaction(RapportsConstantes.COLLECTION_DONNEES_NOM)
+        doc_transaction = self.charger_transaction(RapportsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
         # Faire le rapport
         url = doc_transaction['url']
@@ -160,7 +160,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
             '$setOnInsert': filtre
         }
 
-        collection_rapports = self.contexte.document_dao.get_collection(RapportsConstantes.COLLECTION_NOM)
+        collection_rapports = self.contexte.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
         collection_rapports.update_one(filtre, operations, upsert=True)
 
         self._logger.debug("Previsions: %s" % str(operation_set))

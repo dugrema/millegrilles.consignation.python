@@ -12,8 +12,8 @@ class ConstantesPrincipale:
     """ Constantes pour le domaine de l'interface principale """
 
     DOMAINE_NOM = 'millegrilles.domaines.Principale'
-    COLLECTION_NOM = DOMAINE_NOM
-    COLLECTION_DONNEES_NOM = '%s/donnees' % COLLECTION_NOM
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = 'millegrilles.domaines.Principale'
 
     LIBVAL_CONFIGURATION = 'configuration'
@@ -104,7 +104,7 @@ class GestionnairePrincipale(GestionnaireDomaine):
 
     def initialiser_document(self, mg_libelle, doc_defaut):
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
 
         # Trouver le document de configuration
         document_configuration = collection_domaine.find_one(
@@ -164,12 +164,12 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_DONNEES_NOM)
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
 
         ts_alerte = transaction['alerte']['ts']
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
         operation = {'$pull': {'alertes': {'ts': ts_alerte}}}
@@ -187,7 +187,7 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_DONNEES_NOM)
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
 
         if transaction.get('message') is None:
             raise ValueError("L'alerte doit avoir un element 'message'")
@@ -196,7 +196,7 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
             transaction['ts'] = int(datetime.datetime.utcnow().timestamp() * 1000)
 
         # Ajouter au document d'alerte
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_NOM)
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
         operation = {'$push': {'alertes': transaction}}
