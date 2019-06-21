@@ -35,9 +35,9 @@ class TestEnvoyerRequete:
                     }
                 }
             ],
-            'retour': {
-                "routage": "reponse.%s" % message_dao.queue_reponse
-            }
+            # 'retour': {
+            #     "routage": "reponse.%s" % message_dao.queue_reponse
+            # }
         }
 
         # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')

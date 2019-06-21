@@ -15,7 +15,7 @@ class AfficheurSenseurPassifTemperatureHumiditePressionTest(AfficheurSenseurPass
 
         self.document_ids = ['5bf98475a9f65540c1bcc016']
 
-        super().__init__(self.configuration, self.document_dao, document_ids=self.document_ids, intervalle_secs=5)
+        super().__init__(self.configuration, self.document_dao, senseur_ids=self.document_ids, intervalle_secs=5)
 
     def test(self):
         for document_id in self.get_documents():

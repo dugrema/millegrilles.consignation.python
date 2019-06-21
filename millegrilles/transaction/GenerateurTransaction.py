@@ -82,13 +82,19 @@ class GenerateurTransaction:
 
         return message_signe
 
-    def transmettre_requete(self, message_dict, routing_key, exchange):
+    def transmettre_requete(self, message_dict, domaine, exchange):
 
-        uuid_transaction = message_dict.get(
+        enveloppe = message_dict.copy()
+        enveloppe['retour'] = {
+                "routage": "reponse.%s" % self._contexte.message_dao.queue_reponse
+            }
+        enveloppe = self.preparer_enveloppe(enveloppe, '%s.requete' % domaine)
+        uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key, encoding=self.encodeur_json)
+        routing_key = 'requete.%s' % domaine
+        self._contexte.message_dao.transmettre_message_noeuds(enveloppe, routing_key, encoding=self.encodeur_json)
 
         return uuid_transaction
 

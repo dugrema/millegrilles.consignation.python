@@ -12,8 +12,17 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
         contexte.initialiser(init_document=False)
         super().__init__(contexte, intervalle_secs=5)
 
+    def liste_senseurs(self):
+        return [2, 3, "17"]
+
     def get_filtre(self):
-        return ["5c42605524fb4ce929db094e"]
+        filtre = {
+            "_mg-libelle": "senseur.individuel",
+            "senseur": {
+                "$in": [int(senseur) for senseur in self.liste_senseurs()]
+            }
+        }
+        return filtre
 
     def test(self):
         for document_id in self.get_documents():

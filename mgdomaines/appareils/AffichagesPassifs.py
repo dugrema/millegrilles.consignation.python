@@ -10,6 +10,7 @@ from threading import Thread, Event
 from millegrilles import Constantes
 from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
 from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 # Affichage qui se connecte a un ou plusieurs documents et recoit les changements live
@@ -22,11 +23,13 @@ class AfficheurDocumentMAJDirecte:
         self._intervalle_secs = intervalle_secs
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
+        self._generateur = GenerateurTransaction(contexte)  # Transmet requete de documents
 
         # self._collection = None
         # self._curseur_changements = None  # Si None, on fonctionne par timer
         # self._watch_desactive = False  # Si true, on utilise watch. Sinon on utilise le timer
         self._thread_maj_document = None
+        self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
 
         self.traitement_callback = None
 
@@ -61,9 +64,13 @@ class AfficheurDocumentMAJDirecte:
         self.charger_documents()  # Charger une version initiale des documents
 
     def charger_documents(self):
-        # Sauvegarder la version la plus recente de chaque document
-        filtre = self.get_filtre()
-        # A FAIRE
+        # Charger la version la plus recente de chaque document
+        requete = {'requetes': [{
+            'type': 'mongodb',
+            "filtre": self.get_filtre()
+        }]}
+        self._generateur.transmettre_requete(requete, 'millegrilles.domaines.SenseursPassifs',
+                                             Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS)
 
     def get_documents(self):
         return self._documents
@@ -89,9 +96,9 @@ class AfficheurDocumentMAJDirecte:
 # pour quelques senseurs passifs.
 class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDirecte):
 
-    def __init__(self, contexte, document_ids, intervalle_secs=30):
+    def __init__(self, contexte, senseur_ids, intervalle_secs=30):
         super().__init__(contexte, intervalle_secs)
-        self._document_ids = document_ids
+        self._senseur_ids = senseur_ids
         self._thread_affichage = None
         self._thread_horloge = None
         self._horloge_event = Event()  # Evenement pour synchroniser l'heure
@@ -101,7 +108,13 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         return self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
 
     def get_filtre(self):
-        return self._document_ids
+        filtre = {
+            "_mg-libelle": "senseur.individuel",
+            "senseur": {
+                "$in": [int(senseur) for senseur in self._senseur_ids]
+            }
+        }
+        return filtre
 
     def start(self):
         super().start()  # Demarre thread de lecture de documents
@@ -214,12 +227,29 @@ class DocumentCallback(BaseCallback):
 
     def __init__(self, contexte, documents, liste_ids):
         super().__init__(contexte)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.documents = documents
         self.liste_ids = liste_ids
 
     def traiter_message(self, ch, method, properties, body):
         message_json = self.decoder_message_json(body)
+        routing_key = method.routing_key
 
-        doc_id = message_json.get("_id")
-        if doc_id in self.liste_ids:
-            self.documents[doc_id] = message_json
+        self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, str(message_json)))
+
+        # Determiner type de message
+        documents = list()
+        if routing_key == 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents':
+            # Probablement une mise a jour d'un document existant
+            documents = [message_json]
+            document_keys = self.documents.keys()
+            for document in documents:
+                doc_id = document.get("_id")
+                if doc_id in document_keys:
+                    self.__logger.debug("Accepte document _id:%s" % doc_id)
+                    self.documents[doc_id] = document
+        elif routing_key.split('.')[0:2] == ['reponse', 'amq']:
+            for reponse in message_json.get('resultats'):
+                for document in reponse:
+                    documents.append(document)
+                    self.documents[document.get('_id')] = document
