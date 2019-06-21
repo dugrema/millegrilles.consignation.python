@@ -165,6 +165,6 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         nom_collection = None
         if domaine_split[0] == 'millegrilles' and domaine_split[1] == 'domaines':
-            nom_collection = '%s/%s' % ('.'.join(domaine_split[0:3]), 'donnees')
+            nom_collection = '.'.join(domaine_split[0:3])
 
         return nom_collection
