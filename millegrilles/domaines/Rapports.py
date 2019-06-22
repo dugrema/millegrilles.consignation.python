@@ -15,6 +15,7 @@ class RapportsConstantes:
     DOMAINE_NOM = 'millegrilles.domaines.Rapports'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = 'millegrilles.domaines.Rapports'
 
 
@@ -70,6 +71,12 @@ class GestionnaireRapports(GestionnaireDomaine):
     def get_nom_queue(self):
         return RapportsConstantes.QUEUE_NOM
 
+    def get_collection_transaction_nom(self):
+        return RapportsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return RapportsConstantes.COLLECTION_PROCESSUS_NOM
+
     def declencher_processus_persistance(self, routing_key, evenement):
         routing_key_list = routing_key.split('.')
 
@@ -79,6 +86,9 @@ class GestionnaireRapports(GestionnaireDomaine):
                 parametres = evenement.copy()
                 parametres['type_rapport'] = routing_key_list[-1]
                 self.demarrer_processus(nom_processus, parametres)
+
+    def get_nom_domaine(self):
+        return RapportsConstantes.DOMAINE_NOM
 
 
 class TraitementMessageRapports(BaseCallback):

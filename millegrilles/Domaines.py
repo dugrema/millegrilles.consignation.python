@@ -2,7 +2,7 @@
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
-from millegrilles.MGProcessus import MGPProcessusDemarreur
+from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
@@ -178,14 +178,19 @@ class GestionnaireDomaine:
         self.channel_mq = None
         self._arret_en_cours = False
         self._stop_event = Event()
+        self.traitement_evenements = None
 
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     def configurer(self):
+        self.traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte)
+        self.traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
-        self.demarreur_processus = MGPProcessusDemarreur(self.contexte)
+        self.demarreur_processus = MGPProcessusDemarreur(
+            self.contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
+            self.get_collection_processus_nom(), self.traitement_evenements)
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
@@ -202,6 +207,7 @@ class GestionnaireDomaine:
     ''' Demarre le traitement des messages pour le domaine '''
     def enregistrer_queue(self, queue_name):
         self._logger.info("Enregistrement queue %s" % queue_name)
+
         self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_transaction)
 
         if self.get_nom_queue_requetes_noeuds() is not None:
@@ -235,6 +241,15 @@ class GestionnaireDomaine:
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
     def traiter_cedule(self, message):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
+    def get_collection_transaction_nom(self):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
+    def get_collection_processus_nom(self):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
+    def get_nom_domaine(self):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
     ''' Arrete le traitement des messages pour le domaine '''

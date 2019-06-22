@@ -17,9 +17,11 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 
 class WebPollConstantes:
 
-    QUEUE_NOM = 'millegrilles.domaines.WebPoll'
+    DOMAINE_NOM = 'millegrilles.domaines.WebPoll'
+    QUEUE_NOM = DOMAINE_NOM
     COLLECTION_TRANSACTIONS_NOM = QUEUE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
 
     # Document de configuration de reference s'il n'existe pas deja
     # Se document se trouve dans la collection millegrilles.domaines.WebPoll, _mg-libelle: configuration.
@@ -137,8 +139,14 @@ class GestionnaireWebPoll(GestionnaireDomaine):
     def get_nom_queue(self):
         return WebPollConstantes.QUEUE_NOM
 
-    ''' Traite les evenements sur cedule. '''
+    def get_collection_transaction_nom(self):
+        return WebPollConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return WebPollConstantes.COLLECTION_PROCESSUS_NOM
+
     def traiter_cedule(self, evenement):
+        """ Traite les evenements sur cedule. """
         indicateurs = evenement['indicateurs']
         self._logger.debug("Cedule webPoll: %s" % str(indicateurs))
 
@@ -230,6 +238,9 @@ class GestionnaireWebPoll(GestionnaireDomaine):
 
     def get_nom_collection(self):
         return WebPollConstantes.COLLECTION_DOCUMENTS_NOM
+
+    def get_nom_domaine(self):
+        return WebPollConstantes.DOMAINE_NOM
 
 
 class TraitementMessageWebPoll(BaseCallback):

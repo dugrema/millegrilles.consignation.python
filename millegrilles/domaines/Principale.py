@@ -14,6 +14,7 @@ class ConstantesPrincipale:
     DOMAINE_NOM = 'millegrilles.domaines.Principale'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = 'millegrilles.domaines.Principale'
 
     LIBVAL_CONFIGURATION = 'configuration'
@@ -102,6 +103,12 @@ class GestionnairePrincipale(GestionnaireDomaine):
     def get_nom_queue(self):
         return ConstantesPrincipale.QUEUE_NOM
 
+    def get_collection_transaction_nom(self):
+        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
+
     def initialiser_document(self, mg_libelle, doc_defaut):
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
         collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
@@ -122,6 +129,9 @@ class GestionnairePrincipale(GestionnaireDomaine):
             collection_domaine.insert(configuration_initiale)
         else:
             self._logger.info("Document de %s pour principale: %s" % (mg_libelle, str(document_configuration)))
+
+    def get_nom_domaine(self):
+        return ConstantesPrincipale.DOMAINE_NOM
 
 
 class TraitementMessagePrincipale(BaseCallback):

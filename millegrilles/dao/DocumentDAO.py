@@ -84,8 +84,8 @@ class MongoDAO:
             id_doc = ObjectId(id_doc)
         return self.get_collection(collection).find_one({Constantes.MONGO_DOC_ID: id_doc})
 
-    def charger_processus_par_id(self, id_doc):
-        return self._collection_processus.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
+    def charger_processus_par_id(self, id_doc, collection):
+        return self.get_collection(collection).find_one({Constantes.MONGO_DOC_ID: ObjectId(id_doc)})
 
     def processus_helper(self):
         return self._processus_document_helper

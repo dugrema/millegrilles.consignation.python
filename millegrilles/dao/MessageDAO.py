@@ -347,7 +347,7 @@ class PikaDAO:
     :param dict_parametres: (Optionnel) Parametres a utiliser pour la prochaine etape du processus.
     '''
 
-    def transmettre_evenement_mgpprocessus(self, id_document, nom_processus, nom_etape='initiale'):
+    def transmettre_evenement_mgpprocessus(self, nom_domaine: str, id_document, nom_processus, nom_etape='initiale'):
         message = {
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(id_document),
             Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: nom_processus,
@@ -356,9 +356,12 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        routing_key = 'mgpprocessus.%s.%s' % \
-                      (nom_processus,
-                       nom_etape)
+        # routing_key = 'mgpprocessus.%s.%s' % \
+        #               (nom_processus,
+        #                nom_etape)
+
+        routing_key = 'processus.domaine.%s.%s.%s' % \
+                      (nom_domaine, nom_processus, nom_etape)
 
         with self._lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_middleware,

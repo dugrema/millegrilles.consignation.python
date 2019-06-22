@@ -1,6 +1,8 @@
 # Module de processus pour MilleGrilles
-import signal
 import logging
+import datetime
+
+from bson.objectid import ObjectId
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
@@ -18,26 +20,59 @@ class MGPProcessusControleur(ModeleConfiguration):
 
     def __init__(self):
         super().__init__()
-        self._json_helper = JSONHelper()
-        self._message_handler = None
+        # self._json_helper = JSONHelper()
+        # self._message_handler = None
 
-    def initialiser(self, init_document=True, init_message=True, connecter=True):
+        self._traitement_evenements = None
+
+    def initialiser(self, init_message=True, init_document=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
         # Executer la configuration pour RabbitMQ
         self._contexte.message_dao.configurer_rabbitmq()
-        self._message_handler = MGControlleurMessageHandler(self.contexte, self)
+        # self._message_handler = MGControlleurMessageHandler(self.contexte, self)
+        #
+        # # Configuration pour les processus
+        # collection = self.document_dao().get_collection(Constantes.DOCUMENT_COLLECTION_PROCESSUS)
+        # collection.create_index([
+        #     (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
+        #     (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
+        #     (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+        # ])
 
-        # Configuration pour les processus
-        collection = self.document_dao().get_collection(Constantes.DOCUMENT_COLLECTION_PROCESSUS)
-        collection.create_index([
-            (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
-            (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
-            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
-        ])
+        self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte)
 
     def executer(self):
         """ Methode qui demarre la lecture des evenements sur la Q de processus. """
-        self.contexte.message_dao.demarrer_lecture_etape_processus(self._message_handler.callbackAvecAck)
+        self.contexte.message_dao.demarrer_lecture_etape_processus(self._traitement_evenements.callbackAvecAck)
+
+    def document_dao(self):
+        return self.contexte.document_dao
+
+    def message_dao(self):
+        return self.contexte.message_dao
+
+    @property
+    def contexte(self):
+        return self._contexte
+
+
+class MGPProcesseurTraitementEvenements(BaseCallback):
+
+    def __init__(self, contexte):
+        super().__init__(contexte)
+
+        self._json_helper = JSONHelper()
+        self._contexte = contexte
+
+    def initialiser(self, collection_processus_noms: list):
+        # Configuration pour les processus
+        for collection_processus_nom in collection_processus_noms:
+            collection = self._contexte.document_dao.get_collection(collection_processus_nom)
+            collection.create_index([
+                (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
+                (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
+                (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+            ])
 
     def extraire_evenement(self, message_body):
         """
@@ -78,28 +113,106 @@ class MGPProcessusControleur(ModeleConfiguration):
     def charger_transaction_par_id(self, id_transaction, nom_collection):
         return self.contexte.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
 
-    def charger_document_processus(self, id_document_processus):
-        return self.contexte.document_dao.charger_processus_par_id(id_document_processus)
+    def charger_document_processus(self, id_document_processus, nom_collection):
+        return self.contexte.document_dao.charger_processus_par_id(
+            id_document_processus, nom_collection)
 
-    def sauvegarder_etape_processus(self, id_document_processus, dict_etape, etape_suivante=None):
-        helper = self.contexte.document_dao.processus_helper()
-        helper.sauvegarder_etape_processus(id_document_processus, dict_etape, etape_suivante)
+    def sauvegarder_etape_processus(self, collection_processus_nom, id_document_processus, dict_etape,
+                                    etape_suivante=None):
+        """
+        Modifie un document de processus en ajoutant l'information de l'etape a la suite des autres etapes
+        dans la liste du processus.
+
+        :param collection_processus_nom: Nom de la collection mongo des processus pour le domaine
+        :param id_document_processus: _id du document dans la collection processus.
+        :param dict_etape: Dictionnaire complet a ajoute a la file des autres etapes.
+        :param etape_suivante:
+        """
+        collection_processus = self._contexte.document_dao.get_collection(collection_processus_nom)
+
+        # Convertir id_document_process en ObjectId
+        if isinstance(id_document_processus, ObjectId):
+            id_document = {Constantes.MONGO_DOC_ID: id_document_processus}
+        else:
+            id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
+
+        doc_etape = dict_etape.copy()
+        doc_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_DATEEXECUTION] = datetime.datetime.utcnow()
+
+        # print("$push vers mongo: %s --- %s" % (id_document, str(dict_etape)))
+        set_operation = {}
+        operation = {
+            '$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: doc_etape},
+        }
+        if etape_suivante is None:
+            operation['$unset'] = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: ''}
+        else:
+            set_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE] = etape_suivante
+
+        dict_etapes_parametres = dict_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES)
+        if dict_etapes_parametres is not None:
+            for key, value in dict_etapes_parametres.items():
+                complete_key = 'parametres.%s' % key
+                set_operation[complete_key] = value
+
+        if len(set_operation) > 0:
+            operation['$set'] = set_operation
+
+        # Conserver la date de mise a jour
+        operation['$currentDate'] = {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+
+        resultat = collection_processus.update_one(id_document, operation)
+
+        if resultat.modified_count != 1:
+            raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
         self.contexte.message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
-
-    def processus_helper(self):
-        return self.contexte.document_dao.processus_helper()
 
     def preparer_document_helper(self, collection, classe):
         helper = classe(self.contexte.document_dao.get_collection(collection))
         return helper
 
-    def document_dao(self):
-        return self.contexte.document_dao
+    '''
+    Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
+    '''
+    def traiter_message(self, ch, method, properties, body):
 
-    def message_dao(self):
-        return self.contexte.message_dao
+        id_doc_processus = None
+        try:
+            # Decoder l'evenement qui contient l'information sur l'etape a traiter
+            evenement_dict = self.extraire_evenement(body)
+            id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
+            logging.debug("Recu evenement processus: %s" % str(evenement_dict))
+            self.traiter_evenement(evenement_dict)
+        except Exception as e:
+            # Mettre le message d'erreur sur la Q erreur processus
+            self.erreur_fatale(id_doc_processus, str(body), e)
+
+    '''
+    Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
+
+    :param parametres: Parametres pour l'etape initiale.
+    :returns: _id du nouveau document de processus
+    '''
+
+    def sauvegarder_initialisation_processus(self, collection_processus, moteur, nom_processus, parametres):
+        document = {
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_MOTEUR: moteur,
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: 'initiale',
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: [
+                {
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE: 'orientation',
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES: parametres,
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_DATEEXECUTION: datetime.datetime.utcnow()
+                }
+            ]
+        }
+        doc_id = collection_processus.insert_one(document)
+        return doc_id.inserted_id
 
     @property
     def contexte(self):
@@ -121,28 +234,28 @@ class MGPProcessusControleur(ModeleConfiguration):
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
 
-class MGControlleurMessageHandler(BaseCallback):
-
-    def __init__(self, contexte, controleur):
-        super().__init__(contexte)
-        self._contexte = contexte
-        self._controleur = controleur
-
-    '''
-    Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
-    '''
-    def traiter_message(self, ch, method, properties, body):
-
-        id_doc_processus = None
-        try:
-            # Decoder l'evenement qui contient l'information sur l'etape a traiter
-            evenement_dict = self._controleur.extraire_evenement(body)
-            id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
-            logging.debug("Recu evenement processus: %s" % str(evenement_dict))
-            self._controleur.traiter_evenement(evenement_dict)
-        except Exception as e:
-            # Mettre le message d'erreur sur la Q erreur processus
-            self._controleur.erreur_fatale(id_doc_processus, str(body), e)
+# class MGControlleurMessageHandler(BaseCallback):
+#
+#     def __init__(self, contexte, controleur):
+#         super().__init__(contexte)
+#         self._contexte = contexte
+#         self._controleur = controleur
+#
+#     '''
+#     Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
+#     '''
+#     def traiter_message(self, ch, method, properties, body):
+#
+#         id_doc_processus = None
+#         try:
+#             # Decoder l'evenement qui contient l'information sur l'etape a traiter
+#             evenement_dict = self._controleur.extraire_evenement(body)
+#             id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
+#             logging.debug("Recu evenement processus: %s" % str(evenement_dict))
+#             self._controleur.traiter_evenement(evenement_dict)
+#         except Exception as e:
+#             # Mettre le message d'erreur sur la Q erreur processus
+#             self._controleur.erreur_fatale(id_doc_processus, str(body), e)
 
 
 class MGProcessus:
@@ -153,7 +266,7 @@ class MGProcessus:
     :param controleur: Controleur de processus qui appelle l'etape
     :param evenement: Message recu qui a declenche l'execution de cette etape
     """
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement):
         if controleur is None or evenement is None:
             raise Exception('controleur et evenement ne doivent pas etre None')
 
@@ -220,7 +333,8 @@ class MGProcessus:
         try:
             # Charger le document du processus
             id_document_processus = self._evenement[Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS]
-            self._document_processus = self._controleur.charger_document_processus(id_document_processus)
+            self._document_processus = self._controleur.charger_document_processus(
+                id_document_processus, self.get_collection_processus_nom())
 
             # Executer l'etape
             etape_execution = self._identifier_etape_courante()
@@ -234,8 +348,8 @@ class MGProcessus:
             if resultat is not None:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
 
-            helper = self._controleur.processus_helper()
-            helper.sauvegarder_etape_processus(id_document_processus, document_etape, self._etape_suivante)
+            self._controleur.sauvegarder_etape_processus(
+                self.get_collection_processus_nom(), id_document_processus, document_etape, self._etape_suivante)
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
             if not self._processus_complete:
@@ -296,6 +410,12 @@ class MGProcessus:
         """
         return self._document_processus['parametres']
 
+    def get_collection_transaction_nom(self):
+        raise NotImplementedError("Pas implemente")
+
+    def get_collection_processus_nom(self):
+        raise NotImplementedError("Pas implemente")
+
 
 # Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
 # comme ayant ete completee.
@@ -349,11 +469,15 @@ class MGProcessusTransaction(MGProcessus):
 # Classe qui sert a demarrer un processus
 class MGPProcessusDemarreur:
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, nom_domaine: str, collection_transaction_nom: str, collection_processus_nom: str,
+                 traitement_processus: MGPProcesseurTraitementEvenements):
         self._contexte = contexte
         self._json_helper = JSONHelper()
 
-        self._processus_helper = ProcessusHelper(self.contexte.document_dao._mg_database)
+        self._nom_domaine = nom_domaine
+        self._collection_transaction_nom = collection_transaction_nom
+        self._collection_processus_nom = collection_processus_nom
+        self._traitement_processus = traitement_processus
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -373,12 +497,12 @@ class MGPProcessusDemarreur:
 
         try:
             # On va declencher un nouveau processus
-            id_doc_processus = self._processus_helper.sauvegarder_initialisation_processus(
-                moteur, processus_a_declencher, dictionnaire_evenement)
+            collection_processus = self.contexte.document_dao.get_collection(self._collection_processus_nom)
+            id_doc_processus = self._traitement_processus.sauvegarder_initialisation_processus(
+                collection_processus, moteur, processus_a_declencher, dictionnaire_evenement)
 
             self.contexte.message_dao.transmettre_evenement_mgpprocessus(
-                id_doc_processus,
-                nom_processus=processus_a_declencher
+                self._nom_domaine, id_doc_processus, nom_processus=processus_a_declencher
             )
 
         except Exception as erreur:
@@ -388,6 +512,9 @@ class MGPProcessusDemarreur:
     @property
     def contexte(self):
         return self._contexte
+
+
+
 
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
@@ -410,6 +537,13 @@ class ErreurEtapePasEncoreExecutee(Exception):
 
     def __init__(self, message=None):
         super().__init__(self, message)
+
+
+class ErreurMAJProcessus(Exception):
+
+    def __init__(self, message=None):
+        super().__init__(message=message)
+
 
 # --- MAIN ---
 #

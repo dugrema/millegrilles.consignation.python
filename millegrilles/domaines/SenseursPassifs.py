@@ -20,6 +20,7 @@ class SenseursPassifsConstantes:
     DOMAINE_NOM = 'millegrilles.domaines.SenseursPassifs'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
@@ -86,26 +87,33 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             },
         ]
 
+        channel = self.message_dao.channel
         for queue_config in queues_config:
-            self.message_dao.channel.queue_declare(
+            channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=True)
 
-            self.message_dao.channel.queue_bind(
+            channel.queue_bind(
                 exchange=queue_config['exchange'],
                 queue=queue_config['nom'],
                 routing_key=queue_config['routing']
             )
 
             # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
-            self.message_dao.channel.queue_purge(
+            channel.queue_purge(
                 queue=queue_config['nom']
             )
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_senseurspassifs,
             routing_key='ceduleur.#'
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_senseurspassifs,
+            routing_key='processus.domaine.millegrilles.domaines.SenseursPassifs.#'
         )
 
         # Index collection domaine
@@ -150,7 +158,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
         # de persistance.
         # Toutes les autres transactions non-traitees de SenseursPassifs.Lecture peuvent etre marquees comme traitees.
-        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.contexte)
+        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.contexte, self.demarreur_processus)
         liste_transactions = traitement_backlog_lectures.run_requete_plusrecentetransactionlecture_parsenseur()
         traitement_backlog_lectures.run_requete_genererdeclencheur_parsenseur(liste_transactions)
 
@@ -178,6 +186,15 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
 
     def get_nom_queue_requetes_noeuds(self):
         return SenseursPassifsConstantes.QUEUE_NOEUDS_NOM
+
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
+
+    def get_nom_domaine(self):
+        return SenseursPassifsConstantes.DOMAINE_NOM
 
     ''' Traite les evenements sur cedule. '''
     def traiter_cedule(self, evenement):
@@ -231,6 +248,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
     
      :param domaine: Domaine millegrilles    
      '''
+
     def transmettre_declencheur_domaine(self, domaine, dict_message):
         routing_key = 'destinataire.domaine.%s' % domaine
         self.message_dao.transmettre_message(dict_message, routing_key)
@@ -247,7 +265,11 @@ class TraitementMessageLecture(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
-        if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
+            # Chaining vers le gestionnaire de processus du domaine
+            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+
+        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer.
             routing_key_sansprefixe = routing_key.replace(
                 'destinataire.domaine.',
@@ -272,7 +294,7 @@ class TraitementMessageLecture(BaseCallback):
             self._gestionnaire.traiter_cedule(message_dict)
         else:
             # Type d'evenement inconnu, on lance une exception
-            raise ValueError("Type d'evenement inconnu: %s" % evenement)
+            raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
 
 
 class TraitementMessageRequete(BaseCallback):
@@ -897,10 +919,16 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
         # Terminer ce processus
         self.set_etape_suivante()
 
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
+
 
 class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: GestionnaireSenseursPassifs, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -925,6 +953,12 @@ class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
             producteur.calculer_aggregation_journee(doc_senseur)
 
         self.set_etape_suivante()  # Rien a faire, etape finale
+
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
 
 
 class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
@@ -956,14 +990,21 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
 
         self.set_etape_suivante()  # Rien a faire, etape finale
 
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
+
 
 class TraitementBacklogLecturesSenseursPassifs:
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, demarreur_processus):
         self._contexte = contexte
         self._logger = logging.getLogger('%s.TraitementBacklogLecturesSenseursPassifs' % __name__)
 
-        self.demarreur_processus = MGPProcessusDemarreur(self._contexte)
+        # self.demarreur_processus = MGPProcessusDemarreur(self._contexte)
+        self.demarreur_processus = demarreur_processus
 
     ''' 
     Identifie la transaction de lecture la plus recente pour chaque noeud/senseur. Cherche uniquement dans
@@ -1096,6 +1137,12 @@ class ProcessusMAJNoeudsSenseurPassif(MGProcessus):
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
 
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
+
 
 class ProcessusMajManuelle(MGProcessusTransaction):
     """ Processus de modification d'un senseur par un usager """
@@ -1135,6 +1182,12 @@ class ProcessusMajManuelle(MGProcessusTransaction):
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
         self.set_etape_suivante()  # Termine
+
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
 
 
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):

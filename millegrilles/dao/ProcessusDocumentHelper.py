@@ -13,7 +13,8 @@ Classe avec des methodes pour travailler dans la collection 'transactions'
 class ProcessusHelper:
 
     def __init__(self, mongo_database):
-        self._collection_processus = mongo_database[Constantes.DOCUMENT_COLLECTION_PROCESSUS]
+        # self._collection_processus = mongo_database[Constantes.DOCUMENT_COLLECTION_PROCESSUS]
+        pass
 
     '''
     Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
@@ -22,7 +23,7 @@ class ProcessusHelper:
     :returns: _id du nouveau document de processus
     '''
 
-    def sauvegarder_initialisation_processus(self, moteur, nom_processus, parametres):
+    def sauvegarder_initialisation_processus(self, collection_processus, moteur, nom_processus, parametres):
         document = {
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_MOTEUR: moteur,
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus,
@@ -37,7 +38,7 @@ class ProcessusHelper:
                 }
             ]
         }
-        doc_id = self._collection_processus.insert_one(document)
+        doc_id = collection_processus.insert_one(document)
         return doc_id.inserted_id
 
 
@@ -49,7 +50,7 @@ class ProcessusHelper:
     :param dict_etape: Dictionnaire complet a ajoute a la file des autres etapes.
     '''
 
-    def sauvegarder_etape_processus(self, id_document_processus, dict_etape, etape_suivante=None):
+    def sauvegarder_etape_processus(self, collection_processus, id_document_processus, dict_etape, etape_suivante=None):
         # Convertir id_document_process en ObjectId
         if isinstance(id_document_processus, ObjectId):
             id_document = {Constantes.MONGO_DOC_ID: id_document_processus}
@@ -81,7 +82,7 @@ class ProcessusHelper:
         # Conserver la date de mise a jour
         operation['$currentDate'] = {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
 
-        resultat = self._collection_processus.update_one(id_document, operation)
+        resultat = collection_processus.update_one(id_document, operation)
 
         if resultat.modified_count != 1:
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
@@ -91,4 +92,3 @@ class ErreurMAJProcessus(Exception):
 
     def __init__(self, message=None):
         super().__init__(message=message)
-

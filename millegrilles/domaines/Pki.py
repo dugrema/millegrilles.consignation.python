@@ -17,6 +17,7 @@ class ConstantesPki:
     DOMAINE_NOM = 'millegrilles.domaines.Pki'
     COLLECTION_TRANSACTIONS_NOM = ConstantesSecurityPki.COLLECTION_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % ConstantesSecurityPki.COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
@@ -65,12 +66,11 @@ class GestionnairePki(GestionnaireDomaine):
 
         self._pki_document_helper = None
         self._traitement_message = None
-        self.demarreur_processus = MGPProcessusDemarreur(self.contexte)
 
     def configurer(self):
         super().configurer()
-        self._traitement_message = TraitementMessagePki(self)
-        self._pki_document_helper = PKIDocumentHelper(self._contexte)
+        self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
+        self._traitement_message = TraitementMessagePki(self, self._pki_document_helper)
 
         nom_queue_domaine = self.get_nom_queue()
 
@@ -142,6 +142,12 @@ class GestionnairePki(GestionnaireDomaine):
     def get_nom_collection(self):
         return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
 
+    def get_collection_transaction_nom(self):
+        return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPki.COLLECTION_PROCESSUS_NOM
+
     def initialiser_mgca(self):
         """ Initialise les root CA """
         ca_file = self.configuration.mq_cafile
@@ -165,12 +171,16 @@ class GestionnairePki(GestionnaireDomaine):
         # )
         # self.demarrer_processus(processus, dict())
 
+    def get_nom_domaine(self):
+        return ConstantesPki.DOMAINE_NOM
+
 
 class PKIDocumentHelper:
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, mg_processus_demarreur):
         self._contexte = contexte
-        self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
+        # self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
+        self._mg_processus_demarreur = mg_processus_demarreur
 
     def inserer_certificat(self, enveloppe, upsert=False, trusted=False):
         document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
@@ -275,10 +285,11 @@ class PKIDocumentHelper:
 
 class TraitementMessagePki(BaseCallback):
 
-    def __init__(self, gestionnaire):
+    def __init__(self, gestionnaire, pki_document_helper):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
-        self._pki_document_helper = PKIDocumentHelper(gestionnaire.contexte)
+        # self._pki_document_helper = PKIDocumentHelper(gestionnaire.contexte)
+        self._pki_document_helper = pki_document_helper
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
