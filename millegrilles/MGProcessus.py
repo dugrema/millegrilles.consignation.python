@@ -58,11 +58,12 @@ class MGPProcessusControleur(ModeleConfiguration):
 
 class MGPProcesseurTraitementEvenements(BaseCallback):
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, gestionnaire_domaine=None):
         super().__init__(contexte)
 
         self._json_helper = JSONHelper()
         self._contexte = contexte
+        self._gestionnaire_domaine = gestionnaire_domaine
 
     def initialiser(self, collection_processus_noms: list):
         # Configuration pour les processus
@@ -221,6 +222,10 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
     @property
     def configuration(self):
         return self.contexte.configuration
+
+    @property
+    def demarreur_processus(self):
+        return self._gestionnaire_domaine.demarreur_processus
 
     def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
         """

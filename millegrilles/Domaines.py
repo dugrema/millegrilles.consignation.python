@@ -185,7 +185,7 @@ class GestionnaireDomaine:
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     def configurer(self):
-        self.traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte)
+        self.traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte, gestionnaire_domaine=self)
         self.traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         self.demarreur_processus = MGPProcessusDemarreur(

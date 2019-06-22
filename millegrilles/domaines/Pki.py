@@ -74,28 +74,36 @@ class GestionnairePki(GestionnaireDomaine):
 
         nom_queue_domaine = self.get_nom_queue()
 
+        channel = self.message_dao.channel
+
         # Configurer la Queue pour les rapports sur RabbitMQ
-        self.message_dao.channel.queue_declare(
+        channel.queue_declare(
             queue=nom_queue_domaine,
             durable=True)
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='destinataire.domaine.%s.#' % nom_queue_domaine
         )
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='ceduleur.#'
         )
 
         # Ecouter les evenements de type pki - servent a echanger certificats et requetes de certificats
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='pki.#'
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_domaine,
+            routing_key='processus.domaine.%s.#' % ConstantesPki.DOMAINE_NOM
         )
 
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
@@ -294,8 +302,13 @@ class TraitementMessagePki(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        routing_key = method.routing_key
 
-        if evenement == Constantes.EVENEMENT_CEDULEUR:
+        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
+            # Chaining vers le gestionnaire de processus du domaine
+            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+
+        elif evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
             self._gestionnaire.traiter_cedule(message_dict)
         elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
@@ -354,6 +367,12 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
     def verifier_chaine(self):
         self.set_etape_suivante()  # Termine
 
+    def get_collection_transaction_nom(self):
+        return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPki.COLLECTION_PROCESSUS_NOM
+
 
 class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
 
@@ -365,7 +384,7 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        helper = PKIDocumentHelper(self._controleur.contexte)
+        helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
         liste_fingerprints = helper.identifier_certificats_non_valide()
 
         resultat = {}
@@ -427,3 +446,9 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
 
     def chercher_certificats_invalides(self):
         self.set_etape_suivante()
+
+    def get_collection_transaction_nom(self):
+        return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPki.COLLECTION_PROCESSUS_NOM

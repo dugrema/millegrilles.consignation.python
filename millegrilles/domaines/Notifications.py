@@ -158,8 +158,12 @@ class TraitementMessageNotification(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        routing_key = method.routing_key
 
-        if evenement == Constantes.EVENEMENT_CEDULEUR:
+        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
+            # Chaining vers le gestionnaire de processus du domaine
+            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+        elif evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
             self._gestionnaire.traiter_cedule(message_dict)
         elif evenement == Constantes.EVENEMENT_NOTIFICATION:
@@ -180,7 +184,7 @@ class TraitementMessageNotification(BaseCallback):
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
         else:
             # Type d'evenement inconnu, on lance une exception
-            raise ValueError("Type d'evenement inconnu: %s" % evenement)
+            raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
 
 
 class ProcessusNotificationRecue(MGProcessus):

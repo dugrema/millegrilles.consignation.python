@@ -113,7 +113,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_senseurspassifs,
-            routing_key='processus.domaine.millegrilles.domaines.SenseursPassifs.#'
+            routing_key='processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM
         )
 
         # Index collection domaine
