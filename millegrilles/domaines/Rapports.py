@@ -34,21 +34,29 @@ class GestionnaireRapports(GestionnaireDomaine):
 
         nom_queue_rapports = self.get_nom_queue()
 
+        channel = self.message_dao.channel
+
         # Configurer la Queue pour les rapports sur RabbitMQ
-        self.message_dao.channel.queue_declare(
+        channel.queue_declare(
             queue=nom_queue_rapports,
             durable=True)
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_rapports,
             routing_key='destinataire.domaine.%s.#' % RapportsConstantes.QUEUE_NOM
         )
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_rapports,
             routing_key='ceduleur.#'
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_rapports,
+            routing_key='processus.domaine.%s.#' % RapportsConstantes.DOMAINE_NOM
         )
 
         # Creer index _mg-libelle

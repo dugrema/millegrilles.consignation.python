@@ -89,26 +89,34 @@ class GestionnaireWebPoll(GestionnaireDomaine):
 
         nom_queue_webpoll = self.get_nom_queue()
 
+        channel = self.message_dao.channel
+
         # Configurer la Queue pour WebPoll sur RabbitMQ
-        self.message_dao.channel.queue_declare(
+        channel.queue_declare(
             queue=nom_queue_webpoll,
             durable=True)
 
         # Si la Q existe deja, la purger. Ca ne sert a rien de poller les memes documents plusieurs fois.
-        self.message_dao.channel.queue_purge(
+        channel.queue_purge(
             queue=nom_queue_webpoll
         )
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_webpoll,
             routing_key='destinataire.domaine.millegrilles.domaines.WebPoll.#'
         )
 
-        self.message_dao.channel.queue_bind(
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_webpoll,
             routing_key='ceduleur.#'
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_webpoll,
+            routing_key='processus.domaine.%s.#' % WebPollConstantes.DOMAINE_NOM
         )
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
