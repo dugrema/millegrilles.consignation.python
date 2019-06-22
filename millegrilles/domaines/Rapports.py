@@ -105,8 +105,13 @@ class TraitementMessageRapports(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        routing_key = method.routing_key
 
-        if evenement == Constantes.EVENEMENT_CEDULEUR:
+        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
+            # Chaining vers le gestionnaire de processus du domaine
+            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+
+        elif evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
             self._gestionnaire.traiter_cedule(message_dict)
         elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
@@ -176,3 +181,9 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
         self._logger.debug("Previsions: %s" % str(operation_set))
 
         self.set_etape_suivante()
+
+    def get_collection_transaction_nom(self):
+        return RapportsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return RapportsConstantes.COLLECTION_PROCESSUS_NOM
