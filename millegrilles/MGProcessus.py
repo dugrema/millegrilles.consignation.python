@@ -168,7 +168,8 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
-        self.contexte.message_dao.transmettre_evenement_mgpprocessus(id_document_processus, nom_processus, nom_etape)
+        self.contexte.message_dao.transmettre_evenement_mgpprocessus(
+            self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape)
 
     def preparer_document_helper(self, collection, classe):
         helper = classe(self.contexte.document_dao.get_collection(collection))
