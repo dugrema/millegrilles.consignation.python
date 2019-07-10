@@ -2,6 +2,7 @@
 import traceback
 import datetime
 import logging
+import time
 from threading import Thread, Event
 
 # from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
@@ -22,6 +23,7 @@ class AfficheurDocumentMAJDirecte:
         self._documents = dict()
         self._intervalle_secs = intervalle_secs
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
+        self._cycles_entre_rafraichissements = 20  # 20 Cycles
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
         self._generateur = GenerateurTransaction(contexte)  # Transmet requete de documents
 
@@ -30,6 +32,7 @@ class AfficheurDocumentMAJDirecte:
         # self._watch_desactive = False  # Si true, on utilise watch. Sinon on utilise le timer
         self._thread_maj_document = None
         self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
+        self._compteur_cycle = 0  # Utilise pour savoir quand on rafraichit, tente de reparer connexion, etc.
 
         self.traitement_callback = None
 
@@ -39,12 +42,7 @@ class AfficheurDocumentMAJDirecte:
         try:
             # Enregistrer callback
             self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
-            self._contexte.message_dao.inscrire_topic(
-                self._contexte.configuration.exchange_noeuds,
-                ["%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS],
-                self.traitement_callback.callbackAvecAck
-            )
-            self.initialiser_documents()
+            self.setup_rabbitmq()
 
         except TypeError as te:
             self.__logger.error("AffichagesPassifs: Erreur de connexion a Mongo. "
@@ -54,6 +52,23 @@ class AfficheurDocumentMAJDirecte:
         self._thread_maj_document = Thread(target=self.run_maj_document)
         self._thread_maj_document.start()
         self.__logger.info("AfficheurDocumentMAJDirecte: thread demarree")
+
+    def setup_rabbitmq(self):
+        self._contexte.message_dao.inscrire_topic(
+            self._contexte.configuration.exchange_noeuds,
+            ["%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS],
+            self.traitement_callback.callbackAvecAck
+        )
+        self.initialiser_documents()
+
+    def reconnecter(self):
+        self.contexte.message_dao.deconnecter()
+        self._stop_event.set()
+        time.sleep(0.5)
+        self._stop_event.clear()
+        self._stop_event.wait(10)  # Attendre 10 secondes et ressayer du debut
+        self.contexte.message_dao.connecter()
+        self.start()
 
     def fermer(self):
         self._stop_event.set()
@@ -141,6 +156,11 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         while not self._stop_event.is_set():  # Utilise _stop_event de la superclasse pour synchroniser l'arret
 
             try:
+                self._compteur_cycle += 1
+                if self._compteur_cycle > self._cycles_entre_rafraichissements:
+                    self._compteur_cycle = 0  # Reset compteur de cycles
+                    self.charger_documents()  # On recharge les documents
+
                 self.afficher_tph()
 
                 # Afficher heure et date pendant 5 secondes
@@ -149,7 +169,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             except Exception as e:
                 logging.error("Erreur durant affichage: %s" % str(e))
                 traceback.print_exc()
-                self._stop_event.wait(10)  # Attendre 10 secondes et ressayer du debut
+                self.reconnecter()
 
     def maj_affichage(self, lignes_affichage):
         self._lignes_ecran = lignes_affichage

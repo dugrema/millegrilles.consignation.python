@@ -28,6 +28,10 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
         for document_id in self.get_documents():
             print("Document charge: %s" % str(self._documents[document_id]))
 
+    def test_deconnecter_reconnecter(self):
+        self.reconnecter()
+        self.reconnecter()
+
 
 # Demarrer test
 
@@ -35,6 +39,7 @@ test = AfficheurDocumentMAJDirecteTest()
 try:
     print("Test debut")
     test.start()
+    test.test_deconnecter_reconnecter()
 
     for i in range(0, 30):
         test.test()
