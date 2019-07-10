@@ -18,6 +18,7 @@ class ConstantesPrincipale:
     QUEUE_NOM = 'millegrilles.domaines.Principale'
 
     LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_PROFIL_USAGER = 'profil.usager'
     LIBVAL_ALERTES = 'alertes'
 
     TRANSACTION_ACTION_FERMERALERTE = 'fermerAlerte'
@@ -59,6 +60,18 @@ class ConstantesPrincipale:
         }
     }
 
+    DOCUMENT_PROFIL_USAGER = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_PROFIL_USAGER,
+        'courriel': None,
+        'courriel_alertes': [],
+        'prenom': None,
+        'nom': None,
+        'cles': [],
+        'challenge_authentification': None,
+        'uuid_usager': None,
+        'empreinte_absente': True,
+    }
+
 
 class GestionnairePrincipale(GestionnaireDomaine):
 
@@ -93,6 +106,7 @@ class GestionnairePrincipale(GestionnaireDomaine):
 
         self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
 
     def traiter_cedule(self, evenement):
         pass
@@ -108,6 +122,12 @@ class GestionnairePrincipale(GestionnaireDomaine):
 
     def get_collection_processus_nom(self):
         return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
+
+    def traiter_requete_noeud(self, ch, method, properties, body):
+        pass
+
+    def traiter_requete_inter(self, ch, method, properties, body):
+        pass
 
     def initialiser_document(self, mg_libelle, doc_defaut):
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
