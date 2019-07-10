@@ -6,9 +6,9 @@ from bson.objectid import ObjectId
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
-from millegrilles.dao.ProcessusDocumentHelper import ProcessusHelper
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 class MGPProcessusControleur(ModeleConfiguration):
@@ -27,18 +27,9 @@ class MGPProcessusControleur(ModeleConfiguration):
 
     def initialiser(self, init_message=True, init_document=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
+
         # Executer la configuration pour RabbitMQ
         self._contexte.message_dao.configurer_rabbitmq()
-        # self._message_handler = MGControlleurMessageHandler(self.contexte, self)
-        #
-        # # Configuration pour les processus
-        # collection = self.document_dao().get_collection(Constantes.DOCUMENT_COLLECTION_PROCESSUS)
-        # collection.create_index([
-        #     (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
-        #     (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
-        #     (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
-        # ])
-
         self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte)
 
     def executer(self):
@@ -375,7 +366,25 @@ class MGProcessus:
     def finale(self):
         self._etape_complete = True
         self._processus_complete = True
+
+        resultat = {
+            'complete': self._etape_complete,
+            'succes': self._processus_complete,
+            'reponse_transmise': False,
+        }
+
+        # Verifier si on doit transmettre une notification de traitement termine
+        properties = self.parametres['properties']
+        if properties is not None:
+            # Verifier si on a reply_to et correlation_id pour transmettre une confirmation de traitement
+            if properties['reply_to'] is not None and properties['correlation_id'] is not None:
+                generateur_transactions = GenerateurTransaction(self.contexte)
+                generateur_transactions.transmettre_reponse(
+                    resultat, properties['reply_to'], properties['correlation_id'])
+                resultat['reponse_transmise'] = True
+
         logging.debug("Etape finale executee pour %s" % self.__class__.__name__)
+        return resultat
 
     def erreur_fatale(self, detail=None):
         self._etape_complete = True
@@ -448,7 +457,7 @@ class MGProcessusTransaction(MGProcessus):
     def finale(self):
         # Ajouter l'evenement 'traitee' dans la transaction
         self.marquer_transaction_traitee()
-        super().finale()
+        return super().finale()
 
     ''' Ajoute l'evenement 'traitee' dans la transaction '''
     def marquer_transaction_traitee(self):

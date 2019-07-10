@@ -348,9 +348,7 @@ class TraitementMessageRequete(BaseCallback):
             'resultats': resultats,
             'uuid-requete': requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
         }
-
-        enveloppe_reponse = self._generateur.preparer_enveloppe(message_resultat, 'millegrilles.domaines.SenseursPassifs.reponse')
-        self._generateur.transmettre_reponse(enveloppe_reponse, routing_key_reponse, exchange)
+        self._generateur.transmettre_reponse(message_resultat, routing_key_reponse, exchange)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.

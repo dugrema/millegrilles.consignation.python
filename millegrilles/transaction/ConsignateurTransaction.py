@@ -77,8 +77,16 @@ class ConsignateurTransactionCallback(BaseCallback):
             entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
             uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+
+            # Copier properties utiles
+            properties_mq = {}
+            if properties.reply_to is not None:
+                properties_mq['reply_to'] = properties.reply_to
+            if properties.correlation_id is not None:
+                properties_mq['correlation_id'] = properties.correlation_id
+
             self.contexte.message_dao.transmettre_evenement_persistance(
-                id_document, uuid_transaction, domaine, message_dict)
+                id_document, uuid_transaction, domaine, properties_mq)
         except Exception as e:
             uuid_transaction = 'NA'
             en_tete = message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)

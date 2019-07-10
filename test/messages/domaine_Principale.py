@@ -45,21 +45,13 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
-    def envoyer_message_test_senseur_lecture(self):
+    def envoyer_empreinte(self):
 
-        lecture_modele = {
-            'millivolt': 2878,
-            'version': 6,
-            'temps_lecture': int(datetime.datetime.utcnow().timestamp()),
-            # 'humidite': 54.8,
-            'location': 'CUISINE',
-            # 'pression': 101.6,
-            'senseur': 17,
-            'noeud': 'test',
-            'temperature': 8.0
+        empreinte = {
         }
 
-        enveloppe_val = self.generateur.soumettre_transaction(lecture_modele, 'millegrilles.domaines.SenseursPassifs.lecture')
+        enveloppe_val = self.generateur.soumettre_transaction(
+            empreinte, 'millegrilles.domaines.Principale.creerEmpreinte', reply_to=self.queue_name, correlation_id='efgh')
 
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
@@ -70,6 +62,7 @@ sample = MessagesSample()
 
 # TEST
 enveloppe = sample.requete_profil_usager()
+enveloppe = sample.envoyer_empreinte()
 
 sample.channel.start_consuming()
 

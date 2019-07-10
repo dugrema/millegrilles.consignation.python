@@ -25,6 +25,7 @@ class ConstantesPrincipale:
 
     TRANSACTION_ACTION_FERMERALERTE = 'fermerAlerte'
     TRANSACTION_ACTION_CREERALERTE = 'creerAlerte'
+    TRANSACTION_ACTION_CREEREMPREINTE = 'creerEmpreinte'
 
     DOCUMENT_ALERTES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
@@ -228,6 +229,9 @@ class TraitementMessagePrincipale(BaseCallback):
             elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREERALERTE:
                 processus = "millegrilles_domaines_Principale:ProcessusCreerAlerte"
                 self._gestionnaire.demarrer_processus(processus, message_dict)
+            elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREEREMPREINTE:
+                processus = "millegrilles_domaines_Principale:ProcessusCreerEmpreinte"
+                self._gestionnaire.demarrer_processus(processus, message_dict)
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
@@ -290,8 +294,7 @@ class TraitementMessageRequete(BaseCallback):
             'resultats': resultats,
         }
 
-        enveloppe_reponse = self._generateur.preparer_enveloppe(message_resultat)
-        self._generateur.transmettre_reponse(enveloppe_reponse, replying_to, correlation_id)
+        self._generateur.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
 class ProcessusFermerAlerte(MGProcessusTransaction):
@@ -346,6 +349,27 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
 
         if resultat['nModified'] != 1:
             raise ValueError("L'alerte n'a pas ete ajoutee.")
+
+        self.set_etape_suivante()  # Marque transaction comme traitee
+
+    def get_collection_transaction_nom(self):
+        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusCreerEmpreinte(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
+
+        # Verifier que la MilleGrille n'a pas deja d'empreinte
+
+        # Sauvegarder la cle
 
         self.set_etape_suivante()  # Marque transaction comme traitee
 

@@ -38,7 +38,7 @@ class GenerateurTransaction:
     :param domaine: Domaine du message. Utilise pour le routage de la transaction apres persistance.  
     :returns: UUID de la transaction. Permet de retracer la transaction dans MilleGrilles une fois persistee.
     '''
-    def soumettre_transaction(self, message_dict, domaine=None):
+    def soumettre_transaction(self, message_dict, domaine=None, reply_to=None, correlation_id=None):
         # Preparer la structure du message reconnue par MilleGrilles
         enveloppe = self.preparer_enveloppe(message_dict, domaine)
 
@@ -47,7 +47,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe)
+        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id)
 
         return uuid_transaction
 
@@ -114,12 +114,14 @@ class GenerateurTransaction:
         :return:
         """
 
-        uuid_transaction = message_dict.get(
+        enveloppe = self.preparer_enveloppe(message_dict)
+
+        uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
         self._contexte.message_dao.transmettre_reponse(
-            message_dict, replying_to, correlation_id, encoding=self.encodeur_json)
+            enveloppe, replying_to, correlation_id, encoding=self.encodeur_json)
 
         return uuid_transaction
 
