@@ -244,10 +244,17 @@ class PikaDAO:
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
 
-    def transmettre_message_noeuds(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder):
+    def transmettre_message_noeuds(self, message_dict, routing_key, delivery_mode_v=1,
+                                   encoding=json.JSONEncoder, reply_to=None, correlation_id=None):
 
         if self.connectionmq is None or self.connectionmq.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
+        if reply_to is not None:
+            properties.reply_to = reply_to
+        if correlation_id is not None:
+            properties.correlation_id = correlation_id
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
@@ -255,7 +262,25 @@ class PikaDAO:
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
                 body=message_utf8,
-                properties=pika.BasicProperties(delivery_mode=delivery_mode_v),
+                properties=properties,
+                mandatory=True)
+        self.in_error = False
+
+    def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
+
+        if self.connectionmq is None or self.connectionmq.is_closed:
+            raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
+        properties.correlation_id = correlation_id
+
+        message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
+        with self._lock_transmettre_message:
+            self.channel_envoi_async.basic_publish(
+                exchange='',  # Exchange default
+                routing_key=replying_to,
+                body=message_utf8,
+                properties=properties,
                 mandatory=True)
         self.in_error = False
 

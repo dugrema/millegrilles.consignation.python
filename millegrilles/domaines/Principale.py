@@ -3,6 +3,8 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 import logging
 import datetime
@@ -78,30 +80,65 @@ class GestionnairePrincipale(GestionnaireDomaine):
     def __init__(self, contexte):
         super().__init__(contexte)
         self._traitement_message = None
-
+        self._traitement_requetes = None
+        self.traiter_requete_noeud = None
         self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
 
     def configurer(self):
         super().configurer()
         self._traitement_message = TraitementMessagePrincipale(self)
 
-        nom_queue_domaine = self.get_nom_queue()
+        self._traitement_requetes = TraitementMessageRequete(self)
+        self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
         # Configurer la Queue pour les rapports sur RabbitMQ
-        self.message_dao.channel.queue_declare(
-            queue=nom_queue_domaine,
-            durable=True)
+        nom_queue_domaine = self.get_nom_queue()
 
-        self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='destinataire.domaine.%s.#' % nom_queue_domaine
-        )
+        queues_config = [
+            {
+                'nom': self.get_nom_queue(),
+                'routing': 'destinataire.domaine.millegrilles.domaines.Principale.#',
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+            },
+            {
+                'nom': self.get_nom_queue_requetes_noeuds(),
+                'routing': 'requete.%s.#' % ConstantesPrincipale.DOMAINE_NOM,
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS
+            },
+            {
+                'nom': self.get_nom_queue_requetes_inter(),
+                'routing': 'requete.%s.#' % ConstantesPrincipale.DOMAINE_NOM,
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER
+            },
+        ]
 
-        self.message_dao.channel.queue_bind(
+        channel = self.message_dao.channel
+        for queue_config in queues_config:
+            channel.queue_declare(
+                queue=queue_config['nom'],
+                durable=True)
+
+            channel.queue_bind(
+                exchange=queue_config['exchange'],
+                queue=queue_config['nom'],
+                routing_key=queue_config['routing']
+            )
+
+            # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
+            channel.queue_purge(
+                queue=queue_config['nom']
+            )
+
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='ceduleur.#'
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_domaine,
+            routing_key='processus.domaine.%s.#' % ConstantesPrincipale.DOMAINE_NOM
         )
 
         self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
@@ -116,6 +153,12 @@ class GestionnairePrincipale(GestionnaireDomaine):
 
     def get_nom_queue(self):
         return ConstantesPrincipale.QUEUE_NOM
+
+    def get_nom_queue_requetes_noeuds(self):
+        return '%s.noeuds' % self.get_nom_queue()
+
+    def get_nom_queue_requetes_inter(self):
+        return '%s.inter' % self.get_nom_queue()
 
     def get_collection_transaction_nom(self):
         return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
@@ -191,6 +234,64 @@ class TraitementMessagePrincipale(BaseCallback):
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
+
+
+class TraitementMessageRequete(BaseCallback):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire.contexte)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._gestionnaire = gestionnaire
+        self._generateur = GenerateurTransaction(gestionnaire.contexte, encodeur_json=MongoJSONEncoder)
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        exchange = method.exchange
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+
+    def executer_requete(self, requete):
+        self._logger.debug("Requete: %s" % str(requete))
+        collection = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        self._logger.debug("Resultats: %s" % str(resultats))
+
+        return resultats
+
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        if correlation_id is None:
+            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+
+        enveloppe_reponse = self._generateur.preparer_enveloppe(message_resultat)
+        self._generateur.transmettre_reponse(enveloppe_reponse, replying_to, correlation_id)
 
 
 class ProcessusFermerAlerte(MGProcessusTransaction):

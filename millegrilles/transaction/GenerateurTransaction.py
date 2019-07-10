@@ -10,8 +10,10 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.SecuritePKI import SignateurTransaction, GestionnaireEvenementsCertificat
 
 
-# Generateur de transaction - peut etre reutilise.
 class GenerateurTransaction:
+    """
+    Generateur de transactions, requetes et reponses vers RabbitMQ.
+    """
 
     def __init__(self, contexte=None, encodeur_json=json.JSONEncoder):
         self.encodeur_json = encodeur_json
@@ -28,12 +30,6 @@ class GenerateurTransaction:
         # Transmettre le certificat pour etre sur que tous les participants l'ont
         gestionnaire_certificats = GestionnaireEvenementsCertificat(self._contexte, self.signateur_transaction)
         gestionnaire_certificats.transmettre_certificat()
-
-    # def connecter(self):
-    #     self._message_dao.connecter()
-    #
-    # def deconnecter(self):
-    #     self._message_dao.deconnecter()
 
     ''' 
     Transmet un message. La connexion doit etre ouverte.
@@ -82,29 +78,48 @@ class GenerateurTransaction:
 
         return message_signe
 
-    def transmettre_requete(self, message_dict, domaine, exchange):
+    def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None):
+        """
+        Transmet une requete au backend de MilleGrilles. La requete va etre vu par un des workers du domaine. La
+        reponse va etre transmise vers la "message_dao.queue_reponse", et le correlation_id permet de savoir a
+        quelle requete la reponse correspond.
+        :param message_dict:
+        :param domaine: Domaine qui doit traiter la requete - doit correspondre a a une routing key.
+        :param correlation_id: Numero utilise pour faire correspondre la reponse.
+        :return:
+        """
+
+        if reply_to is None:
+            reply_to = self._contexte.message_dao.queue_reponse
 
         enveloppe = message_dict.copy()
-        enveloppe['retour'] = {
-                "routage": "reponse.%s" % self._contexte.message_dao.queue_reponse
-            }
         enveloppe = self.preparer_enveloppe(enveloppe, '%s.requete' % domaine)
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
         routing_key = 'requete.%s' % domaine
-        self._contexte.message_dao.transmettre_message_noeuds(enveloppe, routing_key, encoding=self.encodeur_json)
+        self._contexte.message_dao.transmettre_message_noeuds(
+            enveloppe, routing_key, encoding=self.encodeur_json,
+            reply_to=reply_to, correlation_id=correlation_id)
 
         return uuid_transaction
 
-    def transmettre_reponse(self, message_dict, routing_key, exchange):
+    def transmettre_reponse(self, message_dict, replying_to, correlation_id):
+        """
+        Transmet une reponse a une requete. La reponse va directement sur la queue replying_to (pas de topic).
+        :param message_dict: Message de reponse
+        :param replying_to: Nom de la Q sur laquelle la reponse va etre transmise (reply-to de la requete)
+        :param correlation_id: Numero de correlation fourni dans la requete.
+        :return:
+        """
 
         uuid_transaction = message_dict.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_message_noeuds(message_dict, routing_key, encoding=self.encodeur_json)
+        self._contexte.message_dao.transmettre_reponse(
+            message_dict, replying_to, correlation_id, encoding=self.encodeur_json)
 
         return uuid_transaction
 
