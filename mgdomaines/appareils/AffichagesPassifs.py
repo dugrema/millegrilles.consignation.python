@@ -33,6 +33,8 @@ class AfficheurDocumentMAJDirecte:
 
         self.traitement_callback = None
 
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
     def start(self):
         try:
             # Enregistrer callback
@@ -45,13 +47,13 @@ class AfficheurDocumentMAJDirecte:
             self.initialiser_documents()
 
         except TypeError as te:
-            logging.error("AffichagesPassifs: Erreur de connexion a Mongo. "
+            self.__logger.error("AffichagesPassifs: Erreur de connexion a Mongo. "
                           "On va demarrer quand meme et connecter plus tard. %s" % str(te))
 
         # Thread.start
         self._thread_maj_document = Thread(target=self.run_maj_document)
         self._thread_maj_document.start()
-        logging.info("AfficheurDocumentMAJDirecte: thread demarree")
+        self.__logger.info("AfficheurDocumentMAJDirecte: thread demarree")
 
     def fermer(self):
         self._stop_event.set()
@@ -69,8 +71,10 @@ class AfficheurDocumentMAJDirecte:
             'type': 'mongodb',
             "filtre": self.get_filtre()
         }]}
-        self._generateur.transmettre_requete(requete, 'millegrilles.domaines.SenseursPassifs',
-                                             Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS)
+        self._generateur.transmettre_requete(requete,
+                                             'millegrilles.domaines.SenseursPassifs',
+                                             'etat_senseurs_initial',
+                                             self.contexte.message_dao.queue_reponse)
 
     def get_documents(self):
         return self._documents
@@ -248,7 +252,7 @@ class DocumentCallback(BaseCallback):
                 if doc_id in document_keys:
                     self.__logger.debug("Accepte document _id:%s" % doc_id)
                     self.documents[doc_id] = document
-        elif routing_key.split('.')[0:2] == ['reponse', 'amq']:
+        elif properties.correlation_id == 'etat_senseurs_initial':
             for reponse in message_json.get('resultats'):
                 for document in reponse:
                     documents.append(document)

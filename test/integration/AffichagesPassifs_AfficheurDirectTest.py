@@ -13,7 +13,7 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
         super().__init__(contexte, intervalle_secs=5)
 
     def liste_senseurs(self):
-        return [2, 3, "17"]
+        return [2, 3, 17]
 
     def get_filtre(self):
         filtre = {

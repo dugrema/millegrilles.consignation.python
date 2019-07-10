@@ -317,7 +317,7 @@ class TraitementMessageRequete(BaseCallback):
             resultats.append(resultat)
 
         # Genere message reponse
-        self.transmettre_reponse(message_dict, resultats, message_dict['retour']['routage'], exchange)
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
@@ -342,13 +342,13 @@ class TraitementMessageRequete(BaseCallback):
 
         return resultats
 
-    def transmettre_reponse(self, requete, resultats, routing_key_reponse, exchange):
+    def transmettre_reponse(self, requete, resultats, reply_to, correlation_id):
         # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
         message_resultat = {
             'resultats': resultats,
             'uuid-requete': requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
         }
-        self._generateur.transmettre_reponse(message_resultat, routing_key_reponse, exchange)
+        self._generateur.transmettre_reponse(message_resultat, reply_to, correlation_id)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
