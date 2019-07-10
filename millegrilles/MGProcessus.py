@@ -374,10 +374,10 @@ class MGProcessus:
         }
 
         # Verifier si on doit transmettre une notification de traitement termine
-        properties = self.parametres['properties']
+        properties = self.parametres.get('properties')
         if properties is not None:
             # Verifier si on a reply_to et correlation_id pour transmettre une confirmation de traitement
-            if properties['reply_to'] is not None and properties['correlation_id'] is not None:
+            if properties.get('reply_to') is not None and properties.get('correlation_id') is not None:
                 generateur_transactions = GenerateurTransaction(self.contexte)
                 generateur_transactions.transmettre_reponse(
                     resultat, properties['reply_to'], properties['correlation_id'])
