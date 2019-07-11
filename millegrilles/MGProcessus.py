@@ -367,9 +367,13 @@ class MGProcessus:
         self._etape_complete = True
         self._processus_complete = True
 
+        succes = self.parametres.get('succes')
+        if succes is None:
+            succes = True
+
         resultat = {
-            'complete': self._etape_complete,
-            'succes': self._processus_complete,
+            'complete': self._processus_complete,
+            'succes': succes,
             'reponse_transmise': False,
         }
 

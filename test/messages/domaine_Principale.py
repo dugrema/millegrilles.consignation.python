@@ -48,6 +48,7 @@ class MessagesSample(BaseCallback):
     def envoyer_empreinte(self):
 
         empreinte = {
+            'cle': 'absfoijfdosijfds'
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -61,7 +62,7 @@ class MessagesSample(BaseCallback):
 sample = MessagesSample()
 
 # TEST
-enveloppe = sample.requete_profil_usager()
+# enveloppe = sample.requete_profil_usager()
 enveloppe = sample.envoyer_empreinte()
 
 sample.channel.start_consuming()

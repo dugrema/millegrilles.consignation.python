@@ -2,7 +2,7 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
@@ -367,11 +367,35 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
 
+        if transaction.get('cle') is None:
+            self.set_etape_suivante()  # On arrete le traitement
+            return {'erreur': 'Cle manquante de la transaction', 'succes': False}
+
         # Verifier que la MilleGrille n'a pas deja d'empreinte
+        documents = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        profil = documents.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER})
+        empreinte_absente = profil.get('empreinte_absente')
+        if empreinte_absente is True:
+            # Validation correcte. On passe a l'etape de sauvegarde
+            self.set_etape_suivante('empreinte')
+        else:
+            self.set_etape_suivante()  # On arrete le traitement
+            return {'erreur': 'La MilleGrille a deja une empreinte'}
 
-        # Sauvegarder la cle
+    def empreinte(self):
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
 
-        self.set_etape_suivante()  # Marque transaction comme traitee
+        operation = {
+            '$unset': {'empreinte_absente': True},
+            '$push': {'cles': transaction['cle']}
+        }
+        documents = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER}, operation)
+
+        if resultat.modified_count != 1:
+            raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
+
+        self.set_etape_suivante()  # Termine
 
     def get_collection_transaction_nom(self):
         return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
