@@ -12,12 +12,12 @@ def envoyer_message_test_senseur_lecture():
         'millivolt': 2878,
         'version': 6,
         'temps_lecture': int(datetime.datetime.utcnow().timestamp()),
-#        'humidite': 54.8,
-        'location': 'CUISINE',
-#        'pression': 101.6,
-        'senseur': 17,
-        'noeud': 'test',
-        'temperature': 8.0
+        'humidite': 29.1,
+        'location': 'Propos-a',
+        'pression': 99.3,
+        'senseur': 20,
+        'noeud': 'test2',
+        'temperature': 18.9
     }
 
     enveloppe_val = generateur.soumettre_transaction(lecture_modele, 'millegrilles.domaines.SenseursPassifs.lecture')

@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='MilleGrilles.consignation.python',
-    version='1.7.2',
+    version='1.7.4',
     packages=[
         'millegrilles',
         'millegrilles.dao',
