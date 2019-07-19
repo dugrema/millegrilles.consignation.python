@@ -1,4 +1,4 @@
-# Domaine de l'interface principale
+# Domaine de l'interface GrosFichiers
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 
@@ -7,7 +7,7 @@ import datetime
 
 
 class ConstantesGrosFichiers:
-    """ Constantes pour le domaine de l'interface principale """
+    """ Constantes pour le domaine de GrosFichiers """
 
     DOMAINE_NOM = 'millegrilles.domaines.GrosFichiers'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
@@ -17,13 +17,13 @@ class ConstantesGrosFichiers:
 
     LIBVAL_CONFIGURATION = 'configuration'
 
-    # Document par defaut pour la configuration de l'interface principale
+    # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
     }
 
 
-class GestionnairePrincipale(GestionnaireDomaine):
+class GestionnaireGrosFichiers(GestionnaireDomaine):
 
     def __init__(self, contexte):
         super().__init__(contexte)
