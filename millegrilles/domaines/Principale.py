@@ -44,6 +44,10 @@ class ConstantesPrincipale:
                 'rang': 1,
                 'description': 'SenseursPassifs'
             },
+            'GrosFichiers': {
+                'rang': 1,
+                'description': 'GrosFichiers'
+            },
             'Notifications': {
                 'rang': 2,
                 'description': 'Notifications'
