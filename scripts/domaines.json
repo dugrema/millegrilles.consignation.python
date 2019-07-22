@@ -23,6 +23,10 @@
     {
       "module": "millegrilles.domaines.Pki",
       "classe": "GestionnairePki"
+    },
+    {
+      "module": "millegrilles.domaines.GrosFichiers",
+      "classe": "GestionnaireGrosFichiers"
     }
   ]
 }

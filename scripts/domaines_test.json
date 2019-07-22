@@ -1,8 +1,8 @@
 {
   "domaines": [
     {
-      "module": "millegrilles.domaines.Principale",
-      "classe": "GestionnairePrincipale"
+      "module": "millegrilles.domaines.GrosFichiers",
+      "classe": "GestionnaireGrosFichiers"
     }
   ]
 }

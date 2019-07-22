@@ -401,6 +401,23 @@ class PikaDAO:
                                        routing_key=routing_key,
                                        body=message_utf8)
 
+    def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, token: str,
+                                          id_document_processus_attente=None):
+        message = {
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_DECLENCHEUR: str(id_document_declencheur),
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKEN: token,
+        }
+        if id_document_processus_attente is not None:
+            message[Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE] = str(id_document_processus_attente)
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+        routing_key = 'processus.domaine.%s.resumer' % nom_domaine
+
+        with self._lock_transmettre_message:
+            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
+                                       routing_key=routing_key,
+                                       body=message_utf8)
+
     '''
     Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
     

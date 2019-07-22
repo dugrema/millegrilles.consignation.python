@@ -55,6 +55,7 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         self._json_helper = JSONHelper()
         self._contexte = contexte
         self._gestionnaire_domaine = gestionnaire_domaine
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initialiser(self, collection_processus_noms: list):
         # Configuration pour les processus
@@ -64,6 +65,12 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
                 (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
                 (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
                 (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+            ])
+            collection.create_index([
+                (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE, 1)
+            ])
+            collection.create_index([
+                (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER, 1)
             ])
 
     def extraire_evenement(self, message_body):
@@ -132,12 +139,32 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         doc_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_DATEEXECUTION] = datetime.datetime.utcnow()
 
         # print("$push vers mongo: %s --- %s" % (id_document, str(dict_etape)))
+        operation = {}
+
+        # $push operations (toujours presente)
+        push_operation = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: doc_etape}
+
+        # $addToSet operation
+        addtoset_operation = {}
+        tokens = doc_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKENS)
+        if tokens is not None:
+            tokens_attente = tokens.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE)
+            if tokens_attente is not None:
+                push_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = {'$each': tokens_attente}
+
+            tokens_resumer = tokens.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER)
+            if tokens_resumer is not None:
+                addtoset_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_resumer
+
+        # $set operations
         set_operation = {}
-        operation = {
-            '$push': {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: doc_etape},
-        }
+        unset_operation = {}
         if etape_suivante is None:
-            operation['$unset'] = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: ''}
+            unset_operation.update({
+                Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: '',
+                Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE: '',
+                Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER: '',
+            })
         else:
             set_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE] = etape_suivante
 
@@ -147,11 +174,19 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
                 complete_key = 'parametres.%s' % key
                 set_operation[complete_key] = value
 
+        # Preparer les operations globales de la requete MongoDB
+        operation['$push'] = push_operation
         if len(set_operation) > 0:
             operation['$set'] = set_operation
+        if len(addtoset_operation) > 0:
+            operation['$addToSet'] = addtoset_operation
+        if len(unset_operation) > 0:
+            operation['$unset'] = unset_operation
 
         # Conserver la date de mise a jour
         operation['$currentDate'] = {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+
+        self.__logger.debug("Requete MongoDB pour update processus:\n%s" % str(operation))
 
         resultat = collection_processus.update_one(id_document, operation)
 
@@ -175,9 +210,18 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         try:
             # Decoder l'evenement qui contient l'information sur l'etape a traiter
             evenement_dict = self.extraire_evenement(body)
-            id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
-            logging.debug("Recu evenement processus: %s" % str(evenement_dict))
-            self.traiter_evenement(evenement_dict)
+            evenement_type = evenement_dict.get('evenement')
+            if evenement_type == Constantes.EVENEMENT_RESUMER:
+                id_doc_attente = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE)
+                token = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKEN)
+                if id_doc_attente is not None:
+                    self.__logger.debug("Resumer traitement doc en attente %s avec token %s" % (id_doc_attente, token))
+                else:
+                    self.__logger.debug("Trouver si document en attente de " % token)
+            else:
+                id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
+                logging.debug("Recu evenement processus: %s" % str(evenement_dict))
+                self.traiter_evenement(evenement_dict)
         except Exception as e:
             # Mettre le message d'erreur sur la Q erreur processus
             self.erreur_fatale(id_doc_processus, str(body), e)
@@ -275,6 +319,8 @@ class MGProcessus:
         self._etape_complete = False
         self._methode_etape_courante = None
         self._processus_complete = False
+        self._ajouter_token_attente = None
+        self._ajouter_token_resumer = None
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -345,11 +391,20 @@ class MGProcessus:
             if resultat is not None:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
 
+            # Ajouter tokens pour synchronisation inter-transaction.
+            tokens = {}
+            if self._ajouter_token_resumer is not None:
+                tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER] = self._ajouter_token_resumer
+            if self._ajouter_token_attente is not None:
+                tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = self._ajouter_token_attente
+            if len(tokens) > 0:
+                document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKENS] = tokens
+
             self._controleur.sauvegarder_etape_processus(
                 self.get_collection_processus_nom(), id_document_processus, document_etape, self._etape_suivante)
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
-            if not self._processus_complete:
+            if not self._processus_complete and self._ajouter_token_attente is None:
                 self.transmettre_message_etape_suivante(resultat)
 
         except Exception as erreur:
@@ -405,9 +460,24 @@ class MGProcessus:
     
     :param etape_suivante: Prochaine etape (methode) a executer. Par defaut utilise l'etape finale qui va terminer le processus.
     '''
-    def set_etape_suivante(self, etape_suivante='finale'):
+    def set_etape_suivante(self, etape_suivante='finale', token_attente: list = None):
         self._etape_complete = True
         self._etape_suivante = etape_suivante
+        self._ajouter_token_attente = token_attente
+
+    def add_token_attente(self, token: str):
+        """ Ajoute un token pour dire que le processus est en attente d'un evenement externe. """
+        if self._ajouter_token_resumer is None:
+            self._ajouter_token_resumer = [token]
+        else:
+            self._ajouter_token_resumer.append(token)
+
+    def add_token_resumer(self, token: str):
+        """ Ajoute un token pour dire que le processus/transaction du processus est necessaire a un autre processus. """
+        if self._ajouter_token_resumer is None:
+            self._ajouter_token_resumer = [token]
+        else:
+            self._ajouter_token_resumer.append(token)
 
     @property
     def contexte(self):
