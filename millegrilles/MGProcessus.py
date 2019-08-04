@@ -154,12 +154,14 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
 
             tokens_resumer = tokens.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER)
             if tokens_resumer is not None:
-                addtoset_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_resumer
+                addtoset_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER] = {'$each': tokens_resumer}
 
         # $set operations
         set_operation = {}
         unset_operation = {}
         if etape_suivante is None:
+            # Nettoyage pour finalisation du processus
+            # Enlever tous les elements qui font parti d'un index / recherche de traitement actif
             unset_operation.update({
                 Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE: '',
                 Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE: '',
@@ -197,6 +199,10 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         self.contexte.message_dao.transmettre_evenement_mgpprocessus(
             self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape)
 
+    def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
+        self.contexte.message_dao.transmettre_evenement_mgp_resumer(
+            self._gestionnaire_domaine.get_nom_domaine(), id_document_declencheur, tokens, id_document_processus_attente)
+
     def preparer_document_helper(self, collection, classe):
         helper = classe(self.contexte.document_dao.get_collection(collection))
         return helper
@@ -213,11 +219,13 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             evenement_type = evenement_dict.get('evenement')
             if evenement_type == Constantes.EVENEMENT_RESUMER:
                 id_doc_attente = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE)
-                token = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKEN)
+                tokens = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKENS)
                 if id_doc_attente is not None:
-                    self.__logger.debug("Resumer traitement doc en attente %s avec token %s" % (id_doc_attente, token))
+                    self.__logger.debug("Resumer traitement doc en attente %s avec token %s" % (id_doc_attente, str(tokens)))
                 else:
-                    self.__logger.debug("Trouver si document en attente de " % token)
+                    self.__logger.debug("Trouver si document en attente de %s" % str(tokens))
+                    # collection_processus = self._contexte.document_dao.get_collection(collection_processus_nom)
+
             else:
                 id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
                 logging.debug("Recu evenement processus: %s" % str(evenement_dict))
@@ -404,7 +412,10 @@ class MGProcessus:
                 self.get_collection_processus_nom(), id_document_processus, document_etape, self._etape_suivante)
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
-            if not self._processus_complete and self._ajouter_token_attente is None:
+            if self._ajouter_token_resumer is not None:
+                self._controleur.transmettre_message_resumer(
+                    id_document_processus, self._ajouter_token_resumer)
+            elif not self._processus_complete and self._ajouter_token_attente is None:
                 self.transmettre_message_etape_suivante(resultat)
 
         except Exception as erreur:
@@ -465,19 +476,32 @@ class MGProcessus:
         self._etape_suivante = etape_suivante
         self._ajouter_token_attente = token_attente
 
-    def add_token_attente(self, token: str):
-        """ Ajoute un token pour dire que le processus est en attente d'un evenement externe. """
-        if self._ajouter_token_resumer is None:
-            self._ajouter_token_resumer = [token]
-        else:
-            self._ajouter_token_resumer.append(token)
+    def attendre_token(self, tokens: list):
+        """
+        Verifie si les tokens existent deja.
+        Ajoute un token pour dire que le processus est en attente d'un evenement externe.
+        :return: "True, list documents" processus si tous les tokens ont ete trouves. False si pas tous trouves.
+        """
+        liste_documents_process_trouves = None
 
-    def add_token_resumer(self, token: str):
-        """ Ajoute un token pour dire que le processus/transaction du processus est necessaire a un autre processus. """
-        if self._ajouter_token_resumer is None:
-            self._ajouter_token_resumer = [token]
+        # Chercher la collection pour les documents avec les tokens resumes correspondants aux tokens d'attente
+
+        if self._ajouter_token_attente is None:
+            self._ajouter_token_attente = tokens
         else:
-            self._ajouter_token_resumer.append(token)
+            self._ajouter_token_attente.extend(tokens)
+
+        return False, liste_documents_process_trouves
+
+    def resumer_processus(self, tokens: list):
+        """
+            Ajoute un token pour dire que le processus/transaction du processus est necessaire a un autre processus.
+            Va automatiquement transmettre un message qui sera recu par le processus en attente (s'il existe).
+        """
+        if self._ajouter_token_resumer is None:
+            self._ajouter_token_resumer = tokens
+        else:
+            self._ajouter_token_resumer.extend(tokens)
 
     @property
     def contexte(self):

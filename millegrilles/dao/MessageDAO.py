@@ -401,11 +401,13 @@ class PikaDAO:
                                        routing_key=routing_key,
                                        body=message_utf8)
 
-    def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, token: str,
+    def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, tokens: list,
                                           id_document_processus_attente=None):
         message = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_RESUMER,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_domaine,
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_DECLENCHEUR: str(id_document_declencheur),
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKEN: token,
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKENS: tokens,
         }
         if id_document_processus_attente is not None:
             message[Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE] = str(id_document_processus_attente)

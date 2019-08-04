@@ -308,5 +308,18 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(MGProcessusTransactio
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        """ Emet un evenement pour indiquer que le transfert complete est arrive """
+        """
+        Emet un evenement pour indiquer que le transfert complete est arrive. Comme on ne donne pas de prochaine
+        etape, une fois les tokens consommes, le processus sera termine.
+        """
+        fuuid = self.parametres.get('fuuid')
+        token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
+        self.resumer_processus([token_resumer])
 
+        self.set_etape_suivante()  # Une fois les tokens consommes, le processus sera termine.
+
+    def get_collection_transaction_nom(self):
+        return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
