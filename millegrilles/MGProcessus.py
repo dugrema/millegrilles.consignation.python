@@ -212,7 +212,7 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             id_document_processus,
             document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
             document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
-            tokens=tokens
+            info=tokens
         )
 
     def preparer_document_helper(self, collection, classe):
@@ -456,7 +456,10 @@ class MGProcessus:
                 info_tokens_resume = self._evenement['resumer_token']
                 id_document_processus = info_tokens_resume.get('processus')
                 self._logger.debug("Transmission message terminer processus resumer tokens %s" % id_document_processus)
-                self._controleur.transmettre_message_continuer(id_document_processus, info_tokens_resume.get('tokens'))
+                self._controleur.transmettre_message_continuer(
+                    id_document_processus,
+                    {'processus': id_document_processus, 'tokens': info_tokens_resume.get('tokens')}
+                )
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.

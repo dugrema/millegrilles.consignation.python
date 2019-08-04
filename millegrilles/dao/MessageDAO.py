@@ -380,7 +380,9 @@ class PikaDAO:
     :param dict_parametres: (Optionnel) Parametres a utiliser pour la prochaine etape du processus.
     '''
 
-    def transmettre_evenement_mgpprocessus(self, nom_domaine: str, id_document, nom_processus, nom_etape='initiale', tokens=None):
+    def transmettre_evenement_mgpprocessus(self, nom_domaine: str, id_document, nom_processus, nom_etape='initiale',
+                                           tokens=None,
+                                           info=None):
         message = {
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(id_document),
             Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: nom_processus,
@@ -389,6 +391,9 @@ class PikaDAO:
 
         if tokens is not None:
             message[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER] = tokens
+
+        if info is not None:
+            message[Constantes.PROCESSUS_DOCUMENT_LIBELLE_INFO] = info
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
