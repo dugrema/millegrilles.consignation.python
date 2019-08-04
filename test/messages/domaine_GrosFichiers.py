@@ -70,8 +70,8 @@ sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_profil_usager()
-# enveloppe1 = sample.transaction_nouvelle_version_metadata()
 enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+enveloppe1 = sample.transaction_nouvelle_version_metadata()
 
 sample.channel.start_consuming()
 

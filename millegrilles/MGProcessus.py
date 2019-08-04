@@ -203,6 +203,18 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         self.contexte.message_dao.transmettre_evenement_mgp_resumer(
             self._gestionnaire_domaine.get_nom_domaine(), id_document_declencheur, tokens, id_document_processus_attente)
 
+    def transmettre_message_continuer(self, id_document_processus, tokens=None):
+        document_processus = self.charger_document_processus(
+            id_document_processus, self._gestionnaire_domaine.get_collection_processus_nom())
+
+        self.contexte.message_dao.transmettre_evenement_mgpprocessus(
+            self._gestionnaire_domaine.get_nom_domaine(),
+            id_document_processus,
+            document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
+            document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
+            tokens=tokens
+        )
+
     def preparer_document_helper(self, collection, classe):
         helper = classe(self.contexte.document_dao.get_collection(collection))
         return helper
@@ -246,7 +258,11 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
                 self.__logger.debug("Resumer processus %s" % str(processus))
                 self.message_etape_suivante(processus.get('_id'),
                                             processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
-                                            processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE))
+                                            processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
+                                            tokens={
+                                                'processus': evenement_dict.get('_id_document_processus_declencheur'),
+                                                'tokens': tokens}
+                                            )
 
         else:
             self.__logger.debug("Resumer document %s en attente de %s" % (id_doc_attente, str(tokens)))
@@ -434,6 +450,13 @@ class MGProcessus:
                     id_document_processus, self._ajouter_token_resumer)
             elif not self._processus_complete and self._ajouter_token_attente is None:
                 self.transmettre_message_etape_suivante(resultat)
+
+            # Verifier s'il faut avertir d'autres processus que le traitement de l'etape est complete
+            if self._evenement.get('resumer_token') is not None:
+                info_tokens_resume = self._evenement['resumer_token']
+                id_document_processus = info_tokens_resume.get('processus')
+                self._logger.debug("Transmission message terminer processus resumer tokens %s" % id_document_processus)
+                self._controleur.transmettre_message_continuer(id_document_processus, info_tokens_resume.get('tokens'))
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
