@@ -255,6 +255,10 @@ class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
         """ Sauvegarder une nouvelle version d'un fichier """
         collection_transactions = self.contexte.document_dao.get_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        transaction = self.charger_transaction()
+        fuuid = transaction['fuuid']
+
         # Vierifier si le document de fichier existe deja
         document_fichier = None
 
@@ -267,24 +271,24 @@ class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
             self.set_etape_suivante(
                 ProcessusTransactionNouvelleVersionMetadata.ajouter_version_fichier.__name__)
 
-        return {'fuuid': 'allo mon fuuid'}
+        return {'fuuid': fuuid}
 
     def creer_nouveau_fichier(self):
         # Ajouter fichier
 
         self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__,
-            [self._get_token_attente(), 'token2 pour le fun'])
+            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
 
     def ajouter_version_fichier(self):
-        # Ajouter fichier
+        # Ajouter version au fichier
 
         self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__,
-            [self._get_token_attente()])
+            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
 
     def attendre_transaction_transfertcomplete(self):
-        pass
+        self.set_etape_suivante(
+            ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__,
+            [self._get_token_attente()])
 
     def confirmer_hash(self):
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
@@ -312,11 +316,19 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(MGProcessusTransactio
         Emet un evenement pour indiquer que le transfert complete est arrive. Comme on ne donne pas de prochaine
         etape, une fois les tokens consommes, le processus sera termine.
         """
+        transaction = self.charger_transaction()
+        fuuid = transaction.get('fuuid')
+
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionTransfertComplete.declencher_resumer.__name__)
+        return {'fuuid': fuuid}
+
+    def declencher_resumer(self):
         fuuid = self.parametres.get('fuuid')
         token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
         self.resumer_processus([token_resumer])
 
-        self.set_etape_suivante()  # Une fois les tokens consommes, le processus sera termine.
+        # Une fois les tokens consommes, le processus sera termine.
+        self.set_etape_suivante()
 
     def get_collection_transaction_nom(self):
         return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM

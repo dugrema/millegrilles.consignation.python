@@ -195,9 +195,9 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         if resultat.modified_count != 1:
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
 
-    def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape):
+    def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
         self.contexte.message_dao.transmettre_evenement_mgpprocessus(
-            self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape)
+            self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape, tokens)
 
     def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
         self.contexte.message_dao.transmettre_evenement_mgp_resumer(
@@ -218,14 +218,7 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             evenement_dict = self.extraire_evenement(body)
             evenement_type = evenement_dict.get('evenement')
             if evenement_type == Constantes.EVENEMENT_RESUMER:
-                id_doc_attente = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE)
-                tokens = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKENS)
-                if id_doc_attente is not None:
-                    self.__logger.debug("Resumer traitement doc en attente %s avec token %s" % (id_doc_attente, str(tokens)))
-                else:
-                    self.__logger.debug("Trouver si document en attente de %s" % str(tokens))
-                    # collection_processus = self._contexte.document_dao.get_collection(collection_processus_nom)
-
+                self.traiter_resumer(evenement_dict)
             else:
                 id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
                 logging.debug("Recu evenement processus: %s" % str(evenement_dict))
@@ -233,6 +226,30 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         except Exception as e:
             # Mettre le message d'erreur sur la Q erreur processus
             self.erreur_fatale(id_doc_processus, str(body), e)
+
+    def traiter_resumer(self, evenement_dict):
+        id_doc_attente = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE)
+        tokens = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKENS)
+
+        nom_collection_processus = self._gestionnaire_domaine.get_collection_processus_nom()
+        collection_processus = self._contexte.document_dao.get_collection(nom_collection_processus)
+
+        if id_doc_attente is None:
+            filtre = {
+                Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE: {"$in": tokens}
+            }
+            self.__logger.debug("Trouver documents en attente de :\n %s" % str(filtre))
+            curseur_processus = collection_processus.find(filtre)
+
+            # Declencher le traitement des processus trouves
+            for processus in curseur_processus:
+                self.__logger.debug("Resumer processus %s" % str(processus))
+                self.message_etape_suivante(processus.get('_id'),
+                                            processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
+                                            processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE))
+
+        else:
+            self.__logger.debug("Resumer document %s en attente de %s" % (id_doc_attente, str(tokens)))
 
     '''
     Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
@@ -546,7 +563,9 @@ class MGProcessusTransaction(MGProcessus):
         collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine)
         return {'id_transaction': id_transaction, 'nom_collection': collection}
 
-    def charger_transaction(self, nom_collection):
+    def charger_transaction(self, nom_collection=None):
+        if nom_collection is None:
+            nom_collection = self.get_collection_transaction_nom()
         info_transaction = self.trouver_id_transaction()
         id_transaction = info_transaction['id_transaction']
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
