@@ -34,12 +34,13 @@ class MessagesSample(BaseCallback):
 
     def transaction_nouvelle_version_metadata(self):
         transaction = {
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8410",
+            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8413",
             "securite": "prive",
             "chemin_repertoires": "/",
-            "nom": "ExplorationGrosFichiers.txt",
-            "taille": 5476,
-            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e28",
+            "nom": "ExplorationGrosFichiers2.txt",
+            "taille": 5478,
+            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
+            "mimetype": "test/plain",
             "reception": {
                 "methode": "coupdoeil",
                 "noeud": "public1.maple.mdugre.info"
@@ -54,8 +55,8 @@ class MessagesSample(BaseCallback):
 
     def transaction_nouvelle_version_transfertcomplete(self):
         transaction = {
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8410",
-            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e28",
+            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8413",
+            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e30",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.nouvelleVersion.transfertComplete',
@@ -70,8 +71,8 @@ sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_profil_usager()
-enveloppe1 = sample.transaction_nouvelle_version_metadata()
-# enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+# enveloppe1 = sample.transaction_nouvelle_version_metadata()
+enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
 
 sample.channel.start_consuming()
 

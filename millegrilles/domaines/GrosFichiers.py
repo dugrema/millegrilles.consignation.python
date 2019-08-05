@@ -315,15 +315,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         return document_repertoire
 
-    def maj_repertoire_fichier(self, repertoire_uuid, document_fichier):
+    def maj_repertoire_fichier(self, uuid_fichier):
         """
         Met a jour l'information d'un fichier dans le document de repertoire.
         :param repertoire_uuid: Repertoire a mettre a jour.
         :param document_fichier: Information du fichier.
         :return:
         """
-
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier})
+        repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
         copie_doc_fichier = dict()
+
         champs_conserver = [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
@@ -340,13 +343,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 copie_doc_fichier[key] = document_fichier[key]
 
         # Creer l'update du repertoire
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre_rep = {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid}
         update_op = {
             '$set': {
                 '%s.%s' % (
                     ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_FICHIERS,
-                    document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]): copie_doc_fichier
+                    document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]): copie_doc_fichier,
             },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
@@ -425,6 +427,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE] = date_version
             set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE] = \
                 transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+            set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = \
+                transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+            set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = \
+                transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
 
         operations = {
             '$set': set_operations,
@@ -562,10 +568,12 @@ class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
     def ajouter_version_fichier(self):
         # Ajouter version au fichier
         transaction = self.charger_transaction()
-        self._controleur._gestionnaire_domaine.maj_fichier(transaction)
+        resultat = self._controleur._gestionnaire_domaine.maj_fichier(transaction)
 
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
+
+        return resultat
 
     def attendre_transaction_transfertcomplete(self):
         self.set_etape_suivante(
@@ -574,7 +582,13 @@ class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
 
     def confirmer_hash(self):
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
-        self.set_etape_suivante()  # Processus termine
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.maj_repertoire.__name__)  # Processus termine
+
+    def maj_repertoire(self):
+        uuid_fichier = self.parametres['uuid_fichier']
+        self._controleur._gestionnaire_domaine.maj_repertoire_fichier(uuid_fichier)
+
+        self.set_etape_suivante()  # Termine
 
     def _get_token_attente(self):
         fuuid = self.parametres.get('fuuid')
