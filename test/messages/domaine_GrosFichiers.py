@@ -36,7 +36,7 @@ class MessagesSample(BaseCallback):
         transaction = {
             "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8413",
             "securite": "prive",
-            "chemin_repertoires": "/",
+            "repertoire_uuid": 'c6da1c6e-b7cc-11e9-8c97-00155d011f00',
             "nom": "ExplorationGrosFichiers2.txt",
             "taille": 5478,
             "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
@@ -67,8 +67,8 @@ class MessagesSample(BaseCallback):
 
     def transaction_creer_repertoire(self):
         transaction = {
-            "parent_id": "b805e784-b7ba-11e9-b4bb-00155d011f00",
-            "repertoire": "sous_test",
+            "parent_id": "dcf4359c-b7cd-11e9-9cfa-00155d011f00",
+            "nom": "sous-test6-test1",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.creerRepertoire',
@@ -80,18 +80,6 @@ class MessagesSample(BaseCallback):
     def transaction_renommer_repertoire(self):
         transaction = {
             "repertoire_uuid": "8e2cb4f4-b7bc-11e9-a426-00155d011f00",
-            "repertoire": "sous_test_change_2",
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.renommerRepertoire',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Renommer repertoire complete: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def transaction_renommer_repertoire(self):
-        transaction = {
-            "repertoire_uuid": "92ddd276-b7c6-11e9-81e1-00155d011f00",
             "repertoire": "sous_test_change_2",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -118,10 +106,10 @@ sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_profil_usager()
-# enveloppe1 = sample.transaction_nouvelle_version_metadata()
+enveloppe1 = sample.transaction_nouvelle_version_metadata()
 # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
 # enveloppe3 = sample.transaction_creer_repertoire()
-enveloppe4 = sample.transaction_renommer_repertoire()
+# enveloppe4 = sample.transaction_renommer_repertoire()
 # enveloppe5 = sample.transaction_deplacer_repertoire()
 
 sample.channel.start_consuming()

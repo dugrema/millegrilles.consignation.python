@@ -30,7 +30,7 @@ class ConstantesGrosFichiers:
     REPERTOIRE_ORPHELINS = 'orphelins'
 
     DOCUMENT_SECURITE = 'securite'
-    DOCUMENT_NOMREPERTOIRE = 'repertoire'
+    DOCUMENT_NOMREPERTOIRE = 'nom'
     DOCUMENT_COMMENTAIRES = 'commentaires'
     DOCUMENT_CHEMIN = 'chemin_repertoires'
 
@@ -82,7 +82,7 @@ class ConstantesGrosFichiers:
         # Information repertoire
         DOCUMENT_REPERTOIRE_UUID: None,                 # Identificateur unique du repertoire (uuid trans originale)
         DOCUMENT_REPERTOIRE_PARENT_ID: None,            # Identificateur unique du repertoire parent
-        DOCUMENT_CHEMIN: '/chemin/repertoire',          # Chemin complet du repertoire
+        DOCUMENT_CHEMIN: '/chemin/dummy',               # Chemin complet du repertoire, excluant nom du repertoire
         DOCUMENT_NOMREPERTOIRE: 'repertoire',           # Nom du repertoire affiche a l'usager
 
         # Contenu
@@ -238,13 +238,19 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
 
         # Initialiser document repertoire racine
-        document_repertoire_racine = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/'})
+        document_repertoire_racine = collection_domaine.find_one({
+            ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+            ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+        })
         if document_repertoire_racine is None:
             # Creer le repertoire racine (parent=None)
             document_repertoire_racine = self.creer_repertoire('/', parent_uuid=None)
 
         document_repertoire_orphelins = collection_domaine.find_one(
-            {ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/%s' % ConstantesGrosFichiers.REPERTOIRE_ORPHELINS}
+            {
+                ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
+             }
         )
         if document_repertoire_orphelins is None:
             self.creer_repertoire(
@@ -311,14 +317,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         if parent_uuid is not None:
             document_parent = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: parent_uuid})
-            chemin_parent = document_parent[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
-            if chemin_parent == '/':
-                chemin_parent = ''
-            chemin = '%s/%s' % (chemin_parent, nom_repertoire)
+            chemin_gparent = document_parent[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+            nom_repertoire = document_parent[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
+            chemin_parent = '%s/%s' % (
+                chemin_gparent,
+                nom_repertoire,
+            )
+            chemin_parent = chemin_parent.replace('//', '/')
         else:
-            chemin = '/'  # Racine
+            chemin_parent = '/'  # Racine
 
-        document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin_parent
 
         self._logger.info("Insertion repertoire: %s" % str(document_repertoire))
 
@@ -430,6 +439,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         })
 
+    def refresh_chemin_sousrepertoires(self, uuid_repertoire):
+        """
+        Fait une mise a jour de tous les fichiers et sous-repertoires (recursivement) d'un repertoire suite
+        a un deplacement ou un changement de nom.
+
+        :param uuid_repertoire: Repertoire qui a ete modifie.
+        :return:
+        """
+        pass
 
     def maj_fichier(self, transaction):
         """
@@ -441,28 +459,34 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         if domaine != ConstantesGrosFichiers.TRANSACTION_TYPE_METADATA:
             raise ValueError('La transaction doit etre de type metadata. Trouve: %s' % domaine)
 
-        repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+        repertoire_uuid = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
         collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_CHEMIN: repertoire})
+        document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid})
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
         uuid_fichier = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
         if uuid_fichier is None:
             # Chercher a identifier le fichier par chemin et nom
             doc_fichier = collection_domaine.find_one({
-                ConstantesGrosFichiers.DOCUMENT_CHEMIN: transaction[ConstantesGrosFichiers.DOCUMENT_CHEMIN],
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID],
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
             })
 
             if doc_fichier is not None:
                 uuid_fichier = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
+        chemin_fichier = '%s/%s' % (
+            document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN],
+            document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE],
+        )
+        chemin_fichier = chemin_fichier.replace('///', '/').replace('//', '/')
+
         set_on_insert = ConstantesGrosFichiers.DOCUMENT_FICHIER.copy()
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] =\
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = \
             transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
-        set_on_insert[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin_fichier
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
 
         operation_currentdate = {
@@ -666,9 +690,16 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
         resultat = self._controleur._gestionnaire_domaine.maj_fichier(transaction)
 
         self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
+            ProcessusTransactionNouvelleVersionMetadata.maj_repertoire.__name__)
 
         return resultat
+
+    def maj_repertoire(self):
+        uuid_fichier = self.parametres['uuid_fichier']
+        self._controleur._gestionnaire_domaine.maj_repertoire_fichier(uuid_fichier)
+
+        self.set_etape_suivante(
+            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
 
     def attendre_transaction_transfertcomplete(self):
         self.set_etape_suivante(
@@ -677,13 +708,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
 
     def confirmer_hash(self):
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.maj_repertoire.__name__)  # Processus termine
-
-    def maj_repertoire(self):
-        uuid_fichier = self.parametres['uuid_fichier']
-        self._controleur._gestionnaire_domaine.maj_repertoire_fichier(uuid_fichier)
-
-        self.set_etape_suivante()  # Termine
+        self.set_etape_suivante()  # Processus termine
 
     def _get_token_attente(self):
         fuuid = self.parametres.get('fuuid')
@@ -784,7 +809,7 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
         self._controleur._gestionnaire_domaine.renommer_deplacer_repertoire(
             uuid_repertoire, nom_repertoire, parent_uuid=repertoire_parent_uuid)
 
-        self.set_etape_suivante(ProcessusTransactionCreerRepertoire.maj_repertoire_parent.__name__)
+        self.set_etape_suivante(ProcessusTransactionRenommerDeplacerRepertoire.maj_repertoire_parent.__name__)
 
         return {
             'uuid_repertoire': uuid_repertoire,
@@ -799,5 +824,10 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
             ancien_parent = None  # Pas de unset a faire
 
         self._controleur._gestionnaire_domaine.maj_repertoire_parent(repertoire_uuid, ancien_parent_uuid=ancien_parent)
+
+        self.set_etape_suivante(ProcessusTransactionRenommerDeplacerRepertoire.refresh_recursif_parent.__name__)
+
+    def refresh_recursif_sousrepertoires(self):
+        # A faire, un refresh recursif de tous les fichiers/repertoires sous le repertoire modifie
 
         self.set_etape_suivante()  # Termine
