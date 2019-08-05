@@ -419,6 +419,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: nom_repertoire,
             ConstantesGrosFichiers.DOCUMENT_CHEMIN: nouveau_chemin
         }
+        if parent_uuid is not None:
+            set_operation[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID] = parent_uuid
+
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
         }
@@ -439,7 +442,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             raise ValueError('La transaction doit etre de type metadata. Trouve: %s' % domaine)
 
         repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_CHEMIN: repertoire})
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
@@ -764,6 +767,9 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
         document_repertoire = collection_documents.find_one(
             {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire})
 
+        if document_repertoire is None:
+            raise ValueError("Document pour uuid repertoire %s non trouve" % uuid_repertoire)
+
         # Le processus sert a renommer et deplacer les repertoires.
         # Pour renommer, on a juste le nom et pas necessairement le parent
         # Pour deplacer, on a le nouveau parent mais pas necessairement l'ancien ni le nom
@@ -788,8 +794,8 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
 
     def maj_repertoire_parent(self):
         repertoire_uuid = self.parametres['uuid_repertoire']
-        ancien_parent = self.parametres['repertoire_parent_uuid']
-        if self.parametres['ancien_parent_uuid'] == ancien_parent:
+        ancien_parent = self.parametres['ancien_parent_uuid']
+        if self.parametres['repertoire_parent_uuid'] == ancien_parent:
             ancien_parent = None  # Pas de unset a faire
 
         self._controleur._gestionnaire_domaine.maj_repertoire_parent(repertoire_uuid, ancien_parent_uuid=ancien_parent)

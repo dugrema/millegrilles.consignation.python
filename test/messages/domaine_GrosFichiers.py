@@ -91,11 +91,23 @@ class MessagesSample(BaseCallback):
 
     def transaction_renommer_repertoire(self):
         transaction = {
-            "repertoire_uuid": "0b0b36ce-b7c4-11e9-a940-00155d011f00",
+            "repertoire_uuid": "92ddd276-b7c6-11e9-81e1-00155d011f00",
             "repertoire": "sous_test_change_2",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.renommerRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_deplacer_repertoire(self):
+        transaction = {
+            "repertoire_uuid": "92ddd276-b7c6-11e9-81e1-00155d011f00",
+            "parent_id": 'b805e784-b7ba-11e9-b4bb-00155d011f00',
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.deplacerRepertoire',
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -110,6 +122,7 @@ sample = MessagesSample()
 # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
 # enveloppe3 = sample.transaction_creer_repertoire()
 enveloppe4 = sample.transaction_renommer_repertoire()
+# enveloppe5 = sample.transaction_deplacer_repertoire()
 
 sample.channel.start_consuming()
 
