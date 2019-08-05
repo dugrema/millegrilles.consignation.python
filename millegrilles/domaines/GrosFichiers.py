@@ -19,6 +19,9 @@ class ConstantesGrosFichiers:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = 'millegrilles.domaines.GrosFichiers'
 
+    TRANSACTION_TYPE_METADATA = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata'
+    TRANSACTION_TYPE_TRANSFERTCOMPLETE = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.transfertComplete'
+
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_REPERTOIRE = 'repertoire'
     LIBVAL_FICHIER = 'fichier'
@@ -37,9 +40,10 @@ class ConstantesGrosFichiers:
     DOCUMENT_REPERTOIRE_PARENT_ID = 'parent_id'
 
     DOCUMENT_FICHIER_NOMFICHIER = 'nom'
+    DOCUMENT_FICHIER_UUID_DOC = 'uuid'                    # UUID du document de fichier (metadata)
     DOCUMENT_FICHIER_FUUID = 'fuuid'                    # UUID (v1) du fichier
     DOCUMENT_FICHIER_DATEVCOURANTE = 'date_v_courante'  # Date de la version courante
-    DOCUMENT_FICHIER_UUIDVCOURANTE = 'date_v_courante'  # FUUID de la version courante
+    DOCUMENT_FICHIER_UUIDVCOURANTE = 'fuuid_v_courante'  # FUUID de la version courante
     DOCUMENT_FICHIER_VERSIONS = 'versions'
     DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
     DOCUMENT_FICHIER_TAILLE = 'taille'
@@ -77,23 +81,22 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_FICHIER = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: None,  # Identificateur unique du fichier (UUID trans initiale)
+        DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
         DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
         DOCUMENT_COMMENTAIRES: None,                        # Commentaires
         DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
 
         # Repertoire
         DOCUMENT_REPERTOIRE_UUID: None,                     # Identificateur unique du repertoire principal
-        DOCUMENT_NOMREPERTOIRE: 'repertoire',               # Nom du repertoire (repertoire principal)
-        DOCUMENT_CHEMIN: '/chemin/repertoire',              # Chemin complet du repertoire/fichier
+        # DOCUMENT_NOMREPERTOIRE: 'repertoire',             # Nom du repertoire (repertoire principal)
+        DOCUMENT_CHEMIN: REPERTOIRE_ORPHELINS,              # Chemin complet du repertoire/fichier
 
         # Versions
-        DOCUMENT_FICHIER_VERSIONS: dict(),
-        DOCUMENT_FICHIER_DATEVCOURANTE: None,
-        DOCUMENT_FICHIER_UUIDVCOURANTE: None,
-        DOCUMENT_FICHIER_MIMETYPE: DOCUMENT_DEFAULT_MIMETYPE,
-        DOCUMENT_FICHIER_TAILLE: None,
-        DOCUMENT_FICHIER_SHA256: None,
+        # DOCUMENT_FICHIER_VERSIONS: dict(),
+        # DOCUMENT_FICHIER_DATEVCOURANTE: None,
+        # DOCUMENT_FICHIER_UUIDVCOURANTE: None,
+        # DOCUMENT_FICHIER_MIMETYPE: DOCUMENT_DEFAULT_MIMETYPE,
+        # DOCUMENT_FICHIER_TAILLE: None,
     }
 
     SOUSDOCUMENT_VERSION_FICHIER = {
@@ -323,7 +326,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         copie_doc_fichier = dict()
         champs_conserver = [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
             ConstantesGrosFichiers.DOCUMENT_SECURITE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE,
@@ -349,6 +352,95 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         }
         resultat = collection_domaine.update_one(filtre_rep, update_op)
         self._logger.debug("Resultat maj_fichier : %s" % str(resultat))
+
+    def maj_fichier(self, transaction):
+        """
+        Genere ou met a jour un document de fichier avec l'information recue dans une transaction metadata.
+        :param transaction:
+        :return: True si c'est la version la plus recent, false si la transaction est plus vieille.
+        """
+        domaine = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE)
+        if domaine != ConstantesGrosFichiers.TRANSACTION_TYPE_METADATA:
+            raise ValueError('La transaction doit etre de type metadata. Trouve: %s' % domaine)
+
+        repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_CHEMIN: repertoire})
+
+        fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        uuid_fichier = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+        if uuid_fichier is None:
+            # Chercher a identifier le fichier par chemin et nom
+            doc_fichier = collection_domaine.find_one({
+                ConstantesGrosFichiers.DOCUMENT_CHEMIN: transaction[ConstantesGrosFichiers.DOCUMENT_CHEMIN],
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+            })
+
+            if doc_fichier is not None:
+                uuid_fichier = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        set_on_insert = ConstantesGrosFichiers.DOCUMENT_FICHIER.copy()
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] =\
+            transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = \
+            transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+
+        operation_currentdate = {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+        }
+
+        plus_recente_version = True  # Lors d<une MAJ, on change la plus recente version seulement si necessaire
+        set_operations = {}
+        if uuid_fichier is None:
+            # On n'a pas reussi a identifier le fichier. On prepare un nouveau document.
+            uuid_fichier = set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+            operation_currentdate[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = True
+        else:
+            document_fichier = collection_domaine.find_one({Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_fichier})
+            # Determiner si le fichier est la plus recente version
+
+        # Filtrer transaction pour creer l'entree de version dans le fichier
+        masque_transaction = [
+            ConstantesGrosFichiers.DOCUMENT_CHEMIN,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE,
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+        ]
+        date_version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT].get('_estampille')
+        info_version = {
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: date_version
+        }
+        for key in transaction.keys():
+            if key in masque_transaction:
+                info_version[key] = transaction[key]
+        set_operations['%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid)] = info_version
+
+        if plus_recente_version:
+            set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE] = date_version
+            set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE] = \
+                transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+
+        operations = {
+            '$set': set_operations,
+            '$currentDate': operation_currentdate,
+            '$setOnInsert': set_on_insert
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+        }
+
+        self._logger.debug("maj_fichier: filtre = %s" % filtre)
+        self._logger.debug("maj_fichier: operations = %s" % operations)
+        resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+        self._logger.debug("maj_fichier resultat %s" % str(resultat))
+
+        return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier}
 
 
 class TraitementMessageMiddleware(BaseCallback):
@@ -456,34 +548,21 @@ class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
 
     def initiale(self):
         """ Sauvegarder une nouvelle version d'un fichier """
-        collection_transactions = self.contexte.document_dao.get_collection(
-            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
         transaction = self.charger_transaction()
-        fuuid = transaction['fuuid']
 
         # Vierifier si le document de fichier existe deja
-        document_fichier = None
+        self._logger.debug("Fichier existe, on ajoute une version")
+        self.set_etape_suivante(
+            ProcessusTransactionNouvelleVersionMetadata.ajouter_version_fichier.__name__)
 
-        if document_fichier is None:
-            self._logger.debug("Fichier est nouveau")
-            self.set_etape_suivante(
-                ProcessusTransactionNouvelleVersionMetadata.creer_nouveau_fichier.__name__)
-        else:
-            self._logger.debug("Fichier existe, on ajoute une version")
-            self.set_etape_suivante(
-                ProcessusTransactionNouvelleVersionMetadata.ajouter_version_fichier.__name__)
+        fuuid = transaction['fuuid']
 
         return {'fuuid': fuuid}
 
-    def creer_nouveau_fichier(self):
-        # Ajouter fichier
-
-        self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
-
     def ajouter_version_fichier(self):
         # Ajouter version au fichier
+        transaction = self.charger_transaction()
+        self._controleur._gestionnaire_domaine.maj_fichier(transaction)
 
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
