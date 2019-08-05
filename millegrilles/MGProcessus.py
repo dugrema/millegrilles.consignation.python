@@ -261,6 +261,21 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             # Declencher le traitement des processus trouves
             for processus in curseur_processus:
                 self.__logger.debug("Resumer processus %s" % str(processus))
+                filtre_processus = {Constantes.MONGO_DOC_ID: processus.get(Constantes.MONGO_DOC_ID)}
+
+                tokens_restants = list()
+                tokens_connectes = dict()
+                for token in processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE):
+                    if token not in tokens:
+                        tokens_restants.append(token)
+                    else:
+                        tokens_connectes[token] = evenement_dict.get('_id_document_processus_declencheur')
+
+                set_update = dict()
+                set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_restants
+                set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES] = tokens_connectes
+                collection_processus.update_one(filtre_processus, {'$set': set_update})
+
                 self.message_etape_suivante(processus.get('_id'),
                                             processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
                                             processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
