@@ -144,6 +144,9 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         # $push operations (toujours presente)
         push_operation = {Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPES: doc_etape}
 
+        # $set operations
+        set_operation = {}
+        unset_operation = {}
         # $addToSet operation
         addtoset_operation = {}
         tokens = doc_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKENS)
@@ -156,9 +159,11 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             if tokens_resumer is not None:
                 addtoset_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER] = {'$each': tokens_resumer}
 
+            tokens_connectes = tokens.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES)
+            if tokens_connectes is not None:
+                set_operation[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES] = tokens_connectes
+
         # $set operations
-        set_operation = {}
-        unset_operation = {}
         if etape_suivante is None:
             # Nettoyage pour finalisation du processus
             # Enlever tous les elements qui font parti d'un index / recherche de traitement actif
@@ -362,6 +367,7 @@ class MGProcessus:
         self._processus_complete = False
         self._ajouter_token_attente = None
         self._ajouter_token_resumer = None
+        self._tokens_connectes = None
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -432,12 +438,17 @@ class MGProcessus:
             if resultat is not None:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
 
+            # Verifier si on peut eviter d'attenre des tockens
+            self.verifier_attendre_token()
+
             # Ajouter tokens pour synchronisation inter-transaction.
             tokens = {}
             if self._ajouter_token_resumer is not None:
                 tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER] = self._ajouter_token_resumer
             if self._ajouter_token_attente is not None:
                 tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = self._ajouter_token_attente
+            if self._tokens_connectes is not None:
+                tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES] = self._tokens_connectes
             if len(tokens) > 0:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKENS] = tokens
 
@@ -519,23 +530,6 @@ class MGProcessus:
         self._etape_suivante = etape_suivante
         self._ajouter_token_attente = token_attente
 
-    def attendre_token(self, tokens: list):
-        """
-        Verifie si les tokens existent deja.
-        Ajoute un token pour dire que le processus est en attente d'un evenement externe.
-        :return: "True, list documents" processus si tous les tokens ont ete trouves. False si pas tous trouves.
-        """
-        liste_documents_process_trouves = None
-
-        # Chercher la collection pour les documents avec les tokens resumes correspondants aux tokens d'attente
-
-        if self._ajouter_token_attente is None:
-            self._ajouter_token_attente = tokens
-        else:
-            self._ajouter_token_attente.extend(tokens)
-
-        return False, liste_documents_process_trouves
-
     def resumer_processus(self, tokens: list):
         """
             Ajoute un token pour dire que le processus/transaction du processus est necessaire a un autre processus.
@@ -545,6 +539,51 @@ class MGProcessus:
             self._ajouter_token_resumer = tokens
         else:
             self._ajouter_token_resumer.extend(tokens)
+
+    def verifier_attendre_token(self):
+        """
+        Verifie si les tokens existent deja.
+        Ajoute un token pour dire que le processus est en attente d'un evenement externe.
+        :return: "True, list documents" processus si tous les tokens ont ete trouves. False si pas tous trouves.
+        """
+        tokens = self._ajouter_token_attente
+        if tokens is None:
+            return True, None
+
+        # Chercher la collection pour les documents avec les tokens resumes correspondants aux tokens d'attente
+        nom_collection_processus = self.get_collection_processus_nom()
+        collection_processus = self.contexte.document_dao.get_collection(nom_collection_processus)
+        filtre = {
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER: {"$in": tokens}
+        }
+        curseur = collection_processus.find(filtre)
+        dict_tokens = dict()
+        for processus_avec_tokens in curseur:
+            resume_tokens = processus_avec_tokens.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER)
+            for token in resume_tokens:
+                dict_tokens[token] = processus_avec_tokens.get(Constantes.MONGO_DOC_ID)
+
+                # Transmettre message au processus pour indiquer qu'il peut continuer
+                self._controleur.transmettre_message_continuer(
+                    processus_avec_tokens.get(Constantes.MONGO_DOC_ID),
+                    {'processus': str(self._document_processus.get(Constantes.MONGO_DOC_ID)), 'tokens': tokens}
+                )
+
+        # Conserver les tokens qui ont ete trouves
+        if len(dict_tokens) > 0:
+            self._tokens_connectes = dict_tokens
+
+        tokens_restants = list()
+        for token in tokens:
+            if token not in dict_tokens.keys():
+                tokens_restants.append(token)
+
+        if len(tokens_restants) > 0:
+            self._ajouter_token_attente = tokens_restants
+        else:
+            self._ajouter_token_attente = None
+
+        return len(tokens_restants) == 0, dict_tokens
 
     @property
     def contexte(self):
