@@ -65,6 +65,41 @@ class MessagesSample(BaseCallback):
         print("Envoi transfert complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_creer_repertoire(self):
+        transaction = {
+            "parent_id": "b805e784-b7ba-11e9-b4bb-00155d011f00",
+            "repertoire": "sous_test",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.creerRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Envoi transfert complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_renommer_repertoire(self):
+        transaction = {
+            "repertoire_uuid": "8e2cb4f4-b7bc-11e9-a426-00155d011f00",
+            "repertoire": "sous_test_change_2",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.renommerRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_renommer_repertoire(self):
+        transaction = {
+            "repertoire_uuid": "0b0b36ce-b7c4-11e9-a940-00155d011f00",
+            "repertoire": "sous_test_change_2",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.renommerRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
 
 # --- MAIN ---
 sample = MessagesSample()
@@ -72,7 +107,9 @@ sample = MessagesSample()
 # TEST
 # enveloppe = sample.requete_profil_usager()
 # enveloppe1 = sample.transaction_nouvelle_version_metadata()
-enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+# enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+# enveloppe3 = sample.transaction_creer_repertoire()
+enveloppe4 = sample.transaction_renommer_repertoire()
 
 sample.channel.start_consuming()
 

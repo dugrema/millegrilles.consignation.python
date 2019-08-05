@@ -57,6 +57,17 @@ class ConstantesGrosFichiers:
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
+    TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM
+    TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
+    TRANSACTION_DEPLACER_FICHIER = '%s.deplacerFichier' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
+    TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
+
+    TRANSACTION_CREER_REPERTOIRE = '%s.creerRepertoire' % DOMAINE_NOM
+    TRANSACTION_RENOMMER_REPERTOIRE = '%s.renommerRepertoire' % DOMAINE_NOM
+    TRANSACTION_DEPLACER_REPERTOIRE = '%s.deplacerRepertoire' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_REPERTOIRE = '%s.supprimerRepertoire' % DOMAINE_NOM
+    TRANSACTION_COMMENTER_REPERTOIRE = '%s.commenterRepertoire' % DOMAINE_NOM
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
@@ -355,6 +366,68 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         resultat = collection_domaine.update_one(filtre_rep, update_op)
         self._logger.debug("Resultat maj_fichier : %s" % str(resultat))
 
+    def maj_repertoire_parent(self, uuid_sousrepertoire, ancien_parent_uuid=None):
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_sousrepertoire})
+        parent_uuid = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
+
+        document_repertoire_resume = {
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_sousrepertoire,
+            ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE],
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: document_repertoire[ConstantesGrosFichiers.DOCUMENT_SECURITE],
+        }
+
+        set_operation = {
+            '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_SOUSREPERTOIRES, uuid_sousrepertoire):
+                document_repertoire_resume
+        }
+        resultat = collection_domaine.update_one(
+            {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: parent_uuid},
+            {
+                '$set': set_operation,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+        )
+        self._logger.debug("maj_repertoire_parent resultat: %s" % str(resultat))
+
+        if ancien_parent_uuid is not None and ancien_parent_uuid:
+            resultat = collection_domaine.update_one(
+                {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: ancien_parent_uuid},
+                {
+                    '$unset': set_operation,
+                    '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+                }
+            )
+            self._logger.debug("maj_repertoire_parent resultat unset: %s" % str(resultat))
+
+    def renommer_deplacer_repertoire(self, uuid_repertoire, nom_repertoire, parent_uuid=None):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        if parent_uuid is None:
+            # Trouver parent uuid
+            parent_document = None
+        else:
+            parent_document = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: parent_uuid})
+
+        chemin_parent = parent_document[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+        if chemin_parent == '/':
+            chemin_parent = ''
+        nouveau_chemin = '%s/%s' % (chemin_parent, nom_repertoire)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: nom_repertoire,
+            ConstantesGrosFichiers.DOCUMENT_CHEMIN: nouveau_chemin
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
+        }
+        collection_domaine.update_one(filtre, {
+            '$set': set_operation,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        })
+
+
     def maj_fichier(self, transaction):
         """
         Genere ou met a jour un document de fichier avec l'information recue dans une transaction metadata.
@@ -471,15 +544,25 @@ class TraitementMessageMiddleware(BaseCallback):
                 'destinataire.domaine.',
                 ''
             )
+
+            # Fichiers
             if routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
+
+            # Repertoires
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerRepertoire"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_RENOMMER_REPERTOIRE or \
+                    routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_REPERTOIRE:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerRepertoire"
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
             self._gestionnaire.traiter_cedule(message_dict)
         else:
@@ -546,7 +629,16 @@ class TraitementMessageNoeud(BaseCallback):
 
 
 # ******************* Processus *******************
-class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
+class ProcessusGrosFichiers(MGProcessusTransaction):
+
+    def get_collection_transaction_nom(self):
+        return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
     """ Processus de d'ajout de nouveau fichier ou nouvelle version d'un fichier """
 
     def __init__(self, controleur, evenement):
@@ -595,14 +687,8 @@ class ProcessusTransactionNouvelleVersionMetadata(MGProcessusTransaction):
         token_attente = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
         return token_attente
 
-    def get_collection_transaction_nom(self):
-        return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
 
-    def get_collection_processus_nom(self):
-        return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusTransactionNouvelleVersionTransfertComplete(MGProcessusTransaction):
+class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -626,8 +712,86 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(MGProcessusTransactio
         # Une fois les tokens consommes, le processus sera termine.
         self.set_etape_suivante()
 
-    def get_collection_transaction_nom(self):
-        return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
 
-    def get_collection_processus_nom(self):
-        return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
+class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """
+        Emet un evenement pour indiquer que le transfert complete est arrive. Comme on ne donne pas de prochaine
+        etape, une fois les tokens consommes, le processus sera termine.
+        """
+        transaction = self.charger_transaction()
+        repertoire_parent_uuid = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
+        nom_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
+
+        securite = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
+        if securite is None:
+            securite = Constantes.SECURITE_PRIVE
+
+        document_repertoire = self._controleur._gestionnaire_domaine.creer_repertoire(
+            nom_repertoire, repertoire_parent_uuid, securite=securite)
+
+        self.set_etape_suivante(ProcessusTransactionCreerRepertoire.maj_repertoire_parent.__name__)
+
+        return {'document_repertoire': document_repertoire, 'repertoire_parent_uuid': repertoire_parent_uuid}
+
+    def maj_repertoire_parent(self):
+
+        document_repertoire = self.parametres['document_repertoire']
+        repertoire_uuid = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        self._controleur._gestionnaire_domaine.maj_repertoire_parent(repertoire_uuid)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+
+        nom_repertoire = transaction.get(ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE)
+        repertoire_parent_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID)
+
+        collection_documents = self.contexte.document_dao.get_collection(
+            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_repertoire = collection_documents.find_one(
+            {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire})
+
+        # Le processus sert a renommer et deplacer les repertoires.
+        # Pour renommer, on a juste le nom et pas necessairement le parent
+        # Pour deplacer, on a le nouveau parent mais pas necessairement l'ancien ni le nom
+        if nom_repertoire is None:
+            nom_repertoire = document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
+
+        ancien_parent = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
+
+        if repertoire_parent_uuid is None:
+            repertoire_parent_uuid = ancien_parent
+
+        self._controleur._gestionnaire_domaine.renommer_deplacer_repertoire(
+            uuid_repertoire, nom_repertoire, parent_uuid=repertoire_parent_uuid)
+
+        self.set_etape_suivante(ProcessusTransactionCreerRepertoire.maj_repertoire_parent.__name__)
+
+        return {
+            'uuid_repertoire': uuid_repertoire,
+            'repertoire_parent_uuid': repertoire_parent_uuid,
+            'ancien_parent_uuid': ancien_parent
+        }
+
+    def maj_repertoire_parent(self):
+        repertoire_uuid = self.parametres['uuid_repertoire']
+        ancien_parent = self.parametres['repertoire_parent_uuid']
+        if self.parametres['ancien_parent_uuid'] == ancien_parent:
+            ancien_parent = None  # Pas de unset a faire
+
+        self._controleur._gestionnaire_domaine.maj_repertoire_parent(repertoire_uuid, ancien_parent_uuid=ancien_parent)
+
+        self.set_etape_suivante()  # Termine
