@@ -23,6 +23,9 @@ class ConstantesGrosFichiers:
     LIBVAL_REPERTOIRE = 'repertoire'
     LIBVAL_FICHIER = 'fichier'
 
+    # Repertoires speciaux
+    REPERTOIRE_ORPHELINS = 'orphelins'
+
     DOCUMENT_SECURITE = 'securite'
     DOCUMENT_NOMREPERTOIRE = 'repertoire'
     DOCUMENT_COMMENTAIRES = 'commentaires'
@@ -223,13 +226,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         # Initialiser document repertoire racine
         document_repertoire_racine = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/'})
         if document_repertoire_racine is None:
-            document_repertoire_racine = ConstantesGrosFichiers.DOCUMENT_REPERTOIRE.copy()
-            document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = '/'
-            document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = '/'
-            document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
-            self._logger.info("Insertion document racine: %s" % str(document_repertoire_racine))
+            # Creer le repertoire racine (parent=None)
+            document_repertoire_racine = self.creer_repertoire('/', parent_uuid=None)
 
-            collection_domaine.insert(document_repertoire_racine)
+        document_repertoire_orphelins = collection_domaine.find_one(
+            {ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/%s' % ConstantesGrosFichiers.REPERTOIRE_ORPHELINS}
+        )
+        if document_repertoire_orphelins is None:
+            self.creer_repertoire(
+                ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
+                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+            )
 
     def creer_index(self):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -259,9 +266,89 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
              1),
         ])
 
+        # Index par SHA256 / taille. Permet de determiner si le fichier existe deja (et juste faire un lien).
+        collection_domaine.create_index([
+            ('%s.%s' %
+             (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+              ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256),
+             1),
+            ('%s.%s' %
+             (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+              ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE),
+             1),
+        ])
 
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
+
+    def creer_repertoire(self, nom_repertoire, parent_uuid, securite=Constantes.SECURITE_PRIVE):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        document_repertoire = ConstantesGrosFichiers.DOCUMENT_REPERTOIRE.copy()
+
+        maintenant = datetime.datetime.utcnow()
+        document_repertoire[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
+        document_repertoire[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = nom_repertoire
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID] = parent_uuid
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite
+
+        if parent_uuid is not None:
+            document_parent = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: parent_uuid})
+            chemin_parent = document_parent[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+            if chemin_parent == '/':
+                chemin_parent = ''
+            chemin = '%s/%s' % (chemin_parent, nom_repertoire)
+        else:
+            chemin = '/'  # Racine
+
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin
+
+        self._logger.info("Insertion repertoire: %s" % str(document_repertoire))
+
+        collection_domaine.insert(document_repertoire)
+
+        return document_repertoire
+
+    def maj_repertoire_fichier(self, repertoire_uuid, document_fichier):
+        """
+        Met a jour l'information d'un fichier dans le document de repertoire.
+        :param repertoire_uuid: Repertoire a mettre a jour.
+        :param document_fichier: Information du fichier.
+        :return:
+        """
+
+        copie_doc_fichier = dict()
+        champs_conserver = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+        ]
+
+        for key in document_fichier.keys():
+            if key in champs_conserver:
+                copie_doc_fichier[key] = document_fichier[key]
+
+        # Creer l'update du repertoire
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre_rep = {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid}
+        update_op = {
+            '$set': {
+                '%s.%s' % (
+                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_FICHIERS,
+                    document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]): copie_doc_fichier
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        resultat = collection_domaine.update_one(filtre_rep, update_op)
+        self._logger.debug("Resultat maj_fichier : %s" % str(resultat))
 
 
 class TraitementMessageMiddleware(BaseCallback):
