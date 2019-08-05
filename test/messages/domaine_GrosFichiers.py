@@ -101,16 +101,42 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_renommer_fichier(self):
+        transaction = {
+            "uuid": "ec2626aa-b7ce-11e9-a706-00155d011f00",
+            "nom": 'Bashir Bouzouka 3!',
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.renommerFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_deplacer_fichier(self):
+        transaction = {
+            "uuid": "ec2626aa-b7ce-11e9-a706-00155d011f00",
+            "repertoire_uuid": 'c6da1c6e-b7cc-11e9-8c97-00155d011f00',
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.deplacerFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_profil_usager()
-enveloppe1 = sample.transaction_nouvelle_version_metadata()
+# enveloppe1 = sample.transaction_nouvelle_version_metadata()
 # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
 # enveloppe3 = sample.transaction_creer_repertoire()
 # enveloppe4 = sample.transaction_renommer_repertoire()
 # enveloppe5 = sample.transaction_deplacer_repertoire()
+# enveloppe6 = sample.transaction_renommer_fichier()
+enveloppe7 = sample.transaction_deplacer_fichier()
 
 sample.channel.start_consuming()
 

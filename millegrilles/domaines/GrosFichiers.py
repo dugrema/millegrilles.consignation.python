@@ -335,7 +335,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         return document_repertoire
 
-    def maj_repertoire_fichier(self, uuid_fichier):
+    def maj_repertoire_fichier(self, uuid_fichier, ancien_repertoire_uuid=None):
         """
         Met a jour l'information d'un fichier dans le document de repertoire.
         :param repertoire_uuid: Repertoire a mettre a jour.
@@ -364,16 +364,24 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         # Creer l'update du repertoire
         filtre_rep = {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid}
+        set_op = {
+            '%s.%s' % (
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_FICHIERS,
+                document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]): copie_doc_fichier,
+        }
         update_op = {
-            '$set': {
-                '%s.%s' % (
-                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_FICHIERS,
-                    document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]): copie_doc_fichier,
-            },
+            '$set': set_op,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
         resultat = collection_domaine.update_one(filtre_rep, update_op)
         self._logger.debug("Resultat maj_fichier : %s" % str(resultat))
+
+        if ancien_repertoire_uuid is not None:
+            collection_domaine.update_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: ancien_repertoire_uuid}, {
+                '$unset': set_op,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            })
+            self._logger.debug("Resultat maj_fichier unset: %s" % str(resultat))
 
     def maj_repertoire_parent(self, uuid_sousrepertoire, ancien_parent_uuid=None):
 
@@ -548,6 +556,37 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier}
 
+    def renommer_deplacer_fichier(self, uuid_doc, uuid_repertoire=None, nouveau_nom=None):
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc})
+
+        ancien_repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        set_operations = dict()
+        if nouveau_nom is not None:
+            set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nouveau_nom
+        if uuid_repertoire is not None:
+            document_repertoire = collection_domaine.find_one({
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
+            })
+            set_operations[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = uuid_repertoire
+
+            chemin_repertoire = document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
+            chemin = '%s/%s' % (chemin_repertoire, document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE])
+            chemin = chemin.replace('///', '/').replace('//', '/')
+            set_operations[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin
+
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc
+        }
+
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operations,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        })
+        self._logger.debug('renommer_deplacer_fichier resultat: %s' % str(resultat))
+
+        return {'ancien_repertoire_uuid': ancien_repertoire_uuid}
+
 
 class TraitementMessageMiddleware(BaseCallback):
 
@@ -577,6 +616,9 @@ class TraitementMessageMiddleware(BaseCallback):
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_FICHIER or \
+                    ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
 
             # Repertoires
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
@@ -825,9 +867,47 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
 
         self._controleur._gestionnaire_domaine.maj_repertoire_parent(repertoire_uuid, ancien_parent_uuid=ancien_parent)
 
-        self.set_etape_suivante(ProcessusTransactionRenommerDeplacerRepertoire.refresh_recursif_parent.__name__)
+        self.set_etape_suivante(ProcessusTransactionRenommerDeplacerRepertoire.refresh_recursif_sousrepertoires.__name__)
 
     def refresh_recursif_sousrepertoires(self):
         # A faire, un refresh recursif de tous les fichiers/repertoires sous le repertoire modifie
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_doc = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        nouveau_repertoire_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID)
+        nouveau_nom = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
+
+        resultat = self._controleur._gestionnaire_domaine.renommer_deplacer_fichier(
+            uuid_doc, uuid_repertoire=nouveau_repertoire_uuid, nouveau_nom=nouveau_nom)
+
+        # Le resultat a deja ancien_repertoire_uuid. On ajoute le nouveau pour permettre de traiter les deux.
+        resultat['fichier_uuid'] = uuid_doc
+        if nouveau_repertoire_uuid is not None:
+            resultat['repertoire_uuid'] = nouveau_repertoire_uuid
+
+        self.set_etape_suivante(ProcessusTransactionRenommerDeplacerFichier.maj_repertoire_parent.__name__)
+
+        return resultat
+
+    def maj_repertoire_parent(self):
+        fichier_uuid = self.parametres['fichier_uuid']
+        repertoire_uuid = self.parametres.get('repertoire_uuid')
+        ancien_repertoire_uuid = self.parametres.get('ancien_repertoire_uuid')
+
+        # Verifier si l'ancien et le nouveau repertoire sont le meme. Dans ce cas on
+        # ne fait aucun changement a _l'ancien_.
+        if repertoire_uuid is None or repertoire_uuid == ancien_repertoire_uuid:
+            ancien_repertoire_uuid = None
+
+        self._controleur._gestionnaire_domaine.maj_repertoire_fichier(fichier_uuid, ancien_repertoire_uuid)
 
         self.set_etape_suivante()  # Termine
