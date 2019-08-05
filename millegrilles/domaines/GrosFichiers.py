@@ -8,7 +8,7 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 
 import logging
 import datetime
-
+import uuid
 
 class ConstantesGrosFichiers:
     """ Constantes pour le domaine de GrosFichiers """
@@ -20,6 +20,33 @@ class ConstantesGrosFichiers:
     QUEUE_NOM = 'millegrilles.domaines.GrosFichiers'
 
     LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_REPERTOIRE = 'repertoire'
+    LIBVAL_FICHIER = 'fichier'
+
+    DOCUMENT_SECURITE = 'securite'
+    DOCUMENT_NOMREPERTOIRE = 'repertoire'
+    DOCUMENT_COMMENTAIRES = 'commentaires'
+    DOCUMENT_CHEMIN = 'chemin_repertoires'
+
+    DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
+    DOCUMENT_REPERTOIRE_SOUSREPERTOIRES = 'repertoires'
+    DOCUMENT_REPERTOIRE_UUID = 'repertoire_uuid'
+    DOCUMENT_REPERTOIRE_PARENT_ID = 'parent_id'
+
+    DOCUMENT_FICHIER_NOMFICHIER = 'nom'
+    DOCUMENT_FICHIER_FUUID = 'fuuid'                    # UUID (v1) du fichier
+    DOCUMENT_FICHIER_DATEVCOURANTE = 'date_v_courante'  # Date de la version courante
+    DOCUMENT_FICHIER_UUIDVCOURANTE = 'date_v_courante'  # FUUID de la version courante
+    DOCUMENT_FICHIER_VERSIONS = 'versions'
+    DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
+    DOCUMENT_FICHIER_TAILLE = 'taille'
+    DOCUMENT_FICHIER_SHA256 = 'sha256'
+
+    DOCUMENT_VERSION_NOMFICHIER = 'nom'
+    DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
+    DOCUMENT_VERSION_DATE_VERSION = 'date_version'
+
+    DOCUMENT_DEFAULT_MIMETYPE = 'application/binary'
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
@@ -27,6 +54,54 @@ class ConstantesGrosFichiers:
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+    }
+
+    DOCUMENT_REPERTOIRE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_REPERTOIRE,
+        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,   # Niveau de securite
+        DOCUMENT_COMMENTAIRES: None,
+
+        # Information repertoire
+        DOCUMENT_REPERTOIRE_UUID: None,                 # Identificateur unique du repertoire (uuid trans originale)
+        DOCUMENT_REPERTOIRE_PARENT_ID: None,            # Identificateur unique du repertoire parent
+        DOCUMENT_CHEMIN: '/chemin/repertoire',          # Chemin complet du repertoire
+        DOCUMENT_NOMREPERTOIRE: 'repertoire',           # Nom du repertoire affiche a l'usager
+
+        # Contenu
+        DOCUMENT_REPERTOIRE_FICHIERS: dict(),           # Liste des fichiers, cle: uuid, valeur: doc fichier filtre
+        DOCUMENT_REPERTOIRE_SOUSREPERTOIRES: dict(),    # Liste des sous-repertoires, cle: uuid, valeur: doc rep filtre
+    }
+
+    DOCUMENT_FICHIER = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: None,  # Identificateur unique du fichier (UUID trans initiale)
+        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
+        DOCUMENT_COMMENTAIRES: None,                        # Commentaires
+        DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
+
+        # Repertoire
+        DOCUMENT_REPERTOIRE_UUID: None,                     # Identificateur unique du repertoire principal
+        DOCUMENT_NOMREPERTOIRE: 'repertoire',               # Nom du repertoire (repertoire principal)
+        DOCUMENT_CHEMIN: '/chemin/repertoire',              # Chemin complet du repertoire/fichier
+
+        # Versions
+        DOCUMENT_FICHIER_VERSIONS: dict(),
+        DOCUMENT_FICHIER_DATEVCOURANTE: None,
+        DOCUMENT_FICHIER_UUIDVCOURANTE: None,
+        DOCUMENT_FICHIER_MIMETYPE: DOCUMENT_DEFAULT_MIMETYPE,
+        DOCUMENT_FICHIER_TAILLE: None,
+        DOCUMENT_FICHIER_SHA256: None,
+    }
+
+    SOUSDOCUMENT_VERSION_FICHIER = {
+        DOCUMENT_FICHIER_FUUID: None,
+        DOCUMENT_FICHIER_NOMFICHIER: None,
+        DOCUMENT_FICHIER_MIMETYPE: DOCUMENT_DEFAULT_MIMETYPE,
+        DOCUMENT_VERSION_DATE_FICHIER: None,
+        DOCUMENT_VERSION_DATE_VERSION: None,
+        DOCUMENT_FICHIER_TAILLE: None,
+        DOCUMENT_FICHIER_SHA256: None,
+        DOCUMENT_COMMENTAIRES: None,
     }
 
 
@@ -95,6 +170,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         )
 
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
+        self.creer_index()  # Creer index dans MongoDB
 
     def traiter_cedule(self, evenement):
         pass
@@ -143,6 +219,46 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             collection_domaine.insert(configuration_initiale)
         else:
             self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
+
+        # Initialiser document repertoire racine
+        document_repertoire_racine = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/'})
+        if document_repertoire_racine is None:
+            document_repertoire_racine = ConstantesGrosFichiers.DOCUMENT_REPERTOIRE.copy()
+            document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = '/'
+            document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = '/'
+            document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
+            self._logger.info("Insertion document racine: %s" % str(document_repertoire_racine))
+
+            collection_domaine.insert(document_repertoire_racine)
+
+    def creer_index(self):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        # Creer un index pour les chemins et noms de fichiers. L'index est unique (empeche duplication).
+        collection_domaine.create_index([
+            (ConstantesGrosFichiers.DOCUMENT_CHEMIN, 1),
+            (ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE, 1),
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER, 1)
+        ], unique=True)
+
+        # Index pour trouver un repertoire par UUID
+        collection_domaine.create_index([
+            (ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID, 1),
+        ])
+
+        # Index pour trouver un fichier par UUID
+        collection_domaine.create_index([
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID, 1),
+        ])
+
+        # Index pour trouver une version de fichier par FUUID
+        collection_domaine.create_index([
+            ('%s.%s' %
+             (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+              ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID),
+             1),
+        ])
+
 
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
