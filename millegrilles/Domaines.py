@@ -395,9 +395,15 @@ class WatcherCollectionMongoThread:
                     full_document = change_event['fullDocument']
                     self.__logger.debug("Watcher document recu: %s" % str(full_document))
 
+                    # Ajuster la routing key pour ajouter information si necessaire.
+                    routing_key = self.__routing_key
+                    mg_libelle = full_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+                    if mg_libelle is not None:
+                        routing_key = '%s.%s' % (routing_key, mg_libelle)
+
                     # Transmettre document sur MQ
                     self.__contexte.message_dao.transmettre_message_noeuds(
-                        full_document, self.__routing_key, encoding=MongoJSONEncoder)
+                        full_document, routing_key, encoding=MongoJSONEncoder)
                 except StopIteration:
                     self.__logger.info("Arret watcher dans l'iteration courante")
 

@@ -18,12 +18,16 @@ class ConstantesGrosFichiers:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = 'millegrilles.domaines.GrosFichiers'
+    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_GrosFichiers'
 
     TRANSACTION_TYPE_METADATA = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata'
     TRANSACTION_TYPE_TRANSFERTCOMPLETE = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.transfertComplete'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_REPERTOIRE = 'repertoire'
+    LIBVAL_REPERTOIRE_RACINE = 'repertoire.racine'
+    LIBVAL_REPERTOIRE_ORPHELINS = 'repertoire.orphelins'
+    LIBVAL_REPERTOIRE_CORBEILLE = 'repertoire.corbeille'
     LIBVAL_FICHIER = 'fichier'
 
     # Repertoires speciaux
@@ -192,6 +196,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
         self.creer_index()  # Creer index dans MongoDB
 
+    def demarrer(self):
+        super().demarrer()
+        self.demarrer_watcher_collection(
+            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
+
     def traiter_cedule(self, evenement):
         pass
 
@@ -272,20 +281,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         document_repertoire_racine = self.get_document_racine()
         if document_repertoire_racine is None:
             # Creer le repertoire racine (parent=None)
-            document_repertoire_racine = self.creer_repertoire('/', parent_uuid=None)
+            document_repertoire_racine = self.creer_repertoire(
+                '/', parent_uuid=None, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE)
 
         document_repertoire_orphelins = self.get_document_orphelins()
         if document_repertoire_orphelins is None:
             self.creer_repertoire(
                 ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
-                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID],
+                libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS
             )
 
         document_repertoire_corbeille = self.get_document_corbeille()
         if document_repertoire_corbeille is None:
             self.creer_repertoire(
                 ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
-                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID],
+                libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE
             )
 
     def creer_index(self):
@@ -297,6 +309,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             (ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE, 1),
             (ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER, 1)
         ], unique=True)
+
+        # Index _mg-libelle
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+        ])
 
         # Index pour trouver un repertoire par UUID
         collection_domaine.create_index([
@@ -331,10 +348,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
 
-    def creer_repertoire(self, nom_repertoire, parent_uuid, securite=Constantes.SECURITE_PRIVE):
+    def creer_repertoire(self, nom_repertoire, parent_uuid, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         document_repertoire = ConstantesGrosFichiers.DOCUMENT_REPERTOIRE.copy()
+
+        document_repertoire[Constantes.DOCUMENT_INFODOC_LIBELLE] = libelle
 
         maintenant = datetime.datetime.utcnow()
         document_repertoire[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
