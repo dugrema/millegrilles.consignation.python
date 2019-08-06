@@ -125,6 +125,17 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_supprimer_fichier(self):
+        transaction = {
+            "uuid": "ec2626aa-b7ce-11e9-a706-00155d011f00",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.supprimerFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
 # --- MAIN ---
 sample = MessagesSample()
 
@@ -136,7 +147,8 @@ sample = MessagesSample()
 # enveloppe4 = sample.transaction_renommer_repertoire()
 # enveloppe5 = sample.transaction_deplacer_repertoire()
 # enveloppe6 = sample.transaction_renommer_fichier()
-enveloppe7 = sample.transaction_deplacer_fichier()
+# enveloppe7 = sample.transaction_deplacer_fichier()
+enveloppe8 = sample.transaction_supprimer_fichier()
 
 sample.channel.start_consuming()
 

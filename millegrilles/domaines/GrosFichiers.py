@@ -28,6 +28,7 @@ class ConstantesGrosFichiers:
 
     # Repertoires speciaux
     REPERTOIRE_ORPHELINS = 'orphelins'
+    REPERTOIRE_CORBEILLE = 'corbeille'
 
     DOCUMENT_SECURITE = 'securite'
     DOCUMENT_NOMREPERTOIRE = 'nom'
@@ -48,6 +49,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
     DOCUMENT_FICHIER_TAILLE = 'taille'
     DOCUMENT_FICHIER_SHA256 = 'sha256'
+    DOCUMENT_FICHIER_SUPPRIME = 'supprime'
 
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
@@ -210,6 +212,34 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
     def get_collection_processus_nom(self):
         return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
 
+    def get_document_racine(self):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_repertoire_racine = collection_domaine.find_one({
+            ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+            ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+        })
+        return document_repertoire_racine
+
+    def get_document_corbeille(self):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_repertoire_corbeille = collection_domaine.find_one(
+            {
+                ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
+             }
+        )
+        return document_repertoire_corbeille
+
+    def get_document_orphelins(self):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_repertoire_orphelins = collection_domaine.find_one(
+            {
+                ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
+             }
+        )
+        return document_repertoire_orphelins
+
     def traiter_requete_noeud(self, ch, method, properties, body):
         self._traitement_noeud.callbackAvecAck(ch, method, properties, body)
 
@@ -238,23 +268,22 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
 
         # Initialiser document repertoire racine
-        document_repertoire_racine = collection_domaine.find_one({
-            ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
-            ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
-        })
+        document_repertoire_racine = self.get_document_racine()
         if document_repertoire_racine is None:
             # Creer le repertoire racine (parent=None)
             document_repertoire_racine = self.creer_repertoire('/', parent_uuid=None)
 
-        document_repertoire_orphelins = collection_domaine.find_one(
-            {
-                ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
-                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
-             }
-        )
+        document_repertoire_orphelins = self.get_document_orphelins()
         if document_repertoire_orphelins is None:
             self.creer_repertoire(
                 ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
+                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+            )
+
+        document_repertoire_corbeille = self.get_document_corbeille()
+        if document_repertoire_corbeille is None:
+            self.creer_repertoire(
+                ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
                 parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
             )
 
@@ -323,7 +352,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 chemin_gparent,
                 nom_repertoire,
             )
-            chemin_parent = chemin_parent.replace('//', '/')
+            chemin_parent = chemin_parent.replace('///', '/').replace('//', '/')
         else:
             chemin_parent = '/'  # Racine
 
@@ -344,7 +373,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         """
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier})
-        repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        supprime_flag = document_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME)
+        if not supprime_flag:
+            repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        else:
+            document_corbeille = self.get_document_corbeille()
+            repertoire_uuid = document_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+
         copie_doc_fichier = dict()
 
         champs_conserver = [
@@ -587,6 +622,33 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         return {'ancien_repertoire_uuid': ancien_repertoire_uuid}
 
+    def supprimer_fichier(self, uuid_doc):
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operations = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True,
+        }
+
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operations,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        })
+        self._logger.debug('renommer_deplacer_fichier resultat: %s' % str(resultat))
+
+        # Trouver l'information de repertoires pour prochain processus
+        document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc})
+        repertoire_corbeille = self.get_document_corbeille()
+        uuid_repertoire_corbeille = repertoire_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        ancien_repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+
+        return {
+            'ancien_repertoire_uuid': ancien_repertoire_uuid,
+            'corbeille': uuid_repertoire_corbeille
+        }
+
 
 class TraitementMessageMiddleware(BaseCallback):
 
@@ -617,8 +679,10 @@ class TraitementMessageMiddleware(BaseCallback):
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_FICHIER or \
-                    ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
+                    routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
 
             # Repertoires
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
@@ -911,3 +975,31 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiers):
         self._controleur._gestionnaire_domaine.maj_repertoire_fichier(fichier_uuid, ancien_repertoire_uuid)
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_doc = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        resultat = self._controleur._gestionnaire_domaine.supprimer_fichier(uuid_doc)
+        # Le resultat contient ancien_repertoire_uuid.
+
+        self.set_etape_suivante(ProcessusTransactionRenommerDeplacerFichier.maj_repertoire_parent.__name__)
+
+        resultat['fichier_uuid'] = uuid_doc
+
+        return resultat
+
+    def maj_repertoire_parent(self):
+        fichier_uuid = self.parametres['fichier_uuid']
+        ancien_repertoire_uuid = self.parametres.get('ancien_repertoire_uuid')
+
+        self._controleur._gestionnaire_domaine.maj_repertoire_fichier(fichier_uuid, ancien_repertoire_uuid)
+
+        self.set_etape_suivante()  # Termine
+
