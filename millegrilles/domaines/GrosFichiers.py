@@ -50,6 +50,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_TAILLE = 'taille'
     DOCUMENT_FICHIER_SHA256 = 'sha256'
     DOCUMENT_FICHIER_SUPPRIME = 'supprime'
+    DOCUMENT_FICHIER_SUPPRIME_DATE = 'supprime_date'
 
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
@@ -423,6 +424,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_sousrepertoire})
         parent_uuid = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
+        supprime_flag = document_repertoire.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME)
+        if supprime_flag == True:
+            document_corbeille = self.get_document_corbeille()
+            parent_uuid = document_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
 
         document_repertoire_resume = {
             ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_sousrepertoire,
@@ -625,6 +630,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
     def supprimer_fichier(self, uuid_doc):
         collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
+        # Trouver l'information de repertoires pour prochain processus
+        # On le fait a l'avance pour eviter de commencer les changements et trouver qu'on manque d'info
+        document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc})
+        repertoire_corbeille = self.get_document_corbeille()
+        uuid_repertoire_corbeille = repertoire_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        ancien_repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+
         set_operations = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True,
         }
@@ -634,20 +646,76 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operations,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME_DATE: True
+            },
         })
-        self._logger.debug('renommer_deplacer_fichier resultat: %s' % str(resultat))
-
-        # Trouver l'information de repertoires pour prochain processus
-        document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc})
-        repertoire_corbeille = self.get_document_corbeille()
-        uuid_repertoire_corbeille = repertoire_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
-        ancien_repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
 
         return {
             'ancien_repertoire_uuid': ancien_repertoire_uuid,
             'corbeille': uuid_repertoire_corbeille
         }
+
+    def supprimer_repertoire(self, uuid_doc):
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        # Trouver l'information de repertoires pour prochain processus
+        # On le fait a l'avance pour eviter de commencer les changements et trouver qu'on manque d'info
+        document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_doc})
+        repertoire_corbeille = self.get_document_corbeille()
+        uuid_repertoire_corbeille = repertoire_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        ancien_repertoire_uuid = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
+
+        set_operations = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True,
+        }
+
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_doc
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operations,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME_DATE: True,
+            },
+        })
+        self._logger.debug('supprimer_repertoire resultat: %s' % str(resultat))
+
+        return {
+            'ancien_repertoire_uuid': ancien_repertoire_uuid,
+            'corbeille': uuid_repertoire_corbeille
+        }
+
+    def maj_commentaire_repertoire(self, uuid_repertoire, commentaire):
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation
+        })
+        self._logger.debug('maj_commentaire_repertoire resultat: %s' % str(resultat))
+
+    def maj_commentaire_fichier(self, uuid_fichier, commentaire):
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation
+        })
+        self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
 
 
 class TraitementMessageMiddleware(BaseCallback):
@@ -683,6 +751,8 @@ class TraitementMessageMiddleware(BaseCallback):
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
 
             # Repertoires
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
@@ -690,6 +760,11 @@ class TraitementMessageMiddleware(BaseCallback):
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_RENOMMER_REPERTOIRE or \
                     routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_REPERTOIRE:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerRepertoire"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_REPERTOIRE:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerRepertoire"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_COMMENTER_REPERTOIRE:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterRepertoire"
+
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
@@ -1000,6 +1075,62 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiers):
         ancien_repertoire_uuid = self.parametres.get('ancien_repertoire_uuid')
 
         self._controleur._gestionnaire_domaine.maj_repertoire_fichier(fichier_uuid, ancien_repertoire_uuid)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionSupprimerRepertoire(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+
+        resultat = self._controleur._gestionnaire_domaine.supprimer_repertoire(uuid_repertoire)
+        # Le resultat contient ancien_repertoire_uuid.
+
+        self.set_etape_suivante(ProcessusTransactionSupprimerRepertoire.maj_repertoire_parent.__name__)
+
+        resultat['uuid_repertoire'] = uuid_repertoire
+
+        return resultat
+
+    def maj_repertoire_parent(self):
+        uuid_repertoire = self.parametres['uuid_repertoire']
+        ancien_repertoire_uuid = self.parametres.get('ancien_repertoire_uuid')
+
+        self._controleur._gestionnaire_domaine.maj_repertoire_parent(
+            uuid_repertoire, ancien_parent_uuid=ancien_repertoire_uuid)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionCommenterRepertoire(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
+        self._controleur._gestionnaire_domaine.maj_commentaire_repertoire(uuid_repertoire, commentaire)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
+        self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, commentaire)
 
         self.set_etape_suivante()  # Termine
 

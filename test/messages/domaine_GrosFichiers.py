@@ -136,6 +136,41 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_supprimer_repertoire(self):
+        transaction = {
+            "repertoire_uuid": "392405b4-b7cd-11e9-831d-00155d011f00",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.supprimerRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_commenter_repertoire(self):
+        transaction = {
+            "repertoire_uuid": "408f2b1c-b7cd-11e9-831d-00155d011f00",
+            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.commenterRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_commenter_fichier(self):
+        transaction = {
+            "uuid": "1127ef4a-b7d1-11e9-8ec6-00155d011f00",
+            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.commenterFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
 # --- MAIN ---
 sample = MessagesSample()
 
@@ -148,7 +183,11 @@ sample = MessagesSample()
 # enveloppe5 = sample.transaction_deplacer_repertoire()
 # enveloppe6 = sample.transaction_renommer_fichier()
 # enveloppe7 = sample.transaction_deplacer_fichier()
-enveloppe8 = sample.transaction_supprimer_fichier()
+# enveloppe8 = sample.transaction_supprimer_fichier()
+# enveloppe9 = sample.transaction_supprimer_repertoire()
+# enveloppe10 = sample.transaction_commenter_repertoire()
+enveloppe11 = sample.transaction_commenter_fichier()
+
 
 sample.channel.start_consuming()
 
