@@ -418,7 +418,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 copie_doc_fichier[key] = document_fichier[key]
 
         # Creer l'update du repertoire
-        filtre_rep = {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid}
+        filtre_rep = {
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid,
+            '$or': [
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE},
+            ]
+        }
         set_op = {
             '%s.%s' % (
                 ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_FICHIERS,
@@ -432,10 +440,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self._logger.debug("Resultat maj_fichier : %s" % str(resultat))
 
         if ancien_repertoire_uuid is not None:
-            collection_domaine.update_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: ancien_repertoire_uuid}, {
-                '$unset': set_op,
-                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            })
+            collection_domaine.update_one(
+                {
+                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: ancien_repertoire_uuid,
+                    '$or': [
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE},
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE},
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS},
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE},
+                    ]
+                },
+                {
+                    '$unset': set_op,
+                    '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+                })
             self._logger.debug("Resultat maj_fichier unset: %s" % str(resultat))
 
     def maj_repertoire_parent(self, uuid_sousrepertoire, ancien_parent_uuid=None):
@@ -469,7 +487,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         if ancien_parent_uuid is not None and ancien_parent_uuid:
             resultat = collection_domaine.update_one(
-                {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: ancien_parent_uuid},
+                {
+                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: ancien_parent_uuid,
+                    '$or': [
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE},
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE},
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS},
+                        {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE},
+                    ]
+                },
                 {
                     '$unset': set_operation,
                     '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
@@ -498,8 +524,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         if parent_uuid is not None:
             set_operation[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID] = parent_uuid
 
+        # On ne permet pas de deplacer les repertoires speciaux (racine, corbeille, etc.)
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE
         }
         collection_domaine.update_one(filtre, {
             '$set': set_operation,
@@ -605,7 +633,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             '$setOnInsert': set_on_insert
         }
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
 
         self._logger.debug("maj_fichier: filtre = %s" % filtre)
@@ -625,7 +654,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nouveau_nom
         if uuid_repertoire is not None:
             document_repertoire = collection_domaine.find_one({
-                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire,
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE
             })
             set_operations[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = uuid_repertoire
 
@@ -635,7 +665,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             set_operations[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin
 
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
 
         resultat = collection_domaine.update_one(filtre, {
@@ -661,7 +692,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         }
 
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operations,
@@ -691,8 +723,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True,
         }
 
+        # On ne permet pas de supprimer les repertoires speciaux (racine, corbeille, etc.)
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_doc
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_doc,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE,
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operations,
@@ -715,7 +749,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
         }
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire,
+            '$or': [
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE},
+            ]
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation
@@ -729,7 +769,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
         }
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation

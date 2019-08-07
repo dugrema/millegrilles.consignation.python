@@ -80,7 +80,7 @@ class MessagesSample(BaseCallback):
     def transaction_renommer_repertoire(self):
         transaction = {
             "repertoire_uuid": "8e2cb4f4-b7bc-11e9-a426-00155d011f00",
-            "repertoire": "sous_test_change_2",
+            "nom": "sous_test_change_2",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.renommerRepertoire',
