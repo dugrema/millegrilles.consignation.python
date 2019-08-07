@@ -185,8 +185,8 @@ sample = MessagesSample()
 # enveloppe7 = sample.transaction_deplacer_fichier()
 # enveloppe8 = sample.transaction_supprimer_fichier()
 # enveloppe9 = sample.transaction_supprimer_repertoire()
-# enveloppe10 = sample.transaction_commenter_repertoire()
-enveloppe11 = sample.transaction_commenter_fichier()
+enveloppe10 = sample.transaction_commenter_repertoire()
+# enveloppe11 = sample.transaction_commenter_fichier()
 
 
 sample.channel.start_consuming()

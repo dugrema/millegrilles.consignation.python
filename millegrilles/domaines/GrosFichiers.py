@@ -714,7 +714,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         # Trouver l'information de repertoires pour prochain processus
         # On le fait a l'avance pour eviter de commencer les changements et trouver qu'on manque d'info
-        document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_doc})
+        document_repertoire = collection_domaine.find_one({
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_doc,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE,
+        })
         repertoire_corbeille = self.get_document_corbeille()
         uuid_repertoire_corbeille = repertoire_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
         ancien_repertoire_uuid = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
