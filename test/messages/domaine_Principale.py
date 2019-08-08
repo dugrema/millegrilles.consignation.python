@@ -57,13 +57,25 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def ajouter_token(self):
+
+        token = {
+            'cle': 'cle_3'
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            token, 'millegrilles.domaines.Principale.ajouterToken', reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_profil_usager()
-enveloppe = sample.envoyer_empreinte()
+# enveloppe = sample.envoyer_empreinte()
+enveloppe = sample.ajouter_token()
 
 sample.channel.start_consuming()
 

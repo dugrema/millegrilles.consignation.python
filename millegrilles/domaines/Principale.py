@@ -26,6 +26,7 @@ class ConstantesPrincipale:
     TRANSACTION_ACTION_FERMERALERTE = 'fermerAlerte'
     TRANSACTION_ACTION_CREERALERTE = 'creerAlerte'
     TRANSACTION_ACTION_CREEREMPREINTE = 'creerEmpreinte'
+    TRANSACTION_ACTION_AJOUTER_TOKEN = 'ajouterToken'
 
     DOCUMENT_ALERTES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
@@ -229,16 +230,18 @@ class TraitementMessagePrincipale(BaseCallback):
             )
             if routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_FERMERALERTE:
                 processus = "millegrilles_domaines_Principale:ProcessusFermerAlerte"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
             elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREERALERTE:
                 processus = "millegrilles_domaines_Principale:ProcessusCreerAlerte"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
             elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREEREMPREINTE:
                 processus = "millegrilles_domaines_Principale:ProcessusCreerEmpreinte"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
+            elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_AJOUTER_TOKEN:
+                processus = "millegrilles_domaines_Principale:ProcessusAjouterToken"
             else:
                 # Type de transaction inconnue, on lance une exception
                 raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
@@ -388,6 +391,37 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
 
     def empreinte(self):
         transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
+
+        operation = {
+            '$unset': {'empreinte_absente': True},
+            '$push': {'cles': transaction['cle']}
+        }
+        documents = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER}, operation)
+
+        if resultat.modified_count != 1:
+            raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
+
+        self.set_etape_suivante()  # Termine
+
+    def get_collection_transaction_nom(self):
+        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusAjouterToken(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
+
+        if transaction.get('cle') is None:
+            self.set_etape_suivante()  # On arrete le traitement
+            return {'erreur': 'Cle manquante de la transaction', 'succes': False}
 
         operation = {
             '$unset': {'empreinte_absente': True},
