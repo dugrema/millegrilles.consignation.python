@@ -382,10 +382,10 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
+        self._helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
 
     def initiale(self):
-        helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
-        liste_fingerprints = helper.identifier_certificats_non_valide()
+        liste_fingerprints = self._helper.identifier_certificats_non_valide()
 
         resultat = {}
         if len(liste_fingerprints) > 0:
@@ -434,10 +434,9 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
 
     def marquer_certificats_valides(self):
         parametres = self.parametres
-        helper = PKIDocumentHelper(self._controleur.contexte)
 
         fingerprints = parametres.get(ProcessusVerifierChaineCertificatsNonValides.PARAM_VALIDE)
-        helper.marquer_certificats_valides(fingerprints)
+        self._helper.marquer_certificats_valides(fingerprints)
 
         if len(parametres[ProcessusVerifierChaineCertificatsNonValides.PARAM_INVALIDE]) > 0:
             self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.chercher_certificats_invalides.__name__)
