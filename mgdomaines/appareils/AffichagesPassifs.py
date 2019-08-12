@@ -264,7 +264,7 @@ class DocumentCallback(BaseCallback):
 
         # Determiner type de message
         documents = list()
-        if routing_key.startsWith('noeuds.source.millegrilles_domaines_SenseursPassifs.documents'):
+        if routing_key.startswith('noeuds.source.millegrilles_domaines_SenseursPassifs.documents'):
             # Probablement une mise a jour d'un document existant
             documents = [message_json]
             document_keys = self.documents.keys()
