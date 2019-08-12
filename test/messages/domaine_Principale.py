@@ -73,9 +73,9 @@ class MessagesSample(BaseCallback):
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.requete_profil_usager()
+enveloppe = sample.requete_profil_usager()
 # enveloppe = sample.envoyer_empreinte()
-enveloppe = sample.ajouter_token()
+# enveloppe = sample.ajouter_token()
 
 sample.channel.start_consuming()
 

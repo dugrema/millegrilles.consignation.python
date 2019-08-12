@@ -34,12 +34,12 @@ class TransactionConfiguration:
             Constantes.CONFIG_MQ_PASSWORD: None,
             Constantes.CONFIG_MQ_SSL: 'on',  # Options on, off.
             Constantes.CONFIG_MQ_AUTH_CERT: 'off',  # Options on, off.
-        }
-
-        self._pki_config = {
             Constantes.CONFIG_MQ_KEYFILE: Constantes.DEFAUT_KEYFILE,
             Constantes.CONFIG_MQ_CERTFILE: Constantes.DEFAUT_CERTFILE,
             Constantes.CONFIG_MQ_CA_CERTS: Constantes.DEFAUT_CA_CERTS,
+        }
+
+        self._pki_config = {
             Constantes.CONFIG_PKI_WORKDIR: Constantes.DEFAUT_PKI_WORKDIR,
         }
 
@@ -170,27 +170,27 @@ class TransactionConfiguration:
 
     @property
     def mq_keyfile(self):
-        return self._pki_config[Constantes.CONFIG_MQ_KEYFILE]
+        return self._mq_config[Constantes.CONFIG_MQ_KEYFILE]
 
     @property
     def mq_certfile(self):
-        return self._pki_config[Constantes.CONFIG_MQ_CERTFILE]
+        return self._mq_config[Constantes.CONFIG_MQ_CERTFILE]
 
     @property
     def mq_cafile(self):
-        return self._pki_config[Constantes.CONFIG_MQ_CA_CERTS]
+        return self._mq_config[Constantes.CONFIG_MQ_CA_CERTS]
 
     @property
     def pki_keyfile(self):
-        return self._pki_config[Constantes.CONFIG_MQ_KEYFILE]
+        return self._mq_config[Constantes.CONFIG_MQ_KEYFILE]
 
     @property
     def pki_certfile(self):
-        return self._pki_config[Constantes.CONFIG_MQ_CERTFILE]
+        return self._mq_config[Constantes.CONFIG_MQ_CERTFILE]
 
     @property
     def pki_cafile(self):
-        return self._pki_config[Constantes.CONFIG_MQ_CA_CERTS]
+        return self._mq_config[Constantes.CONFIG_MQ_CA_CERTS]
 
     @property
     def pki_workdir(self):
