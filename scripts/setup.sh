@@ -5,20 +5,22 @@
 GIT_NAME=MilleGrilles.consignation.python
 GIT_FOLDER=$SRC_FOLDER/$GIT_NAME
 
-REQ_FILE=$GIT_FOLDER/requirements.txt
-if [ ! -f $REQ_FILE ]; then
-    echo Fichier $REQ_FILE introuvable
-
-    echo Repertoire git: $GIT_FOLDER
-    echo Repertoire src: $SRC_FOLDER
-
-    ls -la $SRC_FOLDER
-    ls -la $GIT_FOLDER
-    exit 1
-fi
-
-echo "Installer dependances Python avec pip: fichier $REQ_FILE"
-pip3 install --no-cache-dir -r $REQ_FILE
+# Note: les requirements doivent etre installes dans l'image Python de base
+#       (MilleGrilles.consignation/dockerfiles/millegrilles-python)
+#REQ_FILE=$GIT_FOLDER/requirements.txt
+#if [ ! -f $REQ_FILE ]; then
+#    echo Fichier $REQ_FILE introuvable
+#
+#    echo Repertoire git: $GIT_FOLDER
+#    echo Repertoire src: $SRC_FOLDER
+#
+#    ls -la $SRC_FOLDER
+#    ls -la $GIT_FOLDER
+#    exit 1
+#fi
+#
+#echo "Installer dependances Python avec pip: fichier $REQ_FILE"
+#pip3 install --no-cache-dir -r $REQ_FILE
 
 echo Installer package MilleGrilles.consignation
 cd $GIT_FOLDER
