@@ -193,6 +193,10 @@ class TransactionConfiguration:
         return self._pki_config[Constantes.CONFIG_MQ_CA_CERTS]
 
     @property
+    def pki_workdir(self):
+        return self._pki_config[Constantes.CONFIG_PKI_WORKDIR]
+
+    @property
     def nom_millegrille(self):
         return self._millegrille_config[Constantes.CONFIG_NOM_MILLEGRILLE]
 

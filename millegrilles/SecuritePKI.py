@@ -7,6 +7,7 @@ import binascii
 import os
 import datetime
 import subprocess
+import tempfile
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -471,9 +472,12 @@ class VerificateurCertificats(UtilCertificats):
 
         self._cache_certificats_ca = dict()
         self._cache_certificats_fingerprint = dict()
-        self._root_ca_path = self.configuration.pki_cafile
+        self._liste_CAs_connus = []  # Fingerprint de tous les CAs connus, trusted et untrusted
 
-        self._initialiser_untrusted_ca()
+        self.__untrusted_CAs_filename = None
+        self.__untrusted_CAs_writer = None
+
+        self._initialiser_cas()
 
     def charger_certificat(self, fichier=None, fingerprint=None):
         # Tenter de charger a partir d'une copie locale
@@ -501,12 +505,16 @@ class VerificateurCertificats(UtilCertificats):
 
             if not enveloppe.est_verifie:
                 # Verifier la chaine de ce certificat
-                self._verifier_chaine(enveloppe)
-                self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
-
                 if enveloppe.is_CA:
                     # Ajouter dans le fichier temp des untrusted CAs pour openssl
-                    self._logger.debug("Conserver cert CA dans untrusted: %s" % enveloppe.fingerprint_ascii)
+                    # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
+                    # sont pas chargees en ordre. On le conserve quand meme.
+                    if enveloppe.fingerprint_ascii not in self._liste_CAs_connus:
+                        self._logger.debug("Conserver cert CA dans untrusted: %s" % enveloppe.fingerprint_ascii)
+                        self._ajouter_untrusted_ca(enveloppe)
+
+                self._verifier_chaine(enveloppe)
+                self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
         else:
             raise ValueError("Certificat ne peut pas etre charge")
@@ -514,13 +522,25 @@ class VerificateurCertificats(UtilCertificats):
         return enveloppe
 
     def _ajouter_untrusted_ca(self, enveloppe: EnveloppeCertificat):
-        pass
 
-    def _initialiser_untrusted_ca(self):
+        if self.__untrusted_CAs_writer is None:
+            # Ouvrir un fichier pour ecrire les untrusted CAs. Le fichier reste ouvert pour eviter qu'il soit
+            # modifie ou efface par un processus tiers.
+            workdir = self.configuration.pki_workdir
+            self.__untrusted_CAs_filename = tempfile.mktemp(prefix='untrusted.', suffix='.cert.pem', dir=workdir)
+            self.__untrusted_CAs_writer = open(self.__untrusted_CAs_filename, 'w')
+
+        self.__untrusted_CAs_writer.write(enveloppe.certificat_pem)
+        self.__untrusted_CAs_writer.flush()
+
+    def _initialiser_cas(self):
         """
-        Re-initialise le fichier dynamique des untrusted CAs pour openssl.
+        Initialise la liste des CA connus et ouvre un fichier pour les untrusted CAs.
         :return:
         """
+        # Charger le root CAs. On garde les fingerprints en memoire pour indiquer qu'il
+        # n'est pas necessaire de les ajouter au fichier untrusted CAs.
+
         pass
 
     def _verifier_chaine(self, enveloppe: EnveloppeCertificat):
@@ -528,107 +548,49 @@ class VerificateurCertificats(UtilCertificats):
         Utilise les root CA et untrusted CAs pour verifier la chaine du certificat
         :return: True si le certificat est valide selon la chaine de certification, date, etc (openssl).
         """
-        fingerprint = enveloppe.fingerprint_ascii
-        nom_fichier_tmp = '/tmp/%s.cert.pem' % fingerprint
+        workdir = self.configuration.pki_workdir
+        nom_fichier_tmp = tempfile.mktemp(suffix='.cert.pem', dir=workdir)
         with open(nom_fichier_tmp, 'w') as output_cert_file :
             output_cert_file.write(enveloppe.certificat_pem)
-            # output_cert_file.write('Blahs!')
 
-        self._logger.debug("Cert CA: %s" % self._root_ca_path)
+            # Flush le contenu, mais on garde le write lock sur le fichier pour eviter
+            # qu'il soit altere par un autre processus.
+            output_cert_file.flush()
 
-        process_output = subprocess.run([
-            'openssl', 'verify',
-            '-CAfile', self._root_ca_path,
-            '-untrusted', '/home/mathieu/PycharmProjects/MilleGrilles.consignation.python_2/test/integration/data/cert_untrusted.pem',
-            nom_fichier_tmp,
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            root_ca_path = self.configuration.pki_cafile
+            self._logger.debug("Cert CA: %s, untrusted: %s" % (root_ca_path, self.__untrusted_CAs_filename))
+
+            commande_openssl = [
+                'openssl', 'verify',
+                '-CAfile', root_ca_path,
+            ]
+            if self.__untrusted_CAs_writer is not None:
+                commande_openssl.extend(['-untrusted', self.__untrusted_CAs_filename])
+            commande_openssl.append(nom_fichier_tmp)
+
+            self._logger.debug("Commande openssl: %s" % str(commande_openssl))
+
+            process_output = subprocess.run(commande_openssl, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Travail avec le certificat termine, il est supprime.
+        os.unlink(nom_fichier_tmp)
 
         resultat = process_output.returncode
         output_txt = '%s\n%s' % (process_output.stderr.decode('utf8'), process_output.stdout.decode('utf8'))
 
+        if resultat != 0:
+            message = 'Certificat invalide. Output openssl: %s' % output_txt
+            self._logger.debug(message)
+            raise CertificatInvalide(message, key_subject_identifier=enveloppe.fingerprint_ascii)
+
+        enveloppe.set_est_verifie(True)
+
         return resultat == 0, output_txt
 
-    # def _charger_ca(self):
-    #     """ Initialise les root CA """
-    #     ca_file = self.configuration.mq_cafile
-    #     with open(ca_file) as f:
-    #         contenu = f.read()
-    #         certificats_ca = contenu.split(ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS)[1:]
-    #         self._logger.debug("Certificats CA configures: %s" % certificats_ca)
-    #
-    #     for cert in certificats_ca:
-    #         certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cert)
-    #         enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
-    #         if enveloppe.is_CA:
-    #             self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
-    #
-    #             # Puisque c'est un certificat CA, on l'ajoute aussi a l'index des CA pour faire une verification
-    #             # de la chaine.
-    #             liste_ca_identifier = self._cache_certificats_ca.get(enveloppe.subject_key_identifier)
-    #             if liste_ca_identifier is None:
-    #                 liste_ca_identifier = list()
-    #                 self._cache_certificats_ca[enveloppe.subject_key_identifier] = liste_ca_identifier
-    #             liste_ca_identifier.append(enveloppe)
-    #
-    #             if enveloppe.is_rootCA:
-    #                 self._root_ca.append(enveloppe)  # Conserver le certificat en tant que root
-    #
-    #     self._logger.debug("Certificats ROOT: %s" % str(self._root_ca))
-    #     self._logger.debug("Certificats cache CA (%d): %s" % (
-    #         len(self._cache_certificats_ca),
-    #         str(self._cache_certificats_ca)
-    #     ))
-    #     self._logger.debug("Certificats cache: %s" % str(self._cache_certificats_fingerprint))
-
-    # def verifier_chaine(self, enveloppe):
-    #     # Batir la chaine
-    #     enveloppe_courante = enveloppe
-    #
-    #     correspond = False
-    #     cle_verifiee = [enveloppe.fingerprint_ascii]  # Utilise pour eviter les cycles dans la verification
-    #     limite_profondeur = ConstantesSecurityPki.REGLE_LIMITE_CHAINE
-    #     profondeur = 0
-    #     authority_key_id = None
-    #     while not correspond and profondeur < limite_profondeur:
-    #         profondeur += 1
-    #         authority_key_id = enveloppe_courante.authority_key_identifier
-    #
-    #         liste_authority = self._cache_certificats_ca.get(authority_key_id)
-    #         if liste_authority is not None:
-    #             for authority_enveloppe in liste_authority:
-    #                 if authority_enveloppe.fingerprint_ascii not in cle_verifiee:
-    #                     cle_verifiee.append(authority_enveloppe.fingerprint_ascii)
-    #                 else:
-    #                     raise ValueError("Cycle detecte dans la verification des cles, abandon")
-    #
-    #                 # Verifier si la signature correspond
-    #                 authority_public_key = authority_enveloppe.certificat.public_key()
-    #                 cert_to_check = enveloppe_courante.certificat
-    #
-    #                 authority_public_key.verify(
-    #                     cert_to_check.signature,
-    #                     cert_to_check.tbs_certificate_bytes,
-    #                     # Depends on the algorithm used to create the certificate
-    #                     padding.PKCS1v15(),
-    #                     cert_to_check.signature_hash_algorithm,
-    #                 )
-    #
-    #                 enveloppe_courante = authority_enveloppe
-    #                 correspond = enveloppe_courante in self._root_ca
-    #                 self._logger.debug("Certificat %s correspond a CA: %s" % (enveloppe_courante.subject_key_identifier, correspond))
-    #
-    #     if not correspond:
-    #         raise CertificatInconnu(
-    #             'Chaine incomplete, il manque un certificat avec la bonne cle pour authority_key_identifier %s' %
-    #             authority_key_id,
-    #             key_subject_identifier=authority_key_id
-    #         )
-    #
-    #     if not enveloppe_courante.is_rootCA:
-    #         raise ValueError("Le certificat en haut de la chaine n'est pas root, chaine invalide")
-    #
-    #     # Aucune erreur n'a ete identifiee, on marque le certificat comme verifie
-    #     enveloppe.set_est_verifie(True)
+    def close(self):
+        if self.__untrusted_CAs_writer is not None:
+            self.__untrusted_CAs_writer.close()
+            os.unlink(self.__untrusted_CAs_filename)
 
 
 class GestionnaireEvenementsCertificat(BaseCallback):
@@ -656,16 +618,15 @@ class GestionnaireEvenementsCertificat(BaseCallback):
         pass
 
 
-class CertificatInconnu(Exception):
+class CertificatInvalide(Exception):
     def __init__(self, message, errors=None, key_subject_identifier=None):
         super().__init__(message, errors)
         self.errors = errors
-        self._key_subject_identifier = key_subject_identifier
+        self.__key_subject_identifier = key_subject_identifier
 
     @property
     def key_subject_identifier(self):
-        return self._key_subject_identifier
-
+        return self.__key_subject_identifier
 
 class HachageInvalide(Exception):
     def __init__(self, message, errors=None):
