@@ -47,7 +47,7 @@ DEFAUT_HOSTNAME = 'localhost'
 DEFAUT_KEYFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'
 DEFAUT_KEYCERTFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key_cert'
 DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert'
-DEFAUT_CA_CERTS = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.CAchain'
+DEFAUT_CA_CERTS = '/opt/millegrilles/etc/millegrilles.RootCA.pem'
 
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
@@ -77,6 +77,11 @@ CONFIG_EMAIL_FROM = 'email_from'
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'
 DEFAUT_NOM_MILLEGRILLE = 'sansnom'
+
+# PKI
+CONFIG_PKI_WORKDIR = 'pki_workdir'
+
+DEFAUT_PKI_WORKDIR = '/tmp'
 
 # Environnement
 PREFIXE_ENV_MG = 'MG_'
