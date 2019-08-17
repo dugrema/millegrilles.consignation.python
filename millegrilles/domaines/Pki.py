@@ -77,31 +77,37 @@ class GestionnairePki(GestionnaireDomaine):
         # Configurer la Queue pour les rapports sur RabbitMQ
         channel.queue_declare(
             queue=nom_queue_domaine,
-            durable=True)
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='destinataire.domaine.%s.#' % nom_queue_domaine
+            durable=True,
+            callback=None,
         )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
-            routing_key='ceduleur.#'
+            routing_key='destinataire.domaine.%s.#' % nom_queue_domaine,
+            callback=None,
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_domaine,
+            routing_key='ceduleur.#',
+            callback=None,
         )
 
         # Ecouter les evenements de type pki - servent a echanger certificats et requetes de certificats
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
-            routing_key='pki.#'
+            routing_key='pki.#',
+            callback=None,
         )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
-            routing_key='processus.domaine.%s.#' % ConstantesPki.DOMAINE_NOM
+            routing_key='processus.domaine.%s.#' % ConstantesPki.DOMAINE_NOM,
+            callback=None,
         )
 
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)

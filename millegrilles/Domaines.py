@@ -27,10 +27,13 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
         self._gestionnaires = []
         self._stop_event = Event()
+        self.__mq_ioloop = None
 
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
         super().initialiser(init_document, init_message, connecter)
+        self.__mq_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
+        self.__mq_ioloop.start()
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -146,10 +149,10 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
         # Surveiller les gestionnaires - si un gestionnaire termine son execution, on doit tout fermer
         while not self._stop_event.is_set():
-            self.contexte.message_dao.start_consuming()  # Blocking
-            self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
+            # self.contexte.message_dao.start_consuming()  # Blocking
+            # self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
 
-            self._stop_event.wait(5)  # Boucler toutes les 20 secondes
+            self._stop_event.wait(60)   # Boucler pour maintenance  A FAIRE
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """

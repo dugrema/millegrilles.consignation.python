@@ -86,24 +86,29 @@ class GestionnaireNotifications(GestionnaireDomaine):
         # Configurer la Queue pour les notifications sur RabbitMQ
         self.message_dao.channel.queue_declare(
             queue=nom_queue_notification,
-            durable=True)
-
-        self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_notification,
-            routing_key='notification.#'
+            durable=True,
+            callback=None,
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_notification,
-            routing_key='destinataire.domaine.%s.#' % NotificationsConstantes.QUEUE_SUFFIXE
+            routing_key='notification.#',
+            callback=None,
         )
 
         self.message_dao.channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_notification,
-            routing_key='ceduleur.#'
+            routing_key='destinataire.domaine.%s.#' % NotificationsConstantes.QUEUE_SUFFIXE,
+            callback=None,
+        )
+
+        self.message_dao.channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_notification,
+            routing_key='ceduleur.#',
+            callback=None,
         )
 
     def verifier_notifications_actionsdues(self, message):

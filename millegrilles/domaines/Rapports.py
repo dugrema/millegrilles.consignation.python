@@ -39,24 +39,29 @@ class GestionnaireRapports(GestionnaireDomaine):
         # Configurer la Queue pour les rapports sur RabbitMQ
         channel.queue_declare(
             queue=nom_queue_rapports,
-            durable=True)
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_rapports,
-            routing_key='destinataire.domaine.%s.#' % RapportsConstantes.QUEUE_NOM
+            durable=True,
+            callback=None,
         )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_rapports,
-            routing_key='ceduleur.#'
+            routing_key='destinataire.domaine.%s.#' % RapportsConstantes.QUEUE_NOM,
+            callback=None,
         )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_rapports,
-            routing_key='processus.domaine.%s.#' % RapportsConstantes.DOMAINE_NOM
+            routing_key='ceduleur.#',
+            callback=None,
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_queue_rapports,
+            routing_key='processus.domaine.%s.#' % RapportsConstantes.DOMAINE_NOM,
+            callback=None,
         )
 
         # Creer index _mg-libelle

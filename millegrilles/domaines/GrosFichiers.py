@@ -168,29 +168,35 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         for queue_config in queues_config:
             channel.queue_declare(
                 queue=queue_config['nom'],
-                durable=True)
+                durable=True,
+                callback=None,
+            )
 
             channel.queue_bind(
                 exchange=queue_config['exchange'],
                 queue=queue_config['nom'],
-                routing_key=queue_config['routing']
+                routing_key=queue_config['routing'],
+                callback=None,
             )
 
             # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
             channel.queue_purge(
-                queue=queue_config['nom']
+                queue=queue_config['nom'],
+                callback=None,
             )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
-            routing_key='ceduleur.#'
+            routing_key='ceduleur.#',
+            callback=None,
         )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
-            routing_key='processus.domaine.%s.#' % ConstantesGrosFichiers.DOMAINE_NOM
+            routing_key='processus.domaine.%s.#' % ConstantesGrosFichiers.DOMAINE_NOM,
+            callback=None,
         )
 
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)

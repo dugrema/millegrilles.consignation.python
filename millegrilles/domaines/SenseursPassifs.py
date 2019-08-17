@@ -91,12 +91,15 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         for queue_config in queues_config:
             channel.queue_declare(
                 queue=queue_config['nom'],
-                durable=True)
+                durable=True,
+                callback=None,
+            )
 
             channel.queue_bind(
                 exchange=queue_config['exchange'],
                 queue=queue_config['nom'],
-                routing_key=queue_config['routing']
+                routing_key=queue_config['routing'],
+                callback=None,
             )
 
             # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
@@ -107,13 +110,15 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_senseurspassifs,
-            routing_key='ceduleur.#'
+            routing_key='ceduleur.#',
+            callback=None,
         )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_senseurspassifs,
-            routing_key='processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM
+            routing_key='processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
+            callback=None,
         )
 
         # Index collection domaine
