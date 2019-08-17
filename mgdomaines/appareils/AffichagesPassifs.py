@@ -98,7 +98,7 @@ class AfficheurDocumentMAJDirecte:
 
         while not self._stop_event.is_set():
             try:
-                self._contexte.message_dao.start_consuming()
+                self._contexte.message_dao.run_ioloop()
             except Exception as e:
 
                 logging.warning("AfficheurDocumentMAJDirecte: Exception %s" % str(e))
