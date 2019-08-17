@@ -14,6 +14,41 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
+class DocumentCallback(BaseCallback):
+    """
+    Sauvegarde le document recu s'il fait parti de la liste.
+    """
+
+    def __init__(self, contexte, documents, liste_ids):
+        super().__init__(contexte)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.documents = documents
+        self.liste_ids = liste_ids
+
+    def traiter_message(self, ch, method, properties, body):
+        message_json = self.decoder_message_json(body)
+        routing_key = method.routing_key
+
+        self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, str(message_json)))
+
+        # Determiner type de message
+        documents = list()
+        if routing_key.startswith('noeuds.source.millegrilles_domaines_SenseursPassifs.documents'):
+            # Probablement une mise a jour d'un document existant
+            documents = [message_json]
+            document_keys = self.documents.keys()
+            for document in documents:
+                doc_id = document.get("_id")
+                if doc_id in document_keys:
+                    self.__logger.debug("Accepte document _id:%s" % doc_id)
+                    self.documents[doc_id] = document
+        elif properties.correlation_id == 'etat_senseurs_initial':
+            for reponse in message_json.get('resultats'):
+                for document in reponse:
+                    documents.append(document)
+                    self.documents[document.get('_id')] = document
+
+
 # Affichage qui se connecte a un ou plusieurs documents et recoit les changements live
 class AfficheurDocumentMAJDirecte:
 
@@ -34,24 +69,16 @@ class AfficheurDocumentMAJDirecte:
         self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
         self._compteur_cycle = 0  # Utilise pour savoir quand on rafraichit, tente de reparer connexion, etc.
 
+        self.thread_configuration = None
+
         self.traitement_callback = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def start(self):
-        try:
-            # Enregistrer callback
-            self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
-            self.setup_rabbitmq()
-
-        except TypeError as te:
-            self.__logger.error("AffichagesPassifs: Erreur de connexion a Mongo. "
-                          "On va demarrer quand meme et connecter plus tard. %s" % str(te))
-
-        # Thread.start
-        self._thread_maj_document = Thread(target=self.run_maj_document)
-        self._thread_maj_document.start()
-        self.__logger.info("AfficheurDocumentMAJDirecte: thread demarree")
+        # Enregistrer callback
+        self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
+        self.thread_configuration = Thread(name='configuration', target=self.setup_rabbitmq)
 
     def setup_rabbitmq(self):
         self._contexte.message_dao.inscrire_topic(
@@ -60,6 +87,11 @@ class AfficheurDocumentMAJDirecte:
             self.traitement_callback.callbackAvecAck
         )
         self.initialiser_documents()
+
+        # Thread.start
+        self._thread_maj_document = Thread(target=self.run_maj_document)
+        self._thread_maj_document.start()
+        self.__logger.info("AfficheurDocumentMAJDirecte: thread demarree")
 
     def reconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -245,36 +277,3 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         return lignes
 
 
-class DocumentCallback(BaseCallback):
-    """
-    Sauvegarde le document recu s'il fait parti de la liste.
-    """
-
-    def __init__(self, contexte, documents, liste_ids):
-        super().__init__(contexte)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self.documents = documents
-        self.liste_ids = liste_ids
-
-    def traiter_message(self, ch, method, properties, body):
-        message_json = self.decoder_message_json(body)
-        routing_key = method.routing_key
-
-        self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, str(message_json)))
-
-        # Determiner type de message
-        documents = list()
-        if routing_key.startswith('noeuds.source.millegrilles_domaines_SenseursPassifs.documents'):
-            # Probablement une mise a jour d'un document existant
-            documents = [message_json]
-            document_keys = self.documents.keys()
-            for document in documents:
-                doc_id = document.get("_id")
-                if doc_id in document_keys:
-                    self.__logger.debug("Accepte document _id:%s" % doc_id)
-                    self.documents[doc_id] = document
-        elif properties.correlation_id == 'etat_senseurs_initial':
-            for reponse in message_json.get('resultats'):
-                for document in reponse:
-                    documents.append(document)
-                    self.documents[document.get('_id')] = document
