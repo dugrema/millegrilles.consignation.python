@@ -513,7 +513,7 @@ class VerificateurCertificats(UtilCertificats):
                         self._logger.debug("Conserver cert CA dans untrusted: %s" % enveloppe.fingerprint_ascii)
                         self._ajouter_untrusted_ca(enveloppe)
 
-                self._verifier_chaine(enveloppe)
+                self.verifier_chaine(enveloppe)
                 self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
         else:
@@ -543,7 +543,7 @@ class VerificateurCertificats(UtilCertificats):
 
         pass
 
-    def _verifier_chaine(self, enveloppe: EnveloppeCertificat):
+    def verifier_chaine(self, enveloppe: EnveloppeCertificat):
         """
         Utilise les root CA et untrusted CAs pour verifier la chaine du certificat
         :return: True si le certificat est valide selon la chaine de certification, date, etc (openssl).

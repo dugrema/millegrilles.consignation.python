@@ -32,7 +32,7 @@ class TestVerificationChaine(unittest.TestCase):
         self.assertEqual('3eff5b5fcc8484ea9a3579b29ca0167339014694', enveloppe.fingerprint_ascii)
         self.assertTrue(enveloppe.est_verifie)
 
-        resultat, output_txt = self.verificateur._verifier_chaine(enveloppe)
+        resultat, output_txt = self.verificateur.verifier_chaine(enveloppe)
         self.logger.debug("Code %s, output: %s" % (str(resultat), output_txt))
         self.assertTrue(resultat)
 
@@ -51,7 +51,7 @@ class TestVerificationChaine(unittest.TestCase):
         self.assertEqual('e2ff90cf369f6f03d0abe6c247c09a8143873361', enveloppe.fingerprint_ascii)
         self.assertTrue(enveloppe.est_verifie)
 
-        resultat, output_txt = self.verificateur._verifier_chaine(enveloppe)
+        resultat, output_txt = self.verificateur.verifier_chaine(enveloppe)
         self.logger.debug("Code %s, output: %s" % (str(resultat), output_txt))
         self.assertTrue(resultat)
 
@@ -62,7 +62,7 @@ class TestVerificationChaine(unittest.TestCase):
         self.assertEqual('42905255f627cdaac59d976aec8035082f76ffe9', enveloppe.fingerprint_ascii)
         self.assertTrue(enveloppe.est_verifie)
 
-        resultat, output_txt = self.verificateur._verifier_chaine(enveloppe)
+        resultat, output_txt = self.verificateur.verifier_chaine(enveloppe)
         self.logger.debug("Code %s, output: %s" % (str(resultat), output_txt))
         self.assertTrue(resultat)
 
@@ -83,6 +83,6 @@ class TestVerificationChaine(unittest.TestCase):
         self.assertEqual('3eff5b5fcc8484ea9a3579b29ca0167339014694', enveloppe.fingerprint_ascii)
         self.assertTrue(enveloppe.est_verifie)
 
-        resultat, output_txt = self.verificateur._verifier_chaine(enveloppe)
+        resultat, output_txt = self.verificateur.verifier_chaine(enveloppe)
         self.logger.debug("Code %s, output: %s" % (str(resultat), output_txt))
         self.assertTrue(resultat)
