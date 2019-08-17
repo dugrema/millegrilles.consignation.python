@@ -108,7 +108,11 @@ class PikaDAO:
         try:
             parametres_connexion = self.preparer_connexion()
             parametres = pika.ConnectionParameters(**parametres_connexion)
-            self.connectionmq = pika.SelectConnection(parameters=parametres, on_open_callback=self.__on_connection_open)
+            self.connectionmq = pika.SelectConnection(
+                parameters=parametres,
+                on_open_callback=self.__on_connection_open,
+                on_close_callback=self.__on_connection_close,
+            )
 
             # if not self._separer:
             #     # La connexion est pour l'instance de PikaDAO
@@ -127,17 +131,28 @@ class PikaDAO:
 
     def __on_connection_open(self, connection):
         self._logger.info("Callback connection, on ouvre le channel")
+        connection.add_on_close_callback(self.__on_connection_close)
         self.connectionmq = connection
-        self.channel = self.connectionmq.channel(self.__on_channel_open)
+        self.channel = self.connectionmq.channel(on_open_callback=self.__on_channel_open)
 
     def __on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)
+        channel.add_on_close_callback(self.__on_channel_close)
         self._actif = True
         self.in_error = False
 
         self.__stop_event.clear()
 
         self._logger.info("Connection / channel prets")
+
+    def __on_connection_close(self, connection=None, code=None, reason=None):
+        self._logger.warn("Connection fermee: %s, %s" % (code, reason))
+        self.connectionmq = None
+        self._actif = False
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self._logger.warn("Channel ferme: %s, %s" %(code, reason))
+        self.channel = None
 
     def configurer_rabbitmq(self):
 
