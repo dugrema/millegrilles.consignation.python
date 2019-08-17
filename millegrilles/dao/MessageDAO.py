@@ -29,20 +29,17 @@ class PikaDAO:
         self.connectionmq = None
         self.channel = None
 
-        self._separer = False  # True si on separer envoi et reception (mitigation d'un bug avec connexion SSL)
-        self.connectionmq_envoi_async = None
-        self.channel_envoi_async = None
         self._queue_reponse = None
 
         self._executer_configurer_rabbitmq = False
 
         self._actif = False
-        self.in_error = True
+        self._in_error = True
 
         # Thread utilisee pour verifier le fonctionnement correct de MQ
         self.__stop_event = Event()
-        self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
         self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
+        self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
 
         self.json_helper = JSONHelper()
 
@@ -103,13 +100,9 @@ class PikaDAO:
             connectionmq = self.connectionmq
             self.connectionmq = None
             connectionmq.close()
-        if self.connectionmq_envoi_async is not None:
-            self._logger.warn("Appel de connecter avec connectionmq_envoi_async deja ouverte")
-            connectionmq_envoi_async = self.connectionmq_envoi_async
-            self.connectionmq_envoi_async = None
-            connectionmq_envoi_async.close()
 
         try:
+            self._lock_transmettre_message.acquire(blocking=True, timeout=30)
             parametres_connexion = self.preparer_connexion()
             parametres = pika.ConnectionParameters(**parametres_connexion)
             self.connectionmq = pika.SelectConnection(
@@ -122,37 +115,37 @@ class PikaDAO:
             self.enter_error_state()
             raise e  # S'assurer de mettre le flag d'erreur
 
-        if not self.__thread_maintenance.isAlive():
-            self.__thread_maintenance.start()
-
-        return self.connectionmq, self.connectionmq_envoi_async
+        return self.connectionmq
 
     def __on_connection_open(self, connection):
         self._logger.info("Callback connection, on ouvre le channel")
+        self.connectionmq = connection
         connection.add_on_close_callback(self.__on_connection_close)
         self.connectionmq = connection
-        self.channel = self.connectionmq.channel(on_open_callback=self.__on_channel_open)
+        self.connectionmq.channel(on_open_callback=self.__on_channel_open)
+        self.__thread_maintenance.start()
 
     def __on_channel_open(self, channel):
+        self.channel = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.__on_channel_close)
         self._actif = True
-        self.in_error = False
+        self._in_error = False
 
         self.__stop_event.clear()
         self._attendre_channel.set()  # Declenche execution processus en attente de la connexion
+        self._lock_transmettre_message.release()
 
         self._logger.info("Connection / channel prets")
 
     def __on_connection_close(self, connection=None, code=None, reason=None):
         self._logger.warn("Connection fermee: %s, %s" % (code, reason))
         self.connectionmq = None
-        self._actif = False
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warn("Channel ferme: %s, %s" %(code, reason))
         self.channel = None
-        self.in_error = True  # Au cas ou la fermeture ne soit pas planifiee
+        self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
     def configurer_rabbitmq(self):
 
@@ -295,7 +288,7 @@ class PikaDAO:
 
     def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None, correlation_id=None):
 
-        if self.connectionmq_envoi_async is None or self.connectionmq_envoi_async.is_closed:
+        if self.connectionmq is None or self.connectionmq.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
@@ -306,12 +299,12 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
-            self.channel_envoi_async.basic_publish(
+            self.connectionmq.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8,
                 properties=properties)
-        self.in_error = False
+        self._in_error = False
 
     ''' 
     Methode generique pour transmettre un evenement JSON avec l'echange millegrilles
@@ -334,13 +327,13 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
-            self.channel_envoi_async.basic_publish(
+            self.channel.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
                 body=message_utf8,
                 properties=properties,
                 mandatory=True)
-        self.in_error = False
+        self._in_error = False
 
     def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
 
@@ -352,13 +345,13 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
-            self.channel_envoi_async.basic_publish(
+            self.channel.basic_publish(
                 exchange='',  # Exchange default
                 routing_key=replying_to,
                 body=message_utf8,
                 properties=properties,
                 mandatory=True)
-        self.in_error = False
+        self._in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction, reply_to, correlation_id):
         routing_key = 'transaction.nouvelle'
@@ -554,13 +547,14 @@ class PikaDAO:
 
     # Mettre la classe en etat d'erreur
     def enter_error_state(self):
-        self.in_error = True
+        self._logger.warn("MQ Enter error state")
+        self._in_error = True
 
         if self.channel is not None:
             try:
-                self.channel.stop_consuming()
+                self.channel.close()
             except Exception as e:
-                logging.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
+                self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
 
         self.deconnecter()
 
@@ -568,13 +562,6 @@ class PikaDAO:
     def deconnecter(self):
         self._actif = False
         self.__stop_event.set()
-
-        if self.connectionmq_envoi_async is not None:
-            try:
-                self.connectionmq_envoi_async.close()
-            finally:
-                self.channel_envoi_async = None
-                self.connectionmq_envoi_async = None
 
         if self.connectionmq is not None:
             try:
@@ -585,18 +572,23 @@ class PikaDAO:
 
     def executer_maintenance(self):
 
-        while not self.__stop_event.is_set():
-            self.__stop_event.wait(self._intervalle_maintenance)
-            self._logger.debug("Maintenance MQ")
+        self._logger.info("Demarrage maintenance")
 
-            if self.in_error:
+        while not self.__stop_event.is_set():
+            self._logger.info("Maintenance MQ, in error: %s" % self._in_error)
+
+            if self._in_error and self._actif:
                 self._logger.info("Tentative de reconnexion a MQ")
                 if self.connectionmq is None or self.connectionmq.is_closed:
                     self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
                     self.connecter()
-                else:
+                elif self.channel is None:
                     self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
-                    self.channel = self.connectionmq.channel(self.__on_channel_open)
+                    self.connectionmq.channel(self.__on_channel_open)
+                else:
+                    self._logger.warn("Rien a faire pour reconnecter a MQ")
+
+            self.__stop_event.wait(self._intervalle_maintenance)
 
         self._logger.info("MQ-Maint closing")
 

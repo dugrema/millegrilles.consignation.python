@@ -3,5 +3,4 @@
 
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 ceduleur = CeduleurMilleGrilles()
-ceduleur.initialiser()
 ceduleur.main()
