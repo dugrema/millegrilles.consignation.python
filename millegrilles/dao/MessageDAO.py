@@ -114,18 +114,12 @@ class PikaDAO:
                 on_close_callback=self.__on_connection_close,
             )
 
-            # if not self._separer:
-            #     # La connexion est pour l'instance de PikaDAO
-            #     self.connectionmq_envoi_async = pika.BlockingConnection(parametres)
-            #     self.channel_envoi_async = self.connectionmq_envoi_async.channel()
-            #     self.channel_envoi_async.basic_qos(prefetch_count=1)
-
         except Exception as e:
             self.enter_error_state()
             raise e  # S'assurer de mettre le flag d'erreur
 
-        # if not self.__thread_maintenance.isAlive():
-        #     self.__thread_maintenance.start()
+        if not self.__thread_maintenance.isAlive():
+            self.__thread_maintenance.start()
 
         return self.connectionmq, self.connectionmq_envoi_async
 
@@ -153,6 +147,7 @@ class PikaDAO:
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warn("Channel ferme: %s, %s" %(code, reason))
         self.channel = None
+        self.in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
     def configurer_rabbitmq(self):
 
@@ -571,27 +566,17 @@ class PikaDAO:
     def executer_maintenance(self):
 
         while not self.__stop_event.is_set():
+            self.__stop_event.wait(self._intervalle_maintenance)
             self._logger.debug("Maintenance MQ")
 
             if self.in_error:
                 self._logger.info("Tentative de reconnexion a MQ")
-                self.connecter(self._separer)
-
-            try:
-                pass
-                # if self.connectionmq_envoi_async is not None:
-                #     self.connectionmq.heartbeat_tick()
-                # if self.connectionmq_envoi_async is not None:
-                #     self.connectionmq_envoi_async.send_heartbeat()
-
-                # Verifier que les channels sont encore actifs
-
-
-            except Exception as e:
-                self._logger.error("Erreur d'envoi heartbeats MQ", e)
-                self.enter_error_state()
-
-            self.__stop_event.wait(self._intervalle_maintenance)
+                if self.connectionmq is None or self.connectionmq.is_closed:
+                    self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
+                    self.connecter()
+                else:
+                    self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
+                    self.channel = self.connectionmq.channel(self.__on_channel_open)
 
         self._logger.info("MQ-Maint closing")
 
