@@ -23,6 +23,8 @@ class PikaDAO:
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._lock_transmettre_message = Lock()
 
+        self._attendre_channel = Event()
+
         self.configuration = configuration
         self.connectionmq = None
         self.channel = None
@@ -31,6 +33,8 @@ class PikaDAO:
         self.connectionmq_envoi_async = None
         self.channel_envoi_async = None
         self._queue_reponse = None
+
+        self._executer_configurer_rabbitmq = False
 
         self._actif = False
         self.in_error = True
@@ -136,6 +140,7 @@ class PikaDAO:
         self.in_error = False
 
         self.__stop_event.clear()
+        self._attendre_channel.set()  # Declenche execution processus en attente de la connexion
 
         self._logger.info("Connection / channel prets")
 
@@ -150,6 +155,10 @@ class PikaDAO:
         self.in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
     def configurer_rabbitmq(self):
+
+        self.attendre_channel(timeout=30)
+        if not self._attendre_channel.is_set():
+            raise Exception("Channel MQ n'est pas ouvert")
 
         # S'assurer que toutes les queues durables existes. Ces queues doivent toujours exister
         # pour eviter que des messages de donnees originales ne soient perdus.
@@ -177,46 +186,58 @@ class PikaDAO:
         # Creer la Q de nouvelles transactions pour cette MilleGrille
         self.channel.queue_declare(
             queue=nom_q_nouvelles_transactions,
-            durable=True)
+            durable=True,
+            callback=None
+        )
 
         for nom_echange in nom_echanges:
             self.channel.queue_bind(
                 exchange=nom_echange,
                 queue=nom_q_nouvelles_transactions,
-                routing_key='transaction.nouvelle'
+                routing_key='transaction.nouvelle',
+                callback=None
             )
 
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
         self.channel.queue_declare(
             queue=nom_q_mgp_processus,
-            durable=True)
+            durable=True,
+            callback=None
+        )
 
         self.channel.queue_bind(
             exchange=nom_echange_middleware,
             queue=nom_q_mgp_processus,
-            routing_key='mgpprocessus.#'
+            routing_key='mgpprocessus.#',
+            callback=None
         )
 
         # Creer la Q d'erreurs dans les transactions pour cette MilleGrille
         self.channel.queue_declare(
             queue=nom_q_erreurs_transactions,
-            durable=True)
+            durable=True,
+            callback=None
+        )
 
         self.channel.queue_bind(
             exchange=nom_echange_middleware,
             queue=nom_q_erreurs_transactions,
-            routing_key='transaction.erreur'
+            routing_key='transaction.erreur',
+            callback=None
         )
 
         # Creer la Q d'erreurs dans les processus pour cette MilleGrille
         self.channel.queue_declare(
             queue=nom_q_erreurs_processus,
-            durable=True)
+            durable=True,
+            callback=None
+        )
 
         self.channel.queue_bind(
             exchange=nom_echange_middleware,
             queue=nom_q_erreurs_processus,
-            routing_key='processus.erreur'
+            routing_key='processus.erreur',
+            callback=None
         )
 
     def start_consuming(self):
@@ -256,7 +277,6 @@ class PikaDAO:
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
-        self.start_consuming()
 
     def demarrer_lecture_etape_processus(self, callback):
         """ Demarre la lecture de la queue mgp_processus. Appel bloquant. """
@@ -579,6 +599,9 @@ class PikaDAO:
                     self.channel = self.connectionmq.channel(self.__on_channel_open)
 
         self._logger.info("MQ-Maint closing")
+
+    def attendre_channel(self, timeout):
+        self._attendre_channel.wait(timeout)
 
     def queuename_nouvelles_transactions(self):
         return self.configuration.queue_nouvelles_transactions

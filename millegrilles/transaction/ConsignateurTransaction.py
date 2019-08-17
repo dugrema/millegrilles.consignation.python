@@ -5,6 +5,7 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 from millegrilles import Constantes
 from bson.objectid import ObjectId
+from threading import Thread
 
 import logging
 import datetime
@@ -17,6 +18,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         super().__init__()
         self.json_helper = JSONHelper()
         self.message_handler = None
+        self.__thread_mqioloop = None
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -36,7 +38,8 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
 
         # Executer la configuration pour RabbitMQ
-        self.contexte.message_dao.configurer_rabbitmq()
+        configurer_rabbitmq_thread = Thread(name="MQ-Configuration", target=self.callback_configurer_rabbitmq)
+        configurer_rabbitmq_thread.start()
 
         # Creer index: _mg-libelle
         collection = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
@@ -52,9 +55,12 @@ class ConsignateurTransaction(ModeleConfiguration):
         ])
         logging.info("Configuration et connection completee")
 
-    def executer(self):
-        # Note: la methode demarrer_... est blocking
+    def callback_configurer_rabbitmq(self):
+        self.contexte.message_dao.configurer_rabbitmq()
         self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+
+    def executer(self):
+        self.contexte.message_dao.run_ioloop()  # Methode blocking
 
     def deconnecter(self):
         self.contexte.document_dao.deconnecter()
