@@ -299,7 +299,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
-            self.connectionmq.basic_publish(
+            self.channel.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8,
@@ -575,7 +575,7 @@ class PikaDAO:
         self._logger.info("Demarrage maintenance")
 
         while not self.__stop_event.is_set():
-            self._logger.info("Maintenance MQ, in error: %s" % self._in_error)
+            self._logger.debug("Maintenance MQ, in error: %s" % self._in_error)
 
             if self._in_error and self._actif:
                 self._logger.info("Tentative de reconnexion a MQ")
