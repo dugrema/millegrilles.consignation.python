@@ -44,7 +44,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         }
         requetes = {'requetes': [requete_profil]}
         enveloppe_requete = self.generateur.transmettre_requete(
-            requetes, 'millegrilles.domaines.Principale', 'abcd-1234', self.queue_name)
+            requetes, 'millegrilles.domaines.Principale', reply_to=self.queue_name, correlation_id='abcd-1234')
 
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
@@ -55,7 +55,7 @@ sample = MessagesSample()
 # TEST
 enveloppe = sample.transmettre_lecture()
 
-time.sleep(60)
+sample.recu.wait(60)
 
 # FIN TEST
 sample.deconnecter()

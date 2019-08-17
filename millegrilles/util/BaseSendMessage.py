@@ -7,8 +7,9 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
+from millegrilles.dao.MessageDAO import JSONHelper
 
-from threading import Thread
+from threading import Thread, Event
 
 
 class BaseEnvoyerMessageEcouter(BaseCallback):
@@ -20,6 +21,8 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
         self.__thread_ioloop.start()
         self.generateur = GenerateurTransaction(self.contexte)
         self.message_dao = self.contexte.message_dao
+        self.pret = Event()
+        self.recu = Event()
 
         # Enregistrer la reply-to queue
         print("Attente du channel")
@@ -27,18 +30,27 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
         self.channel = self.message_dao.channel
         self.channel.queue_declare(durable=True, exclusive=True, callback=self.set_cb_queue)
         self.queue_name = None
+        self.pret.wait(5)
 
     def set_cb_queue(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.pret.set()
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
 
+    def lire_message(self, body):
+        json_helper = JSONHelper()
+        message_dict = json_helper.bin_utf8_json_vers_dict(body)
+        print(str(message_dict))
+
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(body)
+        self.lire_message(body)
+
+        self.recu.set()
 
     # def requete_profil_usager(self):
     #     requete_profil = {
