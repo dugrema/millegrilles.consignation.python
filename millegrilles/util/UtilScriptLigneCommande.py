@@ -62,6 +62,7 @@ class ModeleConfiguration:
         try:
             # Preparer logging
             logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
+            logging.getLogger('millegrilles.dao.MessageDAO').setLevel(logging.INFO)
             self._logger.info("\n-----------\n\n-----------")
             self._logger.info("Demarrage de %s en cours\n-----------" % self.__class__.__name__)
 

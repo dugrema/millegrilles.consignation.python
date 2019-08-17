@@ -4,9 +4,10 @@ import time
 import datetime
 import pytz
 import logging
+import threading
 
-from threading import Event
-from pika.exceptions import ConnectionClosed
+from threading import Event, Thread
+from pika.exceptions import ConnectionClosed, ChannelClosed
 
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
@@ -17,10 +18,13 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         super().__init__()
         self._stop_event = Event()
         self._stop_event.set()
+
+        self.__thread_mq = None
         self.logger = logging.getLogger('%s.CeduleurMilleGrilles' % __name__)
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
+        self.__thread_mq = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -100,6 +104,7 @@ class CeduleurMilleGrilles(ModeleConfiguration):
     def executer(self):
 
         self._stop_event.clear()  # Pret a l'execution
+        self.__thread_mq.start()  # Executer ioloop de MQ
 
         # Preparer configuration / logging
         if self.args.debug:
@@ -122,7 +127,13 @@ class CeduleurMilleGrilles(ModeleConfiguration):
                 else:
                     self.logger.warning("On skip, il reste juste %d secondes d'attente" % temps_restant)
 
+                print("Threads: %s" % str(threading.enumerate()))
+
                 self._stop_event.wait(temps_restant)
+
+            except ChannelClosed as ce:
+                self.logger.fatal("Connection a Pika fermee, on termine l'execution. %s" % str(ce))
+                self.exit_gracefully()  # Connection perdue, On va fermer l'application
 
             except ConnectionClosed as ce:
                 self.logger.fatal("Connection a Pika fermee, on termine l'execution. %s" % str(ce))

@@ -6,7 +6,7 @@ import traceback
 import logging
 import ssl
 
-from threading import Lock
+from threading import Lock, Event, Thread
 
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials, ExternalCredentials
@@ -27,12 +27,18 @@ class PikaDAO:
         self.connectionmq = None
         self.channel = None
 
+        self._separer = False  # True si on separer envoi et reception (mitigation d'un bug avec connexion SSL)
         self.connectionmq_envoi_async = None
         self.channel_envoi_async = None
         self._queue_reponse = None
 
         self._actif = False
         self.in_error = True
+
+        # Thread utilisee pour verifier le fonctionnement correct de MQ
+        self.__stop_event = Event()
+        self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
+        self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
 
         self.json_helper = JSONHelper()
 
@@ -43,8 +49,11 @@ class PikaDAO:
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
             'virtual_host': self.configuration.nom_millegrille,
-            'heartbeat': self.configuration.mq_heartbeat
+            'heartbeat': self.configuration.mq_heartbeat,
+            'blocked_connection_timeout': self.configuration.mq_heartbeat/3
         }
+
+        self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
 
         if self.configuration.mq_auth_cert == 'on':
             # Va faire la connection via plugin configure dans MQ, normalement c'est rabbitmq_auth_mechanism_ssl
@@ -81,31 +90,54 @@ class PikaDAO:
         :return: Connexion a RabbitMQ.
         """
 
+        self._separer = separer
+
+        self._logger.info("Connecter RabbitMQ, separer=%s" % self._separer)
+
+        if self.connectionmq is not None:
+            self._logger.warn("Appel de connecter avec connection deja ouverte")
+            connectionmq = self.connectionmq
+            self.connectionmq = None
+            connectionmq.close()
+        if self.connectionmq_envoi_async is not None:
+            self._logger.warn("Appel de connecter avec connectionmq_envoi_async deja ouverte")
+            connectionmq_envoi_async = self.connectionmq_envoi_async
+            self.connectionmq_envoi_async = None
+            connectionmq_envoi_async.close()
+
         try:
-            parametres = pika.ConnectionParameters(**self.preparer_connexion())
-            connectionmq = pika.BlockingConnection(parametres)
-            channel = connectionmq.channel()
-            channel.basic_qos(prefetch_count=1)
+            parametres_connexion = self.preparer_connexion()
+            parametres = pika.ConnectionParameters(**parametres_connexion)
+            self.connectionmq = pika.SelectConnection(parameters=parametres, on_open_callback=self.__on_connection_open)
 
-            connectionmq_envoi_async = pika.BlockingConnection(parametres)
-            channel_envoi_async = connectionmq_envoi_async.channel()
-            channel_envoi_async.basic_qos(prefetch_count=1)
+            # if not self._separer:
+            #     # La connexion est pour l'instance de PikaDAO
+            #     self.connectionmq_envoi_async = pika.BlockingConnection(parametres)
+            #     self.channel_envoi_async = self.connectionmq_envoi_async.channel()
+            #     self.channel_envoi_async.basic_qos(prefetch_count=1)
 
-            if not separer:
-                # La connexion est pour l'instance de PikaDAO
-                self._actif = True
-                self.in_error = False
-                self.connectionmq = connectionmq
-                self.channel = channel
-
-                self.connectionmq_envoi_async = connectionmq_envoi_async
-                self.channel_envoi_async = channel_envoi_async
         except Exception as e:
-            if not separer:
-                self.in_error = True
+            self.enter_error_state()
             raise e  # S'assurer de mettre le flag d'erreur
 
-        return connectionmq
+        # if not self.__thread_maintenance.isAlive():
+        #     self.__thread_maintenance.start()
+
+        return self.connectionmq, self.connectionmq_envoi_async
+
+    def __on_connection_open(self, connection):
+        self._logger.info("Callback connection, on ouvre le channel")
+        self.connectionmq = connection
+        self.channel = self.connectionmq.channel(self.__on_channel_open)
+
+    def __on_channel_open(self, channel):
+        channel.basic_qos(prefetch_count=1)
+        self._actif = True
+        self.in_error = False
+
+        self.__stop_event.clear()
+
+        self._logger.info("Connection / channel prets")
 
     def configurer_rabbitmq(self):
 
@@ -180,12 +212,20 @@ class PikaDAO:
     def start_consuming(self):
         """ Demarre la lecture de messages RabbitMQ """
         try:
-            self.channel.start_consuming()
+            # self.channel.start_consuming()
+            self.connectionmq.ioloop.start()
 
         except OSError as oserr:
             logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Prepare la reception de message '''
+
+    def run_ioloop(self):
+        try:
+            self.connectionmq.ioloop.start()
+
+        except OSError as oserr:
+            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
@@ -497,25 +537,48 @@ class PikaDAO:
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
         self._actif = False
-        try:
-            if self.connectionmq is not None:
-                if self.channel is not None:
-                    self.channel.stop_consuming()
-                    self.channel.close()
-                if self.connectionmq is not None:
-                    self.connectionmq.close()
+        self.__stop_event.set()
 
-            if self.connectionmq_envoi_async is not None:
-                if self.channel_envoi_async is not None:
-                    self.channel_envoi_async.close()
-                if self.connectionmq_envoi_async is not None:
-                    self.connectionmq_envoi_async.close()
+        if self.connectionmq_envoi_async is not None:
+            try:
+                self.connectionmq_envoi_async.close()
+            finally:
+                self.channel_envoi_async = None
+                self.connectionmq_envoi_async = None
 
-        finally:
-            self.channel = None
-            self.connectionmq = None
-            self.channel_envoi_async = None
-            self.connectionmq_envoi_async = None
+        if self.connectionmq is not None:
+            try:
+                self.connectionmq.close()
+            finally:
+                self.channel = None
+                self.connectionmq = None
+
+    def executer_maintenance(self):
+
+        while not self.__stop_event.is_set():
+            self._logger.debug("Maintenance MQ")
+
+            if self.in_error:
+                self._logger.info("Tentative de reconnexion a MQ")
+                self.connecter(self._separer)
+
+            try:
+                pass
+                # if self.connectionmq_envoi_async is not None:
+                #     self.connectionmq.heartbeat_tick()
+                # if self.connectionmq_envoi_async is not None:
+                #     self.connectionmq_envoi_async.send_heartbeat()
+
+                # Verifier que les channels sont encore actifs
+
+
+            except Exception as e:
+                self._logger.error("Erreur d'envoi heartbeats MQ", e)
+                self.enter_error_state()
+
+            self.__stop_event.wait(self._intervalle_maintenance)
+
+        self._logger.info("MQ-Maint closing")
 
     def queuename_nouvelles_transactions(self):
         return self.configuration.queue_nouvelles_transactions
