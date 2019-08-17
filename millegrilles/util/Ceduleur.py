@@ -127,8 +127,6 @@ class CeduleurMilleGrilles(ModeleConfiguration):
                 else:
                     self.logger.warning("On skip, il reste juste %d secondes d'attente" % temps_restant)
 
-                print("Threads: %s" % str(threading.enumerate()))
-
                 self._stop_event.wait(temps_restant)
 
             except ChannelClosed as ce:
