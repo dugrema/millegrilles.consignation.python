@@ -5,7 +5,7 @@ import subprocess
 def get_version():
     try:
         with open('version.txt', 'r') as version_file:
-            version = version_file.read()
+            version = version_file.readline().strip()
     except FileNotFoundError as e:
         with open('build.txt', "r") as buildno_file:
             build_no = buildno_file.read()
