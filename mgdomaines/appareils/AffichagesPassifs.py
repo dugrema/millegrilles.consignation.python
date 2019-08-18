@@ -43,6 +43,8 @@ class DocumentCallback(BaseCallback):
                     self.__logger.debug("Accepte document _id:%s" % doc_id)
                     self.documents[doc_id] = document
         elif properties.correlation_id == 'etat_senseurs_initial':
+            self.__logger.info("Recu message d'etat des senseurs initial")
+            self.__logger.debug("%s" % str(message_json))
             for reponse in message_json.get('resultats'):
                 for document in reponse:
                     documents.append(document)
@@ -240,8 +242,11 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
 
         for senseur_id in self._documents:
             senseur = self._documents[senseur_id].copy()
-            if len(senseur.get('location')) > taille_titre_tph:
-                senseur['location'] = senseur['location'][:taille_titre_tph]
+            if senseur.get('location') is not None:
+                if len(senseur.get('location')) > taille_titre_tph:
+                    senseur['location'] = senseur['location'][:taille_titre_tph]
+            else:
+                senseur['location'] = '%s' % senseur.get('senseur')
 
             info_loc_temp_hum = ligne_tph_format.format(**senseur)
             lignes.append(info_loc_temp_hum)
