@@ -5,7 +5,7 @@ import traceback
 import argparse
 import logging
 
-from threading import Event
+from threading import Event, Thread
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
@@ -27,7 +27,7 @@ class DemarreurNoeud(Daemon):
         # Call superclass init
         Daemon.__init__(self, pidfile, stdin, stdout, stderr)
 
-        logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
+        logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.DEBUG)
         logging.getLogger().setLevel(logging.WARNING)
         logging.getLogger('millegrilles.noeuds').setLevel(logging.INFO)
 
@@ -44,6 +44,7 @@ class DemarreurNoeud(Daemon):
 
         self._contexte = ContexteRessourcesMilleGrilles()
         self._producteur_transaction = None
+        self.__thread_mq_ioloop = None
 
         self._chargement_reussi = False  # Vrai si au moins un module a ete charge
         self._stop_event = Event()
@@ -87,10 +88,17 @@ class DemarreurNoeud(Daemon):
             '--noconnect', action="store_true", required=False,
             help="Effectue la connexion aux serveurs plus tard plutot qu'au demarrage."
         )
-
+        self._parser.add_argument(
+            '--debug', action="store_true", required=False,
+            help="Active le logging maximal"
+        )
         self._args = self._parser.parse_args()
 
     def executer_daemon_command(self):
+        
+        if self._args.debug:
+            logging.getLogger('millegrilles').setLevel(logging.DEBUG)
+        
         daemon_command = self._args.command[0]
         if daemon_command == 'start':
             self.start()
@@ -130,8 +138,11 @@ class DemarreurNoeud(Daemon):
 
     def setup_modules(self, init_document=False):
         # Charger la configuration et les DAOs
+        self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
         self._contexte.initialiser(init_document=init_document, connecter=doit_connecter)
+        self.__thread_mq_ioloop = Thread(name='MQ-ioloop', target=self._contexte.message_dao.run_ioloop)
+        self.__thread_mq_ioloop.start()
 
         self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
 

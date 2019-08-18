@@ -256,16 +256,18 @@ class PikaDAO:
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
-        resultat = self.channel.queue_declare(queue='', exclusive=True)
-        nom_queue = resultat.method.queue
-        self._queue_reponse = nom_queue
-        self._logger.debug("Resultat creation queue: %s" % nom_queue)
-        bindings = routing.copy()
-        bindings.append('reponse.%s' % nom_queue)
-        for routing_key in bindings:
-            self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, calbback=None)
-        tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
-        self._logger.debug("Tag queue: %s" % tag_queue)
+        def callback_inscrire(queue, self=self, exchange=exchange, routing=routing, callback=callback):
+            nom_queue = queue.method.queue
+            self._queue_reponse = nom_queue
+            self._logger.debug("Resultat creation queue: %s" % nom_queue)
+            bindings = routing.copy()
+            bindings.append('reponse.%s' % nom_queue)
+            for routing_key in bindings:
+                self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
+            tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
+            self._logger.debug("Tag queue: %s" % tag_queue)
+        
+        self.channel.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions

@@ -79,6 +79,7 @@ class AfficheurDocumentMAJDirecte:
         # Enregistrer callback
         self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
         self.thread_configuration = Thread(name='configuration', target=self.setup_rabbitmq)
+        self.thread_configuration.start()
 
     def setup_rabbitmq(self):
         self._contexte.message_dao.inscrire_topic(
@@ -87,11 +88,6 @@ class AfficheurDocumentMAJDirecte:
             self.traitement_callback.callbackAvecAck
         )
         self.initialiser_documents()
-
-        # Thread.start
-        self._thread_maj_document = Thread(target=self.run_maj_document)
-        self._thread_maj_document.start()
-        self.__logger.info("AfficheurDocumentMAJDirecte: thread demarree")
 
     def reconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -125,18 +121,6 @@ class AfficheurDocumentMAJDirecte:
 
     def get_documents(self):
         return self._documents
-
-    def run_maj_document(self):
-
-        while not self._stop_event.is_set():
-            try:
-                self._contexte.message_dao.run_ioloop()
-            except Exception as e:
-
-                logging.warning("AfficheurDocumentMAJDirecte: Exception %s" % str(e))
-                traceback.print_exc()
-
-                self._stop_event.wait(self._intervalle_erreurs_secs)  # On attend avant de se reconnecter
 
     @property
     def contexte(self):
@@ -201,7 +185,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             except Exception as e:
                 logging.error("Erreur durant affichage: %s" % str(e))
                 traceback.print_exc()
-                self.reconnecter()
+                # self.reconnecter()
 
     def maj_affichage(self, lignes_affichage):
         self._lignes_ecran = lignes_affichage
