@@ -1228,12 +1228,17 @@ class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
 
         document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
+        liste_cles = dict()
+        for senseur in document_transaction['senseurs']:
+            senseur_cle = 'dict_senseurs.%s' % senseur
+            liste_cles[senseur_cle] = 1
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_NOEUD,
             "noeud": document_transaction['noeud'],
         }
         valeurs = {
-            '$unset': {'dict_senseurs': document_transaction['senseurs']},
+            '$unset': liste_cles,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 

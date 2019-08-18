@@ -21,14 +21,14 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
 
         message_dict = dict()
-        message_dict['senseur'] = 5
-        message_dict['noeud'] = 'domaine_SenseursPassifs_1'
+        message_dict['senseur'] = 8
+        message_dict['noeud'] = 'domaine_SenseursPassifs'
         message_dict['temps_lecture'] = int(temps_lecture.timestamp())
         message_dict['temperature'] = 28.1
         message_dict['humidite'] = 67.3
         message_dict['pression'] = 103.3
         message_dict['bat_mv'] = 3498
-        message_dict['hachi-parmentier'] = 'Nah nah nah, nah!'
+        message_dict['hachi-parmentier'] = 'Chambre A'
 
         enveloppe_val = self.generateur.soumettre_transaction(
             message_dict, 'millegrilles.domaines.SenseursPassifs.lecture', reply_to=self.queue_name, correlation_id='efgh')
@@ -41,8 +41,8 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
 
         message_dict = {
-            'senseur': 4,
-            'noeud': 'domaine_SenseursPassifs_1',
+            'senseur': 5,
+            'noeud': 'domaine_SenseursPassifs',
             'location': "Bazaar"
         }
 
@@ -61,7 +61,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
 
         message_dict = {
-            'senseurs': [3],
+            'senseurs': [6, 7],
             'noeud': 'domaine_SenseursPassifs',
         }
 
@@ -93,8 +93,8 @@ sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.transmettre_lecture()
-# enveloppe = sample.changer_nom()
-enveloppe = sample.supprimer_senseur()
+enveloppe = sample.changer_nom()
+# enveloppe = sample.supprimer_senseur()
 
 sample.recu.wait(60)
 
