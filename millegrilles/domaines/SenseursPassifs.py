@@ -68,6 +68,42 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
         self.traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
+        # Index collection domaine
+        collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        # Index noeud, _mg-libelle
+        collection_domaine.create_index([
+            (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index senseur, noeud, _mg-libelle
+        collection_domaine.create_index([
+            (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
+            (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
+        ])
+        # Ajouter les index dans la collection de transactions
+        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions.create_index([
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+             1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        collection_transactions.create_index([
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+             1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+
+    def channel_open(self, channel):
+        super().channel_open(channel)
+
         nom_queue_senseurspassifs = self.get_nom_queue()
 
         queues_config = [
@@ -88,7 +124,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             },
         ]
 
-        channel = self.message_dao.channel
+        # channel = self.message_dao.channel
         for queue_config in queues_config:
             channel.queue_declare(
                 queue=queue_config['nom'],
@@ -122,38 +158,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             callback=None,
         )
 
-        # Index collection domaine
-        collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        # Index noeud, _mg-libelle
-        collection_domaine.create_index([
-            (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        # Index senseur, noeud, _mg-libelle
-        collection_domaine.create_index([
-            (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
-            (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
-            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
-        ])
-        # Ajouter les index dans la collection de transactions
-        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        collection_transactions.create_index([
-            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
-             1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        collection_transactions.create_index([
-            ('%s' % SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
-            ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
-            ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
-             1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
 
     def demarrer(self):
         super().demarrer()

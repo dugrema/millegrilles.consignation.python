@@ -42,6 +42,10 @@ class PikaDAO:
         self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
         self.__thread_maintenance.start()
 
+        # Liste des processus qui veulent se faire allouer un channel au demarrage
+        # Methode appellee: channel_open(channel)
+        self.__liste_listeners_channels = None
+
         self.json_helper = JSONHelper()
 
     def preparer_connexion(self):
@@ -126,6 +130,11 @@ class PikaDAO:
         self.connectionmq = connection
         self.connectionmq.channel(on_open_callback=self.__on_channel_open)
 
+        # Aussi allouer un channel a chaque listener inscrit
+        if self.__liste_listeners_channels is not None:
+            for listener in self.__liste_listeners_channels:
+                self.__ouvrir_channel_listener(listener)
+
     def __on_channel_open(self, channel):
         self.channel = channel
         channel.basic_qos(prefetch_count=1)
@@ -147,6 +156,18 @@ class PikaDAO:
         self._logger.warn("Channel ferme: %s, %s" %(code, reason))
         self.channel = None
         self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
+
+    def register_channel_listener(self, listener):
+        if self.__liste_listeners_channels is None:
+            self.__liste_listeners_channels = list()
+        self.__liste_listeners_channels.append(listener)
+
+        # On verifie si on peut ouvrir le channel immediatement
+        if self.connectionmq is not None and not self.connectionmq.is_closed:
+            self.__ouvrir_channel_listener(listener)
+
+    def __ouvrir_channel_listener(self, listener):
+        self.connectionmq.channel(on_open_callback=listener.on_channel_open)
 
     def configurer_rabbitmq(self):
 
@@ -246,11 +267,15 @@ class PikaDAO:
     ''' Prepare la reception de message '''
 
     def run_ioloop(self):
-        try:
-            self.connectionmq.ioloop.start()
+        while not self.__stop_event.is_set():
+            self._logger.info("Demarrage MQ-ioloop")
+            try:
+                self.connectionmq.ioloop.start()
 
-        except OSError as oserr:
-            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+            except Exception as oserr:
+                logging.error("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr)
+
+            self.__stop_event.wait(10)  # Attendre 10 secondes avant de redemarrer la loop
 
         self._logger.info("MQ-ioloop: Execution terminee")
 

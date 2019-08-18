@@ -207,25 +207,43 @@ class GestionnaireDomaine:
         self.configurer()
         self.traiter_backlog()
         self._logger.info("Backlog traite, on enregistre la queue %s" % self.get_nom_queue())
-        self.enregistrer_queue(self.get_nom_queue())
+        self.contexte.message_dao.register_channel_listener(self)
 
     def traiter_backlog(self):
         """ Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. """
         pass
 
+    def on_channel_open(self, channel):
+        """
+        Callback pour l"ouverture ou la reouverture du channel MQ
+        :param channel:
+        :return:
+        """
+        self.channel_mq = channel
+        channel.basic_qos(prefetch_count=1)
+        channel.add_on_close_callback(self.on_channel_close)
+        self.enregistrer_queue(self.get_nom_queue())
+
+    def on_channel_close(self, channel=None, code=None, reason=None):
+        """
+        Callback pour la fermeture du channel
+        :param channel:
+        :return:
+        """
+        self._logger.info("Channel ferme: %s, %s" %(code, reason))
+        self.channel_mq = None
+
     ''' Demarre le traitement des messages pour le domaine '''
     def enregistrer_queue(self, queue_name):
         self._logger.info("Enregistrement queue %s" % queue_name)
 
-        self.message_dao.enregistrer_callback(queue=queue_name, callback=self.traiter_transaction)
+        self.channel_mq.basic_consume(self.traiter_transaction, queue=queue_name, no_ack=False)
 
         if self.get_nom_queue_requetes_noeuds() is not None:
-            self.message_dao.enregistrer_callback(
-                queue=self.get_nom_queue_requetes_noeuds(), callback=self.traiter_requete_noeud)
+            self.channel_mq.basic_consume(self.traiter_requete_noeud, queue=self.get_nom_queue_requetes_noeuds(), no_ack=False)
 
         if self.get_nom_queue_requetes_inter() is not None:
-            self.message_dao.enregistrer_callback(
-                queue=self.get_nom_queue_requetes_inter(), callback=self.traiter_requete_inter)
+            self.channel_mq.basic_consume(self.traiter_requete_inter, queue=self.get_nom_queue_requetes_inter(), no_ack=False)
 
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """
