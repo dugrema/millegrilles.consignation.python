@@ -21,8 +21,8 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
 
         message_dict = dict()
-        message_dict['senseur'] = 2
-        message_dict['noeud'] = 'domaine_SenseursPassifs'
+        message_dict['senseur'] = 5
+        message_dict['noeud'] = 'domaine_SenseursPassifs_1'
         message_dict['temps_lecture'] = int(temps_lecture.timestamp())
         message_dict['temperature'] = 28.1
         message_dict['humidite'] = 67.3
@@ -32,6 +32,45 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
 
         enveloppe_val = self.generateur.soumettre_transaction(
             message_dict, 'millegrilles.domaines.SenseursPassifs.lecture', reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def changer_nom(self):
+        temps_lecture = datetime.datetime.now()
+        # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
+
+        message_dict = {
+            'senseur': 4,
+            'noeud': 'domaine_SenseursPassifs_1',
+            'location': "Bazaar"
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            message_dict,
+            'millegrilles.domaines.SenseursPassifs.changementAttributSenseur',
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def supprimer_senseur(self):
+        temps_lecture = datetime.datetime.now()
+        # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
+
+        message_dict = {
+            'senseurs': [3],
+            'noeud': 'domaine_SenseursPassifs',
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            message_dict,
+            'millegrilles.domaines.SenseursPassifs.suppressionSenseur',
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
 
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
@@ -53,7 +92,9 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
 sample = MessagesSample()
 
 # TEST
-enveloppe = sample.transmettre_lecture()
+# enveloppe = sample.transmettre_lecture()
+# enveloppe = sample.changer_nom()
+enveloppe = sample.supprimer_senseur()
 
 sample.recu.wait(60)
 
