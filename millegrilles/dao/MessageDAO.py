@@ -251,6 +251,8 @@ class PikaDAO:
         except OSError as oserr:
             logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
+        self._logger.info("MQ-ioloop: Execution terminee")
+
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
@@ -579,16 +581,19 @@ class PikaDAO:
         while not self.__stop_event.is_set():
             self._logger.debug("Maintenance MQ, in error: %s" % self._in_error)
 
-            if self._in_error and self._actif:
-                self._logger.info("Tentative de reconnexion a MQ")
-                if self.connectionmq is None or self.connectionmq.is_closed:
-                    self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
-                    self.connecter()
-                elif self.channel is None:
-                    self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
-                    self.connectionmq.channel(self.__on_channel_open)
-                else:
-                    self._logger.warn("Rien a faire pour reconnecter a MQ")
+            try:
+                if self._in_error and self._actif:
+                    self._logger.info("Tentative de reconnexion a MQ")
+                    if self.connectionmq is None or self.connectionmq.is_closed:
+                        self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
+                        self.connecter()
+                    elif self.channel is None:
+                        self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
+                        self.connectionmq.channel(self.__on_channel_open)
+                    else:
+                        self._logger.warn("Rien a faire pour reconnecter a MQ")
+            except Exception as e:
+                self._logger.error("Erreur dans boucle de maintenance", e)
 
             self.__stop_event.wait(self._intervalle_maintenance)
 

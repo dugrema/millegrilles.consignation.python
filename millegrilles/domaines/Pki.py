@@ -417,7 +417,8 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
                     verificateur.verifier_chaine(enveloppe)
                     liste_valide.append(fingerprint)
             except Exception as e:
-                self._logger.exception("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
+                self._logger.warn("Certificat invalide: %s" % fingerprint)
+                self._logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
 
             if fingerprint not in liste_valide:
                 liste_invalide.append(fingerprint)

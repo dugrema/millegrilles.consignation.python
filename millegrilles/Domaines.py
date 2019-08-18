@@ -121,18 +121,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             gestionnaire.demarrer()
 
     def exit_gracefully(self, signum=None, frame=None):
-        self._logger.info("Arret du gestionnaire de domaines MilleGrilles")
-        self._stop_event.set()  # Va arreter la boucle de verification des gestionnaires
-
-        # Avertir chaque gestionnaire
-        for gestionnaire in self._gestionnaires:
-            try:
-                gestionnaire.arreter()
-            except ChannelClosed as ce:
-                self._logger.debug("Channel deja ferme: %s" % str(ce))
-            except Exception as e:
-                self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__name__, str(e)))
-
+        self.arreter()
         super().exit_gracefully()
 
     def executer(self):
@@ -153,6 +142,23 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             # self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
 
             self._stop_event.wait(60)   # Boucler pour maintenance  A FAIRE
+
+        self._logger.info("Fin de la boucle executer() dans MAIN")
+
+    def arreter(self):
+        self._logger.info("Arret du gestionnaire de domaines MilleGrilles")
+        self._stop_event.set()  # Va arreter la boucle de verification des gestionnaires
+
+        # Avertir chaque gestionnaire
+        for gestionnaire in self._gestionnaires:
+            try:
+                gestionnaire.arreter()
+            except ChannelClosed as ce:
+                self._logger.debug("Channel deja ferme: %s" % str(ce))
+            except Exception as e:
+                self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__name__, str(e)))
+
+        self.deconnecter()
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """
