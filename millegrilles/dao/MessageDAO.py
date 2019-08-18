@@ -40,6 +40,7 @@ class PikaDAO:
         self.__stop_event = Event()
         self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
         self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
+        self.__thread_maintenance.start()
 
         self.json_helper = JSONHelper()
 
@@ -115,6 +116,7 @@ class PikaDAO:
             self.enter_error_state()
             raise e  # S'assurer de mettre le flag d'erreur
 
+        self._actif = True  # Le fait de se connecter indique que le DAO doit est actif
         return self.connectionmq
 
     def __on_connection_open(self, connection):
@@ -123,7 +125,6 @@ class PikaDAO:
         connection.add_on_close_callback(self.__on_connection_close)
         self.connectionmq = connection
         self.connectionmq.channel(on_open_callback=self.__on_channel_open)
-        self.__thread_maintenance.start()
 
     def __on_channel_open(self, channel):
         self.channel = channel
@@ -582,8 +583,7 @@ class PikaDAO:
             self._logger.debug("Maintenance MQ, in error: %s" % self._in_error)
 
             try:
-                if self._in_error and self._actif:
-                    self._logger.info("Tentative de reconnexion a MQ")
+                if self._actif:
                     if self.connectionmq is None or self.connectionmq.is_closed:
                         self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
                         self.connecter()
@@ -591,7 +591,7 @@ class PikaDAO:
                         self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
                         self.connectionmq.channel(self.__on_channel_open)
                     else:
-                        self._logger.warn("Rien a faire pour reconnecter a MQ")
+                        self._logger.debug("Rien a faire pour reconnecter a MQ")
             except Exception as e:
                 self._logger.error("Erreur dans boucle de maintenance", e)
 
