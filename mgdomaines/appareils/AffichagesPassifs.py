@@ -71,7 +71,8 @@ class AfficheurDocumentMAJDirecte:
         self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
         self._compteur_cycle = 0  # Utilise pour savoir quand on rafraichit, tente de reparer connexion, etc.
 
-        self.thread_configuration = None
+        self.channel = None
+        self._queue_reponse = None
 
         self.traitement_callback = None
 
@@ -80,15 +81,23 @@ class AfficheurDocumentMAJDirecte:
     def start(self):
         # Enregistrer callback
         self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
-        self.thread_configuration = Thread(name='configuration', target=self.setup_rabbitmq)
-        self.thread_configuration.start()
+        self.contexte.message_dao.register_channel_listener(self)   # Callback sur on_channel_open avec le channel
 
-    def setup_rabbitmq(self):
-        self._contexte.message_dao.inscrire_topic(
-            self._contexte.configuration.exchange_noeuds,
-            ["%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS],
-            self.traitement_callback.callbackAvecAck
-        )
+    def on_channel_open(self, channel):
+        self.channel = channel
+
+        # Creer la Q de callback, listener pour documents
+        self.channel.queue_declare(queue='', exclusive=True, callback=self.callback_inscrire)
+
+    def callback_inscrire(self, queue):
+        nom_queue = queue.method.queue
+        self._queue_reponse = nom_queue
+        self.__logger.debug("Resultat creation queue: %s" % nom_queue)
+        routing_key = "%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS
+        self.channel.queue_bind(queue=nom_queue, exchange=self._contexte.configuration.exchange_noeuds, routing_key=routing_key, callback=None)
+        tag_queue = self.channel.basic_consume(self.traitement_callback.callbackAvecAck, queue=nom_queue, no_ack=False)
+        self.__logger.debug("Tag queue: %s" % tag_queue)
+
         self.initialiser_documents()
 
     def reconnecter(self):

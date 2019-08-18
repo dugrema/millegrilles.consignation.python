@@ -3,13 +3,21 @@ from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRes
 from millegrilles.dao.DocumentDAO import MongoDAO
 from bson import ObjectId
 import time
+from threading import Thread
 
 
 class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
 
     def __init__(self):
         contexte = ContexteRessourcesMilleGrilles()
+
+        print("contexte.initialiser()")
         contexte.initialiser(init_document=False)
+        print("ioloop MQ")
+        self.thread_ioloop = Thread(name="MQ-ioloop", target=contexte.message_dao.run_ioloop)
+        self.thread_ioloop.start()
+
+        print("super.init")
         super().__init__(contexte, intervalle_secs=5)
 
     def liste_senseurs(self):
@@ -39,7 +47,7 @@ test = AfficheurDocumentMAJDirecteTest()
 try:
     print("Test debut")
     test.start()
-    test.test_deconnecter_reconnecter()
+    # test.test_deconnecter_reconnecter()
 
     for i in range(0, 30):
         test.test()
