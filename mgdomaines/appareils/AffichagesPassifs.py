@@ -92,7 +92,7 @@ class AfficheurDocumentMAJDirecte:
     def callback_inscrire(self, queue):
         nom_queue = queue.method.queue
         self._queue_reponse = nom_queue
-        self.__logger.debug("Resultat creation queue: %s" % nom_queue)
+        self.__logger.info("Resultat creation queue: %s" % nom_queue)
         routing_key = "%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS
         self.channel.queue_bind(queue=nom_queue, exchange=self._contexte.configuration.exchange_noeuds, routing_key=routing_key, callback=None)
         tag_queue = self.channel.basic_consume(self.traitement_callback.callbackAvecAck, queue=nom_queue, no_ack=False)
@@ -128,7 +128,7 @@ class AfficheurDocumentMAJDirecte:
         self._generateur.transmettre_requete(requete,
                                              'millegrilles.domaines.SenseursPassifs',
                                              'etat_senseurs_initial',
-                                             self.contexte.message_dao.queue_reponse)
+                                             self._queue_reponse)
 
     def get_documents(self):
         return self._documents
