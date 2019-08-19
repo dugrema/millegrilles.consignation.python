@@ -38,6 +38,7 @@ class PikaDAO:
 
         # Thread utilisee pour verifier le fonctionnement correct de MQ
         self.__stop_event = Event()
+        self.__ioloop = None
         self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
         self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
         self.__thread_maintenance.start()
@@ -259,7 +260,8 @@ class PikaDAO:
         """ Demarre la lecture de messages RabbitMQ """
         try:
             # self.channel.start_consuming()
-            self.connectionmq.ioloop.start()
+            self.__ioloop = self.connectionmq.ioloop;
+            self.__ioloop.start()
 
         except OSError as oserr:
             logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
@@ -593,6 +595,9 @@ class PikaDAO:
         self._actif = False
         self.__stop_event.set()
 
+        if self.__ioloop is not None:
+            self.__ioloop.stop()  # Arreter boucle MQ
+
         if self.connectionmq is not None:
             try:
                 self.connectionmq.close()
@@ -619,6 +624,7 @@ class PikaDAO:
                         self._logger.debug("Rien a faire pour reconnecter a MQ")
             except Exception as e:
                 self._logger.error("Erreur dans boucle de maintenance", e)
+                self.enter_error_state()
 
             self.__stop_event.wait(self._intervalle_maintenance)
 
