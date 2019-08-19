@@ -124,6 +124,20 @@ class GestionnairePki(GestionnaireDomaine):
         )
 
         channel.queue_bind(
+            exchange=self.configuration.exchange_noeuds,
+            queue=nom_queue_domaine,
+            routing_key='pki.#',
+            callback=None
+        )
+
+        channel.queue_bind(
+            exchange=self.configuration.exchange_inter,
+            queue=nom_queue_domaine,
+            routing_key='pki.#',
+            callback=None
+        )
+
+        channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
             routing_key='processus.domaine.%s.#' % ConstantesPki.DOMAINE_NOM,
