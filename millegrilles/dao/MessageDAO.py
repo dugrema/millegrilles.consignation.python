@@ -626,7 +626,7 @@ class PikaDAO:
                     else:
                         self._logger.debug("Rien a faire pour reconnecter a MQ")
             except Exception as e:
-                self._logger.error("Erreur dans boucle de maintenance", e)
+                self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
                 self.enter_error_state()
 
             self.__stop_event.wait(self._intervalle_maintenance)
