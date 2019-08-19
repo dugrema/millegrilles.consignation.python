@@ -273,7 +273,7 @@ class PikaDAO:
                 self.connectionmq.ioloop.start()
 
             except Exception as oserr:
-                logging.error("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr)
+                self._logger.exception("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr, exc_info=oserr)
 
             self.__stop_event.wait(10)  # Attendre 10 secondes avant de redemarrer la loop
 
@@ -609,12 +609,12 @@ class PikaDAO:
 
             try:
                 if self._actif:
-                    if self.connectionmq is None or self.connectionmq.is_closed:
-                        self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
+                    if self.connectionmq is None or self.channel is None:
+                        self._logger.info("La connection MQ ou channel sont fermes. On tente de se reconnecter.")
                         self.connecter()
-                    elif self.channel is None:
-                        self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
-                        self.connectionmq.channel(self.__on_channel_open)
+                    # elif self.channel is None:
+                    #    self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
+                    #    self.connectionmq.channel(self.__on_channel_open)
                     else:
                         self._logger.debug("Rien a faire pour reconnecter a MQ")
             except Exception as e:
