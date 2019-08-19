@@ -8,12 +8,13 @@ def get_version():
             version = version_file.readline().strip()
     except FileNotFoundError as e:
         with open('build.txt', "r") as buildno_file:
-            build_no = buildno_file.read()
+            build_no = buildno_file.read().strip()
 
         commande_git_version = ['git', 'name-rev', '--name-only', 'HEAD']
         output_process = subprocess.run(commande_git_version, stdout=subprocess.PIPE)
         version = output_process.stdout.decode('utf8').strip()
-        print("Version: %s.%s" % (version, build_no))
+        version = '%s.%s' % (version, build_no)
+        print("Version: %s" % (version))
 
     return version
 
