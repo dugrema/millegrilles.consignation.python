@@ -81,13 +81,14 @@ class GestionnaireNotifications(GestionnaireDomaine):
         super().configurer()
         self._traitement_message = TraitementMessageNotification(self)
 
+    def setup_rabbitmq(self, channel):
         nom_queue_notification = self.get_nom_queue()
 
         # Configurer la Queue pour les notifications sur RabbitMQ
         self.message_dao.channel.queue_declare(
             queue=nom_queue_notification,
             durable=True,
-            callback=None,
+            callback=self.callback_queue_cree,
         )
 
         self.message_dao.channel.queue_bind(

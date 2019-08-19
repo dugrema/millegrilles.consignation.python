@@ -101,9 +101,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
 
-    def channel_open(self, channel):
-        super().channel_open(channel)
-
+    def setup_rabbitmq(self, channel):
         nom_queue_senseurspassifs = self.get_nom_queue()
 
         queues_config = [
@@ -129,7 +127,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=True,
-                callback=None,
+                callback=self.callback_queue_cree,
             )
 
             channel.queue_bind(

@@ -142,7 +142,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         self._traitement_middleware = TraitementMessageMiddleware(self)
         self._traitement_noeud = TraitementMessageNoeud(self)
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
+        self.creer_index()  # Creer index dans MongoDB
 
+    def setup_rabbitmq(self, channel):
         # Configurer la Queue pour les rapports sur RabbitMQ
         nom_queue_domaine = self.get_nom_queue()
 
@@ -169,7 +172,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=True,
-                callback=None,
+                callback=self.callback_queue_cree,
             )
 
             channel.queue_bind(
@@ -198,9 +201,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             routing_key='processus.domaine.%s.#' % ConstantesGrosFichiers.DOMAINE_NOM,
             callback=None,
         )
-
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
-        self.creer_index()  # Creer index dans MongoDB
 
     def demarrer(self):
         super().demarrer()

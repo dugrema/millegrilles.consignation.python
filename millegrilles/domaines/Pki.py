@@ -70,15 +70,35 @@ class GestionnairePki(GestionnaireDomaine):
         self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
         self._traitement_message = TraitementMessagePki(self, self._pki_document_helper)
 
-        nom_queue_domaine = self.get_nom_queue()
+        self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
+        self.initialiser_mgca()
 
-        channel = self.message_dao.channel
+        # Index collection domaine
+        collection_domaine = self.get_collection()
+        # Index par fingerprint de certificat
+        collection_domaine.create_index([
+            (ConstantesPki.LIBELLE_FINGERPRINT, 1)
+        ], unique=True)
+        # Index par chaine de certificat verifie
+        collection_domaine.create_index([
+            (ConstantesPki.LIBELLE_CHAINE_COMPLETE, 2),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index pour trouver l'autorite qui a signe un certificat (par son subject)
+        collection_domaine.create_index([
+            (ConstantesPki.LIBELLE_SUBJECT_KEY, 1),
+            (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
+            (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
+        ])
+
+    def setup_rabbitmq(self, channel):
+        nom_queue_domaine = self.get_nom_queue()
 
         # Configurer la Queue pour les rapports sur RabbitMQ
         channel.queue_declare(
             queue=nom_queue_domaine,
             durable=True,
-            callback=None,
+            callback=self.callback_queue_cree,
         )
 
         channel.queue_bind(
@@ -109,27 +129,6 @@ class GestionnairePki(GestionnaireDomaine):
             routing_key='processus.domaine.%s.#' % ConstantesPki.DOMAINE_NOM,
             callback=None,
         )
-
-        self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
-        self.initialiser_mgca()
-
-        # Index collection domaine
-        collection_domaine = self.get_collection()
-        # Index par fingerprint de certificat
-        collection_domaine.create_index([
-            (ConstantesPki.LIBELLE_FINGERPRINT, 1)
-        ], unique=True)
-        # Index par chaine de certificat verifie
-        collection_domaine.create_index([
-            (ConstantesPki.LIBELLE_CHAINE_COMPLETE, 2),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        # Index pour trouver l'autorite qui a signe un certificat (par son subject)
-        collection_domaine.create_index([
-            (ConstantesPki.LIBELLE_SUBJECT_KEY, 1),
-            (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
-            (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
-        ])
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)

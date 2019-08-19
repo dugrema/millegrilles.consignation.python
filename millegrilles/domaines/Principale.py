@@ -97,6 +97,11 @@ class GestionnairePrincipale(GestionnaireDomaine):
         self._traitement_requetes = TraitementMessageRequete(self)
         self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
+
+    def setup_rabbitmq(self, channel):
         # Configurer la Queue pour les rapports sur RabbitMQ
         nom_queue_domaine = self.get_nom_queue()
 
@@ -123,7 +128,7 @@ class GestionnairePrincipale(GestionnaireDomaine):
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=True,
-                callback=None,
+                callback=self.callback_queue_cree,
             )
 
             channel.queue_bind(
@@ -151,10 +156,6 @@ class GestionnairePrincipale(GestionnaireDomaine):
             routing_key='processus.domaine.%s.#' % ConstantesPrincipale.DOMAINE_NOM,
             callback=None,
         )
-
-        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
-        self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
-        self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
 
     def traiter_cedule(self, evenement):
         pass

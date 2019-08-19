@@ -87,15 +87,35 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         self._traitement_lecture = TraitementMessageWebPoll(self)
         self.traiter_transaction = self._traitement_lecture.callbackAvecAck
 
-        nom_queue_webpoll = self.get_nom_queue()
+        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
+        collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_DOCUMENTS_NOM)
 
-        channel = self.message_dao.channel
+        # Trouver le document de configuration
+        document_configuration = collection_webpoll.find_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration'}
+        )
+        if document_configuration is None:
+            self._logger.info("On insere le document de configuration de reference pour WebPoll")
+            collection_webpoll.insert(WebPollConstantes.document_configuration_reference)
+        else:
+            self._logger.info("Document de configuration de telechargement: %s" % str(document_configuration))
+
+        # Creer index _mg-libelle
+        collection_webpoll.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+
+        self._downloaders['page'] = WebPageDownload(self.contexte)
+        self._downloaders['rss'] = RSSFeedDownload(self.contexte)
+
+    def setup_rabbitmq(self, channel):
+        nom_queue_webpoll = self.get_nom_queue()
 
         # Configurer la Queue pour WebPoll sur RabbitMQ
         channel.queue_declare(
             queue=nom_queue_webpoll,
             durable=True,
-            callback=None,
+            callback=self.callback_queue_cree,
         )
 
         # Si la Q existe deja, la purger. Ca ne sert a rien de poller les memes documents plusieurs fois.
@@ -123,27 +143,6 @@ class GestionnaireWebPoll(GestionnaireDomaine):
             routing_key='processus.domaine.%s.#' % WebPollConstantes.DOMAINE_NOM,
             callback=None,
         )
-
-        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_webpoll = self.document_dao.get_collection(WebPollConstantes.COLLECTION_DOCUMENTS_NOM)
-
-        # Trouver le document de configuration
-        document_configuration = collection_webpoll.find_one(
-            {Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration'}
-        )
-        if document_configuration is None:
-            self._logger.info("On insere le document de configuration de reference pour WebPoll")
-            collection_webpoll.insert(WebPollConstantes.document_configuration_reference)
-        else:
-            self._logger.info("Document de configuration de telechargement: %s" % str(document_configuration))
-
-        # Creer index _mg-libelle
-        collection_webpoll.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-
-        self._downloaders['page'] = WebPageDownload(self.contexte)
-        self._downloaders['rss'] = RSSFeedDownload(self.contexte)
 
     def traiter_transaction(self, ch, method, properties, body):
         # self._traitement_lecture.callbackAvecAck(ch, method, properties, body)

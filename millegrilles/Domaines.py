@@ -222,7 +222,11 @@ class GestionnaireDomaine:
         self.channel_mq = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
-        self.enregistrer_queue(self.get_nom_queue())
+        self.setup_rabbitmq(channel)
+
+    def setup_rabbitmq(self, channel):
+        """ Callback pour faire le setup de rabbitMQ quand le channel est ouvert """
+        pass
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         """
@@ -233,17 +237,15 @@ class GestionnaireDomaine:
         self._logger.info("Channel ferme: %s, %s" %(code, reason))
         self.channel_mq = None
 
-    ''' Demarre le traitement des messages pour le domaine '''
-    def enregistrer_queue(self, queue_name):
-        self._logger.info("Enregistrement queue %s" % queue_name)
-
-        self.channel_mq.basic_consume(self.traiter_transaction, queue=queue_name, no_ack=False)
-
-        if self.get_nom_queue_requetes_noeuds() is not None:
-            self.channel_mq.basic_consume(self.traiter_requete_noeud, queue=self.get_nom_queue_requetes_noeuds(), no_ack=False)
-
-        if self.get_nom_queue_requetes_inter() is not None:
-            self.channel_mq.basic_consume(self.traiter_requete_inter, queue=self.get_nom_queue_requetes_inter(), no_ack=False)
+    def callback_queue_cree(self, queue):
+        """
+        Suite d'un queue_declare, active le basic_consume sur la Q en utilisant la methode self.traiter_transaction.
+        :param queue:
+        :return:
+        """
+        nom_queue = queue.method.queue
+        self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
+        self.channel_mq.basic_consume(self.traiter_transaction, queue=nom_queue, no_ack=False)
 
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """

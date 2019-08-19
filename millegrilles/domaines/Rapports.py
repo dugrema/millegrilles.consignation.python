@@ -32,15 +32,25 @@ class GestionnaireRapports(GestionnaireDomaine):
         super().configurer()
         self._traitement_message = TraitementMessageRapports(self)
 
-        nom_queue_rapports = self.get_nom_queue()
+        # Creer index _mg-libelle
+        collection_domaine = self.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index _mg-libelle, url
+        collection_domaine.create_index([
+            ('url', 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
 
-        channel = self.message_dao.channel
+    def setup_rabbitmq(self, channel):
+        nom_queue_rapports = self.get_nom_queue()
 
         # Configurer la Queue pour les rapports sur RabbitMQ
         channel.queue_declare(
             queue=nom_queue_rapports,
             durable=True,
-            callback=None,
+            callback=self.callback_queue_cree,
         )
 
         channel.queue_bind(
@@ -63,17 +73,6 @@ class GestionnaireRapports(GestionnaireDomaine):
             routing_key='processus.domaine.%s.#' % RapportsConstantes.DOMAINE_NOM,
             callback=None,
         )
-
-        # Creer index _mg-libelle
-        collection_domaine = self.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        # Index _mg-libelle, url
-        collection_domaine.create_index([
-            ('url', 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
