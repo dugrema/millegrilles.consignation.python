@@ -115,7 +115,7 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         channel.queue_declare(
             queue=nom_queue_webpoll,
             durable=True,
-            callback=self.callback_queue_cree,
+            callback=self.callback_queue_transaction
         )
 
         # Si la Q existe deja, la purger. Ca ne sert a rien de poller les memes documents plusieurs fois.

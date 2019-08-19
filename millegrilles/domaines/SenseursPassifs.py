@@ -108,17 +108,20 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             {
                 'nom': self.get_nom_queue(),
                 'routing': 'destinataire.domaine.millegrilles.domaines.SenseursPassifs.#',
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+                'callback': self.callback_queue_transaction
             },
             {
                 'nom': self.get_nom_queue_requetes_noeuds(),
                 'routing': 'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+                'callback': self.callback_queue_requete_noeud
             },
             {
                 'nom': self.get_nom_queue_requetes_inter(),
                 'routing': 'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER
+                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER,
+                'callback': self.callback_queue_requete_inter
             },
         ]
 
@@ -127,7 +130,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=True,
-                callback=self.callback_queue_cree,
+                callback=queue_config['callback'],
             )
 
             channel.queue_bind(

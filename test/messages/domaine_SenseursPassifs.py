@@ -92,8 +92,8 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.transmettre_lecture()
-enveloppe = sample.changer_nom()
+enveloppe = sample.transmettre_lecture()
+# enveloppe = sample.changer_nom()
 # enveloppe = sample.supprimer_senseur()
 
 sample.recu.wait(60)

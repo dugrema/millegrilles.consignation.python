@@ -50,7 +50,7 @@ class GestionnaireRapports(GestionnaireDomaine):
         channel.queue_declare(
             queue=nom_queue_rapports,
             durable=True,
-            callback=self.callback_queue_cree,
+            callback=self.callback_queue_transaction,
         )
 
         channel.queue_bind(

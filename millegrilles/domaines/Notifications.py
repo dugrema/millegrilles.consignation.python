@@ -88,7 +88,7 @@ class GestionnaireNotifications(GestionnaireDomaine):
         self.message_dao.channel.queue_declare(
             queue=nom_queue_notification,
             durable=True,
-            callback=self.callback_queue_cree,
+            callback=self.callback_queue_transaction
         )
 
         self.message_dao.channel.queue_bind(
