@@ -582,16 +582,21 @@ class PikaDAO:
         self._logger.warn("MQ Enter error state")
         self._in_error = True
 
-        if self.channel is not None:
-            try:
+        try:
+            if self.channel is not None:
                 self.channel.close()
-            except Exception as e:
-                self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
+        except Exception as e:
+            self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
+        finally:
+            self.channel = None
 
         try:
-            self.deconnecter()
+            if self.connectionmq is not None:
+                self.connectionmq.close()
         except Exception as e:
             self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
+        finally:
+            self.connectionmq = None
 
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
