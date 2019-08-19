@@ -164,7 +164,7 @@ class PikaDAO:
         self.__liste_listeners_channels.append(listener)
 
         # On verifie si on peut ouvrir le channel immediatement
-        if self.connectionmq is not None and not self.connectionmq.is_closed:
+        if self.connectionmq is not None and not self.connectionmq.is_closed and not self._in_error:
             self.__ouvrir_channel_listener(listener)
 
     def __ouvrir_channel_listener(self, listener):
@@ -318,10 +318,13 @@ class PikaDAO:
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
 
-    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None, correlation_id=None):
+    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None, correlation_id=None, channel=None):
 
         if self.connectionmq is None or self.connectionmq.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        if channel is None:
+            channel = self.channel
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
         if reply_to is not None:
@@ -331,7 +334,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self._lock_transmettre_message:
-            self.channel.basic_publish(
+            channel.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8,
@@ -385,11 +388,11 @@ class PikaDAO:
                 mandatory=True)
         self._in_error = False
 
-    def transmettre_nouvelle_transaction(self, document_transaction, reply_to, correlation_id):
+    def transmettre_nouvelle_transaction(self, document_transaction, reply_to, correlation_id, channel=None):
         routing_key = 'transaction.nouvelle'
         # Utiliser delivery mode 2 (persistent) pour les transactions
         self.transmettre_message(
-            document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id)
+            document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
     def transmettre_notification(self, document_transaction, sub_routing_key):
         routing_key = 'notification.%s' % sub_routing_key

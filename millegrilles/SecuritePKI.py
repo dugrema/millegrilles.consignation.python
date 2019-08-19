@@ -599,7 +599,7 @@ class GestionnaireEvenementsCertificat(BaseCallback):
         super().__init__(contexte)
         self._gestionnaire_certificats = gestionnaire_certificats
 
-    def transmettre_certificat(self):
+    def transmettre_certificat(self, channel=None):
         enveloppe = self._gestionnaire_certificats.enveloppe_certificat_courant
 
         message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
@@ -610,7 +610,7 @@ class GestionnaireEvenementsCertificat(BaseCallback):
 
         routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
         self.contexte.message_dao.transmettre_message(
-            message_evenement, routing
+            message_evenement, routing, channel=channel
         )
 
     def traiter_message(self, ch, method, properties, body):

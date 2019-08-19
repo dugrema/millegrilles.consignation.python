@@ -28,8 +28,14 @@ class GenerateurTransaction:
         self.signateur_transaction.initialiser()
 
         # Transmettre le certificat pour etre sur que tous les participants l'ont
+        self._contexte.message_dao.register_channel_listener(self)
+        self.__channel = None
+
+    def on_channel_open(self, channel):
+        self.__channel = channel
+        channel.basic_qos(prefetch_count=1)
         gestionnaire_certificats = GestionnaireEvenementsCertificat(self._contexte, self.signateur_transaction)
-        gestionnaire_certificats.transmettre_certificat()
+        gestionnaire_certificats.transmettre_certificat(channel)
 
     ''' 
     Transmet un message. La connexion doit etre ouverte.
@@ -47,7 +53,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id)
+        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id, self.__channel)
 
         return uuid_transaction
 
