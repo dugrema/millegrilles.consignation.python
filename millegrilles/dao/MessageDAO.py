@@ -273,7 +273,7 @@ class PikaDAO:
                 self.connectionmq.ioloop.start()
 
             except Exception as oserr:
-                logging.error("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr)
+                self._logger.exception("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr, exc_info=oserr)
 
             self.__stop_event.wait(10)  # Attendre 10 secondes avant de redemarrer la loop
 
