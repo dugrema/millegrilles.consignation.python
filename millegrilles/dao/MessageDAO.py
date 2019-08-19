@@ -588,7 +588,10 @@ class PikaDAO:
             except Exception as e:
                 self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
 
-        self.deconnecter()
+        try:
+            self.deconnecter()
+        except Exception as e:
+            self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
 
     # Se deconnecter de RabbitMQ
     def deconnecter(self):

@@ -156,7 +156,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             except ChannelClosed as ce:
                 self._logger.debug("Channel deja ferme: %s" % str(ce))
             except Exception as e:
-                self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__name__, str(e)))
+                self._logger.warning("Erreur arret gestionnaire %s: %s" % (gestionnaire.__class__.__name__, str(e)))
 
         self.deconnecter()
 

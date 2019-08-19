@@ -3,6 +3,8 @@
 import argparse
 import signal
 import logging
+import threading
+import time
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -85,6 +87,12 @@ class ModeleConfiguration:
             self.exit_gracefully()
 
         self._logger.info("Main terminee, exit.")
+
+        if threading.active_count() > 1:
+            ok_threads = ['MainThread', 'pymongo_kill_cursors_thread']
+            for thread in threading.enumerate():
+                if thread.name not in ok_threads:
+                    self._logger.error("Thread ouverte apres demande de fermeture: %s" % thread.name)
 
     @property
     def contexte(self):
