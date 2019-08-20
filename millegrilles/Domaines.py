@@ -237,6 +237,11 @@ class GestionnaireDomaine:
         self._logger.info("Channel ferme: %s, %s" %(code, reason))
         self.channel_mq = None
 
+    def inscrire_basicconsume(self, queue, callback):
+        nom_queue = queue.method.queue
+        self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
+        self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
+
     def callback_queue_transaction(self, queue):
         """
         Suite d'un queue_declare, active le basic_consume sur la Q en utilisant la methode self.traiter_transaction.
