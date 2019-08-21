@@ -5,7 +5,8 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
-from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -18,9 +19,11 @@ import datetime
 class ConstantesMaitreDesCles:
 
     DOMAINE_NOM = 'millegrilles.domaines.MaitreDesCles'
-    COLLECTION_TRANSACTIONS_NOM = ConstantesSecurityPki.COLLECTION_NOM
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % ConstantesSecurityPki.COLLECTION_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_NOM = DOMAINE_NOM
+
+    COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     LIBVAL_CONFIGURATION = 'configuration'
@@ -28,6 +31,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER = 'nouvelleCle,grosFichier'
     TRANSACTION_NOUVELLE_CLE_DOCUMENT = 'nouvelleCle,document'
 
+    REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
 
@@ -50,25 +54,22 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self.__prefix_maitredescles = '%s_maitredescles' % nom_millegrille
 
         self.__certificat_courant = None
+        self.__certificat_courant_pem = None
         self.__cle_courante = None
 
         # Queue message handlers
         self.__handler_transaction = None
         self.__handler_cedule = None
-        self.__handler_processus = None
         self.__handler_requetes_noeuds = None
+
+        self.generateur = GenerateurTransaction(self.contexte, encodeur_json=MongoJSONEncoder)
 
     def configurer(self):
         super().configurer()
+
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
         self.charger_certificat_courant()
-
-        # Queue message handlers
-        self.__handler_transaction = TraitementTransactionPersistee(self)
-        self.__handler_cedule = TraitementMessageCedule(self)
-        self.__handler_processus = self.traitement_evenements
-        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
         # Index collection domaine
         collection_domaine = self.get_collection()
@@ -94,8 +95,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         mot_de_passe = '%s/%s.password.txt' % (self.__repertoire_motsdepasse, self.__prefix_maitredescles)
 
         with open(mot_de_passe, 'rb') as motpasse_courant:
-            motpass = motpasse_courant.readline()[0:-1]
-            self._logger.info("Mot de passe: %s" % motpass)
+            motpass = motpasse_courant.readline()[0:-1]  # Enlever newline a la fin.
             with open(fichier_cle, "rb") as keyfile:
                 cle = serialization.load_pem_private_key(
                     keyfile.read(),
@@ -107,23 +107,31 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self._logger.info("Cle courante: %s" % str(self.__cle_courante))
 
         with open(fichier_cert, 'rb') as certificat_pem:
+            certificat_courant_pem = certificat_pem.read()
             # certificat_pem = bytes(certificat_pem, 'utf-8')
             cert = x509.load_pem_x509_certificate(
-                certificat_pem.read(),
+                certificat_courant_pem,
                 backend=default_backend()
             )
             self.__certificat_courant = cert
+            self.__certificat_courant_pem = certificat_courant_pem.decode('utf8')
 
         self._logger.info("Certificat courant: %s" % str(self.__certificat_courant))
 
     def setup_rabbitmq(self, channel):
+
+        # Queue message handlers
+        self.__handler_transaction = TraitementTransactionPersistee(self)
+        self.__handler_cedule = TraitementMessageCedule(self)
+        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
+
         nom_queue_transactions = '%s.%s' % (self.get_nom_queue(), 'transactions')
         nom_queue_ceduleur = '%s.%s' % (self.get_nom_queue(), 'ceduleur')
         nom_queue_processus = '%s.%s' % (self.get_nom_queue(), 'processus')
         nom_queue_requetes_noeuds = '%s.%s' % (self.get_nom_queue(), 'requete.noeuds')
 
         # Configurer la Queue pour les transactions
-        def callback_init_transaction(queue, self=self, callback=self.__handler_transaction.traiter_message):
+        def callback_init_transaction(queue, self=self, callback=self.__handler_transaction.callbackAvecAck):
             self.inscrire_basicconsume(queue, callback)
             channel.queue_bind(
                 exchange=self.configuration.exchange_middleware,
@@ -139,7 +147,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         )
 
         # Configuration la queue pour le ceduleur
-        def callback_init_cedule(queue, self=self, callback=self.__handler_cedule.traiter_message):
+        def callback_init_cedule(queue, self=self, callback=self.__handler_cedule.callbackAvecAck):
             self.inscrire_basicconsume(queue, callback)
             channel.queue_bind(
                 exchange=self.configuration.exchange_middleware,
@@ -155,7 +163,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         )
 
         # Queue pour les processus
-        def callback_init_processus(queue, self=self, callback=self.__handler_cedule.traiter_message):
+        def callback_init_processus(queue, self=self, callback=self.traitement_evenements.callbackAvecAck):
             self.inscrire_basicconsume(queue, callback)
             channel.queue_bind(
                 exchange=self.configuration.exchange_middleware,
@@ -171,7 +179,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         )
 
         # Queue pour les requetes de noeuds
-        def callback_init_requetes_noeuds(queue, self=self, callback=self.__handler_requetes_noeuds.traiter_message):
+        def callback_init_requetes_noeuds(queue, self=self, callback=self.__handler_requetes_noeuds.callbackAvecAck):
             self.inscrire_basicconsume(queue, callback)
             channel.queue_bind(
                 exchange=self.configuration.exchange_noeuds,
@@ -200,6 +208,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
 
     def get_nom_domaine(self):
         return ConstantesMaitreDesCles.DOMAINE_NOM
+
+    @property
+    def get_certificat(self):
+        return self.__certificat_courant
+
+    @property
+    def get_certificat_pem(self):
+        return self.__certificat_courant_pem
 
 
 class TraitementMessageCedule(BaseCallback):
@@ -243,6 +259,7 @@ class TraitementRequetesNoeuds(BaseCallback):
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -254,15 +271,32 @@ class TraitementRequetesNoeuds(BaseCallback):
             ''
         )
 
-        if routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
-            processus = "millegrilles_domaines_MaitreDesCles:RequeteDecryptageCleDocument"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
+        if routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
+            # Transmettre le certificat courant du maitre des cles
+            self.transmettre_certificat(properties)
+
         elif routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
             processus = "millegrilles_domaines_MaitreDesCles:RequeteDecryptageCleGrosFichier"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         else:
             # Type de transaction inconnue, on lance une exception
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
+
+    def transmettre_certificat(self, properties):
+        """
+        Transmet le certificat courant du MaitreDesCles au demandeur.
+        :param properties:
+        :return:
+        """
+        self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
+        # Genere message reponse
+        message_resultat = {
+            'certificat': self._gestionnaire.get_certificat_pem
+        }
+
+        self._gestionnaire.generateur.transmettre_reponse(
+            message_resultat, properties.reply_to, properties.correlation_id
+        )
 
 
 class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
@@ -272,7 +306,7 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
 
     def initiale(self):
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
-        pass
+        self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
 
     def generer_transaction_cles_backup(self):
         """
@@ -280,7 +314,7 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         Va aussi declencher la mise a jour du document de cles associe.
         :return:
         """
-        pass
+        self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.mettre_token_resumer_transaction.__name__)
 
     def mettre_token_resumer_transaction(self):
         """
@@ -288,3 +322,9 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         :return:
         """
         self.set_etape_suivante()  # Termine
+
+    def get_collection_transaction_nom(self):
+        return ConstantesMaitreDesCles.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesMaitreDesCles.COLLECTION_PROCESSUS_NOM
