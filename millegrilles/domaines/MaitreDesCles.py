@@ -7,6 +7,10 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography import x509
+
 import logging
 import datetime
 
@@ -21,7 +25,8 @@ class ConstantesMaitreDesCles:
 
     LIBVAL_CONFIGURATION = 'configuration'
 
-    TRANSACTION_NOUVELLE_CLE = 'nouvelleCle'
+    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = 'nouvelleCle,grosFichier'
+    TRANSACTION_NOUVELLE_CLE_DOCUMENT = 'nouvelleCle,document'
 
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
@@ -37,6 +42,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
+        nom_millegrille = contexte.configuration.nom_millegrille
+
+        self.__repertoire_cles = '/opt/millegrilles/%s/pki/keys' % nom_millegrille
+        self.__repertoire_certs = '/opt/millegrilles/%s/pki/certs' % nom_millegrille
+        self.__repertoire_motsdepasse = '/opt/millegrilles/%s/pki/passwords' % nom_millegrille
+        self.__prefix_maitredescles = '%s_maitredescles' % nom_millegrille
+
+        self.__certificat_courant = None
+        self.__cle_courante = None
+
         # Queue message handlers
         self.__handler_transaction = None
         self.__handler_cedule = None
@@ -46,6 +61,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
     def configurer(self):
         super().configurer()
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
+
+        self.charger_certificat_courant()
 
         # Queue message handlers
         self.__handler_transaction = TraitementTransactionPersistee(self)
@@ -70,6 +87,34 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         #     (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
         #     (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
         # ])
+
+    def charger_certificat_courant(self):
+        fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_certs, self.__prefix_maitredescles)
+        fichier_cle = '%s/%s.key.pem' % (self.__repertoire_cles, self.__prefix_maitredescles)
+        mot_de_passe = '%s/%s.password.txt' % (self.__repertoire_motsdepasse, self.__prefix_maitredescles)
+
+        with open(mot_de_passe, 'rb') as motpasse_courant:
+            motpass = motpasse_courant.readline()[0:-1]
+            self._logger.info("Mot de passe: %s" % motpass)
+            with open(fichier_cle, "rb") as keyfile:
+                cle = serialization.load_pem_private_key(
+                    keyfile.read(),
+                    password=motpass,
+                    backend=default_backend()
+                )
+                self.__cle_courante = cle
+
+        self._logger.info("Cle courante: %s" % str(self.__cle_courante))
+
+        with open(fichier_cert, 'rb') as certificat_pem:
+            # certificat_pem = bytes(certificat_pem, 'utf-8')
+            cert = x509.load_pem_x509_certificate(
+                certificat_pem.read(),
+                backend=default_backend()
+            )
+            self.__certificat_courant = cert
+
+        self._logger.info("Certificat courant: %s" % str(self.__certificat_courant))
 
     def setup_rabbitmq(self, channel):
         nom_queue_transactions = '%s.%s' % (self.get_nom_queue(), 'transactions')
@@ -130,7 +175,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
             self.inscrire_basicconsume(queue, callback)
             channel.queue_bind(
                 exchange=self.configuration.exchange_noeuds,
-                queue=nom_queue_processus,
+                queue=nom_queue_requetes_noeuds,
                 routing_key='requete.%s.#' % ConstantesMaitreDesCles.DOMAINE_NOM,
                 callback=None,
             )
@@ -185,8 +230,8 @@ class TraitementTransactionPersistee(BaseCallback):
             ''
         )
 
-        if routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCle"
+        if routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleGrosFichier"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         else:
             # Type de transaction inconnue, on lance une exception
@@ -220,14 +265,26 @@ class TraitementRequetesNoeuds(BaseCallback):
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
 
 
-class ProcessusNouvelleCle(BaseCallback):
+class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
 
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
 
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        routing_key = method.routing_key
+    def initiale(self):
+        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+        pass
 
+    def generer_transaction_cles_backup(self):
+        """
+        Sauvegarder les cles de backup sous forme de transaction dans le domaine MaitreDesCles.
+        Va aussi declencher la mise a jour du document de cles associe.
+        :return:
+        """
+        pass
+
+    def mettre_token_resumer_transaction(self):
+        """
+        Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
+        :return:
+        """
+        self.set_etape_suivante()  # Termine
