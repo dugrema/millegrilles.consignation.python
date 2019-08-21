@@ -64,6 +64,7 @@ class ConstantesGrosFichiers:
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
+    TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM
     TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM
     TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
     TRANSACTION_DEPLACER_FICHIER = '%s.deplacerFichier' % DOMAINE_NOM
@@ -818,6 +819,8 @@ class TraitementMessageMiddleware(BaseCallback):
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionClesRecues"
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_FICHIER or \
                     routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
@@ -919,7 +922,12 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
 
 
 class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
-    """ Processus de d'ajout de nouveau fichier ou nouvelle version d'un fichier """
+    """
+    Processus de d'ajout de nouveau fichier ou nouvelle version d'un fichier
+    C'est le processus principal qui depend de deux sous-processus:
+     -  ProcessusTransactionNouvelleVersionTransfertComplete
+     -  ProcessusNouvelleCleGrosFichier (pour securite 3.protege et 4.secure)
+    """
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -935,7 +943,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
 
         fuuid = transaction['fuuid']
 
-        return {'fuuid': fuuid}
+        return {'fuuid': fuuid, 'securite': transaction['securite']}
 
     def ajouter_version_fichier(self):
         # Ajouter version au fichier
@@ -957,16 +965,29 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
     def attendre_transaction_transfertcomplete(self):
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__,
-            [self._get_token_attente()])
+            self._get_tokens_attente())
 
     def confirmer_hash(self):
+        if self.parametres.get('attente_token') is not None:
+            # Il manque des tokens, on boucle.
+            self._logger.debug('attendre_transaction_transfertcomplete(): Il reste des tokens actifs, on boucle')
+            self.set_etape_suivante(
+                ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__)
+            return
+
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
         self.set_etape_suivante()  # Processus termine
 
-    def _get_token_attente(self):
+    def _get_tokens_attente(self):
         fuuid = self.parametres.get('fuuid')
-        token_attente = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
-        return token_attente
+        tokens = [
+            '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
+        ]
+
+        if self.parametres['securite'] in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+            tokens.append('%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid))
+
+        return tokens
 
 
 class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers):
@@ -992,6 +1013,25 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers
 
         # Une fois les tokens consommes, le processus sera termine.
         self.set_etape_suivante()
+
+
+class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """
+        Emet un evenement pour indiquer que les cles sont recues par le MaitreDesCles.
+        """
+        transaction = self.charger_transaction()
+        fuuid = transaction.get('fuuid')
+
+        token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid)
+        self.resumer_processus([token_resumer])
+
+        self.set_etape_suivante()  # Termine
+        return {'fuuid': fuuid}
 
 
 class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):

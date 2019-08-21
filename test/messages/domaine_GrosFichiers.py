@@ -7,6 +7,7 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
+from threading import Thread, Event
 
 
 class MessagesSample(BaseCallback):
@@ -14,16 +15,28 @@ class MessagesSample(BaseCallback):
     def __init__(self):
         super().__init__(ContexteRessourcesMilleGrilles())
         self.contexte.initialiser(init_document=False)
+        self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
         self.message_dao = self.contexte.message_dao
 
+        self.channel = None
+        self.event_recu = Event()
+        self.thread_ioloop = Thread(target=self.run_ioloop)
+
+    def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
-        self.channel = self.message_dao.channel
-        queue = self.channel .queue_declare(durable=True, exclusive=True)
+        self.channel = channel
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+
+    def queue_open(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.executer()
+
+    def run_ioloop(self):
+        self.contexte.message_dao.run_ioloop()
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -35,8 +48,8 @@ class MessagesSample(BaseCallback):
     def transaction_nouvelle_version_metadata(self):
         transaction = {
             "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8413",
-            "securite": "prive",
-            "repertoire_uuid": 'c6da1c6e-b7cc-11e9-8c97-00155d011f00',
+            "securite": "3.protege",
+            "repertoire_uuid": '16e474e6-c116-11e9-a058-00155d011f00',
             "nom": "ExplorationGrosFichiers2.txt",
             "taille": 5478,
             "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
@@ -171,25 +184,27 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def executer(self):
+        # enveloppe = sample.requete_profil_usager()
+        enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+        # enveloppe3 = sample.transaction_creer_repertoire()
+        # enveloppe4 = sample.transaction_renommer_repertoire()
+        # enveloppe5 = sample.transaction_deplacer_repertoire()
+        # enveloppe6 = sample.transaction_renommer_fichier()
+        # enveloppe7 = sample.transaction_deplacer_fichier()
+        # enveloppe8 = sample.transaction_supprimer_fichier()
+        # enveloppe9 = sample.transaction_supprimer_repertoire()
+        # enveloppe10 = sample.transaction_commenter_repertoire()
+        # enveloppe11 = sample.transaction_commenter_fichier()
+
+
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.requete_profil_usager()
-# enveloppe1 = sample.transaction_nouvelle_version_metadata()
-# enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
-# enveloppe3 = sample.transaction_creer_repertoire()
-# enveloppe4 = sample.transaction_renommer_repertoire()
-# enveloppe5 = sample.transaction_deplacer_repertoire()
-# enveloppe6 = sample.transaction_renommer_fichier()
-# enveloppe7 = sample.transaction_deplacer_fichier()
-# enveloppe8 = sample.transaction_supprimer_fichier()
-# enveloppe9 = sample.transaction_supprimer_repertoire()
-enveloppe10 = sample.transaction_commenter_repertoire()
-# enveloppe11 = sample.transaction_commenter_fichier()
-
-
-sample.channel.start_consuming()
+sample.thread_ioloop.start()
 
 # FIN TEST
+sample.event_recu.wait(10)
 sample.deconnecter()

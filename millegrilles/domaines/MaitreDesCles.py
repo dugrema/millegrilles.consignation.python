@@ -3,6 +3,7 @@
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
@@ -64,6 +65,10 @@ class ConstantesMaitreDesCles:
         TRANSACTION_CHAMP_SUJET_CLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,  # Mettre le sujet approprie
         'fuuid': None,  # Identificateur unique de version de fichier
         'cles': dict(),  # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
+    }
+
+    DOCUMENT_TRANSACTION_GROSFICHIERRESUME = {
+        'fuuid': None,  # Identificateur unique de version de fichier
     }
 
 
@@ -518,7 +523,17 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
         :return:
         """
+        generateur_transaction = GenerateurTransaction(self.contexte)
+        transaction_resumer = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_GROSFICHIERRESUME.copy()
+        transaction_resumer['fuuid'] = self.parametres['fuuid']
+        domaine_routing = ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES
+
+        # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
+        self._logger.debug("Transmission nouvelle transaction cle recues pour GrosFichier")
+        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
+
         self.set_etape_suivante()  # Termine
+        return {'resumer': transaction_resumer}
 
 
 class ProcessusMAJDocumentCles(MGProcessusTransaction):
