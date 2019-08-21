@@ -558,12 +558,12 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         }
 
         contenu_date = {
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
         }
 
         contenu_set = dict()
         for fingerprint in transaction['cles'].keys():
-            cle_dict = 'cles.%s' % fingerprint;
+            cle_dict = 'cles.%s' % fingerprint
             valeur = transaction['cles'].get(fingerprint)
             contenu_set[cle_dict] = valeur
 

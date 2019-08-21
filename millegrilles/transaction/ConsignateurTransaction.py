@@ -5,7 +5,7 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 from millegrilles import Constantes
 from bson.objectid import ObjectId
-from threading import Thread
+from threading import Thread, Event
 
 import logging
 import datetime
@@ -18,7 +18,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         super().__init__()
         self.json_helper = JSONHelper()
         self.message_handler = None
-        self.__thread_mqioloop = None
+        self.__stop_event = Event()
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -60,9 +60,11 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
     def executer(self):
-        self.contexte.message_dao.run_ioloop()  # Methode blocking
+        while not self.__stop_event.is_set():
+            self.__stop_event.wait(3600)  # On fait juste attendre l'evenement de fermeture
 
     def deconnecter(self):
+        self.__stop_event.set()
         self.contexte.document_dao.deconnecter()
         self.contexte.message_dao.deconnecter()
         logging.info("Deconnexion completee")

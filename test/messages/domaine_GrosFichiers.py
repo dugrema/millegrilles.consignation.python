@@ -21,14 +21,13 @@ class MessagesSample(BaseCallback):
 
         self.channel = None
         self.event_recu = Event()
-        self.thread_ioloop = Thread(target=self.run_ioloop)
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
 
-    def queue_open(self, queue):
+    def queue_open_local(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
 
@@ -203,7 +202,6 @@ class MessagesSample(BaseCallback):
 sample = MessagesSample()
 
 # TEST
-sample.thread_ioloop.start()
 
 # FIN TEST
 sample.event_recu.wait(10)

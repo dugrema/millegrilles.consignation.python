@@ -19,12 +19,10 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         self._stop_event = Event()
         self._stop_event.set()
 
-        self.__thread_mq = None
         self.logger = logging.getLogger('%s.CeduleurMilleGrilles' % __name__)
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
-        self.__thread_mq = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -104,7 +102,6 @@ class CeduleurMilleGrilles(ModeleConfiguration):
     def executer(self):
 
         self._stop_event.clear()  # Pret a l'execution
-        self.__thread_mq.start()  # Executer ioloop de MQ
 
         # Preparer configuration / logging
         if self.args.debug:
