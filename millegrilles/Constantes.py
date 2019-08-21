@@ -165,3 +165,7 @@ SECURITE_PUBLIC = '1,public'    # Niveau 1, le moins securitaire. Accessible a n
 SECURITE_PRIVE = '2.prive'      # Niveau 2, accessible aux personnes authentifiees
 SECURITE_PROTEGE = '3.protege'  # Niveau 3, accessible aux personnes autorisees (delegues, autorise individuellement)
 SECURITE_SECURE = '4.secure'    # Niveau 4, accessible uniquement a l'usager et aux delegues directs
+
+SECURITE_LIBELLE_REPONSE = 'acces'
+SECURITE_ACCES_REFUSE = '0.refuse'
+SECURITE_ACCES_PERMIS = '1.permis'

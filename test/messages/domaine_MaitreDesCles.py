@@ -74,6 +74,20 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_decryptage_cle_fuuid(self):
+        requete_cert_maitredescles = {
+            'fuuid': "02d569a0-c388-11e9-b478-630aa73a3f1e"
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def nouvelle_cle_grosfichiers(self):
 
         cle_secrete = 'Mon mot de passe secret'
@@ -107,7 +121,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.requete_cert_maitredescles()
-        enveloppe = sample.nouvelle_cle_grosfichiers()
+        # enveloppe = sample.nouvelle_cle_grosfichiers()
+        enveloppe = sample.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---
 sample = MessagesSample()

@@ -4,7 +4,7 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
@@ -266,6 +266,34 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         )
         return contenu_decrypte
 
+    def decrypter_cle(self, dict_cles):
+        """
+        Decrypte la cle secrete en utilisant la cle prviee d'un certificat charge en memoire
+        :param dict_cles: Dictionnaire de cles secretes cryptes, la cle_dict est le fingerprint du certificat
+        :return:
+        """
+        fingerprint_courant = self.get_fingerprint_cert()
+        cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
+        if cle_secrete_cryptee is not None:
+            # On peut decoder la cle secrete
+            return self.decrypter_contenu(cle_secrete_cryptee)
+        else:
+            return None
+
+    def crypter_cle(self, cle_secrete, cert=None):
+        if cert is None:
+            cert = self.__certificat_courant
+        cle_secrete_backup = cert.public_key().encrypt(
+            cle_secrete,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        fingerprint = self.get_fingerprint_cert(cert)
+        return cle_secrete_backup, fingerprint
+
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
 
@@ -292,6 +320,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
     @property
     def get_certificats_backup(self):
         return self.__certificats_backup
+
+    def get_fingerprint_cert(self, cert=None):
+        if cert is None:
+            cert = self.__certificat_courant
+        return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
 
 class TraitementMessageCedule(BaseCallback):
@@ -355,8 +388,8 @@ class TraitementRequetesNoeuds(BaseCallback):
             self.transmettre_certificat(properties)
 
         elif routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
-            processus = "millegrilles_domaines_MaitreDesCles:RequeteDecryptageCleGrosFichier"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
+            self.transmettre_cle_grosfichier(message_dict, properties)
+
         else:
             # Type de transaction inconnue, on lance une exception
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
@@ -375,6 +408,45 @@ class TraitementRequetesNoeuds(BaseCallback):
 
         self._gestionnaire.generateur.transmettre_reponse(
             message_resultat, properties.reply_to, properties.correlation_id
+        )
+
+    def transmettre_cle_grosfichier(self, evenement, properties):
+        """
+        Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
+        :param properties:
+        :return:
+        """
+        self._logger.debug("Transmettre cle grosfichier a %s" % properties.reply_to)
+
+        # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
+        # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
+        # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
+        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(evenement)
+        # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
+
+        acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+        self._logger.debug("Verification signature requete cle grosfichier. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+
+        collection_documents = self.contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+            'fuuid': evenement['fuuid'],
+        }
+        document = collection_documents.find_one(filtre)
+        # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+        if document is not None:
+            self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
+            if acces_permis:
+                cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
+                cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(cle_secrete, enveloppe_certificat.certificat)
+                reponse = {
+                    'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                    Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                }
+
+        self._gestionnaire.generateur.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id
         )
 
 
@@ -501,3 +573,4 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {'filtre': filtre, 'operation': operations}
+
