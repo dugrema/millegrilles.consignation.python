@@ -303,9 +303,12 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+        transaction = self.transaction
+        self._logger.info("Transaction GrosFichier secure: %s" % str(transaction))
         self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
 
     def generer_transaction_cles_backup(self):
@@ -322,9 +325,3 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         :return:
         """
         self.set_etape_suivante()  # Termine
-
-    def get_collection_transaction_nom(self):
-        return ConstantesMaitreDesCles.COLLECTION_TRANSACTIONS_NOM
-
-    def get_collection_processus_nom(self):
-        return ConstantesMaitreDesCles.COLLECTION_PROCESSUS_NOM

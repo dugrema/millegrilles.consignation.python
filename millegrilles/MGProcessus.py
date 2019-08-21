@@ -335,6 +335,14 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         self.contexte.message_dao.transmettre_erreur_processus(
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
+    @property
+    def collection_processus_nom(self):
+        return self._gestionnaire_domaine.get_collection_processus_nom
+
+    @property
+    def get_collection_transaction_nom(self):
+        return self._gestionnaire_domaine.get_collection_transaction_nom
+
 
 # class MGControlleurMessageHandler(BaseCallback):
 #
@@ -620,18 +628,20 @@ class MGProcessus:
         """
         return self._document_processus['parametres']
 
+    @property
     def get_collection_transaction_nom(self):
-        raise NotImplementedError("Pas implemente")
+        return self._controleur.get_collection_transaction_nom
 
+    @property
     def get_collection_processus_nom(self):
-        raise NotImplementedError("Pas implemente")
+        return self._controleur.collection_processus_nom
 
 
 # Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
 # comme ayant ete completee.
 class MGProcessusTransaction(MGProcessus):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement):
         super().__init__(controleur, evenement)
 
         self._transaction = None
