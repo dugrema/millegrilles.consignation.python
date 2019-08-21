@@ -16,6 +16,8 @@ from base64 import b64encode, b64decode
 
 import logging
 import datetime
+import os
+import re
 
 
 class ConstantesMaitreDesCles:
@@ -60,6 +62,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self.__certificat_courant = None
         self.__certificat_courant_pem = None
         self.__cle_courante = None
+        self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
 
         # Queue message handlers
         self.__handler_transaction = None
@@ -74,6 +77,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
         self.charger_certificat_courant()
+        self.charger_certificats_backup()
 
         # Index collection domaine
         collection_domaine = self.get_collection()
@@ -121,6 +125,31 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
             self.__certificat_courant_pem = certificat_courant_pem.decode('utf8')
 
         self._logger.info("Certificat courant: %s" % str(self.__certificat_courant))
+
+    def charger_certificats_backup(self):
+        """
+        Charge les certificats de backup presents dans le repertoire des certificats.
+        Les cles publiques des backups sont utilisees pour re-encrypter les cles secretes.
+        :return:
+        """
+        certificats_backup = list()
+
+        p = re.compile("%s_backup_[0-9]*.cert.pem" % self.configuration.nom_millegrille)
+        for file in os.listdir(self.__repertoire_certs):
+            if p.match(file) is not None:
+                self._logger.debug('Fichier cert backup %s' % os.path.join(self.__repertoire_certs, file))
+                certfilepath = os.path.join(self.__repertoire_certs, file)
+                with open(certfilepath, 'rb') as certificat_pem:
+                    certificat_courant_pem = certificat_pem.read()
+                    # certificat_pem = bytes(certificat_pem, 'utf-8')
+                    cert = x509.load_pem_x509_certificate(
+                        certificat_courant_pem,
+                        backend=default_backend()
+                    )
+                    certificats_backup.append(cert)
+
+        if len(certificats_backup) > 0:
+            self.__certificats_backup = certificats_backup
 
     def setup_rabbitmq(self, channel):
 
@@ -328,11 +357,14 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
-        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         transaction = self.transaction
 
+        cles_secretes_encryptees = list()
+
+        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
         self._logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
+        cles_secretes_encryptees.append(cle_secrete_encryptee)
 
         cle_secrete = self._controleur.gestionnaire.decrypter_contenu(cle_secrete_encryptee)
         self._logger.debug("Cle secrete: %s" % cle_secrete)
@@ -340,6 +372,8 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         # Re-encrypter la cle secrete avec les cles backup
 
         self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
+
+        return {'cles_secretes_encryptees': cles_secretes_encryptees}
 
     def generer_transaction_cles_backup(self):
         """
