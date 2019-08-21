@@ -9,6 +9,11 @@ from millegrilles import Constantes
 from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles
 
 from threading import Event, Thread
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from base64 import b64encode
 
 class MessagesSample(BaseCallback):
 
@@ -21,6 +26,16 @@ class MessagesSample(BaseCallback):
         self.channel = None
         self.event_recu = Event()
         self.thread_ioloop = Thread(target=self.run_ioloop)
+
+        # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
+        with open('/opt/millegrilles/dev2/pki/certs/dev2_maitredescles.cert.pem', 'rb') as certificat_pem:
+            certificat_courant_pem = certificat_pem.read()
+            cert = x509.load_pem_x509_certificate(
+                certificat_courant_pem,
+                backend=default_backend()
+            )
+            self.certificat_courant = cert
+            self.certificat_courant_pem = certificat_courant_pem.decode('utf8')
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -59,13 +74,24 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
-    def nouvelle_cle(self):
+    def nouvelle_cle_grosfichiers(self):
+
+        cle_secrete = 'Mon mot de passe secret'
+        cle_secrete_encryptee = self.certificat_courant.public_key().encrypt(
+            cle_secrete.encode('utf8'),
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        cle_secrete_encryptee_mime64 = b64encode(cle_secrete_encryptee).decode('utf8')
 
         nouvelle_cle = {
             "domaine": "millegrilles.domaines.GrosFichiers",
             "fuuid": "02d569a0-c388-11e9-b478-630aa73a3f1e",
             "fingerprint": "abcd",
-            "cle": "bIteZjNBYmWP482k1OFzBn56OD+2R3QS8I3vxtUsUl30k9j7Zvolom2vYcVmtqxKcYfNTJDwxqT5T/F+D5ooFTUgDT1/md1BvCDeicqh5+daVAK2P5kKRWklQkAkldrUgUthW3CjVtwkDb0D1tKdwWGasF6IKWtI+MZv3Z2pB+o+Oz7etZhlaaWmL7ncfPQn/lFaf2JgskpV1zJDfbipilEtxqAA/U50hEAbuFajm+eJyfrNrTA+n5M6gnscDVyeRa7uozU3QRoMaB1/v8vo3lUHVqS/fxaeToc0oqcdJRObWP9uTGhvZ4cg8lDjQwci7P2AjFAaDsgpYolWb3SnPQ==",
+            "cle": cle_secrete_encryptee_mime64,
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
         }
 
@@ -81,7 +107,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.requete_cert_maitredescles()
-        enveloppe = sample.nouvelle_cle()
+        enveloppe = sample.nouvelle_cle_grosfichiers()
 
 # --- MAIN ---
 sample = MessagesSample()

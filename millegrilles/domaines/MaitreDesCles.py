@@ -9,8 +9,10 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
+from base64 import b64encode, b64decode
 
 import logging
 import datetime
@@ -34,6 +36,8 @@ class ConstantesMaitreDesCles:
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
+
+    TRANSACTION_CHAMP_CLESECRETE = 'cle'
 
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
@@ -194,6 +198,24 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
             callback=callback_init_requetes_noeuds,
         )
 
+    def decrypter_contenu(self, contenu):
+        """
+        Utilise la cle privee en memoire pour decrypter le contenu.
+        :param contenu:
+        :return:
+        """
+        contenu_bytes = b64decode(contenu)
+
+        contenu_decrypte = self.__cle_courante.decrypt(
+            contenu_bytes,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return contenu_decrypte
+
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
 
@@ -232,7 +254,7 @@ class TraitementMessageCedule(BaseCallback):
 
 class TraitementTransactionPersistee(BaseCallback):
 
-    def __init__(self, gestionnaire):
+    def __init__(self, gestionnaire: GestionnaireMaitreDesCles):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 
@@ -308,7 +330,15 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
     def initiale(self):
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         transaction = self.transaction
-        self._logger.info("Transaction GrosFichier secure: %s" % str(transaction))
+
+        cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
+        self._logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
+
+        cle_secrete = self._controleur.gestionnaire.decrypter_contenu(cle_secrete_encryptee)
+        self._logger.debug("Cle secrete: %s" % cle_secrete)
+
+        # Re-encrypter la cle secrete avec les cles backup
+
         self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
 
     def generer_transaction_cles_backup(self):

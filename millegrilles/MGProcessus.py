@@ -321,8 +321,20 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         return self.contexte.configuration
 
     @property
+    def gestionnaire(self):
+        return self._gestionnaire_domaine
+
+    @property
     def demarreur_processus(self):
         return self._gestionnaire_domaine.demarreur_processus
+
+    @property
+    def collection_processus_nom(self):
+        return self._gestionnaire_domaine.get_collection_processus_nom
+
+    @property
+    def get_collection_transaction_nom(self):
+        return self._gestionnaire_domaine.get_collection_transaction_nom
 
     def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
         """
@@ -334,14 +346,6 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         """
         self.contexte.message_dao.transmettre_erreur_processus(
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
-
-    @property
-    def collection_processus_nom(self):
-        return self._gestionnaire_domaine.get_collection_processus_nom
-
-    @property
-    def get_collection_transaction_nom(self):
-        return self._gestionnaire_domaine.get_collection_transaction_nom
 
 
 # class MGControlleurMessageHandler(BaseCallback):
