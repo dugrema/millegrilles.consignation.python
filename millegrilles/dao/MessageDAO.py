@@ -38,7 +38,7 @@ class PikaDAO:
 
         # Thread utilisee pour verifier le fonctionnement correct de MQ
         self.__stop_event = Event()
-        self.__ioloop = None
+        self.__thread_ioloop = None
         self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
         self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
         self.__thread_maintenance.start()
@@ -97,15 +97,18 @@ class PikaDAO:
         :return: Connexion a RabbitMQ.
         """
 
-        self._separer = separer
-
-        self._logger.info("Connecter RabbitMQ, separer=%s" % self._separer)
+        self._logger.info("Connecter RabbitMQ")
 
         if self.connectionmq is not None:
             self._logger.warn("Appel de connecter avec connection deja ouverte")
             connectionmq = self.connectionmq
             self.connectionmq = None
-            connectionmq.close()
+            self.__thread_ioloop = None
+
+            try:
+                connectionmq.close()
+            except Exception as e:
+                self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
 
         try:
             self._lock_transmettre_message.acquire(blocking=True, timeout=30)
@@ -116,6 +119,8 @@ class PikaDAO:
                 on_open_callback=self.__on_connection_open,
                 on_close_callback=self.__on_connection_close,
             )
+            self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop)
+            self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
 
         except Exception as e:
             self.enter_error_state()
@@ -126,10 +131,8 @@ class PikaDAO:
 
     def __on_connection_open(self, connection):
         self._logger.info("Callback connection, on ouvre le channel")
-        self.connectionmq = connection
         connection.add_on_close_callback(self.__on_connection_close)
-        self.connectionmq = connection
-        self.connectionmq.channel(on_open_callback=self.__on_channel_open)
+        connection.channel(on_open_callback=self.__on_channel_open)
 
         # Aussi allouer un channel a chaque listener inscrit
         if self.__liste_listeners_channels is not None:
@@ -152,6 +155,7 @@ class PikaDAO:
     def __on_connection_close(self, connection=None, code=None, reason=None):
         self._logger.warn("Connection fermee: %s, %s" % (code, reason))
         self.connectionmq = None
+        self.__thread_ioloop = None
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warn("Channel ferme: %s, %s" %(code, reason))
@@ -257,29 +261,37 @@ class PikaDAO:
         )
 
     def start_consuming(self):
-        """ Demarre la lecture de messages RabbitMQ """
-        try:
-            # self.channel.start_consuming()
-            self.__ioloop = self.connectionmq.ioloop;
-            self.__ioloop.start()
-
-        except OSError as oserr:
-            logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
+        self._logger.warn("start_consuming(): Deprecated, gere dans MessageDAO")
+        # """ Demarre la lecture de messages RabbitMQ """
+        # try:
+        #     # self.channel.start_consuming()
+        #     self.__ioloop = self.connectionmq.ioloop
+        #     self.__ioloop.start()
+        #
+        # except OSError as oserr:
+        #     logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
 
     ''' Prepare la reception de message '''
 
+    def __run_ioloop(self):
+        self._logger.info("Demarrage MQ-IOLoop")
+        self.connectionmq.ioloop.start()
+        self._logger.info("Fin execution MQ-IOLoop")
+
     def run_ioloop(self):
-        while not self.__stop_event.is_set():
-            self._logger.info("Demarrage MQ-ioloop")
-            try:
-                self.connectionmq.ioloop.start()
+        self._logger.warn("run_ioloop(): Deprecated, gere dans MessageDAO")
 
-            except Exception as oserr:
-                self._logger.exception("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr, exc_info=oserr)
-
-            self.__stop_event.wait(10)  # Attendre 10 secondes avant de redemarrer la loop
-
-        self._logger.info("MQ-ioloop: Execution terminee")
+        # while not self.__stop_event.is_set():
+        #     self._logger.info("Demarrage MQ-ioloop")
+        #     try:
+        #         self.connectionmq.ioloop.start()
+        #
+        #     except Exception as oserr:
+        #         self._logger.exception("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr, exc_info=oserr)
+        #
+        #     self.__stop_event.wait(10)  # Attendre 10 secondes avant de redemarrer la loop
+        #
+        # self._logger.info("MQ-ioloop: Execution terminee")
 
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
@@ -600,21 +612,21 @@ class PikaDAO:
             self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
         finally:
             self.connectionmq = None
+            self.__thread_ioloop = None
 
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
         self._actif = False
         self.__stop_event.set()
 
-        if self.__ioloop is not None:
-            self.__ioloop.stop()  # Arreter boucle MQ
-
         if self.connectionmq is not None:
             try:
                 self.connectionmq.close()
             finally:
-                self.channel = None
                 self.connectionmq = None
+
+        self.channel = None
+        self.__thread_ioloop = None
 
     def executer_maintenance(self):
 
