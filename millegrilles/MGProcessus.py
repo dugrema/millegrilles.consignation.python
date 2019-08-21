@@ -269,11 +269,12 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
                     if token not in tokens:
                         tokens_restants.append(token)
                     else:
-                        tokens_connectes[token] = evenement_dict.get('_id_document_processus_declencheur')
+                        token_dockey = '%s.%s' % (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES, token)
+                        tokens_connectes[token_dockey] = evenement_dict.get('_id_document_processus_declencheur')
 
                 set_update = dict()
                 set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_restants
-                set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES] = tokens_connectes
+                set_update.update(tokens_connectes)
                 collection_processus.update_one(filtre_processus, {'$set': set_update})
 
                 self.message_etape_suivante(processus.get('_id'),
