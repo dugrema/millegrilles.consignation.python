@@ -48,12 +48,12 @@ class JavascriptPythonAsymetric:
         self._logger.info("Certificat courant: %s" % str(self.cert))
 
     def decrypter_contenu(self, contenu):
-        self._logger.info('------- JavascriptPythonAsymetric.decrypter_contenu() ----------')
         """
         Utilise la cle privee en memoire pour decrypter le contenu.
         :param contenu:
         :return:
         """
+        self._logger.info('------- JavascriptPythonAsymetric.decrypter_contenu() ----------')
         contenu_bytes = b64decode(contenu)
         self._logger.info("Contenu bytes (%d): %s" % (len(contenu_bytes), binascii.hexlify(contenu_bytes)))
 
@@ -82,7 +82,8 @@ class JavascriptPythonAsymetric:
 
     def executer(self):
 
-        contenu = 'v2oS1YZsX7+aCWfzf0DQtsmlSDrR/YuuFIUxiuwJIz6kXGHI8S9OBs0w1dw/oJvcHDWlcNcNDIENs9mtaSRnNgQQgD+x12dFHxsGL8kWiW0QNGugFVMf9J/8fcfkVXUibbsKK/QwkEfdiBO+rN4yX1aXWqm35V0hL9FEDVUlb/JDJ+2l9sNvutw+1D5paFWOI+fYEzKae/29gW2O4QILw0wvF7deZc6LjU4LoG4kXkNlDGL+RwPK17OuXU6zrRf5ZBKE+CiUFvpRUqttCv7kC3shvQ6JSVI8c4J5hgSNWL6fpx9WJFaPEu+ItK5TF6GIZ/x4Tjxbwf1lP1Wah/bFRg=='
+        contenu = 'hmCC9S5uvAvGekDsl5afneMDyjzwaWATOgbYANgHKqVa/fIEfmij1Afc8Qgyv95UGtY5Efp9cIKo9QsXCZXvL5owtVE4tt/P0OHNNgLBzTDxf4CpA3wjpS4cjuRBZY0KT11UQTLqaFoFmBqcjtf3yoC6qjacr8ciAzgJEmFwV6eYRlX98ITUinUEfDQ8mes7bykDkfor0oYFMZXB5F8pDWA1+wGPjOQcGldv+5h9vTSqKvI+i0lbGR7u3no6TPkdGEtySMLYFxRXFvz+xGVewoT+jWsbYjQqb6R4OX+UMhFMZkkiqGDbFvSQo3K6QOaBGDIDZQ4YRoTN3PtVLI4LyQ=='
+
         resultat = self.decrypter_contenu(contenu)
         self._logger.info("Decrypter, Resultat est:  %s" % resultat)
 

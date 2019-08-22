@@ -25,7 +25,7 @@ class MessagesSample(BaseCallback):
         self.message_dao = self.contexte.message_dao
         self.channel = None
         self.event_recu = Event()
-        self.thread_ioloop = Thread(target=self.run_ioloop)
+        # self.thread_ioloop = Thread(target=self.run_ioloop)
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/opt/millegrilles/dev2/pki/certs/dev2_maitredescles.cert.pem', 'rb') as certificat_pem:
@@ -49,8 +49,8 @@ class MessagesSample(BaseCallback):
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
         self.executer()
 
-    def run_ioloop(self):
-        self.contexte.message_dao.run_ioloop()
+    # def run_ioloop(self):
+    #     self.contexte.message_dao.run_ioloop()
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -103,7 +103,7 @@ class MessagesSample(BaseCallback):
 
         nouvelle_cle = {
             "domaine": "millegrilles.domaines.GrosFichiers",
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8415",
+            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8417",
             "fingerprint": "abcd",
             "cle": cle_secrete_encryptee_mime64,
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
@@ -120,16 +120,14 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # enveloppe = sample.requete_cert_maitredescles()
-        enveloppe = sample.nouvelle_cle_grosfichiers()
-        # enveloppe = sample.requete_decryptage_cle_fuuid()
+        # enveloppe = self.requete_cert_maitredescles()
+        enveloppe = self.nouvelle_cle_grosfichiers()
+        # enveloppe = self.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-sample.thread_ioloop.start()
-
 # FIN TEST
 sample.event_recu.wait(10)
 sample.deconnecter()

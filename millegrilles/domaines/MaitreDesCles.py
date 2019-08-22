@@ -558,7 +558,7 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         }
 
         contenu_date = {
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
         }
 
         contenu_set = dict()
@@ -573,19 +573,17 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
             # Par defaut, on met le document en mode secure
             contenu_on_insert[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = Constantes.SECURITE_SECURE
 
-        operations = {
+        operations_mongo = {
             '$set': contenu_set,
             '$currentDate': contenu_date,
             '$setOnInsert': contenu_on_insert,
         }
 
         collection_documents = self.contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        self.__logger.debug("Operations: %s" % str({'filtre': filtre, 'operation': operations}))
+        self.__logger.debug("Operations: %s" % str({'filtre': filtre, 'operation': operations_mongo}))
 
-        resultat_update = collection_documents.update_one(filter=filtre, update=operations, upsert=True)
+        resultat_update = collection_documents.update_one(filter=filtre, update=operations_mongo, upsert=True)
         self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
 
         self.set_etape_suivante()  # Termine
-
-        return {'filtre': filtre, 'operation': operations}
 
