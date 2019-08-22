@@ -447,6 +447,7 @@ class TraitementRequetesNoeuds(BaseCallback):
                 cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(cle_secrete, enveloppe_certificat.certificat)
                 reponse = {
                     'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                    'iv': document['iv'],
                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
                 }
 
@@ -494,7 +495,11 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
 
         self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
 
-        return {'fuuid': transaction['fuuid'], 'cles_secretes_encryptees': cles_secretes_encryptees}
+        return {
+            'fuuid': transaction['fuuid'],
+            'cles_secretes_encryptees': cles_secretes_encryptees,
+            'iv': transaction['iv'],
+        }
 
     def generer_transaction_cles_backup(self):
         """
@@ -509,6 +514,7 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
             ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS
         transaction_nouvellescles['fuuid'] = self.parametres['fuuid']
         transaction_nouvellescles['cles'] = self.parametres['cles_secretes_encryptees']
+        transaction_nouvellescles['iv'] = self.parametres['iv']
 
         # La transaction va mettre a jour (ou creer) les cles pour
         generateur_transaction.soumettre_transaction(
@@ -555,6 +561,7 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
             Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             'fuuid': transaction['fuuid'],
+            'iv': transaction['iv'],
         }
 
         contenu_date = {

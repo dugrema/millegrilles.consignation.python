@@ -76,7 +76,7 @@ class MessagesSample(BaseCallback):
 
     def requete_decryptage_cle_fuuid(self):
         requete_cert_maitredescles = {
-            'fuuid': "02d569a0-c388-11e9-b478-630aa73a3f1e"
+            'fuuid': "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8419"
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
@@ -103,7 +103,7 @@ class MessagesSample(BaseCallback):
 
         nouvelle_cle = {
             "domaine": "millegrilles.domaines.GrosFichiers",
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8417",
+            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8419",
             "fingerprint": "abcd",
             "cle": cle_secrete_encryptee_mime64,
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
@@ -121,8 +121,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = self.requete_cert_maitredescles()
-        enveloppe = self.nouvelle_cle_grosfichiers()
-        # enveloppe = self.requete_decryptage_cle_fuuid()
+        # enveloppe = self.nouvelle_cle_grosfichiers()
+        enveloppe = self.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---
 sample = MessagesSample()
