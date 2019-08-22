@@ -2,6 +2,9 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.padding import PKCS7
+
 from cryptography import x509
 from base64 import b64encode, b64decode
 
@@ -45,6 +48,7 @@ class JavascriptPythonAsymetric:
         self._logger.info("Certificat courant: %s" % str(self.cert))
 
     def decrypter_contenu(self, contenu):
+        self._logger.info('------- JavascriptPythonAsymetric.decrypter_contenu() ----------')
         """
         Utilise la cle privee en memoire pour decrypter le contenu.
         :param contenu:
@@ -64,6 +68,7 @@ class JavascriptPythonAsymetric:
         return contenu_decrypte
 
     def crypter_contenu(self, message):
+        self._logger.info('------- JavascriptPythonAsymetric.crypter_contenu() ----------')
         cle_secrete_backup = self.cert.public_key().encrypt(
             message,
             padding.OAEP(
@@ -89,10 +94,42 @@ class JavascriptPythonAsymetric:
 class JavascriptPythonSymmetric:
 
     def __init__(self):
-        self.secret_key = b'Mon mot de passe'
+        self._logger = logging.getLogger('%s' % self.__class__.__name__)
+
+    def decrypter_contenu(self, key, iv, contenu):
+        self._logger.info('------- JavascriptPythonSymmetric.decrypter_contenu() ----------')
+        keyb = b64decode(key)
+        ivb = b64decode(iv)
+        contenub = b64decode(contenu)
+        cipher = Cipher(algorithms.AES(keyb), modes.CBC(ivb), backend=default_backend())
+        decryptor = cipher.decryptor()
+
+        resultat = decryptor.update(contenub) + decryptor.finalize()
+        self._logger.info("Message decrypte (%d):\n%s" % (len(resultat), binascii.hexlify(resultat)))
+
+        # On utilise AES 256, blocks de taille 256 bits.
+        unpadder = PKCS7(256).unpadder()
+        resultat_unpadded = unpadder.update(resultat) + unpadder.finalize()
+        self._logger.info("Message unpadded (%d):\n%s" % (len(resultat_unpadded), binascii.hexlify(resultat_unpadded)))
+
+        with open('/home/mathieu/output.tar.gz', 'wb') as output:
+            output.write(resultat_unpadded)
+
+    def executer(self):
+        self.decrypter_contenu(
+            key='AxuAY0oDJIh0bVLayHTp2uy2KPqj7Fx7PZhNqt9ZVxE=',
+            iv='/9W0JEbFziynzG4xYl+GTw==',
+            contenu='ScLql5g+y4T1JeyzfFV7z72kw4v7ZKMTANjPERC1aP8cSG6s/1hTuxQgenx3p2DJy7AFvJbGj5E9mBUJydQpaClOYwjU0NIWs13HSidtWjmcUDFCRYAaInPgC8nQYuIseiqMjEUkSEXL8cF/oqXppabI9noTeYQdA0zg4fHRXPJ905J54T7R9qQjkIyUg4WpfRx3buig0aoJ2CCdF/p9MPrq/r7bHz2fHOIlHNLrCrkqlyYMWxlcD3eL+SsBk6gM'
+        )
+
 
 # ---- MAIN ----
 logging.basicConfig(level=logging.WARN)
 logging.getLogger('JavascriptPythonAsymetric').setLevel(logging.DEBUG)
+logging.getLogger('JavascriptPythonSymmetric').setLevel(logging.DEBUG)
+
 asymetric = JavascriptPythonAsymetric()
 asymetric.executer()
+
+symetric = JavascriptPythonSymmetric()
+symetric.executer()
