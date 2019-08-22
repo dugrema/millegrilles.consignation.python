@@ -24,7 +24,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         message_dict['senseur'] = 8
         message_dict['noeud'] = 'domaine_SenseursPassifs'
         message_dict['temps_lecture'] = int(temps_lecture.timestamp())
-        message_dict['temperature'] = 28.1
+        message_dict['temperature'] = 32.1
         message_dict['humidite'] = 67.3
         message_dict['pression'] = 103.3
         message_dict['bat_mv'] = 3498
