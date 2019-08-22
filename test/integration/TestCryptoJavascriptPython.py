@@ -19,7 +19,6 @@ class JavascriptPythonAsymetric:
         self.fichier_cert = '/opt/millegrilles/dev2/pki/certs/dev2_middleware.cert.pem'
         self.cert = None
         self.private = None
-        self.secret_key = b'Mon mot de passe'
 
         self.charger_cles()
 
@@ -64,10 +63,28 @@ class JavascriptPythonAsymetric:
         )
         return contenu_decrypte
 
+    def crypter_contenu(self, message):
+        cle_secrete_backup = self.cert.public_key().encrypt(
+            message,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return cle_secrete_backup
+
+
     def executer(self):
+
         contenu = 'v2oS1YZsX7+aCWfzf0DQtsmlSDrR/YuuFIUxiuwJIz6kXGHI8S9OBs0w1dw/oJvcHDWlcNcNDIENs9mtaSRnNgQQgD+x12dFHxsGL8kWiW0QNGugFVMf9J/8fcfkVXUibbsKK/QwkEfdiBO+rN4yX1aXWqm35V0hL9FEDVUlb/JDJ+2l9sNvutw+1D5paFWOI+fYEzKae/29gW2O4QILw0wvF7deZc6LjU4LoG4kXkNlDGL+RwPK17OuXU6zrRf5ZBKE+CiUFvpRUqttCv7kC3shvQ6JSVI8c4J5hgSNWL6fpx9WJFaPEu+ItK5TF6GIZ/x4Tjxbwf1lP1Wah/bFRg=='
         resultat = self.decrypter_contenu(contenu)
-        self._logger.info("Resultat: %s" % resultat)
+        self._logger.info("Decrypter, Resultat est:  %s" % resultat)
+
+        secret = b'Mon mot de passe, ce serait un secret. Je dis!'
+        secret_crypte = self.crypter_contenu(secret)
+        self._logger.info("Crypter: %s" % b64encode(secret_crypte).decode('utf-8'))
+
 
 class JavascriptPythonSymmetric:
 
