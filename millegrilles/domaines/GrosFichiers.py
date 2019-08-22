@@ -593,6 +593,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin_fichier
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
 
         operation_currentdate = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
