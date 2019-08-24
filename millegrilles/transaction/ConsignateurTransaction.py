@@ -38,8 +38,9 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
 
         # Executer la configuration pour RabbitMQ
-        configurer_rabbitmq_thread = Thread(name="MQ-Configuration", target=self.callback_configurer_rabbitmq)
-        configurer_rabbitmq_thread.start()
+        self.contexte.message_dao.register_channel_listener(self)
+        # configurer_rabbitmq_thread = Thread(name="MQ-Configuration", target=self.callback_configurer_rabbitmq)
+        # configurer_rabbitmq_thread.start()
 
         # Creer index: _mg-libelle
         collection = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
@@ -55,9 +56,11 @@ class ConsignateurTransaction(ModeleConfiguration):
         ])
         logging.info("Configuration et connection completee")
 
-    def callback_configurer_rabbitmq(self):
+    def on_channel_open(self, channel):
         self.contexte.message_dao.configurer_rabbitmq()
-        self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+        queue_name = self.contexte.configuration.queue_nouvelles_transactions
+        channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
+        # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
     def executer(self):
         while not self.__stop_event.is_set():
