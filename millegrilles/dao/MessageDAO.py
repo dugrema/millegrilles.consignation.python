@@ -104,6 +104,7 @@ class PikaDAO:
             self._logger.warn("Appel de connecter avec connection deja ouverte")
             connectionmq = self.connectionmq
             self.connectionmq = None
+            self.channel = None
             self.__thread_ioloop = None
 
             try:
@@ -112,7 +113,7 @@ class PikaDAO:
                 self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
 
         try:
-            self._lock_transmettre_message.acquire(blocking=True, timeout=30)
+            self._lock_transmettre_message.acquire(blocking=True, timeout=5)
             parametres_connexion = self.preparer_connexion()
             parametres = pika.ConnectionParameters(**parametres_connexion)
             self.connectionmq = pika.SelectConnection(
@@ -155,6 +156,7 @@ class PikaDAO:
 
     def __on_connection_close(self, connection=None, code=None, reason=None):
         self.connectionmq = None
+        self.channel = None
         self.__thread_ioloop = None
         if not self.__stop_event.is_set():
             self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
@@ -654,6 +656,14 @@ class PikaDAO:
                     self.connecter()
                 else:
                     self._logger.debug("Rien a faire pour reconnecter a MQ")
+
+                    # Verifier si les listeners fonctionnent bien
+                    for listener in self.__liste_listeners_channels:
+                        if 'is_channel_open' in dir(listener):  # Methode est optionnelle
+                            if not listener.is_channel_open():
+                                self._logger.warn("Re-ouverture d'un channel de listener")
+                                self.__ouvrir_channel_listener(listener)
+
             except Exception as e:
                 self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
                 self.enter_error_state()

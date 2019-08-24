@@ -19,6 +19,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.json_helper = JSONHelper()
         self.message_handler = None
         self.__stop_event = Event()
+        self.__channel = None
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -57,10 +58,19 @@ class ConsignateurTransaction(ModeleConfiguration):
         logging.info("Configuration et connection completee")
 
     def on_channel_open(self, channel):
+        channel.add_on_close_callback(self.__on_channel_close)
+        self.__channel = channel
+
         self.contexte.message_dao.configurer_rabbitmq()
         queue_name = self.contexte.configuration.queue_nouvelles_transactions
         channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
         # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def is_channel_open(self):
+        return self.__channel is not None
 
     def executer(self):
         while not self.__stop_event.is_set():
