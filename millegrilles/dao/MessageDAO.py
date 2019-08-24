@@ -10,6 +10,7 @@ from threading import Lock, Event, Thread
 
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials, ExternalCredentials
+from pika.exceptions import AMQPConnectionError
 
 ''' 
 DAO vers la messagerie
@@ -153,9 +154,13 @@ class PikaDAO:
         self._logger.info("Connection / channel prets")
 
     def __on_connection_close(self, connection=None, code=None, reason=None):
-        self._logger.warn("Connection fermee: %s, %s" % (code, reason))
         self.connectionmq = None
         self.__thread_ioloop = None
+        if not self.__stop_event.is_set():
+            self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
+            self.enter_error_state()
+        else:
+            self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warn("Channel ferme: %s, %s" %(code, reason))
@@ -275,7 +280,11 @@ class PikaDAO:
 
     def __run_ioloop(self):
         self._logger.info("Demarrage MQ-IOLoop")
-        self.connectionmq.ioloop.start()
+        try:
+            self.connectionmq.ioloop.start()
+        except AMQPConnectionError as e:
+            self._logger.error("Erreur ouverture connexion MQ", e)
+            self.enter_error_state()
         self._logger.info("Fin execution MQ-IOLoop")
 
     def run_ioloop(self):
@@ -631,20 +640,20 @@ class PikaDAO:
     def executer_maintenance(self):
 
         self._logger.info("Demarrage maintenance")
+        self.__stop_event.wait(self._intervalle_maintenance)  # Attendre avant premier cycle de maintenance
 
         while not self.__stop_event.is_set():
             self._logger.debug("Maintenance MQ, in error: %s" % self._in_error)
 
             try:
-                if self._actif:
-                    if self.connectionmq is None or self.connectionmq.is_closed:
-                        self._logger.info("La connection MQ est fermee. On tente de se reconnecter.")
-                        self.connecter()
-                    elif self.channel is None:
-                        self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
-                        self.connectionmq.channel(self.__on_channel_open)
-                    else:
-                        self._logger.debug("Rien a faire pour reconnecter a MQ")
+                if self.connectionmq is None or self.connectionmq.is_closed:
+                    self._logger.warn("La connection MQ est fermee. On tente de se reconnecter.")
+                    self.connecter()
+                # elif self.channel is None:
+                #     self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
+                #     self.connectionmq.channel(self.__on_channel_open)
+                else:
+                    self._logger.debug("Rien a faire pour reconnecter a MQ")
             except Exception as e:
                 self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
                 self.enter_error_state()

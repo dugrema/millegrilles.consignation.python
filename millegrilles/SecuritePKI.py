@@ -283,7 +283,6 @@ class UtilCertificats:
         digest = hashes.Hash(self._contenu_hash_function(), backend=default_backend())
         digest.update(message_bytes)
         resultat_digest = digest.finalize()
-        self._logger.error('Message en bytes: %s' % binascii.hexlify(message_bytes))
         digest_base64 = str(base64.b64encode(resultat_digest), 'utf-8')
         self._logger.debug("Resultat hash contenu: %s" % digest_base64)
 
