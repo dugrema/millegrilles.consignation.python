@@ -197,7 +197,13 @@ class UtilCertificats:
                 self._logger.debug("Enlever cle: %s" % cle)
 
         self._logger.debug("Message nettoye: %s" % str(transaction_temp))
-        message_json = json.dumps(transaction_temp, sort_keys=True, separators=(',', ':'), cls=MongoJSONEncoder)
+        message_json = json.dumps(
+            transaction_temp,
+            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+            sort_keys=True,
+            separators=(',', ':'),
+            cls=MongoJSONEncoder
+        )
         message_bytes = bytes(message_json, 'utf-8')
 
         return message_bytes
@@ -277,6 +283,7 @@ class UtilCertificats:
         digest = hashes.Hash(self._contenu_hash_function(), backend=default_backend())
         digest.update(message_bytes)
         resultat_digest = digest.finalize()
+        self._logger.error('Message en bytes: %s' % binascii.hexlify(message_bytes))
         digest_base64 = str(base64.b64encode(resultat_digest), 'utf-8')
         self._logger.debug("Resultat hash contenu: %s" % digest_base64)
 
@@ -426,9 +433,10 @@ class VerificateurTransaction(UtilCertificats):
             certificat = self.certificat
 
         signature_bytes = base64.b64decode(signature)
-        message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
-        message_bytes = bytes(message_json, 'utf-8')
-        self._logger.debug("Verifier signature, Message: %s" % str(message_json))
+        # message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
+        # message_bytes = bytes(message_json, 'utf-8')
+        message_bytes = self.preparer_transaction_bytes(dict_message);
+        self._logger.debug("Verifier signature, Message: %s" % str(dict_message))
 
         cle_publique = certificat.public_key()
         cle_publique.verify(
