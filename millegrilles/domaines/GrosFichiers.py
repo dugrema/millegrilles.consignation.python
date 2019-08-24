@@ -76,6 +76,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_DEPLACER_REPERTOIRE = '%s.deplacerRepertoire' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_REPERTOIRE = '%s.supprimerRepertoire' % DOMAINE_NOM
     TRANSACTION_COMMENTER_REPERTOIRE = '%s.commenterRepertoire' % DOMAINE_NOM
+    TRANSACTION_CHANGER_SECURITE_REPERTOIRE = '%s.changerSecuriteRepertoire' % DOMAINE_NOM
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
@@ -776,6 +777,26 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         })
         self._logger.debug('maj_commentaire_repertoire resultat: %s' % str(resultat))
 
+    def maj_securite_repertoire(self, uuid_repertoire, securite):
+        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: securite
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire,
+            '$or': [
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS},
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE},
+            ]
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation
+        })
+        self._logger.debug('maj_securite_repertoire resultat: %s' % str(resultat))
+
     def maj_commentaire_fichier(self, uuid_fichier, commentaire):
         collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
@@ -840,6 +861,8 @@ class TraitementMessageMiddleware(BaseCallback):
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerRepertoire"
             elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_COMMENTER_REPERTOIRE:
                 processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterRepertoire"
+            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_REPERTOIRE:
+                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerSecuriteRepertoire"
 
             else:
                 # Type de transaction inconnue, on lance une exception
@@ -1244,6 +1267,23 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
         self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, commentaire)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionChangerSecuriteRepertoire(ProcessusGrosFichiers):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+        if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_PRIVE]:
+            self._controleur._gestionnaire_domaine.maj_securite_repertoire(uuid_repertoire, securite)
+        else:
+            raise ValueError("Type de securite non supporte: %s" % securite)
 
         self.set_etape_suivante()  # Termine
 

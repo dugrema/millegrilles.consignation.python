@@ -171,6 +171,18 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_changersecurite_repertoire(self):
+        transaction = {
+            "repertoire_uuid": "16e474e6-c116-11e9-a058-00155d011f00",
+            "securite": "2.prive"
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.changerSecuriteRepertoire',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
     def transaction_commenter_fichier(self):
         transaction = {
             "uuid": "1127ef4a-b7d1-11e9-8ec6-00155d011f00",
@@ -185,8 +197,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
-        enveloppe1 = sample.transaction_nouvelle_version_metadata()
-        enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe3 = sample.transaction_creer_repertoire()
         # enveloppe4 = sample.transaction_renommer_repertoire()
         # enveloppe5 = sample.transaction_deplacer_repertoire()
@@ -196,6 +208,7 @@ class MessagesSample(BaseCallback):
         # enveloppe9 = sample.transaction_supprimer_repertoire()
         # enveloppe10 = sample.transaction_commenter_repertoire()
         # enveloppe11 = sample.transaction_commenter_fichier()
+        enveloppe12 = sample.transaction_changersecurite_repertoire()
 
 
 # --- MAIN ---
