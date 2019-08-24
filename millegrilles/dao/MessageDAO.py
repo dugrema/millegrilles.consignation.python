@@ -646,12 +646,12 @@ class PikaDAO:
             self._logger.debug("Maintenance MQ, in error: %s" % self._in_error)
 
             try:
-                if self.connectionmq is None or self.connectionmq.is_closed:
+                if self.connectionmq is not None and self.channel is None:
+                    self._logger.error("La connection MQ est invalide - channel n'est pas ouvert.")
+                    self.enter_error_state()
+                elif self.connectionmq is None or self.connectionmq.is_closed:
                     self._logger.warn("La connection MQ est fermee. On tente de se reconnecter.")
                     self.connecter()
-                # elif self.channel is None:
-                #     self._logger.info("La connection MQ est encore ouverte. On tente d'ouvrir un nouveau channel.")
-                #     self.connectionmq.channel(self.__on_channel_open)
                 else:
                     self._logger.debug("Rien a faire pour reconnecter a MQ")
             except Exception as e:

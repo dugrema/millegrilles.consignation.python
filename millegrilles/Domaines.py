@@ -219,6 +219,13 @@ class GestionnaireDomaine:
         :param channel:
         :return:
         """
+        if self.channel_mq is not None:
+            # Fermer le vieux channel
+            try:
+                self.channel_mq.close()
+            finally:
+                self.channel_mq = None
+
         self.channel_mq = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
