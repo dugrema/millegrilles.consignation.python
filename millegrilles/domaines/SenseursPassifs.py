@@ -9,7 +9,7 @@ from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
-from millegrilles.transaction.GenerateurTransaction import TransactionOperations
+from millegrilles.transaction.GenerateurTransaction import TransactionOperations, GenerateurTransaction
 from bson.objectid import ObjectId
 
 
