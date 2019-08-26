@@ -6,6 +6,7 @@ import re
 import json
 
 from millegrilles import Constantes
+from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 # from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 # from millegrilles.SecuritePKI import SignateurTransaction, GestionnaireEvenementsCertificat
 
@@ -15,7 +16,7 @@ class GenerateurTransaction:
     Generateur de transactions, requetes et reponses vers RabbitMQ.
     """
 
-    def __init__(self, contexte, encodeur_json=json.JSONEncoder):
+    def __init__(self, contexte, encodeur_json=MongoJSONEncoder):
         self.encodeur_json = encodeur_json
         self._contexte = contexte
 
