@@ -3,7 +3,6 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 import logging
@@ -262,7 +261,7 @@ class TraitementMessageRequete(BaseCallback):
         super().__init__(gestionnaire.contexte)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._gestionnaire = gestionnaire
-        self._generateur = GenerateurTransaction(gestionnaire.contexte, encodeur_json=MongoJSONEncoder)
+        self._generateur = gestionnaire.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key

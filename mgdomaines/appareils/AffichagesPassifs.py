@@ -11,7 +11,6 @@ from threading import Thread, Event
 from millegrilles import Constantes
 from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 class DocumentCallback(BaseCallback):
@@ -62,7 +61,7 @@ class AfficheurDocumentMAJDirecte:
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
         self._cycles_entre_rafraichissements = 20  # 20 Cycles
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
-        self._generateur = GenerateurTransaction(contexte)  # Transmet requete de documents
+        self._generateur = contexte.generateur_transactions  # Transmet requete de documents
 
         # self._collection = None
         # self._curseur_changements = None  # Si None, on fonctionne par timer

@@ -8,7 +8,6 @@ import feedparser
 from urllib.error import HTTPError
 from urllib.request import Request
 
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles import Constantes
@@ -50,13 +49,13 @@ class WebPollConstantes:
                 "domaine": "millegrilles.domaines.Rapports.SommaireRSS.meteo_envcanada"
             }
         },
-        'minute': ['exemple1'],
+        'minute': [],
         'minute%2': [],
         'minute%3': [],
         'minute%4': [],
         'minute%6': [],
         'minute%12': [],
-        'heure': ['exemple2', 'minimal'],
+        'heure': [],
         'heure%2': [],
         'heure%3': [],
         'heure%4': [],
@@ -287,7 +286,7 @@ class WebPageDownload:
     TRANSACTION_VALEUR_DOMAINE = 'millegrilles.domaines.WebPoll.WebPageDownload'
 
     def __init__(self, contexte, limit_bytes=50*1024):
-        self._generateur_transaction = GenerateurTransaction(contexte)
+        self._generateur_transaction = contexte.generateur_transactions
         # self._configuration = configuration
         # self._message_dao = message_dao
         self._limit_bytes = limit_bytes  # Taille limite du download

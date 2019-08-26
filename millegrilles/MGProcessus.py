@@ -8,7 +8,6 @@ from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 class MGPProcessusControleur(ModeleConfiguration):
@@ -530,7 +529,7 @@ class MGProcessus:
         if properties is not None:
             # Verifier si on a reply_to et correlation_id pour transmettre une confirmation de traitement
             if properties.get('reply_to') is not None and properties.get('correlation_id') is not None:
-                generateur_transactions = GenerateurTransaction(self.contexte)
+                generateur_transactions = self.contexte.generateur_transactions
                 generateur_transactions.transmettre_reponse(
                     resultat, properties['reply_to'], properties['correlation_id'])
                 resultat['reponse_transmise'] = True

@@ -4,7 +4,6 @@ import datetime, time
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
 from millegrilles.dao.MessageDAO import JSONHelper
@@ -19,7 +18,7 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
         self.contexte.initialiser(init_document=False)
         self.__thread_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
         self.__thread_ioloop.start()
-        self.generateur = GenerateurTransaction(self.contexte)
+        self.generateur = self.contexte.generateur_transactions
         self.message_dao = self.contexte.message_dao
         self.pret = Event()
         self.recu = Event()

@@ -52,16 +52,6 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             help="Chemin du fichier de configuration des domaines"
         )
 
-        self.parser.add_argument(
-            '--debug', action="store_true", required=False,
-            help="Active le debugging (logger, tres verbose)"
-        )
-
-        self.parser.add_argument(
-            '--info', action="store_true", required=False,
-            help="Afficher davantage de messages (verbose)"
-        )
-
     ''' Charge les domaines listes en parametre '''
     def charger_domaines(self):
 
@@ -126,8 +116,6 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
     def executer(self):
 
-        self.set_logging_level()
-
         self.charger_domaines()
 
         if len(self._gestionnaires) > 0:
@@ -161,11 +149,11 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self.deconnecter()
 
     def set_logging_level(self):
+        super().set_logging_level()
         """ Utilise args pour ajuster le logging level (debug, info) """
         if self.args.debug:
             self._logger.setLevel(logging.DEBUG)
             logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
-            logging.getLogger('millegrilles').setLevel(logging.DEBUG)
         elif self.args.info:
             self._logger.setLevel(logging.INFO)
             logging.getLogger('mgdomaines').setLevel(logging.INFO)

@@ -24,11 +24,6 @@ class ConsignateurTransaction(ModeleConfiguration):
     def configurer_parser(self):
         super().configurer_parser()
 
-        self.parser.add_argument(
-            '--debug', action="store_true", required=False,
-            help="Active le debugging (logger)"
-        )
-
     # Initialise les DAOs, connecte aux serveurs.
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)

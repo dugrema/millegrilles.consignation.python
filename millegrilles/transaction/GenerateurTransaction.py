@@ -6,8 +6,8 @@ import re
 import json
 
 from millegrilles import Constantes
-from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.SecuritePKI import SignateurTransaction, GestionnaireEvenementsCertificat
+# from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+# from millegrilles.SecuritePKI import SignateurTransaction, GestionnaireEvenementsCertificat
 
 
 class GenerateurTransaction:
@@ -15,27 +15,9 @@ class GenerateurTransaction:
     Generateur de transactions, requetes et reponses vers RabbitMQ.
     """
 
-    def __init__(self, contexte=None, encodeur_json=json.JSONEncoder):
+    def __init__(self, contexte, encodeur_json=json.JSONEncoder):
         self.encodeur_json = encodeur_json
-        if contexte is not None:
-            self._contexte = contexte
-        else:
-            self._contexte = ContexteRessourcesMilleGrilles()
-            self._contexte.initialiser(init_message=True, init_document=False, connecter=True)
-
-        # Initialiser la configuration et dao au besoin
-        self.signateur_transaction = SignateurTransaction(self._contexte)
-        self.signateur_transaction.initialiser()
-
-        # Transmettre le certificat pour etre sur que tous les participants l'ont
-        self._contexte.message_dao.register_channel_listener(self)
-        self.__channel = None
-
-    def on_channel_open(self, channel):
-        self.__channel = channel
-        channel.basic_qos(prefetch_count=1)
-        gestionnaire_certificats = GestionnaireEvenementsCertificat(self._contexte, self.signateur_transaction)
-        gestionnaire_certificats.transmettre_certificat(channel)
+        self._contexte = contexte
 
     ''' 
     Transmet un message. La connexion doit etre ouverte.
@@ -53,14 +35,16 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id, self.__channel)
+        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id)
 
         return uuid_transaction
 
     def preparer_enveloppe(self, message_dict, domaine=None):
 
         # Identifier usager du systeme, nom de domaine
-        common_name = self.signateur_transaction.enveloppe_certificat_courant.subject_common_name
+        signateur_transactions = self._contexte.signateur_transactions
+
+        common_name = signateur_transactions.enveloppe_certificat_courant.subject_common_name
         identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
 
         # Ajouter identificateur unique et temps de la transaction
@@ -79,8 +63,8 @@ class GenerateurTransaction:
         enveloppe.update(message_dict)
 
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.signateur_transaction.hacher_contenu(enveloppe)
-        message_signe = self.signateur_transaction.signer(enveloppe)
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = signateur_transactions.hacher_contenu(enveloppe)
+        message_signe = signateur_transactions.signer(enveloppe)
 
         return message_signe
 

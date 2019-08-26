@@ -170,9 +170,11 @@ class PikaDAO:
         self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
     def register_channel_listener(self, listener):
+        self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
         if self.__liste_listeners_channels is None:
             self.__liste_listeners_channels = list()
         self.__liste_listeners_channels.append(listener)
+        self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
 
         # On verifie si on peut ouvrir le channel immediatement
         if self.connectionmq is not None and not self.connectionmq.is_closed and not self._in_error:

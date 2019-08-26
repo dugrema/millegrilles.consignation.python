@@ -6,7 +6,6 @@ from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 from cryptography.hazmat.backends import default_backend
@@ -95,7 +94,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self.__handler_cedule = None
         self.__handler_requetes_noeuds = None
 
-        self.generateur = GenerateurTransaction(self.contexte, encodeur_json=MongoJSONEncoder)
+        self.generateur = self.contexte.generateur_transactions
 
     def configurer(self):
         super().configurer()
@@ -507,7 +506,7 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         Va aussi declencher la mise a jour du document de cles associe.
         :return:
         """
-        generateur_transaction = GenerateurTransaction(self.contexte)
+        generateur_transaction = self.contexte.generateur_transactions
 
         transaction_nouvellescles = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_CONSERVER_CLES.copy()
         transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = \
@@ -529,7 +528,7 @@ class ProcessusNouvelleCleGrosFichier(MGProcessusTransaction):
         Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
         :return:
         """
-        generateur_transaction = GenerateurTransaction(self.contexte)
+        generateur_transaction = self.contexte.generateur_transactions
         transaction_resumer = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_GROSFICHIERRESUME.copy()
         transaction_resumer['fuuid'] = self.parametres['fuuid']
         domaine_routing = ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES

@@ -33,6 +33,16 @@ class ModeleConfiguration:
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
 
+        self.parser.add_argument(
+            '--debug', action="store_true", required=False,
+            help="Active le debugging (logger, tres verbose)"
+        )
+
+        self.parser.add_argument(
+            '--info', action="store_true", required=False,
+            help="Afficher davantage de messages (verbose)"
+        )
+
     def print_help(self):
         self.parser.print_help()
 
@@ -59,6 +69,15 @@ class ModeleConfiguration:
         if self._contexte.document_dao is not None:
             self._contexte.document_dao.deconnecter()
 
+    def set_logging_level(self):
+        """ Utilise args pour ajuster le logging level (debug, info) """
+        if self.args.debug:
+            self._logger.setLevel(logging.DEBUG)
+            logging.getLogger('millegrilles').setLevel(logging.DEBUG)
+        elif self.args.info:
+            self._logger.setLevel(logging.INFO)
+            logging.getLogger('millegrilles').setLevel(logging.INFO)
+
     def main(self):
 
         try:
@@ -71,6 +90,8 @@ class ModeleConfiguration:
             # Faire le parsing des arguments pour verifier s'il en manque
             self.configurer_parser()
             self.parse()
+
+            self.set_logging_level()
 
             self._logger.info("Initialisation")
             self.initialiser()  # Initialiser les ressources

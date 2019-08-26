@@ -8,6 +8,7 @@ import ssl
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.SecuritePKI import VerificateurTransaction, SignateurTransaction, VerificateurCertificats
 
 
@@ -311,6 +312,7 @@ class ContexteRessourcesMilleGrilles:
         self._verificateur_certificats = None
         self._verificateur_transactions = None
         self._signateur_transactions = None
+        self._generateur_transactions = None
 
     def initialiser(self, init_message=True, init_document=True, connecter=True):
         """
@@ -328,9 +330,12 @@ class ContexteRessourcesMilleGrilles:
 
         if init_message:
             self._message_dao = PikaDAO(self._configuration)
-            self._signateur_transactions = SignateurTransaction(self._configuration)
+            self._signateur_transactions = SignateurTransaction(self)
+            self._signateur_transactions.initialiser()
             if connecter:
                 self._message_dao.connecter()
+                # self._signateur_transactions.initialiser()
+                self._generateur_transactions = GenerateurTransaction(self)
 
         if init_document:
             self._document_dao = MongoDAO(self._configuration)
@@ -384,3 +389,11 @@ class ContexteRessourcesMilleGrilles:
     @property
     def verificateur_certificats(self):
         return self._verificateur_certificats
+
+    @property
+    def generateur_transactions(self):
+        return self._generateur_transactions
+
+    @property
+    def signateur_transactions(self):
+        return self._signateur_transactions
