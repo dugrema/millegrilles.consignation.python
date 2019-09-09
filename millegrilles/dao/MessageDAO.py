@@ -660,11 +660,12 @@ class PikaDAO:
                     self._logger.debug("Rien a faire pour reconnecter a MQ")
 
                     # Verifier si les listeners fonctionnent bien
-                    for listener in self.__liste_listeners_channels:
-                        if 'is_channel_open' in dir(listener):  # Methode est optionnelle
-                            if not listener.is_channel_open():
-                                self._logger.warn("Re-ouverture d'un channel de listener")
-                                self.__ouvrir_channel_listener(listener)
+                    if self.__liste_listeners_channels is not None:
+                        for listener in self.__liste_listeners_channels:
+                            if 'is_channel_open' in dir(listener):  # Methode est optionnelle
+                                if not listener.is_channel_open():
+                                    self._logger.warn("Re-ouverture d'un channel de listener")
+                                    self.__ouvrir_channel_listener(listener)
 
             except Exception as e:
                 self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)

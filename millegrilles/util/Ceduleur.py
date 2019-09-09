@@ -18,19 +18,33 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         super().__init__()
         self._stop_event = Event()
         self._stop_event.set()
+        self.__channel = None
 
         self.logger = logging.getLogger('%s.CeduleurMilleGrilles' % __name__)
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
 
+    def on_channel_open(self, channel):
+        channel.add_on_close_callback(self.__on_channel_close)
+        self.__channel = channel
+
+        self.contexte.message_dao.configurer_rabbitmq()
+        # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def is_channel_open(self):
+        return self.__channel is not None
+
     def configurer_parser(self):
         super().configurer_parser()
 
-        self.parser.add_argument(
-            '--debug', action="store_true", required=False,
-            help="Active le debugging (logger)"
-        )
+        # self.parser.add_argument(
+        #     '--debug', action="store_true", required=False,
+        #     help="Active le debugging (logger)"
+        # )
 
         self.parser.add_argument(
             '--test_indicateurs', action="store_true", required=False,
