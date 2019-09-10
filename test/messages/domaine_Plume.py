@@ -113,8 +113,8 @@ sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_document()
-enveloppe = sample.requete_liste()
-# enveloppe = sample.nouveau_document()
+# enveloppe = sample.requete_liste()
+enveloppe = sample.nouveau_document()
 # enveloppe = sample.modifier_document()
 # enveloppe = sample.supprimer_document()
 

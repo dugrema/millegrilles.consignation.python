@@ -179,6 +179,8 @@ class GestionnairePlume(GestionnaireDomaine):
         collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.insert_one(document_plume)
 
+        return document_plume
+
     def modifier_document(self, transaction):
         document_plume = dict()
         self.__map_transaction_vers_document(transaction, document_plume)
@@ -352,8 +354,14 @@ class ProcessusTransactionAjouterDocumentPlume(ProcessusPlume):
     def initiale(self):
         """ Sauvegarder une nouvelle version d'un fichier """
         transaction = self.charger_transaction()
-        self._controleur._gestionnaire_domaine.ajouter_nouveau_document(transaction)
+        document_plume = self._controleur._gestionnaire_domaine.ajouter_nouveau_document(transaction)
         self.set_etape_suivante()  # Termine
+
+        return {
+            ConstantesPlume.DOCUMENT_PLUME_UUID: document_plume[ConstantesPlume.DOCUMENT_PLUME_UUID],
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: document_plume[Constantes.DOCUMENT_INFODOC_DATE_CREATION],
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: document_plume[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
+        }
 
 
 class ProcessusTransactionModifierDocumentPlume(ProcessusPlume):

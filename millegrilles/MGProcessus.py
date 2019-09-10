@@ -524,6 +524,9 @@ class MGProcessus:
             'reponse_transmise': False,
         }
 
+        params_copy = self.parametres.copy()
+        params_copy.update(resultat)
+
         # Verifier si on doit transmettre une notification de traitement termine
         properties = self.parametres.get('properties')
         if properties is not None:
@@ -531,7 +534,7 @@ class MGProcessus:
             if properties.get('reply_to') is not None and properties.get('correlation_id') is not None:
                 generateur_transactions = self.contexte.generateur_transactions
                 generateur_transactions.transmettre_reponse(
-                    resultat, properties['reply_to'], properties['correlation_id'])
+                    params_copy, properties['reply_to'], properties['correlation_id'])
                 resultat['reponse_transmise'] = True
 
         logging.debug("Etape finale executee pour %s" % self.__class__.__name__)
