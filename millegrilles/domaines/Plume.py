@@ -19,11 +19,16 @@ class ConstantesPlume:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
+    TRANSACTION_NOUVEAU_DOCUMENT = 'nouveauDocument'
+    TRANSACTION_MODIFIER_DOCUMENT = 'modifierDocument'
+    TRANSACTION_SUPPRIMER_DOCUMENT = 'supprimerDocument'
+
     DOCUMENT_PLUME_UUID = 'uuid'
     DOCUMENT_SECURITE = 'securite'
     DOCUMENT_TITRE = 'titre'
     DOCUMENT_CATEGORIES = 'categories'
     DOCUMENT_TEXTE = 'texte'
+    DOCUMENT_QUILL_DELTA = 'quilldelta'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PLUME = 'plume'
@@ -38,7 +43,8 @@ class ConstantesPlume:
         DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
         DOCUMENT_TITRE: None,                               # Titre
         DOCUMENT_CATEGORIES: None,                          # Nom du fichier (libelle affiche a l'usager)
-        DOCUMENT_TEXTE: None,                               # Contenu, delta Quill
+        DOCUMENT_QUILL_DELTA: None,                         # Contenu, delta Quill
+        DOCUMENT_TEXTE: None,                               # Texte sans formattage
     }
 
 
@@ -177,6 +183,7 @@ class GestionnairePlume(GestionnaireDomaine):
     def __map_transaction_vers_document(self, transaction, document_plume):
         document_plume[ConstantesPlume.DOCUMENT_TITRE] = transaction[ConstantesPlume.DOCUMENT_TITRE]
         document_plume[ConstantesPlume.DOCUMENT_TEXTE] = transaction[ConstantesPlume.DOCUMENT_TEXTE]
+        document_plume[ConstantesPlume.DOCUMENT_QUILL_DELTA] = transaction[ConstantesPlume.DOCUMENT_QUILL_DELTA]
         document_plume[ConstantesPlume.DOCUMENT_CATEGORIES] = transaction[ConstantesPlume.DOCUMENT_CATEGORIES]
 
     def publier_document(self, uuid_document):
@@ -219,7 +226,25 @@ class TraitementTransactionPersistee(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        # Verifier quel processus demarrer.
         routing_key = method.routing_key
+        routing_key_sansprefixe = routing_key.replace(
+            'destinataire.domaine.%s.' % ConstantesPlume.DOMAINE_NOM,
+            ''
+        )
+
+        # Actions
+        if routing_key_sansprefixe == ConstantesPlume.TRANSACTION_NOUVEAU_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionAjouterDocumentPlume"
+        elif routing_key_sansprefixe == ConstantesPlume.TRANSACTION_MODIFIER_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionModifierDocumentPlume"
+        elif routing_key_sansprefixe == ConstantesPlume.TRANSACTION_SUPPRIMER_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionSupprimerDocumentPlume"
+        else:
+            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+
+        self._gestionnaire.demarrer_processus(processus, message_dict)
 
 
 class TraitementRequetesNoeuds(BaseCallback):

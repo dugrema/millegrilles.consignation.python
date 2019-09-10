@@ -16,6 +16,8 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def __init__(self):
         super().__init__()
 
+        self.uuid = '40a873c4-d3e3-11e9-af0b-00155d011f00'
+
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
 
@@ -43,7 +45,8 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
             ConstantesPlume.DOCUMENT_TITRE: 'Document Unit Test',
             ConstantesPlume.DOCUMENT_CATEGORIES: 'cat1 cat2 Cat3',
             ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
-            ConstantesPlume.DOCUMENT_TEXTE: {"ops": [{"insert": "Un document de test.\n"}]}
+            ConstantesPlume.DOCUMENT_QUILL_DELTA: {"ops": [{"insert": "Un document de test.\n"}]},
+            ConstantesPlume.DOCUMENT_TEXTE: "Un document de test.\n",
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -55,6 +58,12 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def modifier_document(self):
 
         document = {
+            ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
+            ConstantesPlume.DOCUMENT_TITRE: 'Document Unit Test modifie 1',
+            ConstantesPlume.DOCUMENT_CATEGORIES: 'cat1 cat4 Cat3',
+            ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesPlume.DOCUMENT_QUILL_DELTA: {"ops": [{"insert": "Un document de test modifie 1.\n"}]},
+            ConstantesPlume.DOCUMENT_TEXTE: "Un document de test modifie 1.\n",
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -66,6 +75,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def supprimer_document(self):
 
         document = {
+            ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -80,8 +90,9 @@ sample = MessagesSample()
 
 # TEST
 # enveloppe = sample.requete_profil_usager()
-enveloppe = sample.nouveau_document()
+# enveloppe = sample.nouveau_document()
 # enveloppe = sample.modifier_document()
+# enveloppe = sample.supprimer_document()
 
 sample.recu.wait(10)
 
