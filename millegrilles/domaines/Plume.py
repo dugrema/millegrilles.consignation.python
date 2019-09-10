@@ -20,7 +20,7 @@ class ConstantesPlume:
     QUEUE_NOM = DOMAINE_NOM
 
     DOCUMENT_PLUME_UUID = 'uuid'
-    DOCUMENT_SECURITE = Constantes.SECURITE_PRIVE
+    DOCUMENT_SECURITE = 'securite'
     DOCUMENT_TITRE = 'titre'
     DOCUMENT_CATEGORIES = 'categories'
     DOCUMENT_TEXTE = 'texte'
