@@ -84,7 +84,7 @@ class GestionnairePlume(GestionnaireDomaine):
             (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
         ])
         collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, 1)
+            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
         ])
 
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
@@ -306,6 +306,8 @@ class TraitementRequetesNoeuds(BaseCallback):
             curseur = collection.find(filtre)
         else:
             curseur = collection.find(filtre, projection)
+
+        curseur.limit(2500)  # Mettre limite sur nombre de resultats
 
         if sort_params is not None:
             curseur.sort(sort_params)
