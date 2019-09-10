@@ -16,7 +16,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def __init__(self):
         super().__init__()
 
-        self.uuid = '4c4b7f78-d3f7-11e9-af0b-00155d011f00'
+        self.uuid = '16b85142-d406-11e9-af0b-00155d011f00'
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -114,8 +114,8 @@ sample = MessagesSample()
 # TEST
 # enveloppe = sample.requete_document()
 # enveloppe = sample.requete_liste()
-enveloppe = sample.nouveau_document()
-# enveloppe = sample.modifier_document()
+# enveloppe = sample.nouveau_document()
+enveloppe = sample.modifier_document()
 # enveloppe = sample.supprimer_document()
 
 sample.recu.wait(10)

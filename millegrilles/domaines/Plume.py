@@ -182,11 +182,12 @@ class GestionnairePlume(GestionnaireDomaine):
         return document_plume
 
     def modifier_document(self, transaction):
-        document_plume = dict()
+        document_plume = {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: datetime.datetime.utcnow()
+        }
         self.__map_transaction_vers_document(transaction, document_plume)
         operations = {
             '$set': document_plume,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
         filtre = {
@@ -195,6 +196,8 @@ class GestionnairePlume(GestionnaireDomaine):
 
         collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.update_one(filtre, operations)
+
+        return document_plume
 
     def supprimer_document(self, transaction):
         filtre = {
@@ -375,8 +378,12 @@ class ProcessusTransactionModifierDocumentPlume(ProcessusPlume):
     def initiale(self):
         """ Mettre a jour le document """
         transaction = self.charger_transaction()
-        self._controleur._gestionnaire_domaine.modifier_document(transaction)
+        document_plume = self._controleur._gestionnaire_domaine.modifier_document(transaction)
         self.set_etape_suivante()  # Termine
+
+        return {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: document_plume[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
+        }
 
 
 class ProcessusTransactionSupprimerDocumentPlume(ProcessusPlume):
