@@ -5,18 +5,6 @@
       "classe": "GestionnaireSenseursPassifs"
     },
     {
-      "module": "millegrilles.domaines.WebPoll",
-      "classe": "GestionnaireWebPoll"
-    },
-    {
-      "module": "millegrilles.domaines.Notifications",
-      "classe": "GestionnaireNotifications"
-    },
-    {
-      "module": "millegrilles.domaines.Rapports",
-      "classe": "GestionnaireRapports"
-    },
-    {
       "module": "millegrilles.domaines.Principale",
       "classe": "GestionnairePrincipale"
     },
@@ -27,6 +15,10 @@
     {
       "module": "millegrilles.domaines.GrosFichiers",
       "classe": "GestionnaireGrosFichiers"
+    },
+    {
+      "module": "millegrilles.domaines.Plume",
+      "classe": "GestionnairePlume"
     }
   ]
 }
