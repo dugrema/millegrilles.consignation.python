@@ -275,13 +275,59 @@ class TraitementRequetesNoeuds(BaseCallback):
 
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.contexte)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._gestionnaire = gestionnaire
+        self._generateur = gestionnaire.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        routing_key = method.routing_key
+        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
 
+        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+
+    def executer_requete(self, requete):
+        self._logger.debug("Requete: %s" % str(requete))
+        collection = self.contexte.document_dao.get_collection(ConstantesPlume.COLLECTION_DOCUMENTS_NOM)
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        self._logger.debug("Resultats: %s" % str(resultats))
+
+        return resultats
+
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        if correlation_id is None:
+            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+
+        self._generateur.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 # ******************* Processus *******************
 class ProcessusPlume(MGProcessusTransaction):

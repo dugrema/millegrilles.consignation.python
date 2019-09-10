@@ -29,7 +29,16 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         requete_document = {
             'filtre': {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME,
-                ConstantesPlume.DOCUMENT_PLUME_UUID: '',
+                ConstantesPlume.DOCUMENT_CATEGORIES: {'$in': ['cat1']},
+            },
+            'sort': [(Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)],
+            'projection': {
+                ConstantesPlume.DOCUMENT_PLUME_UUID: 1,
+                ConstantesPlume.DOCUMENT_CATEGORIES: 1,
+                ConstantesPlume.DOCUMENT_TITRE: 1,
+                ConstantesPlume.DOCUMENT_SECURITE: 1,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: 1,
             }
         }
         requetes = {'requetes': [requete_document]}
@@ -43,7 +52,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         requete_document = {
             'filtre': {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME,
-                ConstantesPlume.DOCUMENT_PLUME_UUID: '',
+                ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
             }
         }
         requetes = {'requetes': [requete_document]}
@@ -103,9 +112,10 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.requete_profil_usager()
+# enveloppe = sample.requete_document()
+enveloppe = sample.requete_liste()
 # enveloppe = sample.nouveau_document()
-enveloppe = sample.modifier_document()
+# enveloppe = sample.modifier_document()
 # enveloppe = sample.supprimer_document()
 
 sample.recu.wait(10)
