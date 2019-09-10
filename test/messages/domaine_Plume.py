@@ -16,7 +16,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def __init__(self):
         super().__init__()
 
-        self.uuid = '40a873c4-d3e3-11e9-af0b-00155d011f00'
+        self.uuid = '4c4b7f78-d3f7-11e9-af0b-00155d011f00'
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -24,6 +24,20 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
         print(body)
+
+    def requete_liste(self):
+        requete_document = {
+            'filtre': {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME,
+                ConstantesPlume.DOCUMENT_PLUME_UUID: '',
+            }
+        }
+        requetes = {'requetes': [requete_document]}
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requetes, 'millegrilles.domaines.Plume', 'abcd-1234', self.queue_name)
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
 
     def requete_document(self):
         requete_document = {
@@ -91,7 +105,7 @@ sample = MessagesSample()
 # TEST
 # enveloppe = sample.requete_profil_usager()
 # enveloppe = sample.nouveau_document()
-# enveloppe = sample.modifier_document()
+enveloppe = sample.modifier_document()
 # enveloppe = sample.supprimer_document()
 
 sample.recu.wait(10)

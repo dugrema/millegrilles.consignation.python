@@ -66,6 +66,27 @@ class GestionnairePlume(GestionnaireDomaine):
     def configurer(self):
         super().configurer()
 
+        collection_domaine = self.document_dao.get_collection(ConstantesPlume.COLLECTION_DOCUMENTS_NOM)
+        # Index noeud, _mg-libelle
+        collection_domaine.create_index([
+            (ConstantesPlume.DOCUMENT_CATEGORIES, 1)
+        ])
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        collection_domaine.create_index([
+            (ConstantesPlume.DOCUMENT_PLUME_UUID, 1)
+        ])
+        collection_domaine.create_index([
+            (ConstantesPlume.DOCUMENT_TITRE, 1)
+        ])
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+        ])
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, 1)
+        ])
+
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
 
     def setup_rabbitmq(self, channel):
@@ -184,7 +205,10 @@ class GestionnairePlume(GestionnaireDomaine):
         document_plume[ConstantesPlume.DOCUMENT_TITRE] = transaction[ConstantesPlume.DOCUMENT_TITRE]
         document_plume[ConstantesPlume.DOCUMENT_TEXTE] = transaction[ConstantesPlume.DOCUMENT_TEXTE]
         document_plume[ConstantesPlume.DOCUMENT_QUILL_DELTA] = transaction[ConstantesPlume.DOCUMENT_QUILL_DELTA]
-        document_plume[ConstantesPlume.DOCUMENT_CATEGORIES] = transaction[ConstantesPlume.DOCUMENT_CATEGORIES]
+        categories_string = transaction[ConstantesPlume.DOCUMENT_CATEGORIES]
+        if categories_string is not None:
+            categories = categories_string.split(' ')
+            document_plume[ConstantesPlume.DOCUMENT_CATEGORIES] = categories
 
     def publier_document(self, uuid_document):
         pass
