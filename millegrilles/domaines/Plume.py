@@ -1,21 +1,12 @@
 # Domaine Plume - ecriture de documents
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography import x509
-from base64 import b64encode, b64decode
-
 import logging
 import datetime
-import os
-import re
 
 
 class ConstantesPlume:
@@ -28,10 +19,26 @@ class ConstantesPlume:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
+    DOCUMENT_PLUME_UUID = 'uuid'
+    DOCUMENT_SECURITE = Constantes.SECURITE_PRIVE
+    DOCUMENT_TITRE = 'titre'
+    DOCUMENT_CATEGORIES = 'categories'
+    DOCUMENT_TEXTE = 'texte'
+
     LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_PLUME = 'plume'
 
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
+    }
+
+    DOCUMENT_PLUME = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_PLUME,
+        DOCUMENT_PLUME_UUID: None,  # Identificateur unique du document plume
+        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
+        DOCUMENT_TITRE: None,                               # Titre
+        DOCUMENT_CATEGORIES: None,                          # Nom du fichier (libelle affiche a l'usager)
+        DOCUMENT_TEXTE: None,                               # Contenu, delta Quill
     }
 
 
@@ -105,7 +112,7 @@ class GestionnairePlume(GestionnaireDomaine):
             channel.queue_bind(
                 exchange=self.configuration.exchange_middleware,
                 queue=nom_queue_processus,
-                routing_key='processus.domaine.%s.#' % ConstantesMaitreDesCles.DOMAINE_NOM,
+                routing_key='processus.domaine.%s.#' % ConstantesPlume.DOMAINE_NOM,
                 callback=None,
             )
 
@@ -121,7 +128,7 @@ class GestionnairePlume(GestionnaireDomaine):
             channel.queue_bind(
                 exchange=self.configuration.exchange_noeuds,
                 queue=nom_queue_requetes_noeuds,
-                routing_key='requete.%s.#' % ConstantesMaitreDesCles.DOMAINE_NOM,
+                routing_key='requete.%s.#' % ConstantesPlume.DOMAINE_NOM,
                 callback=None,
             )
 
@@ -130,6 +137,50 @@ class GestionnairePlume(GestionnaireDomaine):
             durable=False,
             callback=callback_init_requetes_noeuds,
         )
+
+    def ajouter_nouveau_document(self, transaction):
+        document_plume = ConstantesPlume.DOCUMENT_PLUME.copy()
+
+        document_plume[ConstantesPlume.DOCUMENT_PLUME_UUID] = \
+            transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        document_plume[ConstantesPlume.DOCUMENT_SECURITE] = transaction[ConstantesPlume.DOCUMENT_SECURITE]
+        document_plume[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = datetime.datetime.utcnow()
+        document_plume[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = datetime.datetime.utcnow()
+
+        self.__map_transaction_vers_document(transaction, document_plume)
+
+        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection_domaine.insert_one(document_plume)
+
+    def modifier_document(self, transaction):
+        document_plume = dict()
+        self.__map_transaction_vers_document(transaction, document_plume)
+        operations = {
+            '$set': document_plume,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        filtre = {
+            ConstantesPlume.DOCUMENT_PLUME_UUID: transaction[ConstantesPlume.DOCUMENT_PLUME_UUID]
+        }
+
+        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection_domaine.update_one(filtre, operations)
+
+    def supprimer_document(self, transaction):
+        filtre = {
+            ConstantesPlume.DOCUMENT_PLUME_UUID: transaction[ConstantesPlume.DOCUMENT_PLUME_UUID]
+        }
+        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection_domaine.delete_one(filtre)
+
+    def __map_transaction_vers_document(self, transaction, document_plume):
+        document_plume[ConstantesPlume.DOCUMENT_TITRE] = transaction[ConstantesPlume.DOCUMENT_TITRE]
+        document_plume[ConstantesPlume.DOCUMENT_TEXTE] = transaction[ConstantesPlume.DOCUMENT_TEXTE]
+        document_plume[ConstantesPlume.DOCUMENT_CATEGORIES] = transaction[ConstantesPlume.DOCUMENT_CATEGORIES]
+
+    def publier_document(self, uuid_document):
+        pass
 
     def get_nom_queue(self):
         return ConstantesPlume.QUEUE_NOM
@@ -181,3 +232,74 @@ class TraitementRequetesNoeuds(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
         routing_key = method.routing_key
+
+
+# ******************* Processus *******************
+class ProcessusPlume(MGProcessusTransaction):
+
+    def get_collection_transaction_nom(self):
+        return ConstantesPlume.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPlume.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusTransactionAjouterDocumentPlume(ProcessusPlume):
+    """
+    Processus de d'ajout de nouveau document Plume
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Sauvegarder une nouvelle version d'un fichier """
+        transaction = self.charger_transaction()
+        self._controleur._gestionnaire_domaine.ajouter_nouveau_document(transaction)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionModifierDocumentPlume(ProcessusPlume):
+    """
+    Processus de modification de document Plume
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour le document """
+        transaction = self.charger_transaction()
+        self._controleur._gestionnaire_domaine.modifier_document(transaction)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionSupprimerDocumentPlume(ProcessusPlume):
+    """
+    Processus de modification de document Plume
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Supprimer le document """
+        transaction = self.charger_transaction()
+        self._controleur._gestionnaire_domaine.supprimer_document(transaction)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionPublierVersionDocumentPlume(ProcessusPlume):
+    """
+    Processus de publication d'une version de document Plume
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour le document """
+        transaction = self.charger_transaction()
+
+        self.set_etape_suivante()  # Termine
+
