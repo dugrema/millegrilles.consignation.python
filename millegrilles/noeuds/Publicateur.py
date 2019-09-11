@@ -5,6 +5,7 @@ import datetime
 import pytz
 import logging
 import threading
+import os
 
 from threading import Event, Thread
 from pika.exceptions import ConnectionClosed, ChannelClosed
@@ -26,10 +27,25 @@ class Publicateur(ModeleConfiguration):
         self.__queue_reponse = None
         self._message_handler = None
 
+        self._configuration = None
+
         self.logger = logging.getLogger('Publicateur')
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
+
+        nom_millegrille = self.contexte.configuration.nom_millegrille
+        if nom_millegrille is None:
+            raise ValueError("Il faut fournir le nom de la MilleGrille (MG_NOM_MILLEGRILLE)")
+
+        webroot = self.args.webroot
+        if webroot is None:
+            webroot = '/opt/millegrilles/%s/mounts/nginx/www-public' % nom_millegrille
+
+        self._configuration = {
+            'nom_millegrille': nom_millegrille,
+            'webroot': webroot,
+        }
 
         # Configuration MQ
         self._message_handler = TraitementPublication(self.contexte)
@@ -116,12 +132,96 @@ class TraitementPublication(BaseCallback):
             # C'est une reponse
             pass
         elif routing_key is not None:
-            pass
+            if routing_key in ['publicateur.plume.ajouterDocument', 'publicateur.plume.modifierDocument']:
+                pass
+            else:
+                raise ValueError("Message routing inconnu: %s" % routing_key)
         else:
             raise ValueError("Message type inconnu")
 
 
 class ExporterDeltaVersHtml:
+
+    def __init__(self, configuration, message_publication):
+        self._configuration = configuration
+        self._message_publication = message_publication
+
+    def exporter_html(self):
+        """
+        Sauvegarde le contenu HTML dans un fichier
+        :param delta_html:
+        :return:
+        """
+
+        # S'assurer que le repertoire existe
+        repertoire = os.path.dirname(self._chemin_fichier())
+        os.makedirs(repertoire, exist_ok=True)
+
+        chemin_fichier = self._chemin_fichier()
+
+        # Enregistrer fichier
+        with open('%s.staging' % chemin_fichier, 'wb') as fichier:
+            self.render_delta(fichier)
+
+        # Aucune exception, on supprime l'ancien fichier et renomme .staging
+        if os.path.exists(chemin_fichier):
+            os.remove(chemin_fichier)
+        os.rename('%s.staging' % chemin_fichier, chemin_fichier)
+
+    def render_delta(self, fichier):
+        raise NotImplementedError("Pas implemente")
+
+    def identifier_grosfichiers(self):
+        """
+        Retourne une liste de grosfichiers a extraire
+        :return: GrosFichiers a telecharger
+        """
+        # Faire la liste
+
+        return []
+
+    def _creer_links(self):
+        """ Met a jour les symlinks vers le fichier HTML """
+        pass
+
+    def _chemin_fichier(self):
+        raise NotImplementedError("Pas implemente")
+
+
+class ExporterDeltaPlume(ExporterDeltaVersHtml):
+
+    def __init__(self, configuration, message_publication):
+        super().__init__(configuration, message_publication)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def render_delta(self, fichier):
+        """ Genere le contenu HTML """
+        delta = self._message_publication['quilldelta']
+        delta_html = html.render(delta['ops'], pretty=True)
+
+        fichier.write('<html><head>'.encode('utf-8'))
+        fichier.write((
+                '<title>%s</title>' % self._message_publication['titre']
+            ).encode('utf-8'))
+        fichier.write('</head><body>'.encode('utf-8'))
+        fichier.write(delta_html.encode('utf-8'))
+        fichier.write('</body></html>\n'.encode('utf-8'))
+
+    def _chemin_fichier(self):
+        webroot = self._configuration['webroot']
+        uuid = self._message_publication['uuid']
+        titre = self._message_publication['titre']
+        chemin = '%s/plume/%s/%s.html' % (webroot, uuid, titre)
+        return chemin
+
+
+class PublierGrosFichiers:
+    """
+    Telecharge et sauvegarde un gros fichiers.
+
+    Les fichiers vont sous /grosfichiers/YYYY/MM/DD/HH/mm/uuid-v4.dat  (public par definition, donc .dat)
+    Les symlinks sont generes sous /images/...rep.../NOM_IMAGE.jpg, /video/...rep.../NOM_VIDEO.XXX ou /fichiers/...rep.../NOM_FICHIER.XXX
+    """
 
     def __init__(self):
         pass
