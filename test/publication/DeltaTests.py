@@ -30,21 +30,18 @@ class TestDelta:
 class TestExportPlumeHtml:
 
     def __init__(self):
-        self.configuration = {
-            'webroot': '/home/mathieu/tmp'
-        }
-
-        self.delta_1 = {'ops':
-            [
-                {"insert": "Quill\nEditor\n\n"},
-                {"insert": "bold",
-                 "attributes": {"bold": True}},
-                {"insert": " and the "},
-                {"insert": "italic",
-                 "attributes": {"italic": True}},
-                {"insert": "\n\nNormal\n"},
-            ]
-        }
+        self.delta_1 = \
+            {'ops':
+                [
+                    {"insert": "Quill\nEditor\n\n"},
+                    {"insert": "bold",
+                     "attributes": {"bold": True}},
+                    {"insert": " and the "},
+                    {"insert": "italic",
+                     "attributes": {"italic": True}},
+                    {"insert": "\n\nNormal\n"},
+                ]
+            }
 
         self.message = {
             'quilldelta': self.delta_1,
@@ -52,7 +49,11 @@ class TestExportPlumeHtml:
             'titre': 'Un fichier de test, c''est le fun'
         }
 
-        self.exporteur = ExporterDeltaPlume(self.configuration, self.message)
+        self.exporteur = ExporterDeltaPlume(self, self.message)
+
+    @property
+    def webroot(self):
+        return '/home/mathieu/tmp'
 
     def exporter(self):
         self.exporteur.exporter_html()
@@ -61,10 +62,6 @@ class TestExportPlumeHtml:
 class TestPublierCataloguePlume:
 
     def __init__(self):
-        self.configuration = {
-            'webroot': '/home/mathieu/tmp'
-        }
-
         self.doc_catalogue = {
             'documents': [
                 {
@@ -88,7 +85,11 @@ class TestPublierCataloguePlume:
             ]
         }
 
-        self.exportCatalogue = PublierCataloguePlume(self.configuration, self.doc_catalogue)
+        self.exportCatalogue = PublierCataloguePlume(self, self.doc_catalogue)
+
+    @property
+    def webroot(self):
+        return '/home/mathieu/tmp'
 
     def exporter(self):
         self.exportCatalogue.exporter_catalogue()
@@ -99,8 +100,8 @@ class TestPublierCataloguePlume:
 # test = TestDelta()
 # test.render(test.delta_1)
 
-# testExporteur = TestExportPlumeHtml()
-# testExporteur.exporter()
+testExporteur = TestExportPlumeHtml()
+testExporteur.exporter()
 
-testCatalogue = TestPublierCataloguePlume()
-testCatalogue.exporter()
+# testCatalogue = TestPublierCataloguePlume()
+# testCatalogue.exporter()

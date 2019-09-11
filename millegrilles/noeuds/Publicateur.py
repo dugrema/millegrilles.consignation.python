@@ -7,6 +7,7 @@ import logging
 import threading
 import os
 import shutil
+import urllib
 
 from threading import Event, Thread
 from pika.exceptions import ConnectionClosed, ChannelClosed
@@ -28,7 +29,7 @@ class Publicateur(ModeleConfiguration):
         self.__queue_reponse = None
         self._message_handler = None
 
-        self._configuration = None
+        self._webroot = None
 
         self.logger = logging.getLogger('Publicateur')
 
@@ -39,17 +40,12 @@ class Publicateur(ModeleConfiguration):
         if nom_millegrille is None:
             raise ValueError("Il faut fournir le nom de la MilleGrille (MG_NOM_MILLEGRILLE)")
 
-        webroot = self.args.webroot
-        if webroot is None:
-            webroot = '/opt/millegrilles/%s/mounts/nginx/www-public' % nom_millegrille
-
-        self._configuration = {
-            'nom_millegrille': nom_millegrille,
-            'webroot': webroot,
-        }
+        self._webroot = self.args.webroot
+        if self._webroot is None:
+            self._webroot = '/opt/millegrilles/%s/mounts/nginx/www-public' % nom_millegrille
 
         # Configuration MQ
-        self._message_handler = TraitementPublication(self.contexte)
+        self._message_handler = TraitementPublication(self)
         self.contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):
@@ -59,7 +55,7 @@ class Publicateur(ModeleConfiguration):
 
     def register_mq_hanlder(self, queue):
         nom_queue = queue.method.queue
-        exchange = Constantes.CONFIG_MQ_EXCHANGE_NOEUDS
+        exchange = self.contexte.configuration.exchange_noeuds
         self.__queue_reponse = nom_queue
         self._logger.debug("Resultat creation queue: %s" % nom_queue)
 
@@ -67,6 +63,8 @@ class Publicateur(ModeleConfiguration):
 
         for routing_key in routing_keys:
             self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
+
+        self.__channel.basic_consume(self._message_handler.callbackAvecAck, queue=nom_queue, no_ack=False)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -87,7 +85,7 @@ class Publicateur(ModeleConfiguration):
         self.parser.add_argument(
             '--webroot',
             type=str,
-            required=True,
+            required=False,
             help="Repertoire de base pour publier les fichiers"
         )
 
@@ -109,8 +107,8 @@ class Publicateur(ModeleConfiguration):
             self._stop_event.wait(30)
 
     @property
-    def configuration(self):
-        return self._configuration
+    def webroot(self):
+        return self._webroot
 
 
 class TraitementPublication(BaseCallback):
@@ -118,11 +116,11 @@ class TraitementPublication(BaseCallback):
     Handler pour la Q du publicateur. Execute les commandes de publication.
     """
 
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+    def __init__(self, publicateur):
+        super().__init__(publicateur.contexte)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._gestionnaire = gestionnaire
-        self._generateur = gestionnaire.contexte.generateur_transactions
+        self._publicateur = publicateur
+        self._generateur = self.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
@@ -131,26 +129,26 @@ class TraitementPublication(BaseCallback):
 
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        # enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
 
         if correlation_id is not None:
             # C'est une reponse
-            pass
+            raise ValueError("Reponse non supportee. Correlation_id: %s" % correlation_id)
         elif routing_key is not None:
             if routing_key in ['publicateur.plume.publierDocument']:
-                exporteur = ExporterDeltaPlume(self._gestionnaire.configuration, message_dict)
+                exporteur = ExporterDeltaPlume(self._publicateur, message_dict)
                 exporteur.exporter_html()
             elif routing_key in ['publicateur.plume.supprimerDocument', 'publicateur.plume.depublierDocument']:
                 # Supprime un document Plume (ou le de-publie)
-                exporteur = ExporterDeltaPlume(self._gestionnaire.configuration, message_dict)
+                exporteur = ExporterDeltaPlume(self._publicateur, message_dict)
                 exporteur.supprimer_fichier()
             elif routing_key in ['publicateur.plume.catalogue']:
                 # Mettre a jour le catalogue (index.html) des fichiers plume
-                exporteur = PublierCataloguePlume(self._gestionnaire.configuration, message_dict)
+                exporteur = PublierCataloguePlume(self._publicateur, message_dict)
                 exporteur.exporter_catalogue()
             elif routing_key in ['publicateur.plume.categorie']:
                 # Mettre a jour le catalogue d'une categorie plume
-                exporteur = PublierCataloguePlume(self._gestionnaire.configuration, message_dict)
+                exporteur = PublierCataloguePlume(self._publicateur, message_dict)
                 exporteur.exporter_categorie()
             else:
                 raise ValueError("Message routing inconnu: %s" % routing_key)
@@ -160,8 +158,8 @@ class TraitementPublication(BaseCallback):
 
 class ExporterDeltaVersHtml:
 
-    def __init__(self, configuration, message_publication):
-        self._configuration = configuration
+    def __init__(self, publicateur, message_publication):
+        self._publicateur = publicateur
         self._message_publication = message_publication
 
     def exporter_html(self):
@@ -211,8 +209,8 @@ class ExporterDeltaVersHtml:
 
 class ExporterDeltaPlume(ExporterDeltaVersHtml):
 
-    def __init__(self, configuration, message_publication):
-        super().__init__(configuration, message_publication)
+    def __init__(self, publicateur, message_publication):
+        super().__init__(publicateur, message_publication)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def render_delta(self, fichier):
@@ -229,13 +227,13 @@ class ExporterDeltaPlume(ExporterDeltaVersHtml):
         fichier.write('</body></html>\n'.encode('utf-8'))
 
     def supprimer_fichier(self):
-        webroot = self._configuration['webroot']
+        webroot = self._publicateur.webroot
         uuid = self._message_publication['uuid']
         chemin = '%s/plume/%s' % (webroot, uuid)
         shutil.rmtree(chemin)
 
     def _chemin_fichier(self):
-        webroot = self._configuration['webroot']
+        webroot = self._publicateur.webroot
         uuid = self._message_publication['uuid']
         titre = self._message_publication['titre']
         chemin = '%s/plume/%s/%s.html' % (webroot, uuid, titre)
@@ -244,8 +242,8 @@ class ExporterDeltaPlume(ExporterDeltaVersHtml):
 
 class PublierCataloguePlume:
 
-    def __init__(self, configuration, message_publication):
-        self._configuration = configuration
+    def __init__(self, publicateur, message_publication):
+        self._publicateur = publicateur
         self._message_publication = message_publication
 
     def exporter_catalogue(self):
@@ -255,6 +253,11 @@ class PublierCataloguePlume:
         with open(nom_fichier_staging, 'wb') as fichier:
             self.render_catalogue(fichier)
 
+        # Aucune erreur lancee, on renomme le fichier
+        if os.path.exists(nom_fichier):
+            os.remove(nom_fichier)
+        os.rename(nom_fichier_staging, nom_fichier)
+
     def render_catalogue(self, fichier):
         fichier.write('<html>\n'.encode('utf-8'))
         fichier.write('<head><title>Plume</title></head>\n'.encode('utf-8'))
@@ -262,15 +265,17 @@ class PublierCataloguePlume:
         fichier.write('<h1>Plume public</h1>\n'.encode('utf-8'))
 
         liste_documents = self._message_publication['documents']
-        for document in liste_documents:
+        for uuid in liste_documents:
+            document = liste_documents[uuid]
             titre = document['titre']
-            uuid = document['uuid']
+            titre_urlsafe = urllib.parse.quote(titre)
             categories = document['categories']
             date_modification = document['_mg-derniere-modification']
+            date_modification = time.ctime(date_modification)
 
             fichier.write('<div>\n'.encode('utf-8'))
 
-            fichier.write(('<a href="/plume/%s/%s.html">%s</a> ' % (uuid, titre, titre)).encode('utf-8'))
+            fichier.write(('<a href="/plume/%s/%s.html">%s</a> ' % (uuid, titre_urlsafe, titre)).encode('utf-8'))
             fichier.write(' '.join(categories).encode('utf-8'))
             fichier.write(' <span>'.encode('utf-8'))
             fichier.write(str(date_modification).encode('utf-8'))
@@ -287,7 +292,7 @@ class PublierCataloguePlume:
         pass
 
     def _chemin_fichier(self):
-        webroot = self._configuration['webroot']
+        webroot = self._publicateur.webroot
         return '%s/plume/index.html' % webroot
 
 
