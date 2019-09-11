@@ -6,6 +6,7 @@ import pytz
 import logging
 import threading
 import os
+import shutil
 
 from threading import Event, Thread
 from pika.exceptions import ConnectionClosed, ChannelClosed
@@ -107,6 +108,10 @@ class Publicateur(ModeleConfiguration):
         while not self._stop_event.is_set():
             self._stop_event.wait(30)
 
+    @property
+    def configuration(self):
+        return self._configuration
+
 
 class TraitementPublication(BaseCallback):
     """
@@ -133,7 +138,20 @@ class TraitementPublication(BaseCallback):
             pass
         elif routing_key is not None:
             if routing_key in ['publicateur.plume.ajouterDocument', 'publicateur.plume.modifierDocument']:
-                pass
+                exporteur = ExporterDeltaPlume(self._gestionnaire.configuration, message_dict)
+                exporteur.exporter_html()
+            elif routing_key in ['publicateur.plume.supprimerDocument', 'publicateur.plume.depublierDocument']:
+                # Supprime un document Plume (ou le de-publie)
+                exporteur = ExporterDeltaPlume(self._gestionnaire.configuration, message_dict)
+                exporteur.supprimer_fichier()
+            elif routing_key in ['publicateur.plume.catalogue']:
+                # Mettre a jour le catalogue (index.html) des fichiers plume
+                exporteur = PublierCataloguePlume(self._gestionnaire.configuration, message_dict)
+                exporteur.exporter_catalogue()
+            elif routing_key in ['publicateur.plume.categorie']:
+                # Mettre a jour le catalogue d'une categorie plume
+                exporteur = PublierCataloguePlume(self._gestionnaire.configuration, message_dict)
+                exporteur.exporter_categorie()
             else:
                 raise ValueError("Message routing inconnu: %s" % routing_key)
         else:
@@ -180,6 +198,9 @@ class ExporterDeltaVersHtml:
 
         return []
 
+    def supprimer_fichier(self):
+        raise NotImplementedError("Pas implemente")
+
     def _creer_links(self):
         """ Met a jour les symlinks vers le fichier HTML """
         pass
@@ -207,12 +228,67 @@ class ExporterDeltaPlume(ExporterDeltaVersHtml):
         fichier.write(delta_html.encode('utf-8'))
         fichier.write('</body></html>\n'.encode('utf-8'))
 
+    def supprimer_fichier(self):
+        webroot = self._configuration['webroot']
+        uuid = self._message_publication['uuid']
+        chemin = '%s/plume/%s' % (webroot, uuid)
+        shutil.rmtree(chemin)
+
     def _chemin_fichier(self):
         webroot = self._configuration['webroot']
         uuid = self._message_publication['uuid']
         titre = self._message_publication['titre']
         chemin = '%s/plume/%s/%s.html' % (webroot, uuid, titre)
         return chemin
+
+
+class PublierCataloguePlume:
+
+    def __init__(self, configuration, message_publication):
+        self._configuration = configuration
+        self._message_publication = message_publication
+
+    def exporter_catalogue(self):
+        nom_fichier = self._chemin_fichier()
+        nom_fichier_staging = '%s.staging' % nom_fichier
+
+        with open(nom_fichier_staging, 'wb') as fichier:
+            self.render_catalogue(fichier)
+
+    def render_catalogue(self, fichier):
+        fichier.write('<html>\n'.encode('utf-8'))
+        fichier.write('<head><title>Plume</title></head>\n'.encode('utf-8'))
+        fichier.write('<body>\n'.encode('utf-8'))
+        fichier.write('<h1>Plume public</h1>\n'.encode('utf-8'))
+
+        liste_documents = self._message_publication['documents']
+        for document in liste_documents:
+            titre = document['titre']
+            uuid = document['uuid']
+            categories = document['categories']
+            date_modification = document['_mg-derniere-modification']
+
+            fichier.write('<div>\n'.encode('utf-8'))
+
+            fichier.write(('<a href="/plume/%s/%s.html">%s</a> ' % (uuid, titre, titre)).encode('utf-8'))
+            fichier.write(' '.join(categories).encode('utf-8'))
+            fichier.write(' <span>'.encode('utf-8'))
+            fichier.write(str(date_modification).encode('utf-8'))
+            fichier.write('</span>'.encode('utf-8'))
+
+            fichier.write('</div>\n'.encode('utf-8'))
+
+        fichier.write('</body>\n</html>\n'.encode('utf-8'))
+
+    def exporter_categorie(self):
+        pass
+
+    def render_categorie(self):
+        pass
+
+    def _chemin_fichier(self):
+        webroot = self._configuration['webroot']
+        return '%s/plume/index.html' % webroot
 
 
 class PublierGrosFichiers:
