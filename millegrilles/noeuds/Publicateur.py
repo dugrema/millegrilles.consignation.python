@@ -8,6 +8,7 @@ import threading
 
 from threading import Event, Thread
 from pika.exceptions import ConnectionClosed, ChannelClosed
+from delta import html
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -118,3 +119,9 @@ class TraitementPublication(BaseCallback):
             pass
         else:
             raise ValueError("Message type inconnu")
+
+
+class ExporterDeltaVersHtml:
+
+    def __init__(self):
+        pass
