@@ -242,6 +242,8 @@ class GestionnairePlume(GestionnaireDomaine):
 
     def publier_document_danscatalogue(self, uuid_document):
         document = self.get_document(uuid_document)
+        if document is None:
+            raise ValueError("Document uuid: %s non trouve" % uuid_document)
 
         info_catalogue = {
             ConstantesPlume.DOCUMENT_PLUME_UUID: document[ConstantesPlume.DOCUMENT_PLUME_UUID],

@@ -31,7 +31,7 @@ class Publicateur(ModeleConfiguration):
 
         self._webroot = None
 
-        self.logger = logging.getLogger('Publicateur')
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
@@ -94,10 +94,10 @@ class Publicateur(ModeleConfiguration):
         """ Utilise args pour ajuster le logging level (debug, info) """
         if self.args.debug:
             self._logger.setLevel(logging.DEBUG)
-            # logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
+            logging.getLogger('millegrilles.noeuds').setLevel(logging.DEBUG)
         elif self.args.info:
             self._logger.setLevel(logging.INFO)
-            # logging.getLogger('mgdomaines').setLevel(logging.INFO)
+            logging.getLogger('millegrilles.noeuds').setLevel(logging.INFO)
 
     def executer(self):
 
@@ -161,6 +161,7 @@ class ExporterDeltaVersHtml:
     def __init__(self, publicateur, message_publication):
         self._publicateur = publicateur
         self._message_publication = message_publication
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def exporter_html(self):
         """
@@ -183,6 +184,8 @@ class ExporterDeltaVersHtml:
         if os.path.exists(chemin_fichier):
             os.remove(chemin_fichier)
         os.rename('%s.staging' % chemin_fichier, chemin_fichier)
+
+        self.__logger.info("Fichier exporte: %s" % chemin_fichier)
 
     def render_delta(self, fichier):
         raise NotImplementedError("Pas implemente")
@@ -245,6 +248,7 @@ class PublierCataloguePlume:
     def __init__(self, publicateur, message_publication):
         self._publicateur = publicateur
         self._message_publication = message_publication
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def exporter_catalogue(self):
         nom_fichier = self._chemin_fichier()
@@ -257,6 +261,8 @@ class PublierCataloguePlume:
         if os.path.exists(nom_fichier):
             os.remove(nom_fichier)
         os.rename(nom_fichier_staging, nom_fichier)
+
+        self.__logger.info("Fichier catalogue cree: %s" % nom_fichier)
 
     def render_catalogue(self, fichier):
         fichier.write('<html>\n'.encode('utf-8'))
