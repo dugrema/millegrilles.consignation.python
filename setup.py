@@ -30,7 +30,8 @@ setup(
         'millegrilles.util',
         'millegrilles.noeuds',
         'mgdomaines',
-        'mgdomaines.appareils'
+        'mgdomaines.appareils',
+        'delta',
     ],
     url='',
     license='',
