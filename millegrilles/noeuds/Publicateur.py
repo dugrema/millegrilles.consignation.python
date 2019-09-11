@@ -222,6 +222,7 @@ class ExporterDeltaPlume(ExporterDeltaVersHtml):
         delta_html = html.render(delta['ops'], pretty=True)
 
         fichier.write('<html><head>'.encode('utf-8'))
+        fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
         fichier.write((
                 '<title>%s</title>' % self._message_publication['titre']
             ).encode('utf-8'))
@@ -266,8 +267,9 @@ class PublierCataloguePlume:
 
     def render_catalogue(self, fichier):
         fichier.write('<html>\n'.encode('utf-8'))
-        fichier.write('<head><title>Plume</title></head>\n'.encode('utf-8'))
-        fichier.write('<body>\n'.encode('utf-8'))
+        fichier.write('<head><title>Plume</title>\n'.encode('utf-8'))
+        fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
+        fichier.write('</head>\n<body>\n'.encode('utf-8'))
         fichier.write('<h1>Plume public</h1>\n'.encode('utf-8'))
 
         liste_documents = self._message_publication['documents']

@@ -17,6 +17,8 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         super().__init__()
 
         self.uuid = '16b85142-d406-11e9-af0b-00155d011f00'
+        # self.uuid = 'bb58dc23-bf28-49b6-b3f6-a534794d6de4'
+
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
