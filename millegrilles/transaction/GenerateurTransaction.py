@@ -116,6 +116,24 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
+    def emettre_commande_noeuds(self, message_dict, routing_key):
+        """
+        Transmet une reponse a une requete. La reponse va directement sur la queue replying_to (pas de topic).
+        :param message_dict: Message de reponse
+        :return:
+        """
+
+        enveloppe = self.preparer_enveloppe(message_dict)
+
+        uuid_transaction = enveloppe.get(
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+
+        self._contexte.message_dao.transmettre_message_noeuds(
+            message_dict=enveloppe, routing_key=routing_key, encoding=self.encodeur_json)
+
+        return uuid_transaction
+
 
 class TransactionOperations:
 

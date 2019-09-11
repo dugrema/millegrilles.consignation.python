@@ -107,6 +107,18 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def publier_document(self):
+
+        document = {
+            ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            document, 'millegrilles.domaines.Plume.publierDocument', reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
 
 # --- MAIN ---
 sample = MessagesSample()
@@ -115,8 +127,9 @@ sample = MessagesSample()
 # enveloppe = sample.requete_document()
 # enveloppe = sample.requete_liste()
 # enveloppe = sample.nouveau_document()
-enveloppe = sample.modifier_document()
+# enveloppe = sample.modifier_document()
 # enveloppe = sample.supprimer_document()
+enveloppe = sample.publier_document()
 
 sample.recu.wait(10)
 

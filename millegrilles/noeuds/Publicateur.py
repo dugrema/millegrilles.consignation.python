@@ -137,7 +137,7 @@ class TraitementPublication(BaseCallback):
             # C'est une reponse
             pass
         elif routing_key is not None:
-            if routing_key in ['publicateur.plume.ajouterDocument', 'publicateur.plume.modifierDocument']:
+            if routing_key in ['publicateur.plume.publierDocument']:
                 exporteur = ExporterDeltaPlume(self._gestionnaire.configuration, message_dict)
                 exporteur.exporter_html()
             elif routing_key in ['publicateur.plume.supprimerDocument', 'publicateur.plume.depublierDocument']:
