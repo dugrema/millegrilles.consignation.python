@@ -32,6 +32,7 @@ class ConstantesPlume:
     DOCUMENT_TEXTE = 'texte'
     DOCUMENT_QUILL_DELTA = 'quilldelta'
     DOCUMENT_LISTE = 'documents'
+    DOCUMENT_DATE_PUBLICATION = 'datePublication'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PLUME = 'plume'
@@ -269,6 +270,16 @@ class GestionnairePlume(GestionnaireDomaine):
 
         collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.update_one(filtre_catalogue, operations)
+
+        # Marquer document comme publie
+        operations_publie = {
+            '$currentDate': {ConstantesPlume.DOCUMENT_DATE_PUBLICATION: True}
+        }
+        filtre_document = {
+            'uuid': uuid_document,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME
+        }
+        resultat = collection_domaine.update_one(filtre_document, operations_publie)
 
     def get_catalogue(self):
         collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
