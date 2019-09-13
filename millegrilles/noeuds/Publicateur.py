@@ -63,11 +63,26 @@ class Publicateur(ModeleConfiguration):
 
         self._template_path = self.args.templates
         if self._template_path is None:
-            self._template_path = '.'
+            self._template_path = './html'
 
         # Configuration MQ
         self._message_handler = TraitementPublication(self)
         self.contexte.message_dao.register_channel_listener(self)
+
+        # Copier les ressources statiques
+        if not self.args.noinit:
+            self._copier_ressources_statiques()
+
+    def _copier_ressources_statiques(self):
+        """
+        Faire une copie initiale des ressources statiques
+        :return:
+        """
+        exporteur_index = ExporterPageHtml(self, ConstantesPublicateur.PATH_FICHIER_ACCUEIL, 'index.html')
+        exporteur_ressources = PublierRessourcesStatiques(self)
+
+        exporteur_index.exporter_html('ACCUEIL')
+        exporteur_ressources.copier_ressources()
 
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
@@ -99,7 +114,7 @@ class Publicateur(ModeleConfiguration):
         super().configurer_parser()
 
         self.parser.add_argument(
-            '--no-init', action="store_true", required=False,
+            '--noinit', action="store_true", required=False,
             help="Desactive la copie des templates/ressources vers webroot au demarrage"
         )
 
