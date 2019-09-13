@@ -1,7 +1,7 @@
 import logging
 
 from delta import html
-from millegrilles.noeuds.Publicateur import ExporterDeltaPlume, PublierCataloguePlume
+from millegrilles.noeuds.Publicateur import ExporterPlume, PublierCataloguePlume, ExporterPageHtml, ConstantesPublicateur
 
 logging.basicConfig()
 logging.getLogger('millegrilles').setLevel(logging.DEBUG)
@@ -49,7 +49,7 @@ class TestExportPlumeHtml:
             'titre': 'Un fichier de test, c''est le fun'
         }
 
-        self.exporteur = ExporterDeltaPlume(self, self.message)
+        self.exporteur = ExporterPlume(self, self.message)
 
     @property
     def webroot(self):
@@ -95,13 +95,43 @@ class TestPublierCataloguePlume:
         self.exportCatalogue.exporter_catalogue()
 
 
+class TestExportAccueilHtml:
+
+    def __init__(self):
+        self._exporter = ExporterPageHtml(self, ConstantesPublicateur.PATH_FICHIER_ACCUEIL, 'index.html')
+
+    @property
+    def template_path(self):
+        return '../..'
+
+    @property
+    def webroot(self):
+        return '/home/mathieu/tmp'
+
+    @property
+    def contexte(self):
+        configuration = MicroMock(nom_millegrille='local')
+        return MicroMock(configuration=configuration)
+
+    def render(self):
+        self._exporter.exporter_html()
+
+
+class MicroMock:
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
 # ========= MAIN ==========
 
 # test = TestDelta()
 # test.render(test.delta_1)
 
-testExporteur = TestExportPlumeHtml()
-testExporteur.exporter()
+# testExporteur = TestExportPlumeHtml()
+# testExporteur.exporter()
 
 # testCatalogue = TestPublierCataloguePlume()
 # testCatalogue.exporter()
+
+testAccueil = TestExportAccueilHtml()
+testAccueil.render()

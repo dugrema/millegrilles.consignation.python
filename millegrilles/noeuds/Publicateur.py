@@ -8,6 +8,7 @@ import threading
 import os
 import shutil
 import urllib
+import re
 
 from threading import Event, Thread
 from pika.exceptions import ConnectionClosed, ChannelClosed
@@ -16,6 +17,16 @@ from delta import html
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
+
+
+class ConstantesPublicateur:
+
+    PATH_FICHIER_MAIN = 'html/templates/main.template.html'
+    PATH_FICHIER_ACCUEIL = 'html/templates/accueil.content.html'
+    MARQUEUR_CONTENU = '<!-- MARQUEUR - Contenu de la page - MARQUEUR -->'
+
+    MENUCLASS_ACTIF = 'w3-white'
+    MENUCLASS_INACTIF = 'w3-hide-small w3-hover-white'
 
 
 class Publicateur(ModeleConfiguration):
@@ -30,6 +41,7 @@ class Publicateur(ModeleConfiguration):
         self._message_handler = None
 
         self._webroot = None
+        self._template_path = None
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -43,6 +55,10 @@ class Publicateur(ModeleConfiguration):
         self._webroot = self.args.webroot
         if self._webroot is None:
             self._webroot = '/opt/millegrilles/%s/mounts/nginx/www-public' % nom_millegrille
+
+        self._template_path = self.args.templates
+        if self._template_path is None:
+            self._template_path = '.'
 
         # Configuration MQ
         self._message_handler = TraitementPublication(self)
@@ -77,10 +93,10 @@ class Publicateur(ModeleConfiguration):
     def configurer_parser(self):
         super().configurer_parser()
 
-        # self.parser.add_argument(
-        #     '--debug', action="store_true", required=False,
-        #     help="Active le debugging (logger)"
-        # )
+        self.parser.add_argument(
+            '--no-init', action="store_true", required=False,
+            help="Desactive la copie des templates/ressources vers webroot au demarrage"
+        )
 
         self.parser.add_argument(
             '--webroot',
@@ -88,6 +104,14 @@ class Publicateur(ModeleConfiguration):
             required=False,
             help="Repertoire de base pour publier les fichiers"
         )
+
+        self.parser.add_argument(
+            '--templates',
+            type=str,
+            required=False,
+            help="Repertoire pour les modeles (templates) html et autres ressources"
+        )
+
 
     def set_logging_level(self):
         super().set_logging_level()
@@ -109,6 +133,10 @@ class Publicateur(ModeleConfiguration):
     @property
     def webroot(self):
         return self._webroot
+
+    @property
+    def template_path(self):
+        return self._template_path
 
 
 class TraitementPublication(BaseCallback):
@@ -136,11 +164,11 @@ class TraitementPublication(BaseCallback):
             raise ValueError("Reponse non supportee. Correlation_id: %s" % correlation_id)
         elif routing_key is not None:
             if routing_key in ['publicateur.plume.publierDocument']:
-                exporteur = ExporterDeltaPlume(self._publicateur, message_dict)
+                exporteur = ExporterPlume(self._publicateur, message_dict)
                 exporteur.exporter_html()
             elif routing_key in ['publicateur.plume.supprimerDocument', 'publicateur.plume.depublierDocument']:
                 # Supprime un document Plume (ou le de-publie)
-                exporteur = ExporterDeltaPlume(self._publicateur, message_dict)
+                exporteur = ExporterPlume(self._publicateur, message_dict)
                 exporteur.supprimer_fichier()
             elif routing_key in ['publicateur.plume.catalogue']:
                 # Mettre a jour le catalogue (index.html) des fichiers plume
@@ -156,17 +184,20 @@ class TraitementPublication(BaseCallback):
             raise ValueError("Message type inconnu")
 
 
-class ExporterDeltaVersHtml:
+class ExporterVersHtml:
 
-    def __init__(self, publicateur, message_publication):
+    def __init__(self, publicateur):
         self._publicateur = publicateur
-        self._message_publication = message_publication
+
+        self._nom_template = '%s/%s' % (self._publicateur.template_path, ConstantesPublicateur.PATH_FICHIER_MAIN)
+        self._template_split = None
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def exporter_html(self):
+    def exporter_html(self, nom_section: str = 'ACCUEIL'):
         """
         Sauvegarde le contenu HTML dans un fichier
         :param delta_html:
+        :param nom_section:
         :return:
         """
 
@@ -176,9 +207,13 @@ class ExporterDeltaVersHtml:
 
         chemin_fichier = self._chemin_fichier()
 
+        self._template_split = self.preparer_template(nom_section)
+
         # Enregistrer fichier
         with open('%s.staging' % chemin_fichier, 'wb') as fichier:
-            self.render_delta(fichier)
+            fichier.write(self._template_split[0].encode('utf-8'))
+            self.render(fichier)
+            fichier.write(self._template_split[1].encode('utf-8'))
 
         # Aucune exception, on supprime l'ancien fichier et renomme .staging
         if os.path.exists(chemin_fichier):
@@ -187,7 +222,27 @@ class ExporterDeltaVersHtml:
 
         self.__logger.info("Fichier exporte: %s" % chemin_fichier)
 
-    def render_delta(self, fichier):
+    def preparer_template(self, nom_section: str = 'ACCUEIL'):
+        """
+        Le template contient des variables a remplacer et un marqueur de contenu utiliser pour separer l'output.
+        :param nom_section: Le nom de la section, utilise pour gerer le menu (${MENUCLASS_NOMSECTION} devient actif)
+        :return:
+        """
+        with open(self._nom_template, 'r') as fichier:
+            template_complet = fichier.read()
+
+        # Effectuer les remplacements
+        nom_millegrille = self._publicateur.contexte.configuration.nom_millegrille
+
+        # Activer l'item courant dans le menu, desactiver les autres
+        template_complet = template_complet.replace('${MENUCLASS_%s}' % nom_section.upper(), ConstantesPublicateur.MENUCLASS_ACTIF)
+
+        template_complet = template_complet.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
+        self.__logger.debug("Template complet: %s" % template_complet)
+
+        return template_complet.split(ConstantesPublicateur.MARQUEUR_CONTENU)
+
+    def render(self, fichier):
         raise NotImplementedError("Pas implemente")
 
     def identifier_grosfichiers(self):
@@ -210,13 +265,39 @@ class ExporterDeltaVersHtml:
         raise NotImplementedError("Pas implemente")
 
 
-class ExporterDeltaPlume(ExporterDeltaVersHtml):
+class ExporterPageHtml(ExporterVersHtml):
 
-    def __init__(self, publicateur, message_publication):
-        super().__init__(publicateur, message_publication)
+    def __init__(self, publicateur, nom_fichier_contenu, destination):
+        super().__init__(publicateur)
+        self._nom_fichier_contenu = nom_fichier_contenu
+        self._destination = destination
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def render_delta(self, fichier):
+    def render(self, fichier):
+        nom_fichier = '%s/%s' % (self._publicateur.template_path, self._nom_fichier_contenu)
+        self.__logger.debug("Ouverture fichier contenu %s" % nom_fichier)
+        with open(nom_fichier, 'rb') as fichier_contenu:
+            fichier.write(fichier_contenu.read())
+
+    def supprimer_fichier(self):
+        webroot = self._publicateur.webroot
+        chemin = '%s/%s' % (webroot, self._destination)
+        os.remove(chemin)
+
+    def _chemin_fichier(self):
+        webroot = self._publicateur.webroot
+        chemin = '%s/%s' % (webroot, self._destination)
+        return chemin
+
+
+class ExporterPlume(ExporterVersHtml):
+
+    def __init__(self, publicateur, message_publication):
+        super().__init__(publicateur)
+        self._message_publication = message_publication
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def render(self, fichier):
         """ Genere le contenu HTML """
         delta = self._message_publication['quilldelta']
         delta_html = html.render(delta['ops'], pretty=True)
