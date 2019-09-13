@@ -13,6 +13,7 @@ import re
 from threading import Event, Thread
 from pika.exceptions import ConnectionClosed, ChannelClosed
 from delta import html
+from distutils import dir_util
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -21,12 +22,16 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 class ConstantesPublicateur:
 
-    PATH_FICHIER_MAIN = 'html/templates/main.template.html'
-    PATH_FICHIER_ACCUEIL = 'html/templates/accueil.content.html'
+    PATH_FICHIER_MAIN = 'templates/main.template.html'
+    PATH_FICHIER_ACCUEIL = 'templates/accueil.content.html'
     MARQUEUR_CONTENU = '<!-- MARQUEUR - Contenu de la page - MARQUEUR -->'
 
     MENUCLASS_ACTIF = 'w3-white'
     MENUCLASS_INACTIF = 'w3-hide-small w3-hover-white'
+
+    RESSOURCES_CSS = 'stylesheets'
+    RESSOURCES_JS = 'js'
+    RESSOURCES_FONTS = 'fonts'
 
 
 class Publicateur(ModeleConfiguration):
@@ -184,6 +189,27 @@ class TraitementPublication(BaseCallback):
             raise ValueError("Message type inconnu")
 
 
+class PublierRessourcesStatiques:
+
+    def __init__(self, publicateur):
+        self._publicateur = publicateur
+        self._liste_ressources = [
+            ConstantesPublicateur.RESSOURCES_CSS,
+            ConstantesPublicateur.RESSOURCES_JS,
+            ConstantesPublicateur.RESSOURCES_FONTS,
+        ]
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def copier_ressources(self):
+        webroot = self._publicateur.webroot
+        self.__logger.debug("Copie des ressources sous %s vers %s" % (str(self._liste_ressources), webroot))
+
+        for res in self._liste_ressources:
+            path_res = '%s/%s' % (self._publicateur.template_path, res)
+            dir_util.copy_tree(path_res, '%s/%s' % (webroot, res))
+
+
 class ExporterVersHtml:
 
     def __init__(self, publicateur):
@@ -232,7 +258,10 @@ class ExporterVersHtml:
             template_complet = fichier.read()
 
         # Effectuer les remplacements
+        # Inserer le nom de la millegrille
         nom_millegrille = self._publicateur.contexte.configuration.nom_millegrille
+        template_complet = template_complet.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
+        self.__logger.debug("Template complet: %s" % template_complet)
 
         # Activer l'item courant dans le menu, desactiver les autres
         template_complet = template_complet.replace('${MENUCLASS_%s}' % nom_section.upper(), ConstantesPublicateur.MENUCLASS_ACTIF)
@@ -242,9 +271,7 @@ class ExporterVersHtml:
             template_complet = template_complet.replace(menu, ConstantesPublicateur.MENUCLASS_INACTIF)
         self.__logger.debug("Classes tags trouves: %s" % str(classes))
 
-        template_complet = template_complet.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
-        self.__logger.debug("Template complet: %s" % template_complet)
-
+        # Faire un split entre avant et apres le marqueur de contenu
         return template_complet.split(ConstantesPublicateur.MARQUEUR_CONTENU)
 
     def render(self, fichier):

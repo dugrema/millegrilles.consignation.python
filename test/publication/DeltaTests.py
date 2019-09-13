@@ -1,7 +1,7 @@
 import logging
 
 from delta import html
-from millegrilles.noeuds.Publicateur import ExporterPlume, PublierCataloguePlume, ExporterPageHtml, ConstantesPublicateur
+from millegrilles.noeuds.Publicateur import ExporterPlume, PublierCataloguePlume, ExporterPageHtml, ConstantesPublicateur, PublierRessourcesStatiques
 
 logging.basicConfig()
 logging.getLogger('millegrilles').setLevel(logging.DEBUG)
@@ -99,10 +99,11 @@ class TestExportAccueilHtml:
 
     def __init__(self):
         self._exporter = ExporterPageHtml(self, ConstantesPublicateur.PATH_FICHIER_ACCUEIL, 'index.html')
+        self._ressources = PublierRessourcesStatiques(self)
 
     @property
     def template_path(self):
-        return '../..'
+        return '../../html'
 
     @property
     def webroot(self):
@@ -115,6 +116,9 @@ class TestExportAccueilHtml:
 
     def render(self):
         self._exporter.exporter_html()
+
+    def ressources(self):
+        self._ressources.copier_ressources()
 
 
 class MicroMock:
@@ -134,4 +138,5 @@ class MicroMock:
 # testCatalogue.exporter()
 
 testAccueil = TestExportAccueilHtml()
-testAccueil.render()
+# testAccueil.render()
+testAccueil.ressources()
