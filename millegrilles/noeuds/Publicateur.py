@@ -237,6 +237,11 @@ class ExporterVersHtml:
         # Activer l'item courant dans le menu, desactiver les autres
         template_complet = template_complet.replace('${MENUCLASS_%s}' % nom_section.upper(), ConstantesPublicateur.MENUCLASS_ACTIF)
 
+        classes = re.search('(\\$\\{MENUCLASS_[A-Z]+\\})', template_complet)
+        for menu in classes.groups():
+            template_complet = template_complet.replace(menu, ConstantesPublicateur.MENUCLASS_INACTIF)
+        self.__logger.debug("Classes tags trouves: %s" % str(classes))
+
         template_complet = template_complet.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
         self.__logger.debug("Template complet: %s" % template_complet)
 
