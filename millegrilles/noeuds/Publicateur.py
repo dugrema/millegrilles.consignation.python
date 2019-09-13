@@ -323,8 +323,11 @@ class ExporterPageHtml(ExporterVersHtml):
     def render(self, fichier):
         nom_fichier = '%s/%s' % (self._publicateur.template_path, self._nom_fichier_contenu)
         self.__logger.debug("Ouverture fichier contenu %s" % nom_fichier)
+        nom_millegrille = self._publicateur.contexte.configuration.nom_millegrille
         with open(nom_fichier, 'rb') as fichier_contenu:
-            fichier.write(fichier_contenu.read())
+            contenu = fichier_contenu.read().decode('utf-8')
+            contenu = contenu.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
+            fichier.write(contenu.encode('utf-8'))
 
     def supprimer_fichier(self):
         webroot = self._publicateur.webroot

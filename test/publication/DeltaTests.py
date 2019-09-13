@@ -138,5 +138,5 @@ class MicroMock:
 # testCatalogue.exporter()
 
 testAccueil = TestExportAccueilHtml()
-# testAccueil.render()
-testAccueil.ressources()
+testAccueil.render()
+# testAccueil.ressources()
