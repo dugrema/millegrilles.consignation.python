@@ -193,7 +193,7 @@ class TraitementPublication(BaseCallback):
             elif routing_key in ['publicateur.plume.catalogue']:
                 # Mettre a jour le catalogue (index.html) des fichiers plume
                 exporteur = PublierCataloguePlume(self._publicateur, message_dict)
-                exporteur.exporter_catalogue()
+                exporteur.exporter_html('PLUME')
             elif routing_key in ['publicateur.plume.categorie']:
                 # Mettre a jour le catalogue d'une categorie plume
                 exporteur = PublierCataloguePlume(self._publicateur, message_dict)
@@ -375,28 +375,29 @@ class ExporterPlume(ExporterVersHtml):
         return chemin
 
 
-class PublierCataloguePlume:
+class PublierCataloguePlume(ExporterVersHtml):
 
     def __init__(self, publicateur, message_publication):
+        super().__init__(publicateur)
         self._publicateur = publicateur
         self._message_publication = message_publication
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def exporter_catalogue(self):
-        nom_fichier = self._chemin_fichier()
-        nom_fichier_staging = '%s.staging' % nom_fichier
+    # def exporter_catalogue(self):
+    #     nom_fichier = self._chemin_fichier()
+    #     nom_fichier_staging = '%s.staging' % nom_fichier
+    #
+    #     with open(nom_fichier_staging, 'wb') as fichier:
+    #         self.render_catalogue(fichier)
+    #
+    #     # Aucune erreur lancee, on renomme le fichier
+    #     if os.path.exists(nom_fichier):
+    #         os.remove(nom_fichier)
+    #     os.rename(nom_fichier_staging, nom_fichier)
+    #
+    #     self.__logger.info("Fichier catalogue cree: %s" % nom_fichier)
 
-        with open(nom_fichier_staging, 'wb') as fichier:
-            self.render_catalogue(fichier)
-
-        # Aucune erreur lancee, on renomme le fichier
-        if os.path.exists(nom_fichier):
-            os.remove(nom_fichier)
-        os.rename(nom_fichier_staging, nom_fichier)
-
-        self.__logger.info("Fichier catalogue cree: %s" % nom_fichier)
-
-    def render_catalogue(self, fichier):
+    def render(self, fichier):
         fichier.write('<html>\n'.encode('utf-8'))
         fichier.write('<head><title>Plume</title>\n'.encode('utf-8'))
         fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
@@ -433,6 +434,10 @@ class PublierCataloguePlume:
     def _chemin_fichier(self):
         webroot = self._publicateur.webroot
         return '%s/plume/index.html' % webroot
+
+    def supprimer_fichier(self):
+        chemin = self._chemin_fichier()
+        os.remove(chemin)
 
 
 class PublierGrosFichiers:
