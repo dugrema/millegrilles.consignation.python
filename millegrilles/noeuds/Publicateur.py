@@ -193,7 +193,7 @@ class TraitementPublication(BaseCallback):
             elif routing_key in ['publicateur.plume.catalogue']:
                 # Mettre a jour le catalogue (index.html) des fichiers plume
                 exporteur = PublierCataloguePlume(self._publicateur, message_dict)
-                exporteur.exporter_html('PLUME')
+                exporteur.exporter_html()
             elif routing_key in ['publicateur.plume.categorie']:
                 # Mettre a jour le catalogue d'une categorie plume
                 exporteur = PublierCataloguePlume(self._publicateur, message_dict)
@@ -347,19 +347,22 @@ class ExporterPlume(ExporterVersHtml):
         self._message_publication = message_publication
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+    def exporter_html(self, nom_section: str = 'PLUME'):
+        super().exporter_html(nom_section)
+
     def render(self, fichier):
         """ Genere le contenu HTML """
         delta = self._message_publication['quilldelta']
         delta_html = html.render(delta['ops'], pretty=True)
 
-        fichier.write('<html><head>'.encode('utf-8'))
-        fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
-        fichier.write((
-                '<title>%s</title>' % self._message_publication['titre']
-            ).encode('utf-8'))
-        fichier.write('</head><body>'.encode('utf-8'))
+        # fichier.write('<html><head>'.encode('utf-8'))
+        # fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
+        # fichier.write((
+        #         '<title>%s</title>' % self._message_publication['titre']
+        #     ).encode('utf-8'))
+        # fichier.write('</head><body>'.encode('utf-8'))
         fichier.write(delta_html.encode('utf-8'))
-        fichier.write('</body></html>\n'.encode('utf-8'))
+        # fichier.write('</body></html>\n'.encode('utf-8'))
 
     def supprimer_fichier(self):
         webroot = self._publicateur.webroot
@@ -383,6 +386,9 @@ class PublierCataloguePlume(ExporterVersHtml):
         self._message_publication = message_publication
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+    def exporter_html(self, nom_section: str = 'PLUME'):
+        super().exporter_html(nom_section)
+
     # def exporter_catalogue(self):
     #     nom_fichier = self._chemin_fichier()
     #     nom_fichier_staging = '%s.staging' % nom_fichier
@@ -398,10 +404,10 @@ class PublierCataloguePlume(ExporterVersHtml):
     #     self.__logger.info("Fichier catalogue cree: %s" % nom_fichier)
 
     def render(self, fichier):
-        fichier.write('<html>\n'.encode('utf-8'))
-        fichier.write('<head><title>Plume</title>\n'.encode('utf-8'))
-        fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
-        fichier.write('</head>\n<body>\n'.encode('utf-8'))
+        # fichier.write('<html>\n'.encode('utf-8'))
+        # fichier.write('<head><title>Plume</title>\n'.encode('utf-8'))
+        # fichier.write('<meta charset="UTF-8">\n'.encode('utf-8'))
+        # fichier.write('</head>\n<body>\n'.encode('utf-8'))
         fichier.write('<h1>Plume public</h1>\n'.encode('utf-8'))
 
         liste_documents = self._message_publication['documents']
@@ -423,7 +429,7 @@ class PublierCataloguePlume(ExporterVersHtml):
 
             fichier.write('</div>\n'.encode('utf-8'))
 
-        fichier.write('</body>\n</html>\n'.encode('utf-8'))
+        # fichier.write('</body>\n</html>\n'.encode('utf-8'))
 
     def exporter_categorie(self):
         pass
