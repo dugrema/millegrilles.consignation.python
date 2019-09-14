@@ -62,7 +62,6 @@ class AfficheurDocumentMAJDirecte:
         self._cycles_entre_rafraichissements = 20  # 20 Cycles
         self._age_donnee_expiree = 120  # Secondes pour considerer une lecture comme expiree (stale)
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
-        self._generateur = contexte.generateur_transactions  # Transmet requete de documents
 
         # self._collection = None
         # self._curseur_changements = None  # Si None, on fonctionne par timer
@@ -126,10 +125,15 @@ class AfficheurDocumentMAJDirecte:
             'type': 'mongodb',
             "filtre": self.get_filtre()
         }]}
-        self._generateur.transmettre_requete(requete,
-                                             'millegrilles.domaines.SenseursPassifs',
-                                             'etat_senseurs_initial',
-                                             self._queue_reponse)
+
+        try:
+            self._contexte.generateur_transactions.transmettre_requete(
+                requete,
+                'millegrilles.domaines.SenseursPassifs',
+                'etat_senseurs_initial',
+                self._queue_reponse)
+        except Exception as e:
+            self.__logger.exception("Erreur transmission requete documents", e)
 
     def get_documents(self):
         return self._documents

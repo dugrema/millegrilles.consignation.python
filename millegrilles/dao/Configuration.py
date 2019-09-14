@@ -335,7 +335,6 @@ class ContexteRessourcesMilleGrilles:
             if connecter:
                 self._message_dao.connecter()
                 # self._signateur_transactions.initialiser()
-                self._generateur_transactions = GenerateurTransaction(self)
 
         if init_document:
             self._document_dao = MongoDAO(self._configuration)
@@ -392,6 +391,8 @@ class ContexteRessourcesMilleGrilles:
 
     @property
     def generateur_transactions(self):
+        if self._generateur_transactions is None:
+            self._generateur_transactions = GenerateurTransaction(self)
         return self._generateur_transactions
 
     @property
