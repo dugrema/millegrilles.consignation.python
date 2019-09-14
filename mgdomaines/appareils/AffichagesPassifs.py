@@ -60,6 +60,7 @@ class AfficheurDocumentMAJDirecte:
         self._intervalle_secs = intervalle_secs
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
         self._cycles_entre_rafraichissements = 20  # 20 Cycles
+        self._age_donnee_expiree = 120  # Secondes pour considerer une lecture comme expiree (stale)
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
         self._generateur = contexte.generateur_transactions  # Transmet requete de documents
 
@@ -69,6 +70,7 @@ class AfficheurDocumentMAJDirecte:
         self._thread_maj_document = None
         self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
         self._compteur_cycle = 0  # Utilise pour savoir quand on rafraichit, tente de reparer connexion, etc.
+        self._age_donnee_expiree_timedelta = datetime.timedelta(secondes=self._age_donnee_expiree)
 
         self.channel = None
         self._queue_reponse = None
@@ -245,9 +247,11 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         taille_titre_tph = taille_ecran - 11
         taille_titre_press = taille_ecran - 10
 
+        ligne_expiree_format = "{location:<%d} <Expire>" % taille_titre_press
         ligne_tph_format = "{location:<%d} {temperature: 5.1f}C/{humidite:2.0f}%%" % taille_titre_tph
         ligne_pression_format = "{titre:<%d} {pression:5.1f}kPa{tendance}" % taille_titre_press
 
+        date_now = datetime.datetime.utcnow()
         for senseur_id in self._documents:
             senseur = self._documents[senseur_id].copy()
             if senseur.get('location') is not None:
@@ -256,8 +260,15 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             else:
                 senseur['location'] = '%s' % senseur.get('senseur')
 
-            info_loc_temp_hum = ligne_tph_format.format(**senseur)
-            lignes.append(info_loc_temp_hum)
+            derniere_lecture = senseur['temps_lecture']
+            date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
+            date_expiration = date_chargee + self._age_donnee_expiree_timedelta
+            if date_expiration > date_now:
+                ligne_donnee = ligne_expiree_format.format(**senseur)
+            else:
+                ligne_donnee = ligne_tph_format.format(**senseur)
+
+            lignes.append(ligne_donnee)
 
             pression_senseur = senseur.get('pression')
             if pression is None and pression_senseur is not None and pression_senseur > 0.0:
