@@ -1,6 +1,6 @@
 # Module avec utilitaires generiques pour mgdomaines
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import JSONHelper
+from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
@@ -392,6 +392,180 @@ class GestionnaireDomaine:
     @property
     def contexte(self):
         return self._contexte
+
+
+class GestionnaireDomaineStandard(GestionnaireDomaine):
+    """
+    Implementation des Q standards pour les domaines.
+    """
+
+    def __init__(self, contexte):
+        super().__init__(contexte)
+        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
+
+        nom_millegrille = contexte.configuration.nom_millegrille
+
+        # Queue message handlers
+        self.__handler_transaction = None
+        self.__handler_cedule = None
+        self.__handler_requetes_noeuds = None
+
+        self.generateur = self.contexte.generateur_transactions
+
+    def configurer(self):
+        super().configurer()
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection)
+        # Index noeud, _mg-libelle
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+        ])
+        collection_domaine.create_index([
+            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
+        ])
+
+    def setup_rabbitmq(self, channel):
+        nom_queue_transactions = '%s.%s' % (self.get_nom_queue(), 'transactions')
+        nom_queue_ceduleur = '%s.%s' % (self.get_nom_queue(), 'ceduleur')
+        nom_queue_processus = '%s.%s' % (self.get_nom_queue(), 'processus')
+        nom_queue_requetes_noeuds = '%s.%s' % (self.get_nom_queue(), 'requete.noeuds')
+
+        # Configurer la Queue pour les transactions
+        def callback_init_transaction(queue, self=self, callback=self.get_handler_transaction().callbackAvecAck):
+            self.inscrire_basicconsume(queue, callback)
+            channel.queue_bind(
+                exchange=self.configuration.exchange_middleware,
+                queue=nom_queue_transactions,
+                routing_key='destinataire.domaine.%s.#' % self.get_nom_queue(),
+                callback=None,
+            )
+
+        channel.queue_declare(
+            queue=nom_queue_transactions,
+            durable=False,
+            callback=callback_init_transaction,
+        )
+
+        # Configuration la queue pour le ceduleur
+        def callback_init_cedule(queue, self=self, callback=self.get_handler_cedule().callbackAvecAck):
+            self.inscrire_basicconsume(queue, callback)
+            channel.queue_bind(
+                exchange=self.configuration.exchange_middleware,
+                queue=nom_queue_ceduleur,
+                routing_key='ceduleur.#',
+                callback=None,
+            )
+
+        channel.queue_declare(
+            queue=nom_queue_ceduleur,
+            durable=False,
+            callback=callback_init_cedule,
+        )
+
+        # Queue pour les processus
+        def callback_init_processus(queue, self=self, callback=self.traitement_evenements.callbackAvecAck):
+            self.inscrire_basicconsume(queue, callback)
+            channel.queue_bind(
+                exchange=self.configuration.exchange_middleware,
+                queue=nom_queue_processus,
+                routing_key='processus.domaine.%s.#' % self.get_nom_domaine(),
+                callback=None,
+            )
+
+        channel.queue_declare(
+            queue=nom_queue_processus,
+            durable=False,
+            callback=callback_init_processus,
+        )
+
+        # Queue pour les requetes de noeuds
+        def callback_init_requetes_noeuds(queue, self=self, callback=self.get_handler_requetes_noeuds().callbackAvecAck):
+            self.inscrire_basicconsume(queue, callback)
+            channel.queue_bind(
+                exchange=self.configuration.exchange_noeuds,
+                queue=nom_queue_requetes_noeuds,
+                routing_key='requete.%s.#' % self.get_nom_domaine(),
+                callback=None,
+            )
+
+        channel.queue_declare(
+            queue=nom_queue_requetes_noeuds,
+            durable=False,
+            callback=callback_init_requetes_noeuds,
+        )
+
+    def get_handler_transaction(self):
+        raise NotImplementedError("Pas implemente")
+
+    def get_handler_cedule(self):
+        raise NotImplementedError("Pas implemente")
+
+    def get_handler_requetes_noeuds(self):
+        raise NotImplementedError("Pas implemente")
+
+
+class TraitementRequetesNoeuds(BaseCallback):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire.contexte)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._gestionnaire = gestionnaire
+        self._generateur = gestionnaire.contexte.generateur_transactions
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        exchange = method.exchange
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+
+        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+
+    def executer_requete(self, requete):
+        self._logger.debug("Requete: %s" % str(requete))
+        collection = self.contexte.document_dao.get_collection(ConstantesDomaine.COLLECTION_DOCUMENTS_NOM)
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        curseur.limit(2500)  # Mettre limite sur nombre de resultats
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        self._logger.debug("Resultats: %s" % str(resultats))
+
+        return resultats
+
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        if correlation_id is None:
+            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+
+        self._generateur.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
 class WatcherCollectionMongoThread:

@@ -1,4 +1,4 @@
-# Domaine de l'interface principale
+# Domaine de l'interface principale de l'usager. Ne peut pas etre deleguee.
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import BaseCallback
