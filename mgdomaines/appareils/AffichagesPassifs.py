@@ -70,7 +70,7 @@ class AfficheurDocumentMAJDirecte:
         self._thread_maj_document = None
         self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
         self._compteur_cycle = 0  # Utilise pour savoir quand on rafraichit, tente de reparer connexion, etc.
-        self._age_donnee_expiree_timedelta = datetime.timedelta(secondes=self._age_donnee_expiree)
+        self._age_donnee_expiree_timedelta = datetime.timedelta(seconds=self._age_donnee_expiree)
 
         self.channel = None
         self._queue_reponse = None
