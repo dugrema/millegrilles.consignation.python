@@ -270,14 +270,15 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             else:
                 ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_tph_format.format(**senseur)
 
+                # S'assurer d'utiliser une pression recente
+                pression_senseur = senseur.get('pression')
+                if pression is None and pression_senseur is not None and pression_senseur > 0.0:
+                    pression = pression_senseur
+
+                if tendance is None and senseur.get('pression_tendance') is not None:
+                    tendance = senseur['pression_tendance']
+
             lignes.append(ligne_donnee)
-
-            pression_senseur = senseur.get('pression')
-            if pression is None and pression_senseur is not None and pression_senseur > 0.0:
-                pression = pression_senseur
-
-            if tendance is None and senseur.get('pression_tendance') is not None:
-                tendance = senseur['pression_tendance']
 
         if pression is not None:
             lecture = {'titre': 'Press.', 'pression': pression, 'tendance': tendance}
