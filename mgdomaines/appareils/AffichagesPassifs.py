@@ -143,6 +143,14 @@ class AfficheurDocumentMAJDirecte:
 # pour quelques senseurs passifs.
 class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDirecte):
 
+    taille_ecran = 16
+    taille_titre_tph = taille_ecran - 11
+    taille_titre_press = taille_ecran - 10
+
+    ligne_expiree_format = "{location:<%d} <Expire>" % taille_titre_press
+    ligne_tph_format = "{location:<%d} {temperature: 5.1f}C/{humidite:2.0f}%%" % taille_titre_tph
+    ligne_pression_format = "{titre:<%d} {pression:5.1f}kPa{tendance}" % taille_titre_press
+
     def __init__(self, contexte, senseur_ids, intervalle_secs=30):
         super().__init__(contexte, intervalle_secs)
         self._senseur_ids = senseur_ids
@@ -150,6 +158,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         self._thread_horloge = None
         self._horloge_event = Event()  # Evenement pour synchroniser l'heure
         self._lignes_ecran = None
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def get_collection(self):
         return self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
@@ -243,30 +252,23 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         pression = None
         tendance = None
 
-        taille_ecran = 16
-        taille_titre_tph = taille_ecran - 11
-        taille_titre_press = taille_ecran - 10
-
-        ligne_expiree_format = "{location:<%d} <Expire>" % taille_titre_press
-        ligne_tph_format = "{location:<%d} {temperature: 5.1f}C/{humidite:2.0f}%%" % taille_titre_tph
-        ligne_pression_format = "{titre:<%d} {pression:5.1f}kPa{tendance}" % taille_titre_press
-
         date_now = datetime.datetime.utcnow()
         for senseur_id in self._documents:
             senseur = self._documents[senseur_id].copy()
             if senseur.get('location') is not None:
-                if len(senseur.get('location')) > taille_titre_tph:
-                    senseur['location'] = senseur['location'][:taille_titre_tph]
+                if len(senseur.get('location')) > AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph:
+                    senseur['location'] = senseur['location'][:AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph]
             else:
                 senseur['location'] = '%s' % senseur.get('senseur')
 
             derniere_lecture = senseur['temps_lecture']
             date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
             date_expiration = date_chargee + self._age_donnee_expiree_timedelta
-            if date_expiration > date_now:
-                ligne_donnee = ligne_expiree_format.format(**senseur)
+            self.__logger.info("Date expiration lecture: %s. Lecture complete: %s" % ( date_expiration, str(senseur)))
+            if date_expiration < date_now:
+                ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_expiree_format.format(**senseur)
             else:
-                ligne_donnee = ligne_tph_format.format(**senseur)
+                ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_tph_format.format(**senseur)
 
             lignes.append(ligne_donnee)
 
@@ -279,7 +281,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
 
         if pression is not None:
             lecture = {'titre': 'Press.', 'pression': pression, 'tendance': tendance}
-            contenu = ligne_pression_format.format(**lecture)
+            contenu = AfficheurSenseurPassifTemperatureHumiditePression.ligne_pression_format.format(**lecture)
             lignes.append(contenu)
 
         return lignes
