@@ -499,7 +499,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
     def map_transaction_vers_document(self, transaction: dict, document: dict):
         for key, value in transaction.items():
-            if not key.startswith('_'):
+            if key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE and not key.startswith('_'):
                 document[key] = value
 
     def get_handler_transaction(self):

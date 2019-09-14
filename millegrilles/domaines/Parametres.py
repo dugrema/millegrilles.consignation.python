@@ -18,7 +18,7 @@ class ConstantesParametres:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
-    TRANSACTION_NOUVEAU_DOCUMENT = 'nouveauDocument'
+    TRANSACTION_MODIFIER_EMAIL_SMTP = 'modifierEmailSmtp'
 
     DOCUMENT_CHAMP_COURRIEL_ORIGINE = 'origine'
     DOCUMENT_CHAMP_COURRIEL_DESTINATIONS = 'destinations'
@@ -145,8 +145,8 @@ class TraitementTransactionPersistee(BaseCallback):
         )
 
         # Actions
-        if routing_key_sansprefixe == ConstantesParametres.TRANSACTION_NOUVEAU_DOCUMENT:
-            processus = "millegrilles_domaines_Plume:ProcessusTransactionAjouterDocumentPlume"
+        if routing_key_sansprefixe == ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP:
+            processus = "millegrilles_domaines_Parametres:ProcessusTransactionModifierEmailSmtp"
         else:
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
 
@@ -163,7 +163,7 @@ class ProcessusParametres(MGProcessusTransaction):
         return ConstantesParametres.COLLECTION_PROCESSUS_NOM
 
 
-class ProcessusTransactionModifierDocumentDomaine(ProcessusParametres):
+class ProcessusTransactionModifierEmailSmtp(ProcessusParametres):
     """
     Processus de modification de document Plume
     """
