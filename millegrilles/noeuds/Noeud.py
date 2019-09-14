@@ -222,17 +222,21 @@ class DemarreurNoeud(Daemon):
     def traiter_backlog_messages(self):
         if len(self._backlog_messages) > 0:
             # Tenter de reconnecter a RabbitMQ
-            if self.contexte.message_dao.in_error:
-                try:
-                    self.contexte.message_dao.connecter()
-                except:
-                    self._logger.exception("Erreur connexion MQ")
+            # if self.contexte.message_dao.in_error:
+            #     try:
+            #         self.contexte.message_dao.connecter()
+            #     except:
+            #         self._logger.exception("Erreur connexion MQ")
 
             # La seule facon de confirmer la connexion et d'envoyer un message
             # On tente de passer le backlog en remettant le message dans la liste en cas d'echec
-            message = self._backlog_messages.pop()
+            message = self._backlog_messages[0]  # Tenter transmettre un message, mais le garder en cas d'echec
             try:
                 self._producteur_transaction.transmettre_lecture_senseur(message)
+                # Succes (pas d'exception lancee), on enleve le premier message du backlog
+                self._backlog_messages.pop()
+
+                # Transmettre le reste des messages
                 while len(self._backlog_messages) > 0:
                     message = self._backlog_messages.pop()
                     self._producteur_transaction.transmettre_lecture_senseur(message)
