@@ -410,6 +410,8 @@ class PublierCataloguePlume(ExporterVersHtml):
         # fichier.write('</head>\n<body>\n'.encode('utf-8'))
         fichier.write('<h1>Plume public</h1>\n'.encode('utf-8'))
 
+        fichier.write('<div class="w3-col m12 w3-row-padding">'.encode('utf-8'))
+
         liste_documents = self._message_publication['documents']
         for uuid in liste_documents:
             document = liste_documents[uuid]
@@ -419,15 +421,15 @@ class PublierCataloguePlume(ExporterVersHtml):
             date_modification = document['_mg-derniere-modification']
             date_modification = time.ctime(date_modification)
 
-            fichier.write('<div>\n'.encode('utf-8'))
-
+            fichier.write('<div class="w3-col m6">\n'.encode('utf-8'))
             fichier.write(('<a href="/plume/%s/%s.html">%s</a> ' % (uuid, titre_urlsafe, titre)).encode('utf-8'))
+            fichier.write('</div>\n<div class="w3-col m3">'.encode('utf-8'))
             fichier.write(' '.join(categories).encode('utf-8'))
-            fichier.write(' <span>'.encode('utf-8'))
+            fichier.write('</div>\n<div class="w3-col m3">'.encode('utf-8'))
             fichier.write(str(date_modification).encode('utf-8'))
-            fichier.write('</span>'.encode('utf-8'))
-
             fichier.write('</div>\n'.encode('utf-8'))
+
+        fichier.write('</div>\n'.encode('utf-8'))
 
         # fichier.write('</body>\n</html>\n'.encode('utf-8'))
 
