@@ -4,6 +4,7 @@
 import traceback
 import argparse
 import logging
+import time
 
 from threading import Event, Thread
 
@@ -41,6 +42,7 @@ class DemarreurNoeud(Daemon):
         self._intervalle_entretien = None
         self._max_backlog = None
         self._apcupsd = None
+        self._dummysenseurs = None
 
         self._contexte = ContexteRessourcesMilleGrilles()
         self._producteur_transaction = None
@@ -89,6 +91,10 @@ class DemarreurNoeud(Daemon):
             help="Effectue la connexion aux serveurs plus tard plutot qu'au demarrage."
         )
         self._parser.add_argument(
+            '--dummysenseurs', action="store_true", required=False,
+            help="Initalise un emetteur de lecture dummy, pour tester la connexion"
+        )
+        self._parser.add_argument(
             '--debug', action="store_true", required=False,
             help="Active le logging maximal"
         )
@@ -130,19 +136,17 @@ class DemarreurNoeud(Daemon):
             except Exception:
                 self._logger.exception("Erreur traitement backlog de messages")
 
-            self.verifier_connexion_document()
-
             # Sleep
             self._stop_event.wait(self._intervalle_entretien)
         self._logger.info("Fin execution Daemon")
 
-    def setup_modules(self, init_document=False):
+    def setup_modules(self):
         # Charger la configuration et les DAOs
         self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
-        self._contexte.initialiser(init_document=init_document, connecter=doit_connecter)
-        self.__thread_mq_ioloop = Thread(name='MQ-ioloop', target=self._contexte.message_dao.run_ioloop)
-        self.__thread_mq_ioloop.start()
+        self._contexte.initialiser(init_document=False, connecter=doit_connecter)
+        # self.__thread_mq_ioloop = Thread(name='MQ-ioloop', target=self._contexte.message_dao.run_ioloop)
+        # self.__thread_mq_ioloop.start()
 
         self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
 
@@ -156,6 +160,9 @@ class DemarreurNoeud(Daemon):
             except Exception as erreur_lcd:
                 self._logger.exception("Erreur chargement apcupsd: %s" % str(erreur_lcd))
                 traceback.print_exc()
+
+        if self._args.dummysenseurs:
+            self.inclure_dummysenseurs()
 
     def fermer(self):
         self._stop_event.set()
@@ -187,6 +194,12 @@ class DemarreurNoeud(Daemon):
         self._logger.info("Configuration apcupsd: %s" % config)
         self._apcupsd = ApcupsdCollector(no_senseur=no_senseur, config=config)
         self._apcupsd.start(self.transmettre_lecture_callback)
+        self._chargement_reussi = True
+
+    def inclure_dummysenseurs(self):
+        self._logger.info("Activer dummysenseurs")
+        self._dummysenseurs = DummySenseurs(no_senseur=1)
+        self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
     def transmettre_lecture_callback(self, dict_lecture):
@@ -229,19 +242,68 @@ class DemarreurNoeud(Daemon):
                 self._backlog_messages.append(message)
                 traceback.print_exc()
 
-    ''' Verifie la connexion au document_dao, reconnecte au besoin. '''
-    def verifier_connexion_document(self):
-        if self.contexte.document_dao is not None and not self.contexte.document_dao.est_enligne():
-            try:
-                self.contexte.document_dao.connecter()
-                self._logger.info("DemarreurNoeud: Connexion a Mongo re-etablie")
-            except Exception as ce:
-                self._logger.exception("DemarreurNoeud: Erreur reconnexion Mongo: %s" % str(ce))
-                traceback.print_exc()
-
     @property
     def contexte(self):
         return self._contexte
+
+
+# Thermometre AM2302 connecte sur une pin GPIO
+# Dependances:
+#   - Adafruit package Adafruit_DHT
+class DummySenseurs:
+
+    def __init__(self, no_senseur, intervalle_lectures=50):
+        self._no_senseur = no_senseur
+        self._intervalle_lectures = intervalle_lectures
+        self._callback_soumettre = None
+        self._stop_event = Event()
+        self._thread = None
+
+        self._stop_event.set()
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self._valeurs = [
+            {'humidite': 40, 'temperature': 17},
+            {'humidite': 42, 'temperature': 16},
+            {'humidite': 43, 'temperature': 15},
+            {'humidite': 44, 'temperature': 14},
+            {'humidite': 50, 'temperature': 13.5},
+        ]
+
+    def lire(self):
+        lecture = self._valeurs[0]
+        humidite = lecture['humidite']
+        temperature = lecture['temperature']
+
+        dict_message = {
+            'version': 6,
+            'senseur': self._no_senseur,
+            'temps_lecture': int(time.time()),
+            'temperature': round(temperature, 1),
+            'humidite': round(humidite, 1)
+        }
+
+        self._callback_soumettre(dict_message)
+
+    def start(self, callback_soumettre):
+        self._callback_soumettre = callback_soumettre
+        self._stop_event.clear()
+
+        # Demarrer thread
+        self._thread = Thread(target=self.run)
+        self._thread.start()
+
+    def fermer(self):
+        self._stop_event.set()
+
+    def run(self):
+        while not self._stop_event.is_set():
+            try:
+                self.lire()
+            except:
+                self._logger.exception("DummySenseurs: Erreur lecture AM2302")
+            finally:
+                self._stop_event.wait(self._intervalle_lectures)
 
 
 # **** MAIN ****
