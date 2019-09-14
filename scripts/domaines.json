@@ -19,6 +19,10 @@
     {
       "module": "millegrilles.domaines.Plume",
       "classe": "GestionnairePlume"
+    },
+    {
+      "module": "millegrilles.domaines.Parametres",
+      "classe": "GestionnaireParametres"
     }
   ]
 }

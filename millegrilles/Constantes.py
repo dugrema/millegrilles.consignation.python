@@ -143,6 +143,9 @@ DOCUMENT_INFODOC_LIBELLE = '_mg-libelle'
 DOCUMENT_INFODOC_DERNIERE_MODIFICATION = '_mg-derniere-modification'
 DOCUMENT_INFODOC_DATE_CREATION = '_mg-creation'
 
+# Section cryptee d'un document
+DOCUMENT_SECTION_CRYPTE = 'crypte'
+
 # Evenements
 EVENEMENT_MESSAGE_EVENEMENT = 'evenement'
 EVENEMENT_TRANSACTION_NOUVELLE = 'transaction_nouvelle'

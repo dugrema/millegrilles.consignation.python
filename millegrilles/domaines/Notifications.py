@@ -22,7 +22,8 @@ class NotificationsConstantes:
     TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Notifications.actionUsager'
 
     # Niveaux d'une notification
-    INFORMATION = 'information'      # Plus bas niveau
+    SUIVI = 'suivi'                  # Niveau bas avec limite de temps
+    INFORMATION = 'information'      # Plus bas niveau sans limite de temps
     AVERTISSEMENT = 'avertissement'  # Niveau par defaut
     ALERTE = 'alerte'                # Plus haut niveau
 

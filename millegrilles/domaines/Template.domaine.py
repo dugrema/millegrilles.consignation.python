@@ -186,9 +186,6 @@ class ProcessusTransactionAjouterDocumentDomaine(ProcessusDomaine):
     Processus de d'ajout de nouveau document Plume
     """
 
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
     def initiale(self):
         """ Sauvegarder une nouvelle version d'un fichier """
         transaction = self.charger_transaction()
@@ -207,9 +204,6 @@ class ProcessusTransactionModifierDocumentDomaine(ProcessusDomaine):
     Processus de modification de document Plume
     """
 
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
     def initiale(self):
         """ Mettre a jour le document """
         transaction = self.charger_transaction()
@@ -225,9 +219,6 @@ class ProcessusTransactionSupprimerDocumentDomaine(ProcessusDomaine):
     """
     Processus de modification de document Plume
     """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
 
     def initiale(self):
         """ Supprimer le document """

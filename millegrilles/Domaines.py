@@ -415,7 +415,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def configurer(self):
         super().configurer()
 
-        collection_domaine = self.document_dao.get_collection(self.get_nom_collection)
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         # Index noeud, _mg-libelle
         collection_domaine.create_index([
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
@@ -497,6 +497,11 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             callback=callback_init_requetes_noeuds,
         )
 
+    def map_transaction_vers_document(self, transaction: dict, document: dict):
+        for key, value in transaction.items():
+            if not key.startswith('_'):
+                document[key] = value
+
     def get_handler_transaction(self):
         raise NotImplementedError("Pas implemente")
 
@@ -533,7 +538,7 @@ class TraitementRequetesNoeuds(BaseCallback):
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
-        collection = self.contexte.document_dao.get_collection(ConstantesDomaine.COLLECTION_DOCUMENTS_NOM)
+        collection = self.contexte.document_dao.get_collection(self._gestionnaire.get_nom_collection())
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
