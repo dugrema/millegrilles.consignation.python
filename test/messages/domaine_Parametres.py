@@ -8,6 +8,7 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Parametres import ConstantesParametres
+from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles
 from millegrilles.util.BaseSendMessage import BaseEnvoyerMessageEcouter
 
 
@@ -26,7 +27,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Message recu, correlationId: %s" % properties.correlation_id)
         print(body)
 
-    def maj_email_smtp(self):
+    def maj_email_smtp_avecpassword(self):
         email_smtp_transaction = {
             ConstantesParametres.DOCUMENT_CHAMP_ACTIF: True,
             ConstantesParametres.DOCUMENT_CHAMP_HOST: 'mg-maple.local',
@@ -39,7 +40,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
 
         enveloppe_val = self.generateur.soumettre_transaction(
             email_smtp_transaction,
-            'millegrilles.domaines.Parametres.%s' % ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP,
+            ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP,
             reply_to=self.queue_name,
             correlation_id='efgh'
         )
@@ -47,12 +48,53 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transmettre_cles(self, uuid):
+        email_smtp_transaction = {
+            'domaine': ConstantesParametres.DOMAINE_NOM,
+            ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE: ConstantesParametres.LIBVAL_EMAIL_SMTP,
+            'uuid': uuid,
+        }
+
+        routing = ConstantesParametres.TRANSACTION_CLES_RECUES
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            email_smtp_transaction,
+            routing,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def maj_email_smtp_sanspassword(self):
+        email_smtp_transaction = {
+            ConstantesParametres.DOCUMENT_CHAMP_ACTIF: True,
+            ConstantesParametres.DOCUMENT_CHAMP_HOST: 'mg-maple.local',
+            ConstantesParametres.DOCUMENT_CHAMP_PORT: 443,
+            ConstantesParametres.DOCUMENT_CHAMP_COURRIEL_ORIGINE: 'mathieu.dugre@mdugre.info',
+            ConstantesParametres.DOCUMENT_CHAMP_COURRIEL_DESTINATIONS: 'mail@mdugre.info',
+            ConstantesParametres.DOCUMENT_CHAMP_USER: 'mathieu',
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            email_smtp_transaction,
+            ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-enveloppe = sample.maj_email_smtp()
+# enveloppe = sample.maj_email_smtp_sanspassword()
+uuid = sample.maj_email_smtp_avecpassword()
+enveloppe = sample.transmettre_cles(uuid)
+
 
 sample.recu.wait(10)
 

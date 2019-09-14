@@ -18,7 +18,11 @@ class ConstantesParametres:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
-    TRANSACTION_MODIFIER_EMAIL_SMTP = 'modifierEmailSmtp'
+    TRANSACTION_MODIFIER_EMAIL_SMTP = '%s.modifierEmailSmtp' % DOMAINE_NOM
+    TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
+
+    TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
+    TRANSACTION_CHAMP_UUID = 'uuid'
 
     DOCUMENT_CHAMP_COURRIEL_ORIGINE = 'origine'
     DOCUMENT_CHAMP_COURRIEL_DESTINATIONS = 'destinations'
@@ -140,13 +144,15 @@ class TraitementTransactionPersistee(BaseCallback):
         # Verifier quel processus demarrer.
         routing_key = method.routing_key
         routing_key_sansprefixe = routing_key.replace(
-            'destinataire.domaine.%s.' % ConstantesParametres.DOMAINE_NOM,
+            'destinataire.domaine.',
             ''
         )
 
         # Actions
         if routing_key_sansprefixe == ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP:
             processus = "millegrilles_domaines_Parametres:ProcessusTransactionModifierEmailSmtp"
+        elif routing_key_sansprefixe == ConstantesParametres.TRANSACTION_CLES_RECUES:
+            processus = "millegrilles_domaines_Parametres:ProcessusTransactionClesRecues"
         else:
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
 
@@ -171,9 +177,43 @@ class ProcessusTransactionModifierEmailSmtp(ProcessusParametres):
     def initiale(self):
         """ Mettre a jour le document """
         transaction = self.charger_transaction()
+        uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         document_email_smtp = self._controleur._gestionnaire_domaine.modifier_document_email_smtp(transaction)
-        self.set_etape_suivante()  # Termine
+
+        tokens_attente = None
+        if document_email_smtp.get(Constantes.DOCUMENT_SECTION_CRYPTE) is not None:
+            # On doit attendre la confirmation de reception des cles
+            tokens_attente = self._get_tokens_attente(uuid)
+
+        self.set_etape_suivante(token_attente=tokens_attente)  # Termine
 
         return {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: document_email_smtp[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
         }
+
+    def _get_tokens_attente(self, uuid):
+        tokens = [
+            '%s:%s:%s' % (ConstantesParametres.TRANSACTION_CLES_RECUES, ConstantesParametres.LIBVAL_EMAIL_SMTP, uuid)
+        ]
+
+        return tokens
+
+
+class ProcessusTransactionClesRecues(ProcessusParametres):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """
+        Emet un evenement pour indiquer que les cles sont recues par le MaitreDesCles.
+        """
+        transaction = self.charger_transaction()
+        mg_libelle = transaction.get(ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE)
+        uuid = transaction[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+
+        token_resumer = '%s:%s:%s' % (ConstantesParametres.TRANSACTION_CLES_RECUES, mg_libelle, uuid)
+        self.resumer_processus([token_resumer])
+
+        self.set_etape_suivante()  # Termine
+        return {ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE: mg_libelle}

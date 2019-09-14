@@ -3,6 +3,10 @@
     {
       "module": "millegrilles.domaines.Parametres",
       "classe": "GestionnaireParametres"
+    },
+    {
+      "module": "millegrilles.domaines.MaitreDesCles",
+      "classe": "GestionnaireMaitreDesCles"
     }
   ]
 }
