@@ -252,7 +252,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         pression = None
         tendance = None
 
-        date_now = datetime.datetime.utcnow()
+        date_now = datetime.datetime.now()
         for senseur_id in self._documents:
             senseur = self._documents[senseur_id].copy()
             if senseur.get('location') is not None:
