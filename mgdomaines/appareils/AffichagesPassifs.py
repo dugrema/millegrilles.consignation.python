@@ -264,7 +264,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             derniere_lecture = senseur['temps_lecture']
             date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
             date_expiration = date_chargee + self._age_donnee_expiree_timedelta
-            self.__logger.info("Date expiration lecture: %s. Lecture complete: %s" % ( date_expiration, str(senseur)))
+            self.__logger.warn("Date expiration lecture: %s. Lecture complete: %s" % ( date_expiration, str(senseur)))
             if date_expiration < date_now:
                 ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_expiree_format.format(**senseur)
             else:
