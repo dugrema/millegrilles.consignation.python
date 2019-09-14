@@ -208,7 +208,7 @@ class DemarreurNoeud(Daemon):
                 self._producteur_transaction.transmettre_lecture_senseur(dict_lecture)
             else:
                 self._logger.info("Message ajoute au backlog: %s" % str(dict_lecture))
-                if len(self._backlog_messages) < 1000:
+                if len(self._backlog_messages) < self._max_backlog:
                     self._backlog_messages.append(dict_lecture)
                 else:
                     self._logger.warning("Backlog > 1000, message perdu: %s" % str(dict_lecture))

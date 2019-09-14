@@ -694,6 +694,10 @@ class PikaDAO:
     def queue_reponse(self):
         return self._queue_reponse
 
+    @property
+    def in_error(self):
+        return self._in_error
+
 
 # Classe avec utilitaires pour JSON
 class JSONHelper:
