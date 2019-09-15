@@ -348,30 +348,6 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
 
-# class MGControlleurMessageHandler(BaseCallback):
-#
-#     def __init__(self, contexte, controleur):
-#         super().__init__(contexte)
-#         self._contexte = contexte
-#         self._controleur = controleur
-#
-#     '''
-#     Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
-#     '''
-#     def traiter_message(self, ch, method, properties, body):
-#
-#         id_doc_processus = None
-#         try:
-#             # Decoder l'evenement qui contient l'information sur l'etape a traiter
-#             evenement_dict = self._controleur.extraire_evenement(body)
-#             id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
-#             logging.debug("Recu evenement processus: %s" % str(evenement_dict))
-#             self._controleur.traiter_evenement(evenement_dict)
-#         except Exception as e:
-#             # Mettre le message d'erreur sur la Q erreur processus
-#             self._controleur.erreur_fatale(id_doc_processus, str(body), e)
-
-
 class MGProcessus:
 
     """
@@ -676,18 +652,23 @@ class MGProcessusTransaction(MGProcessus):
 
     ''' Ajoute l'evenement 'traitee' dans la transaction '''
     def marquer_transaction_traitee(self):
+        self.marquer_evenement_transaction(Constantes.EVENEMENT_TRANSACTION_TRAITEE)
+
+    def marquer_transaction_intraitable(self):
+        self.marquer_evenement_transaction(Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT)
+
+    def marquer_evenement_transaction(self, evenement):
         info_transaction = self.trouver_id_transaction()
         id_transaction = info_transaction['id_transaction']
         nom_collection = info_transaction['nom_collection']
-        ConsignateurTransactionCallback.ajouter_evenement_transaction(
-            self._controleur.contexte,
-            id_transaction,
-            nom_collection,
-            Constantes.EVENEMENT_TRANSACTION_TRAITEE
-        )
 
-    def marquer_transaction_intraitable(self):
-        pass
+        evenement = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
+            Constantes.MONGO_DOC_ID: id_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
+        }
+        self.contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
 
     @property
     def transaction(self):

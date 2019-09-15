@@ -223,9 +223,16 @@ class PikaDAO:
             self.channel.queue_bind(
                 exchange=nom_echange,
                 queue=nom_q_nouvelles_transactions,
-                routing_key='transaction.nouvelle',
+                routing_key=Constantes.TRANSACTION_ROUTING_NOUVELLE,
                 callback=None
             )
+
+        self.channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=nom_q_nouvelles_transactions,
+            routing_key=Constantes.TRANSACTION_ROUTING_EVENEMENT,
+            callback=None
+        )
 
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
         # self.channel.queue_declare(

@@ -83,10 +83,10 @@ class ConsignateurTransactionCallback(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         exchange = method.exchange
-        if routing_key == Constantes.EVENEMENT_TRANSACTION_NOUVELLE:
+        if routing_key == Constantes.TRANSACTION_ROUTING_NOUVELLE:
             self.traiter_nouvelle_transaction(message_dict, exchange, properties)
         elif exchange == self.contexte.configuration.exchange_middleware:
-            if routing_key == Constantes.EVENEMENT_MESSAGE_EVENEMENT:
+            if routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENT:
                 self.ajouter_evenement(message_dict)
             else:
                 raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
@@ -138,15 +138,17 @@ class ConsignateurTransactionCallback(BaseCallback):
         collection_erreurs = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
         collection_erreurs.insert_one(document_staging)
 
-    def ajouter_evenement(self, message):
-        pass
+    def ajouter_evenement(self, message_dict):
+        id_transaction =  message_dict[Constantes.MONGO_DOC_ID]
+        nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        evenement = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENT]
+        self.ajouter_evenement_transaction(id_transaction, nom_collection, evenement)
 
-    @staticmethod
-    def ajouter_evenement_transaction(contexte, id_transaction, nom_collection, evenement):
-        collection_transactions = contexte.document_dao.get_collection(nom_collection)
+    def ajouter_evenement_transaction(self, id_transaction, nom_collection, evenement):
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
         libelle_transaction_traitee = '%s.%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            contexte.configuration.nom_millegrille,
+            self.contexte.configuration.nom_millegrille,
             evenement
         )
         selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
