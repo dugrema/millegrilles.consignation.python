@@ -41,18 +41,9 @@ class ConsignateurTransaction(ModeleConfiguration):
         # configurer_rabbitmq_thread = Thread(name="MQ-Configuration", target=self.callback_configurer_rabbitmq)
         # configurer_rabbitmq_thread.start()
 
-        # Creer index: _mg-libelle
-        collection = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
-        collection.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        # Index domaine, _mg-libelle
-        collection.create_index([
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
-             1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        configurationCollections = ConfigurationCollectionsDomaines(self.contexte)
+        configurationCollections.setup_transaction()
+        configurationCollections.setup_index_domaines()
         self.__logger.info("Configuration et connection completee")
 
     def on_channel_open(self, channel):
@@ -210,3 +201,53 @@ class ConsignateurTransactionCallback(BaseCallback):
             nom_collection = '.'.join(domaine_split[0:3])
 
         return nom_collection
+
+
+class ConfigurationCollectionsDomaines:
+
+    def __init__(self, contexte):
+        self.__contexte = contexte
+
+        self.__liste_domaines = [
+            'millegrilles.domaines.GrosFichiers',
+            'millegrilles.domaines.MaitreDesCles',
+            'millegrilles.domaines.Parametres',
+            'millegrilles.domaines.Plume',
+            'millegrilles.domaines.Principale',
+            'millegrilles.domaines.SenseursPassifs',
+        ]
+
+    def setup_transaction(self):
+        # Creer index: _mg-libelle
+        collection = self.__contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
+        collection.create_index([
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+        # Index domaine, _mg-libelle
+        collection.create_index([
+            ('%s.%s' %
+             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+             1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+
+    def setup_index_domaines(self):
+        nom_millegrille = self.__contexte.configuration.nom_millegrille
+
+        for nom_collection_transaction in self.__liste_domaines:
+            collection = self.__contexte.document_dao.get_collection(nom_collection_transaction)
+
+            # en-tete.uuid-transaction
+            collection.create_index([
+                ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID), 1)
+            ])
+
+            # _evenements.estampille
+            collection.create_index([
+                ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE), -1)
+            ])
+
+            # _evenements.NOM_MILLEGRILLE.transaction_traitee
+            collection.create_index([
+                ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
+            ])
