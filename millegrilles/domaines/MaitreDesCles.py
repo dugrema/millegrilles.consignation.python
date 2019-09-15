@@ -580,6 +580,7 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
                 cles_document[key] = value
 
         contenu_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             'iv': transaction['iv'],
         }
