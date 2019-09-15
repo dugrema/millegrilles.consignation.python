@@ -104,6 +104,7 @@ class MessagesSample(BaseCallback):
 
         nouvelle_cle = {
             "domaine": "millegrilles.domaines.GrosFichiers",
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841c",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
                 "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa851a",
             },
@@ -137,9 +138,9 @@ class MessagesSample(BaseCallback):
 
         nouvelle_cle = {
             "domaine": "millegrilles.domaines.Parametres",
-            "mg-libelle": ConstantesParametres.LIBVAL_EMAIL_SMTP,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841c",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                "uuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841c",
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_EMAIL_SMTP,
             },
             "fingerprint": "abcd",
             "cle": cle_secrete_encryptee_mime64,
@@ -161,7 +162,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.requete_cert_maitredescles()
         # enveloppe = self.nouvelle_cle_grosfichiers()
         enveloppe = self.nouvelle_cle_document()
-        enveloppe = self.requete_decryptage_cle_fuuid()
+        # enveloppe = self.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---
 sample = MessagesSample()

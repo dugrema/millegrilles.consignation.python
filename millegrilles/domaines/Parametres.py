@@ -175,18 +175,32 @@ class ProcessusTransactionModifierEmailSmtp(ProcessusParametres):
     """
 
     def initiale(self):
-        """ Mettre a jour le document """
+        """
+        Certains messages contiennent de l'information cryptee. On doit s'assurer d'avoir recu la cle avant
+        de poursuivre la mise a jour.
+        :return:
+        """
         transaction = self.charger_transaction()
-        uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         document_email_smtp = self._controleur._gestionnaire_domaine.modifier_document_email_smtp(transaction)
 
         tokens_attente = None
         if document_email_smtp.get(Constantes.DOCUMENT_SECTION_CRYPTE) is not None:
             # On doit attendre la confirmation de reception des cles
+            uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             tokens_attente = self._get_tokens_attente(uuid)
 
-        self.set_etape_suivante(token_attente=tokens_attente)  # Termine
+        self.set_etape_suivante(
+            etape_suivante=ProcessusTransactionModifierEmailSmtp.sauvegarder_changements.__name__,
+            token_attente=tokens_attente
+        )
 
+    def sauvegarder_changements(self):
+        """ Mettre a jour le document """
+        transaction = self.charger_transaction()
+        document_email_smtp = self._controleur._gestionnaire_domaine.modifier_document_email_smtp(transaction)
+
+        self.set_etape_suivante()  # Termine
         return {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: document_email_smtp[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
         }
@@ -210,8 +224,8 @@ class ProcessusTransactionClesRecues(ProcessusParametres):
         """
         transaction = self.charger_transaction()
         identificateurs_documents = transaction['identificateurs_document']
-        mg_libelle = identificateurs_documents[ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE]
-        uuid = identificateurs_documents[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+        mg_libelle = identificateurs_documents[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
         token_resumer = '%s:%s:%s' % (ConstantesParametres.TRANSACTION_CLES_RECUES, mg_libelle, uuid)
         self.resumer_processus([token_resumer])

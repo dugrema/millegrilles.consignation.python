@@ -47,7 +47,6 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
-    TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_IDDOC = 'id-doc'
     TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
 
@@ -495,11 +494,17 @@ class ProcessusReceptionCles(MGProcessusTransaction):
 
         transaction_nouvellescles = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_CONSERVER_CLES.copy()
         transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
-        transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES] = self.parametres['cles_secretes_encryptees']
+        transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES] = \
+            self.parametres['cles_secretes_encryptees']
         transaction_nouvellescles['iv'] = self.parametres['iv']
 
         # Copier les champs d'identification de ce document
-        transaction_nouvellescles.update(self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS])
+        transaction_nouvellescles[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = \
+            self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        transaction_nouvellescles[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = \
+            self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = \
+            self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         # La transaction va mettre a jour (ou creer) les cles pour
         generateur_transaction.soumettre_transaction(
@@ -568,16 +573,12 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         transaction = self.transaction
 
         # Extraire les cles de document de la transaction (par processus d'elimination)
-        cles_document = {}
-        champ_exclure = [
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE,
-            'iv',
-        ]
-        for key, value in transaction.items():
-            if key not in champ_exclure and not key.startswith('_'):
-                cles_document[key] = value
+        cles_document = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
+                transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
+                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
+        }
 
         contenu_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
@@ -590,14 +591,17 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
         }
 
-        contenu_set = dict()
+        contenu_set = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+        }
         for fingerprint in transaction['cles'].keys():
             cle_dict = 'cles.%s' % fingerprint
             valeur = transaction['cles'].get(fingerprint)
             contenu_set[cle_dict] = valeur
 
         if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
-            contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = transaction[ConstantesMaitreDesCles.DOCUMENT_SECURITE]
+            contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = \
+                transaction[ConstantesMaitreDesCles.DOCUMENT_SECURITE]
         else:
             # Par defaut, on met le document en mode secure
             contenu_on_insert[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = Constantes.SECURITE_SECURE
@@ -618,21 +622,15 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
 
 
 class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
-
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
         transaction = self.transaction
-        iddoc = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS)
-
-        identificateurs_document = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE],
-        }
-        if iddoc is not None:
-            identificateurs_document.update(iddoc)
+        domaine = transaction['domaine']
+        uuid_transaction_doc = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]  # UUID du contenu, pas celui dans en-tete
+        iddoc = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
@@ -642,7 +640,9 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         self.set_etape_suivante(ProcessusNouvelleCleDocument.generer_transaction_cles_backup.__name__)
 
         return {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
+            'domaine': domaine,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_doc,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: iddoc,
             'cles_secretes_encryptees': cles_secretes_encryptees,
             'iv': transaction['iv'],
         }
@@ -665,10 +665,13 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         generateur_transaction = self.contexte.generateur_transactions
         identificateurs_document = self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         transaction_resumer = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
         }
 
-        domaine_routing = '%s.%s' % (identificateurs_document['domaine'], ConstantesMaitreDesCles.TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES)
+        domaine_routing = '%s.%s' % (
+            self.parametres['domaine'], ConstantesMaitreDesCles.TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES)
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
         self._logger.debug("Transmission nouvelle transaction cle recues pour %s" % domaine_routing)

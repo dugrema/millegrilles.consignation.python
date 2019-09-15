@@ -147,7 +147,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         resultat = collection_transactions.update_one(selection, operation)
 
         if resultat.modified_count != 1:
-            raise Exception("Erreur ajout evenement transaction: %s" % str(resultat))
+            raise Exception("Erreur ajout evenement transaction, updated: %d, ObjectId: %s, collection: %s, evenement: %s" % (resultat.modified_count, str(id_transaction), nom_collection, evenement))
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction, exchange):
 
