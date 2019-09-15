@@ -49,6 +49,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_IDDOC = 'id-doc'
+    TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
 
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
@@ -70,7 +71,6 @@ class ConstantesMaitreDesCles:
 
     DOCUMENT_TRANSACTION_CONSERVER_CLES = {
         TRANSACTION_CHAMP_SUJET_CLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,  # Mettre le sujet approprie
-        'fuuid': None,  # Identificateur unique de version de fichier
         'cles': dict(),  # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
     }
 
@@ -369,14 +369,15 @@ class TraitementTransactionPersistee(BaseCallback):
 
         if routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleGrosFichier"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
+        elif routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocument"
         elif routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
         else:
             # Type de transaction inconnue, on lance une exception
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
 
+        self._gestionnaire.demarrer_processus(processus, message_dict)
 
 class TraitementRequetesNoeuds(BaseCallback):
 
@@ -498,7 +499,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         transaction_nouvellescles['iv'] = self.parametres['iv']
 
         # Copier les champs d'identification de ce document
-        transaction_nouvellescles.update(self.parametres['identifcateurs_document'])
+        transaction_nouvellescles.update(self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS])
 
         # La transaction va mettre a jour (ou creer) les cles pour
         generateur_transaction.soumettre_transaction(
@@ -519,11 +520,13 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
         cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
+        identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
 
         return {
-            'fuuid': transaction['fuuid'],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
+            'fuuid': identificateurs_document['fuuid'],
             'cles_secretes_encryptees': cles_secretes_encryptees,
             'iv': transaction['iv'],
         }
@@ -621,14 +624,14 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
     def initiale(self):
         transaction = self.transaction
-        iddoc = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDDOC)
+        iddoc = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS)
 
         identificateurs_document = {
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE],
         }
         if iddoc is not None:
-            identificateurs_document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDDOC] = iddoc
+            identificateurs_document.update(iddoc)
 
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
@@ -638,7 +641,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         self.set_etape_suivante(ProcessusNouvelleCleDocument.generer_transaction_cles_backup.__name__)
 
         return {
-            'identifcateurs_document': identificateurs_document,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'cles_secretes_encryptees': cles_secretes_encryptees,
             'iv': transaction['iv'],
         }
@@ -659,10 +662,10 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         :return:
         """
         generateur_transaction = self.contexte.generateur_transactions
-        transaction_resumer = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_GROSFICHIERRESUME.copy()
-
-        identificateurs_document = self.parametres['identifcateurs_document']
-        transaction_resumer['identifcateurs_document'] = identificateurs_document
+        identificateurs_document = self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+        transaction_resumer = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
+        }
 
         domaine_routing = '%s.%s' % (identificateurs_document['domaine'], ConstantesMaitreDesCles.TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES)
 

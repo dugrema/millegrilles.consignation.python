@@ -7,6 +7,7 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles
+from millegrilles.domaines.Parametres import ConstantesParametres
 
 from threading import Event, Thread
 from cryptography import x509
@@ -103,7 +104,9 @@ class MessagesSample(BaseCallback):
 
         nouvelle_cle = {
             "domaine": "millegrilles.domaines.GrosFichiers",
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8419",
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8519",
+            },
             "fingerprint": "abcd",
             "cle": cle_secrete_encryptee_mime64,
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
@@ -119,10 +122,46 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def nouvelle_cle_document(self):
+
+        cle_secrete = 'Mon mot de passe secret'
+        cle_secrete_encryptee = self.certificat_courant.public_key().encrypt(
+            cle_secrete.encode('utf8'),
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        cle_secrete_encryptee_mime64 = b64encode(cle_secrete_encryptee).decode('utf8')
+
+        nouvelle_cle = {
+            "domaine": "millegrilles.domaines.Parametres",
+            "mg-libelle": ConstantesParametres.LIBVAL_EMAIL_SMTP,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                "uuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841b",
+            },
+            "fingerprint": "abcd",
+            "cle": cle_secrete_encryptee_mime64,
+            "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            nouvelle_cle,
+            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+
     def executer(self):
         # enveloppe = self.requete_cert_maitredescles()
-        # enveloppe = self.nouvelle_cle_grosfichiers()
-        enveloppe = self.requete_decryptage_cle_fuuid()
+        enveloppe = self.nouvelle_cle_grosfichiers()
+        # enveloppe = self.nouvelle_cle_document()
+        # enveloppe = self.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---
 sample = MessagesSample()

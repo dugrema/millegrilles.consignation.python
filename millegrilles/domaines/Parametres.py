@@ -209,8 +209,9 @@ class ProcessusTransactionClesRecues(ProcessusParametres):
         Emet un evenement pour indiquer que les cles sont recues par le MaitreDesCles.
         """
         transaction = self.charger_transaction()
-        mg_libelle = transaction.get(ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE)
-        uuid = transaction[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+        identificateurs_documents = transaction['identificateurs_document']
+        mg_libelle = identificateurs_documents[ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE]
+        uuid = identificateurs_documents[ConstantesParametres.TRANSACTION_CHAMP_UUID]
 
         token_resumer = '%s:%s:%s' % (ConstantesParametres.TRANSACTION_CLES_RECUES, mg_libelle, uuid)
         self.resumer_processus([token_resumer])
