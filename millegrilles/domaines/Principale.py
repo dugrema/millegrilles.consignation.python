@@ -129,7 +129,7 @@ class GestionnairePrincipale(GestionnaireDomaine):
         for queue_config in queues_config:
             channel.queue_declare(
                 queue=queue_config['nom'],
-                durable=True,
+                durable=False,
                 callback=queue_config['callback'],
             )
 

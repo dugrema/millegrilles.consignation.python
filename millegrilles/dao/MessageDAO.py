@@ -228,32 +228,32 @@ class PikaDAO:
             )
 
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
-        self.channel.queue_declare(
-            queue=nom_q_mgp_processus,
-            durable=True,
-            callback=None
-        )
-
-        self.channel.queue_bind(
-            exchange=nom_echange_middleware,
-            queue=nom_q_mgp_processus,
-            routing_key='mgpprocessus.#',
-            callback=None
-        )
-
+        # self.channel.queue_declare(
+        #     queue=nom_q_mgp_processus,
+        #     durable=True,
+        #     callback=None
+        # )
+        #
+        # self.channel.queue_bind(
+        #     exchange=nom_echange_middleware,
+        #     queue=nom_q_mgp_processus,
+        #     routing_key='mgpprocessus.#',
+        #     callback=None
+        # )
+        #
         # Creer la Q d'erreurs dans les transactions pour cette MilleGrille
-        self.channel.queue_declare(
-            queue=nom_q_erreurs_transactions,
-            durable=True,
-            callback=None
-        )
-
-        self.channel.queue_bind(
-            exchange=nom_echange_middleware,
-            queue=nom_q_erreurs_transactions,
-            routing_key='transaction.erreur',
-            callback=None
-        )
+        # self.channel.queue_declare(
+        #     queue=nom_q_erreurs_transactions,
+        #     durable=True,
+        #     callback=None
+        # )
+        #
+        # self.channel.queue_bind(
+        #     exchange=nom_echange_middleware,
+        #     queue=nom_q_erreurs_transactions,
+        #     routing_key='transaction.erreur',
+        #     callback=None
+        # )
 
         # Creer la Q d'erreurs dans les processus pour cette MilleGrille
         self.channel.queue_declare(
