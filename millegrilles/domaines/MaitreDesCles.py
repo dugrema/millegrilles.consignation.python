@@ -50,13 +50,16 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_IDDOC = 'id-doc'
     TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
 
+    TRANSACTION_VERSION_COURANTE = 5
+
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
 
     DOCUMENT_SECURITE = 'securite'
 
     DOCUMENT_DEFAUT = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: TRANSACTION_VERSION_COURANTE
     }
 
     # Document utilise pour conserver un ensemble de cles lie a un document
@@ -267,6 +270,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
             callback=callback_init_requetes_noeuds,
         )
 
+    def traiter_backlog(self):
+        # Verifier si la version des documents a changee - trigger un reload de /documents au complet
+
+        # Identifier transactions qui n'ont pas ete traitees
+
+        pass
+
     def decrypter_contenu(self, contenu):
         """
         Utilise la cle privee en memoire pour decrypter le contenu.
@@ -472,6 +482,10 @@ class TraitementRequetesNoeuds(BaseCallback):
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self._mapper = TransactionDocumentClesVersionMapper()
 
     def recrypterCle(self, cle_secrete_encryptee):
         cert_maitredescles = self._controleur.gestionnaire.get_certificat
@@ -687,3 +701,38 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
         self.set_etape_suivante()  # Termine
         return {'resumer': transaction_resumer}
+
+
+class TransactionDocumentClesVersionMapper:
+
+    def __init__(self):
+        self.__mappers = {
+            '4': self.map_version_4_to_current,
+            '5': self.map_version_5_to_current,
+        }
+
+    def map_version_to_current(self, transaction):
+        version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION]
+        mapper = self.__mappers[str(version)]
+        if mapper is None:
+            raise ValueError("Version inconnue: %s" % str(version))
+
+        mapper(transaction)
+
+    def map_version_4_to_current(self, transaction):
+        fuuid = transaction.get('fuuid')
+        if transaction.get('fuuid') is not None:
+            # Type GrosFichiers
+            document = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesGrosFichiers.DOMAINE_NOM,
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: fuuid,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
+                }
+            }
+            del transaction['fuuid']
+            transaction.update(document)
+
+    def map_version_5_to_current(self, transaction):
+        """ Version courante, rien a faire """
+        pass

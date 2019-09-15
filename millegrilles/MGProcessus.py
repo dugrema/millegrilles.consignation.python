@@ -648,9 +648,10 @@ class MGProcessus:
 # comme ayant ete completee.
 class MGProcessusTransaction(MGProcessus):
 
-    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement):
+    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement, transaction_mapper: None):
         super().__init__(controleur, evenement)
 
+        self._transaction_mapper = transaction_mapper
         self._transaction = None
 
     def trouver_id_transaction(self):
@@ -691,7 +692,10 @@ class MGProcessusTransaction(MGProcessus):
     @property
     def transaction(self):
         if self._transaction is None:
-            return self.charger_transaction()
+            self._transaction = self.charger_transaction()
+            if self._transaction_mapper is not None:
+                self._transaction_mapper.map_version_to_current(self._transaction)
+
         return self._transaction
 
 
