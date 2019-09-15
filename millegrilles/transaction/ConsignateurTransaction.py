@@ -146,14 +146,30 @@ class ConsignateurTransactionCallback(BaseCallback):
 
     def ajouter_evenement_transaction(self, id_transaction, nom_collection, evenement):
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
+
+        transaction_complete = False
+        if evenement in [
+            Constantes.EVENEMENT_TRANSACTION_TRAITEE,
+            Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT,
+            Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE
+        ]:
+            transaction_complete = True
+
         libelle_transaction_traitee = '%s.%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
             self.contexte.configuration.nom_millegrille,
             evenement
         )
+        libelle_transaction_complete = '%s.%s' %  (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            Constantes.EVENEMENT_TRANSACTION_COMPLETE
+        )
         selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
         operation = {
-            '$set': {libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc)}
+            '$set': {
+                libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc),
+                libelle_transaction_complete: transaction_complete,
+            }
         }
         resultat = collection_transactions.update_one(selection, operation)
 
@@ -185,6 +201,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         }
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
             Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,
+            Constantes.EVENEMENT_TRANSACTION_COMPLETE: False,
             self.contexte.configuration.nom_millegrille: evenements
         }
 
@@ -251,5 +268,6 @@ class ConfigurationCollectionsDomaines:
 
             # _evenements.NOM_MILLEGRILLE.transaction_traitee
             collection.create_index([
+                ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE), 1),
                 ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
             ])
