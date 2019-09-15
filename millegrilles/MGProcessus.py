@@ -648,7 +648,7 @@ class MGProcessus:
 # comme ayant ete completee.
 class MGProcessusTransaction(MGProcessus):
 
-    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement, transaction_mapper: None):
+    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement, transaction_mapper=None):
         super().__init__(controleur, evenement)
 
         self._transaction_mapper = transaction_mapper

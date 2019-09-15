@@ -1,5 +1,6 @@
 # Programme principal pour transferer les nouvelles transactions vers MongoDB
 
+from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
@@ -20,6 +21,8 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.message_handler = None
         self.__stop_event = Event()
         self.__channel = None
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -50,7 +53,7 @@ class ConsignateurTransaction(ModeleConfiguration):
              1),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
-        logging.info("Configuration et connection completee")
+        self.__logger.info("Configuration et connection completee")
 
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
@@ -75,7 +78,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.__stop_event.set()
         self.contexte.document_dao.deconnecter()
         self.contexte.message_dao.deconnecter()
-        logging.info("Deconnexion completee")
+        self.__logger.info("Deconnexion completee")
 
 
 class ConsignateurTransactionCallback(BaseCallback):
@@ -87,9 +90,21 @@ class ConsignateurTransactionCallback(BaseCallback):
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        exchange = method.exchange
+        if routing_key == Constantes.EVENEMENT_TRANSACTION_NOUVELLE:
+            self.traiter_nouvelle_transaction(message_dict, exchange, properties)
+        elif exchange == self.contexte.configuration.exchange_middleware:
+            if routing_key == Constantes.EVENEMENT_MESSAGE_EVENEMENT:
+                self.ajouter_evenement(message_dict)
+            else:
+                raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+        else:
+            raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
 
+    def traiter_nouvelle_transaction(self, message_dict, exchange, properties):
         try:
-            id_document = self.sauvegarder_nouvelle_transaction(message_dict, method.exchange)
+            id_document = self.sauvegarder_nouvelle_transaction(message_dict, exchange)
             entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
             uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
@@ -132,6 +147,9 @@ class ConsignateurTransactionCallback(BaseCallback):
         collection_erreurs = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
         collection_erreurs.insert_one(document_staging)
 
+    def ajouter_evenement(self, message):
+        pass
+
     @staticmethod
     def ajouter_evenement_transaction(contexte, id_transaction, nom_collection, evenement):
         collection_transactions = contexte.document_dao.get_collection(nom_collection)
@@ -142,7 +160,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         )
         selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
         operation = {
-            '$push': {libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc)}
+            '$set': {libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc)}
         }
         resultat = collection_transactions.update_one(selection, operation)
 
@@ -169,8 +187,8 @@ class ConsignateurTransactionCallback(BaseCallback):
         # Changer estampille du format epoch en un format date et sauver l'evenement
         date_estampille = datetime.datetime.fromtimestamp(estampille)
         evenements = {
-            Constantes.EVENEMENT_DOCUMENT_PERSISTE: [datetime.datetime.now(tz=datetime.timezone.utc)],
-            Constantes.EVENEMENT_SIGNATURE_VERIFIEE: [datetime.datetime.now(tz=datetime.timezone.utc)]
+            Constantes.EVENEMENT_DOCUMENT_PERSISTE: datetime.datetime.now(tz=datetime.timezone.utc),
+            Constantes.EVENEMENT_SIGNATURE_VERIFIEE: datetime.datetime.now(tz=datetime.timezone.utc)
         }
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
             Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,

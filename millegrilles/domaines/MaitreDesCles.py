@@ -272,6 +272,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
 
     def traiter_backlog(self):
         # Verifier si la version des documents a changee - trigger un reload de /documents au complet
+        version_changee = False
+        if version_changee:
+            # La version a change, on va faire un reload complet de /documents avec les transactions traitees, en ordre
+            pass
 
         # Identifier transactions qui n'ont pas ete traitees
 
@@ -484,8 +488,7 @@ class TraitementRequetesNoeuds(BaseCallback):
 class ProcessusReceptionCles(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self._mapper = TransactionDocumentClesVersionMapper()
+        super().__init__(controleur, evenement, TransactionDocumentClesVersionMapper())
 
     def recrypterCle(self, cle_secrete_encryptee):
         cert_maitredescles = self._controleur.gestionnaire.get_certificat
