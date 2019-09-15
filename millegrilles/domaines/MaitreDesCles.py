@@ -113,6 +113,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
 
         # Index collection domaine
         collection_domaine = self.get_collection()
+
+        # Index par identificateurs_documents, domaine
+        collection_domaine.create_index([
+            (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 1),
+            (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+        ], unique=True)
+
         # Index par fingerprint de certificat
         # collection_domaine.create_index([
         #     (ConstantesPki.LIBELLE_FINGERPRINT, 1)

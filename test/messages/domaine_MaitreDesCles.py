@@ -160,8 +160,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = self.requete_cert_maitredescles()
-        # enveloppe = self.nouvelle_cle_grosfichiers()
-        enveloppe = self.nouvelle_cle_document()
+        enveloppe = self.nouvelle_cle_grosfichiers()
+        # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---
