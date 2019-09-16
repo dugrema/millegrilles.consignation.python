@@ -17,7 +17,6 @@ class MessagesSample(BaseCallback):
         self.contexte.initialiser(init_document=False)
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
-        self.message_dao = self.contexte.message_dao
 
         self.channel = None
         self.event_recu = Event()

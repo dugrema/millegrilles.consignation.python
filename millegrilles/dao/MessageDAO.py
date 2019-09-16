@@ -721,7 +721,7 @@ class TraitementMessageCallback:
     """
 
     def __init__(self, message_dao, configuration):
-        self._json_helper = JSONHelper()
+        self.__json_helper = JSONHelper()
         self.__message_dao = message_dao
         self.__configuration = configuration
 
@@ -746,14 +746,14 @@ class TraitementMessageCallback:
             message["stacktrace"] = traceback.format_exception(etype=type(erreur), value=erreur,
                                                                tb=erreur.__traceback__)
 
-        message_utf8 = self._json_helper.dict_vers_json(message)
+        message_utf8 = self.__json_helper.dict_vers_json(message)
 
         ch.basic_publish(exchange=self.__configuration.exchange_middleware,
                          routing_key='processus.erreur',
                          body=message_utf8)
 
     def decoder_message_json(self, body):
-        return self._json_helper.bin_utf8_json_vers_dict(body)
+        return self.__json_helper.bin_utf8_json_vers_dict(body)
 
     @property
     def message_dao(self):
@@ -762,6 +762,10 @@ class TraitementMessageCallback:
     @property
     def configuration(self):
         return self.__configuration
+
+    @property
+    def json_helper(self):
+        return self.__json_helper
 
     def traiter_message(self, ch, method, properties, body):
         """
