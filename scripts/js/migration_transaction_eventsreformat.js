@@ -23,9 +23,14 @@ function maj(collection) {
         let row = curseur.next();
         let docId = row['_id'];
         let mgEvenements = map_row(row);
+        let transactionComplete = false;
+        if(mgEvenements['transaction_traitee']) {
+            transactionComplete = true;
+        }
         let ops = {
             '$set': {
-                '_evenements.sansnom': mgEvenements
+                '_evenements.sansnom': mgEvenements,
+                '_evenements.transaction_complete': transactionComplete
             }
         }
 

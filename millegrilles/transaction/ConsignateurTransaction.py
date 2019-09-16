@@ -309,7 +309,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$lt': date_expiration},
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_expiration},
             }
 
             self.__logger.debug("Entretien collection %s: %s" % (nom_collection_transaction, filtre))
