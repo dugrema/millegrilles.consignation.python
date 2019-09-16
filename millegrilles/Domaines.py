@@ -715,20 +715,69 @@ class RegenerateurDeDocuments:
         """
         pass
 
-    def get_generateur_transactions(self):
-        raise NotImplementedError("Pas implemente")
+    def creer_generateur_transactions(self):
+        return GroupeurTransactionsARegenerer()
 
 
 class GroupeurTransactionsARegenerer:
     """
     Classe qui permet de grouper les transactions d'un domaine pour regenerer les documents.
+    Groupe toutes les transactions dans un seul groupe, en ordre de transaction_traitee.
     """
 
-    def __init__(self, contexte):
-        self._contexte = contexte
+    def __init__(self, gestionnaire_domaine):
+        self._gestionnaire_domaine = gestionnaire_domaine
+        self._curseur = None
+        self._complet = False
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self._preparer_curseur_transactions()
+
+    def _preparer_curseur_transactions(self):
+        nom_collection_transaction = self._gestionnaire_domaine.get_collection_transactions()
+        self.__logger.debug('Preparer curseur transactions sur %s' % nom_collection_transaction)
+
+        collection_transactions = self._gestionnaire_domaine.contexte.document_dao.get_collection(nom_collection_transaction)
+
+        filtre, ordre_tri, index = self._preparer_requete()
+        self._curseur = collection_transactions.find(filtre, sort=ordre_tri)  #.hint(index)
+
+    def _preparer_requete(self):
+        nom_millegrille = self._gestionnaire_domaine.contexte.configuration.nom_millegrille
+
+        # Parcourir l'index:
+        #  - _evenements.transaction_complete
+        #  - _evenements.NOM_MILLEGRILLE.transaction_traitee
+        index = [
+            ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                        Constantes.EVENEMENT_TRANSACTION_COMPLETE), 1),
+            ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
+                           Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
+        ]
+        ordre_tri = index  # L'index est trie dans l'ordre necessaire
+
+        # Filtre par transaction completee:
+        #  - _evenements.transaction_complete = True
+        #  - _evenements.NOM_MILLEGRILLE.transaction_traitee existe
+        filtre = {
+            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                        Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
+            '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
+                           Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
+        }
+
+        return filtre, ordre_tri, index
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        pass
+        """
+        Retourne un curseur Mongo avec les transactions a executer en ordre.
+        :return:
+        """
+        if not self._complet:
+            self._complet = True  # Ce generateur supporte un seul groupe
+            return self._curseur
+
+        raise StopIteration()
