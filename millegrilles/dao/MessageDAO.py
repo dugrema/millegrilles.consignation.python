@@ -234,6 +234,19 @@ class PikaDAO:
             callback=None
         )
 
+        self.channel.queue_declare(
+            queue=Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
+            durable=False,
+            callback=None
+        )
+
+        self.channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
+            routing_key='ceduleur.#',
+            callback=None
+        )
+
         # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
         # self.channel.queue_declare(
         #     queue=nom_q_mgp_processus,

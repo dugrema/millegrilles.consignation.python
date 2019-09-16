@@ -36,14 +36,13 @@ class ConsignateurTransaction(ModeleConfiguration):
 
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
 
+        self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
+        self.handler_entretien.entretien_initial()
+
         # Executer la configuration pour RabbitMQ
         self.contexte.message_dao.register_channel_listener(self)
-        # configurer_rabbitmq_thread = Thread(name="MQ-Configuration", target=self.callback_configurer_rabbitmq)
-        # configurer_rabbitmq_thread.start()
+        self.contexte.message_dao.register_channel_listener(self.handler_entretien)
 
-        configurationCollections = ConfigurationCollectionsDomaines(self.contexte)
-        configurationCollections.setup_transaction()
-        configurationCollections.setup_index_domaines()
         self.__logger.info("Configuration et connection completee")
 
     def on_channel_open(self, channel):
@@ -222,10 +221,13 @@ class ConsignateurTransactionCallback(BaseCallback):
         return nom_collection
 
 
-class ConfigurationCollectionsDomaines:
+class EntretienCollectionsDomaines(BaseCallback):
 
     def __init__(self, contexte):
-        self.__contexte = contexte
+        super().__init__(contexte)
+
+        self.__thread_entretien = None
+        self.__channel = None
 
         self.__liste_domaines = [
             'millegrilles.domaines.GrosFichiers',
@@ -236,9 +238,22 @@ class ConfigurationCollectionsDomaines:
             'millegrilles.domaines.SenseursPassifs',
         ]
 
-    def setup_transaction(self):
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def entretien_initial(self):
+        self.__thread_entretien = Thread(target=self._run_entretien_initial, name="Entretien")
+        self.__thread_entretien.start()
+
+    def _run_entretien_initial(self):
+        self.__logger.info("Entretien initial transactions")
+        self._setup_transaction()
+        self._setup_index_domaines()
+        self.__thread_entretien = None  # Cleanup thread termine
+        self.__logger.info("FIN Entretien initial transactions")
+
+    def _setup_transaction(self):
         # Creer index: _mg-libelle
-        collection = self.__contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
+        collection = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
         collection.create_index([
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
@@ -250,11 +265,11 @@ class ConfigurationCollectionsDomaines:
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
 
-    def setup_index_domaines(self):
-        nom_millegrille = self.__contexte.configuration.nom_millegrille
+    def _setup_index_domaines(self):
+        nom_millegrille = self.contexte.configuration.nom_millegrille
 
         for nom_collection_transaction in self.__liste_domaines:
-            collection = self.__contexte.document_dao.get_collection(nom_collection_transaction)
+            collection = self.contexte.document_dao.get_collection(nom_collection_transaction)
 
             # en-tete.uuid-transaction
             collection.create_index([
@@ -271,3 +286,62 @@ class ConfigurationCollectionsDomaines:
                 ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE), 1),
                 ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
             ])
+
+    def _nettoyer_transactions_expirees(self):
+        """
+        Marque les transactions trop vieilles comme expirees.
+        :return:
+        """
+        self.__logger.info("Entretien transactions expirees")
+
+        nom_millegrille = self.contexte.configuration.nom_millegrille
+        delta_expiration = datetime.timedelta(hours=1)
+        date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
+        date_expiration = date_courante - delta_expiration
+        operations = {
+            '$set': {
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
+                               Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE): date_courante,
+            }
+        }
+
+        for nom_collection_transaction in self.__liste_domaines:
+            filtre = {
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$lt': date_expiration},
+            }
+
+            self.__logger.debug("Entretien collection %s: %s" % (nom_collection_transaction, filtre))
+
+            collection_transaction = self.contexte.document_dao.get_collection(nom_collection_transaction)
+            collection_transaction.update(filtre, operations)
+
+        self.__thread_entretien = None  # Cleanup thread termine
+        self.__logger.info("FIN Entretien transactions expirees")
+
+    def traiter_message(self, ch, method, properties, body):
+        # Pour l'instant on a juste les evenements ceduleur
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        exchange = method.exchange
+        indicateurs = message_dict['indicateurs']
+
+        if 'heure' in indicateurs and self.__thread_entretien is None:
+            self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
+            self.__thread_entretien.start()
+
+    def on_channel_open(self, channel):
+        channel.add_on_close_callback(self.__on_channel_close)
+        self.__channel = channel
+
+        self.contexte.message_dao.configurer_rabbitmq()
+        queue_name = Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS
+        channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
+        # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def is_channel_open(self):
+        return self.__channel is not None
