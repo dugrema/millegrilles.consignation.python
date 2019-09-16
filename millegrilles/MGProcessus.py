@@ -23,6 +23,21 @@ class MGPProcesseur:
         return self.contexte.document_dao.charger_processus_par_id(
             id_document_processus, nom_collection)
 
+    def identifier_processus(self, evenement):
+        """
+        Identifie le processus a executer, retourne une instance si le processus est trouve.
+        :param evenement:
+        :return: Instance MGPProcessus si le processus est trouve.
+        :raises ErreurProcessusInconnu: Si le processus est inconnu.
+        """
+        nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
+        nom_module, nom_classe = nom_processus.split(':')
+        nom_module = nom_module.replace("_", ".")
+        logging.debug('Importer %s, %s' % (nom_module, nom_classe))
+        module_processus = __import__('%s' % nom_module, fromlist=nom_classe)
+        classe_processus = getattr(module_processus, nom_classe)
+        return classe_processus
+
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
         raise NotImplementedError("Pas Implemente")
 
@@ -126,21 +141,6 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         classe_processus = self.identifier_processus(evenement)
         instance_processus = classe_processus(self, evenement)
         instance_processus.traitement_etape()
-
-    def identifier_processus(self, evenement):
-        """
-        Identifie le processus a executer, retourne une instance si le processus est trouve.
-        :param evenement:
-        :return: Instance MGPProcessus si le processus est trouve.
-        :raises ErreurProcessusInconnu: Si le processus est inconnu.
-        """
-        nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
-        nom_module, nom_classe = nom_processus.split(':')
-        nom_module = nom_module.replace("_", ".")
-        logging.debug('Importer %s, %s' % (nom_module, nom_classe))
-        module_processus = __import__('%s' % nom_module, fromlist=nom_classe)
-        classe_processus = getattr(module_processus, nom_classe)
-        return classe_processus
 
     def sauvegarder_etape_processus(self, collection_processus_nom, id_document_processus, dict_etape,
                                     etape_suivante=None):
@@ -371,6 +371,21 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         return None
 
+    def traiter_transaction(self, transaction):
+
+        # Identifier le processus pour cette transaction
+        en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        domaine_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        nom_processus = self._gestionnaire.identifier_processus(domaine_transaction)
+        classe_processus = self.identifier_processus({Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus})
+
+        evenement = {
+        }
+        instance_processus = classe_processus(self, evenement)
+
+        # Executer le processus
+        instance_processus.traitement_regenerer()
+
     @property
     def generateur_transactions(self):
         """
@@ -555,6 +570,32 @@ class MGProcessus:
 
         logging.debug("Etape finale executee pour %s" % self.__class__.__name__)
         return resultat
+
+    def traitement_regenerer(self):
+        """
+        Execute toutes les etapes d'un processus deja traiter avec succes. Sert a regenerer le document.
+        :return:
+        """
+        etape_execution = 'initiale'  # Commencer l'execution apres orientation (qui n'a aucun effet)
+        finale_executee = False
+        nombre_etapes_executees = 0
+        parametres = {}
+        while not self._processus_complete:
+            nombre_etapes_executees = nombre_etapes_executees + 1
+
+            methode_a_executer = getattr(self, etape_execution)
+
+            # Recuperer les parametres pour la prochaine etape
+            resultat = methode_a_executer()
+            parametres.update(resultat)  # On fait juste cumuler les parametres pour la prochaine etape
+
+            # Identifier prochaine etape, reset etat
+            etape_execution = self._etape_suivante
+            self._etape_suivante = None
+            self._etape_complete = False
+
+            if nombre_etapes_executees > 100:
+                raise Exception("Nombre d'etapes executees > 100, depasse limite")
 
     def erreur_fatale(self, detail=None):
         self._etape_complete = True

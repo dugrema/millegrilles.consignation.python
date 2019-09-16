@@ -280,6 +280,9 @@ class GestionnaireDomaine:
         self._watchers.append(watcher)
         watcher.start()
 
+    def identifier_processus(self, domaine_transaction):
+        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 

@@ -211,6 +211,41 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
+    def identifier_processus(self, domaine_transaction):
+        # Fichiers
+        if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionClesRecues"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DEPLACER_FICHIER or \
+                domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
+
+        # Repertoires
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerRepertoire"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_REPERTOIRE or \
+                domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DEPLACER_REPERTOIRE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerRepertoire"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_REPERTOIRE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerRepertoire"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_REPERTOIRE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterRepertoire"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_REPERTOIRE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerSecuriteRepertoire"
+
+        else:
+            # Type de transaction inconnue, on lance une exception
+            raise ValueError("Type de transaction inconnue: routing: %s" % domaine_transaction)
+
+        return processus
+
     def traiter_cedule(self, evenement):
         pass
 
@@ -835,38 +870,7 @@ class TraitementMessageMiddleware(TraitementMessageDomaine):
                 ''
             )
 
-            # Fichiers
-            if routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionClesRecues"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_FICHIER or \
-                    routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
-
-            # Repertoires
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerRepertoire"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_RENOMMER_REPERTOIRE or \
-                    routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_DEPLACER_REPERTOIRE:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerRepertoire"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_REPERTOIRE:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerRepertoire"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_COMMENTER_REPERTOIRE:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterRepertoire"
-            elif routing_key_sansprefixe == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_REPERTOIRE:
-                processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerSecuriteRepertoire"
-
-            else:
-                # Type de transaction inconnue, on lance une exception
-                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
             self._gestionnaire.demarrer_processus(processus, message_dict)
 
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
