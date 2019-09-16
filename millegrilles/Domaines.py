@@ -689,7 +689,8 @@ class RegenerateurDeDocuments:
         self.supprimer_documents()
 
         # Grouper et executer les transactions
-        for transactions in self.get_generateur_transactions():
+        generateur_groupes_transactions = self.creer_generateur_transactions()
+        for transactions in generateur_groupes_transactions:
             self.traiter_transactions(transactions)
 
     def supprimer_documents(self):
@@ -701,10 +702,10 @@ class RegenerateurDeDocuments:
         self.__logger.info("Supprimer les documents de %s" % nom_collection_documents)
 
         collection_documents = self._gestionnaire_domaine.get_collection()
-        collection_documents.deleteMany({})
+        collection_documents.delete_many({})
 
-    def traiter_transactions(self, transactions):
-        for transaction in transactions:
+    def traiter_transactions(self, curseur_transactions):
+        for transaction in curseur_transactions:
             self.traiter_transaction(transaction)
 
     def traiter_transaction(self, transaction):
@@ -713,10 +714,10 @@ class RegenerateurDeDocuments:
         :param transaction:
         :return:
         """
-        pass
+        self.__logger.debug("Traitement transaction %s" % transaction[Constantes.MONGO_DOC_ID])
 
     def creer_generateur_transactions(self):
-        return GroupeurTransactionsARegenerer()
+        return GroupeurTransactionsARegenerer(self._gestionnaire_domaine)
 
 
 class GroupeurTransactionsARegenerer:
@@ -725,7 +726,7 @@ class GroupeurTransactionsARegenerer:
     Groupe toutes les transactions dans un seul groupe, en ordre de transaction_traitee.
     """
 
-    def __init__(self, gestionnaire_domaine):
+    def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
         self._gestionnaire_domaine = gestionnaire_domaine
         self._curseur = None
         self._complet = False
@@ -735,13 +736,13 @@ class GroupeurTransactionsARegenerer:
         self._preparer_curseur_transactions()
 
     def _preparer_curseur_transactions(self):
-        nom_collection_transaction = self._gestionnaire_domaine.get_collection_transactions()
+        nom_collection_transaction = self._gestionnaire_domaine.get_collection_transaction_nom()
         self.__logger.debug('Preparer curseur transactions sur %s' % nom_collection_transaction)
 
         collection_transactions = self._gestionnaire_domaine.contexte.document_dao.get_collection(nom_collection_transaction)
 
-        filtre, ordre_tri, index = self._preparer_requete()
-        self._curseur = collection_transactions.find(filtre, sort=ordre_tri).hint(index)
+        filtre, index = self._preparer_requete()
+        self._curseur = collection_transactions.find(filtre, sort=index).hint(index)
 
     def _preparer_requete(self):
         nom_millegrille = self._gestionnaire_domaine.contexte.configuration.nom_millegrille
@@ -755,19 +756,19 @@ class GroupeurTransactionsARegenerer:
             ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
                            Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
         ]
-        ordre_tri = index  # L'index est trie dans l'ordre necessaire
+        # ordre_tri = index  # L'index est trie dans l'ordre necessaire
 
         # Filtre par transaction completee:
         #  - _evenements.transaction_complete = True
         #  - _evenements.NOM_MILLEGRILLE.transaction_traitee existe
         filtre = {
             '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                        Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
+                       Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
             '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
-                           Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
+                          Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
         }
 
-        return filtre, ordre_tri, index
+        return filtre, index
 
     def __iter__(self):
         return self
