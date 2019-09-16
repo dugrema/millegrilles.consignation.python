@@ -728,8 +728,6 @@ class MGPProcessusDemarreur:
         return self._contexte
 
 
-
-
 '''
 Exception lancee lorsqu'une etape ne peut plus continuer (erreur fatale).
 '''
@@ -757,38 +755,3 @@ class ErreurMAJProcessus(Exception):
 
     def __init__(self, message=None):
         super().__init__(message=message)
-
-
-# --- MAIN ---
-#
-#
-# controleur = MGPProcessusControleur()
-#
-#
-# def exit_gracefully(signum, frame):
-#     logging.info("Arret de MGProcessusControleur")
-#     controleur.deconnecter()
-#
-#
-# def main():
-#     logging.basicConfig(format='%(asctime)s %(message)s')
-#     logging.getLogger('mgdomaines').setLevel(logging.DEBUG)
-#     logging.getLogger('millegrilles').setLevel(logging.DEBUG)
-#     logging.info("Demarrage de MGProcessusControleur")
-#
-#     signal.signal(signal.SIGINT, exit_gracefully)
-#     signal.signal(signal.SIGTERM, exit_gracefully)
-#
-#     controleur.initialiser()
-#
-#     try:
-#         logging.info("MGProcessusControleur est pret")
-#         controleur.executer()
-#     finally:
-#         exit_gracefully(None, None)
-#
-#     logging.info("MGProcessusControleur est arrete")
-#
-#
-# if __name__=="__main__":
-#     main()
