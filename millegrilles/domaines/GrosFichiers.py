@@ -320,11 +320,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         if document_configuration is None:
             self._logger.info("On insere le document %s pour domaine GrosFichiers" % mg_libelle)
 
-            # Preparation document de configuration pour le domaine
-            configuration_initiale = doc_defaut.copy()
-
-            # collection_domaine.insert(configuration_initiale)
-            super().initialiser_document(configuration_initiale[Constantes.DOCUMENT_INFODOC_LIBELLE], configuration_initiale)
+            super().initialiser_document(doc_defaut[Constantes.DOCUMENT_INFODOC_LIBELLE], doc_defaut)
 
             # Initialiser document repertoire racine
             document_repertoire_racine = self.get_document_racine()
@@ -335,8 +331,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                     ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
                     ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
                 }
-                # document_repertoire_racine = self.creer_repertoire(
-                #     '/', parent_uuid=None, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE)
                 self.generateur_transactions.soumettre_transaction(transaction_racine, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
 
             document_repertoire_orphelins = self.get_document_orphelins()

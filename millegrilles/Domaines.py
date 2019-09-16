@@ -192,7 +192,7 @@ class GestionnaireDomaine:
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
         self._logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
-        self.configurer()
+        # self.configurer()  # Deja fait durant l'initialisation
         self.traiter_backlog()
         self._logger.info("Backlog traite, on enregistre la queue %s" % self.get_nom_queue())
         self._contexte.message_dao.register_channel_listener(self)
