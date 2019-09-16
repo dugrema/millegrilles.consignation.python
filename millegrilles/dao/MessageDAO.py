@@ -805,5 +805,82 @@ class TraitementMessageDomaine(TraitementMessageCallback):
         return self._gestionnaire
 
 
+class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
+            # Chaining vers le gestionnaire de processus du domaine
+            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+
+        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+            # Verifier quel processus demarrer.
+            routing_key_sansprefixe = routing_key.replace(
+                'destinataire.domaine.',
+                ''
+            )
+
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+
+        elif evenement == Constantes.EVENEMENT_CEDULEUR:
+            self._gestionnaire.traiter_cedule(message_dict)
+        else:
+            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+
+
+class TraitementMessageDomaineRequete(TraitementMessageDomaine):
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        self.gestionnaire.verificateur_transaction.verifier(message_dict)
+
+        # routing_key = method.routing_key
+        # exchange = method.exchange
+        # evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+
+    def executer_requete(self, requete):
+        collection = self.gestionnaire.get_collection()
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        return resultats
+
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        if correlation_id is None:
+            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+
+
 class ExceptionConnectionFermee(Exception):
     pass
