@@ -333,11 +333,16 @@ class GestionnaireDomaine:
 
             # Preparation document de configuration pour le domaine
             configuration_initiale = doc_defaut.copy()
-            maintenant = datetime.datetime.utcnow()
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+            # maintenant = datetime.datetime.utcnow()
+            # configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant.timestamp()
+            # configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant.timestamp()
+            nouveau_doc = {
+                'document': configuration_initiale
+            }
 
-            collection_domaine.insert(configuration_initiale)
+            # collection_domaine.insert(configuration_initiale)
+            domaine_transaction = '%s.%s' % (self.get_nom_domaine(), Constantes.TRANSACTION_ROUTING_DOCINITIAL)
+            self.generateur_transactions.soumettre_transaction(nouveau_doc, domaine_transaction)
         else:
             self._logger.info("Document de %s pour %s: %s" % (
                 mg_libelle, str(document_configuration), self.__class__.__name__

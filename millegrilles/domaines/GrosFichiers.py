@@ -22,6 +22,8 @@ class ConstantesGrosFichiers:
     TRANSACTION_TYPE_METADATA = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata'
     TRANSACTION_TYPE_TRANSFERTCOMPLETE = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.transfertComplete'
 
+    TRANSACTION_CHAMP_LIBELLE = 'libelle'
+
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_REPERTOIRE = 'repertoire'
     LIBVAL_REPERTOIRE_RACINE = 'repertoire.racine'
@@ -70,6 +72,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
     TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
 
+    TRANSACTION_CREER_REPERTOIRE_SPECIAL = '%s.creerRepertoireSpecial' % DOMAINE_NOM
     TRANSACTION_CREER_REPERTOIRE = '%s.creerRepertoire' % DOMAINE_NOM
     TRANSACTION_RENOMMER_REPERTOIRE = '%s.renommerRepertoire' % DOMAINE_NOM
     TRANSACTION_DEPLACER_REPERTOIRE = '%s.deplacerRepertoire' % DOMAINE_NOM
@@ -228,6 +231,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
 
         # Repertoires
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerRepertoireSpecial"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerRepertoire"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_REPERTOIRE or \
@@ -317,36 +322,43 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
             # Preparation document de configuration pour le domaine
             configuration_initiale = doc_defaut.copy()
-            maintenant = datetime.datetime.utcnow()
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
 
-            collection_domaine.insert(configuration_initiale)
+            # collection_domaine.insert(configuration_initiale)
+            super().initialiser_document(configuration_initiale[Constantes.DOCUMENT_INFODOC_LIBELLE], configuration_initiale)
+
+            # Initialiser document repertoire racine
+            document_repertoire_racine = self.get_document_racine()
+            if document_repertoire_racine is None:
+                # Creer le repertoire racine (parent=None)
+                transaction_racine = {
+                    ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE,
+                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
+                }
+                # document_repertoire_racine = self.creer_repertoire(
+                #     '/', parent_uuid=None, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE)
+                self.generateur_transactions.soumettre_transaction(transaction_racine, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
+
+            document_repertoire_orphelins = self.get_document_orphelins()
+            if document_repertoire_orphelins is None:
+                transaction_orphelins = {
+                    ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS,
+                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
+                }
+                self.generateur_transactions.soumettre_transaction(transaction_orphelins, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
+
+            document_repertoire_corbeille = self.get_document_corbeille()
+            if document_repertoire_corbeille is None:
+                transaction_corbeille = {
+                    ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE,
+                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
+                }
+                self.generateur_transactions.soumettre_transaction(transaction_corbeille, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
+
         else:
             self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
-
-        # Initialiser document repertoire racine
-        document_repertoire_racine = self.get_document_racine()
-        if document_repertoire_racine is None:
-            # Creer le repertoire racine (parent=None)
-            document_repertoire_racine = self.creer_repertoire(
-                '/', parent_uuid=None, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE)
-
-        document_repertoire_orphelins = self.get_document_orphelins()
-        if document_repertoire_orphelins is None:
-            self.creer_repertoire(
-                ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
-                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID],
-                libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS
-            )
-
-        document_repertoire_corbeille = self.get_document_corbeille()
-        if document_repertoire_corbeille is None:
-            self.creer_repertoire(
-                ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
-                parent_uuid=document_repertoire_racine[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID],
-                libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE
-            )
 
     def creer_index(self):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -395,6 +407,35 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
+
+    def creer_repertoire_special(self, nom_repertoire, mg_libelle, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        # Un repertoire special est unique, on peut juste en creer un de ce type
+        check_document = collection_domaine.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle})
+        if check_document is not None:
+            raise ValueError("Le document %s existe deja" % mg_libelle)
+
+        document_repertoire = ConstantesGrosFichiers.DOCUMENT_REPERTOIRE.copy()
+
+        document_repertoire[Constantes.DOCUMENT_INFODOC_LIBELLE] = mg_libelle
+
+        maintenant = datetime.datetime.utcnow()
+        document_repertoire[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
+        document_repertoire[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = nom_repertoire
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite
+
+        chemin_parent = '/'  # Racine
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin_parent
+
+        self._logger.info("Insertion repertoire special: %s" % str(document_repertoire))
+
+        collection_domaine.insert(document_repertoire)
+
+        return document_repertoire
 
     def creer_repertoire(self, nom_repertoire, parent_uuid, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -978,7 +1019,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
     def ajouter_version_fichier(self):
         # Ajouter version au fichier
         transaction = self.charger_transaction()
-        resultat = self._controleur._gestionnaire_domaine.maj_fichier(transaction)
+        resultat = self._controleur.gestionnaire.maj_fichier(transaction)
 
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.maj_repertoire.__name__)
@@ -1062,6 +1103,35 @@ class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
         return {'fuuid': fuuid}
+
+
+class ProcessusTransactionCreerRepertoireSpecial(ProcessusGrosFichiers):
+    """
+    Creer repertoire special (racine, corbeille, etc.)
+    """
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """
+        Emet un evenement pour indiquer que le transfert complete est arrive. Comme on ne donne pas de prochaine
+        etape, une fois les tokens consommes, le processus sera termine.
+        """
+        transaction = self.charger_transaction()
+        mg_libelle = transaction[ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE]
+        nom_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
+
+        securite = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
+        if securite is None:
+            securite = Constantes.SECURITE_PRIVE
+
+        document_repertoire = self._controleur._gestionnaire_domaine.creer_repertoire_special(
+            nom_repertoire, mg_libelle, securite=securite)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'document_repertoire': document_repertoire, '_mg-libelle': mg_libelle}
 
 
 class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):

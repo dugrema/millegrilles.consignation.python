@@ -17,10 +17,10 @@ class MGPProcesseur:
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def charger_transaction_par_id(self, id_transaction, nom_collection):
-        return self.contexte.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
+        return self.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
 
     def charger_document_processus(self, id_document_processus, nom_collection):
-        return self.contexte.document_dao.charger_processus_par_id(
+        return self.document_dao.charger_processus_par_id(
             id_document_processus, nom_collection)
 
     def identifier_processus(self, evenement):
@@ -72,6 +72,10 @@ class MGPProcesseur:
 
     @property
     def _gestionnaire(self):
+        return self.__gestionnaire_domaine
+
+    @property
+    def gestionnaire(self):
         return self.__gestionnaire_domaine
 
     @property
@@ -351,6 +355,11 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
 
+class StubMessageDao:
+
+    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=None, reply_to=None, correlation_id=None, channel=None):
+        pass
+
 class MGPProcesseurRegeneration(MGPProcesseur):
     """
     Processeur utiliser pour regenerer les documents d'un domaine a partir de transactions deja traitees avec succes.
@@ -359,6 +368,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
     def __init__(self, contexte, gestionnaire_domaine):
         super().__init__(contexte, gestionnaire_domaine)
+
+        self.__message_dao = StubMessageDao()  # Stub Message DAO
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -371,7 +382,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         :return: Message Dao dummy qui ne fait rien.
         """
-        return None
+        return self.__message_dao
 
     def regenerer_documents(self):
         """
@@ -402,6 +413,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         self.__logger.debug("Traitement transaction %s" % transaction[Constantes.MONGO_DOC_ID])
 
         # Identifier le processus pour cette transaction
+        id_transaction = transaction[Constantes.MONGO_DOC_ID]
         en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         domaine_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         nom_processus = self._gestionnaire.identifier_processus(domaine_transaction)
@@ -412,7 +424,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         instance_processus = classe_processus(self, evenement)
 
         # Executer le processus
-        instance_processus.traitement_regenerer()
+        instance_processus.traitement_regenerer(id_transaction, domaine_transaction)
 
     @property
     def generateur_transactions(self):
@@ -599,13 +611,20 @@ class MGProcessus:
         logging.debug("Etape finale executee pour %s" % self.__class__.__name__)
         return resultat
 
-    def traitement_regenerer(self):
+    def traitement_regenerer(self, id_transaction, domaine):
         """
         Execute toutes les etapes d'un processus deja traiter avec succes. Sert a regenerer le document.
         :return:
         """
         etape_execution = 'initiale'  # Commencer l'execution apres orientation (qui n'a aucun effet)
-        finale_executee = False
+
+        self._document_processus = {
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES: {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: id_transaction,
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+            }
+        }
+
         nombre_etapes_executees = 0
         parametres = {}
         while not self._processus_complete:
@@ -615,7 +634,8 @@ class MGProcessus:
 
             # Recuperer les parametres pour la prochaine etape
             resultat = methode_a_executer()
-            parametres.update(resultat)  # On fait juste cumuler les parametres pour la prochaine etape
+            if resultat is not None:
+                parametres.update(resultat)  # On fait juste cumuler les parametres pour la prochaine etape
 
             # Identifier prochaine etape, reset etat
             etape_execution = self._etape_suivante

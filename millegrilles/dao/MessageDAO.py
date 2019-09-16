@@ -794,7 +794,6 @@ class TraitementMessageDomaine(TraitementMessageCallback):
 
     def __init__(self, gestionnaire_domaine):
         super().__init__(message_dao=gestionnaire_domaine.message_dao, configuration=gestionnaire_domaine.configuration)
-        self.json_helper = JSONHelper()
         self._gestionnaire = gestionnaire_domaine
 
     @property
