@@ -662,3 +662,73 @@ class TraiteurRequeteDomaineNoeud:
 
     def __init__(self):
         pass
+
+
+class RegenerateurDeDocuments:
+    """
+    Efface et regenere les /documents d'un domaine.
+    """
+
+    def __init__(self, gestionnaire_domaine):
+        self._gestionnaire_domaine = gestionnaire_domaine
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    @property
+    def contexte(self):
+        return self._gestionnaire_domaine.contexte
+
+    def regenerer_documents(self):
+        """
+        Effectue une requete pour chaque type de transaction du domaine, en ordonnant les transactions
+        completes et traitees correctement en ordre de traitement dans la MilleGrille avec autorite.
+
+        Le groupe de base est: toutes les transactions traitees, en ordre.
+        :return:
+        """
+        self.supprimer_documents()
+
+        # Grouper et executer les transactions
+        for transactions in self.get_generateur_transactions():
+            self.traiter_transactions(transactions)
+
+    def supprimer_documents(self):
+        """
+        Supprime les documents de la collection
+        :return:
+        """
+        nom_collection_documents = self._gestionnaire_domaine.get_nom_collection()
+        self.__logger.info("Supprimer les documents de %s" % nom_collection_documents)
+
+        collection_documents = self._gestionnaire_domaine.get_collection()
+        collection_documents.deleteMany({})
+
+    def traiter_transactions(self, transactions):
+        for transaction in transactions:
+            self.traiter_transaction(transaction)
+
+    def traiter_transaction(self, transaction):
+        """
+        Traite la transaction pour simuler la reception et sauvegarde initiale
+        :param transaction:
+        :return:
+        """
+        pass
+
+    def get_generateur_transactions(self):
+        raise NotImplementedError("Pas implemente")
+
+
+class GroupeurTransactionsARegenerer:
+    """
+    Classe qui permet de grouper les transactions d'un domaine pour regenerer les documents.
+    """
+
+    def __init__(self, contexte):
+        self._contexte = contexte
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        pass
