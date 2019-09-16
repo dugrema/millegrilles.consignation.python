@@ -400,6 +400,9 @@ class GestionnaireDomaine:
     def verificateur_transaction(self):
         return self._contexte.verificateur_transaction
 
+    def creer_regenerateur_documents(self):
+        return RegenerateurDeDocuments(self)
+
     @property
     def _contexte(self):
         return self.__contexte
@@ -577,7 +580,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
             'resultats': resultats,
         }
 
-        self._generateur.transmettre_reponse(message_resultat, replying_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
 class WatcherCollectionMongoThread:
@@ -678,27 +681,11 @@ class RegenerateurDeDocuments:
 
     def __init__(self, gestionnaire_domaine):
         self._gestionnaire_domaine = gestionnaire_domaine
-
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     @property
     def contexte(self):
         return self._gestionnaire_domaine.contexte
-
-    def regenerer_documents(self):
-        """
-        Effectue une requete pour chaque type de transaction du domaine, en ordonnant les transactions
-        completes et traitees correctement en ordre de traitement dans la MilleGrille avec autorite.
-
-        Le groupe de base est: toutes les transactions traitees, en ordre.
-        :return:
-        """
-        self.supprimer_documents()
-
-        # Grouper et executer les transactions
-        generateur_groupes_transactions = self.creer_generateur_transactions()
-        for transactions in generateur_groupes_transactions:
-            self.traiter_transactions(transactions)
 
     def supprimer_documents(self):
         """
@@ -710,18 +697,6 @@ class RegenerateurDeDocuments:
 
         collection_documents = self._gestionnaire_domaine.get_collection()
         collection_documents.delete_many({})
-
-    def traiter_transactions(self, curseur_transactions):
-        for transaction in curseur_transactions:
-            self.traiter_transaction(transaction)
-
-    def traiter_transaction(self, transaction):
-        """
-        Traite la transaction pour simuler la reception et sauvegarde initiale
-        :param transaction:
-        :return:
-        """
-        self.__logger.debug("Traitement transaction %s" % transaction[Constantes.MONGO_DOC_ID])
 
     def creer_generateur_transactions(self):
         return GroupeurTransactionsARegenerer(self._gestionnaire_domaine)

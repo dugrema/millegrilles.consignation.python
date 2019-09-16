@@ -360,6 +360,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
     def __init__(self, contexte, gestionnaire_domaine):
         super().__init__(contexte, gestionnaire_domaine)
 
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
     @property
     def contexte(self):
         raise Exception("Le contexte n'est pas disponible dans MGPProcesseurRegeneration")
@@ -371,7 +373,33 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         return None
 
+    def regenerer_documents(self):
+        """
+        Effectue une requete pour chaque type de transaction du domaine, en ordonnant les transactions
+        completes et traitees correctement en ordre de traitement dans la MilleGrille avec autorite.
+
+        Le groupe de base est: toutes les transactions traitees, en ordre.
+        :return:
+        """
+        regenerateur = self._gestionnaire.creer_regenerateur_documents()
+        regenerateur.supprimer_documents()
+
+        # Grouper et executer les transactions
+        generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
+        for transactions in generateur_groupes_transactions:
+            self.traiter_transactions(transactions)
+
+    def traiter_transactions(self, curseur_transactions):
+        for transaction in curseur_transactions:
+            self.traiter_transaction(transaction)
+
     def traiter_transaction(self, transaction):
+        """
+        Traite la transaction pour simuler la reception et sauvegarde initiale
+        :param transaction:
+        :return:
+        """
+        self.__logger.debug("Traitement transaction %s" % transaction[Constantes.MONGO_DOC_ID])
 
         # Identifier le processus pour cette transaction
         en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
@@ -718,6 +746,8 @@ class MGProcessusTransaction(MGProcessus):
 
         self._transaction_mapper = transaction_mapper
         self._transaction = None
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def trouver_id_transaction(self):
         parametres = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES]

@@ -252,6 +252,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_middleware.callbackAvecAck(ch, method, properties, body)
 
+    def get_nom_collection(self):
+        return ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM
+
     def get_nom_queue(self):
         return ConstantesGrosFichiers.QUEUE_NOM
 

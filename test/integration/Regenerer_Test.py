@@ -1,8 +1,9 @@
 # Test du regenerateur de transactions
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles import Constantes
-from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
+from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers, GestionnaireGrosFichiers
+from millegrilles.Domaines import GroupeurTransactionsARegenerer, GestionnaireDomaine
+from millegrilles.MGProcessus import MGPProcesseurRegeneration
 from millegrilles.util.BaseMongo import BaseMongo
 import logging
 
@@ -16,7 +17,7 @@ class RegenererTest(BaseMongo):
 
     def __init__(self):
         super().__init__()
-        self.mock_gestionnaire = MockGestionnaire(self.contexte)
+        self.mock_gestionnaire = GestionnaireGrosFichiers(self.contexte)
         self.logger = logging.getLogger('RegenererTest')
         self.logger.setLevel(logging.DEBUG)
 
@@ -32,18 +33,18 @@ class RegenererTest(BaseMongo):
                 )
 
     def regenerer_grosfichiers(self):
-        regenerateur = RegenerateurDeDocuments(self.mock_gestionnaire)
-        regenerateur.regenerer_documents()
+        processus_controleur = MGPProcesseurRegeneration(self.contexte, self.mock_gestionnaire)
+        processus_controleur.regenerer_documents()
 
     def test(self):
         # self.liste_documents_gros_fichiers()
         self.regenerer_grosfichiers()
 
 
-class MockGestionnaire:
+class MockGestionnaire(GestionnaireDomaine):
 
     def __init__(self, contexte):
-        self.contexte = contexte
+        super().__init__(contexte=contexte)
 
     def get_collection_transaction_nom(self):
         return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
@@ -52,7 +53,7 @@ class MockGestionnaire:
         return ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM
 
     def get_collection(self):
-        return self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        return self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
 # ---- MAIN ----
 regenererTest = RegenererTest()
