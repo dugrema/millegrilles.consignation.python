@@ -1,5 +1,6 @@
 # Test du regenerateur de transactions
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles import Constantes
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.Domaines import GroupeurTransactionsARegenerer
 from millegrilles.util.BaseMongo import BaseMongo
@@ -19,11 +20,15 @@ class RegenererTest(BaseMongo):
         self.logger.setLevel(logging.DEBUG)
 
     def liste_documents_gros_fichiers(self):
+        nom_millegrille = self.contexte.configuration.nom_millegrille
         groupeur = GroupeurTransactionsARegenerer(self.mock_gestionnaire)
         for transactions in groupeur:
             self.logger.debug("Nombre de transactions: %s" % str(transactions.count()))
             for transaction in transactions:
-                self.logger.debug("Transaction: %s" % str(transaction))
+                self.logger.debug("Transaction _id:%s, transaction_traitee: %s" % (
+                    str(transaction['_id']),
+                    str(transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]))
+                )
 
     def test(self):
         self.liste_documents_gros_fichiers()

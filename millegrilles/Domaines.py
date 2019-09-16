@@ -731,6 +731,7 @@ class GroupeurTransactionsARegenerer:
         self._complet = False
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
         self._preparer_curseur_transactions()
 
     def _preparer_curseur_transactions(self):
@@ -740,7 +741,7 @@ class GroupeurTransactionsARegenerer:
         collection_transactions = self._gestionnaire_domaine.contexte.document_dao.get_collection(nom_collection_transaction)
 
         filtre, ordre_tri, index = self._preparer_requete()
-        self._curseur = collection_transactions.find(filtre, sort=ordre_tri)  #.hint(index)
+        self._curseur = collection_transactions.find(filtre, sort=ordre_tri).hint(index)
 
     def _preparer_requete(self):
         nom_millegrille = self._gestionnaire_domaine.contexte.configuration.nom_millegrille
