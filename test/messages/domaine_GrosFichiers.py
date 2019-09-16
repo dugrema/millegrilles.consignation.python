@@ -48,7 +48,7 @@ class MessagesSample(BaseCallback):
         transaction = {
             "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8418",
             "securite": "2.prive",
-            "repertoire_uuid": '16e474e6-c116-11e9-a058-00155d011f00',
+            "repertoire_uuid": '0dba8148-d891-11e9-8a7f-00155d011f00',
             "nom": "ExplorationGrosFichiers5.txt",
             "taille": 5478,
             "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
@@ -197,8 +197,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
-        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
-        # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+        enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe3 = sample.transaction_creer_repertoire()
         # enveloppe4 = sample.transaction_renommer_repertoire()
         # enveloppe5 = sample.transaction_deplacer_repertoire()
@@ -208,7 +208,7 @@ class MessagesSample(BaseCallback):
         # enveloppe9 = sample.transaction_supprimer_repertoire()
         # enveloppe10 = sample.transaction_commenter_repertoire()
         # enveloppe11 = sample.transaction_commenter_fichier()
-        enveloppe12 = sample.transaction_changersecurite_repertoire()
+        # enveloppe12 = sample.transaction_changersecurite_repertoire()
 
 
 # --- MAIN ---

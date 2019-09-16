@@ -6,53 +6,80 @@ from bson.objectid import ObjectId
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
-from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 
 
-class MGPProcessusControleur(ModeleConfiguration):
-    """
-    Controleur des processus MilleGrilles. Identifie et execute les processus.
+class MGPProcesseur:
 
-    MGPProcessus = MilleGrilles Python Processus. D'autres controleurs de processus peuvent etre disponibles.
-    """
+    def __init__(self, contexte, gestionnaire_domaine=None):
+        self.__contexte = contexte
+        self.__gestionnaire_domaine = gestionnaire_domaine
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def __init__(self):
-        super().__init__()
-        # self._json_helper = JSONHelper()
-        # self._message_handler = None
+    def charger_transaction_par_id(self, id_transaction, nom_collection):
+        return self.contexte.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
 
-        self._traitement_evenements = None
+    def charger_document_processus(self, id_document_processus, nom_collection):
+        return self.contexte.document_dao.charger_processus_par_id(
+            id_document_processus, nom_collection)
 
-    def initialiser(self, init_message=True, init_document=True, connecter=True):
-        super().initialiser(init_document, init_message, connecter)
+    def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
+        raise NotImplementedError("Pas Implemente")
 
-        # Executer la configuration pour RabbitMQ
-        self._contexte.message_dao.configurer_rabbitmq()
-        self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte)
+    def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
+        raise NotImplementedError("Pas Implemente")
 
-    def executer(self):
-        """ Methode qui demarre la lecture des evenements sur la Q de processus. """
-        self.contexte.message_dao.demarrer_lecture_etape_processus(self._traitement_evenements.callbackAvecAck)
+    def transmettre_message_continuer(self, id_document_processus, tokens=None):
+        raise NotImplementedError("Pas Implemente")
 
-    def document_dao(self):
-        return self.contexte.document_dao
-
+    @property
     def message_dao(self):
-        return self.contexte.message_dao
+        return self.__contexte.message_dao
+
+    @property
+    def document_dao(self):
+        return self.__contexte.document_dao
+
+    @property
+    def generateur_transactions(self):
+        return self.__contexte.generateur_transactions
+
+    @property
+    def configuration(self):
+        return self.__contexte.configuration
+
+    @property
+    def gestionnaire(self):
+        return self.__gestionnaire_domaine
+
+    @property
+    def demarreur_processus(self):
+        return self.__gestionnaire_domaine.demarreur_processus
+
+    @property
+    def collection_processus_nom(self):
+        return self.__gestionnaire_domaine.get_collection_processus_nom
+
+    @property
+    def get_collection_transaction_nom(self):
+        return self.__gestionnaire_domaine.get_collection_transaction_nom
 
     @property
     def contexte(self):
-        return self._contexte
+        self.__logger.warning("Acces contexte par MGProcessus est deprecated")
+        return self.__contexte
+
+    @property
+    def _contexte(self):
+        return self.__contexte
 
 
-class MGPProcesseurTraitementEvenements(BaseCallback):
+class MGPProcesseurTraitementEvenements(MGPProcesseur, BaseCallback):
 
     def __init__(self, contexte, gestionnaire_domaine=None):
-        super().__init__(contexte)
+        super().__init__(contexte=contexte, gestionnaire_domaine=gestionnaire_domaine)
 
         self._json_helper = JSONHelper()
-        self._contexte = contexte
         self._gestionnaire_domaine = gestionnaire_domaine
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -107,13 +134,6 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         module_processus = __import__('%s' % nom_module, fromlist=nom_classe)
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
-
-    def charger_transaction_par_id(self, id_transaction, nom_collection):
-        return self.contexte.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
-
-    def charger_document_processus(self, id_document_processus, nom_collection):
-        return self.contexte.document_dao.charger_processus_par_id(
-            id_document_processus, nom_collection)
 
     def sauvegarder_etape_processus(self, collection_processus_nom, id_document_processus, dict_etape,
                                     etape_suivante=None):
@@ -200,18 +220,18 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
-        self.contexte.message_dao.transmettre_evenement_mgpprocessus(
+        self._contexte.message_dao.transmettre_evenement_mgpprocessus(
             self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape, tokens)
 
     def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
-        self.contexte.message_dao.transmettre_evenement_mgp_resumer(
+        self._contexte.message_dao.transmettre_evenement_mgp_resumer(
             self._gestionnaire_domaine.get_nom_domaine(), id_document_declencheur, tokens, id_document_processus_attente)
 
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
         document_processus = self.charger_document_processus(
             id_document_processus, self._gestionnaire_domaine.get_collection_processus_nom())
 
-        self.contexte.message_dao.transmettre_evenement_mgpprocessus(
+        self._contexte.message_dao.transmettre_evenement_mgpprocessus(
             self._gestionnaire_domaine.get_nom_domaine(),
             id_document_processus,
             document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
@@ -220,7 +240,7 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         )
 
     def preparer_document_helper(self, collection, classe):
-        helper = classe(self.contexte.document_dao.get_collection(collection))
+        helper = classe(self._contexte.document_dao.get_collection(collection))
         return helper
 
     '''
@@ -312,30 +332,6 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         doc_id = collection_processus.insert_one(document)
         return doc_id.inserted_id
 
-    @property
-    def contexte(self):
-        return self._contexte
-
-    @property
-    def configuration(self):
-        return self.contexte.configuration
-
-    @property
-    def gestionnaire(self):
-        return self._gestionnaire_domaine
-
-    @property
-    def demarreur_processus(self):
-        return self._gestionnaire_domaine.demarreur_processus
-
-    @property
-    def collection_processus_nom(self):
-        return self._gestionnaire_domaine.get_collection_processus_nom
-
-    @property
-    def get_collection_transaction_nom(self):
-        return self._gestionnaire_domaine.get_collection_transaction_nom
-
     def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
         """
         Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs.
@@ -344,7 +340,7 @@ class MGPProcesseurTraitementEvenements(BaseCallback):
         :param erreur: Optionnel, objet ErreurExecutionEtape.
         :return:
         """
-        self.contexte.message_dao.transmettre_erreur_processus(
+        self._contexte.message_dao.transmettre_erreur_processus(
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
 
@@ -508,7 +504,7 @@ class MGProcessus:
         if properties is not None:
             # Verifier si on a reply_to et correlation_id pour transmettre une confirmation de traitement
             if properties.get('reply_to') is not None and properties.get('correlation_id') is not None:
-                generateur_transactions = self.contexte.generateur_transactions
+                generateur_transactions = self._controleur.generateur_transactions
                 generateur_transactions.transmettre_reponse(
                     params_copy, properties['reply_to'], properties['correlation_id'])
                 resultat['reponse_transmise'] = True
@@ -558,7 +554,7 @@ class MGProcessus:
 
         # Chercher la collection pour les documents avec les tokens resumes correspondants aux tokens d'attente
         nom_collection_processus = self.get_collection_processus_nom()
-        collection_processus = self.contexte.document_dao.get_collection(nom_collection_processus)
+        collection_processus = self._controleur.document_dao.get_collection(nom_collection_processus)
         filtre = {
             Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER: {"$in": tokens}
         }
@@ -668,7 +664,7 @@ class MGProcessusTransaction(MGProcessus):
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
         }
-        self.contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+        self._controleur.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
 
     @property
     def transaction(self):
@@ -711,21 +707,17 @@ class MGPProcessusDemarreur:
 
         try:
             # On va declencher un nouveau processus
-            collection_processus = self.contexte.document_dao.get_collection(self._collection_processus_nom)
+            collection_processus = self._contexte.document_dao.get_collection(self._collection_processus_nom)
             id_doc_processus = self._traitement_processus.sauvegarder_initialisation_processus(
                 collection_processus, moteur, processus_a_declencher, dictionnaire_evenement)
 
-            self.contexte.message_dao.transmettre_evenement_mgpprocessus(
+            self._contexte.message_dao.transmettre_evenement_mgpprocessus(
                 self._nom_domaine, id_doc_processus, nom_processus=processus_a_declencher
             )
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
-            self.contexte.message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
-
-    @property
-    def contexte(self):
-        return self._contexte
+            self._contexte.message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
 
 
 '''
@@ -754,4 +746,4 @@ class ErreurEtapePasEncoreExecutee(Exception):
 class ErreurMAJProcessus(Exception):
 
     def __init__(self, message=None):
-        super().__init__(message=message)
+        super().__init__(message)
