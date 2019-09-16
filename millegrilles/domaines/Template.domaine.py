@@ -64,7 +64,7 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
 
         self.__map_transaction_vers_document(transaction, document_domaine)
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.insert_one(document_domaine)
 
         return document_domaine
@@ -82,7 +82,7 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
             ConstantesDomaine.DOCUMENT_DOMAINE_CHAMP: transaction[ConstantesDomaine.DOCUMENT_DOMAINE_CHAMP]
         }
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.update_one(filtre, operations)
 
         return document_domaine
@@ -91,7 +91,7 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
         filtre = {
             ConstantesDomaine.DOCUMENT_DOMAINE_CHAMP: transaction[ConstantesDomaine.DOCUMENT_DOMAINE_CHAMP]
         }
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.delete_one(filtre)
 
     def __map_transaction_vers_document(self, transaction, document_domaine):
@@ -103,7 +103,7 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
             ConstantesDomaine.DOCUMENT_DOMAINE_CHAMP: uuid_document,
         }
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         document = collection_domaine.find_one(filtre)
 
         return document
@@ -135,7 +135,7 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
 
 class TraitementMessageCedule(BaseCallback):
 
-    def __init__(self, gestionnaire):
+    def __init__(self, gestionnaire: GestionnaireDomaineStandard):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 
@@ -147,7 +147,7 @@ class TraitementMessageCedule(BaseCallback):
 
 class TraitementTransactionPersistee(BaseCallback):
 
-    def __init__(self, gestionnaire):
+    def __init__(self, gestionnaire: GestionnaireDomaineStandard):
         super().__init__(gestionnaire.contexte)
         self._gestionnaire = gestionnaire
 

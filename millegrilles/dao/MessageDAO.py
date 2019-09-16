@@ -101,7 +101,7 @@ class PikaDAO:
         self._logger.info("Connecter RabbitMQ")
 
         if self.connectionmq is not None:
-            self._logger.warn("Appel de connecter avec connection deja ouverte")
+            self._logger.warning("Appel de connecter avec connection deja ouverte")
             connectionmq = self.connectionmq
             self.connectionmq = None
             self.channel = None
@@ -165,7 +165,7 @@ class PikaDAO:
             self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
-        self._logger.warn("Channel ferme: %s, %s" %(code, reason))
+        self._logger.warning("Channel ferme: %s, %s" % (code, reason))
         self.channel = None
         self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
@@ -290,17 +290,7 @@ class PikaDAO:
         )
 
     def start_consuming(self):
-        self._logger.warn("start_consuming(): Deprecated, gere dans MessageDAO")
-        # """ Demarre la lecture de messages RabbitMQ """
-        # try:
-        #     # self.channel.start_consuming()
-        #     self.__ioloop = self.connectionmq.ioloop
-        #     self.__ioloop.start()
-        #
-        # except OSError as oserr:
-        #     logging.error("erreur start_consuming, probablement du a la fermeture de la queue: %s" % oserr)
-
-    ''' Prepare la reception de message '''
+        self._logger.warning("start_consuming(): Deprecated, gere dans MessageDAO")
 
     def __run_ioloop(self):
         self._logger.info("Demarrage MQ-IOLoop")
@@ -312,34 +302,24 @@ class PikaDAO:
         self._logger.info("Fin execution MQ-IOLoop")
 
     def run_ioloop(self):
-        self._logger.warn("run_ioloop(): Deprecated, gere dans MessageDAO")
-
-        # while not self.__stop_event.is_set():
-        #     self._logger.info("Demarrage MQ-ioloop")
-        #     try:
-        #         self.connectionmq.ioloop.start()
-        #
-        #     except Exception as oserr:
-        #         self._logger.exception("erreur run_ioloop, probablement du a la fermeture de la queue: %s" % oserr, exc_info=oserr)
-        #
-        #     self.__stop_event.wait(10)  # Attendre 10 secondes avant de redemarrer la loop
-        #
-        # self._logger.info("MQ-ioloop: Execution terminee")
+        self._logger.warning("run_ioloop(): Deprecated, gere dans MessageDAO")
 
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
         self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
-        def callback_inscrire(queue, self=self, exchange=exchange, routing=routing, callback=callback):
+        def callback_inscrire(
+                queue, self=self, exchange_in=exchange, routing_in=frozenset(routing), callback_in=callback):
             nom_queue = queue.method.queue
             self._queue_reponse = nom_queue
             self._logger.debug("Resultat creation queue: %s" % nom_queue)
-            bindings = routing.copy()
-            bindings.append('reponse.%s' % nom_queue)
+            bindings = set()
+            bindings.update(routing_in)
+            bindings.add('reponse.%s' % nom_queue)
             for routing_key in bindings:
-                self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
-            tag_queue = self.channel.basic_consume(callback, queue=nom_queue, no_ack=False)
+                self.channel.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
+            tag_queue = self.channel.basic_consume(callback_in, queue=nom_queue, no_ack=False)
             self._logger.debug("Tag queue: %s" % tag_queue)
         
         self.channel.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
@@ -627,7 +607,7 @@ class PikaDAO:
 
     # Mettre la classe en etat d'erreur
     def enter_error_state(self):
-        self._logger.warn("MQ Enter error state")
+        self._logger.warning("MQ Enter error state")
         self._in_error = True
 
         try:
@@ -674,7 +654,7 @@ class PikaDAO:
                     self._logger.error("La connection MQ est invalide - channel n'est pas ouvert.")
                     self.enter_error_state()
                 elif self.connectionmq is None or self.connectionmq.is_closed:
-                    self._logger.warn("La connection MQ est fermee. On tente de se reconnecter.")
+                    self._logger.warning("La connection MQ est fermee. On tente de se reconnecter.")
                     self.connecter()
                 else:
                     self._logger.debug("Rien a faire pour reconnecter a MQ")
@@ -684,7 +664,7 @@ class PikaDAO:
                         for listener in self.__liste_listeners_channels:
                             if 'is_channel_open' in dir(listener):  # Methode est optionnelle
                                 if not listener.is_channel_open():
-                                    self._logger.warn("Re-ouverture d'un channel de listener")
+                                    self._logger.warning("Re-ouverture d'un channel de listener")
                                     self.__ouvrir_channel_listener(listener)
 
             except Exception as e:
@@ -735,20 +715,15 @@ class JSONHelper:
         return dict
 
 
-''' 
-Classe qui facilite l'implementation de callbacks avec ACK
-'''
+class TraitementMessageCallback:
+    """
+    Classe qui facilite l'implementation de callbacks avec ACK
+    """
 
-
-class BaseCallback:
-
-    def __init__(self, contexte):
-
-        if contexte is None:
-            raise TypeError('configuration ne doit pas etre None')
-
-        self.json_helper = JSONHelper()
-        self._contexte = contexte
+    def __init__(self, message_dao, configuration):
+        self._json_helper = JSONHelper()
+        self.__message_dao = message_dao
+        self.__configuration = configuration
 
     def callbackAvecAck(self, ch, method, properties, body):
         try:
@@ -771,23 +746,61 @@ class BaseCallback:
             message["stacktrace"] = traceback.format_exception(etype=type(erreur), value=erreur,
                                                                tb=erreur.__traceback__)
 
-        message_utf8 = self.json_helper.dict_vers_json(message)
+        message_utf8 = self._json_helper.dict_vers_json(message)
 
-        ch.basic_publish(exchange=self._contexte.configuration.exchange_middleware,
+        ch.basic_publish(exchange=self.__configuration.exchange_middleware,
                          routing_key='processus.erreur',
                          body=message_utf8)
 
-    ''' Methode qui peut etre remplacee dans la sous-classe '''
+    def decoder_message_json(self, body):
+        return self._json_helper.bin_utf8_json_vers_dict(body)
+
+    @property
+    def message_dao(self):
+        return self.__message_dao
+
+    @property
+    def configuration(self):
+        return self.__configuration
 
     def traiter_message(self, ch, method, properties, body):
+        """
+        Traitement du message. A implementer dans la sous-classe.
+        :param ch:
+        :param method:
+        :param properties:
+        :param body:
+        :return:
+        """
         raise NotImplemented('traiter_message() methode doit etre implementee')
 
-    def decoder_message_json(self, body):
-        return self.json_helper.bin_utf8_json_vers_dict(body)
+
+class BaseCallback(TraitementMessageCallback):
+
+    def __init__(self, contexte):
+        super().__init__(message_dao=contexte.message_dao, configuration=contexte.configuration)
+        self._contexte = contexte
 
     @property
     def contexte(self):
         return self._contexte
+
+
+class TraitementMessageDomaine(TraitementMessageCallback):
+
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(message_dao=gestionnaire_domaine.message_dao, configuration=gestionnaire_domaine.configuration)
+        self.json_helper = JSONHelper()
+        self._gestionnaire = gestionnaire_domaine
+
+    @property
+    def document_dao(self):
+        return self._gestionnaire.document_dao
+
+    @property
+    def gestionnaire(self):
+        return self._gestionnaire
+
 
 class ExceptionConnectionFermee(Exception):
     pass

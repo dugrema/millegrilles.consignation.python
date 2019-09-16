@@ -4,10 +4,8 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.domaines.Parametres import ConstantesParametres
-from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -400,7 +398,8 @@ class TraitementTransactionPersistee(BaseCallback):
 
         self._gestionnaire.demarrer_processus(processus, message_dict)
 
-class TraitementRequetesNoeuds(BaseCallback):
+
+class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire.contexte)
@@ -515,7 +514,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         return cles_secretes_encryptees
 
     def generer_transaction_majcles(self, sujet):
-        generateur_transaction = self.contexte.generateur_transactions
+        generateur_transaction = self.generateur_transactions
 
         transaction_nouvellescles = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_CONSERVER_CLES.copy()
         transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
@@ -575,7 +574,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
         :return:
         """
-        generateur_transaction = self.contexte.generateur_transactions
+        generateur_transaction = self.generateur_transactions
         transaction_resumer = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_GROSFICHIERRESUME.copy()
         transaction_resumer['fuuid'] = self.parametres['fuuid']
         domaine_routing = ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES
@@ -637,7 +636,7 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
             '$setOnInsert': contenu_on_insert,
         }
 
-        collection_documents = self.contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         self.__logger.debug("Operations: %s" % str({'filtre': cles_document, 'operation': operations_mongo}))
 
         resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
@@ -687,7 +686,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
         :return:
         """
-        generateur_transaction = self.contexte.generateur_transactions
+        generateur_transaction = self.generateur_transactions
         identificateurs_document = self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         transaction_resumer = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],

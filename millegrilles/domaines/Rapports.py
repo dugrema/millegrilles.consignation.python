@@ -1,10 +1,9 @@
 # Module des rapports et sommaires de documents
 
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles import Constantes
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.domaines.WebPoll import WebPollConstantes
 
 import dateutil.parser
 import logging
@@ -103,7 +102,7 @@ class GestionnaireRapports(GestionnaireDomaine):
         return RapportsConstantes.DOMAINE_NOM
 
 
-class TraitementMessageRapports(BaseCallback):
+class TraitementMessageRapports(TraitementMessageDomaine):
     """ Classe helper pour traiter les transactions de la queue de notifications """
 
     MAPPING_PROCESSUS = {
@@ -112,7 +111,6 @@ class TraitementMessageRapports(BaseCallback):
 
     def __init__(self, gestionnaire):
         super().__init__(gestionnaire)
-        self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -121,11 +119,11 @@ class TraitementMessageRapports(BaseCallback):
 
         if routing_key.split('.')[0:2] == ['processus', 'domaine']:
             # Chaining vers le gestionnaire de processus du domaine
-            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+            self.gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
 
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
             # Ceduleur, verifier si action requise
-            self._gestionnaire.traiter_cedule(message_dict)
+            self.gestionnaire.traiter_cedule(message_dict)
         elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer. On match la valeur dans la routing key.
             routing_key = method.routing_key
@@ -134,7 +132,7 @@ class TraitementMessageRapports(BaseCallback):
                 ''
             )
             # Trouver le processus a demarrer
-            self._gestionnaire.declencher_processus_persistance(routing_key_sansprefixe, message_dict)
+            self.gestionnaire.declencher_processus_persistance(routing_key_sansprefixe, message_dict)
 
         else:
             # Type d'evenement inconnu, on lance une exception
@@ -187,7 +185,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
             '$setOnInsert': filtre
         }
 
-        collection_rapports = self.contexte.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_rapports = self.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
         collection_rapports.update_one(filtre, operations, upsert=True)
 
         self._logger.debug("Previsions: %s" % str(operation_set))

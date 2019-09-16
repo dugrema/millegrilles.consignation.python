@@ -1,9 +1,8 @@
 # Domaine de l'interface principale de l'usager. Ne peut pas etre deleguee.
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 import logging
 import datetime
@@ -211,11 +210,10 @@ class GestionnairePrincipale(GestionnaireDomaine):
         return ConstantesPrincipale.DOMAINE_NOM
 
 
-class TraitementMessagePrincipale(BaseCallback):
+class TraitementMessagePrincipale(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -255,19 +253,17 @@ class TraitementMessagePrincipale(BaseCallback):
             raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
 
 
-class TraitementMessageRequete(BaseCallback):
+class TraitementMessageRequete(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._gestionnaire = gestionnaire
-        self._generateur = gestionnaire.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
         for requete in message_dict['requetes']:
@@ -279,7 +275,7 @@ class TraitementMessageRequete(BaseCallback):
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
-        collection = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        collection = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
@@ -309,7 +305,7 @@ class TraitementMessageRequete(BaseCallback):
             'resultats': resultats,
         }
 
-        self._generateur.transmettre_reponse(message_resultat, replying_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
 class ProcessusFermerAlerte(MGProcessusTransaction):
@@ -323,7 +319,7 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
         ts_alerte = transaction['alerte']['ts']
 
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
         operation = {'$pull': {'alertes': {'ts': ts_alerte}}}
@@ -356,7 +352,7 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
             transaction['ts'] = int(datetime.datetime.utcnow().timestamp() * 1000)
 
         # Ajouter au document d'alerte
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_ALERTES}
         operation = {'$push': {'alertes': transaction}}
@@ -387,7 +383,7 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
             return {'erreur': 'Cle manquante de la transaction', 'succes': False}
 
         # Verifier que la MilleGrille n'a pas deja d'empreinte
-        documents = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
         profil = documents.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER})
         empreinte_absente = profil.get('empreinte_absente')
         if empreinte_absente is True:
@@ -404,7 +400,7 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
             '$unset': {'empreinte_absente': True},
             '$push': {'cles': transaction['cle']}
         }
-        documents = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
         resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER}, operation)
 
         if resultat.modified_count != 1:
@@ -435,7 +431,7 @@ class ProcessusAjouterToken(MGProcessusTransaction):
             '$unset': {'empreinte_absente': True},
             '$push': {'cles': transaction['cle']}
         }
-        documents = self.contexte.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
         resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER}, operation)
 
         if resultat.modified_count != 1:

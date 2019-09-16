@@ -2,7 +2,7 @@
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.EmailDAO import SmtpDAO
 
@@ -155,12 +155,11 @@ class GestionnaireNotifications(GestionnaireDomaine):
         return NotificationsConstantes.DOMAINE_NOM
 
 
-class TraitementMessageNotification(BaseCallback):
+class TraitementMessageNotification(TraitementMessageDomaine):
     """ Classe helper pour traiter les transactions de la queue de notifications """
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)

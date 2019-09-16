@@ -2,8 +2,8 @@
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 
 import logging
@@ -308,11 +308,10 @@ class PKIDocumentHelper:
         collection.update(filtre, operation, multi=True)
 
 
-class TraitementMessagePki(BaseCallback):
+class TraitementMessagePki(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire, pki_document_helper):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
         # self._pki_document_helper = PKIDocumentHelper(gestionnaire.contexte)
         self._pki_document_helper = pki_document_helper
 
@@ -354,7 +353,7 @@ class TraitementMessagePki(BaseCallback):
 
 class ProcessusAjouterCertificat(MGProcessusTransaction):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -363,7 +362,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
         # Verifier si on a deja les certificats
-        collection = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         certificat_existant = collection.find_one({'fingerprint': fingerprint})
 
         if certificat_existant is None:
@@ -397,7 +396,7 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
     PARAM_VALIDE = 'fingerprints_valides'
     PARAM_INVALIDE = 'fingerprints_invalides'
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
         self._helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
 

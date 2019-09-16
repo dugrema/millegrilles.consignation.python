@@ -1,9 +1,8 @@
 # Domaine Plume - ecriture de documents
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 import logging
 import datetime
@@ -74,8 +73,6 @@ class GestionnairePlume(GestionnaireDomaine):
         self.__handler_transaction = None
         self.__handler_cedule = None
         self.__handler_requetes_noeuds = None
-
-        self.generateur = self.contexte.generateur_transactions
 
     def configurer(self):
         super().configurer()
@@ -191,7 +188,7 @@ class GestionnairePlume(GestionnaireDomaine):
 
         self.__map_transaction_vers_document(transaction, document_plume)
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.insert_one(document_plume)
 
         return document_plume
@@ -209,7 +206,7 @@ class GestionnairePlume(GestionnaireDomaine):
             ConstantesPlume.DOCUMENT_PLUME_UUID: transaction[ConstantesPlume.DOCUMENT_PLUME_UUID]
         }
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.update_one(filtre, operations)
 
         return document_plume
@@ -218,7 +215,7 @@ class GestionnairePlume(GestionnaireDomaine):
         filtre = {
             ConstantesPlume.DOCUMENT_PLUME_UUID: transaction[ConstantesPlume.DOCUMENT_PLUME_UUID]
         }
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.delete_one(filtre)
 
     def __map_transaction_vers_document(self, transaction, document_plume):
@@ -236,7 +233,7 @@ class GestionnairePlume(GestionnaireDomaine):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME
         }
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         document = collection_domaine.find_one(filtre)
 
         return document
@@ -268,7 +265,7 @@ class GestionnairePlume(GestionnaireDomaine):
             ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PUBLIC,
         }
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.update_one(filtre_catalogue, operations)
 
         # Marquer document comme publie
@@ -282,7 +279,7 @@ class GestionnairePlume(GestionnaireDomaine):
         resultat = collection_domaine.update_one(filtre_document, operations_publie)
 
     def get_catalogue(self):
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         filtre_catalogue = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_CATALOGUE,
             ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PUBLIC,
@@ -306,11 +303,10 @@ class GestionnairePlume(GestionnaireDomaine):
         return ConstantesPlume.DOMAINE_NOM
 
 
-class TraitementMessageCedule(BaseCallback):
+class TraitementMessageCedule(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -318,11 +314,10 @@ class TraitementMessageCedule(BaseCallback):
         routing_key = method.routing_key
 
 
-class TraitementTransactionPersistee(BaseCallback):
+class TraitementTransactionPersistee(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -352,20 +347,18 @@ class TraitementTransactionPersistee(BaseCallback):
         self._gestionnaire.demarrer_processus(processus, message_dict)
 
 
-class TraitementRequetesNoeuds(BaseCallback):
+class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._gestionnaire = gestionnaire
-        self._generateur = gestionnaire.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
@@ -378,7 +371,7 @@ class TraitementRequetesNoeuds(BaseCallback):
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
-        collection = self.contexte.document_dao.get_collection(ConstantesPlume.COLLECTION_DOCUMENTS_NOM)
+        collection = self.document_dao.get_collection(ConstantesPlume.COLLECTION_DOCUMENTS_NOM)
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
@@ -410,7 +403,8 @@ class TraitementRequetesNoeuds(BaseCallback):
             'resultats': resultats,
         }
 
-        self._generateur.transmettre_reponse(message_resultat, replying_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+
 
 # ******************* Processus *******************
 class ProcessusPlume(MGProcessusTransaction):

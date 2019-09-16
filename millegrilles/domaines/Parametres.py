@@ -1,7 +1,7 @@
 # Domaine de gestion et d'administration de MilleGrilles
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import  MGProcessusTransaction
 
 import logging
@@ -89,7 +89,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_EMAIL_SMTP
         }
 
-        collection_domaine = self.contexte.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.update_one(filtre, operations)
 
         return document_email_smtp
@@ -119,11 +119,10 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         return self.__handler_requetes_noeuds
 
 
-class TraitementMessageCedule(BaseCallback):
+class TraitementMessageCedule(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -131,11 +130,10 @@ class TraitementMessageCedule(BaseCallback):
         routing_key = method.routing_key
 
 
-class TraitementTransactionPersistee(BaseCallback):
+class TraitementTransactionPersistee(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)

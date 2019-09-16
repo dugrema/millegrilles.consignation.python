@@ -5,7 +5,7 @@ import datetime
 from bson.objectid import ObjectId
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import BaseCallback, JSONHelper
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 
 
@@ -32,6 +32,13 @@ class MGPProcesseur:
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
         raise NotImplementedError("Pas Implemente")
 
+    def sauvegarder_etape_processus(self, collection_processus_nom, id_document_processus, dict_etape,
+                                    etape_suivante=None):
+        raise NotImplementedError("Pas Implemente")
+
+    def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
+        raise NotImplementedError("Pas Implemente")
+
     @property
     def message_dao(self):
         return self.__contexte.message_dao
@@ -49,7 +56,7 @@ class MGPProcesseur:
         return self.__contexte.configuration
 
     @property
-    def gestionnaire(self):
+    def _gestionnaire(self):
         return self.__gestionnaire_domaine
 
     @property
@@ -74,7 +81,7 @@ class MGPProcesseur:
         return self.__contexte
 
 
-class MGPProcesseurTraitementEvenements(MGPProcesseur, BaseCallback):
+class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine):
 
     def __init__(self, contexte, gestionnaire_domaine=None):
         super().__init__(contexte=contexte, gestionnaire_domaine=gestionnaire_domaine)
@@ -344,6 +351,43 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, BaseCallback):
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
 
 
+class MGPProcesseurRegeneration(MGPProcesseur):
+    """
+    Processeur utiliser pour regenerer les documents d'un domaine a partir de transactions deja traitees avec succes.
+    Ce processus empeche la transmission de messages et fait executer un processus sans interruption (token attente, etc.)
+    """
+
+    def __init__(self, contexte, gestionnaire_domaine):
+        super().__init__(contexte, gestionnaire_domaine)
+
+    @property
+    def contexte(self):
+        raise Exception("Le contexte n'est pas disponible dans MGPProcesseurRegeneration")
+
+    @property
+    def message_dao(self):
+        """
+        :return: Message Dao dummy qui ne fait rien.
+        """
+        return None
+
+    @property
+    def generateur_transactions(self):
+        """
+        :return: Generateur dummy qui ne fait rien.
+        """
+        return None
+
+    def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
+        pass  # Aucun effet.
+
+    def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
+        pass  # Aucun effet
+
+    def transmettre_message_continuer(self, id_document_processus, tokens=None):
+        pass  # Aucun effet
+
+
 class MGProcessus:
 
     """
@@ -352,7 +396,7 @@ class MGProcessus:
     :param controleur: Controleur de processus qui appelle l'etape
     :param evenement: Message recu qui a declenche l'execution de cette etape
     """
-    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         if controleur is None or evenement is None:
             raise Exception('controleur et evenement ne doivent pas etre None')
 
@@ -588,8 +632,16 @@ class MGProcessus:
         return len(tokens_restants) == 0, dict_tokens
 
     @property
-    def contexte(self):
-        return self._controleur.contexte
+    def document_dao(self):
+        return self._controleur.document_dao
+
+    @property
+    def message_dao(self):
+        return self._controleur.message_dao
+
+    @property
+    def generateur_transactions(self):
+        return self._controleur.generateur_transactions
 
     @property
     def document_processus(self):
@@ -620,7 +672,7 @@ class MGProcessus:
 # comme ayant ete completee.
 class MGProcessusTransaction(MGProcessus):
 
-    def __init__(self, controleur: MGPProcesseurTraitementEvenements, evenement, transaction_mapper=None):
+    def __init__(self, controleur: MGPProcesseur, evenement, transaction_mapper=None):
         super().__init__(controleur, evenement)
 
         self._transaction_mapper = transaction_mapper

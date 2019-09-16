@@ -9,7 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import Request
 
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles import Constantes
 from millegrilles.MGProcessus import MGProcessusTransaction
 
@@ -254,11 +254,10 @@ class GestionnaireWebPoll(GestionnaireDomaine):
         return WebPollConstantes.DOMAINE_NOM
 
 
-class TraitementMessageWebPoll(BaseCallback):
+class TraitementMessageWebPoll(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -267,14 +266,14 @@ class TraitementMessageWebPoll(BaseCallback):
 
         if routing_key.split('.')[0:2] == ['processus', 'domaine']:
             # Chaining vers le gestionnaire de processus du domaine
-            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+            self.gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
 
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
-            self._gestionnaire.traiter_cedule(message_dict)
+            self.gestionnaire.traiter_cedule(message_dict)
         elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # On envoit la transaction au processus par defaut
             processus = "millegrilles_domaines_WebPoll:ProcessusTransactionDownloadPageWeb"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
+            self.gestionnaire.demarrer_processus(processus, message_dict)
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % evenement)

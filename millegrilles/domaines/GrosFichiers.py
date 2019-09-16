@@ -1,13 +1,13 @@
 # Domaine de l'interface GrosFichiers
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
-from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import logging
 import datetime
 import uuid
+
 
 class ConstantesGrosFichiers:
     """ Constantes pour le domaine de GrosFichiers """
@@ -397,8 +397,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
     def maj_repertoire_fichier(self, uuid_fichier, ancien_repertoire_uuid=None):
         """
         Met a jour l'information d'un fichier dans le document de repertoire.
-        :param repertoire_uuid: Repertoire a mettre a jour.
-        :param document_fichier: Information du fichier.
+        :param uuid_fichier:
+        :param ancien_repertoire_uuid:
         :return:
         """
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -565,7 +565,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             raise ValueError('La transaction doit etre de type metadata. Trouve: %s' % domaine)
 
         repertoire_uuid = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid})
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
@@ -656,7 +656,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier}
 
     def renommer_deplacer_fichier(self, uuid_doc, uuid_repertoire=None, nouveau_nom=None):
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc})
 
         ancien_repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
@@ -689,7 +689,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         return {'ancien_repertoire_uuid': ancien_repertoire_uuid}
 
     def supprimer_fichier(self, uuid_doc):
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         # Trouver l'information de repertoires pour prochain processus
         # On le fait a l'avance pour eviter de commencer les changements et trouver qu'on manque d'info
@@ -721,7 +721,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         }
 
     def supprimer_repertoire(self, uuid_doc):
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         # Trouver l'information de repertoires pour prochain processus
         # On le fait a l'avance pour eviter de commencer les changements et trouver qu'on manque d'info
@@ -757,7 +757,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         }
 
     def maj_commentaire_repertoire(self, uuid_repertoire, commentaire):
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = {
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
@@ -777,7 +777,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self._logger.debug('maj_commentaire_repertoire resultat: %s' % str(resultat))
 
     def maj_securite_repertoire(self, uuid_repertoire, securite):
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = {
             ConstantesGrosFichiers.DOCUMENT_SECURITE: securite
@@ -797,7 +797,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self._logger.debug('maj_securite_repertoire resultat: %s' % str(resultat))
 
     def maj_commentaire_fichier(self, uuid_fichier, commentaire):
-        collection_domaine = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = {
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
@@ -812,10 +812,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
 
 
-class TraitementMessageMiddleware(BaseCallback):
+class TraitementMessageMiddleware(TraitementMessageDomaine):
 
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+    def __init__(self, gestionnaire: GestionnaireDomaine):
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._gestionnaire = gestionnaire
 
@@ -875,20 +875,20 @@ class TraitementMessageMiddleware(BaseCallback):
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
 
 
-class TraitementMessageNoeud(BaseCallback):
+class TraitementMessageNoeud(TraitementMessageDomaine):
 
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+    def __init__(self, gestionnaire: GestionnaireDomaine):
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._gestionnaire = gestionnaire
-        self._generateur = gestionnaire.contexte.generateur_transactions
+        self._generateur = gestionnaire.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
@@ -901,7 +901,7 @@ class TraitementMessageNoeud(BaseCallback):
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
-        collection = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
@@ -952,7 +952,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
      -  ProcessusNouvelleCleGrosFichier (pour securite 3.protege et 4.secure)
     """
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1015,7 +1015,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
 
 class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1040,7 +1040,7 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers
 
 class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1059,7 +1059,7 @@ class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
 
 class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1093,7 +1093,7 @@ class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
 
 class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1103,7 +1103,7 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
         nom_repertoire = transaction.get(ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE)
         repertoire_parent_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID)
 
-        collection_documents = self.contexte.document_dao.get_collection(
+        collection_documents = self.document_dao.get_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_repertoire = collection_documents.find_one(
             {ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire})
@@ -1151,7 +1151,7 @@ class ProcessusTransactionRenommerDeplacerRepertoire(ProcessusGrosFichiers):
 
 class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1189,7 +1189,7 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiers):
 
 class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1216,7 +1216,7 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiers):
 
 class ProcessusTransactionSupprimerRepertoire(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1244,7 +1244,7 @@ class ProcessusTransactionSupprimerRepertoire(ProcessusGrosFichiers):
 
 class ProcessusTransactionCommenterRepertoire(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1258,7 +1258,7 @@ class ProcessusTransactionCommenterRepertoire(ProcessusGrosFichiers):
 
 class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
@@ -1272,7 +1272,7 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
 
 class ProcessusTransactionChangerSecuriteRepertoire(ProcessusGrosFichiers):
 
-    def __init__(self, controleur, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):

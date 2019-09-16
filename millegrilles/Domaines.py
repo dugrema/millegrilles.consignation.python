@@ -1,6 +1,6 @@
 # Module avec utilitaires generiques pour mgdomaines
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback
+from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
@@ -165,7 +165,7 @@ class GestionnaireDomaine:
     def __init__(self, contexte):
 
         # Nouvelle approche, utilisation classe contexte pour obtenir les ressources
-        self._contexte = contexte
+        self.__contexte = contexte
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
         self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
@@ -186,7 +186,7 @@ class GestionnaireDomaine:
         self.traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         self.demarreur_processus = MGPProcessusDemarreur(
-            self.contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
+            self._contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
             self.get_collection_processus_nom(), self.traitement_evenements)
 
     def demarrer(self):
@@ -195,7 +195,7 @@ class GestionnaireDomaine:
         self.configurer()
         self.traiter_backlog()
         self._logger.info("Backlog traite, on enregistre la queue %s" % self.get_nom_queue())
-        self.contexte.message_dao.register_channel_listener(self)
+        self._contexte.message_dao.register_channel_listener(self)
 
     def traiter_backlog(self):
         """ Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. """
@@ -276,7 +276,7 @@ class GestionnaireDomaine:
                e.g. noeuds.source.millegrilles_domaines_SenseursPassifs.affichage.__nom_noeud__.__no_senseur__
         :return:
         """
-        watcher = WatcherCollectionMongoThread(self.contexte, self._stop_event, nom_collection_mongo, routing_key)
+        watcher = WatcherCollectionMongoThread(self._contexte, self._stop_event, nom_collection_mongo, routing_key)
         self._watchers.append(watcher)
         watcher.start()
 
@@ -390,8 +390,16 @@ class GestionnaireDomaine:
         return self._contexte.document_dao
 
     @property
-    def contexte(self):
-        return self._contexte
+    def generateur_transactions(self):
+        return self._contexte.generateur_transactions
+
+    @property
+    def verificateur_transaction(self):
+        return self._contexte.verificateur_transaction
+
+    @property
+    def _contexte(self):
+        return self.__contexte
 
 
 class GestionnaireDomaineStandard(GestionnaireDomaine):
@@ -409,8 +417,6 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         self.__handler_transaction = None
         self.__handler_cedule = None
         self.__handler_requetes_noeuds = None
-
-        self.generateur = self.contexte.generateur_transactions
 
     def configurer(self):
         super().configurer()
@@ -512,20 +518,18 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         raise NotImplementedError("Pas implemente")
 
 
-class TraitementRequetesNoeuds(BaseCallback):
+class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._gestionnaire = gestionnaire
-        self._generateur = gestionnaire.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
@@ -538,7 +542,7 @@ class TraitementRequetesNoeuds(BaseCallback):
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
-        collection = self.contexte.document_dao.get_collection(self._gestionnaire.get_nom_collection())
+        collection = self.document_dao.get_collection(self._gestionnaire.get_nom_collection())
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
@@ -727,7 +731,7 @@ class GroupeurTransactionsARegenerer:
     """
 
     def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
-        self._gestionnaire_domaine = gestionnaire_domaine
+        self.__gestionnaire_domaine = gestionnaire_domaine
         self._curseur = None
         self._complet = False
 
@@ -736,16 +740,16 @@ class GroupeurTransactionsARegenerer:
         self._preparer_curseur_transactions()
 
     def _preparer_curseur_transactions(self):
-        nom_collection_transaction = self._gestionnaire_domaine.get_collection_transaction_nom()
+        nom_collection_transaction = self.__gestionnaire_domaine.get_collection_transaction_nom()
         self.__logger.debug('Preparer curseur transactions sur %s' % nom_collection_transaction)
 
-        collection_transactions = self._gestionnaire_domaine.contexte.document_dao.get_collection(nom_collection_transaction)
+        collection_transactions = self.__gestionnaire_domaine.document_dao.get_collection(nom_collection_transaction)
 
         filtre, index = self._preparer_requete()
         self._curseur = collection_transactions.find(filtre, sort=index).hint(index)
 
     def _preparer_requete(self):
-        nom_millegrille = self._gestionnaire_domaine.contexte.configuration.nom_millegrille
+        nom_millegrille = self.__gestionnaire_domaine.configuration.nom_millegrille
 
         # Parcourir l'index:
         #  - _evenements.transaction_complete

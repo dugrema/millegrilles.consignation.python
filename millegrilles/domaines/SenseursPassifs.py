@@ -4,10 +4,9 @@ import socket
 import logging
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine, MGPProcessusDemarreur
-from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
-from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
+from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations, GenerateurTransaction
 from bson.objectid import ObjectId
@@ -168,7 +167,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
         # de persistance.
         # Toutes les autres transactions non-traitees de SenseursPassifs.Lecture peuvent etre marquees comme traitees.
-        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.contexte, self.demarreur_processus)
+        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.document_dao, self.demarreur_processus)
         liste_transactions = traitement_backlog_lectures.run_requete_plusrecentetransactionlecture_parsenseur()
         traitement_backlog_lectures.run_requete_genererdeclencheur_parsenseur(liste_transactions)
 
@@ -264,11 +263,10 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.message_dao.transmettre_message(dict_message, routing_key)
 
 
-class TraitementMessageLecture(BaseCallback):
+class TraitementMessageLecture(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
@@ -310,19 +308,17 @@ class TraitementMessageLecture(BaseCallback):
             raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
 
 
-class TraitementMessageRequete(BaseCallback):
+class TraitementMessageRequete(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._gestionnaire = gestionnaire
-        self._generateur = gestionnaire.contexte.generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()
         for requete in message_dict['requetes']:
@@ -334,7 +330,7 @@ class TraitementMessageRequete(BaseCallback):
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
-        collection = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
@@ -361,14 +357,14 @@ class TraitementMessageRequete(BaseCallback):
             'resultats': resultats,
             'uuid-requete': requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
         }
-        self._generateur.transmettre_reponse(message_resultat, reply_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, reply_to, correlation_id)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
 class ProducteurDocumentSenseurPassif:
 
-    def __init__(self, contexte):
-        self._contexte = contexte
+    def __init__(self, document_dao):
+        self._document_dao = document_dao
         self._logger = logging.getLogger("%s.ProducteurDocumentSenseurPassif" % __name__)
 
     ''' 
@@ -417,7 +413,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Donnees senseur passif: selection=%s, operation=%s" % (str(selection), str(operation)))
 
-        collection = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document_senseur = collection.find_one_and_update(
             filter=selection, update=operation, upsert=False, fields="_id:1")
 
@@ -452,7 +448,7 @@ class ProducteurDocumentSenseurPassif:
         senseur_objectid_key = {"_id": ObjectId(id_document_senseur)}
 
         # Charger l'information du senseur
-        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document_senseur = collection_senseurs.find_one(senseur_objectid_key)
 
         self._logger.debug("Document charge: %s" % str(document_senseur))
@@ -508,7 +504,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         resultat = []
@@ -564,7 +560,7 @@ class ProducteurDocumentSenseurPassif:
         senseur_objectid_key = {"_id": ObjectId(id_document_senseur)}
 
         # Charger l'information du senseur
-        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document_senseur = collection_senseurs.find_one(senseur_objectid_key)
 
         self._logger.debug("Document charge: %s" % str(document_senseur))
@@ -631,7 +627,7 @@ class ProducteurDocumentSenseurPassif:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         resultat = []
@@ -677,7 +673,7 @@ class ProducteurDocumentSenseurPassif:
     Retourne les _id de tous les documents de senseurs. 
     '''
     def trouver_id_documents_senseurs(self):
-        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
 
         selection = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
@@ -691,16 +687,12 @@ class ProducteurDocumentSenseurPassif:
 
         return document_ids
 
-    @property
-    def contexte(self):
-        return self._contexte
-
 
 # Classe qui gere le document pour un noeud. Supporte une mise a jour incrementale des donnees.
 class ProducteurDocumentNoeud:
 
-    def __init__(self, contexte):
-        self._contexte = contexte
+    def __init__(self, document_dao):
+        self._document_dao = document_dao
 
     '''
     Mise a jour du document de noeud par une transaction senseur passif
@@ -709,7 +701,7 @@ class ProducteurDocumentNoeud:
     '''
     def maj_document_noeud_senseurpassif(self, id_document_senseur):
 
-        collection_senseurs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
 
         noeud = document_senseur['noeud']
@@ -737,10 +729,6 @@ class ProducteurDocumentNoeud:
         }
 
         collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
-
-    @property
-    def contexte(self):
-        return self._contexte
 
 
 class VerificateurNotificationsSenseursPassifs:
@@ -875,7 +863,7 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
         self._logger.debug("Document processus: %s" % self._document_processus)
         self._logger.debug("Document transaction: %s" % doc_transaction)
 
-        producteur_document = ProducteurDocumentSenseurPassif(self.contexte)
+        producteur_document = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
         document_senseur = producteur_document.maj_document_senseur(doc_transaction)
 
         parametres = None
@@ -901,7 +889,7 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
 
         id_document_senseur = self._document_processus['parametres']['id_document_senseur']
 
-        producteur_document = ProducteurDocumentNoeud(self.contexte)
+        producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
         # Verifier si on doit executer les notifications
@@ -939,12 +927,12 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
 
 class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
 
-    def __init__(self, controleur: GestionnaireSenseursPassifs, evenement):
+    def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
         # Faire liste des documents a mettre a jour
-        producteur = ProducteurDocumentSenseurPassif(self.contexte)
+        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
         liste_documents = producteur.trouver_id_documents_senseurs()
 
         parametres = {}
@@ -957,7 +945,7 @@ class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
         return parametres
 
     def calculer_moyennes(self):
-        producteur = ProducteurDocumentSenseurPassif(self.contexte)
+        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
 
         liste_documents = self._document_processus['parametres']['documents_senseurs']
         for doc_senseur in liste_documents:
@@ -979,7 +967,7 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
 
     def initiale(self):
         # Faire liste des documents a mettre a jour
-        producteur = ProducteurDocumentSenseurPassif(self.contexte)
+        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
         liste_documents = producteur.trouver_id_documents_senseurs()
 
         parametres = {}
@@ -993,7 +981,7 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
         return parametres
 
     def calculer_valeurs_quotidiennes(self):
-        producteur = ProducteurDocumentSenseurPassif(self.contexte)
+        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
 
         liste_documents = self._document_processus['parametres']['documents_senseurs']
         for doc_senseur in liste_documents:
@@ -1010,8 +998,8 @@ class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
 
 class TraitementBacklogLecturesSenseursPassifs:
 
-    def __init__(self, contexte, demarreur_processus):
-        self._contexte = contexte
+    def __init__(self, document_dao, demarreur_processus):
+        self._document_dao = document_dao
         self._logger = logging.getLogger('%s.TraitementBacklogLecturesSenseursPassifs' % __name__)
 
         # self.demarreur_processus = MGPProcessusDemarreur(self._contexte)
@@ -1045,7 +1033,7 @@ class TraitementBacklogLecturesSenseursPassifs:
 
         self._logger.debug("Operation aggregation: %s" % str(operation))
 
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         resultat_curseur = collection_transactions.aggregate(operation)
 
         liste_transaction_senseurs = []
@@ -1070,7 +1058,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     '''
     def run_requete_genererdeclencheur_parsenseur(self, liste_senseurs):
 
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
         for transaction_senseur in liste_senseurs:
             filtre = {
@@ -1116,7 +1104,7 @@ class TraitementBacklogLecturesSenseursPassifs:
     def declencher_maj_manuelle(self):
         """ Re-declencher les transactions de mise a jour manuelles qui n'ont pas ete executees. """
 
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         filtre = {
             'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR,
             'evenements.transaction_traitee': {'$exists': False}
@@ -1137,10 +1125,6 @@ class TraitementBacklogLecturesSenseursPassifs:
             self._logger.debug("Redemarrer processus pour ProcessusMajManuelle _id:%s" % transaction['_id'])
             self.demarreur_processus.demarrer_processus(processus, transaction)
 
-    @property
-    def contexte(self):
-        return self._contexte
-
 
 # Processus pour mettre a jour un document de noeud suite a une transaction de senseur passif
 class ProcessusMAJSenseurPassif(MGProcessusTransaction):
@@ -1151,7 +1135,7 @@ class ProcessusMAJSenseurPassif(MGProcessusTransaction):
     def modifier_noeud(self):
         """ Appliquer les modifications au noeud """
         id_document_senseur = self._document_processus['parametres']['id_document_senseur']
-        producteur_document = ProducteurDocumentNoeud(self.contexte)
+        producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
         self.set_etape_suivante()  # Termine
@@ -1200,7 +1184,7 @@ class ProcessusChangementAttributSenseur(ProcessusMAJSenseurPassif):
         }
 
         self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document = collection_transactions.find_one_and_update(filtre, valeurs)
 
         if document is None:
@@ -1247,7 +1231,7 @@ class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
         }
 
         self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document = collection_transactions.find_one_and_update(filtre, valeurs)
 
         if document is None:
@@ -1279,7 +1263,7 @@ class ProcessusMajManuelle(ProcessusMAJSenseurPassif):
         }
 
         self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
-        collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document = collection_transactions.find_one_and_update(filtre, valeurs)
 
         if document is None:
