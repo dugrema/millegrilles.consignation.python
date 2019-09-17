@@ -10,6 +10,7 @@ from millegrilles.domaines.SenseursPassifs import GestionnaireSenseursPassifs
 from millegrilles.domaines.Principale import GestionnairePrincipale
 from millegrilles.domaines.Plume import GestionnairePlume
 from millegrilles.domaines.Parametres import GestionnaireParametres
+from millegrilles.domaines.Pki import GestionnairePki
 
 import logging
 
@@ -68,6 +69,11 @@ class RegenererTest(BaseMongo):
         processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_parametres)
         processus_controleur.regenerer_documents()
 
+    def regenerer_pki(self):
+        gestionnaire_pki = GestionnairePki(self.contexte)
+        processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_pki)
+        processus_controleur.regenerer_documents()
+
     def test(self):
         # self.liste_documents_gros_fichiers()
 
@@ -76,7 +82,8 @@ class RegenererTest(BaseMongo):
         # self.regenerer_senseurspassifs()
         # self.regenerer_principale()
         # self.regenerer_plume()
-        self.regenerer_parametres()
+        # self.regenerer_parametres()
+        self.regenerer_pki()  # Tester que rien n'arrive - pas pret avant inter
 
 
 class MockGestionnaire(GestionnaireDomaine):

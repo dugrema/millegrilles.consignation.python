@@ -715,6 +715,18 @@ class RegenerateurDeDocuments:
         return GroupeurTransactionsARegenerer(self._gestionnaire_domaine)
 
 
+class RegenerateurDeDocumentsSansEffet(RegenerateurDeDocuments):
+    """
+    Empeche la regeneration d'un domaine
+    """
+
+    def supprimer_documents(self):
+        pass
+
+    def creer_generateur_transactions(self):
+        return GroupeurTransactionsSansEffet()
+
+
 class GroupeurTransactionsARegenerer:
     """
     Classe qui permet de grouper les transactions d'un domaine pour regenerer les documents.
@@ -777,6 +789,15 @@ class GroupeurTransactionsARegenerer:
             self._complet = True  # Ce generateur supporte un seul groupe
             return self._curseur
 
+        raise StopIteration()
+
+
+class GroupeurTransactionsSansEffet:
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
         raise StopIteration()
 
 

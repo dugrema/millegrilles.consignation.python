@@ -24,7 +24,7 @@ from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 class ConstantesSecurityPki:
 
     DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
-    COLLECTION_NOM = 'millegrilles.domaines.Pki'
+    COLLECTION_NOM = 'millegrilles.domaines.Pki/documents'
 
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'

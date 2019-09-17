@@ -1,7 +1,7 @@
 # Domaine Public Key Infrastructure (PKI)
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.Domaines import GestionnaireDomaine, RegenerateurDeDocumentsSansEffet
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
@@ -13,9 +13,9 @@ import datetime
 class ConstantesPki:
 
     DOMAINE_NOM = 'millegrilles.domaines.Pki'
-    COLLECTION_TRANSACTIONS_NOM = ConstantesSecurityPki.COLLECTION_NOM
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % ConstantesSecurityPki.COLLECTION_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_TRANSACTIONS_NOM = 'millegrilles.domaines.Pki'
+    COLLECTION_DOCUMENTS_NOM = ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_PROCESSUS_NOM = 'millegrilles.domaines.Pki/processus'
     QUEUE_NOM = DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
@@ -165,7 +165,7 @@ class GestionnairePki(GestionnaireDomaine):
         return ConstantesPki.QUEUE_NOM
 
     def get_nom_collection(self):
-        return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
+        return ConstantesPki.COLLECTION_DOCUMENTS_NOM
 
     def get_collection_transaction_nom(self):
         return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
@@ -174,7 +174,7 @@ class GestionnairePki(GestionnaireDomaine):
         return ConstantesPki.COLLECTION_PROCESSUS_NOM
 
     def initialiser_mgca(self):
-        """ Initialise les root CA """
+        """ Initialise les root CA et noeud middleware (ou local) """
         ca_file = self.configuration.mq_cafile
 
         with open(ca_file) as f:
@@ -188,6 +188,13 @@ class GestionnairePki(GestionnaireDomaine):
             self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
             self._pki_document_helper.inserer_certificat(enveloppe, upsert=True, trusted=True)
 
+        mq_certfile = self.configuration.mq_certfile
+        with open(mq_certfile) as f:
+            contenu_pem = f.read()
+            enveloppe = EnveloppeCertificat(certificat_pem=bytes(contenu_pem, 'utf-8'))
+            self._logger.debug("Certificats noeud local: %s" % contenu)
+            self._pki_document_helper.inserer_certificat(enveloppe, upsert=True, trusted=False)
+
         # Demarrer validation des certificats
         # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
         # processus = "%s:%s" % (
@@ -198,6 +205,16 @@ class GestionnairePki(GestionnaireDomaine):
 
     def get_nom_domaine(self):
         return ConstantesPki.DOMAINE_NOM
+
+    def identifier_processus(self, domaine_transaction):
+        if domaine_transaction == ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT:
+            processus = "millegrilles_domaines_Pki:ProcessusAjouterCertificat"
+        else:
+            processus = super().identifier_processus(domaine_transaction)
+        return processus
+
+    def creer_regenerateur_documents(self):
+        return RegenerateurDeDocumentsSansEffet(self)
 
 
 class PKIDocumentHelper:
@@ -238,7 +255,7 @@ class PKIDocumentHelper:
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
         }
 
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         if upsert:
             collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=upsert)
         else:
@@ -260,7 +277,7 @@ class PKIDocumentHelper:
             filtre[ConstantesPki.LIBELLE_SUBJECT_KEY] = subject
 
         # Lire les certificats et les charger dans des enveloppes
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         curseur = collection.find(filtre)
         liste_certificats = list()
         for certificat in curseur:
@@ -283,7 +300,7 @@ class PKIDocumentHelper:
         if authority_key is not None:
             filtre[ConstantesPki.LIBELLE_AUTHORITY_KEY] = authority_key
 
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         curseur = collection.find(filtre)
         fingerprints = list()
         for certificat in curseur:
@@ -304,7 +321,7 @@ class PKIDocumentHelper:
             }
         }
 
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         collection.update(filtre, operation, multi=True)
 
 
@@ -335,12 +352,9 @@ class TraitementMessagePki(TraitementMessageDomaine):
                 ''
             )
 
-            if routing_key_sansprefixe == ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT:
-                processus = "millegrilles_domaines_Pki:ProcessusAjouterCertificat"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
-            else:
-                # Type de transaction inconnue, on lance une exception
-                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+
         elif evenement == ConstantesPki.EVENEMENT_CERTIFICAT:
             enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
             # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
@@ -362,7 +376,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
         # Verifier si on a deja les certificats
-        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         certificat_existant = collection.find_one({'fingerprint': fingerprint})
 
         if certificat_existant is None:
