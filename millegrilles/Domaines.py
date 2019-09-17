@@ -287,7 +287,7 @@ class GestionnaireDomaine:
             processus = "%s:millegrilles_MGProcessus:MGProcessusDocInitial" % operation
         else:
             # Type de transaction inconnue, on lance une exception
-            raise ValueError("Type de transaction inconnue: routing: %s" % domaine_transaction)
+            raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s" % domaine_transaction)
 
         return processus
 
@@ -778,3 +778,12 @@ class GroupeurTransactionsARegenerer:
             return self._curseur
 
         raise StopIteration()
+
+
+class TransactionTypeInconnuError(Exception):
+
+    def __init__(self, msg, routing_key=None):
+        if routing_key is not None:
+            msg = '%s: %s' % (msg, routing_key)
+        super.__init__(msg)
+        self.routing_key = routing_key

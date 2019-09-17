@@ -2,9 +2,9 @@
 # Responsable de la gestion et de l'acces aux cles secretes pour les niveaux 3.Protege et 4.Secure.
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.Domaines import GestionnaireDomaine, TransactionTypeInconnuError
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 from cryptography.hazmat.backends import default_backend
@@ -101,8 +101,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self.__handler_transaction = None
         self.__handler_cedule = None
         self.__handler_requetes_noeuds = None
-
-        self.generateur = self.contexte.generateur_transactions
 
     def configurer(self):
         super().configurer()
@@ -268,6 +266,19 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
             callback=callback_init_requetes_noeuds,
         )
 
+    def identifier_processus(self, domaine_transaction):
+
+        if domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleGrosFichier"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocument"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
+        else:
+            processus = super().identifier_processus(domaine_transaction)
+
+        return processus
+
     def traiter_backlog(self):
         # Verifier si la version des documents a changee - trigger un reload de /documents au complet
         version_changee = False
@@ -358,23 +369,21 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
 
-class TraitementMessageCedule(BaseCallback):
+class TraitementMessageCedule(TraitementMessageCallback):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire.message_dao, gestionnaire.configuration)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        routing_key = method.routing_key
+        # evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        # routing_key = method.routing_key
 
 
-class TraitementTransactionPersistee(BaseCallback):
+class TraitementTransactionPersistee(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire: GestionnaireMaitreDesCles):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -394,7 +403,8 @@ class TraitementTransactionPersistee(BaseCallback):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
         else:
             # Type de transaction inconnue, on lance une exception
-            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
+            raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s, message: %s" %
+                                              (routing_key, message_dict))
 
         self._gestionnaire.demarrer_processus(processus, message_dict)
 
@@ -402,8 +412,7 @@ class TraitementTransactionPersistee(BaseCallback):
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.contexte)
-        self._gestionnaire = gestionnaire
+        super().__init__(gestionnaire)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_message(self, ch, method, properties, body):
@@ -425,7 +434,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
         else:
             # Type de transaction inconnue, on lance une exception
-            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
+            raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
 
     def transmettre_certificat(self, properties):
         """
@@ -446,6 +455,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
     def transmettre_cle_grosfichier(self, evenement, properties):
         """
         Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
+        :param evenement:
         :param properties:
         :return:
         """
@@ -454,13 +464,14 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(evenement)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(evenement)
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
         acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
-        self._logger.debug("Verification signature requete cle grosfichier. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+        self._logger.debug(
+            "Verification signature requete cle grosfichier. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
 
-        collection_documents = self.contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
             'fuuid': evenement['fuuid'],
@@ -472,7 +483,8 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
             self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
             if acces_permis:
                 cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
-                cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(cle_secrete, enveloppe_certificat.certificat)
+                cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(
+                    cle_secrete, enveloppe_certificat.certificat)
                 reponse = {
                     'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
                     'iv': document['iv'],
@@ -653,7 +665,8 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
     def initiale(self):
         transaction = self.transaction
         domaine = transaction['domaine']
-        uuid_transaction_doc = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]  # UUID du contenu, pas celui dans en-tete
+        # UUID du contenu, pas celui dans en-tete
+        uuid_transaction_doc = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         iddoc = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
@@ -689,8 +702,10 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         generateur_transaction = self.generateur_transactions
         identificateurs_document = self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         transaction_resumer = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
+                self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID:
+                self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
         }
 
@@ -714,7 +729,8 @@ class TransactionDocumentClesVersionMapper:
         }
 
     def map_version_to_current(self, transaction):
-        version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION]
+        version = transaction[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION]
         mapper = self.__mappers[str(version)]
         if mapper is None:
             raise ValueError("Version inconnue: %s" % str(version))
