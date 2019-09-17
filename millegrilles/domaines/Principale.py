@@ -40,27 +40,19 @@ class ConstantesPrincipale:
         'adresse_url_base': 'sansnom.millegrilles.com',
         'domaines': {
             'SenseursPassifs': {
-                'rang': 1,
+                'rang': 5,
                 'description': 'SenseursPassifs'
             },
             'GrosFichiers': {
-                'rang': 1,
+                'rang': 3,
                 'description': 'GrosFichiers'
             },
             'Notifications': {
                 'rang': 2,
                 'description': 'Notifications'
             },
-            'WebPoll': {
-                'rang': 3,
-                'description': 'WebPoll'
-            },
-            'Rapports': {
-                'rang': 4,
-                'description': 'Rapports'
-            },
             'Principale': {
-                'rang': 5,
+                'rang': 1,
                 'description': 'Principale'
             }
         }
@@ -95,7 +87,12 @@ class GestionnairePrincipale(GestionnaireDomaine):
         self._traitement_requetes = TraitementMessageRequete(self)
         self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
-        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
+        document_config = ConstantesPrincipale.DOCUMENT_DEFAUT.copy()
+        nom_millegrille = self.configuration.nom_millegrille
+        document_config['nom_millegrille'] = nom_millegrille
+        document_config['adresse_url_base'] = 'mg-%s.local' % nom_millegrille
+
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, document_config)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
 
@@ -164,6 +161,9 @@ class GestionnairePrincipale(GestionnaireDomaine):
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
 
+    def get_nom_collection(self):
+        return ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM
+
     def get_nom_queue(self):
         return ConstantesPrincipale.QUEUE_NOM
 
@@ -185,29 +185,23 @@ class GestionnairePrincipale(GestionnaireDomaine):
     def traiter_requete_inter(self, ch, method, properties, body):
         pass
 
-    def initialiser_document(self, mg_libelle, doc_defaut):
-        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
-        collection_domaine = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
-
-        # Trouver le document de configuration
-        document_configuration = collection_domaine.find_one(
-            {Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}
-        )
-        if document_configuration is None:
-            self._logger.info("On insere le document %s pour domaine Principale" % mg_libelle)
-
-            # Preparation document de configuration pour le domaine
-            configuration_initiale = doc_defaut.copy()
-            maintenant = datetime.datetime.utcnow()
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
-            configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
-
-            collection_domaine.insert(configuration_initiale)
-        else:
-            self._logger.info("Document de %s pour principale: %s" % (mg_libelle, str(document_configuration)))
-
     def get_nom_domaine(self):
         return ConstantesPrincipale.DOMAINE_NOM
+
+    def identifier_processus(self, domaine_transaction):
+        if domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_FERMERALERTE:
+            processus = "millegrilles_domaines_Principale:ProcessusFermerAlerte"
+        elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_CREERALERTE:
+            processus = "millegrilles_domaines_Principale:ProcessusCreerAlerte"
+        elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_CREEREMPREINTE:
+            processus = "millegrilles_domaines_Principale:ProcessusCreerEmpreinte"
+        elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_AJOUTER_TOKEN:
+            processus = "millegrilles_domaines_Principale:ProcessusAjouterToken"
+        else:
+            # Type de transaction inconnue, on lance une exception
+            processus = super().identifier_processus(domaine_transaction)
+
+        return processus
 
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
@@ -234,18 +228,7 @@ class TraitementMessagePrincipale(TraitementMessageDomaine):
                 'destinataire.domaine.millegrilles.domaines.Principale.',
                 ''
             )
-            if routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_FERMERALERTE:
-                processus = "millegrilles_domaines_Principale:ProcessusFermerAlerte"
-            elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREERALERTE:
-                processus = "millegrilles_domaines_Principale:ProcessusCreerAlerte"
-            elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_CREEREMPREINTE:
-                processus = "millegrilles_domaines_Principale:ProcessusCreerEmpreinte"
-            elif routing_key_sansprefixe == ConstantesPrincipale.TRANSACTION_ACTION_AJOUTER_TOKEN:
-                processus = "millegrilles_domaines_Principale:ProcessusAjouterToken"
-            else:
-                # Type de transaction inconnue, on lance une exception
-                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
             self._gestionnaire.demarrer_processus(processus, message_dict)
 
         else:
