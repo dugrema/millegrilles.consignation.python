@@ -1,10 +1,13 @@
 # Test du regenerateur de transactions
 from millegrilles import Constantes
-from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers, GestionnaireGrosFichiers
-from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles, GestionnaireMaitreDesCles
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, GestionnaireDomaine
 from millegrilles.MGProcessus import MGPProcesseurRegeneration
 from millegrilles.util.BaseMongo import BaseMongo
+
+from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers, GestionnaireGrosFichiers
+from millegrilles.domaines.MaitreDesCles import GestionnaireMaitreDesCles
+from millegrilles.domaines.SenseursPassifs import GestionnaireSenseursPassifs
+
 import logging
 
 logging.basicConfig()
@@ -42,10 +45,16 @@ class RegenererTest(BaseMongo):
         processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_maitredescles)
         processus_controleur.regenerer_documents()
 
+    def regenerer_senseurspassifs(self):
+        gestionnaire_senseurspassifs = GestionnaireSenseursPassifs(self.contexte)
+        processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_senseurspassifs)
+        processus_controleur.regenerer_documents()
+
     def test(self):
         # self.liste_documents_gros_fichiers()
-        self.regenerer_grosfichiers()
+        # self.regenerer_grosfichiers()
         # self.regenerer_maitredescles()
+        self.regenerer_senseurspassifs()
 
 
 class MockGestionnaire(GestionnaireDomaine):

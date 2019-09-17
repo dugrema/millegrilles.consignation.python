@@ -27,6 +27,7 @@ class SenseursPassifsConstantes:
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
     LIBELLE_DOCUMENT_GROUPE = 'groupe.senseurs'
+    LIBVAL_CONFIGURATION = 'configuration'
 
     TRANSACTION_NOEUD = 'noeud'
     TRANSACTION_ID_SENSEUR = 'senseur'
@@ -39,6 +40,11 @@ class SenseursPassifsConstantes:
 
     EVENEMENT_MAJ_HORAIRE = 'miseajour.horaire'
     EVENEMENT_MAJ_QUOTIDIENNE = 'miseajour.quotidienne'
+
+    DOCUMENT_DEFAUT_CONFIGURATION = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4
+    }
 
 
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
@@ -65,6 +71,12 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self._traitement_requetes = TraitementMessageRequete(self)
         self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
         self.traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
+
+        # Documents initiaux
+        self.initialiser_document(
+            SenseursPassifsConstantes.LIBVAL_CONFIGURATION,
+            SenseursPassifsConstantes.DOCUMENT_DEFAUT_CONFIGURATION
+        )
 
         # Index collection domaine
         collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
@@ -139,9 +151,9 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             )
 
             # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
-            channel.queue_purge(
-                queue=queue_config['nom']
-            )
+            # channel.queue_purge(
+            #     queue=queue_config['nom']
+            # )
 
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
@@ -156,7 +168,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             routing_key='processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
             callback=None,
         )
-
 
     def demarrer(self):
         super().demarrer()
@@ -258,6 +269,22 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
      :param domaine: Domaine millegrilles    
      '''
 
+    def get_nom_collection(self):
+        return SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM
+
+    def identifier_processus(self, domaine_transaction):
+        if domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
+        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusChangementAttributSenseur"
+        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusSupprimerSenseur"
+        else:
+            # Type de transaction inconnue, on lance une exception
+            processus = super().identifier_processus(domaine_transaction)
+
+        return processus
+
     def transmettre_declencheur_domaine(self, domaine, dict_message):
         routing_key = 'destinataire.domaine.%s' % domaine
         self.message_dao.transmettre_message(dict_message, routing_key)
@@ -283,18 +310,8 @@ class TraitementMessageLecture(TraitementMessageDomaine):
                 'destinataire.domaine.',
                 ''
             )
-            if routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:
-                processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
-            elif routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR:
-                processus = "millegrilles_domaines_SenseursPassifs:ProcessusChangementAttributSenseur"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
-            elif routing_key_sansprefixe == SenseursPassifsConstantes.TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR:
-                processus = "millegrilles_domaines_SenseursPassifs:ProcessusSupprimerSenseur"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
-            else:
-                # Type de transaction inconnue, on lance une exception
-                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+            self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
             self._gestionnaire.demarrer_processus(processus, message_dict)
