@@ -58,6 +58,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         self.traiter_requete_noeud = None  # Override de la methode super().traiter_transaction
         self.traiter_requete_inter = None  # Override de la methode super().traiter_transaction
         self._traitement_backlog_lectures = None
+        self.__channel = None
 
         self._logger = logging.getLogger("%s.GestionnaireSenseursPassifs" % __name__)
 
@@ -111,63 +112,37 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
 
-    def setup_rabbitmq(self, channel):
-        nom_queue_senseurspassifs = self.get_nom_queue()
-
+    def get_queue_configuration(self):
         queues_config = [
             {
                 'nom': self.get_nom_queue(),
-                'routing': 'destinataire.domaine.millegrilles.domaines.SenseursPassifs.#',
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+                'routing': [
+                    'destinataire.domaine.millegrilles.domaines.SenseursPassifs.#',
+                    'ceduleur.#',
+                    'processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
+                ],
+                'exchange': self.configuration.exchange_middleware,
                 'callback': self.callback_queue_transaction
             },
             {
                 'nom': self.get_nom_queue_requetes_noeuds(),
-                'routing': 'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+                'routing': [
+                    'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM
+                ],
+                'exchange': self.configuration.exchange_noeuds,
                 'callback': self.callback_queue_requete_noeud
             },
             {
                 'nom': self.get_nom_queue_requetes_inter(),
-                'routing': 'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER,
+                'routing': [
+                    'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM
+                ],
+                'exchange': self.configuration.exchange_inter,
                 'callback': self.callback_queue_requete_inter
             },
         ]
 
-        # channel = self.message_dao.channel
-        for queue_config in queues_config:
-            channel.queue_declare(
-                queue=queue_config['nom'],
-                durable=False,
-                callback=queue_config['callback'],
-            )
-
-            channel.queue_bind(
-                exchange=queue_config['exchange'],
-                queue=queue_config['nom'],
-                routing_key=queue_config['routing'],
-                callback=None,
-            )
-
-            # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
-            # channel.queue_purge(
-            #     queue=queue_config['nom']
-            # )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_senseurspassifs,
-            routing_key='ceduleur.#',
-            callback=None,
-        )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_senseurspassifs,
-            routing_key='processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
-            callback=None,
-        )
+        return queues_config
 
     def demarrer(self):
         super().demarrer()

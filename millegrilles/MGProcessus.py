@@ -428,12 +428,25 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         :return:
         """
         regenerateur = self._gestionnaire.creer_regenerateur_documents()
+
+        # Deconnecter les Q
+        self.gestionnaire.unbind_rabbitmq()
+
+        # Supprimer le contenu de la collection de documents
         regenerateur.supprimer_documents()
 
-        # Grouper et executer les transactions
+        # Grouper et executer les transactions de regeneration
         generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
         for transactions in generateur_groupes_transactions:
             self.traiter_transactions(transactions)
+
+        # Purger la Q de notifications de transactions
+        # Re-soumettre les notifications pour toutes les transactions non traitees, en ordre de persistance.
+        # Inclure notification pour regenerer l'information a date (e.g. trigger des cedules)
+        self.gestionnaire.resoumettre_transactions()
+
+        # Reconnecter les Q
+        self.gestionnaire.setup_rabbitmq()
 
     def traiter_transactions(self, curseur_transactions):
         erreurs_regeneration = []

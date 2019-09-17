@@ -216,10 +216,61 @@ class GestionnaireDomaine:
         self.channel_mq = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
-        self.setup_rabbitmq(channel)
+        self.setup_rabbitmq()
 
-    def setup_rabbitmq(self, channel):
-        """ Callback pour faire le setup de rabbitMQ quand le channel est ouvert """
+    def get_queue_configuration(self):
+        """
+        :return: Liste de Q avec configuration pour le domaine
+        """
+        raise NotImplementedError("Pas implemente")
+
+    def setup_rabbitmq(self):
+        """
+        Callback pour faire le setup de rabbitMQ quand le channel est ouvert. Permet aussi de refaire les binding
+        avec les Q apres avoir appele unbind_rabbitmq.
+        """
+        channel = self.channel_mq
+        queues_config = self.get_queue_configuration()
+
+        # channel = self.message_dao.channel
+        for queue_config in queues_config:
+
+            def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config):
+                gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
+                for routing in in_queue_config['routing']:
+                    channel.queue_bind(
+                        exchange=in_queue_config['exchange'],
+                        queue=in_queue_config['nom'],
+                        routing_key=routing
+                    )
+
+            channel.queue_declare(
+                queue=queue_config['nom'],
+                durable=False,
+                callback=callback_init_transaction,
+            )
+
+    def unbind_rabbitmq(self):
+        """
+        Deconnecte les queues du domaine pour effectuer du travail offline.
+        """
+        channel = self.channel_mq
+        queues_config = self.get_queue_configuration()
+
+        # channel = self.message_dao.channel
+        for queue_config in queues_config:
+            for routing in queue_config['routing']:
+                channel.queue_unbind(
+                    exchange=queue_config['exchange'],
+                    queue=queue_config['nom'],
+                    routing_key=routing
+                )
+
+    def resoumettre_transactions(self):
+        """
+        Soumets a nouveau les notifications de transactions non completees du domaine. Utilise l'ordre de
+        :return:
+        """
         pass
 
     def on_channel_close(self, channel=None, code=None, reason=None):
