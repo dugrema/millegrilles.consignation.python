@@ -259,10 +259,26 @@ class GestionnaireDomaine:
 
     def resoumettre_transactions(self):
         """
-        Soumets a nouveau les notifications de transactions non completees du domaine. Utilise l'ordre de
+        Soumets a nouveau les notifications de transactions non completees du domaine.
+        Utilise l'ordre de persistance.
         :return:
         """
-        pass
+        nom_millegrille = self.configuration.nom_millegrille
+        champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
+        champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+        filtre = {
+            champ_complete: False
+        }
+        hint = [
+            (champ_complete, 1),
+            (champ_persiste, 1)
+        ]
+
+        collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
+        transactions_incompletes = collection_transactions.find(filtre, sort=hint).hint(hint)
+
+        for transaction in transactions_incompletes:
+            self._logger.warning("Transaction incomplete: %s" % transaction)
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         """

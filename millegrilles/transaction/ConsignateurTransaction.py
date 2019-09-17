@@ -270,6 +270,9 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         for nom_collection_transaction in self.__liste_domaines:
             collection = self.contexte.document_dao.get_collection(nom_collection_transaction)
+            champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
+            champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+            champ_traitee = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
 
             # en-tete.uuid-transaction
             collection.create_index([
@@ -283,8 +286,14 @@ class EntretienCollectionsDomaines(BaseCallback):
 
             # _evenements.NOM_MILLEGRILLE.transaction_traitee
             collection.create_index([
-                ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE), 1),
-                ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
+                (champ_complete, 1),
+                (champ_traitee, 1)
+            ])
+
+            # _evenements.NOM_MILLEGRILLE.transaction_persistee
+            collection.create_index([
+                (champ_complete, 1),
+                (champ_persiste, 1)
             ])
 
     def _nettoyer_transactions_expirees(self):
