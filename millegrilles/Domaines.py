@@ -8,7 +8,6 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 import logging
 import json
-import datetime
 
 from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure

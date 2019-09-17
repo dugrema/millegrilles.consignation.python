@@ -189,12 +189,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 callback=None,
             )
 
-            # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
-            channel.queue_purge(
-                queue=queue_config['nom'],
-                callback=None,
-            )
-
         channel.queue_bind(
             exchange=self.configuration.exchange_middleware,
             queue=nom_queue_domaine,
