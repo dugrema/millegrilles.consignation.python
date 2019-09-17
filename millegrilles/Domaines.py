@@ -279,6 +279,12 @@ class GestionnaireDomaine:
 
         for transaction in transactions_incompletes:
             self._logger.warning("Transaction incomplete: %s" % transaction)
+            id_document = transaction[Constantes.MONGO_DOC_ID]
+            en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+            uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            domaine = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            self.message_dao.transmettre_evenement_persistance(
+                id_document, uuid_transaction, domaine, None)
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         """
