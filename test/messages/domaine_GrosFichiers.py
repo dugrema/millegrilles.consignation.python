@@ -45,9 +45,9 @@ class MessagesSample(BaseCallback):
 
     def transaction_nouvelle_version_metadata(self):
         transaction = {
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8418",
+            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8fab841b",
             "securite": "2.prive",
-            "repertoire_uuid": '0dba8148-d891-11e9-8a7f-00155d011f00',
+            "repertoire_uuid": '2527cadc-d8ed-11e9-8a7f-00155d011f00',
             "nom": "ExplorationGrosFichiers5.txt",
             "taille": 5478,
             "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
@@ -66,7 +66,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_nouvelle_version_transfertcomplete(self):
         transaction = {
-            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8418",
+            "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8fab841b",
             "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e30",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -78,8 +78,8 @@ class MessagesSample(BaseCallback):
 
     def transaction_creer_repertoire(self):
         transaction = {
-            "parent_id": "dcf4359c-b7cd-11e9-9cfa-00155d011f00",
-            "nom": "sous-test6-test1",
+            "parent_id": "019a03fd-d8f0-11e9-8a7f-00155d011f00",
+            "nom": "test1",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.creerRepertoire',
@@ -196,9 +196,9 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
-        enveloppe1 = sample.transaction_nouvelle_version_metadata()
-        enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
-        # enveloppe3 = sample.transaction_creer_repertoire()
+        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+        enveloppe3 = sample.transaction_creer_repertoire()
         # enveloppe4 = sample.transaction_renommer_repertoire()
         # enveloppe5 = sample.transaction_deplacer_repertoire()
         # enveloppe6 = sample.transaction_renommer_fichier()

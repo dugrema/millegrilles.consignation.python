@@ -322,7 +322,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 transaction_racine = {
                     ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE,
                     ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
-                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
+                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
                 }
                 self.generateur_transactions.soumettre_transaction(transaction_racine, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
 
@@ -331,7 +332,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 transaction_orphelins = {
                     ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS,
                     ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
-                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
+                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
                 }
                 self.generateur_transactions.soumettre_transaction(transaction_orphelins, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
 
@@ -340,7 +342,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 transaction_corbeille = {
                     ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE,
                     ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
-                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
+                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
                 }
                 self.generateur_transactions.soumettre_transaction(transaction_corbeille, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
 
@@ -395,7 +398,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
 
-    def creer_repertoire_special(self, nom_repertoire, mg_libelle, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
+    def creer_repertoire_special(self, nom_repertoire, mg_libelle, uuid, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         # Un repertoire special est unique, on peut juste en creer un de ce type
@@ -412,7 +415,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         document_repertoire[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
 
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = nom_repertoire
-        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = uuid
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite
 
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = nom_repertoire
@@ -1016,13 +1019,14 @@ class ProcessusTransactionCreerRepertoireSpecial(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         mg_libelle = transaction[ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE]
         nom_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
+        uuid = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
 
         securite = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
         if securite is None:
             securite = Constantes.SECURITE_PRIVE
 
-        document_repertoire = self._controleur._gestionnaire_domaine.creer_repertoire_special(
-            nom_repertoire, mg_libelle, securite=securite)
+        document_repertoire = self._controleur.gestionnaire.creer_repertoire_special(
+            nom_repertoire, mg_libelle, uuid=uuid, securite=securite)
 
         self.set_etape_suivante()  # Termine
 
@@ -1047,7 +1051,7 @@ class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
         if securite is None:
             securite = Constantes.SECURITE_PRIVE
 
-        document_repertoire = self._controleur._gestionnaire_domaine.creer_repertoire(
+        document_repertoire = self._controleur._gestionnaire.creer_repertoire(
             nom_repertoire, repertoire_parent_uuid, securite=securite)
 
         self.set_etape_suivante(ProcessusTransactionCreerRepertoire.maj_repertoire_parent.__name__)
