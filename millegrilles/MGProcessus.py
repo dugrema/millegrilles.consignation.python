@@ -814,9 +814,15 @@ class MGProcessusTransaction(MGProcessus):
     def charger_transaction(self, nom_collection=None):
         if nom_collection is None:
             nom_collection = self.get_collection_transaction_nom()
+
         info_transaction = self.trouver_id_transaction()
         id_transaction = info_transaction['id_transaction']
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
+
+        if self._transaction_mapper is not None:
+            # Faire le mapping de la transaction en fonction de sa version
+            self._transaction_mapper.map_version_to_current(self._transaction)
+
         return self._transaction
 
     def finale(self):

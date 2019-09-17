@@ -1,4 +1,6 @@
 # Domaine de l'interface GrosFichiers
+from pymongo.errors import DuplicateKeyError
+
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.dao.MessageDAO import TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete
@@ -426,7 +428,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         return document_repertoire
 
-    def creer_repertoire(self, nom_repertoire, parent_uuid, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
+    def creer_repertoire(self, nom_repertoire, parent_uuid, uuid_repertoire, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         document_repertoire = ConstantesGrosFichiers.DOCUMENT_REPERTOIRE.copy()
@@ -438,7 +440,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         document_repertoire[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
 
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = nom_repertoire
-        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = uuid_repertoire
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID] = parent_uuid
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite
 
@@ -450,6 +452,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
                 document_parent = collection_domaine.find_one(
                     {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS}
                 )
+                document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE] = '%s_%s' % (uuid_repertoire, nom_repertoire)
 
             chemin_gparent = document_parent[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
             nom_repertoire = document_parent[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
@@ -644,11 +647,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid})
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        est_orphelin = False
         if document_repertoire is None:
             self._logger.info("Fichier orphelin fuuid: %s" % fuuid)
             document_repertoire = collection_domaine.find_one(
                 {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS}
             )
+            est_orphelin = True
 
         uuid_fichier = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
         if uuid_fichier is None:
@@ -666,12 +671,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             document_repertoire[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE],
         )
         chemin_fichier = chemin_fichier.replace('///', '/').replace('//', '/')
+        nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+        if est_orphelin:
+            nom_fichier = '%s_%s' % (fuuid, nom_fichier)
 
         set_on_insert = ConstantesGrosFichiers.DOCUMENT_FICHIER.copy()
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] =\
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = \
-            transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
+
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin_fichier
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
@@ -731,7 +739,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         self._logger.debug("maj_fichier: filtre = %s" % filtre)
         self._logger.debug("maj_fichier: operations = %s" % operations)
-        resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+        try:
+            resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+        except DuplicateKeyError as dke:
+            self._logger.info("Cle dupliquee sur fichier %s, on le met orphelin" % fuuid)
+            nom_fichier = '%s_%s' % (uuid.uuid1(), transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER])
+            set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
+            resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+
         self._logger.debug("maj_fichier resultat %s" % str(resultat))
 
         return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier}
@@ -893,6 +908,37 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
 
 
+# ********** Mappers ************
+class TransactionCreerRepertoireVersionMapper:
+
+    def __init__(self):
+        self.__mappers = {
+            '4': self.map_version_4_to_current,
+            '5': self.map_version_5_to_current,
+        }
+
+    def map_version_to_current(self, transaction):
+        version = transaction[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION]
+        mapper = self.__mappers[str(version)]
+        if mapper is None:
+            raise ValueError("Version inconnue: %s" % str(version))
+
+        mapper(transaction)
+
+    def map_version_4_to_current(self, transaction):
+        # Il manque le uuid du repertoire. Dans V5, c'est un uuid v1. Mais pour V4 on ne l'avait pas,
+        # ca empeche de reconnecter les fichiers crees precedement. Les fichiers deviennent orphelins et
+        # doivent etre ramenes sous le bon repertoire a la main. La transaction de deplacement creee a ce moment
+        # permet de corriger le probleme de facon permanente.
+        uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = uuid_transaction
+
+    def map_version_5_to_current(self, transaction):
+        """ Version courante, rien a faire """
+        pass
+
+
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
 
@@ -1049,7 +1095,7 @@ class ProcessusTransactionCreerRepertoireSpecial(ProcessusGrosFichiers):
 class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
+        super().__init__(controleur, evenement, TransactionCreerRepertoireVersionMapper())
 
     def initiale(self):
         """
@@ -1059,13 +1105,14 @@ class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         repertoire_parent_uuid = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_PARENT_ID]
         nom_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
+        uuid_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
 
         securite = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
         if securite is None:
             securite = Constantes.SECURITE_PRIVE
 
         document_repertoire = self._controleur._gestionnaire.creer_repertoire(
-            nom_repertoire, repertoire_parent_uuid, securite=securite)
+            nom_repertoire, repertoire_parent_uuid, uuid_repertoire, securite=securite)
 
         self.set_etape_suivante(ProcessusTransactionCreerRepertoire.maj_repertoire_parent.__name__)
 
