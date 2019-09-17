@@ -1,6 +1,6 @@
 # Module de processus pour MilleGrilles
 import logging
-import datetime
+import datetime, time
 
 from bson.objectid import ObjectId
 
@@ -429,8 +429,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         regenerateur = self._gestionnaire.creer_regenerateur_documents()
 
-        # Deconnecter les Q
-        self.gestionnaire.unbind_rabbitmq()
+        # Deconnecter les Q (channel - consumer tags)
+        self.gestionnaire.stop_consuming()
 
         # Supprimer le contenu de la collection de documents
         regenerateur.supprimer_documents()

@@ -247,21 +247,15 @@ class GestionnaireDomaine:
                 callback=callback_init_transaction,
             )
 
-    def unbind_rabbitmq(self):
+    def stop_consuming(self):
         """
-        Deconnecte les queues du domaine pour effectuer du travail offline.
+        Deconnecte les consommateur queues du domaine pour effectuer du travail offline.
         """
         channel = self.channel_mq
-        queues_config = self.get_queue_configuration()
-
-        # channel = self.message_dao.channel
-        for queue_config in queues_config:
-            for routing in queue_config['routing']:
-                channel.queue_unbind(
-                    exchange=queue_config['exchange'],
-                    queue=queue_config['nom'],
-                    routing_key=routing
-                )
+        tags = channel.consumer_tags
+        for tag in tags:
+            self._logger.debug("Removing ctag %s" % tag)
+            channel.basic_cancel(consumer_tag=tag, nowait=True)
 
     def resoumettre_transactions(self):
         """
