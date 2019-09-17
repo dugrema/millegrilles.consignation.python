@@ -203,17 +203,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return processus
 
-    def traiter_backlog(self):
-        # Verifier si la version des documents a changee - trigger un reload de /documents au complet
-        version_changee = False
-        if version_changee:
-            # La version a change, on va faire un reload complet de /documents avec les transactions traitees, en ordre
-            pass
-
-        # Identifier transactions qui n'ont pas ete traitees
-
-        pass
-
     def decrypter_contenu(self, contenu):
         """
         Utilise la cle privee en memoire pour decrypter le contenu.

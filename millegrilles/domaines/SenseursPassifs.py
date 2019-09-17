@@ -114,19 +114,19 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         self.demarrer_watcher_collection(
             SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
 
-    def traiter_backlog(self):
-        # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
-        # de persistance.
-        # Toutes les autres transactions non-traitees de SenseursPassifs.Lecture peuvent etre marquees comme traitees.
-        traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.document_dao, self.demarreur_processus)
-        liste_transactions = traitement_backlog_lectures.run_requete_plusrecentetransactionlecture_parsenseur()
-        traitement_backlog_lectures.run_requete_genererdeclencheur_parsenseur(liste_transactions)
-
-        # Ajouter messages declencheurs pour refaire les calculs horaires et quoditiens (moyennes, extremes)
-        traitement_backlog_lectures.declencher_calculs()
-
-        # Appliquer transactions de mise a jour manuelles en ordre.
-        traitement_backlog_lectures.declencher_maj_manuelle()
+    # def traiter_backlog(self):
+    #     # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
+    #     # de persistance.
+    #     # Toutes les autres transactions non-traitees de SenseursPassifs.Lecture peuvent etre marquees comme traitees.
+    #     traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.document_dao, self.demarreur_processus)
+    #     liste_transactions = traitement_backlog_lectures.run_requete_plusrecentetransactionlecture_parsenseur()
+    #     traitement_backlog_lectures.run_requete_genererdeclencheur_parsenseur(liste_transactions)
+    #
+    #     # Ajouter messages declencheurs pour refaire les calculs horaires et quoditiens (moyennes, extremes)
+    #     traitement_backlog_lectures.declencher_calculs()
+    #
+    #     # Appliquer transactions de mise a jour manuelles en ordre.
+    #     traitement_backlog_lectures.declencher_maj_manuelle()
 
     def get_nom_queue(self):
         return SenseursPassifsConstantes.QUEUE_NOM

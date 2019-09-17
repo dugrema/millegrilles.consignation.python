@@ -193,13 +193,8 @@ class GestionnaireDomaine:
         """ Demarrer une thread pour ce gestionnaire """
         self._logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
         # self.configurer()  # Deja fait durant l'initialisation
-        self.traiter_backlog()
-        self._logger.info("Backlog traite, on enregistre la queue %s" % self.get_nom_queue())
+        self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
         self._contexte.message_dao.register_channel_listener(self)
-
-    def traiter_backlog(self):
-        """ Identifie les transactions qui ont ete persistees pendant que le gestionnaire est hors ligne. """
-        pass
 
     def on_channel_open(self, channel):
         """
