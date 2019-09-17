@@ -349,6 +349,11 @@ class PikaDAO:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         if channel is None:
+            # Utiliser le channel implicite
+            if self.channel is None:
+                # Le channel n'est pas pret, on va l'attendre max 30 secondes (cycle de maintenance)
+                with self._lock_transmettre_message:
+                    pass  # On fait juste attendre que le channel soit pret
             channel = self.channel
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)

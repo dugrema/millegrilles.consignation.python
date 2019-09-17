@@ -785,5 +785,5 @@ class TransactionTypeInconnuError(Exception):
     def __init__(self, msg, routing_key=None):
         if routing_key is not None:
             msg = '%s: %s' % (msg, routing_key)
-        super.__init__(msg)
+        super().__init__(msg)
         self.routing_key = routing_key

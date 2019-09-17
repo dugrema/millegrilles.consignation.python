@@ -1,7 +1,7 @@
 # Test du regenerateur de transactions
-from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles import Constantes
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers, GestionnaireGrosFichiers
+from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles, GestionnaireMaitreDesCles
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, GestionnaireDomaine
 from millegrilles.MGProcessus import MGPProcesseurRegeneration
 from millegrilles.util.BaseMongo import BaseMongo
@@ -17,13 +17,13 @@ class RegenererTest(BaseMongo):
 
     def __init__(self):
         super().__init__()
-        self.mock_gestionnaire = GestionnaireGrosFichiers(self.contexte)
         self.logger = logging.getLogger('RegenererTest')
         self.logger.setLevel(logging.DEBUG)
 
     def liste_documents_gros_fichiers(self):
         nom_millegrille = self.contexte.configuration.nom_millegrille
-        groupeur = GroupeurTransactionsARegenerer(self.mock_gestionnaire)
+        gestionnaire_grosfichiers = GestionnaireGrosFichiers(self.contexte)
+        groupeur = GroupeurTransactionsARegenerer(gestionnaire_grosfichiers)
         for transactions in groupeur:
             self.logger.debug("Nombre de transactions: %s" % str(transactions.count()))
             for transaction in transactions:
@@ -33,12 +33,19 @@ class RegenererTest(BaseMongo):
                 )
 
     def regenerer_grosfichiers(self):
-        processus_controleur = MGPProcesseurRegeneration(self.contexte, self.mock_gestionnaire)
+        gestionnaire_grosfichiers = GestionnaireGrosFichiers(self.contexte)
+        processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_grosfichiers)
+        processus_controleur.regenerer_documents()
+
+    def regenerer_maitredescles(self):
+        gestionnaire_maitredescles = GestionnaireGrosFichiers(self.contexte)
+        processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_maitredescles)
         processus_controleur.regenerer_documents()
 
     def test(self):
         # self.liste_documents_gros_fichiers()
-        self.regenerer_grosfichiers()
+        # self.regenerer_grosfichiers()
+        self.regenerer_maitredescles()
 
 
 class MockGestionnaire(GestionnaireDomaine):

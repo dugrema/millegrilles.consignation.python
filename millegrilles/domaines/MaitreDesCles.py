@@ -395,17 +395,7 @@ class TraitementTransactionPersistee(TraitementMessageDomaine):
             ''
         )
 
-        if routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleGrosFichier"
-        elif routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocument"
-        elif routing_key_sansprefixe == ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
-        else:
-            # Type de transaction inconnue, on lance une exception
-            raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s, message: %s" %
-                                              (routing_key, message_dict))
-
+        processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
         self._gestionnaire.demarrer_processus(processus, message_dict)
 
 
