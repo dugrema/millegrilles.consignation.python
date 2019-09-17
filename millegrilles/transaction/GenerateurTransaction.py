@@ -27,9 +27,11 @@ class GenerateurTransaction:
     :param domaine: Domaine du message. Utilise pour le routage de la transaction apres persistance.  
     :returns: UUID de la transaction. Permet de retracer la transaction dans MilleGrilles une fois persistee.
     '''
-    def soumettre_transaction(self, message_dict, domaine=None, reply_to=None, correlation_id=None):
+    def soumettre_transaction(self, message_dict, domaine=None,
+                              reply_to=None, correlation_id=None,
+                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4):
         # Preparer la structure du message reconnue par MilleGrilles
-        enveloppe = self.preparer_enveloppe(message_dict, domaine)
+        enveloppe = self.preparer_enveloppe(message_dict, domaine, version=version)
 
         # Extraire le UUID pour le retourner a l'invoqueur de la methode. Utilise pour retracer une soumission.
         uuid_transaction = enveloppe.get(
@@ -40,7 +42,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def preparer_enveloppe(self, message_dict, domaine=None):
+    def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4):
 
         # Identifier usager du systeme, nom de domaine
         signateur_transactions = self._contexte.signateur_transactions
@@ -55,7 +57,7 @@ class GenerateurTransaction:
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME] = identificateur_systeme
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_COURANTE
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = version
         if domaine is not None:
             meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
 
