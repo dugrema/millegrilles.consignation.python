@@ -4,7 +4,7 @@ import socket
 import logging
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
@@ -48,15 +48,12 @@ class SenseursPassifsConstantes:
 
 
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
-class GestionnaireSenseursPassifs(GestionnaireDomaine):
+class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
-        self._traitement_lecture = None
-        self._traitement_requetes = None
-        self.traiter_transaction = None   # Override de la methode super().traiter_transaction
-        self.traiter_requete_noeud = None  # Override de la methode super().traiter_transaction
-        self.traiter_requete_inter = None  # Override de la methode super().traiter_transaction
+        self.__traitement_lecture = None
+        self.__traitement_requetes = None
         self._traitement_backlog_lectures = None
         self.__channel = None
 
@@ -66,12 +63,12 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         super().configurer()
 
         # Configuration des callbacks pour traiter les messages
-        self._traitement_lecture = TraitementMessageLecture(self)
-        self.traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
+        self.__traitement_lecture = TraitementMessageLecture(self)
+        # self.__traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
 
-        self._traitement_requetes = TraitementMessageRequete(self)
-        self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
-        self.traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
+        self.__traitement_requetes = TraitementMessageRequete(self)
+        # self.__traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
+        # self.__traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
         # Documents initiaux
         self.initialiser_document(
@@ -112,38 +109,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
         ])
 
-    def get_queue_configuration(self):
-        queues_config = [
-            {
-                'nom': self.get_nom_queue(),
-                'routing': [
-                    'destinataire.domaine.millegrilles.domaines.SenseursPassifs.#',
-                    'ceduleur.#',
-                    'processus.domaine.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM,
-                ],
-                'exchange': self.configuration.exchange_middleware,
-                'callback': self.callback_queue_transaction
-            },
-            {
-                'nom': self.get_nom_queue_requetes_noeuds(),
-                'routing': [
-                    'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM
-                ],
-                'exchange': self.configuration.exchange_noeuds,
-                'callback': self.callback_queue_requete_noeud
-            },
-            {
-                'nom': self.get_nom_queue_requetes_inter(),
-                'routing': [
-                    'requete.%s.#' % SenseursPassifsConstantes.DOMAINE_NOM
-                ],
-                'exchange': self.configuration.exchange_inter,
-                'callback': self.callback_queue_requete_inter
-            },
-        ]
-
-        return queues_config
-
     def demarrer(self):
         super().demarrer()
         self.demarrer_watcher_collection(
@@ -163,24 +128,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaine):
         # Appliquer transactions de mise a jour manuelles en ordre.
         traitement_backlog_lectures.declencher_maj_manuelle()
 
-    def traiter_transaction(self, ch, method, properties, body):
-        # Note: Cette methode est remplacee dans la configuration (self.traiter_transaction = self._traitement...)
-        raise NotImplementedError("N'est pas implemente")
-
-    def traiter_requete_noeud(self, ch, method, properties, body):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
-
-    def traiter_requete_inter(self, ch, method, properties, body):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
-
     def get_nom_queue(self):
         return SenseursPassifsConstantes.QUEUE_NOM
-
-    def get_nom_queue_requetes_inter(self):
-        return SenseursPassifsConstantes.QUEUE_INTER_NOM
-
-    def get_nom_queue_requetes_noeuds(self):
-        return SenseursPassifsConstantes.QUEUE_NOEUDS_NOM
 
     def get_collection_transaction_nom(self):
         return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM

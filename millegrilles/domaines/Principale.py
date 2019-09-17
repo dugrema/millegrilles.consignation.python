@@ -1,6 +1,6 @@
 # Domaine de l'interface principale de l'usager. Ne peut pas etre deleguee.
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
 
@@ -71,7 +71,7 @@ class ConstantesPrincipale:
     }
 
 
-class GestionnairePrincipale(GestionnaireDomaine):
+class GestionnairePrincipale(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
@@ -95,65 +95,6 @@ class GestionnairePrincipale(GestionnaireDomaine):
         self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, document_config)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
-
-    def setup_rabbitmq(self, channel):
-        # Configurer la Queue pour les rapports sur RabbitMQ
-        nom_queue_domaine = self.get_nom_queue()
-
-        queues_config = [
-            {
-                'nom': self.get_nom_queue(),
-                'routing': 'destinataire.domaine.millegrilles.domaines.Principale.#',
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-                'callback': self.callback_queue_transaction
-            },
-            {
-                'nom': self.get_nom_queue_requetes_noeuds(),
-                'routing': 'requete.%s.#' % ConstantesPrincipale.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-                'callback': self.callback_queue_requete_noeud
-            },
-            {
-                'nom': self.get_nom_queue_requetes_inter(),
-                'routing': 'requete.%s.#' % ConstantesPrincipale.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER,
-                'callback': self.callback_queue_requete_inter
-            },
-        ]
-
-        channel = self.message_dao.channel
-        for queue_config in queues_config:
-            channel.queue_declare(
-                queue=queue_config['nom'],
-                durable=False,
-                callback=queue_config['callback'],
-            )
-
-            channel.queue_bind(
-                exchange=queue_config['exchange'],
-                queue=queue_config['nom'],
-                routing_key=queue_config['routing'],
-                callback=None,
-            )
-
-            # Si la Q existe deja, la purger. Le traitement du backlog est plus efficient via load du gestionnaire.
-            channel.queue_purge(
-                queue=queue_config['nom']
-            )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='ceduleur.#',
-            callback=None,
-        )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='processus.domaine.%s.#' % ConstantesPrincipale.DOMAINE_NOM,
-            callback=None,
-        )
 
     def traiter_cedule(self, evenement):
         pass

@@ -2,7 +2,7 @@
 # Responsable de la gestion et de l'acces aux cles secretes pour les niveaux 3.Protege et 4.Secure.
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine, TransactionTypeInconnuError
+from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -79,7 +79,7 @@ class ConstantesMaitreDesCles:
     }
 
 
-class GestionnaireMaitreDesCles(GestionnaireDomaine):
+class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
@@ -98,12 +98,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
 
         # Queue message handlers
-        self.__handler_transaction = None
-        self.__handler_cedule = None
         self.__handler_requetes_noeuds = None
 
     def configurer(self):
         super().configurer()
+
+        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
@@ -190,82 +190,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
         if len(certificats_backup) > 0:
             self.__certificats_backup = certificats_backup
 
-    def setup_rabbitmq(self, channel):
-
-        # Queue message handlers
-        self.__handler_transaction = TraitementTransactionPersistee(self)
-        self.__handler_cedule = TraitementMessageCedule(self)
-        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
-
-        nom_queue_transactions = '%s.%s' % (self.get_nom_queue(), 'transactions')
-        nom_queue_ceduleur = '%s.%s' % (self.get_nom_queue(), 'ceduleur')
-        nom_queue_processus = '%s.%s' % (self.get_nom_queue(), 'processus')
-        nom_queue_requetes_noeuds = '%s.%s' % (self.get_nom_queue(), 'requete.noeuds')
-
-        # Configurer la Queue pour les transactions
-        def callback_init_transaction(queue, self=self, callback=self.__handler_transaction.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_transactions,
-                routing_key='destinataire.domaine.%s.#' % self.get_nom_queue(),
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_transactions,
-            durable=False,
-            callback=callback_init_transaction,
-        )
-
-        # Configuration la queue pour le ceduleur
-        def callback_init_cedule(queue, self=self, callback=self.__handler_cedule.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_ceduleur,
-                routing_key='ceduleur.#',
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_ceduleur,
-            durable=False,
-            callback=callback_init_cedule,
-        )
-
-        # Queue pour les processus
-        def callback_init_processus(queue, self=self, callback=self.traitement_evenements.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_processus,
-                routing_key='processus.domaine.%s.#' % ConstantesMaitreDesCles.DOMAINE_NOM,
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_processus,
-            durable=False,
-            callback=callback_init_processus,
-        )
-
-        # Queue pour les requetes de noeuds
-        def callback_init_requetes_noeuds(queue, self=self, callback=self.__handler_requetes_noeuds.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_noeuds,
-                queue=nom_queue_requetes_noeuds,
-                routing_key='requete.%s.#' % ConstantesMaitreDesCles.DOMAINE_NOM,
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_requetes_noeuds,
-            durable=False,
-            callback=callback_init_requetes_noeuds,
-        )
-
     def identifier_processus(self, domaine_transaction):
 
         if domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER:
@@ -351,6 +275,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
     def get_nom_domaine(self):
         return ConstantesMaitreDesCles.DOMAINE_NOM
 
+    def get_handler_requetes_noeuds(self):
+        return self.__handler_requetes_noeuds
+
     @property
     def get_certificat(self):
         return self.__certificat_courant
@@ -368,35 +295,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaine):
             cert = self.__certificat_courant
         return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
-
-class TraitementMessageCedule(TraitementMessageCallback):
-
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire.message_dao, gestionnaire.configuration)
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        # evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        # routing_key = method.routing_key
-
-
-class TraitementTransactionPersistee(TraitementMessageDomaine):
-
-    def __init__(self, gestionnaire: GestionnaireMaitreDesCles):
-        super().__init__(gestionnaire)
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-
-        # Verifier quel processus demarrer. On match la valeur dans la routing key.
-        routing_key = method.routing_key
-        routing_key_sansprefixe = routing_key.replace(
-            'destinataire.domaine.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM,
-            ''
-        )
-
-        processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
-        self._gestionnaire.demarrer_processus(processus, message_dict)
+    def traiter_cedule(self, evenement):
+        pass
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):

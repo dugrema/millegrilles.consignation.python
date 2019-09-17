@@ -2,7 +2,7 @@
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.dao.MessageDAO import TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
@@ -135,75 +135,20 @@ class ConstantesGrosFichiers:
     }
 
 
-class GestionnaireGrosFichiers(GestionnaireDomaine):
+class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
         self._traitement_middleware = None
         self._traitement_noeud = None
+        self._traitement_cedule = None
         self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
 
     def configurer(self):
         super().configurer()
 
-        self._traitement_middleware = TraitementMessageDomaineMiddleware(self)
-        self._traitement_noeud = TraitementMessageDomaineRequete(self)
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
         self.creer_index()  # Creer index dans MongoDB
-
-    def setup_rabbitmq(self, channel):
-        # Configurer la Queue pour les rapports sur RabbitMQ
-        nom_queue_domaine = self.get_nom_queue()
-
-        queues_config = [
-            {
-                'nom': self.get_nom_queue(),
-                'routing': 'destinataire.domaine.millegrilles.domaines.GrosFichiers.#',
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-                'callback': self.callback_queue_transaction
-            },
-            {
-                'nom': self.get_nom_queue_requetes_noeuds(),
-                'routing': 'requete.%s.#' % ConstantesGrosFichiers.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-                'callback': self.callback_queue_requete_noeud
-            },
-            {
-                'nom': self.get_nom_queue_requetes_inter(),
-                'routing': 'requete.%s.#' % ConstantesGrosFichiers.DOMAINE_NOM,
-                'exchange': Constantes.DEFAUT_MQ_EXCHANGE_INTER,
-                'callback': self.callback_queue_requete_inter
-            },
-        ]
-
-        channel = self.message_dao.channel
-        for queue_config in queues_config:
-            channel.queue_declare(
-                queue=queue_config['nom'],
-                durable=False,
-                callback=queue_config['callback'],
-            )
-
-            channel.queue_bind(
-                exchange=queue_config['exchange'],
-                queue=queue_config['nom'],
-                routing_key=queue_config['routing'],
-                callback=None,
-            )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='ceduleur.#',
-            callback=None,
-        )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='processus.domaine.%s.#' % ConstantesGrosFichiers.DOMAINE_NOM,
-            callback=None,
-        )
 
     def demarrer(self):
         super().demarrer()
@@ -246,23 +191,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         return processus
 
-    def traiter_cedule(self, evenement):
-        pass
-
-    def traiter_transaction(self, ch, method, properties, body):
-        self._traitement_middleware.callbackAvecAck(ch, method, properties, body)
-
     def get_nom_collection(self):
         return ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM
 
     def get_nom_queue(self):
         return ConstantesGrosFichiers.QUEUE_NOM
-
-    def get_nom_queue_requetes_noeuds(self):
-        return '%s.noeuds' % self.get_nom_queue()
-
-    def get_nom_queue_requetes_inter(self):
-        return '%s.inter' % self.get_nom_queue()
 
     def get_collection_transaction_nom(self):
         return ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
@@ -297,12 +230,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
              }
         )
         return document_repertoire_orphelins
-
-    def traiter_requete_noeud(self, ch, method, properties, body):
-        self._traitement_noeud.callbackAvecAck(ch, method, properties, body)
-
-    def traiter_requete_inter(self, ch, method, properties, body):
-        pass
 
     def initialiser_document(self, mg_libelle, doc_defaut):
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas

@@ -1,7 +1,7 @@
 # Domaine Public Key Infrastructure (PKI)
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine, RegenerateurDeDocumentsSansEffet
+from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
@@ -56,7 +56,7 @@ class ConstantesPki:
     }
 
 
-class GestionnairePki(GestionnaireDomaine):
+class GestionnairePki(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
@@ -91,61 +91,48 @@ class GestionnairePki(GestionnaireDomaine):
             (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
         ])
 
-    def setup_rabbitmq(self, channel):
-        nom_queue_domaine = self.get_nom_queue()
+    def get_queue_configuration(self):
+        configuration = super().get_queue_configuration()
 
-        # Configurer la Queue pour les rapports sur RabbitMQ
-        channel.queue_declare(
-            queue=nom_queue_domaine,
-            durable=True,
-            callback=self.callback_queue_transaction,
-        )
+        configuration_pki = [
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
+                'routing': [
+                    'pki.#',
+                ],
+                'exchange': self.configuration.exchange_middleware,
+                'callback': self.traiter_transaction
+            },
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
+                'routing': [
+                    'pki.#',
+                ],
+                'exchange': self.configuration.exchange_noeuds,
+                'callback': self.traiter_requete_noeud
+            },
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
+                'routing': [
+                    'pki.#',
+                ],
+                'exchange': self.configuration.exchange_inter,
+                'callback': self.traiter_requete_inter
+            },
+        ]
 
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='destinataire.domaine.%s.#' % nom_queue_domaine,
-            callback=None,
-        )
+        configuration.extend(configuration_pki)
 
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='ceduleur.#',
-            callback=None,
-        )
-
-        # Ecouter les evenements de type pki - servent a echanger certificats et requetes de certificats
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='pki.#',
-            callback=None,
-        )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_noeuds,
-            queue=nom_queue_domaine,
-            routing_key='pki.#',
-            callback=None
-        )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_inter,
-            queue=nom_queue_domaine,
-            routing_key='pki.#',
-            callback=None
-        )
-
-        channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_domaine,
-            routing_key='processus.domaine.%s.#' % ConstantesPki.DOMAINE_NOM,
-            callback=None,
-        )
+        return configuration
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)
+
+    def traiter_requete_noeud(self, ch, method, properties, body):
+        return self.traiter_transaction(ch, method, properties, body)
+
+    def traiter_requete_inter(self, ch, method, properties, body):
+        return self.traiter_transaction(ch, method, properties, body)
 
     def traiter_cedule(self, evenement):
 

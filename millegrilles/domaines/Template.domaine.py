@@ -51,9 +51,6 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
         super().configurer()
         self.initialiser_document(ConstantesDomaine.LIBVAL_CONFIGURATION, ConstantesDomaine.DOCUMENT_DEFAUT)
 
-    def setup_rabbitmq(self, channel):
-        super().setup_rabbitmq(channel)
-
     def ajouter_nouveau_document(self, transaction):
         document_domaine = ConstantesDomaine.DOCUMENT_DOMAINE.copy()
 
@@ -136,7 +133,7 @@ class GestionnaireDuDomaine(GestionnaireDomaineStandard):
 class TraitementMessageCedule(BaseCallback):
 
     def __init__(self, gestionnaire: GestionnaireDomaineStandard):
-        super().__init__(gestionnaire.contexte)
+        super().__init__(gestionnaire)
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):
@@ -148,7 +145,7 @@ class TraitementMessageCedule(BaseCallback):
 class TraitementTransactionPersistee(BaseCallback):
 
     def __init__(self, gestionnaire: GestionnaireDomaineStandard):
-        super().__init__(gestionnaire.contexte)
+        super().__init__(gestionnaire)
         self._gestionnaire = gestionnaire
 
     def traiter_message(self, ch, method, properties, body):

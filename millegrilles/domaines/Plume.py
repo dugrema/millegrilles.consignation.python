@@ -1,6 +1,6 @@
 # Domaine Plume - ecriture de documents
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
 
@@ -61,18 +61,11 @@ class ConstantesPlume:
     }
 
 
-class GestionnairePlume(GestionnaireDomaine):
+class GestionnairePlume(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
-
-        nom_millegrille = contexte.configuration.nom_millegrille
-
-        # Queue message handlers
-        self.__handler_transaction = None
-        self.__handler_cedule = None
-        self.__handler_requetes_noeuds = None
 
     def configurer(self):
         super().configurer()
@@ -101,81 +94,14 @@ class GestionnairePlume(GestionnaireDomaine):
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
 
-    def setup_rabbitmq(self, channel):
+    def setup_rabbitmq(self):
 
         # Queue message handlers
         self.__handler_transaction = TraitementTransactionPersistee(self)
         self.__handler_cedule = TraitementMessageCedule(self)
         self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
-        nom_queue_transactions = '%s.%s' % (self.get_nom_queue(), 'transactions')
-        nom_queue_ceduleur = '%s.%s' % (self.get_nom_queue(), 'ceduleur')
-        nom_queue_processus = '%s.%s' % (self.get_nom_queue(), 'processus')
-        nom_queue_requetes_noeuds = '%s.%s' % (self.get_nom_queue(), 'requete.noeuds')
-
-        # Configurer la Queue pour les transactions
-        def callback_init_transaction(queue, self=self, callback=self.__handler_transaction.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_transactions,
-                routing_key='destinataire.domaine.%s.#' % self.get_nom_queue(),
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_transactions,
-            durable=False,
-            callback=callback_init_transaction,
-        )
-
-        # Configuration la queue pour le ceduleur
-        def callback_init_cedule(queue, self=self, callback=self.__handler_cedule.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_ceduleur,
-                routing_key='ceduleur.#',
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_ceduleur,
-            durable=False,
-            callback=callback_init_cedule,
-        )
-
-        # Queue pour les processus
-        def callback_init_processus(queue, self=self, callback=self.traitement_evenements.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_processus,
-                routing_key='processus.domaine.%s.#' % ConstantesPlume.DOMAINE_NOM,
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_processus,
-            durable=False,
-            callback=callback_init_processus,
-        )
-
-        # Queue pour les requetes de noeuds
-        def callback_init_requetes_noeuds(queue, self=self, callback=self.__handler_requetes_noeuds.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_noeuds,
-                queue=nom_queue_requetes_noeuds,
-                routing_key='requete.%s.#' % ConstantesPlume.DOMAINE_NOM,
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_requetes_noeuds,
-            durable=False,
-            callback=callback_init_requetes_noeuds,
-        )
+        super().setup_rabbitmq()
 
     def ajouter_nouveau_document(self, transaction):
         document_plume = ConstantesPlume.DOCUMENT_PLUME.copy()
@@ -318,6 +244,9 @@ class GestionnairePlume(GestionnaireDomaine):
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
+
+    def traiter_cedule(self, evenement):
+        pass
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):

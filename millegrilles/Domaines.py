@@ -1,6 +1,7 @@
 # Module avec utilitaires generiques pour mgdomaines
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
+    TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
@@ -174,19 +175,19 @@ class GestionnaireDomaine:
         self.channel_mq = None
         self._arret_en_cours = False
         self._stop_event = Event()
-        self.traitement_evenements = None
+        self._traitement_evenements = None
 
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     def configurer(self):
-        self.traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte, gestionnaire_domaine=self)
-        self.traitement_evenements.initialiser([self.get_collection_processus_nom()])
+        self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte, gestionnaire_domaine=self)
+        self._traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         self.demarreur_processus = MGPProcessusDemarreur(
             self._contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
-            self.get_collection_processus_nom(), self.traitement_evenements)
+            self.get_collection_processus_nom(), self._traitement_evenements)
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
@@ -241,7 +242,8 @@ class GestionnaireDomaine:
                     channel.queue_bind(
                         exchange=in_queue_config['exchange'],
                         queue=in_queue_config['nom'],
-                        routing_key=routing
+                        routing_key=routing,
+                        callback=None
                     )
 
             channel.queue_declare(
@@ -287,36 +289,6 @@ class GestionnaireDomaine:
         self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
         self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
 
-    def callback_queue_transaction(self, queue):
-        """
-        Suite d'un queue_declare, active le basic_consume sur la Q en utilisant la methode self.traiter_transaction.
-        :param queue:
-        :return:
-        """
-        nom_queue = queue.method.queue
-        self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
-        self.channel_mq.basic_consume(self.traiter_transaction, queue=nom_queue, no_ack=False)
-
-    def callback_queue_requete_noeud(self, queue):
-        """
-        Suite d'un queue_declare, active le basic_consume sur la Q en utilisant la methode self.traiter_transaction.
-        :param queue:
-        :return:
-        """
-        nom_queue = queue.method.queue
-        self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
-        self.channel_mq.basic_consume(self.traiter_requete_noeud, queue=nom_queue, no_ack=False)
-
-    def callback_queue_requete_inter(self, queue):
-        """
-        Suite d'un queue_declare, active le basic_consume sur la Q en utilisant la methode self.traiter_transaction.
-        :param queue:
-        :return:
-        """
-        nom_queue = queue.method.queue
-        self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
-        self.channel_mq.basic_consume(self.traiter_requete_inter, queue=nom_queue, no_ack=False)
-
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """
         Enregistre un watcher et demarre une thread qui lit le pipeline dans MongoDB. Les documents sont
@@ -341,18 +313,6 @@ class GestionnaireDomaine:
             raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s" % domaine_transaction)
 
         return processus
-
-    def traiter_transaction(self, ch, method, properties, body):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
-
-    def traiter_requete_noeud(self, ch, method, properties, body):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
-
-    def traiter_requete_inter(self, ch, method, properties, body):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
-
-    def traiter_cedule(self, message):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
     def get_collection_transaction_nom(self):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
@@ -415,20 +375,6 @@ class GestionnaireDomaine:
     def get_nom_queue(self):
         raise NotImplementedError("Methode non-implementee")
 
-    def get_nom_queue_requetes_noeuds(self):
-        """
-        Optionnel, le nom de la Q pour les requetes de noeuds.
-        :return: str Nom de la Q a utiliser
-        """
-        return None
-
-    def get_nom_queue_requetes_inter(self):
-        """
-        Optionnel, le nom de la Q pour les requetes inter millegrilles.
-        :return: str Nom de la Q a utiliser
-        """
-        return None
-
     def get_nom_collection(self):
         raise NotImplementedError("Methode non-implementee")
 
@@ -479,17 +425,19 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
     def __init__(self, contexte):
         super().__init__(contexte)
-        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
-        nom_millegrille = contexte.configuration.nom_millegrille
-
-        # Queue message handlers
-        self.__handler_transaction = None
+        self.__traitement_middleware = None
+        self.__traitement_noeud = None
         self.__handler_cedule = None
-        self.__handler_requetes_noeuds = None
+
+        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
     def configurer(self):
         super().configurer()
+
+        self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
+        self.__traitement_noeud = TraitementMessageDomaineRequete(self)
+        self.__handler_cedule = TraitementMessageCedule(self)
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         # Index noeud, _mg-libelle
@@ -503,75 +451,47 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
         ])
 
-    def setup_rabbitmq(self, channel):
-        nom_queue_transactions = '%s.%s' % (self.get_nom_queue(), 'transactions')
-        nom_queue_ceduleur = '%s.%s' % (self.get_nom_queue(), 'ceduleur')
-        nom_queue_processus = '%s.%s' % (self.get_nom_queue(), 'processus')
-        nom_queue_requetes_noeuds = '%s.%s' % (self.get_nom_queue(), 'requete.noeuds')
+    def get_queue_configuration(self):
+        """
+        :return: Liste de configuration pour les Q du domaine
+        """
 
-        # Configurer la Queue pour les transactions
-        def callback_init_transaction(queue, self=self, callback=self.get_handler_transaction().callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_transactions,
-                routing_key='destinataire.domaine.%s.#' % self.get_nom_queue(),
-                callback=None,
-            )
+        queues_config = [
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'transactions'),
+                'routing': [
+                    'destinataire.domaine.%s.#' % self.get_nom_domaine(),
+                ],
+                'exchange': self.configuration.exchange_middleware,
+                'callback': self.get_handler_transaction().traiter_message
+            },
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'ceduleur'),
+                'routing': [
+                    'ceduleur.#',
+                ],
+                'exchange': self.configuration.exchange_middleware,
+                'callback': self.get_handler_cedule().traiter_message
+            },
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'processus'),
+                'routing': [
+                    'processus.domaine.%s.#' % self.get_nom_domaine()
+                ],
+                'exchange': self.configuration.exchange_middleware,
+                'callback': self._traitement_evenements.traiter_message
+            },
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'requete.noeuds'),
+                'routing': [
+                    'requete.%s.#' % self.get_nom_domaine()
+                ],
+                'exchange': self.configuration.exchange_noeuds,
+                'callback': self.get_handler_requetes_noeuds().traiter_message
+            },
+        ]
 
-        channel.queue_declare(
-            queue=nom_queue_transactions,
-            durable=False,
-            callback=callback_init_transaction,
-        )
-
-        # Configuration la queue pour le ceduleur
-        def callback_init_cedule(queue, self=self, callback=self.get_handler_cedule().callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_ceduleur,
-                routing_key='ceduleur.#',
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_ceduleur,
-            durable=False,
-            callback=callback_init_cedule,
-        )
-
-        # Queue pour les processus
-        def callback_init_processus(queue, self=self, callback=self.traitement_evenements.callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
-                queue=nom_queue_processus,
-                routing_key='processus.domaine.%s.#' % self.get_nom_domaine(),
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_processus,
-            durable=False,
-            callback=callback_init_processus,
-        )
-
-        # Queue pour les requetes de noeuds
-        def callback_init_requetes_noeuds(queue, self=self, callback=self.get_handler_requetes_noeuds().callbackAvecAck):
-            self.inscrire_basicconsume(queue, callback)
-            channel.queue_bind(
-                exchange=self.configuration.exchange_noeuds,
-                queue=nom_queue_requetes_noeuds,
-                routing_key='requete.%s.#' % self.get_nom_domaine(),
-                callback=None,
-            )
-
-        channel.queue_declare(
-            queue=nom_queue_requetes_noeuds,
-            durable=False,
-            callback=callback_init_requetes_noeuds,
-        )
+        return queues_config
 
     def map_transaction_vers_document(self, transaction: dict, document: dict):
         for key, value in transaction.items():
@@ -579,13 +499,17 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 document[key] = value
 
     def get_handler_transaction(self):
-        raise NotImplementedError("Pas implemente")
-
-    def get_handler_cedule(self):
-        raise NotImplementedError("Pas implemente")
+        return self.__traitement_middleware
 
     def get_handler_requetes_noeuds(self):
-        raise NotImplementedError("Pas implemente")
+        return self.__traitement_noeud
+
+    def get_handler_cedule(self):
+        return self.__handler_cedule
+
+    def traiter_cedule(self, evenement):
+        """ Appele par __handler_cedule lors de la reception d'un message sur la Q .ceduleur du domaine """
+        raise NotImplementedError()
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):

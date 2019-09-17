@@ -817,11 +817,7 @@ class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
-        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
-            # Chaining vers le gestionnaire de processus du domaine
-            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
-
-        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+        if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer.
             routing_key_sansprefixe = routing_key.replace(
                 'destinataire.domaine.',
@@ -831,8 +827,6 @@ class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
             processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
             self._gestionnaire.demarrer_processus(processus, message_dict)
 
-        elif evenement == Constantes.EVENEMENT_CEDULEUR:
-            self._gestionnaire.traiter_cedule(message_dict)
         else:
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
 
@@ -885,6 +879,22 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
         }
 
         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+
+
+class TraitementMessageCedule(TraitementMessageDomaine):
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        if evenement == Constantes.EVENEMENT_CEDULEUR:
+            self.traiter_evenement(message_dict)
+        else:
+            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+
+    def traiter_evenement(self, message):
+        self.gestionnaire.traiter_cedule(message)
 
 
 class ExceptionConnectionFermee(Exception):

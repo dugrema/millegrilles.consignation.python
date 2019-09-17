@@ -72,9 +72,6 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesParametres.LIBVAL_CONFIGURATION, ConstantesParametres.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesParametres.LIBVAL_EMAIL_SMTP, ConstantesParametres.DOCUMENT_EMAIL_SMTP)
 
-    def setup_rabbitmq(self, channel):
-        super().setup_rabbitmq(channel)
-
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: datetime.datetime.utcnow()
@@ -127,6 +124,9 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
+
+    def traiter_cedule(self, evenement):
+        pass
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
