@@ -31,9 +31,9 @@ class ConstantesMaitreDesCles:
 
     LIBVAL_CONFIGURATION = 'configuration'
 
-    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = 'nouvelleCle.grosFichier'
-    TRANSACTION_NOUVELLE_CLE_DOCUMENT = 'nouvelleCle.document'
-    TRANSACTION_MAJ_DOCUMENT_CLES = 'majcles'
+    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.nouvelleCle.grosFichier' % DOMAINE_NOM
+    TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.nouvelleCle.document' % DOMAINE_NOM
+    TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
 
     TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
 
@@ -491,6 +491,10 @@ class ProcessusReceptionCles(MGProcessusTransaction):
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement, TransactionDocumentClesVersionMapper())
 
+    def traitement_regenerer(self, id_transaction, domaine):
+        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
+        pass
+
     def recrypterCle(self, cle_secrete_encryptee):
         cert_maitredescles = self._controleur.gestionnaire.get_certificat
         fingerprint_certmaitredescles = b64encode(cert_maitredescles.fingerprint(hashes.SHA1())).decode('utf-8')
@@ -544,6 +548,10 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traitement_regenerer(self, id_transaction, domaine):
+        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
+        pass
 
     def initiale(self):
         transaction = self.transaction

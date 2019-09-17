@@ -38,7 +38,7 @@ class RegenererTest(BaseMongo):
         processus_controleur.regenerer_documents()
 
     def regenerer_maitredescles(self):
-        gestionnaire_maitredescles = GestionnaireGrosFichiers(self.contexte)
+        gestionnaire_maitredescles = GestionnaireMaitreDesCles(self.contexte)
         processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_maitredescles)
         processus_controleur.regenerer_documents()
 
