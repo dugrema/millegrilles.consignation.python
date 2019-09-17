@@ -9,7 +9,7 @@ class BaseMongo:
 
     def __init__(self):
         self._contexte = ContexteRessourcesMilleGrilles()
-        self._contexte.initialiser(init_message=False)
+        self._contexte.initialiser(init_message=True)
         self.document_dao = self._contexte.document_dao
 
     def deconnecter(self):
