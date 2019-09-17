@@ -463,7 +463,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'destinataire.domaine.%s.#' % self.get_nom_domaine(),
                 ],
                 'exchange': self.configuration.exchange_middleware,
-                'callback': self.get_handler_transaction().traiter_message
+                'callback': self.get_handler_transaction().callbackAvecAck
             },
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'ceduleur'),
@@ -471,7 +471,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'ceduleur.#',
                 ],
                 'exchange': self.configuration.exchange_middleware,
-                'callback': self.get_handler_cedule().traiter_message
+                'callback': self.get_handler_cedule().callbackAvecAck
             },
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'processus'),
@@ -479,7 +479,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'processus.domaine.%s.#' % self.get_nom_domaine()
                 ],
                 'exchange': self.configuration.exchange_middleware,
-                'callback': self._traitement_evenements.traiter_message
+                'callback': self._traitement_evenements.callbackAvecAck
             },
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'requete.noeuds'),
@@ -487,7 +487,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'requete.%s.#' % self.get_nom_domaine()
                 ],
                 'exchange': self.configuration.exchange_noeuds,
-                'callback': self.get_handler_requetes_noeuds().traiter_message
+                'callback': self.get_handler_requetes_noeuds().callbackAvecAck
             },
         ]
 
