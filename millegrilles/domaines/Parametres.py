@@ -118,6 +118,16 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
     def get_handler_requetes_noeuds(self):
         return self.__handler_requetes_noeuds
 
+    def identifier_processus(self, domaine_transaction):
+        if domaine_transaction == ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP:
+            processus = "millegrilles_domaines_Parametres:ProcessusTransactionModifierEmailSmtp"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_CLES_RECUES:
+            processus = "millegrilles_domaines_Parametres:ProcessusTransactionClesRecues"
+        else:
+            processus = super().identifier_processus(domaine_transaction)
+
+        return processus
+
 
 class TraitementMessageCedule(TraitementMessageDomaine):
 
@@ -146,14 +156,7 @@ class TraitementTransactionPersistee(TraitementMessageDomaine):
             ''
         )
 
-        # Actions
-        if routing_key_sansprefixe == ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP:
-            processus = "millegrilles_domaines_Parametres:ProcessusTransactionModifierEmailSmtp"
-        elif routing_key_sansprefixe == ConstantesParametres.TRANSACTION_CLES_RECUES:
-            processus = "millegrilles_domaines_Parametres:ProcessusTransactionClesRecues"
-        else:
-            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-
+        processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
         self._gestionnaire.demarrer_processus(processus, message_dict)
 
 
@@ -179,7 +182,7 @@ class ProcessusTransactionModifierEmailSmtp(ProcessusParametres):
         :return:
         """
         transaction = self.charger_transaction()
-        document_email_smtp = self._controleur._gestionnaire_domaine.modifier_document_email_smtp(transaction)
+        document_email_smtp = self._controleur.gestionnaire.modifier_document_email_smtp(transaction)
 
         tokens_attente = None
         if document_email_smtp.get(Constantes.DOCUMENT_SECTION_CRYPTE) is not None:
@@ -196,7 +199,7 @@ class ProcessusTransactionModifierEmailSmtp(ProcessusParametres):
     def sauvegarder_changements(self):
         """ Mettre a jour le document """
         transaction = self.charger_transaction()
-        document_email_smtp = self._controleur._gestionnaire_domaine.modifier_document_email_smtp(transaction)
+        document_email_smtp = self._controleur.gestionnaire.modifier_document_email_smtp(transaction)
 
         self.set_etape_suivante()  # Termine
         return {
@@ -215,6 +218,9 @@ class ProcessusTransactionClesRecues(ProcessusParametres):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        pass  # Rien a faire pour cette transaction
 
     def initiale(self):
         """
