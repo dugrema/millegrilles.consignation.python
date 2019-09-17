@@ -246,8 +246,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerSecuriteRepertoire"
 
         else:
-            # Type de transaction inconnue, on lance une exception
-            raise ValueError("Type de transaction inconnue: routing: %s" % domaine_transaction)
+            processus = super().identifier_processus(domaine_transaction)
 
         return processus
 
@@ -287,7 +286,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_repertoire_corbeille = collection_domaine.find_one(
             {
-                ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+                ConstantesGrosFichiers.DOCUMENT_CHEMIN: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
                 ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
              }
         )
@@ -297,7 +296,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_repertoire_orphelins = collection_domaine.find_one(
             {
-                ConstantesGrosFichiers.DOCUMENT_CHEMIN: '/',
+                ConstantesGrosFichiers.DOCUMENT_CHEMIN: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
                 ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
              }
         )
@@ -337,7 +336,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             if document_repertoire_orphelins is None:
                 transaction_orphelins = {
                     ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS,
-                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
                     ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
                 }
                 self.generateur_transactions.soumettre_transaction(transaction_orphelins, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
@@ -346,7 +345,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
             if document_repertoire_corbeille is None:
                 transaction_corbeille = {
                     ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE,
-                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
                     ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE
                 }
                 self.generateur_transactions.soumettre_transaction(transaction_corbeille, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
@@ -422,8 +421,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = str(uuid.uuid1())
         document_repertoire[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite
 
-        chemin_parent = '/'  # Racine
-        document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = chemin_parent
+        document_repertoire[ConstantesGrosFichiers.DOCUMENT_CHEMIN] = nom_repertoire
 
         self._logger.info("Insertion repertoire special: %s" % str(document_repertoire))
 

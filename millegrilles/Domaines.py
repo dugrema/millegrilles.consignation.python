@@ -281,7 +281,16 @@ class GestionnaireDomaine:
         watcher.start()
 
     def identifier_processus(self, domaine_transaction):
-        raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
+        nom_domaine = self.get_nom_domaine()
+        operation = domaine_transaction.replace('%s.' % nom_domaine, '')
+
+        if operation == Constantes.TRANSACTION_ROUTING_DOCINITIAL:
+            processus = "%s:millegrilles_MGProcessus:MGProcessusDocInitial" % operation
+        else:
+            # Type de transaction inconnue, on lance une exception
+            raise ValueError("Type de transaction inconnue: routing: %s" % domaine_transaction)
+
+        return processus
 
     def traiter_transaction(self, ch, method, properties, body):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
@@ -337,7 +346,7 @@ class GestionnaireDomaine:
             # configuration_initiale[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant.timestamp()
             # configuration_initiale[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant.timestamp()
             nouveau_doc = {
-                'document': configuration_initiale
+                Constantes.DOCUMENT_INFODOC_SOUSDOCUMENT: configuration_initiale
             }
 
             # collection_domaine.insert(configuration_initiale)

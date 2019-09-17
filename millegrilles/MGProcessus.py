@@ -31,9 +31,20 @@ class MGPProcesseur:
         :raises ErreurProcessusInconnu: Si le processus est inconnu.
         """
         nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
-        nom_module, nom_classe = nom_processus.split(':')
+        resultats = nom_processus.split(':')
+        if len(resultats) == 2:
+            routing = resultats[0]
+            nom_module = resultats[0]
+            nom_classe = resultats[1]
+        elif len(resultats) == 3:
+            routing = resultats[0]
+            nom_module = resultats[1]
+            nom_classe = resultats[2]
+        else:
+            raise ValueError("Mapping processus incorrect: %s" % nom_processus)
+
         nom_module = nom_module.replace("_", ".")
-        logging.debug('Importer %s, %s' % (nom_module, nom_classe))
+        logging.debug('Importer domaine %s : %s.%s' % (routing, nom_module, nom_classe))
         module_processus = __import__('%s' % nom_module, fromlist=nom_classe)
         classe_processus = getattr(module_processus, nom_classe)
         return classe_processus
@@ -89,6 +100,10 @@ class MGPProcesseur:
     @property
     def get_collection_transaction_nom(self):
         return self.__gestionnaire_domaine.get_collection_transaction_nom
+
+    @property
+    def get_collection_documents(self):
+        return self.__gestionnaire_domaine.get_collection
 
     @property
     def contexte(self):
@@ -817,6 +832,27 @@ class MGProcessusTransaction(MGProcessus):
                 self._transaction_mapper.map_version_to_current(self._transaction)
 
         return self._transaction
+
+
+class MGProcessusDocInitial(MGProcessusTransaction):
+
+    def __init__(self, controleur: MGPProcesseur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+
+    def initiale(self):
+        transaction = self.transaction
+
+        document = transaction[Constantes.DOCUMENT_INFODOC_SOUSDOCUMENT]
+        mg_libelle = document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        operations = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': document
+        }
+
+        collection_documents = self._controleur.get_collection_documents()
+        collection_documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}, operations, upsert=True)
+
+        self.set_etape_suivante()  # Termine
 
 
 # Classe qui sert a demarrer un processus

@@ -147,6 +147,7 @@ COLLECTION_TRANSACTION_STAGING = 'transactions.staging'
 DOCUMENT_INFODOC_LIBELLE = '_mg-libelle'
 DOCUMENT_INFODOC_DERNIERE_MODIFICATION = '_mg-derniere-modification'
 DOCUMENT_INFODOC_DATE_CREATION = '_mg-creation'
+DOCUMENT_INFODOC_SOUSDOCUMENT = 'document'
 
 # Section cryptee d'un document
 DOCUMENT_SECTION_CRYPTE = 'crypte'
