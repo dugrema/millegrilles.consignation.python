@@ -8,6 +8,7 @@ from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers, Gestionna
 from millegrilles.domaines.MaitreDesCles import GestionnaireMaitreDesCles
 from millegrilles.domaines.SenseursPassifs import GestionnaireSenseursPassifs
 from millegrilles.domaines.Principale import GestionnairePrincipale
+from millegrilles.domaines.Plume import GestionnairePlume
 
 import logging
 
@@ -56,12 +57,18 @@ class RegenererTest(BaseMongo):
         processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_principale)
         processus_controleur.regenerer_documents()
 
+    def regenerer_plume(self):
+        gestionnaire_plume = GestionnairePlume(self.contexte)
+        processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_plume)
+        processus_controleur.regenerer_documents()
+
     def test(self):
         # self.liste_documents_gros_fichiers()
         # self.regenerer_grosfichiers()
         # self.regenerer_maitredescles()
         # self.regenerer_senseurspassifs()
-        self.regenerer_principale()
+        # self.regenerer_principale()
+        self.regenerer_plume()
 
 
 class MockGestionnaire(GestionnaireDomaine):

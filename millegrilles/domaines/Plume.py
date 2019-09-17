@@ -18,11 +18,11 @@ class ConstantesPlume:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
-    TRANSACTION_NOUVEAU_DOCUMENT = 'nouveauDocument'
-    TRANSACTION_MODIFIER_DOCUMENT = 'modifierDocument'
-    TRANSACTION_SUPPRIMER_DOCUMENT = 'supprimerDocument'
-    TRANSACTION_PUBLIER_DOCUMENT = 'publierDocument'
-    TRANSACTION_DEPUBLIER_DOCUMENT = 'depublierDocument'
+    TRANSACTION_NOUVEAU_DOCUMENT = '%s.nouveauDocument' % DOMAINE_NOM
+    TRANSACTION_MODIFIER_DOCUMENT = '%s.modifierDocument' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_DOCUMENT = '%s.supprimerDocument' % DOMAINE_NOM
+    TRANSACTION_PUBLIER_DOCUMENT = '%s.publierDocument' % DOMAINE_NOM
+    TRANSACTION_DEPUBLIER_DOCUMENT = '%s.depublierDocument' % DOMAINE_NOM
 
     DOCUMENT_PLUME_UUID = 'uuid'
     DOCUMENT_SECURITE = 'securite'
@@ -221,7 +221,7 @@ class GestionnairePlume(GestionnaireDomaine):
     def __map_transaction_vers_document(self, transaction, document_plume):
         document_plume[ConstantesPlume.DOCUMENT_TITRE] = transaction[ConstantesPlume.DOCUMENT_TITRE]
         document_plume[ConstantesPlume.DOCUMENT_TEXTE] = transaction[ConstantesPlume.DOCUMENT_TEXTE]
-        document_plume[ConstantesPlume.DOCUMENT_QUILL_DELTA] = transaction[ConstantesPlume.DOCUMENT_QUILL_DELTA]
+        document_plume[ConstantesPlume.DOCUMENT_QUILL_DELTA] = transaction.get(ConstantesPlume.DOCUMENT_QUILL_DELTA)
         categories_string = transaction[ConstantesPlume.DOCUMENT_CATEGORIES]
         if categories_string is not None:
             categories = categories_string.split(' ')
@@ -302,6 +302,23 @@ class GestionnairePlume(GestionnaireDomaine):
     def get_nom_domaine(self):
         return ConstantesPlume.DOMAINE_NOM
 
+    def identifier_processus(self, domaine_transaction):
+        # Actions
+        if domaine_transaction == ConstantesPlume.TRANSACTION_NOUVEAU_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionAjouterDocumentPlume"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_MODIFIER_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionModifierDocumentPlume"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_SUPPRIMER_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionSupprimerDocumentPlume"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_PUBLIER_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionPublierDocumentPlume"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_DEPUBLIER_DOCUMENT:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionDepublierDocumentPlume"
+        else:
+            processus = super().identifier_processus(domaine_transaction)
+
+        return processus
+
 
 class TraitementMessageCedule(TraitementMessageDomaine):
 
@@ -330,20 +347,7 @@ class TraitementTransactionPersistee(TraitementMessageDomaine):
             ''
         )
 
-        # Actions
-        if routing_key_sansprefixe == ConstantesPlume.TRANSACTION_NOUVEAU_DOCUMENT:
-            processus = "millegrilles_domaines_Plume:ProcessusTransactionAjouterDocumentPlume"
-        elif routing_key_sansprefixe == ConstantesPlume.TRANSACTION_MODIFIER_DOCUMENT:
-            processus = "millegrilles_domaines_Plume:ProcessusTransactionModifierDocumentPlume"
-        elif routing_key_sansprefixe == ConstantesPlume.TRANSACTION_SUPPRIMER_DOCUMENT:
-            processus = "millegrilles_domaines_Plume:ProcessusTransactionSupprimerDocumentPlume"
-        elif routing_key_sansprefixe == ConstantesPlume.TRANSACTION_PUBLIER_DOCUMENT:
-            processus = "millegrilles_domaines_Plume:ProcessusTransactionPublierDocumentPlume"
-        elif routing_key_sansprefixe == ConstantesPlume.TRANSACTION_DEPUBLIER_DOCUMENT:
-            processus = "millegrilles_domaines_Plume:ProcessusTransactionDepublierDocumentPlume"
-        else:
-            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-
+        processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
         self._gestionnaire.demarrer_processus(processus, message_dict)
 
 
@@ -427,7 +431,7 @@ class ProcessusTransactionAjouterDocumentPlume(ProcessusPlume):
     def initiale(self):
         """ Sauvegarder une nouvelle version d'un fichier """
         transaction = self.charger_transaction()
-        document_plume = self._controleur._gestionnaire_domaine.ajouter_nouveau_document(transaction)
+        document_plume = self._controleur.gestionnaire.ajouter_nouveau_document(transaction)
         self.set_etape_suivante()  # Termine
 
         return {
@@ -448,7 +452,7 @@ class ProcessusTransactionModifierDocumentPlume(ProcessusPlume):
     def initiale(self):
         """ Mettre a jour le document """
         transaction = self.charger_transaction()
-        document_plume = self._controleur._gestionnaire_domaine.modifier_document(transaction)
+        document_plume = self._controleur.gestionnaire.modifier_document(transaction)
         self.set_etape_suivante()  # Termine
 
         return {
@@ -467,7 +471,7 @@ class ProcessusTransactionSupprimerDocumentPlume(ProcessusPlume):
     def initiale(self):
         """ Supprimer le document """
         transaction = self.charger_transaction()
-        self._controleur._gestionnaire_domaine.supprimer_document(transaction)
+        self._controleur.gestionnaire.supprimer_document(transaction)
         self.set_etape_suivante()  # Termine
 
 
@@ -495,7 +499,7 @@ class ProcessusTransactionPublierDocumentPlume(ProcessusPlume):
         document = self._controleur.gestionnaire.get_document(uuid)
         routing_key = 'publicateur.plume.publierDocument'
 
-        generateur_transactions = self._controleur.contexte.generateur_transactions
+        generateur_transactions = self._controleur.generateur_transactions
         generateur_transactions.emettre_commande_noeuds(document, routing_key)
 
         self.set_etape_suivante(ProcessusTransactionPublierDocumentPlume.publier_catalogue.__name__)  # Termine
@@ -504,7 +508,7 @@ class ProcessusTransactionPublierDocumentPlume(ProcessusPlume):
         catalogue = self._controleur.gestionnaire.get_catalogue()
         routing_key = 'publicateur.plume.catalogue'
 
-        generateur_transactions = self._controleur.contexte.generateur_transactions
+        generateur_transactions = self._controleur.generateur_transactions
         generateur_transactions.emettre_commande_noeuds(catalogue, routing_key)
 
         self.set_etape_suivante()  # Termine

@@ -375,6 +375,18 @@ class StubMessageDao:
     def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=None, reply_to=None, correlation_id=None, channel=None):
         pass
 
+
+class StubGenerateurTransactions:
+
+    def soumettre_transaction(self, message_dict, domaine=None,
+                              reply_to=None, correlation_id=None,
+                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4):
+        pass
+
+    def emettre_commande_noeuds(self, message_dict, routing_key):
+        pass
+
+
 class MGPProcesseurRegeneration(MGPProcesseur):
     """
     Processeur utiliser pour regenerer les documents d'un domaine a partir de transactions deja traitees avec succes.
@@ -385,6 +397,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         super().__init__(contexte, gestionnaire_domaine)
 
         self.__message_dao = StubMessageDao()  # Stub Message DAO
+        self.__generateur_transactions = StubGenerateurTransactions()
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -398,6 +411,13 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         :return: Message Dao dummy qui ne fait rien.
         """
         return self.__message_dao
+
+    @property
+    def generateur_transactions(self):
+        """
+        :return: Generateur dummy qui ne fait rien.
+        """
+        return self.__generateur_transactions
 
     def regenerer_documents(self):
         """
@@ -464,13 +484,6 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
         # Executer le processus
         instance_processus.traitement_regenerer(id_transaction, processus_parametres)
-
-    @property
-    def generateur_transactions(self):
-        """
-        :return: Generateur dummy qui ne fait rien.
-        """
-        return None
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
         pass  # Aucun effet.
