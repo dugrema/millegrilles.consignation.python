@@ -742,7 +742,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         try:
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
         except DuplicateKeyError as dke:
-            self._logger.info("Cle dupliquee sur fichier %s, on le met orphelin" % fuuid)
+            self._logger.info("Cle dupliquee sur fichier %s, on ajoute un id unique dans le nom" % fuuid)
             nom_fichier = '%s_%s' % (uuid.uuid1(), transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER])
             set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
