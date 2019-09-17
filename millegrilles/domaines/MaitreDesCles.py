@@ -491,7 +491,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement, TransactionDocumentClesVersionMapper())
 
-    def traitement_regenerer(self, id_transaction, domaine):
+    def traitement_regenerer(self, id_transaction, parametres_processus):
         """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
         pass
 
@@ -549,7 +549,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traitement_regenerer(self, id_transaction, domaine):
+    def traitement_regenerer(self, id_transaction, parametres_processus):
         """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
         pass
 

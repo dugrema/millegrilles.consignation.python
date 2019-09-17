@@ -44,8 +44,8 @@ class RegenererTest(BaseMongo):
 
     def test(self):
         # self.liste_documents_gros_fichiers()
-        # self.regenerer_grosfichiers()
-        self.regenerer_maitredescles()
+        self.regenerer_grosfichiers()
+        # self.regenerer_maitredescles()
 
 
 class MockGestionnaire(GestionnaireDomaine):

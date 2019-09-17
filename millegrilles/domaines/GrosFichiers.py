@@ -444,6 +444,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
 
         if parent_uuid is not None:
             document_parent = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: parent_uuid})
+
+            if document_parent is None:
+                self._logger.info("Repertoire orphelin")
+                document_parent = collection_domaine.find_one(
+                    {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS}
+                )
+
             chemin_gparent = document_parent[ConstantesGrosFichiers.DOCUMENT_CHEMIN]
             nom_repertoire = document_parent[ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE]
             chemin_parent = '%s/%s' % (
@@ -637,6 +644,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaine):
         document_repertoire = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: repertoire_uuid})
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        if document_repertoire is None:
+            self._logger.info("Fichier orphelin fuuid: %s" % fuuid)
+            document_repertoire = collection_domaine.find_one(
+                {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS}
+            )
+
         uuid_fichier = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
         if uuid_fichier is None:
             # Chercher a identifier le fichier par chemin et nom
@@ -926,7 +939,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
 
     def maj_repertoire(self):
         uuid_fichier = self.parametres['uuid_fichier']
-        self._controleur._gestionnaire_domaine.maj_repertoire_fichier(uuid_fichier)
+        self._controleur.gestionnaire.maj_repertoire_fichier(uuid_fichier)
 
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
@@ -1062,7 +1075,7 @@ class ProcessusTransactionCreerRepertoire(ProcessusGrosFichiers):
 
         document_repertoire = self.parametres['document_repertoire']
         repertoire_uuid = document_repertoire[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
-        self._controleur._gestionnaire_domaine.maj_repertoire_parent(repertoire_uuid)
+        self._controleur.gestionnaire.maj_repertoire_parent(repertoire_uuid)
 
         self.set_etape_suivante()  # Termine
 
@@ -1256,7 +1269,7 @@ class ProcessusTransactionChangerSecuriteRepertoire(ProcessusGrosFichiers):
         uuid_repertoire = transaction[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
         securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
         if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_PRIVE]:
-            self._controleur._gestionnaire_domaine.maj_securite_repertoire(uuid_repertoire, securite)
+            self._controleur.gestionnaire.maj_securite_repertoire(uuid_repertoire, securite)
         else:
             raise ValueError("Type de securite non supporte: %s" % securite)
 

@@ -450,15 +450,20 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         id_transaction = transaction[Constantes.MONGO_DOC_ID]
         en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         domaine_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         nom_processus = self._gestionnaire.identifier_processus(domaine_transaction)
         classe_processus = self.identifier_processus({Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS: nom_processus})
 
-        evenement = {
+        processus_parametres = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_PERSISTEE,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: id_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction,
         }
-        instance_processus = classe_processus(self, evenement)
+        instance_processus = classe_processus(self, processus_parametres)
 
         # Executer le processus
-        instance_processus.traitement_regenerer(id_transaction, domaine_transaction)
+        instance_processus.traitement_regenerer(id_transaction, processus_parametres)
 
     @property
     def generateur_transactions(self):
@@ -645,7 +650,7 @@ class MGProcessus:
         logging.debug("Etape finale executee pour %s" % self.__class__.__name__)
         return resultat
 
-    def traitement_regenerer(self, id_transaction, domaine):
+    def traitement_regenerer(self, id_transaction, parametres_processus):
         """
         Execute toutes les etapes d'un processus deja traiter avec succes. Sert a regenerer le document.
         :return:
@@ -653,14 +658,10 @@ class MGProcessus:
         etape_execution = 'initiale'  # Commencer l'execution apres orientation (qui n'a aucun effet)
 
         self._document_processus = {
-            Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES: {
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: id_transaction,
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
-            }
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES: parametres_processus
         }
 
         nombre_etapes_executees = 0
-        parametres = {}
         while not self._processus_complete:
             nombre_etapes_executees = nombre_etapes_executees + 1
 
@@ -669,7 +670,7 @@ class MGProcessus:
             # Recuperer les parametres pour la prochaine etape
             resultat = methode_a_executer()
             if resultat is not None:
-                parametres.update(resultat)  # On fait juste cumuler les parametres pour la prochaine etape
+                parametres_processus.update(resultat)  # On fait juste cumuler les parametres pour la prochaine etape
 
             # Identifier prochaine etape, reset etat
             etape_execution = self._etape_suivante
