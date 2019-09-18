@@ -62,7 +62,7 @@ class MGPProcesseur:
                                     etape_suivante=None):
         raise NotImplementedError("Pas Implemente")
 
-    def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
+    def erreur_fatale(self, id_document_processus, message_original=None, erreur=None, processus=None):
         raise NotImplementedError("Pas Implemente")
 
     @property
@@ -358,16 +358,30 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         doc_id = collection_processus.insert_one(document)
         return doc_id.inserted_id
 
-    def erreur_fatale(self, id_document_processus, message_original=None, erreur=None):
+    def erreur_fatale(self, id_document_processus, message_original=None, erreur=None, processus=None):
         """
         Lance une erreur fatale pour ce message. Met l'information sur la Q d'erreurs.
         :param id_document_processus:
         :param message_original: Le message pour lequel l'erreur a ete generee.
         :param erreur: Optionnel, objet ErreurExecutionEtape.
+        :param processus:
         :return:
         """
         self._contexte.message_dao.transmettre_erreur_processus(
             id_document_processus=id_document_processus, message_original=message_original, detail=erreur)
+        self.__logger.error("Processus erreur _id: %s" % id_document_processus)
+
+        # Sauvegarder l'erreur dans le document de processus
+        collection_processus = self._contexte.document_dao.get_collection(self.gestionnaire.get_collection_processus_nom())
+        filtre_processus = {Constantes.MONGO_DOC_ID: id_document_processus}
+        operations = {
+            '$push': {'erreurs': str(erreur)}
+        }
+        collection_processus.update_one(filtre_processus, operations)
+
+        # Transmettre  l'erreur pour completer la transaction
+        if processus is not None:
+            processus.marquer_evenement_transaction(Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT)
 
 
 class StubMessageDao:
@@ -637,7 +651,7 @@ class MGProcessus:
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
-            self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur)
+            self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur, processus=self)
 
     ''' Methode initiale, doit etre implementee par la sous-classe '''
     def initiale(self):
