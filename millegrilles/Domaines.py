@@ -846,7 +846,7 @@ class GroupeurTransactionsARegenerer:
         :return:
         """
         if self.__complet:
-            raise StopIteration()
+            return
 
         self.__complet = True
         curseur = self.__preparer_curseur_transactions()
@@ -858,7 +858,7 @@ class GroupeurTransactionsARegenerer:
         #     self.__complet = True  # Ce generateur supporte un seul groupe
         #     return self.__curseur
 
-        raise StopIteration()
+        return
 
     @property
     def gestionnaire(self):
@@ -875,7 +875,7 @@ class GroupeurTransactionsSansEffet:
         return self
 
     def __next__(self):
-        raise StopIteration()
+        return
 
 
 class TransactionTypeInconnuError(Exception):
