@@ -478,7 +478,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
 class ProcessusMAJDocumentCles(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement, TransactionDocumentClesVersionMapper())
+        super().__init__(controleur, evenement, TransactionDocumentMajClesVersionMapper())
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
@@ -601,7 +601,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         return {'resumer': transaction_resumer}
 
 
-class TransactionDocumentClesVersionMapper:
+class TransactionDocumentMajClesVersionMapper:
     """
     Mapper de versions pour la transaction DocumentCles (GrosFichiers)
     """
