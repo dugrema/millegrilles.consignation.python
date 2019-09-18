@@ -367,7 +367,7 @@ class GestionnaireDomaine:
         document_configuration = collection_domaine.find_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_CONFIGURATION}
         )
-        self._logger.error("DOCUMENT CONFIG: %s" % document_configuration)
+        self._logger.debug("Document config domaine: %s" % document_configuration)
 
         if document_configuration is not None:
             version_collection = document_configuration.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION)
