@@ -47,6 +47,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
     TRANSACTION_CHAMP_IDDOC = 'id-doc'
     TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
+    TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
 
     TRANSACTION_VERSION_COURANTE = 5
 
@@ -484,16 +485,13 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         transaction = self.transaction
 
         # Extraire les cles de document de la transaction (par processus d'elimination)
-        # IDENTIFICATEURS_DOCUMENTS est optionnel, pour certains docs le _mg-libelle est suffisant comme id
         cles_document = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
                 transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
+                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
         }
-        id_document_cle = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS)
-        if id_document_cle is not None:
-            cles_document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = id_document_cle
 
-        # Preparer requete MongoDB
         contenu_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
@@ -626,8 +624,8 @@ class TransactionDocumentClesVersionMapper:
         mapper(transaction)
 
     def map_version_4_to_current(self, transaction):
-        fuuid = transaction.get('fuuid')
-        if fuuid is not None:
+        if transaction.get('fuuid') is not None:
+            fuuid = transaction.get('fuuid')
             # Type GrosFichiers
             document = {
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesGrosFichiers.DOMAINE_NOM,
@@ -638,7 +636,17 @@ class TransactionDocumentClesVersionMapper:
             }
             del transaction['fuuid']
             transaction.update(document)
-            self.__logger.warning("Mapping V4->5 transaction: %s" % str(transaction))
+            self.__logger.warning("Mapping V4->5 transaction GrosFichiers: %s" % str(transaction))
+        elif transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE):
+            mg_libelle = ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE
+            document = {
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: mg_libelle,
+                }
+            }
+            del transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE]
+            transaction.update(document)
+            self.__logger.warning("Mapping V4->5 transaction Parametres: %s" % str(transaction))
 
     def map_version_5_to_current(self, transaction):
         """ Version courante, rien a faire """
