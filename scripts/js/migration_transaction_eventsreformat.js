@@ -1,4 +1,4 @@
-var nomMilleGrille = 'sansnom';
+var nomMilleGrille = 'dev2';
 var listeDomaines = [
 'millegrilles.domaines.GrosFichiers',
 'millegrilles.domaines.MaitreDesCles',
@@ -29,7 +29,7 @@ function maj(collection) {
         }
         let ops = {
             '$set': {
-                '_evenements.sansnom': mgEvenements,
+                '_evenements.dev2': mgEvenements,
                 '_evenements.transaction_complete': transactionComplete
             }
         }

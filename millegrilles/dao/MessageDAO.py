@@ -857,6 +857,7 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
+        hint = requete.get('hint')
 
         if projection is None:
             curseur = collection.find(filtre)
@@ -865,6 +866,9 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
         if sort_params is not None:
             curseur.sort(sort_params)
+
+        if hint is not None:
+            curseur.hint(hint)
 
         resultats = list()
         for resultat in curseur:
