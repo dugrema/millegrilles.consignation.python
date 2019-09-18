@@ -637,14 +637,14 @@ class TransactionDocumentClesVersionMapper:
             del transaction['fuuid']
             transaction.update(document)
             self.__logger.warning("Mapping V4->5 transaction GrosFichiers: %s" % str(transaction))
-        elif transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE):
-            mg_libelle = ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE
+        elif transaction.get('mg-libelle'):
             document = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction['uuid'],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: mg_libelle,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE: transaction['mg-libelle'],
                 }
             }
-            del transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE]
+            del transaction['mg-libelle']
             transaction.update(document)
             self.__logger.warning("Mapping V4->5 transaction Parametres: %s" % str(transaction))
 
