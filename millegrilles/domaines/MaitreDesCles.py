@@ -316,7 +316,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
             'certificat': self._gestionnaire.get_certificat_pem
         }
 
-        self._gestionnaire.generateur.transmettre_reponse(
+        self._gestionnaire.generateur_transactions.transmettre_reponse(
             message_resultat, properties.reply_to, properties.correlation_id
         )
 
@@ -359,7 +359,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
                 }
 
-        self._gestionnaire.generateur.transmettre_reponse(
+        self._gestionnaire.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )
 
