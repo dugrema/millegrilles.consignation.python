@@ -366,7 +366,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
 class ProcessusReceptionCles(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement, TransactionDocumentClesVersionMapper())
+        super().__init__(controleur, evenement)
 
     def traitement_regenerer(self, id_transaction, parametres_processus):
         """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
@@ -477,7 +477,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
 class ProcessusMAJDocumentCles(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
+        super().__init__(controleur, evenement, TransactionDocumentClesVersionMapper())
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
@@ -533,9 +533,14 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
 
 
 class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
+
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
+        pass
 
     def initiale(self):
         transaction = self.transaction

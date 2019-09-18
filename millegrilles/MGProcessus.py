@@ -896,8 +896,6 @@ class MGProcessusTransaction(MGProcessus):
     def transaction(self):
         if self._transaction is None:
             self._transaction = self.charger_transaction()
-            if self._transaction_mapper is not None:
-                self._transaction_mapper.map_version_to_current(self._transaction)
 
         return self._transaction
 
