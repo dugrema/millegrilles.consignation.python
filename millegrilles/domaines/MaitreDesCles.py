@@ -273,7 +273,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     @property
     def version_domaine(self):
-        return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+        return 6  # ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
@@ -416,7 +416,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         # La transaction va mettre a jour (ou creer) les cles pour
         generateur_transaction.soumettre_transaction(
             transaction_nouvellescles,
-            '%s.%s' % (ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES)
+            ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES
         )
 
 

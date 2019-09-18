@@ -367,6 +367,8 @@ class GestionnaireDomaine:
         document_configuration = collection_domaine.find_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_CONFIGURATION}
         )
+        self._logger.error("DOCUMENT CONFIG: %s" % document_configuration)
+
         if document_configuration is not None:
             version_collection = document_configuration.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION)
             if version_collection is None or version_collection < version_domaine:
@@ -420,7 +422,10 @@ class GestionnaireDomaine:
 
     def changer_version_collection(self, version):
         nouveau_doc = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: version
+            Constantes.DOCUMENT_INFODOC_SOUSDOCUMENT: {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_CONFIGURATION,
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: version
+            }
         }
 
         # collection_domaine.insert(configuration_initiale)
