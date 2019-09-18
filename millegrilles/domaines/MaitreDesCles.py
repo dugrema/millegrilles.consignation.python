@@ -469,7 +469,9 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
         self._logger.debug("Transmission nouvelle transaction cle recues pour GrosFichier")
-        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
+        generateur_transaction.soumettre_transaction(
+            transaction_resumer, domaine_routing, version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+        )
 
         self.set_etape_suivante()  # Termine
         return {'resumer': transaction_resumer}
@@ -545,7 +547,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
     def initiale(self):
         transaction = self.transaction
-        domaine = transaction['domaine']
+        domaine = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE]
         # UUID du contenu, pas celui dans en-tete
         uuid_transaction_doc = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         iddoc = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
@@ -595,7 +597,9 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
         self._logger.debug("Transmission nouvelle transaction cle recues pour %s" % domaine_routing)
-        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
+        generateur_transaction.soumettre_transaction(
+            transaction_resumer, domaine_routing, version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+        )
 
         self.set_etape_suivante()  # Termine
         return {'resumer': transaction_resumer}
