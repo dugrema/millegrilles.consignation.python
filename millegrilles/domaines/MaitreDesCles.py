@@ -641,7 +641,7 @@ class TransactionDocumentClesVersionMapper:
             document = {
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction['uuid'],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_MGLIBELLE: transaction['mg-libelle'],
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: transaction['mg-libelle'],
                 }
             }
             del transaction['mg-libelle']
