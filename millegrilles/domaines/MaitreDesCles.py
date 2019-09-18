@@ -606,6 +606,8 @@ class TransactionDocumentClesVersionMapper:
             '5': self.map_version_5_to_current,
         }
 
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
     def map_version_to_current(self, transaction):
         version = transaction[
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION]
@@ -628,6 +630,7 @@ class TransactionDocumentClesVersionMapper:
             }
             del transaction['fuuid']
             transaction.update(document)
+            self.__logger.warning("Mapping V4->5 transaction: %s" % str(transaction))
 
     def map_version_5_to_current(self, transaction):
         """ Version courante, rien a faire """
