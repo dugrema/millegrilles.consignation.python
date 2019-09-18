@@ -923,6 +923,27 @@ class MGProcessusDocInitial(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
 
+class MGProcessusUpdateDoc(MGProcessusTransaction):
+
+    def __init__(self, controleur: MGPProcesseur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+
+    def initiale(self):
+        transaction = self.transaction
+
+        document = transaction[Constantes.DOCUMENT_INFODOC_SOUSDOCUMENT]
+        mg_libelle = document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        operations = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$set': document
+        }
+
+        collection_documents = self._controleur.get_collection_documents()
+        collection_documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}, operations)
+
+        self.set_etape_suivante()  # Termine
+
+
 # Classe qui sert a demarrer un processus
 class MGPProcessusDemarreur:
 

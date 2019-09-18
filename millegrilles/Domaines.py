@@ -219,6 +219,7 @@ class GestionnaireDomaine:
         doit_regenerer = self.verifier_version_transactions(self.version_domaine)
         if doit_regenerer:
             self.regenerer_documents()
+            self.changer_version_collection(self.version_domaine)
 
     def get_queue_configuration(self):
         """
@@ -325,6 +326,8 @@ class GestionnaireDomaine:
 
         if operation == Constantes.TRANSACTION_ROUTING_DOCINITIAL:
             processus = "%s:millegrilles_MGProcessus:MGProcessusDocInitial" % operation
+        elif operation == Constantes.TRANSACTION_ROUTING_UPDATE_DOC:
+            processus = "%s:millegrilles_MGProcessus:MGProcessusUpdateDoc" % operation
         else:
             # Type de transaction inconnue, on lance une exception
             raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s" % domaine_transaction)
@@ -414,6 +417,15 @@ class GestionnaireDomaine:
             self._logger.info("Document de %s pour %s: %s" % (
                 mg_libelle, str(document_configuration), self.__class__.__name__
             ))
+
+    def changer_version_collection(self, version):
+        nouveau_doc = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: version
+        }
+
+        # collection_domaine.insert(configuration_initiale)
+        domaine_transaction = '%s.%s' % (self.get_nom_domaine(), Constantes.TRANSACTION_ROUTING_UPDATE_DOC)
+        self.generateur_transactions.soumettre_transaction(nouveau_doc, domaine_transaction)
 
     '''
     Implementer cette methode pour retourner le nom de la queue.
