@@ -335,8 +335,10 @@ class GestionnaireDomaine:
         return processus
 
     def regenerer_documents(self, stop_consuming=True):
+        self._logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
         processeur_regeneration = MGPProcesseurRegeneration(self.__contexte, self)
         processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
+        self._logger.info("Fin regeneration des documents de %s" % self.get_nom_domaine())
 
     def get_collection_transaction_nom(self):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
