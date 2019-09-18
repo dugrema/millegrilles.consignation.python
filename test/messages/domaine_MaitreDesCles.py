@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from base64 import b64encode
 
+
 class MessagesSample(BaseCallback):
 
     def __init__(self):
@@ -23,7 +24,6 @@ class MessagesSample(BaseCallback):
         self.contexte.initialiser(init_document=False)
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
-        self.message_dao = self.contexte.message_dao
         self.channel = None
         self.event_recu = Event()
         # self.thread_ioloop = Thread(target=self.run_ioloop)
@@ -115,7 +115,7 @@ class MessagesSample(BaseCallback):
 
         enveloppe_val = self.generateur.soumettre_transaction(
             nouvelle_cle,
-            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER,
+            ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER,
             reply_to=self.queue_name,
             correlation_id='efgh'
         )
@@ -149,7 +149,7 @@ class MessagesSample(BaseCallback):
 
         enveloppe_val = self.generateur.soumettre_transaction(
             nouvelle_cle,
-            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT,
+            ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT,
             reply_to=self.queue_name,
             correlation_id='efgh'
         )
@@ -160,8 +160,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = self.requete_cert_maitredescles()
-        enveloppe = self.nouvelle_cle_grosfichiers()
-        # enveloppe = self.nouvelle_cle_document()
+        # enveloppe = self.nouvelle_cle_grosfichiers()
+        enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.requete_decryptage_cle_fuuid()
 
 # --- MAIN ---

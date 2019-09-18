@@ -847,10 +847,9 @@ class MGProcessusTransaction(MGProcessus):
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def trouver_id_transaction(self):
-        parametres = self._document_processus[Constantes.PROCESSUS_MESSAGE_LIBELLE_PARAMETRES]
+        parametres = self.parametres
         id_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
-        domaine = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine)
+        collection = self.get_collection_transaction_nom()
         return {'id_transaction': id_transaction, 'nom_collection': collection}
 
     def charger_transaction(self, nom_collection=None):

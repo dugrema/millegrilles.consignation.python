@@ -417,7 +417,8 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         # La transaction va mettre a jour (ou creer) les cles pour
         generateur_transaction.soumettre_transaction(
             transaction_nouvellescles,
-            ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES
+            ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES,
+            version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
         )
 
 
@@ -469,9 +470,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
         self._logger.debug("Transmission nouvelle transaction cle recues pour GrosFichier")
-        generateur_transaction.soumettre_transaction(
-            transaction_resumer, domaine_routing, version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
-        )
+        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
 
         self.set_etape_suivante()  # Termine
         return {'resumer': transaction_resumer}
@@ -597,9 +596,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
         self._logger.debug("Transmission nouvelle transaction cle recues pour %s" % domaine_routing)
-        generateur_transaction.soumettre_transaction(
-            transaction_resumer, domaine_routing, version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
-        )
+        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
 
         self.set_etape_suivante()  # Termine
         return {'resumer': transaction_resumer}
