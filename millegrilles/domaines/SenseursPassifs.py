@@ -4,7 +4,8 @@ import socket
 import logging
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, GroupeurTransactionsARegenerer
+from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard
+from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
@@ -233,6 +234,9 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
+
+    def creer_regenerateur_documents(self):
+        return RegenerateurDeDocuments(self)
 
 
 class TraitementMessageRequete(TraitementMessageDomaine):
@@ -1235,6 +1239,15 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         return uuid_transaction
 
 
+class RegenerateurSenseursPassifs(RegenerateurDeDocuments):
+    """
+    Efface et regenere les documents de SenseursPassifs. Optimise pour utiliser lectures recentes.
+    """
+
+    def creer_generateur_transactions(self):
+        return GroupeurRegenererTransactionsSenseursPassif(self._gestionnaire_domaine)
+
+
 class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer):
     """
     Classe qui permet de grouper les transactions d'un domaine pour regenerer les documents.
@@ -1274,9 +1287,21 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
             {'$group': group_query}
         ])
 
-
     def __preparer_curseur_autres(self):
-        pass
+        nom_millegrille = self.gestionnaire.configuration.nom_millegrille
+
+        match_query = {
+            '_evenements.transaction_complete': True,
+            '_evenements.%s.transaction_traitee' % nom_millegrille: {'$exists': True},
+        }
+        sort_query = [
+            {'_evenements.%s.transaction_traitee' % nom_millegrille: 1}
+        ]
+
+        collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
+        collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
+
+        return collection_transaction.find(match_query).sort(sort_query)
 
     def __iter__(self):
         return self
