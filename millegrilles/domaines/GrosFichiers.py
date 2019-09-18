@@ -327,6 +327,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
 
+    def traiter_cedule(self, evenement):
+        pass
+
     def creer_repertoire_special(self, nom_repertoire, mg_libelle, uuid, securite=Constantes.SECURITE_PRIVE, libelle=ConstantesGrosFichiers.LIBVAL_REPERTOIRE):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
