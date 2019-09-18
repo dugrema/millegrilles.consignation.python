@@ -66,6 +66,7 @@ CONFIG_NOM_MILLEGRILLE = 'nom_millegrille'
 
 # Domaines
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
+LIBVAL_CONFIGURATION = 'configuration'
 
 # Email notifications
 CONFIG_EMAIL_HOST = 'email_host'

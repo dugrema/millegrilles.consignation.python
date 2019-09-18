@@ -1,6 +1,6 @@
 # Module de processus pour MilleGrilles
 import logging
-import datetime, time
+import datetime
 
 from bson.objectid import ObjectId
 
@@ -433,7 +433,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         return self.__generateur_transactions
 
-    def regenerer_documents(self):
+    def regenerer_documents(self, stop_consuming=True):
         """
         Effectue une requete pour chaque type de transaction du domaine, en ordonnant les transactions
         completes et traitees correctement en ordre de traitement dans la MilleGrille avec autorite.
@@ -444,7 +444,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         regenerateur = self._gestionnaire.creer_regenerateur_documents()
 
         # Deconnecter les Q (channel - consumer tags)
-        self.gestionnaire.stop_consuming()
+        if stop_consuming:
+            self.gestionnaire.stop_consuming()
 
         # Supprimer le contenu de la collection de documents
         regenerateur.supprimer_documents()
@@ -460,7 +461,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         self.gestionnaire.resoumettre_transactions()
 
         # Reconnecter les Q
-        self.gestionnaire.setup_rabbitmq()
+        if stop_consuming:
+            self.gestionnaire.setup_rabbitmq()
 
     def traiter_transactions(self, curseur_transactions):
         erreurs_regeneration = []

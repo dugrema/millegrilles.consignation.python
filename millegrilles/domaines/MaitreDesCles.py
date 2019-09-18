@@ -4,7 +4,7 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 from cryptography.hazmat.backends import default_backend
@@ -119,22 +119,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
         ], unique=True)
-
-        # Index par fingerprint de certificat
-        # collection_domaine.create_index([
-        #     (ConstantesPki.LIBELLE_FINGERPRINT, 1)
-        # ], unique=True)
-        # # Index par chaine de certificat verifie
-        # collection_domaine.create_index([
-        #     (ConstantesPki.LIBELLE_CHAINE_COMPLETE, 2),
-        #     (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        # ])
-        # # Index pour trouver l'autorite qui a signe un certificat (par son subject)
-        # collection_domaine.create_index([
-        #     (ConstantesPki.LIBELLE_SUBJECT_KEY, 1),
-        #     (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
-        #     (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
-        # ])
 
     def charger_certificat_courant(self):
         fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_certs, self.__prefix_maitredescles)
@@ -286,6 +270,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def traiter_cedule(self, evenement):
         pass
+
+    @property
+    def version_domaine(self):
+        return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):

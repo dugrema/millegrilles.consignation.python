@@ -3,7 +3,7 @@ from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
     TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
-from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements
+from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
@@ -212,7 +212,13 @@ class GestionnaireDomaine:
         self.channel_mq = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
+
         self.setup_rabbitmq()
+
+        # Verifier si on doit upgrader les documents avant de commencer a ecouter
+        doit_regenerer = self.verifier_version_transactions(self.version_domaine)
+        if doit_regenerer:
+            self.regenerer_documents()
 
     def get_queue_configuration(self):
         """
@@ -325,6 +331,10 @@ class GestionnaireDomaine:
 
         return processus
 
+    def regenerer_documents(self, stop_consuming=True):
+        processeur_regeneration = MGPProcesseurRegeneration(self.__contexte, self)
+        processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
+
     def get_collection_transaction_nom(self):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
 
@@ -343,6 +353,33 @@ class GestionnaireDomaine:
 
     def demarrer_processus(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
+
+    def verifier_version_transactions(self, version_domaine):
+        # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
+        collection_domaine = self.get_collection()
+
+        doit_regenerer = False
+
+        # Trouver le document de configuration
+        document_configuration = collection_domaine.find_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_CONFIGURATION}
+        )
+        if document_configuration is not None:
+            version_collection = document_configuration.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION)
+            if version_collection is None or version_collection < version_domaine:
+                self._logger.warning(
+                    "La collection a une version inferieure au domaine (V%d), on regenere les documents" %
+                    version_domaine
+                )
+                doit_regenerer = True
+
+            elif version_collection > version_domaine:
+                message_erreur = "Le code du domaine est V%d, le document de configuration est V%d (plus recent)" % (
+                    version_domaine, version_collection
+                )
+                raise Exception(message_erreur)
+
+        return doit_regenerer
 
     def initialiser_document(self, mg_libelle, doc_defaut):
         """
@@ -427,6 +464,10 @@ class GestionnaireDomaine:
     @property
     def _contexte(self):
         return self.__contexte
+
+    @property
+    def version_domaine(self):
+        return Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4
 
 
 class GestionnaireDomaineStandard(GestionnaireDomaine):
