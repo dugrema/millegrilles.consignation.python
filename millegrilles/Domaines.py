@@ -6,6 +6,7 @@ from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 
 import logging
 import json
@@ -329,7 +330,6 @@ class GestionnaireDomaine:
         elif operation == Constantes.TRANSACTION_ROUTING_UPDATE_DOC:
             processus = "%s:millegrilles_MGProcessus:MGProcessusUpdateDoc" % operation
         else:
-            # Type de transaction inconnue, on lance une exception
             raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s" % domaine_transaction)
 
         return processus
@@ -431,6 +431,20 @@ class GestionnaireDomaine:
         # collection_domaine.insert(configuration_initiale)
         domaine_transaction = '%s.%s' % (self.get_nom_domaine(), Constantes.TRANSACTION_ROUTING_UPDATE_DOC)
         self.generateur_transactions.soumettre_transaction(nouveau_doc, domaine_transaction)
+
+    def marquer_transaction_en_erreur(self, dict_message):
+        # Type de transaction inconnue, on lance une exception
+        id_transaction = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        domaine = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine)
+
+        evenement = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
+            Constantes.MONGO_DOC_ID: id_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: collection,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT,
+        }
+        self.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
 
     '''
     Implementer cette methode pour retourner le nom de la queue.

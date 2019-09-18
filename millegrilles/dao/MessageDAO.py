@@ -824,9 +824,12 @@ class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
                 ''
             )
 
-            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
-            self._gestionnaire.demarrer_processus(processus, message_dict)
-
+            try:
+                processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+                self.gestionnaire.demarrer_processus(processus, message_dict)
+            except Exception as e:
+                self.gestionnaire.marquer_transaction_en_erreur(message_dict)
+                raise e
         else:
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
 

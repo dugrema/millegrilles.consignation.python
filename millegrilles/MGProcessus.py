@@ -933,13 +933,17 @@ class MGProcessusUpdateDoc(MGProcessusTransaction):
 
         document = transaction[Constantes.DOCUMENT_INFODOC_SOUSDOCUMENT]
         mg_libelle = document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        del document[Constantes.DOCUMENT_INFODOC_LIBELLE]
         operations = {
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$set': document
+            '$set': document,
+            '$setOnInsert': {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle
+            }
         }
 
         collection_documents = self._controleur.get_collection_documents()
-        collection_documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}, operations)
+        collection_documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}, operations, upsert=True)
 
         self.set_etape_suivante()  # Termine
 
