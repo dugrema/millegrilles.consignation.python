@@ -361,28 +361,33 @@ class GestionnaireDomaine:
         # Configurer MongoDB, inserer le document de configuration de reference s'il n'existe pas
         collection_domaine = self.get_collection()
 
-        doit_regenerer = False
-
         # Trouver le document de configuration
         document_configuration = collection_domaine.find_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_CONFIGURATION}
         )
         self._logger.debug("Document config domaine: %s" % document_configuration)
 
+        doit_regenerer = True
         if document_configuration is not None:
             version_collection = document_configuration.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION)
-            if version_collection is None or version_collection < version_domaine:
+            if version_collection is None:
                 self._logger.warning(
-                    "La collection a une version inferieure au domaine (V%d), on regenere les documents" %
+                    "La collection a une version inconnue a celle du code Python (V%d), on regenere les documents" %
                     version_domaine
                 )
-                doit_regenerer = True
-
+            elif version_collection == version_domaine:
+                doit_regenerer = False
             elif version_collection > version_domaine:
                 message_erreur = "Le code du domaine est V%d, le document de configuration est V%d (plus recent)" % (
                     version_domaine, version_collection
                 )
                 raise Exception(message_erreur)
+            else:
+                self._logger.warning(
+                    "La collection a une version inferieure (V%d) a celle du code Python (V%d), on regenere les documents" %
+                    (version_collection, version_domaine)
+                )
+
 
         return doit_regenerer
 
