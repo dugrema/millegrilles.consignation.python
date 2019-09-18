@@ -4,7 +4,7 @@ import socket
 import logging
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaineStandard
+from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, GroupeurTransactionsARegenerer
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
@@ -113,20 +113,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         super().demarrer()
         self.demarrer_watcher_collection(
             SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
-
-    # def traiter_backlog(self):
-    #     # Il faut trouver la transaction la plus recente pour chaque noeud/senseur et relancer une transaction
-    #     # de persistance.
-    #     # Toutes les autres transactions non-traitees de SenseursPassifs.Lecture peuvent etre marquees comme traitees.
-    #     traitement_backlog_lectures = TraitementBacklogLecturesSenseursPassifs(self.document_dao, self.demarreur_processus)
-    #     liste_transactions = traitement_backlog_lectures.run_requete_plusrecentetransactionlecture_parsenseur()
-    #     traitement_backlog_lectures.run_requete_genererdeclencheur_parsenseur(liste_transactions)
-    #
-    #     # Ajouter messages declencheurs pour refaire les calculs horaires et quoditiens (moyennes, extremes)
-    #     traitement_backlog_lectures.declencher_calculs()
-    #
-    #     # Appliquer transactions de mise a jour manuelles en ordre.
-    #     traitement_backlog_lectures.declencher_maj_manuelle()
 
     def get_nom_queue(self):
         return SenseursPassifsConstantes.QUEUE_NOM
@@ -1247,3 +1233,62 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         uuid_transaction = self.soumettre_transaction(message, SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE)
 
         return uuid_transaction
+
+
+class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer):
+    """
+    Classe qui permet de grouper les transactions d'un domaine pour regenerer les documents.
+    Groupe toutes les transactions dans un seul groupe, en ordre de transaction_traitee.
+    """
+
+    def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
+        super().__init__(gestionnaire_domaine)
+
+        self.__preparation = [
+            self.__preparer_curseur_lectures,
+            self.__preparer_curseur_autres
+        ]
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def __preparer_curseur_lectures(self):
+        nom_millegrille = self.gestionnaire.configuration.nom_millegrille
+
+        match_query = {
+            'en-tete.domaine': 'millegrilles.domaines.SenseursPassifs.lecture',
+            '_evenements.%s.transaction_traitee' % nom_millegrille: {'$exists': True},
+            'temps_lecture': {'$exists': True},
+        }
+        group_query = {
+            '_id': {
+                'noeud': '$noeud',
+                'senseur': '$senseur'
+            },
+            'temps_lecture': {'$max': '$temps_lecture'}
+        }
+
+        collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
+        collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
+        self._curseur = collection_transaction.aggregate([
+            {'$match': match_query},
+            {'$group': group_query}
+        ])
+
+
+    def __preparer_curseur_autres(self):
+        pass
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """
+        Retourne un curseur Mongo avec les transactions a executer en ordre.
+        :return:
+        """
+        for methode_curseur in self.__preparation:
+            curseur = methode_curseur()
+            for valeur in curseur:
+                yield valeur
+
+        raise StopIteration()

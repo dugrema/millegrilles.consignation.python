@@ -390,7 +390,6 @@ class GestionnaireDomaine:
                     (version_collection, version_domaine)
                 )
 
-
         return doit_regenerer
 
     def initialiser_document(self, mg_libelle, doc_defaut):
@@ -800,23 +799,19 @@ class GroupeurTransactionsARegenerer:
 
     def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
         self.__gestionnaire_domaine = gestionnaire_domaine
-        self._curseur = None
-        self._complet = False
-
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.__complet = False
 
-        self._preparer_curseur_transactions()
-
-    def _preparer_curseur_transactions(self):
+    def __preparer_curseur_transactions(self):
         nom_collection_transaction = self.__gestionnaire_domaine.get_collection_transaction_nom()
         self.__logger.debug('Preparer curseur transactions sur %s' % nom_collection_transaction)
 
         collection_transactions = self.__gestionnaire_domaine.document_dao.get_collection(nom_collection_transaction)
 
-        filtre, index = self._preparer_requete()
-        self._curseur = collection_transactions.find(filtre, sort=index).hint(index)
+        filtre, index = self.__preparer_requete()
+        return collection_transactions.find(filtre).sort(index).hint(index)
 
-    def _preparer_requete(self):
+    def __preparer_requete(self):
         nom_millegrille = self.__gestionnaire_domaine.configuration.nom_millegrille
 
         # Parcourir l'index:
@@ -850,11 +845,28 @@ class GroupeurTransactionsARegenerer:
         Retourne un curseur Mongo avec les transactions a executer en ordre.
         :return:
         """
-        if not self._complet:
-            self._complet = True  # Ce generateur supporte un seul groupe
-            return self._curseur
+        if self.__complet:
+            raise StopIteration()
+
+        self.__complet = True
+        curseur = self.__preparer_curseur_transactions()
+        for valeur in curseur:
+            self.__logger.error("Transaction: %s" % str(valeur))
+            yield(valeur)
+        # if not self._complet:
+        #     self.__preparer_curseur_transactions()
+        #     self.__complet = True  # Ce generateur supporte un seul groupe
+        #     return self.__curseur
 
         raise StopIteration()
+
+    @property
+    def gestionnaire(self):
+        return self.__gestionnaire_domaine
+
+    @property
+    def _complet(self):
+        return self.__complet
 
 
 class GroupeurTransactionsSansEffet:
