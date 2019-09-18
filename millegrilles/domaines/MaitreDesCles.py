@@ -273,7 +273,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     @property
     def version_domaine(self):
-        return 6  # ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+        return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
@@ -596,6 +596,9 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
 
 class TransactionDocumentClesVersionMapper:
+    """
+    Mapper de versions pour la transaction DocumentCles (GrosFichiers)
+    """
 
     def __init__(self):
         self.__mappers = {
@@ -614,7 +617,7 @@ class TransactionDocumentClesVersionMapper:
 
     def map_version_4_to_current(self, transaction):
         fuuid = transaction.get('fuuid')
-        if transaction.get('fuuid') is not None:
+        if fuuid is not None:
             # Type GrosFichiers
             document = {
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesGrosFichiers.DOMAINE_NOM,
