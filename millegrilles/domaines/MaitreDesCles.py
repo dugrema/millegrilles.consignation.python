@@ -342,7 +342,9 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
-            'fuuid': evenement['fuuid'],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                'fuuid': evenement['fuuid'],
+            }
         }
         document = collection_documents.find_one(filtre)
         # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
