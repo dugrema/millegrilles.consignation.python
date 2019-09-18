@@ -200,6 +200,9 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         routing_key = 'destinataire.domaine.%s' % domaine
         self.message_dao.transmettre_message(dict_message, routing_key)
 
+    def creer_regenerateur_documents(self):
+        return RegenerateurSenseursPassifs(self)
+
 
 class TraitementMessageLecture(TraitementMessageDomaine):
 
@@ -234,9 +237,6 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
-
-    def creer_regenerateur_documents(self):
-        return RegenerateurDeDocuments(self)
 
 
 class TraitementMessageRequete(TraitementMessageDomaine):
@@ -1257,10 +1257,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
     def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
         super().__init__(gestionnaire_domaine)
 
-        self.__preparation = [
-            self.__preparer_curseur_lectures,
-            self.__preparer_curseur_autres
-        ]
+        self.__complete = False
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -1282,10 +1279,12 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
 
         collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
         collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
-        self._curseur = collection_transaction.aggregate([
+        curseur = collection_transaction.aggregate([
             {'$match': match_query},
             {'$group': group_query}
         ])
+
+        return curseur
 
     def __preparer_curseur_autres(self):
         nom_millegrille = self.gestionnaire.configuration.nom_millegrille
@@ -1293,15 +1292,26 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         match_query = {
             '_evenements.transaction_complete': True,
             '_evenements.%s.transaction_traitee' % nom_millegrille: {'$exists': True},
+            'en-tete.domaine': {'$not': {'$in': ['millegrilles.domaines.SenseursPassifs.lecture']}}
         }
         sort_query = [
-            {'_evenements.%s.transaction_traitee' % nom_millegrille: 1}
+            ('_evenements.%s.transaction_traitee' % nom_millegrille, 1)
         ]
 
         collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
         collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
 
         return collection_transaction.find(match_query).sort(sort_query)
+
+    def __charger_lecture(self, senseur_lecture):
+        collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
+        collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
+
+        senseur_dict = senseur_lecture['_id']
+        senseur_dict['temps_lecture'] = senseur_lecture['temps_lecture']
+        transaction = collection_transaction.find_one(senseur_dict)
+
+        return transaction
 
     def __iter__(self):
         return self
@@ -1311,9 +1321,17 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         Retourne un curseur Mongo avec les transactions a executer en ordre.
         :return:
         """
-        for methode_curseur in self.__preparation:
-            curseur = methode_curseur()
-            for valeur in curseur:
-                yield valeur
+        if self.__complete:
+            raise StopIteration()
 
+        curseur_aggregation = self.__preparer_curseur_lectures()
+        for senseur_lecture in curseur_aggregation:
+            transaction = self.__charger_lecture(senseur_lecture)
+            yield transaction
+
+        curseur_autres = self.__preparer_curseur_autres()
+        for transaction in curseur_autres:
+            yield transaction
+
+        self.__complete = True
         raise StopIteration()
