@@ -484,13 +484,16 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         transaction = self.transaction
 
         # Extraire les cles de document de la transaction (par processus d'elimination)
+        # IDENTIFICATEURS_DOCUMENTS est optionnel, pour certains docs le _mg-libelle est suffisant comme id
         cles_document = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
                 transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
-                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
         }
+        id_document_cle = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS)
+        if id_document_cle is not None:
+            cles_document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = id_document_cle
 
+        # Preparer requete MongoDB
         contenu_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
