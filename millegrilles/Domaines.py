@@ -871,10 +871,17 @@ class GroupeurTransactionsARegenerer:
 
 class GroupeurTransactionsSansEffet:
 
+    def __init__(self):
+        self.__complete = True
+
     def __iter__(self):
         return self
 
     def __next__(self):
+        if self.__complete:
+            raise StopIteration()
+
+        self.__complete = True
         return
 
 
