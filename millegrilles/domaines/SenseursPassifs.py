@@ -1314,7 +1314,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         return transaction
 
     def __iter__(self):
-        return self
+        return self.__next__()
 
     def __next__(self):
         """

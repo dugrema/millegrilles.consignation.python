@@ -214,13 +214,13 @@ class GestionnaireDomaine:
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
 
-        self.setup_rabbitmq()
-
         # Verifier si on doit upgrader les documents avant de commencer a ecouter
         doit_regenerer = self.verifier_version_transactions(self.version_domaine)
         if doit_regenerer:
-            self.regenerer_documents()
+            self.regenerer_documents(stop_consuming=False)  # stop_consuming: Setup n'est pas encore fait
             self.changer_version_collection(self.version_domaine)
+
+        self.setup_rabbitmq()
 
     def get_queue_configuration(self):
         """
@@ -838,7 +838,7 @@ class GroupeurTransactionsARegenerer:
         return filtre, index
 
     def __iter__(self):
-        return self
+        return self.__next__()
 
     def __next__(self):
         """
@@ -848,15 +848,12 @@ class GroupeurTransactionsARegenerer:
         if self.__complet:
             return
 
-        self.__complet = True
         curseur = self.__preparer_curseur_transactions()
         for valeur in curseur:
-            self.__logger.error("Transaction: %s" % str(valeur))
-            yield(valeur)
-        # if not self._complet:
-        #     self.__preparer_curseur_transactions()
-        #     self.__complet = True  # Ce generateur supporte un seul groupe
-        #     return self.__curseur
+            self.__logger.debug("Transaction: %s" % str(valeur))
+            yield valeur
+
+        self.__complet = True
 
         return
 

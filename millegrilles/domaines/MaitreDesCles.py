@@ -639,7 +639,7 @@ class TransactionDocumentMajClesVersionMapper:
             }
             del transaction['fuuid']
             transaction.update(document)
-            self.__logger.warning("Mapping V4->5 transaction GrosFichiers: %s" % str(transaction))
+            self.__logger.debug("Mapping V4->5 transaction GrosFichiers: %s" % str(transaction))
         elif transaction.get('mg-libelle'):
             document = {
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction['uuid'],
@@ -649,7 +649,7 @@ class TransactionDocumentMajClesVersionMapper:
             }
             del transaction['mg-libelle']
             transaction.update(document)
-            self.__logger.warning("Mapping V4->5 transaction Parametres: %s" % str(transaction))
+            self.__logger.debug("Mapping V4->5 transaction Parametres: %s" % str(transaction))
 
     def map_version_5_to_current(self, transaction):
         """ Version courante, rien a faire """

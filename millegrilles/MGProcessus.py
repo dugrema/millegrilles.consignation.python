@@ -452,8 +452,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
         # Grouper et executer les transactions de regeneration
         generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
-        for transactions in generateur_groupes_transactions:
-            self.traiter_transactions(transactions)
+        for transaction in generateur_groupes_transactions:
+            self.traiter_transaction_wrapper(transaction)
 
         # Purger la Q de notifications de transactions
         # Re-soumettre les notifications pour toutes les transactions non traitees, en ordre de persistance.
@@ -464,26 +464,25 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         if stop_consuming:
             self.gestionnaire.setup_rabbitmq()
 
-    def traiter_transactions(self, curseur_transactions):
+    def traiter_transaction_wrapper(self, transaction):
         erreurs_regeneration = []
         nom_millegrille = self.configuration.nom_millegrille
-        for transaction in curseur_transactions:
-            try:
-                self.traiter_transaction(transaction)
-            except Exception as e:
-                en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-                uuid = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-                domaine_transactions = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-                date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
+        try:
+            self.traiter_transaction(transaction)
+        except Exception as e:
+            en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+            uuid = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            domaine_transactions = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
 
-                self.__logger.warning("Erreur regeneration transaction: %s, domaine: %s, date: %s" % (uuid, domaine_transactions, str(date_traitement)))
-                self.__logger.exception("Erreur")
-                erreur = {
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid,
-                    Constantes.EVENEMENT_TRANSACTION_TRAITEE: date_traitement,
-                    'erreur': e
-                }
-                erreurs_regeneration.append(erreur)
+            self.__logger.warning("Erreur regeneration transaction: %s, domaine: %s, date: %s" % (uuid, domaine_transactions, str(date_traitement)))
+            self.__logger.exception("Erreur")
+            erreur = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid,
+                Constantes.EVENEMENT_TRANSACTION_TRAITEE: date_traitement,
+                'erreur': e
+            }
+            erreurs_regeneration.append(erreur)
 
         return erreurs_regeneration
 
