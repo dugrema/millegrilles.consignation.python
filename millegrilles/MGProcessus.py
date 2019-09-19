@@ -444,8 +444,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         regenerateur = self._gestionnaire.creer_regenerateur_documents()
 
         # Deconnecter les Q (channel - consumer tags)
-        if stop_consuming:
-            self.gestionnaire.stop_consuming()
+        # if stop_consuming:
+        #     self.gestionnaire.stop_consuming()
 
         # Supprimer le contenu de la collection de documents
         regenerateur.supprimer_documents()
@@ -465,8 +465,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         self.gestionnaire.resoumettre_transactions()
 
         # Reconnecter les Q
-        if stop_consuming:
-            self.gestionnaire.setup_rabbitmq()
+        # if stop_consuming:
+        #     self.gestionnaire.setup_rabbitmq()
 
     def traiter_transaction_wrapper(self, transaction):
         erreurs_regeneration = []

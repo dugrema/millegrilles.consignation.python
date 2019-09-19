@@ -216,11 +216,13 @@ class GestionnaireDomaine:
 
         # Verifier si on doit upgrader les documents avant de commencer a ecouter
         doit_regenerer = self.verifier_version_transactions(self.version_domaine)
-        self.setup_rabbitmq(False)
 
         if doit_regenerer:
+            self.setup_rabbitmq(False)  # Setup Q, sans consumers
             self.regenerer_documents()
             self.changer_version_collection(self.version_domaine)
+
+        self.setup_rabbitmq()  # Setup Q et consumers
 
     def get_queue_configuration(self):
         """
@@ -239,8 +241,8 @@ class GestionnaireDomaine:
         # channel = self.message_dao.channel
         for queue_config in queues_config:
 
-            def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config):
-                if consume:
+            def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config, in_consume=consume):
+                if in_consume:
                     gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
                 for routing in in_queue_config['routing']:
                     channel.queue_bind(

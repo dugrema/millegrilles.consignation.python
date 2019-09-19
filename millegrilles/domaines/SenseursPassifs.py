@@ -1265,6 +1265,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         nom_millegrille = self.gestionnaire.configuration.nom_millegrille
 
         match_query = {
+            '_evenements.transaction_complete': True,
             'en-tete.domaine': 'millegrilles.domaines.SenseursPassifs.lecture',
             '_evenements.%s.transaction_traitee' % nom_millegrille: {'$exists': True},
             'temps_lecture': {'$exists': True},
