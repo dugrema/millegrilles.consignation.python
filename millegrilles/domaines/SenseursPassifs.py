@@ -1322,7 +1322,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         :return:
         """
         if self.__complete:
-            return
+            raise StopIteration()
 
         curseur_aggregation = self.__preparer_curseur_lectures()
         for senseur_lecture in curseur_aggregation:

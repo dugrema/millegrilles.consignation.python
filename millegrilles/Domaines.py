@@ -847,7 +847,7 @@ class GroupeurTransactionsARegenerer:
         :return:
         """
         if self.__complet:
-            return
+            raise StopIteration()
 
         curseur = self.__preparer_curseur_transactions()
         for valeur in curseur:

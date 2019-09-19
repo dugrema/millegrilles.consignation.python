@@ -452,8 +452,11 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
         # Grouper et executer les transactions de regeneration
         generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
-        for transaction in generateur_groupes_transactions:
-            self.traiter_transaction_wrapper(transaction)
+        try:
+            for transaction in generateur_groupes_transactions:
+                self.traiter_transaction_wrapper(transaction)
+        except StopIteration as se:
+            self.__logger.info("Traitement transactions termine - StopIteration")
 
         # Purger la Q de notifications de transactions
         # Re-soumettre les notifications pour toutes les transactions non traitees, en ordre de persistance.
