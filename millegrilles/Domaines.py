@@ -216,11 +216,11 @@ class GestionnaireDomaine:
 
         # Verifier si on doit upgrader les documents avant de commencer a ecouter
         doit_regenerer = self.verifier_version_transactions(self.version_domaine)
-        if doit_regenerer:
-            self.regenerer_documents(stop_consuming=False)  # stop_consuming: Setup n'est pas encore fait
-            self.changer_version_collection(self.version_domaine)
+        self.setup_rabbitmq(False)
 
-        self.setup_rabbitmq()
+        if doit_regenerer:
+            self.regenerer_documents()
+            self.changer_version_collection(self.version_domaine)
 
     def get_queue_configuration(self):
         """
@@ -228,7 +228,7 @@ class GestionnaireDomaine:
         """
         raise NotImplementedError("Pas implemente")
 
-    def setup_rabbitmq(self):
+    def setup_rabbitmq(self, consume=True):
         """
         Callback pour faire le setup de rabbitMQ quand le channel est ouvert. Permet aussi de refaire les binding
         avec les Q apres avoir appele unbind_rabbitmq.
@@ -240,7 +240,8 @@ class GestionnaireDomaine:
         for queue_config in queues_config:
 
             def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config):
-                gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
+                if consume:
+                    gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
                 for routing in in_queue_config['routing']:
                     channel.queue_bind(
                         exchange=in_queue_config['exchange'],
@@ -286,7 +287,7 @@ class GestionnaireDomaine:
         transactions_incompletes = collection_transactions.find(filtre, sort=hint).hint(hint)
 
         for transaction in transactions_incompletes:
-            self._logger.warning("Transaction incomplete: %s" % transaction)
+            self._logger.debug("Transaction incomplete: %s" % transaction)
             id_document = transaction[Constantes.MONGO_DOC_ID]
             en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
             uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]

@@ -94,15 +94,6 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
 
-    def setup_rabbitmq(self):
-
-        # Queue message handlers
-        self.__handler_transaction = TraitementTransactionPersistee(self)
-        self.__handler_cedule = TraitementMessageCedule(self)
-        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
-
-        super().setup_rabbitmq()
-
     def ajouter_nouveau_document(self, transaction):
         document_plume = ConstantesPlume.DOCUMENT_PLUME.copy()
 

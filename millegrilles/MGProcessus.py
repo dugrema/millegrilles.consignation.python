@@ -470,19 +470,26 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         try:
             self.traiter_transaction(transaction)
         except Exception as e:
-            en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-            uuid = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            domaine_transactions = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-            date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
-
-            self.__logger.warning("Erreur regeneration transaction: %s, domaine: %s, date: %s" % (uuid, domaine_transactions, str(date_traitement)))
-            self.__logger.exception("Erreur")
-            erreur = {
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid,
-                Constantes.EVENEMENT_TRANSACTION_TRAITEE: date_traitement,
-                'erreur': e
-            }
-            erreurs_regeneration.append(erreur)
+            uuid = 'N/A'
+            date_traitement = 'N/A'
+            domaine_transactions = 'N/A'
+            try:
+                en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+                uuid = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                domaine_transactions = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+                date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
+            except Exception as e2:
+                uuid = transaction
+            finally:
+                self.__logger.warning("Erreur regeneration transaction: %s, domaine: %s, date: %s" % (
+                    uuid, domaine_transactions, str(date_traitement)))
+                self.__logger.exception("Erreur")
+                erreur = {
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid,
+                    Constantes.EVENEMENT_TRANSACTION_TRAITEE: date_traitement,
+                    'erreur': e
+                }
+                erreurs_regeneration.append(erreur)
 
         return erreurs_regeneration
 
