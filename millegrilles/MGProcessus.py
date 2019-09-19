@@ -454,7 +454,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
         try:
             for transaction in generateur_groupes_transactions:
-                self.traiter_transaction_wrapper(transaction)
+                if transaction is not None:
+                    self.traiter_transaction_wrapper(transaction)
         except StopIteration as se:
             self.__logger.info("Traitement transactions termine - StopIteration")
 
