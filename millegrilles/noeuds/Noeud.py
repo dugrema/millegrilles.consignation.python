@@ -12,6 +12,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
 from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursPassifs
 from millegrilles import Constantes
+from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 
 from millegrilles.util.Daemon import Daemon
 
@@ -46,7 +47,8 @@ class DemarreurNoeud(Daemon):
 
         self._contexte = ContexteRessourcesMilleGrilles()
         self._producteur_transaction = None
-        self.__thread_mq_ioloop = None
+        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
+        self.__channel = None
 
         self._chargement_reussi = False  # Vrai si au moins un module a ete charge
         self._stop_event = Event()
@@ -122,6 +124,16 @@ class DemarreurNoeud(Daemon):
     def restart(self):
         Daemon.restart(self)
 
+    def on_channel_open(self, channel):
+        channel.basic_qos(prefetch_count=1)
+        channel.add_on_close_callback(self.on_channel_close)
+        self.__channel = channel
+        self.__certificat_event_handler.initialiser(channel)
+
+    def on_channel_close(self):
+        self.__channel = None
+        self._logger.info("MQ Channel ferme")
+
     def run(self):
         self._logger.info("Demarrage Daemon")
         self.setup_modules()
@@ -145,8 +157,7 @@ class DemarreurNoeud(Daemon):
         self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
         self._contexte.initialiser(init_document=False, connecter=doit_connecter)
-        # self.__thread_mq_ioloop = Thread(name='MQ-ioloop', target=self._contexte.message_dao.run_ioloop)
-        # self.__thread_mq_ioloop.start()
+        self._contexte.message_dao.register_channel_listener(self)
 
         self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
 
