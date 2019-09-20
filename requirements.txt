@@ -1,4 +1,5 @@
 certifi
+requests-unixsocket
 pika==0.12
 pytz==2018.7
 feedparser==5.2.1
