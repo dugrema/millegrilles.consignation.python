@@ -411,12 +411,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         """
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_fichier = collection_domaine.find_one({ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier})
-        supprime_flag = document_fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME)
-        if not supprime_flag:
-            repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
-        else:
-            document_corbeille = self.get_document_corbeille()
-            repertoire_uuid = document_corbeille[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
+        repertoire_uuid = document_fichier[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID]
 
         copie_doc_fichier = dict()
 
@@ -692,7 +687,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if uuid_repertoire is not None:
             document_repertoire = collection_domaine.find_one({
                 ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: uuid_repertoire,
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE
+                Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                    ConstantesGrosFichiers.LIBVAL_REPERTOIRE,
+                    ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE,
+                    ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS,
+                    ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE,
+                ]}
             })
             set_operations[ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID] = uuid_repertoire
 
