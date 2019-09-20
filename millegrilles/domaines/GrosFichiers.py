@@ -243,41 +243,40 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             self._logger.info("On insere le document %s pour domaine GrosFichiers" % mg_libelle)
 
             super().initialiser_document(doc_defaut[Constantes.DOCUMENT_INFODOC_LIBELLE], doc_defaut)
-
-            # Initialiser document repertoire racine
-            document_repertoire_racine = self.get_document_racine()
-            if document_repertoire_racine is None:
-                # Creer le repertoire racine (parent=None)
-                transaction_racine = {
-                    ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE,
-                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
-                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
-                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
-                }
-                self.generateur_transactions.soumettre_transaction(transaction_racine, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
-
-            document_repertoire_orphelins = self.get_document_orphelins()
-            if document_repertoire_orphelins is None:
-                transaction_orphelins = {
-                    ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS,
-                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
-                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
-                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
-                }
-                self.generateur_transactions.soumettre_transaction(transaction_orphelins, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
-
-            document_repertoire_corbeille = self.get_document_corbeille()
-            if document_repertoire_corbeille is None:
-                transaction_corbeille = {
-                    ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE,
-                    ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
-                    ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
-                    ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
-                }
-                self.generateur_transactions.soumettre_transaction(transaction_corbeille, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
-
         else:
             self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
+
+        # Initialiser document repertoire racine
+        document_repertoire_racine = self.get_document_racine()
+        if document_repertoire_racine is None:
+            # Creer le repertoire racine (parent=None)
+            transaction_racine = {
+                ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_RACINE,
+                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: '/',
+                ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
+            }
+            self.generateur_transactions.soumettre_transaction(transaction_racine, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
+
+        document_repertoire_orphelins = self.get_document_orphelins()
+        if document_repertoire_orphelins is None:
+            transaction_orphelins = {
+                ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_ORPHELINS,
+                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_ORPHELINS,
+                ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
+            }
+            self.generateur_transactions.soumettre_transaction(transaction_orphelins, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
+
+        document_repertoire_corbeille = self.get_document_corbeille()
+        if document_repertoire_corbeille is None:
+            transaction_corbeille = {
+                ConstantesGrosFichiers.TRANSACTION_CHAMP_LIBELLE: ConstantesGrosFichiers.LIBVAL_REPERTOIRE_CORBEILLE,
+                ConstantesGrosFichiers.DOCUMENT_NOMREPERTOIRE: ConstantesGrosFichiers.REPERTOIRE_CORBEILLE,
+                ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesGrosFichiers.DOCUMENT_REPERTOIRE_UUID: str(uuid.uuid1()),
+            }
+            self.generateur_transactions.soumettre_transaction(transaction_corbeille, ConstantesGrosFichiers.TRANSACTION_CREER_REPERTOIRE_SPECIAL)
 
     def creer_index(self):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
