@@ -600,14 +600,19 @@ class VerificateurCertificats(UtilCertificats):
             os.unlink(self.__untrusted_CAs_filename)
 
 
-class GestionnaireEvenementsCertificat(BaseCallback):
+class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
-    def __init__(self, contexte, gestionnaire_certificats):
-        super().__init__(contexte)
-        self._gestionnaire_certificats = gestionnaire_certificats
+    def __init__(self, contexte):
+        super().__init__(contexte=contexte)
+
+    def initialiser(self, channel=None):
+        super().initialiser()
+
+        if channel is not None:
+            self.transmettre_certificat(channel)
 
     def transmettre_certificat(self, channel=None):
-        enveloppe = self._gestionnaire_certificats.enveloppe_certificat_courant
+        enveloppe = self.enveloppe_certificat_courant
 
         message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
         message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii

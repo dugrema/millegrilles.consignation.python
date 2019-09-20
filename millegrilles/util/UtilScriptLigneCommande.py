@@ -8,6 +8,7 @@ import time
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 
 
 class ModeleConfiguration:
@@ -19,6 +20,9 @@ class ModeleConfiguration:
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
 
+        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
+        self.__channel = None
+
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.exit_gracefully)
@@ -29,6 +33,18 @@ class ModeleConfiguration:
             init_message=init_message,
             connecter=connecter
         )
+
+        self._contexte.message_dao.register_channel_listener(self)
+
+    def on_channel_open(self, channel):
+        channel.basic_qos(prefetch_count=1)
+        channel.add_on_close_callback(self.on_channel_close)
+        self.__channel = channel
+        self.__certificat_event_handler.initialiser(channel)
+
+    def on_channel_close(self):
+        self.__channel = None
+        self._logger.info("MQ Channel ferme")
 
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
