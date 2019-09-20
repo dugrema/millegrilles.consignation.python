@@ -5,7 +5,7 @@ import logging
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard
-from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
+from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, TraitementMessageDomaineMiddleware
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
@@ -203,6 +203,9 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
     def creer_regenerateur_documents(self):
         return RegenerateurSenseursPassifs(self)
 
+    def get_handler_transaction(self):
+        return TraitementRapportsSenseursPassifs(self)
+
 
 class TraitementMessageLecture(TraitementMessageDomaine):
 
@@ -289,6 +292,22 @@ class TraitementMessageRequete(TraitementMessageDomaine):
             'uuid-requete': requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
         }
         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, reply_to, correlation_id)
+
+
+class TraitementRapportsSenseursPassifs(TraitementMessageDomaineMiddleware):
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        if evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+        elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+        else:
+            super().traiter_message(ch, method, properties, body)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
