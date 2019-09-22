@@ -19,7 +19,9 @@ class CertificatSubjectTest:
         self.enveloppe = enveloppe
 
     def afficher_info(self):
-        print("Certificat %s" % self.enveloppe.subject_rfc4514_string())
+        est_valide = self.enveloppe.date_valide()
+        print("Certificat %s, date valide: %s" % (self.enveloppe.subject_rfc4514_string(), est_valide))
+
 
 
 test = CertificatSubjectTest()

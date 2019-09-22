@@ -142,6 +142,9 @@ class EnveloppeCertificat:
         now = datetime.datetime.utcnow()
         return (now > self.certificat.not_valid_before) and (now < self.certificat.not_valid_after)
 
+    def date_valide(self):
+        return self._is_valid_at_current_time
+
     @property
     def est_verifie(self):
         return self._est_verifie
