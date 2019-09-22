@@ -22,6 +22,8 @@ class CertificatSubjectTest:
         est_valide = self.enveloppe.date_valide()
         print("Certificat %s, date valide: %s" % (self.enveloppe.subject_rfc4514_string(), est_valide))
 
+        date_formattee = self.enveloppe.date_valide_concat()
+        print(date_formattee)
 
 
 test = CertificatSubjectTest()

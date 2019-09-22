@@ -142,6 +142,11 @@ class EnveloppeCertificat:
         now = datetime.datetime.utcnow()
         return (now > self.certificat.not_valid_before) and (now < self.certificat.not_valid_after)
 
+    def date_valide_concat(self):
+        date_brute = self.certificat.not_valid_before
+        date_formatte = date_brute.strftime('%Y%m%d%H%M%S')
+        return date_formatte
+
     def date_valide(self):
         return self._is_valid_at_current_time
 
