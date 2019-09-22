@@ -116,6 +116,9 @@ class EnveloppeCertificat:
         self._logger.debug("Subject key identifier: %s" % key_id)
         return key_id
 
+    def subject_rfc4514_string(self):
+        return self.certificat.subject.rfc4514_string()
+
     @property
     def authority_key_identifier(self):
         authorityKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
