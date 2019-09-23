@@ -30,8 +30,13 @@ class CertificatSubjectTest:
         ou = self.enveloppe.subject_organizational_unit_name
         print("Type noeud: %s" % ou)
 
+    def subject_mq(self):
+        subject = self.enveloppe.subject_rfc4514_string_mq()
+        print(subject)
+
 
 test = CertificatSubjectTest()
-test.charger('/opt/millegrilles/dev2/pki/certs/dev2_middleware.cert.pem')
+test.charger('/opt/millegrilles/test1/pki/certs/test1_middleware.cert.pem')
 test.afficher_info()
 test.verifier_typenoeud()
+test.subject_mq()

@@ -119,6 +119,16 @@ class EnveloppeCertificat:
     def subject_rfc4514_string(self):
         return self.certificat.subject.rfc4514_string()
 
+    def subject_rfc4514_string_mq(self):
+        """
+        Subject avec ordre inverse pour RabbitMQ EXTERNAL
+        :return:
+        """
+        subject = self.subject_rfc4514_string()
+        subject_list = subject.split(',')
+        subject_list.reverse()
+        return ','.join(subject_list)
+
     @property
     def authority_key_identifier(self):
         authorityKeyIdentifier = self.certificat.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
