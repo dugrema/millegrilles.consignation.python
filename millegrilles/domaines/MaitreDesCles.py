@@ -124,7 +124,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def charger_certificat_courant(self):
         fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_certs, self.__prefix_maitredescles)
         fichier_cle = '%s/%s.key.pem' % (self.__repertoire_cles, self.__prefix_maitredescles)
-        mot_de_passe = '%s/%s.password.txt' % (self.__repertoire_motsdepasse, self.__prefix_maitredescles)
+        mot_de_passe = '%s/%s.txt' % (self.__repertoire_motsdepasse, self.__prefix_maitredescles)
 
         with open(mot_de_passe, 'rb') as motpasse_courant:
             motpass = motpasse_courant.readline()[0:-1]  # Enlever newline a la fin.
