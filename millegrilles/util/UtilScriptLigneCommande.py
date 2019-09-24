@@ -34,7 +34,8 @@ class ModeleConfiguration:
             connecter=connecter
         )
 
-        self._contexte.message_dao.register_channel_listener(self)
+        if init_message:
+            self._contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)
