@@ -196,8 +196,8 @@ class GestionnaireDomaine:
         self._arret_en_cours = False
         self._stop_event = Event()
         self._traitement_evenements = None
-        self.__wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
-        self.__nb_queues_a_config = 0
+        self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
+        self.q_pretes = list()
 
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
@@ -218,6 +218,16 @@ class GestionnaireDomaine:
         self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
         self._contexte.message_dao.register_channel_listener(self)
 
+        while not self.wait_Q_ready.is_set():
+            self.wait_Q_ready.wait(15)
+
+        # Verifier si on doit upgrader les documents avant de commencer a ecouter
+        doit_regenerer = self.verifier_version_transactions(self.version_domaine)
+
+        if doit_regenerer:
+            self.regenerer_documents()
+            self.changer_version_collection(self.version_domaine)
+
     def on_channel_open(self, channel):
         """
         Callback pour l"ouverture ou la reouverture du channel MQ
@@ -236,14 +246,6 @@ class GestionnaireDomaine:
         channel.add_on_close_callback(self.on_channel_close)
 
         self.setup_rabbitmq()  # Setup Q et consumers
-        self.__wait_Q_ready.wait(15)
-
-        # Verifier si on doit upgrader les documents avant de commencer a ecouter
-        doit_regenerer = self.verifier_version_transactions(self.version_domaine)
-
-        if doit_regenerer:
-            self.regenerer_documents()
-            self.changer_version_collection(self.version_domaine)
 
     def get_queue_configuration(self):
         """
@@ -259,8 +261,8 @@ class GestionnaireDomaine:
         channel = self.channel_mq
         queues_config = self.get_queue_configuration()
 
-        self.__nb_queues_a_config = len(queues_config)
-        self.__wait_Q_ready.clear()  # Reset flag au besoin
+        self.nb_queues_a_config = len(queues_config)
+        self.wait_Q_ready.clear()  # Reset flag au besoin
         # channel = self.message_dao.channel
         for queue_config in queues_config:
 
@@ -276,11 +278,10 @@ class GestionnaireDomaine:
                     )
 
                 # Indiquer qu'une Q a ete configuree
-                self.__nb_queues_a_config = self.__nb_queues_a_config - 1
-
-                if self.__nb_queues_a_config == 0:
+                gestionnaire.nb_queues_a_config = gestionnaire.nb_queues_a_config - 1
+                if gestionnaire.nb_queues_a_config == 0:
                     # Il ne reste plus de Q a configurer, set flag comme pret
-                    self.__wait_Q_ready.set()
+                    gestionnaire.wait_Q_ready.set()
 
             channel.queue_declare(
                 queue=queue_config['nom'],
