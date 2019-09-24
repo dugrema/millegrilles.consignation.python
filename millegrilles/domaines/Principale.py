@@ -36,12 +36,14 @@ class ConstantesPrincipale:
     }
 
     DOCUMENT_CLES = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CLES,
         'cles': [],
         'challenge_authentification': None,
         'empreinte_absente': True,
     }
 
     DOCUMENT_DOMAINES = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_DOMAINES,
         'SenseursPassifs': {
             'rang': 5,
             'description': 'SenseursPassifs'
