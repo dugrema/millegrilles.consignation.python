@@ -42,7 +42,7 @@ class ModeleConfiguration:
         self.__channel = channel
         self.__certificat_event_handler.initialiser(channel)
 
-    def on_channel_close(self):
+    def on_channel_close(self, arg1, arg2, arg3):
         self.__channel = None
         self._logger.info("MQ Channel ferme")
 

@@ -29,12 +29,28 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self._gestionnaires = []
         self._stop_event = Event()
         self.__mq_ioloop = None
+        self.__channel = None  # Ouvrir un channel pour savoir quand MQ est pret
+        self.__wait_mq_ready = Event()
 
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
         super().initialiser(init_document, init_message, connecter)
         self.__mq_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
         self.__mq_ioloop.start()
+        self.contexte.message_dao.register_channel_listener(self)
+
+    def on_channel_open(self, channel):
+        channel.basic_qos(prefetch_count=1)
+        channel.add_on_close_callback(self.on_channel_close)
+        self.__channel = channel
+
+        # MQ est pret, on charge les domaines
+        self.__wait_mq_ready.set()
+
+    def on_channel_close(self, arg1, arg2, arg3):
+        self.__wait_mq_ready.clear()
+        self.__channel = None
+        self._logger.info("MQ Channel ferme")
 
     def configurer_parser(self):
         super().configurer_parser()
@@ -116,6 +132,9 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         super().exit_gracefully()
 
     def executer(self):
+        self.__wait_mq_ready.wait(60)
+        if not self.__wait_mq_ready.is_set():
+            raise Exception("MQ n'est pas pret apres 60 secondes")
 
         self.charger_domaines()
 
