@@ -32,6 +32,7 @@ class GenerateurCertificat:
         builder = builder.not_valid_after(datetime.datetime.today() + (one_day * 30))
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(public_key)
+
         builder = builder.add_extension(
             x509.SubjectAlternativeName(
                 [x509.DNSName(u'cryptography.io')]
@@ -42,6 +43,11 @@ class GenerateurCertificat:
         builder = builder.add_extension(
             x509.BasicConstraints(ca=False, path_length=None),
             critical=True,
+        )
+
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(public_key),
+            critical=False
         )
 
         certificate = builder.sign(
@@ -123,9 +129,25 @@ class GenerateurCertificat:
             critical=True,
         )
 
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(fichier_csr.public_key()),
+            critical=False
+        )
+
+        ski = signing_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+        #ext = signing_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).digest
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier(
+                ski.value.digest,
+                None,
+                None
+            ),
+            critical=False
+        )
+
         certificate = builder.sign(
             private_key=signing_key,
-            algorithm = hashes.SHA256(),
+            algorithm = hashes.SHA512(),
             backend=default_backend()
         )
         with open('%s.cert.pem' % nom_fichier_csr, 'wb') as fichier:
