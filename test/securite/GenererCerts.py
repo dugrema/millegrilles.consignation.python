@@ -89,9 +89,51 @@ class GenerateurCertificat:
                 serialization.NoEncryption()
             ))
 
+    def signer_csr(self, nom_fichier_csr, nom_signataire):
+        with open('%s.key.pem' % nom_signataire, 'rb') as fichier:
+            private_bytes = fichier.read()
+            signing_key = serialization.load_pem_private_key(private_bytes, password=None, backend=default_backend())
+        with open('%s.cert.pem' % nom_signataire, 'rb') as fichier:
+            public_bytes = fichier.read()
+            signing_cert = x509.load_pem_x509_certificate(public_bytes, backend=default_backend())
+        with open('%s.csr.pem' % nom_fichier_csr, 'rb') as fichier:
+            public_bytes = fichier.read()
+            fichier_csr = x509.load_pem_x509_csr(public_bytes, backend=default_backend())
+
+        one_day = datetime.timedelta(1, 0, 0)
+
+        builder = x509.CertificateBuilder()
+        builder = builder.subject_name(fichier_csr.subject)
+        builder = builder.issuer_name(x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, u'MOI!.io'),
+        ]))
+        builder = builder.not_valid_before(datetime.datetime.today() - one_day)
+        builder = builder.not_valid_after(datetime.datetime.today() + (one_day * 30))
+        builder = builder.serial_number(x509.random_serial_number())
+        builder = builder.public_key(signing_cert.public_key())
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName(
+                [x509.DNSName(u'mon_serveur.ca')]
+            ),
+            critical=False
+        )
+
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+
+        certificate = builder.sign(
+            private_key=signing_key,
+            algorithm = hashes.SHA256(),
+            backend=default_backend()
+        )
+        with open('%s.cert.pem' % nom_fichier_csr, 'wb') as fichier:
+            fichier.write(certificate.public_bytes(serialization.Encoding.PEM))
+
 
 if __name__ == '__main__':
     generateur = GenerateurCertificat()
     generateur.generer_cert_self_signed('/home/mathieu/tmp/certs/self-signed')
     generateur.generer_csr('/home/mathieu/tmp/certs/cert')
-
+    generateur.signer_csr('/home/mathieu/tmp/certs/cert', '/home/mathieu/tmp/certs/self-signed')
