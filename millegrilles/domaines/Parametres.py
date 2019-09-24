@@ -30,6 +30,8 @@ class ConstantesParametres:
     DOCUMENT_CHAMP_PORT = 'port'
     DOCUMENT_CHAMP_USER = 'user'
     DOCUMENT_CHAMP_PASSWORD = 'password'
+    DOCUMENT_CHAMP_NOM_MILLEGRILLE = 'nom_millegrille'
+    DOCUMENT_CHAMP_URL_BASE = 'adresse_url_base'
 
     DOCUMENT_CHAMP_ACTIF = 'actif'
 
@@ -38,9 +40,16 @@ class ConstantesParametres:
     LIBVAL_VERSIONS_IMAGES_DOCKER = 'versions.images.docker'
     LIBVAL_CERTS_WEB = 'certs.web'
     LIBVAL_CERTS_SSL = 'certs.ssl'
+    LIBVAL_ID_MILLEGRILLE = 'millegrille.id'
 
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
+    }
+
+    DOCUMENT_ID_MILLEGRILLE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ID_MILLEGRILLE,
+        DOCUMENT_CHAMP_NOM_MILLEGRILLE: 'Sansnom',
+        DOCUMENT_CHAMP_URL_BASE: 'sansnom.millegrilles.com',
     }
 
     DOCUMENT_EMAIL_SMTP = {
@@ -71,6 +80,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         super().configurer()
         self.initialiser_document(ConstantesParametres.LIBVAL_CONFIGURATION, ConstantesParametres.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesParametres.LIBVAL_EMAIL_SMTP, ConstantesParametres.DOCUMENT_EMAIL_SMTP)
+        self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, ConstantesParametres.DOCUMENT_ID_MILLEGRILLE)
 
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {

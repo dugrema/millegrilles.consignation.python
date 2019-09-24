@@ -20,6 +20,8 @@ class ConstantesPrincipale:
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PROFIL_USAGER = 'profil.usager'
     LIBVAL_ALERTES = 'alertes'
+    LIBVAL_DOMAINES = 'domaines'
+    LIBVAL_CLES = 'cles'
 
     TRANSACTION_ACTION_FERMERALERTE = '%s.fermerAlerte' % DOMAINE_NOM
     TRANSACTION_ACTION_CREERALERTE = '%s.creerAlerte' % DOMAINE_NOM
@@ -33,29 +35,34 @@ class ConstantesPrincipale:
         ]
     }
 
+    DOCUMENT_CLES = {
+        'cles': [],
+        'challenge_authentification': None,
+        'empreinte_absente': True,
+    }
+
+    DOCUMENT_DOMAINES = {
+        'SenseursPassifs': {
+            'rang': 5,
+            'description': 'SenseursPassifs'
+        },
+        'GrosFichiers': {
+            'rang': 3,
+            'description': 'GrosFichiers'
+        },
+        'Notifications': {
+            'rang': 2,
+            'description': 'Notifications'
+        },
+        'Principale': {
+            'rang': 1,
+            'description': 'Principale'
+        }
+    }
+
     # Document par defaut pour la configuration de l'interface principale
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
-        'nom_millegrille': 'Sansnom',
-        'adresse_url_base': 'sansnom.millegrilles.com',
-        'domaines': {
-            'SenseursPassifs': {
-                'rang': 5,
-                'description': 'SenseursPassifs'
-            },
-            'GrosFichiers': {
-                'rang': 3,
-                'description': 'GrosFichiers'
-            },
-            'Notifications': {
-                'rang': 2,
-                'description': 'Notifications'
-            },
-            'Principale': {
-                'rang': 1,
-                'description': 'Principale'
-            }
-        }
     }
 
     DOCUMENT_PROFIL_USAGER = {
@@ -64,10 +71,7 @@ class ConstantesPrincipale:
         'courriel_alertes': [],
         'prenom': None,
         'nom': None,
-        'cles': [],
-        'challenge_authentification': None,
         'uuid_usager': None,
-        'empreinte_absente': True,
     }
 
 
@@ -95,6 +99,8 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, document_config)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_DOMAINES, ConstantesPrincipale.DOCUMENT_DOMAINES)
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_CLES, ConstantesPrincipale.DOCUMENT_CLES)
 
     def traiter_cedule(self, evenement):
         pass
@@ -308,7 +314,7 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
 
         # Verifier que la MilleGrille n'a pas deja d'empreinte
         documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
-        profil = documents.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER})
+        profil = documents.find_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_CLES})
         empreinte_absente = profil.get('empreinte_absente')
         if empreinte_absente is True:
             # Validation correcte. On passe a l'etape de sauvegarde
@@ -325,7 +331,7 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
             '$push': {'cles': transaction['cle']}
         }
         documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
-        resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER}, operation)
+        resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_CLES}, operation)
 
         if resultat.modified_count != 1:
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
@@ -356,7 +362,7 @@ class ProcessusAjouterToken(MGProcessusTransaction):
             '$push': {'cles': transaction['cle']}
         }
         documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
-        resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER}, operation)
+        resultat = documents.update_one({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_CLES}, operation)
 
         if resultat.modified_count != 1:
             raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
