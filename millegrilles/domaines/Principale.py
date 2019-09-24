@@ -44,22 +44,35 @@ class ConstantesPrincipale:
 
     DOCUMENT_DOMAINES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_DOMAINES,
-        'SenseursPassifs': {
-            'rang': 5,
-            'description': 'SenseursPassifs'
+        LIBVAL_DOMAINES: {
+            'SenseursPassifs': {
+                'rang': 5,
+                'description': 'SenseursPassifs'
+            },
+            'GrosFichiers': {
+                'rang': 3,
+                'description': 'GrosFichiers'
+            },
+            'Principale': {
+                'rang': 1,
+                'description': 'Principale'
+            },
+            'Plume': {
+                'rang': 1,
+                'description': 'Plume'
+            },
+            'Parametres': {
+                'rang': 1,
+                'description': 'Parametres'
+            }
         },
-        'GrosFichiers': {
-            'rang': 3,
-            'description': 'GrosFichiers'
-        },
-        'Notifications': {
-            'rang': 2,
-            'description': 'Notifications'
-        },
-        'Principale': {
-            'rang': 1,
-            'description': 'Principale'
-        }
+        "menu": [
+            'Principale',
+            'GrosFichiers',
+            'Plume',
+            'SenseursPassifs',
+            'Parametres',
+        ]
     }
 
     # Document par defaut pour la configuration de l'interface principale
