@@ -235,13 +235,13 @@ class GestionnaireDomaine:
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
 
+        self.setup_rabbitmq()  # Setup Q et consumers
+        self.__wait_Q_ready.wait(15)
+
         # Verifier si on doit upgrader les documents avant de commencer a ecouter
         doit_regenerer = self.verifier_version_transactions(self.version_domaine)
 
-        self.setup_rabbitmq()  # Setup Q et consumers
-
         if doit_regenerer:
-            self.__wait_Q_ready.wait(15)
             self.regenerer_documents()
             self.changer_version_collection(self.version_domaine)
 
