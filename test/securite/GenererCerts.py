@@ -41,7 +41,7 @@ class GenerateurCertificat:
         )
 
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=False, path_length=None),
+            x509.BasicConstraints(ca=True, path_length=5),
             critical=True,
         )
 
@@ -135,12 +135,26 @@ class GenerateurCertificat:
         )
 
         ski = signing_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-        #ext = signing_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).digest
         builder = builder.add_extension(
             x509.AuthorityKeyIdentifier(
                 ski.value.digest,
                 None,
                 None
+            ),
+            critical=False
+        )
+
+        builder = builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=True,
+                key_encipherment=True,
+                data_encipherment=True,
+                key_agreement=True,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
             ),
             critical=False
         )
