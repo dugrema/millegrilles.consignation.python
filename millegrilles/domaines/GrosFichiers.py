@@ -146,12 +146,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
     def configurer(self):
         super().configurer()
-
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
         self.creer_index()  # Creer index dans MongoDB
 
     def demarrer(self):
         super().demarrer()
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
