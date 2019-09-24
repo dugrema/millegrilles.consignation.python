@@ -70,8 +70,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
         self._traitement_message = TraitementMessagePki(self, self._pki_document_helper)
 
-        self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
-        self.initialiser_mgca()
+        self.initialiser_mgca()  # S'assurer que les certs locaux sont prets avant les premieres transactions
 
         # Index collection domaine
         collection_domaine = self.get_collection()
@@ -90,6 +89,10 @@ class GestionnairePki(GestionnaireDomaineStandard):
             (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
             (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
         ])
+
+    def demarrer(self):
+        super().demarrer()
+        self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
 
     def get_queue_configuration(self):
         configuration = super().get_queue_configuration()

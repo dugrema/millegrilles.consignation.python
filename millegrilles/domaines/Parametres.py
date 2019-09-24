@@ -78,9 +78,17 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def configurer(self):
         super().configurer()
+
+    def demarrer(self):
+        super().demarrer()
         self.initialiser_document(ConstantesParametres.LIBVAL_CONFIGURATION, ConstantesParametres.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesParametres.LIBVAL_EMAIL_SMTP, ConstantesParametres.DOCUMENT_EMAIL_SMTP)
-        self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, ConstantesParametres.DOCUMENT_ID_MILLEGRILLE)
+
+        document_config_id = ConstantesParametres.DOCUMENT_ID_MILLEGRILLE.copy()
+        nom_millegrille = self.configuration.nom_millegrille
+        document_config_id['nom_millegrille'] = nom_millegrille
+        document_config_id['adresse_url_base'] = 'mg-%s.local' % nom_millegrille
+        self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, document_config_id)
 
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {

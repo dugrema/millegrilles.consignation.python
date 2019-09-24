@@ -91,12 +91,9 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         self._traitement_requetes = TraitementMessageRequete(self)
         self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
-        document_config = ConstantesPrincipale.DOCUMENT_DEFAUT.copy()
-        nom_millegrille = self.configuration.nom_millegrille
-        document_config['nom_millegrille'] = nom_millegrille
-        document_config['adresse_url_base'] = 'mg-%s.local' % nom_millegrille
-
-        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, document_config)
+    def demarrer(self):
+        super().demarrer()
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_CONFIGURATION, ConstantesPrincipale.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_ALERTES, ConstantesPrincipale.DOCUMENT_ALERTES)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_DOMAINES, ConstantesPrincipale.DOCUMENT_DOMAINES)

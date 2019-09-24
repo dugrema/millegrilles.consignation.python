@@ -71,12 +71,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         # self.__traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
         # self.__traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
-        # Documents initiaux
-        self.initialiser_document(
-            SenseursPassifsConstantes.LIBVAL_CONFIGURATION,
-            SenseursPassifsConstantes.DOCUMENT_DEFAUT_CONFIGURATION
-        )
-
         # Index collection domaine
         collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         # Index noeud, _mg-libelle
@@ -112,6 +106,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     def demarrer(self):
         super().demarrer()
+        # Documents initiaux
+        self.initialiser_document(
+            SenseursPassifsConstantes.LIBVAL_CONFIGURATION,
+            SenseursPassifsConstantes.DOCUMENT_DEFAUT_CONFIGURATION
+        )
         self.demarrer_watcher_collection(
             SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
 

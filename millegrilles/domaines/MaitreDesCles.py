@@ -106,8 +106,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
-        self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
-
         self.charger_certificat_courant()
         self.charger_certificats_backup()
 
@@ -120,6 +118,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
             (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
         ], unique=True)
+
+    def demarrer(self):
+        super().demarrer()
+        self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
     def charger_certificat_courant(self):
         fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_certs, self.__prefix_maitredescles)

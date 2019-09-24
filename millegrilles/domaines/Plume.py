@@ -91,6 +91,8 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
         ])
 
+    def demarrer(self):
+        super().demarrer()
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
 
