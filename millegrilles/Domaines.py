@@ -197,7 +197,7 @@ class GestionnaireDomaine:
         self._stop_event = Event()
         self._traitement_evenements = None
         self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
-        self.q_pretes = list()
+        self.nb_routes_a_config = 0
 
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
@@ -261,7 +261,7 @@ class GestionnaireDomaine:
         channel = self.channel_mq
         queues_config = self.get_queue_configuration()
 
-        self.nb_queues_a_config = len(queues_config)
+        self.nb_routes_a_config = len([r for r in queues_config['routing']])
         self.wait_Q_ready.clear()  # Reset flag au besoin
         # channel = self.message_dao.channel
         for queue_config in queues_config:
@@ -274,20 +274,22 @@ class GestionnaireDomaine:
                         exchange=in_queue_config['exchange'],
                         queue=in_queue_config['nom'],
                         routing_key=routing,
-                        callback=None
+                        callback=self.__compter_route
                     )
-
-                # Indiquer qu'une Q a ete configuree
-                gestionnaire.nb_queues_a_config = gestionnaire.nb_queues_a_config - 1
-                if gestionnaire.nb_queues_a_config == 0:
-                    # Il ne reste plus de Q a configurer, set flag comme pret
-                    gestionnaire.wait_Q_ready.set()
 
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=False,
                 callback=callback_init_transaction,
             )
+
+    def __compter_route(self):
+        # Indiquer qu'une route a ete configuree
+        self.nb_routes_a_config = self.nb_routes_a_config - 1
+
+        if self.nb_routes_a_config == 0:
+            # Il ne reste plus de routes a configurer, set flag comme pret
+            self.wait_Q_ready.set()
 
     def stop_consuming(self):
         """
