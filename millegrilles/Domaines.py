@@ -218,8 +218,15 @@ class GestionnaireDomaine:
         self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
         self._contexte.message_dao.register_channel_listener(self)
 
-        while not self.wait_Q_ready.is_set():
-            self.wait_Q_ready.wait(15)
+        for essai in range(0, 6):
+            self._logger.info("Attente Q et routes prets")
+            self.wait_Q_ready.wait(5)
+            if self.wait_Q_ready.is_set():
+                break
+
+        if not self.wait_Q_ready.is_set():
+            raise Exception("Les routes de Q du domaine ne sont pas configures correctement")
+        self._logger.info("Q et routes prets")
 
         # Verifier si on doit upgrader les documents avant de commencer a ecouter
         doit_regenerer = self.verifier_version_transactions(self.version_domaine)
@@ -261,7 +268,7 @@ class GestionnaireDomaine:
         channel = self.channel_mq
         queues_config = self.get_queue_configuration()
 
-        self.nb_routes_a_config = len([r for r in queues_config['routing']])
+        self.nb_routes_a_config = len([r for r in [q['routing'] for q in queues_config]])
         self.wait_Q_ready.clear()  # Reset flag au besoin
         # channel = self.message_dao.channel
         for queue_config in queues_config:
@@ -283,7 +290,12 @@ class GestionnaireDomaine:
                 callback=callback_init_transaction,
             )
 
-    def __compter_route(self):
+    def __compter_route(self, arg1):
+        """
+        Sert a compter les routes qui sont pretes. Declenche Event wait_Q_ready lorsque complet.
+        :param arg1:
+        :return:
+        """
         # Indiquer qu'une route a ete configuree
         self.nb_routes_a_config = self.nb_routes_a_config - 1
 
