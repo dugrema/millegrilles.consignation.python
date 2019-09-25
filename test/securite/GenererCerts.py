@@ -1,44 +1,47 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
 from cryptography.x509.name import NameOID
 from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
 
+
 class GenerateurCertificat:
 
     def __init__(self):
-        pass
+        self.__nom_millegrille = u'mg-test'
+
+        self.__public_exponent = 65537
+        self.__noeud_keysize = 2048
+        self.__ca_keysize = 4096
+
+        self.__duree_cert_ca = datetime.timedelta(days=3655)
+        self.__one_day = datetime.timedelta(1, 0, 0)
 
     def generer_cert_self_signed(self, nom_fichier):
-        one_day = datetime.timedelta(1, 0, 0)
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
+            public_exponent=self.__public_exponent,
+            key_size=self.__ca_keysize,
             backend=default_backend()
         )
 
         public_key = private_key.public_key()
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, u'cryptography.io'),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.__nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'MilleGrille'),
+            x509.NameAttribute(NameOID.COMMON_NAME, self.__nom_millegrille),
         ]))
         builder = builder.issuer_name(x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, u'cryptography.io'),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.__nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'MilleGrille'),
+            x509.NameAttribute(NameOID.COMMON_NAME, self.__nom_millegrille),
         ]))
-        builder = builder.not_valid_before(datetime.datetime.today() - one_day)
-        builder = builder.not_valid_after(datetime.datetime.today() + (one_day * 30))
+        builder = builder.not_valid_before(datetime.datetime.today() - self.__one_day)
+        builder = builder.not_valid_after(datetime.datetime.today() + self.__duree_cert_ca)
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(public_key)
-
-        builder = builder.add_extension(
-            x509.SubjectAlternativeName(
-                [x509.DNSName(u'cryptography.io')]
-            ),
-            critical=False
-        )
 
         builder = builder.add_extension(
             x509.BasicConstraints(ca=True, path_length=5),
@@ -69,7 +72,7 @@ class GenerateurCertificat:
     def generer_csr(self, nom_fichier):
         private_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=2048,
+            key_size=self.__noeud_keysize,
             backend=default_backend()
         )
 
@@ -77,10 +80,6 @@ class GenerateurCertificat:
         builder = builder.subject_name(x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, u'cryptography.io'),
         ]))
-        builder = builder.add_extension(
-            x509.BasicConstraints(ca=False, path_length=None), critical=True,
-        )
-
         request = builder.sign(
             private_key, hashes.SHA256(), default_backend()
         )
@@ -110,13 +109,11 @@ class GenerateurCertificat:
 
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(fichier_csr.subject)
-        builder = builder.issuer_name(x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, u'MOI!.io'),
-        ]))
+        builder = builder.issuer_name(signing_cert.subject)
         builder = builder.not_valid_before(datetime.datetime.today() - one_day)
         builder = builder.not_valid_after(datetime.datetime.today() + (one_day * 30))
         builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.public_key(signing_cert.public_key())
+        builder = builder.public_key(fichier_csr.public_key())
         builder = builder.add_extension(
             x509.SubjectAlternativeName(
                 [x509.DNSName(u'mon_serveur.ca')]
