@@ -9,14 +9,15 @@ import datetime
 
 class GenerateurCertificat:
 
-    def __init__(self):
-        self.__nom_millegrille = u'mg-test'
+    def __init__(self, nom_millegrille):
+        self.__nom_millegrille = nom_millegrille
 
         self.__public_exponent = 65537
         self.__noeud_keysize = 2048
         self.__ca_keysize = 4096
 
         self.__duree_cert_ca = datetime.timedelta(days=3655)
+        self.__duree_cert_noeud = datetime.timedelta(days=366)
         self.__one_day = datetime.timedelta(1, 0, 0)
 
     def generer_cert_self_signed(self, nom_fichier):
@@ -111,7 +112,7 @@ class GenerateurCertificat:
         builder = builder.subject_name(fichier_csr.subject)
         builder = builder.issuer_name(signing_cert.subject)
         builder = builder.not_valid_before(datetime.datetime.today() - one_day)
-        builder = builder.not_valid_after(datetime.datetime.today() + (one_day * 30))
+        builder = builder.not_valid_after(datetime.datetime.today() + self.__duree_cert_noeud)
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(fichier_csr.public_key())
         builder = builder.add_extension(
@@ -166,7 +167,7 @@ class GenerateurCertificat:
 
 
 if __name__ == '__main__':
-    generateur = GenerateurCertificat()
+    generateur = GenerateurCertificat(u'mg-test')
     generateur.generer_cert_self_signed('/home/mathieu/tmp/certs/self-signed')
     generateur.generer_csr('/home/mathieu/tmp/certs/cert')
     generateur.signer_csr('/home/mathieu/tmp/certs/cert', '/home/mathieu/tmp/certs/self-signed')
