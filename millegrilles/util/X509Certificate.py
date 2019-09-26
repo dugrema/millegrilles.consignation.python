@@ -111,6 +111,7 @@ class GenerateurCertificat:
         key_id = bytes.hex(subjectKeyIdentifier.value.digest)
         return key_id
 
+
 class GenerateurCertificateParRequest(GenerateurCertificat):
 
     def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: dict = None):
