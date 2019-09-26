@@ -7,6 +7,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
 import secrets
 import base64
+import hashlib
+import binascii
 
 from millegrilles.SecuritePKI import EnveloppeCertificat
 
@@ -246,7 +248,16 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
         self._autorite = self._generer_self_signed()
         ss_cert = self._autorite['cert']
         ss_skid = GenerateurCertificat.get_subject_identifier(ss_cert)
-        print("Skid: %s, Fingerprint: %s" % (ss_skid, EnveloppeCertificat.calculer_fingerprint_ascii(ss_cert)))
+        data = ss_cert.public_key().public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.PKCS1,
+        )
+        print(binascii.hexlify(data))
+
+        fingerprint = EnveloppeCertificat.calculer_fingerprint_ascii(ss_cert)
+        fingerprint_data = str(binascii.hexlify(hashlib.sha1(data).digest()), 'utf-8')
+
+        print("Skid: %s, Fingerprint: %s, fingerprint_data: %s" % (ss_skid, fingerprint, fingerprint_data))
         self._dict_ca = {ss_skid: ss_cert}
 
         millegrille = super().generer()
@@ -306,11 +317,14 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
             backend=default_backend()
         )
 
+        certificate_bytes = certificate.public_bytes(serialization.Encoding.PEM)
+
         self_signed = {
             'cle': private_key,
             'cle_bytes': private_bytes,
             'cle_password': password,
             'cert': certificate,
+            'cert_bytes': certificate_bytes,
             'password': password,
         }
 

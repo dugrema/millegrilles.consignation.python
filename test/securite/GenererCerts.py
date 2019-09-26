@@ -7,6 +7,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
 import secrets
 import base64
+import binascii
+import hashlib
 
 
 class GenerateurCertificat:
@@ -172,8 +174,46 @@ class GenerateurCertificat:
             fichier.write(certificate.public_bytes(serialization.Encoding.PEM))
 
 
+class Hasheur:
+
+    def __init__(self):
+        self.cert_path = '/opt/millegrilles/mg-dev3/pki/certs/mg-dev3_ssroot.cert.pem'
+        with open(self.cert_path, 'rb') as fichier:
+            cert_bytes = fichier.read()
+            self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+
+    def hash_interne(self):
+        return str(binascii.hexlify(self.cert.fingerprint(hashes.SHA1())), 'utf-8')
+
+    def data_calc(self):
+        data = self.cert.public_key().public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.PKCS1,
+        )
+        return str(binascii.hexlify(hashlib.sha1(data).digest()), 'utf-8')
+
+    def cert_calc(self):
+        data = self.cert.public_bytes(
+            serialization.Encoding.DER
+        )
+        return str(binascii.hexlify(hashlib.sha1(data).digest()), 'utf-8')
+
+    def comparer(self):
+        hash_openssl = self.hash_interne()
+        data_calcm1 = self.data_calc()
+        cert_hash = self.cert_calc()
+
+        print("Interne: %s, Data calc M1: %s, Cert hash: %s" % (hash_openssl, data_calcm1, cert_hash))
+
+        if hash_openssl == data_calcm1:
+            print("EGAL")
+
+
 if __name__ == '__main__':
-    generateur = GenerateurCertificat(u'mg-test')
-    generateur.generer_cert_self_signed('/home/mathieu/tmp/certs/self-signed')
-    generateur.generer_csr('/home/mathieu/tmp/certs/cert')
-    generateur.signer_csr('/home/mathieu/tmp/certs/cert', '/home/mathieu/tmp/certs/self-signed')
+    # generateur = GenerateurCertificat(u'mg-test')
+    # generateur.generer_cert_self_signed('/home/mathieu/tmp/certs/self-signed')
+    # generateur.generer_csr('/home/mathieu/tmp/certs/cert')
+    # generateur.signer_csr('/home/mathieu/tmp/certs/cert', '/home/mathieu/tmp/certs/self-signed')
+
+    hasheur = Hasheur()
+    hasheur.comparer()
