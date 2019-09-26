@@ -5,6 +5,8 @@ from cryptography import x509
 from cryptography.x509.name import NameOID
 from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
+import secrets
+import base64
 
 
 class GenerateurCertificat:
@@ -27,6 +29,7 @@ class GenerateurCertificat:
             backend=default_backend()
         )
 
+        password = base64.b64encode(secrets.token_bytes(16))
         public_key = private_key.public_key()
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(x509.Name([
@@ -67,8 +70,11 @@ class GenerateurCertificat:
             fichier.write(private_key.private_bytes(
                 serialization.Encoding.PEM,
                 serialization.PrivateFormat.PKCS8,
-                serialization.NoEncryption()
+                serialization.BestAvailableEncryption(password)
             ))
+
+        with open('%s.password.txt' % nom_fichier, 'wb') as fichier:
+            fichier.write(password)
 
     def generer_csr(self, nom_fichier):
         private_key = rsa.generate_private_key(
@@ -159,7 +165,7 @@ class GenerateurCertificat:
 
         certificate = builder.sign(
             private_key=signing_key,
-            algorithm = hashes.SHA512(),
+            algorithm=hashes.SHA512(),
             backend=default_backend()
         )
         with open('%s.cert.pem' % nom_fichier_csr, 'wb') as fichier:
