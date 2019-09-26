@@ -74,6 +74,10 @@ class EnveloppeCertificat:
     def calculer_fingerprint(certificat):
         return certificat.fingerprint(hashes.SHA1())
 
+    @staticmethod
+    def calculer_fingerprint_ascii(certificat):
+        return str(binascii.hexlify(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
+
     @property
     def fingerprint(self):
         return self._fingerprint
