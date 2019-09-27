@@ -22,10 +22,12 @@ class ConstantesGenerateurCertificat:
     ROLE_DEPLOYEUR = 'deployeur'
     ROLE_MAITREDESCLES = 'maitredescles'
     ROLE_TRANSACTIONS = 'transactions'
+    ROLE_CEDULEUR = 'ceduleur'
     ROLE_DOMAINES = 'domaines'
     ROLE_COUPDOEIL = 'coupdoeil'
     ROLE_FICHIERS = 'fichiers'
     ROLE_VITRINE = 'vitrine'
+    ROLE_PUBLICATEUR = 'publicateur'
 
     # Custom OIDs
 
