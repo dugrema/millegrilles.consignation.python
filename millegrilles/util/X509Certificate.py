@@ -123,30 +123,6 @@ class GenerateurCertificat:
     def generer(self) -> EnveloppeCleCert:
         raise NotImplementedError("Pas implemente")
 
-    # def _generer_cle(self, generer_password=False):
-    #     private_key = rsa.generate_private_key(
-    #         public_exponent=self.__public_exponent,
-    #         key_size=self.__keysize,
-    #         backend=default_backend()
-    #     )
-    #
-    #     if generer_password:
-    #         password = base64.b64encode(secrets.token_bytes(16))
-    #         private_bytes = private_key.private_bytes(
-    #             serialization.Encoding.PEM,
-    #             serialization.PrivateFormat.PKCS8,
-    #             serialization.BestAvailableEncryption(password)
-    #         )
-    #     else:
-    #         password = None
-    #         private_bytes = private_key.private_bytes(
-    #             serialization.Encoding.PEM,
-    #             serialization.PrivateFormat.PKCS8,
-    #             serialization.NoEncryption()
-    #         )
-    #
-    #     return private_key, private_bytes, password
-
     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
                                    duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD) -> x509.CertificateBuilder:
 
