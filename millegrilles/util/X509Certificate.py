@@ -17,6 +17,16 @@ class ConstantesGenerateurCertificat:
     DUREE_CERT_NOEUD = datetime.timedelta(days=366)
     ONE_DAY = datetime.timedelta(1, 0, 0)
 
+    ROLE_MQ = 'mq'
+    ROLE_MONGO = 'mongo'
+    ROLE_DEPLOYEUR = 'deployeur'
+    ROLE_MAITREDESCLES = 'maitredescles'
+    ROLE_TRANSACTIONS = 'transactions'
+    ROLE_DOMAINES = 'domaines'
+    ROLE_COUPDOEIL = 'coupdoeil'
+    ROLE_FICHIERS = 'fichiers'
+    ROLE_VITRINE = 'vitrine'
+
     # Custom OIDs
 
     # Composant avec acces interne.
@@ -443,7 +453,7 @@ class GenererDeployeur(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_DEPLOYEUR).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_DEPLOYEUR).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -465,7 +475,7 @@ class GenererMaitredescles(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_MAITREDESCLES).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MAITREDESCLES).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -487,7 +497,7 @@ class GenererTransactions(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_TRANSACTIONS).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_TRANSACTIONS).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -509,7 +519,7 @@ class GenererDomaines(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_DOMAINES).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_DOMAINES).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -524,7 +534,7 @@ class GenererMQ(GenerateurNoeud):
         builder = super()._get_keyusage(builder)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_MQ).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MQ).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -559,7 +569,7 @@ class GenererMongo(GenerateurNoeud):
         builder = super()._get_keyusage(builder)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_MONGO).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MONGO).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -581,7 +591,7 @@ class GenererCoupdoeil(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_COUPDOEIL).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_COUPDOEIL).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -603,7 +613,7 @@ class GenererFichiers(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_FICHIERS).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_FICHIERS).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -625,7 +635,7 @@ class GenererVitrine(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % Constantes.ROLE_VITRINE).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_VITRINE).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -641,15 +651,15 @@ class RenouvelleurCertificat:
         self.__dict_ca = dict_ca
         self.__millegrille = millegrille
         self.__generateurs_par_role = {
-            Constantes.ROLE_FICHIERS: GenererFichiers,
-            Constantes.ROLE_COUPDOEIL: GenererCoupdoeil,
-            Constantes.ROLE_MQ: GenererMQ,
-            Constantes.ROLE_MONGO: GenererMongo,
-            Constantes.ROLE_DOMAINES: GenererDomaines,
-            Constantes.ROLE_TRANSACTIONS: GenererTransactions,
-            Constantes.ROLE_MAITREDESCLES: GenererMaitredescles,
-            Constantes.ROLE_VITRINE: GenererVitrine,
-            Constantes.ROLE_DEPLOYEUR: GenererDeployeur,
+            ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL: GenererCoupdoeil,
+            ConstantesGenerateurCertificat.ROLE_MQ: GenererMQ,
+            ConstantesGenerateurCertificat.ROLE_MONGO: GenererMongo,
+            ConstantesGenerateurCertificat.ROLE_DOMAINES: GenererDomaines,
+            ConstantesGenerateurCertificat.ROLE_TRANSACTIONS: GenererTransactions,
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: GenererMaitredescles,
+            ConstantesGenerateurCertificat.ROLE_VITRINE: GenererVitrine,
+            ConstantesGenerateurCertificat.ROLE_DEPLOYEUR: GenererDeployeur,
         }
 
         self.__generateur_millegrille = None

@@ -183,13 +183,3 @@ SECURITE_SECURE = '4.secure'    # Niveau 4, accessible uniquement a l'usager et 
 SECURITE_LIBELLE_REPONSE = 'acces'
 SECURITE_ACCES_REFUSE = '0.refuse'
 SECURITE_ACCES_PERMIS = '1.permis'
-
-ROLE_MQ = 'mq'
-ROLE_MONGO = 'mongo'
-ROLE_DEPLOYEUR = 'deployeur'
-ROLE_MAITREDESCLES = 'maitredescles'
-ROLE_TRANSACTIONS = 'transactions'
-ROLE_DOMAINES = 'domaines'
-ROLE_COUPDOEIL = 'coupdoeil'
-ROLE_FICHIERS = 'fichiers'
-ROLE_VITRINE = 'vitrine'
