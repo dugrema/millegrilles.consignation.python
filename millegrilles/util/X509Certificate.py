@@ -29,6 +29,7 @@ class ConstantesGenerateurCertificat:
     ROLE_VITRINE = 'vitrine'
     ROLE_PUBLICATEUR = 'publicateur'
     ROLE_MONGOEXPRESS = 'mongoexpress'
+    ROLE_NGINX = 'nginx'
 
     # Custom OIDs
 
@@ -746,6 +747,56 @@ class GenererMongoexpress(GenerateurNoeud):
             critical=False
         )
 
+        liste_dns = [
+            x509.DNSName(u'mongoexpress'),
+            x509.DNSName(u'mongoexpress-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+        ]
+
+        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
+        if self._common_name != 'mg-%s' % self._nom_millegrille:
+            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
+            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
+class GenererNginx(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_NGINX).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'www'),
+            x509.DNSName(u'www-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+        ]
+
+        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
+        if self._common_name != 'mg-%s' % self._nom_millegrille:
+            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
+            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+                liste_dns.append(x509.DNSName(u'www.%s' % domaine))
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
         return builder
 
 
@@ -768,6 +819,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_CEDULEUR: GenererCeduleur,
             ConstantesGenerateurCertificat.ROLE_PUBLICATEUR: GenererPublicateur,
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
+            ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
         }
 
         self.__generateur_millegrille = None
