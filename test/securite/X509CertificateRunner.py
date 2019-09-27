@@ -1,4 +1,5 @@
-from millegrilles.util.X509Certificate import GenerateurInitial, GenerateurNoeud, GenerateurCertificat
+from millegrilles.util.X509Certificate import GenerateurInitial, EnveloppeCleCert, RenouvelleurCertificat
+from millegrilles import Constantes
 
 
 class RunnerCertMilleGrille:
@@ -11,43 +12,46 @@ class RunnerCertMilleGrille:
         self.self_signed = None
         self.millegrille = None
 
+        self.renouvelleur = None
+
 
     def generer_initiale(self):
-        resultat = self.generateur_mg_initial.generer()
+        millegrille_clecert = self.generateur_mg_initial.generer()
         print('generer_initiale()')
-        print(str(resultat))
 
-        self.self_signed = resultat['self_signed']
-        self.millegrille = resultat['millegrille']
+        self.self_signed = self.generateur_mg_initial.autorite
+        self.millegrille = millegrille_clecert
 
         self.sauvegarder('ss', self.self_signed)
         self.sauvegarder('millegrille', self.millegrille)
 
-    def generer_deployeur(self):
         dict_ca = {
-            GenerateurCertificat.get_subject_identifier(self.self_signed['cert']): self.self_signed['cert'],
-            GenerateurCertificat.get_subject_identifier(self.millegrille['cert']): self.millegrille['cert'],
+            self.self_signed.skid: self.self_signed.cert,
+            self.millegrille.skid: self.millegrille.cert,
         }
+        self.renouvelleur = RenouvelleurCertificat(self.nom_millegrille, dict_ca, self.millegrille, self.self_signed)
 
-        generateur_mg_noeud = GenerateurNoeud(self.nom_millegrille, 'Deployeur', 'mg-test1', dict_ca, self.millegrille)
-        resultat = generateur_mg_noeud.generer()
+    def generer_certs_noeuds(self):
+        cn = 'mg-test1'
+        roles = [
+            Constantes.ROLE_DEPLOYEUR,
+            Constantes.ROLE_MQ,
+            Constantes.ROLE_MONGO,
+        ]
+        for role in roles:
+            self.sauvegarder(role, self.renouvelleur.renouveller_par_role(role, cn))
 
-        print('generer_deployeur()')
-        print(str(resultat))
-
-        self.sauvegarder('deployeur', resultat)
-
-    def sauvegarder(self, nom, dict_cert: dict):
+    def sauvegarder(self, nom, clecert: EnveloppeCleCert):
 
         with open('%s/%s.key.pem' % (self.folder_output, nom), 'wb') as fichier:
-            fichier.write(dict_cert['cle_bytes'])
+            fichier.write(clecert.private_key_bytes)
 
         with open('%s/%s.cert.pem' % (self.folder_output, nom), 'wb') as fichier:
-            fichier.write(dict_cert['cert_bytes'])
+            fichier.write(clecert.cert_bytes)
 
-        if dict_cert.get('password') is not None:
+        if clecert.password is not None:
             with open('%s/%s.password.txt' % (self.folder_output, nom), 'wb') as fichier:
-                fichier.write(dict_cert['password'])
+                fichier.write(clecert.password)
 
 
 
@@ -55,4 +59,4 @@ class RunnerCertMilleGrille:
 # ******** MAIN *********
 runner = RunnerCertMilleGrille()
 runner.generer_initiale()
-runner.generer_deployeur()
+runner.generer_certs_noeuds()
