@@ -656,6 +656,9 @@ class GenererMongo(GenerateurNoeud):
                 liste_dns.append(x509.DNSName(u'%s' % domaine))
                 liste_dns.append(x509.DNSName(u'mq.%s' % domaine))
 
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
         return builder
 
 
