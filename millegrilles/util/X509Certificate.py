@@ -573,6 +573,23 @@ class GenererMongo(GenerateurNoeud):
             critical=False
         )
 
+        liste_dns = [
+            x509.DNSName(u'mongo'),
+            x509.DNSName(u'mongo-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+        ]
+
+        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
+        if self._common_name != 'mg-%s' % self._nom_millegrille:
+            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
+            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+                liste_dns.append(x509.DNSName(u'mq.%s' % domaine))
+
         return builder
 
 
