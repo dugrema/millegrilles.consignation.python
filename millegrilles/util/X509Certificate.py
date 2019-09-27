@@ -373,9 +373,22 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
         cle_autorite = self._autorite['cle']
         builder = self._get_keyusage(builder)
 
-        custom_oid = x509.ObjectIdentifier('1.3.6.1.4.1.34380.1.1.13')
+        # custom_oid = x509.ObjectIdentifier('1.3.6.1.4.1.34380.1.1.13')
+        custom_oid_permis = x509.ObjectIdentifier('1.2.3.4.0')
         builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid, b'SenseursPassifs,Parametres'),
+            x509.UnrecognizedExtension(custom_oid_permis, b'SenseursPassifs,Parametres'),
+            critical=False
+        )
+
+        custom_oid_delegue = x509.ObjectIdentifier('1.2.3.4.1')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_delegue, b'Plume'),
+            critical=False
+        )
+
+        custom_oid_associe = x509.ObjectIdentifier('1.2.3.4.2')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_associe, b'Autre'),
             critical=False
         )
 
