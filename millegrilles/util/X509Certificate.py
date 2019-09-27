@@ -117,6 +117,22 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         self._dict_ca = dict_ca
         self._autorite = autorite
 
+    def _get_keyusage(self, builder):
+        return builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=True,
+                key_encipherment=True,
+                data_encipherment=True,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
+            ),
+            critical=False
+        )
+
     def aligner_chaine(self, certificat):
         """
         Genere la chaine PEM str avec le certificat et les certificats intermediares. Exclue root.
@@ -175,7 +191,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
         builder = self._preparer_builder_from_csr(csr_millegrille, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_MILLEGRILLE)
 
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
+            x509.BasicConstraints(ca=True, path_length=4),
             critical=True,
         )
 
@@ -285,7 +301,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
         builder = builder.issuer_name(name)
 
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
+            x509.BasicConstraints(ca=True, path_length=5),
             critical=True,
         )
 
@@ -355,18 +371,11 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
         )
 
         cle_autorite = self._autorite['cle']
+        builder = self._get_keyusage(builder)
+
+        custom_oid = x509.ObjectIdentifier('1.3.6.1.4.1.34380.1.1.13')
         builder = builder.add_extension(
-            x509.KeyUsage(
-                digital_signature=True,
-                content_commitment=True,
-                key_encipherment=True,
-                data_encipherment=True,
-                key_agreement=False,
-                key_cert_sign=False,
-                crl_sign=False,
-                encipher_only=False,
-                decipher_only=False
-            ),
+            x509.UnrecognizedExtension(custom_oid, b'SenseursPassifs,Parametres'),
             critical=False
         )
 
