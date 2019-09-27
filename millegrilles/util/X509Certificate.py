@@ -28,6 +28,7 @@ class ConstantesGenerateurCertificat:
     ROLE_FICHIERS = 'fichiers'
     ROLE_VITRINE = 'vitrine'
     ROLE_PUBLICATEUR = 'publicateur'
+    ROLE_MONGOEXPRESS = 'mongoexpress'
 
     # Custom OIDs
 
@@ -733,6 +734,21 @@ class GenererVitrine(GenerateurNoeud):
         return builder
 
 
+class GenererMongoexpress(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class RenouvelleurCertificat:
 
     def __init__(self, nom_millegrille, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
@@ -751,6 +767,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_DEPLOYEUR: GenererDeployeur,
             ConstantesGenerateurCertificat.ROLE_CEDULEUR: GenererCeduleur,
             ConstantesGenerateurCertificat.ROLE_PUBLICATEUR: GenererPublicateur,
+            ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
         }
 
         self.__generateur_millegrille = None
