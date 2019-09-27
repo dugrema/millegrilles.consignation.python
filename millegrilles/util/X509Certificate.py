@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
 import secrets
 import base64
+from millegrilles import Constantes
 
 
 class ConstantesGenerateurCertificat:
@@ -15,6 +16,18 @@ class ConstantesGenerateurCertificat:
     DUREE_CERT_MILLEGRILLE = datetime.timedelta(days=730)
     DUREE_CERT_NOEUD = datetime.timedelta(days=366)
     ONE_DAY = datetime.timedelta(1, 0, 0)
+
+    # Custom OIDs
+
+    # Composant avec acces interne.
+    # Liste des exchanges: millegrilles.middleware,millegrilles.noeud,etc.
+    MQ_EXCHANGES_OID = x509.ObjectIdentifier('1.2.3.4.0')
+
+    # Liste de roles internes speciaux: transaction,deployeur,maitredescles
+    MQ_ROLES_OID = x509.ObjectIdentifier('1.2.3.4.1')
+
+    # Liste des domaines: SenseursPassifs,GrosFichiers,MaitreDesCles,etc.
+    MQ_DOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.2')
 
 
 class GenerateurCertificat:
@@ -118,7 +131,12 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         self._autorite = autorite
 
     def _get_keyusage(self, builder):
-        return builder.add_extension(
+        # custom_oid_permis = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
+        # builder = builder.add_extension(
+        #     x509.UnrecognizedExtension(custom_oid_permis, b'SenseursPassifs,Parametres'),
+        #     critical=False
+        # )
+        builder = builder.add_extension(
             x509.KeyUsage(
                 digital_signature=True,
                 content_commitment=True,
@@ -132,6 +150,9 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             ),
             critical=False
         )
+
+        return builder
+
 
     def aligner_chaine(self, certificat):
         """
@@ -370,28 +391,10 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
             critical=False
         )
 
-        cle_autorite = self._autorite['cle']
+        # Ajouter les acces specifiques a ce type de cert
         builder = self._get_keyusage(builder)
 
-        # custom_oid = x509.ObjectIdentifier('1.3.6.1.4.1.34380.1.1.13')
-        custom_oid_permis = x509.ObjectIdentifier('1.2.3.4.0')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, b'SenseursPassifs,Parametres'),
-            critical=False
-        )
-
-        custom_oid_delegue = x509.ObjectIdentifier('1.2.3.4.1')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_delegue, b'Plume'),
-            critical=False
-        )
-
-        custom_oid_associe = x509.ObjectIdentifier('1.2.3.4.2')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_associe, b'Autre'),
-            critical=False
-        )
-
+        cle_autorite = self._autorite['cle']
         certificate = builder.sign(
             private_key=cle_autorite,
             algorithm=hashes.SHA512(),
@@ -410,3 +413,42 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
         }
 
         return key_cert
+
+
+class GenererDeployeur(GenerateurNoeud):
+    """
+    Deployeur de MilleGrilles
+    """
+
+    def _get_keyusage(self, builder):
+
+        builder = builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=True,
+                key_encipherment=True,
+                data_encipherment=True,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
+            ),
+            critical=False
+        )
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % Constantes.ROLE_DEPLOYEUR).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, roles),
+            critical=False
+        )
+
+        return builder

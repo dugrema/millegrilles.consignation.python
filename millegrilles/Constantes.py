@@ -183,3 +183,7 @@ SECURITE_SECURE = '4.secure'    # Niveau 4, accessible uniquement a l'usager et 
 SECURITE_LIBELLE_REPONSE = 'acces'
 SECURITE_ACCES_REFUSE = '0.refuse'
 SECURITE_ACCES_PERMIS = '1.permis'
+
+ROLE_MIDDLEWARE = 'middleware'
+ROLE_DEPLOYEUR = 'deployeur'
+ROLE_MAITREDESCLES = 'maitredescles'
