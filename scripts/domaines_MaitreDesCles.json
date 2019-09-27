@@ -3,6 +3,10 @@
     {
       "module": "millegrilles.domaines.MaitreDesCles",
       "classe": "GestionnaireMaitreDesCles"
+    },
+    {
+      "module": "millegrilles.domaines.Pki",
+      "classe": "GestionnairePki"
     }
   ]
 }
