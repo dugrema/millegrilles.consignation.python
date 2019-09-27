@@ -1,4 +1,4 @@
-from millegrilles.util.X509Certificate import GenerateurInitial, EnveloppeCleCert, RenouvelleurCertificat
+from millegrilles.util.X509Certificate import GenerateurInitial, EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat
 from millegrilles import Constantes
 
 
@@ -34,9 +34,9 @@ class RunnerCertMilleGrille:
     def generer_certs_noeuds(self):
         cn = 'mg-test1'
         roles = [
-            Constantes.ROLE_DEPLOYEUR,
-            Constantes.ROLE_MQ,
-            Constantes.ROLE_MONGO,
+            ConstantesGenerateurCertificat.ROLE_DEPLOYEUR,
+            ConstantesGenerateurCertificat.ROLE_MQ,
+            ConstantesGenerateurCertificat.ROLE_MONGO,
         ]
         for role in roles:
             self.sauvegarder(role, self.renouvelleur.renouveller_par_role(role, cn))
@@ -48,6 +48,11 @@ class RunnerCertMilleGrille:
 
         with open('%s/%s.cert.pem' % (self.folder_output, nom), 'wb') as fichier:
             fichier.write(clecert.cert_bytes)
+
+        if clecert.chaine is not None:
+            chaine = ''.join(clecert.chaine)
+            with open('%s/%s.fullchain.pem' % (self.folder_output, nom), 'w') as fichier:
+                fichier.write(chaine)
 
         if clecert.password is not None:
             with open('%s/%s.password.txt' % (self.folder_output, nom), 'wb') as fichier:

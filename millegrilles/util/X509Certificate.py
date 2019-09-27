@@ -55,7 +55,7 @@ class EnveloppeCleCert:
     def set_csr(self, csr):
         self.csr = csr
 
-    def set_chaine(self, chaine: str):
+    def set_chaine(self, chaine: list):
         self.chaine = chaine
 
     @property
@@ -213,23 +213,21 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
             if cert_autorite is None:
                 raise Exception("Erreur, autorite introuvable")
+
+            chaine.append(cert_autorite)
             akid_autorite_suivante = EnveloppeCleCert.get_authority_identifier(cert_autorite)
+
             if akid_autorite == akid_autorite_suivante:
-                # On est rendu au root, on ne l'inclue pas
+                # On est rendu au root
                 break
-            else:
-                chaine.append(cert_autorite)
-                akid_autorite = akid_autorite_suivante
+
+            akid_autorite = akid_autorite_suivante
 
         if idx == 100:
             raise Exception("Depasse limite profondeur")
 
         # Generer la chaine de certificats avec les intermediaires
-        fichier_cert_str = ''
-        for cert in chaine:
-            fichier_cert_str = '%s\n%s' % (fichier_cert_str, cert.public_bytes(serialization.Encoding.PEM).decode('utf-8'))
-
-        return fichier_cert_str
+        return [c.public_bytes(serialization.Encoding.PEM).decode('utf-8') for c in chaine]
 
 
 class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
