@@ -177,6 +177,11 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
     def _get_keyusage(self, builder):
         builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+
+        builder = builder.add_extension(
             x509.KeyUsage(
                 digital_signature=True,
                 content_commitment=True,
