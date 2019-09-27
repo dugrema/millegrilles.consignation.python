@@ -1,6 +1,7 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
 from cryptography.x509.name import NameOID
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -9,6 +10,7 @@ import secrets
 import base64
 import binascii
 import hashlib
+
 
 
 class GenerateurCertificat:
@@ -209,11 +211,52 @@ class Hasheur:
             print("EGAL")
 
 
+class Verificateur:
+
+    def __init__(self):
+        self.ss_path = '/opt/millegrilles/mg-dev3/pki/certs/mg-dev3_ssroot.cert.pem'
+        with open(self.ss_path, 'rb') as fichier:
+            ss_bytes = fichier.read()
+            self.ss = x509.load_pem_x509_certificate(ss_bytes, default_backend())
+
+        self.millegrille_path = '/opt/millegrilles/mg-dev3/pki/certs/mg-dev3_millegrille.cert.pem'
+        with open(self.millegrille_path, 'rb') as fichier:
+            millegrille_bytes = fichier.read()
+            self.millegrille = x509.load_pem_x509_certificate(millegrille_bytes, default_backend())
+
+        self.cert_path = '/opt/millegrilles/mg-dev3/pki/certs/mg-dev3_deployeur.cert.pem'
+        with open(self.cert_path, 'rb') as fichier:
+            cert_bytes = fichier.read()
+            self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+
+    def verifier_millegrille(self):
+        self.ss.public_key().verify(
+            self.millegrille.signature,
+            self.millegrille.tbs_certificate_bytes,
+            padding.PKCS1v15(),
+            self.millegrille.signature_hash_algorithm
+        )
+        print("Resultat verif millegrille, pas plante!")
+
+    def verifier_cert(self):
+        self.millegrille.public_key().verify(
+            self.cert.signature,
+            self.cert.tbs_certificate_bytes,
+            padding.PKCS1v15(),
+            self.cert.signature_hash_algorithm
+        )
+        print("Resultat verif deployeur, pas plante!")
+
+
 if __name__ == '__main__':
     # generateur = GenerateurCertificat(u'mg-test')
     # generateur.generer_cert_self_signed('/home/mathieu/tmp/certs/self-signed')
     # generateur.generer_csr('/home/mathieu/tmp/certs/cert')
     # generateur.signer_csr('/home/mathieu/tmp/certs/cert', '/home/mathieu/tmp/certs/self-signed')
 
-    hasheur = Hasheur()
-    hasheur.comparer()
+    # hasheur = Hasheur()
+    # hasheur.comparer()
+
+    verificateur = Verificateur()
+    verificateur.verifier_millegrille()
+    verificateur.verifier_cert()

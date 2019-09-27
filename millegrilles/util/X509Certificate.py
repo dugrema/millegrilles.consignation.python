@@ -7,10 +7,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
 import secrets
 import base64
-import hashlib
-import binascii
-
-from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class ConstantesGenerateurCertificat:
@@ -168,7 +164,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
         """
         # Preparer une nouvelle cle et CSR pour la millegrille
         key_csr = super()._preparer_key_request(
-            unit_name='MilleGrille',
+            unit_name=u'MilleGrille',
             common_name=self._nom_millegrille,
             generer_password=True
         )
@@ -179,7 +175,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
         builder = self._preparer_builder_from_csr(csr_millegrille, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_MILLEGRILLE)
 
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=4),
+            x509.BasicConstraints(ca=True, path_length=None),
             critical=True,
         )
 
@@ -206,7 +202,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
                 key_encipherment=True,
                 data_encipherment=True,
                 key_agreement=True,
-                key_cert_sign=False,
+                key_cert_sign=True,
                 crl_sign=False,
                 encipher_only=False,
                 decipher_only=False
@@ -248,19 +244,11 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
         self._autorite = self._generer_self_signed()
         ss_cert = self._autorite['cert']
         ss_skid = GenerateurCertificat.get_subject_identifier(ss_cert)
-        data = ss_cert.public_key().public_bytes(
-            serialization.Encoding.DER,
-            serialization.PublicFormat.PKCS1,
-        )
-        print(binascii.hexlify(data))
-
-        fingerprint = EnveloppeCertificat.calculer_fingerprint_ascii(ss_cert)
-        fingerprint_data = str(binascii.hexlify(hashlib.sha1(data).digest()), 'utf-8')
-
-        print("Skid: %s, Fingerprint: %s, fingerprint_data: %s" % (ss_skid, fingerprint, fingerprint_data))
         self._dict_ca = {ss_skid: ss_cert}
 
         millegrille = super().generer()
+        millegrille_skid = GenerateurCertificat.get_subject_identifier(ss_cert)
+        self._dict_ca[millegrille_skid] = millegrille
 
         chaine = {
             'self_signed': self._autorite,
@@ -290,14 +278,14 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
         name = x509.Name([
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._nom_millegrille),
-            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, 'SSRoot'),
-            x509.NameAttribute(NameOID.COMMON_NAME, 'SSRoot'),
+            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'SSRoot'),
+            x509.NameAttribute(NameOID.COMMON_NAME, u'SSRoot'),
         ])
         builder = builder.subject_name(name)
         builder = builder.issuer_name(name)
 
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=5),
+            x509.BasicConstraints(ca=True, path_length=None),
             critical=True,
         )
 
@@ -313,7 +301,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
         certificate = builder.sign(
             private_key=private_key,
-            algorithm = hashes.SHA256(),
+            algorithm = hashes.SHA512(),
             backend=default_backend()
         )
 
@@ -341,20 +329,15 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
     def generer(self):
         # Preparer une nouvelle cle et CSR pour la millegrille
         key_csr = super()._preparer_key_request(
-            unit_name='MilleGrille',
-            common_name=self._nom_millegrille,
-            generer_password=True
+            unit_name=self._organization_name,
+            common_name=self._common_name
         )
 
         # Signer avec l'autorite pour obtenir le certificat de MilleGrille
         csr_millegrille = key_csr['csr']
         cert_autorite = self._autorite['cert']
-        builder = self._preparer_builder_from_csr(csr_millegrille, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_MILLEGRILLE)
-
-        builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=4),
-            critical=True,
-        )
+        builder = self._preparer_builder_from_csr(
+            csr_millegrille, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
 
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr_millegrille.public_key()),
@@ -378,7 +361,7 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
                 content_commitment=True,
                 key_encipherment=True,
                 data_encipherment=True,
-                key_agreement=True,
+                key_agreement=False,
                 key_cert_sign=False,
                 crl_sign=False,
                 encipher_only=False,
@@ -399,7 +382,6 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
         key_cert = {
             'cle': key_csr['cle'],
             'cle_bytes': key_csr['cle_bytes'],
-            'password': key_csr['password'],
             'cert': certificate,
             'cert_bytes': certificate_bytes,
             'chaine': chaine
