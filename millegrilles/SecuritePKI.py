@@ -629,17 +629,42 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
     def __init__(self, contexte):
         super().__init__(contexte=contexte)
+        self.__channel = None
+        self.__queue_reponse = None
+        self.__routing_cert = None
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def initialiser(self, channel=None):
+    def initialiser(self):
         self.__logger.debug("Initialisation GestionnaireEvenementsCertificat")
         super().initialiser()
 
-        if channel is not None:
-            self.__logger.debug("Transmission certificat PKI a l'initialisation")
-            self.transmettre_certificat(channel)
+        if self.contexte.message_dao is not None:
+            self.contexte.message_dao.register_channel_listener(self)
 
-    def transmettre_certificat(self, channel=None):
+    def on_channel_open(self, channel):
+        channel.add_on_close_callback(self.__on_channel_close)
+        self.__channel = channel
+        self.__channel.queue_declare(queue='', exclusive=True, callback=self.register_mq_hanlder)
+
+    def register_mq_hanlder(self, queue):
+        nom_queue = queue.method.queue
+        self.__queue_reponse = nom_queue
+
+        exchange = self.contexte.configuration.exchange_noeuds
+
+        self.__logger.debug("Transmission certificat PKI a l'initialisation")
+        enveloppe = self.transmettre_certificat()
+        fingerprint = enveloppe.fingerprint_ascii
+        routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
+
+        self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
+        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+        self.__routing_cert = routing_key
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def transmettre_certificat(self):
         enveloppe = self.enveloppe_certificat_courant
 
         message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
@@ -650,12 +675,20 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
         routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
         self.contexte.message_dao.transmettre_message(
-            message_evenement, routing, channel=channel
+            message_evenement, routing, channel=self.__channel
         )
+        self.contexte.message_dao.transmettre_message_noeuds(
+            message_evenement, routing
+        )
+
+        return enveloppe
 
     def traiter_message(self, ch, method, properties, body):
         # Implementer la lecture de messages, specialement pour transmettre un certificat manquant
-        pass
+        routing_key = method.routing_key
+        if routing_key == self.__routing_cert:
+            # Transmettre notre certificat
+            self.transmettre_certificat()
 
 
 class CertificatInvalide(Exception):
