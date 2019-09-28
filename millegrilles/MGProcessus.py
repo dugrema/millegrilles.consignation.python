@@ -869,6 +869,7 @@ class MGProcessusTransaction(MGProcessus):
         info_transaction = self.trouver_id_transaction()
         id_transaction = info_transaction['id_transaction']
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
+        self._controleur.gestionnaire.verificateur_transaction.verifier(self._transaction)
 
         if self._transaction_mapper is not None:
             # Faire le mapping de la transaction en fonction de sa version

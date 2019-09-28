@@ -94,20 +94,23 @@ class ConsignateurTransactionCallback(BaseCallback):
 
     def traiter_nouvelle_transaction(self, message_dict, exchange, properties):
         try:
-            id_document = self.sauvegarder_nouvelle_transaction(message_dict, exchange)
-            entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
-            uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            id_document, signature_valide = self.sauvegarder_nouvelle_transaction(message_dict, exchange)
 
-            # Copier properties utiles
-            properties_mq = {}
-            if properties.reply_to is not None:
-                properties_mq['reply_to'] = properties.reply_to
-            if properties.correlation_id is not None:
-                properties_mq['correlation_id'] = properties.correlation_id
+            if signature_valide:
+                entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
+                uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
 
-            self.contexte.message_dao.transmettre_evenement_persistance(
-                id_document, uuid_transaction, domaine, properties_mq)
+                # Copier properties utiles
+                properties_mq = {}
+                if properties.reply_to is not None:
+                    properties_mq['reply_to'] = properties.reply_to
+                if properties.correlation_id is not None:
+                    properties_mq['correlation_id'] = properties.correlation_id
+
+                self.contexte.message_dao.transmettre_evenement_persistance(
+                    id_document, uuid_transaction, domaine, properties_mq)
+
         except Exception as e:
             uuid_transaction = 'NA'
             en_tete = message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
@@ -222,7 +225,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         resultat = collection_transactions.insert_one(enveloppe_transaction)
         doc_id = resultat.inserted_id
 
-        return doc_id
+        return doc_id, signature_valide
 
     @staticmethod
     def identifier_collection_domaine(domaine):
@@ -312,6 +315,53 @@ class EntretienCollectionsDomaines(BaseCallback):
                 (champ_persiste, 1)
             ])
 
+    def _verifier_signature(self):
+        delta_verif = datetime.timedelta(hours=6)
+        date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
+        date_verif = date_courante - delta_verif
+
+        nom_millegrille = self.configuration.nom_millegrille
+
+        verificateur_transaction = self.contexte.verificateur_transaction
+        for nom_collection_transaction in self.__liste_domaines:
+            filtre = {
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_verif},
+            }
+            collection_transaction = self.contexte.document_dao.get_collection(nom_collection_transaction)
+            curseur_transactions = collection_transaction.find(filtre)
+            for doc_transaction in curseur_transactions:
+                entete = doc_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+                uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                try:
+                    verificateur_transaction.verifier(doc_transaction)
+                    # Signature valide, on trigger le traitement de persistance
+                    label_signature = '%s.%s.%s' % (
+                        Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                        nom_millegrille,
+                        Constantes.EVENEMENT_SIGNATURE_VERIFIEE
+                    )
+                    collection_transaction.update_one(
+                        {'_id': doc_transaction['_id']},
+                        {'$set': {label_signature: date_courante}}
+                    )
+
+                    domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+
+                    # Copier properties utiles
+                    self.contexte.message_dao.transmettre_evenement_persistance(
+                        str(doc_transaction['_id']), uuid_transaction, domaine)
+
+                except ValueError:
+                    fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+                    self.__logger.info(
+                        "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
+                            fingerprint, uuid_transaction
+                        )
+                    )
+                    # Emettre demande pour le certificat manquant
+                    self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+
     def _nettoyer_transactions_expirees(self):
         """
         Marque les transactions trop vieilles comme expirees.
@@ -354,6 +404,9 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         if 'heure' in indicateurs and self.__thread_entretien is None:
             self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
+            self.__thread_entretien.start()
+        else:
+            self.__thread_entretien = Thread(target=self._verifier_signature, name="Entretien")
             self.__thread_entretien.start()
 
     def on_channel_open(self, channel):
