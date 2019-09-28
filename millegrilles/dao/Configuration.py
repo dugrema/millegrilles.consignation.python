@@ -42,6 +42,14 @@ class TransactionConfiguration:
 
         self._pki_config = {
             Constantes.CONFIG_PKI_WORKDIR: Constantes.DEFAUT_PKI_WORKDIR,
+            Constantes.CONFIG_MAITREDESCLES_DIR: Constantes.DEFAUT_MAITREDESCLES_DIR,
+            Constantes.CONFIG_PKI_SECRET_DIR: Constantes.DEFAUT_PKI_SECRET_DIR,
+            Constantes.CONFIG_PKI_CERT_MILLEGRILLE: Constantes.DEFAUT_PKI_CERT_MILLEGRILLE,
+            Constantes.CONFIG_PKI_KEY_MILLEGRILLE: Constantes.DEFAUT_PKI_KEY_MILLEGRILLE,
+            Constantes.CONFIG_PKI_PASSWORD_MILLEGRILLE: Constantes.DEFAUT_PKI_PASSWORD_MILLEGRILLE,
+            Constantes.CONFIG_PKI_CERT_AUTORITE: Constantes.DEFAUT_PKI_CERT_AUTORITE,
+            Constantes.CONFIG_PKI_KEY_AUTORITE: Constantes.DEFAUT_PKI_KEY_AUTORITE,
+            Constantes.CONFIG_PKI_PASSWORD_AUTORITE: Constantes.DEFAUT_PKI_PASSWORD_AUTORITE,
         }
 
         # Configuration de connection a MongoDB
@@ -200,6 +208,10 @@ class TransactionConfiguration:
         return self._pki_config[Constantes.CONFIG_PKI_WORKDIR]
 
     @property
+    def pki_config(self):
+        return self._pki_config
+
+    @property
     def nom_millegrille(self):
         return self._millegrille_config[Constantes.CONFIG_NOM_MILLEGRILLE]
 
@@ -222,6 +234,10 @@ class TransactionConfiguration:
     @property
     def mongo_ssl(self):
         return self._mongo_config[Constantes.CONFIG_MONGO_SSL]
+
+    @property
+    def mongo_keycert(self):
+        return self._mongo_config[Constantes.CONFIG_MONGO_SSL_KEYFILE]
 
     @property
     def queue_nouvelles_transactions(self):

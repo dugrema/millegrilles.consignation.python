@@ -82,8 +82,26 @@ DEFAUT_NOM_MILLEGRILLE = 'sansnom'
 
 # PKI
 CONFIG_PKI_WORKDIR = 'pki_workdir'
+CONFIG_MAITREDESCLES_DIR = 'maitredescles_dir'
+CONFIG_PKI_SECRET_DIR = 'pki_secrets'
+CONFIG_CA_PASSWORDS = 'pki_ca_passwords'
+CONFIG_PKI_CERT_MILLEGRILLE = 'pki_cert_millegrille'
+CONFIG_PKI_KEY_MILLEGRILLE = 'pki_key_millegrille'
+CONFIG_PKI_PASSWORD_MILLEGRILLE = 'pki_password_millegrille'
+CONFIG_PKI_CERT_AUTORITE = 'pki_cert_autorite'
+CONFIG_PKI_KEY_AUTORITE = 'pki_key_autorite'
+CONFIG_PKI_PASSWORD_AUTORITE = 'pki_password_millegrille'
 
-DEFAUT_PKI_WORKDIR = '/tmp'
+DEFAUT_PKI_WORKDIR = '/opt/millegrilles/dist/secure/pki'
+DEFAUT_MAITREDESCLES_DIR = '/opt/millegrilles/dist/secure/maitredescles'
+DEFAUT_PKI_SECRET_DIR = '/run/secrets'
+DEFAULT_CA_PASSWORDS = 'pki.ca.passwords'
+DEFAUT_PKI_CERT_MILLEGRILLE = 'pki.ca.millegrille.cert.pem'
+DEFAUT_PKI_KEY_MILLEGRILLE = 'pki.ca.millegrille.key.pem'
+DEFAUT_PKI_PASSWORD_MILLEGRILLE = 'pki.ca.millegrille.password.txt'
+DEFAUT_PKI_CERT_AUTORITE = 'pki.ca.autorite.cert.pem'
+DEFAUT_PKI_KEY_AUTORITE = 'pki.ca.autorite.key.pem'
+DEFAUT_PKI_PASSWORD_AUTORITE = 'pki.ca.autorite.password.txt'
 
 # Environnement
 PREFIXE_ENV_MG = 'MG_'
