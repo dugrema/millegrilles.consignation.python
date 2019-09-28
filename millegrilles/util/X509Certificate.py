@@ -156,6 +156,12 @@ class GenerateurCertificat:
     def generer(self) -> EnveloppeCleCert:
         raise NotImplementedError("Pas implemente")
 
+    def signer(self, csr) -> x509.Certificate:
+        raise NotImplementedError("Pas implemente")
+
+    def _get_keyusage(self, builder):
+        raise NotImplementedError("Pas implemente")
+
     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
                                    duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD) -> x509.CertificateBuilder:
 
@@ -217,14 +223,38 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             critical=False
         )
 
-        # custom_oid_permis = ConstantesGenerateurCertificat.MQ_DOMAINES_OID
-        # builder = builder.add_extension(
-        #     x509.UnrecognizedExtension(custom_oid_permis, b'SenseursPassifs,Parametres'),
-        #     critical=False
-        # )
-
         return builder
 
+    def signer(self, csr) -> x509.Certificate:
+        cert_autorite = self._autorite.cert
+        builder = self._preparer_builder_from_csr(
+            csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
+
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
+            critical=False
+        )
+
+        ski = cert_autorite.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier(
+                ski.value.digest,
+                None,
+                None
+            ),
+            critical=False
+        )
+
+        # Ajouter les acces specifiques a ce type de cert
+        builder = self._get_keyusage(builder)
+
+        cle_autorite = self._autorite.private_key
+        certificate = builder.sign(
+            private_key=cle_autorite,
+            algorithm=hashes.SHA512(),
+            backend=default_backend()
+        )
+        return certificate
 
     def aligner_chaine(self, certificat: x509.Certificate):
         """
@@ -278,30 +308,20 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
         # Signer avec l'autorite pour obtenir le certificat de MilleGrille
         csr_millegrille = clecert.csr
-        cert_autorite = self._autorite.cert
-        builder = self._preparer_builder_from_csr(csr_millegrille, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_MILLEGRILLE)
+        certificate = self.signer(csr_millegrille)
+        clecert.set_cert(certificate)
 
+        chaine = self.aligner_chaine(certificate)
+        clecert.set_chaine(chaine)
+
+        return clecert
+
+    def _get_keyusage(self, builder):
         builder = builder.add_extension(
             x509.BasicConstraints(ca=True, path_length=4),
             critical=True,
         )
 
-        builder = builder.add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(csr_millegrille.public_key()),
-            critical=False
-        )
-
-        ski = cert_autorite.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-        builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier(
-                ski.value.digest,
-                None,
-                None
-            ),
-            critical=False
-        )
-
-        cle_autorite = self._autorite.private_key
         builder = builder.add_extension(
             x509.KeyUsage(
                 digital_signature=True,
@@ -317,17 +337,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
             critical=False
         )
 
-        certificate = builder.sign(
-            private_key=cle_autorite,
-            algorithm=hashes.SHA512(),
-            backend=default_backend()
-        )
-        clecert.set_cert(certificate)
-
-        chaine = self.aligner_chaine(certificate)
-        clecert.set_chaine(chaine)
-
-        return clecert
+        return builder
 
 
 class GenerateurInitial(GenerateurCertificatMilleGrille):
@@ -428,34 +438,7 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
 
         # Signer avec l'autorite pour obtenir le certificat de MilleGrille
         csr_millegrille = clecert.csr
-        cert_autorite = self._autorite.cert
-        builder = self._preparer_builder_from_csr(
-            csr_millegrille, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
-
-        builder = builder.add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(csr_millegrille.public_key()),
-            critical=False
-        )
-
-        ski = cert_autorite.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-        builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier(
-                ski.value.digest,
-                None,
-                None
-            ),
-            critical=False
-        )
-
-        # Ajouter les acces specifiques a ce type de cert
-        builder = self._get_keyusage(builder)
-
-        cle_autorite = self._autorite.private_key
-        certificate = builder.sign(
-            private_key=cle_autorite,
-            algorithm=hashes.SHA512(),
-            backend=default_backend()
-        )
+        certificate = self.signer(csr_millegrille)
         clecert.set_cert(certificate)
 
         chaine = self.aligner_chaine(certificate)

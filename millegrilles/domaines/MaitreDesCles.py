@@ -51,6 +51,8 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_IDDOC = 'id-doc'
     TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
+    TRANSACTION_CHAMP_ROLE_CERTIFICAT = 'role'
+    TRANSACTION_CHAMP_CSR = 'csr'
 
     TRANSACTION_VERSION_COURANTE = 5
 
@@ -201,21 +203,18 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 password=motpass,
                 backend=default_backend()
             )
-            self.__cle_courante = cle
-
-        self._logger.info("Cle courante: %s" % str(self.__cle_courante))
 
         with open(fichier_cert, 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
-            # certificat_pem = bytes(certificat_pem, 'utf-8')
             cert = x509.load_pem_x509_certificate(
                 certificat_courant_pem,
                 backend=default_backend()
             )
-            self.__certificat_courant = cert
             self.__certificat_courant_pem = certificat_courant_pem.decode('utf8')
 
-        self._logger.info("Certificat courant: %s" % str(self.__certificat_courant))
+        self.__clecert_maitredescles = EnveloppeCleCert(cle, cert, motpass)
+
+        self._logger.info("Certificat courant: %s" % str(cert.subject))
 
     def charger_certificats_backup(self):
         """
@@ -252,7 +251,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         """
         contenu_bytes = b64decode(contenu)
 
-        contenu_decrypte = self.__cle_courante.decrypt(
+        contenu_decrypte = self.__clecert_maitredescles.private_key.decrypt(
             contenu_bytes,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -278,7 +277,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def crypter_cle(self, cle_secrete, cert=None):
         if cert is None:
-            cert = self.__certificat_courant
+            cert = self.__clecert_maitredescles.cert
         cle_secrete_backup = cert.public_key().encrypt(
             cle_secrete,
             padding.OAEP(
@@ -310,7 +309,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     @property
     def get_certificat(self):
-        return self.__certificat_courant
+        return self.__clecert_maitredescles.cert
 
     @property
     def get_certificat_pem(self):
@@ -322,7 +321,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def get_fingerprint_cert(self, cert=None):
         if cert is None:
-            cert = self.__certificat_courant
+            cert = self.get_certificat
         return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
     def traiter_cedule(self, evenement):
@@ -658,6 +657,65 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
         self.set_etape_suivante()  # Termine
         return {'resumer': transaction_resumer}
+
+
+class ProcessusRenouvellerCertificat(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        """ Aucun traitement necessaire, la nouvelle cle est re-sauvegardee sous une nouvelle transaction dans PKI """
+        pass
+
+    def initiale(self):
+        transaction = self.transaction
+        role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+
+        # Verifier origine du demandeur.
+        # Les certs de noeuds middleware sont demandes par le module lui-meme ou le deployeur
+        self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
+
+    def generer_cert(self):
+        """
+        Generer cert et creer nouvelle transaction pour PKI
+        :return:
+        """
+        transaction = self.transaction
+        role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+        csr = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR]
+
+        # Trouver generateur pour le role
+        generateur = None
+
+
+        self.set_etape_suivante(ProcessusRenouvellerCertificat.transmettre.__name__)
+
+    def transmettre(self):
+        """
+        Transmettre certificat au demandeur.
+        :return:
+        """
+
+        self.set_etape_suivante(ProcessusRenouvellerCertificat.emettre.__name__)
+
+    def emettre(self):
+        """
+        Emettre le nouveau certificat (broadcast)
+        :return:
+        """
+
+        self.set_etape_suivante()  # Termine
+
+    def refuser_generation(self):
+        """
+        Refuser la creation d'un nouveau certificat.
+        :return:
+        """
+        # Repondre au demandeur avec le refus
+
+        self.set_etape_suivante()  # Termine
 
 
 class TransactionDocumentMajClesVersionMapper:
