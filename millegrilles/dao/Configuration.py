@@ -50,6 +50,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_PKI_CERT_AUTORITE: Constantes.DEFAUT_PKI_CERT_AUTORITE,
             Constantes.CONFIG_PKI_KEY_AUTORITE: Constantes.DEFAUT_PKI_KEY_AUTORITE,
             Constantes.CONFIG_PKI_PASSWORD_AUTORITE: Constantes.DEFAUT_PKI_PASSWORD_AUTORITE,
+            Constantes.CONFIG_CA_PASSWORDS: Constantes.DEFAULT_CA_PASSWORDS,
         }
 
         # Configuration de connection a MongoDB
@@ -97,7 +98,8 @@ class TransactionConfiguration:
             self._mongo_config,
             self._millegrille_config,
             self._domaines_config,
-            self._email_config
+            self._email_config,
+            self._pki_config,
         ]
 
         for config_dict in configurations:

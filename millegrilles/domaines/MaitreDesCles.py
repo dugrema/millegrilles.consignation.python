@@ -6,6 +6,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -17,6 +18,7 @@ import logging
 import datetime
 import os
 import re
+import json
 
 
 class ConstantesMaitreDesCles:
@@ -88,14 +90,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         nom_millegrille = contexte.configuration.nom_millegrille
 
-        self.__repertoire_cles = '/opt/millegrilles/%s/pki/keys' % nom_millegrille
-        self.__repertoire_certs = '/opt/millegrilles/%s/pki/certs' % nom_millegrille
-        self.__repertoire_motsdepasse = '/opt/millegrilles/%s/pki/passwords' % nom_millegrille
-        self.__prefix_maitredescles = '%s_maitredescles' % nom_millegrille
+        self.__repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
 
-        self.__certificat_courant = None
+        self.__clecert_millegrille = None  # Cle et certificat de millegrille
+        self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
         self.__certificat_courant_pem = None
-        self.__cle_courante = None
         self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
 
         # Queue message handlers
@@ -106,7 +105,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
-        self.charger_certificat_courant()
+        self.__clecert_millegrille = self.charger_clecert_millegrille()
+
+        try:
+            self.charger_certificat_courant()
+        except FileNotFoundError as fnf:
+            self.creer_certificat_maitredescles()
+
         self.charger_certificats_backup()
 
         # Index collection domaine
@@ -123,10 +128,27 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
+    def charger_clecert_millegrille(self) -> EnveloppeCleCert:
+        repertoire_secrets = self.configuration.pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
+        passwords_ca = self.configuration.pki_config[Constantes.CONFIG_CA_PASSWORDS]
+        with open('%s/%s' % (repertoire_secrets, passwords_ca)) as fichier:
+            passwords_ca_dict = json.load(fichier)
+
+        cert_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MILLEGRILLE])
+        key_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MILLEGRILLE])
+        clecert = EnveloppeCleCert()
+        clecert.from_files(
+            key_millegrille,
+            cert_millegrille,
+            passwords_ca_dict['pki.ca.millegrille'].encode('utf-8')
+        )
+
+        return clecert
+
     def charger_certificat_courant(self):
-        fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_certs, self.__prefix_maitredescles)
-        fichier_cle = '%s/%s.key.pem' % (self.__repertoire_cles, self.__prefix_maitredescles)
-        mot_de_passe = '%s/%s.txt' % (self.__repertoire_motsdepasse, self.__prefix_maitredescles)
+        fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_maitredescles, self.__prefix_maitredescles)
+        fichier_cle = '%s/%s.key.pem' % (self.__repertoire_maitredescles, self.__prefix_maitredescles)
+        mot_de_passe = '%s/%s.password.txt' % (self.__repertoire_maitredescles, self.__prefix_maitredescles)
 
         with open(mot_de_passe, 'rb') as motpasse_courant:
             motpass = motpasse_courant.readline()[0:-1]  # Enlever newline a la fin.
@@ -160,19 +182,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         """
         certificats_backup = list()
 
-        p = re.compile("%s_backup_[0-9]*.cert.pem" % self.configuration.nom_millegrille)
-        for file in os.listdir(self.__repertoire_certs):
-            if p.match(file) is not None:
-                self._logger.debug('Fichier cert backup %s' % os.path.join(self.__repertoire_certs, file))
-                certfilepath = os.path.join(self.__repertoire_certs, file)
-                with open(certfilepath, 'rb') as certificat_pem:
-                    certificat_courant_pem = certificat_pem.read()
-                    # certificat_pem = bytes(certificat_pem, 'utf-8')
-                    cert = x509.load_pem_x509_certificate(
-                        certificat_courant_pem,
-                        backend=default_backend()
-                    )
-                    certificats_backup.append(cert)
+        # Aller chercher les certs dans mongo
+        # A FAIRE
 
         if len(certificats_backup) > 0:
             self.__certificats_backup = certificats_backup

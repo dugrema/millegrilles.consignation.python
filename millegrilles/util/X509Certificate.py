@@ -62,6 +62,25 @@ class EnveloppeCleCert:
     def set_chaine(self, chaine: list):
         self.chaine = chaine
 
+    def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
+        self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+        self.private_key = serialization.load_pem_private_key(
+            private_key_bytes,
+            password=password_bytes,
+            backend=default_backend()
+        )
+
+    def from_files(self, private_key, cert, password_bytes=None):
+        with open(cert, 'rb') as fichier:
+            self.cert = x509.load_pem_x509_certificate(fichier.read(), default_backend())
+
+        with open(private_key, 'rb') as fichier:
+            self.private_key = serialization.load_pem_private_key(
+                fichier.read(),
+                password=password_bytes,
+                backend=default_backend()
+            )
+
     @property
     def cert_bytes(self):
         return self.cert.public_bytes(serialization.Encoding.PEM)
