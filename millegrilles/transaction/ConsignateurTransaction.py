@@ -331,36 +331,40 @@ class EntretienCollectionsDomaines(BaseCallback):
             collection_transaction = self.contexte.document_dao.get_collection(nom_collection_transaction)
             curseur_transactions = collection_transaction.find(filtre)
             for doc_transaction in curseur_transactions:
-                entete = doc_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-                uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 try:
-                    verificateur_transaction.verifier(doc_transaction)
-                    # Signature valide, on trigger le traitement de persistance
-                    label_signature = '%s.%s.%s' % (
-                        Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                        nom_millegrille,
-                        Constantes.EVENEMENT_SIGNATURE_VERIFIEE
-                    )
-                    collection_transaction.update_one(
-                        {'_id': doc_transaction['_id']},
-                        {'$set': {label_signature: date_courante}}
-                    )
-
-                    domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-
-                    # Copier properties utiles
-                    self.contexte.message_dao.transmettre_evenement_persistance(
-                        str(doc_transaction['_id']), uuid_transaction, domaine)
-
-                except ValueError:
-                    fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
-                    self.__logger.info(
-                        "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
-                            fingerprint, uuid_transaction
+                    entete = doc_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+                    uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                    self.__logger.info("Resoumission transaction non terminee: %s" % uuid_transaction)
+                    try:
+                        verificateur_transaction.verifier(doc_transaction)
+                        # Signature valide, on trigger le traitement de persistance
+                        label_signature = '%s.%s.%s' % (
+                            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                            nom_millegrille,
+                            Constantes.EVENEMENT_SIGNATURE_VERIFIEE
                         )
-                    )
-                    # Emettre demande pour le certificat manquant
-                    self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+                        collection_transaction.update_one(
+                            {'_id': doc_transaction['_id']},
+                            {'$set': {label_signature: date_courante}}
+                        )
+
+                        domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+
+                        # Copier properties utiles
+                        self.contexte.message_dao.transmettre_evenement_persistance(
+                            str(doc_transaction['_id']), uuid_transaction, domaine)
+
+                    except ValueError:
+                        fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+                        self.__logger.info(
+                            "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
+                                fingerprint, uuid_transaction
+                            )
+                        )
+                        # Emettre demande pour le certificat manquant
+                        self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+                except Exception as e:
+                    self.__logger.error("Erreur resoumission transaction (collection %s): %s" % (nom_collection_transaction, str(e)))
 
     def _nettoyer_transactions_expirees(self):
         """
