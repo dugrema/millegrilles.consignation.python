@@ -335,14 +335,18 @@ class GestionnaireDomaine:
         collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
         transactions_incompletes = collection_transactions.find(filtre, sort=hint).hint(hint)
 
-        for transaction in transactions_incompletes:
-            self._logger.debug("Transaction incomplete: %s" % transaction)
-            id_document = transaction[Constantes.MONGO_DOC_ID]
-            en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-            uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            domaine = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-            self.message_dao.transmettre_evenement_persistance(
-                id_document, uuid_transaction, domaine, None)
+        try:
+            for transaction in transactions_incompletes:
+                self._logger.debug("Transaction incomplete: %s" % transaction)
+                id_document = transaction[Constantes.MONGO_DOC_ID]
+                en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+                uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                domaine = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+                self.message_dao.transmettre_evenement_persistance(
+                    id_document, uuid_transaction, domaine, None)
+        except OperationFailure as of:
+            self._logger.error("Collection %s, erreur requete avec hint: %s.\n%s" % (
+                self.get_collection_transaction_nom(), str(hint), str(of)))
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         """

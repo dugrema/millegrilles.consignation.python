@@ -2,7 +2,7 @@
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 
@@ -14,9 +14,12 @@ class ConstantesPki:
 
     DOMAINE_NOM = 'millegrilles.domaines.Pki'
     COLLECTION_TRANSACTIONS_NOM = 'millegrilles.domaines.Pki'
-    COLLECTION_DOCUMENTS_NOM = ConstantesSecurityPki.COLLECTION_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = 'millegrilles.domaines.Pki/processus'
     QUEUE_NOM = DOMAINE_NOM
+    QUEUE_NOM_CERTIFICATS = '%s.certificats' % QUEUE_NOM
+
+    TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat' % DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
@@ -29,6 +32,7 @@ class ConstantesPki:
     LIBELLE_NOT_VALID_AFTER = 'not_valid_after'
     LIBELLE_SUBJECT_KEY = 'subject_key'
     LIBELLE_AUTHORITY_KEY = 'authority_key'
+    LIBELLE_TRANSACTION_FAITE = 'transaction_faite'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_CERTIFICAT_ROOT = 'certificat.root'
@@ -36,6 +40,8 @@ class ConstantesPki:
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
     LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
 
+    REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
+    REQUETE_CERTIFICAT_DEMANDE = 'pki.requete.certificat'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
     # Indique que c'est un evenement avec un certificat (reference)
@@ -63,12 +69,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
         self._pki_document_helper = None
-        self._traitement_message = None
+        self.__traitement_certificats = None
 
     def configurer(self):
         super().configurer()
         self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
-        self._traitement_message = TraitementMessagePki(self, self._pki_document_helper)
+        self.__traitement_certificats = TraitementRequeteCertificat(self, self._pki_document_helper)
 
         self.initialiser_mgca()  # S'assurer que les certs locaux sont prets avant les premieres transactions
 
@@ -101,41 +107,32 @@ class GestionnairePki(GestionnaireDomaineStandard):
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
                 'routing': [
-                    'pki.#',
+                    '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
                 'exchange': self.configuration.exchange_middleware,
-                'callback': self.traiter_transaction
+                'callback': self.__traitement_certificats.callbackAvecAck
             },
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
                 'routing': [
-                    'pki.#',
+                    '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
                 'exchange': self.configuration.exchange_noeuds,
-                'callback': self.traiter_requete_noeud
+                'callback': self.__traitement_certificats.callbackAvecAck
             },
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
                 'routing': [
-                    'pki.#',
+                    '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
                 'exchange': self.configuration.exchange_inter,
-                'callback': self.traiter_requete_inter
+                'callback': self.__traitement_certificats.callbackAvecAck
             },
         ]
 
         configuration.extend(configuration_pki)
 
         return configuration
-
-    def traiter_transaction(self, ch, method, properties, body):
-        self._traitement_message.callbackAvecAck(ch, method, properties, body)
-
-    def traiter_requete_noeud(self, ch, method, properties, body):
-        return self.traiter_transaction(ch, method, properties, body)
-
-    def traiter_requete_inter(self, ch, method, properties, body):
-        return self.traiter_transaction(ch, method, properties, body)
 
     def traiter_cedule(self, evenement):
 
@@ -152,6 +149,9 @@ class GestionnairePki(GestionnaireDomaineStandard):
             self.demarrer_processus(processus, dict())
 
     def get_nom_queue(self):
+        return ConstantesPki.QUEUE_NOM
+
+    def get_nom_queue_certificats(self):
         return ConstantesPki.QUEUE_NOM
 
     def get_nom_collection(self):
@@ -176,14 +176,14 @@ class GestionnairePki(GestionnaireDomaineStandard):
             certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cle)
             enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
             self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
-            self._pki_document_helper.inserer_certificat(enveloppe, upsert=True, trusted=True)
+            self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
 
         mq_certfile = self.configuration.mq_certfile
         with open(mq_certfile) as f:
             contenu_pem = f.read()
             enveloppe = EnveloppeCertificat(certificat_pem=bytes(contenu_pem, 'utf-8'))
             self._logger.debug("Certificats noeud local: %s" % contenu)
-            self._pki_document_helper.inserer_certificat(enveloppe, upsert=True, trusted=False)
+            self._pki_document_helper.inserer_certificat(enveloppe, trusted=False)
 
         # Demarrer validation des certificats
         # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
@@ -197,7 +197,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         return ConstantesPki.DOMAINE_NOM
 
     def identifier_processus(self, domaine_transaction):
-        if domaine_transaction == ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT:
+        if domaine_transaction == ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT:
             processus = "millegrilles_domaines_Pki:ProcessusAjouterCertificat"
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -214,7 +214,7 @@ class PKIDocumentHelper:
         # self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
         self._mg_processus_demarreur = mg_processus_demarreur
 
-    def inserer_certificat(self, enveloppe, upsert=False, trusted=False):
+    def inserer_certificat(self, enveloppe, trusted=False):
         document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
         fingerprint = enveloppe.fingerprint_ascii
 
@@ -229,6 +229,7 @@ class PKIDocumentHelper:
         document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = enveloppe.not_valid_after
         document_cert[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
         document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
+        document_cert[ConstantesPki.LIBELLE_TRANSACTION_FAITE] = False
 
         if enveloppe.is_CA:
             if enveloppe.subject_organizational_unit_name == 'MilleGrille':
@@ -246,18 +247,27 @@ class PKIDocumentHelper:
         }
 
         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        if upsert:
-            collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=upsert)
-        else:
-            collection.insert_one(document_cert)
+        result = collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=True)
+        if result.matched_count == 0:
+            # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
+            # de manier permanente
+            transaction = {
+                ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
+                ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+                ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
+            }
+            self._contexte.generateur_transactions.soumettre_transaction(
+                transaction,
+                domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+            )
 
-        # Demarrer validation des certificats
-        # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
-        processus = "%s:%s" % (
-            ConstantesPki.DOMAINE_NOM,
-            ProcessusVerifierChaineCertificatsNonValides.__name__
-        )
-        self._mg_processus_demarreur.demarrer_processus(processus, dict())
+        # # Demarrer validation des certificats
+        # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+        # processus = "%s:%s" % (
+        #     ConstantesPki.DOMAINE_NOM,
+        #     ProcessusVerifierChaineCertificatsNonValides.__name__
+        # )
+        # self._mg_processus_demarreur.demarrer_processus(processus, dict())
 
     def charger_certificat(self, fingerprint=None, subject=None):
         filtre = dict()
@@ -315,53 +325,13 @@ class PKIDocumentHelper:
         collection.update(filtre, operation, multi=True)
 
 
-class TraitementMessagePki(TraitementMessageDomaine):
-
-    def __init__(self, gestionnaire, pki_document_helper):
-        super().__init__(gestionnaire)
-        # self._pki_document_helper = PKIDocumentHelper(gestionnaire.contexte)
-        self._pki_document_helper = pki_document_helper
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        routing_key = method.routing_key
-
-        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
-            # Chaining vers le gestionnaire de processus du domaine
-            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
-
-        elif evenement == Constantes.EVENEMENT_CEDULEUR:
-            # Ceduleur, verifier si action requise
-            self._gestionnaire.traiter_cedule(message_dict)
-        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
-            # Verifier quel processus demarrer. On match la valeur dans la routing key.
-            routing_key = method.routing_key
-            routing_key_sansprefixe = routing_key.replace(
-                'destinataire.domaine.%s.' % ConstantesPki.DOMAINE_NOM,
-                ''
-            )
-
-            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
-            self._gestionnaire.demarrer_processus(processus, message_dict)
-
-        elif evenement == ConstantesPki.EVENEMENT_CERTIFICAT:
-            enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
-            # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
-            self._pki_document_helper.inserer_certificat(enveloppe, upsert=True)
-
-        else:
-            # Type d'evenement inconnu, on lance une exception
-            raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
-
-
 class ProcessusAjouterCertificat(MGProcessusTransaction):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.charger_transaction(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+        transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         fingerprint = transaction['fingerprint']
         self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
@@ -381,11 +351,42 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
             collection.insert_one(document_certificat)
 
             self.set_etape_suivante(ProcessusAjouterCertificat.verifier_chaine.__name__)
+
         else:
-            self.set_etape_suivante()  # Termine
+            filtre = {'fingerprint': fingerprint}
+            operations = {'$set': {ConstantesPki.LIBELLE_TRANSACTION_FAITE: True}}
+            collection.update_one(filtre, operations)
+
+            if certificat_existant.get(ConstantesPki.LIBELLE_CHAINE_COMPLETE):
+                self.set_etape_suivante()  # Termine
+            else:
+                self.set_etape_suivante(ProcessusAjouterCertificat.verifier_chaine.__name__)
+
+        return {'fingerprint': fingerprint}
 
     def verifier_chaine(self):
+        # Demarrer processus verification
+        verificateur = VerificateurCertificats(self._controleur.contexte)
+        fingerprint = self.parametres['fingerprint']
+
+        # Charger le certificat et verifier si on peut valider la chaine
+        valide = False
+        try:
+            enveloppe = verificateur.charger_certificat(fingerprint=fingerprint)
+            if enveloppe is not None:
+                verificateur.verifier_chaine(enveloppe)
+                valide = True
+        except Exception as e:
+            self._logger.warn("Certificat invalide: %s" % fingerprint)
+            self._logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
+
+        if valide:
+            helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
+            helper.marquer_certificats_valides([fingerprint])
+
         self.set_etape_suivante()  # Termine
+
+        return {'valide': valide}
 
     def get_collection_transaction_nom(self):
         return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
@@ -472,3 +473,31 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
 
     def get_collection_processus_nom(self):
         return ConstantesPki.COLLECTION_PROCESSUS_NOM
+
+
+class TraitementRequeteCertificat(TraitementMessageDomaine):
+
+    def __init__(self, gestionnaire_domaine, pki_document_helper):
+        super().__init__(gestionnaire_domaine)
+        self.__pki_document_helper = pki_document_helper
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        # Pas de verification du contenu - le certificat est sa propre validation via CAs
+        # self.gestionnaire.verificateur_transaction.verifier(message_dict)
+
+        if method.routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_EMIS):
+            self.recevoir_certificat(message_dict)
+        elif method.routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
+            self.transmettre_certificat(properties, message_dict)
+        else:
+            raise Exception("Type evenement inconnu: %s" % method.routing_key)
+
+    def recevoir_certificat(self, message_dict):
+        enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
+        # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
+        self.__pki_document_helper.inserer_certificat(enveloppe)
+
+    def transmettre_certificat(self, properties, message_dict):
+        pass
