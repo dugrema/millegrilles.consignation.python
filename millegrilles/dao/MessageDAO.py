@@ -200,8 +200,6 @@ class PikaDAO:
             self.configuration.exchange_public
         ]
         nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
-        nom_q_erreurs_transactions = self.queuename_erreurs_transactions()
-        nom_q_mgp_processus = self.queuename_mgp_processus()
         nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
         # Creer l'echange de type topics pour toutes les MilleGrilles
@@ -246,34 +244,6 @@ class PikaDAO:
             routing_key='ceduleur.#',
             callback=None
         )
-
-        # Creer la Q de processus MilleGrilles Python (mgp) pour cette MilleGrille
-        # self.channel.queue_declare(
-        #     queue=nom_q_mgp_processus,
-        #     durable=True,
-        #     callback=None
-        # )
-        #
-        # self.channel.queue_bind(
-        #     exchange=nom_echange_middleware,
-        #     queue=nom_q_mgp_processus,
-        #     routing_key='mgpprocessus.#',
-        #     callback=None
-        # )
-        #
-        # Creer la Q d'erreurs dans les transactions pour cette MilleGrille
-        # self.channel.queue_declare(
-        #     queue=nom_q_erreurs_transactions,
-        #     durable=True,
-        #     callback=None
-        # )
-        #
-        # self.channel.queue_bind(
-        #     exchange=nom_echange_middleware,
-        #     queue=nom_q_erreurs_transactions,
-        #     routing_key='transaction.erreur',
-        #     callback=None
-        # )
 
         # Creer la Q d'erreurs dans les processus pour cette MilleGrille
         self.channel.queue_declare(

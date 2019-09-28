@@ -629,11 +629,14 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
     def __init__(self, contexte):
         super().__init__(contexte=contexte)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initialiser(self, channel=None):
+        self.__logger.error("Initialisation GestionnaireEvenementsCertificat")
         super().initialiser()
 
         if channel is not None:
+            self.__logger.error("Transmission certificat PKI a l'initialisation")
             self.transmettre_certificat(channel)
 
     def transmettre_certificat(self, channel=None):

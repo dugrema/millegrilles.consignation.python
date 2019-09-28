@@ -7,6 +7,7 @@ from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitem
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
+from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 
 import logging
 import json
@@ -40,6 +41,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self.contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):
+        super().on_channel_open(channel)
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
         self.__channel = channel
