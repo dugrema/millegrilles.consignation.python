@@ -12,3 +12,5 @@ COPY ./ $SRC_FOLDER/MilleGrilles.consignation.python/
 COPY html/ $BUNDLE_FOLDER/html
 
 RUN $BUILD_FOLDER/scripts/setup.sh
+
+USER mg_python

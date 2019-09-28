@@ -33,5 +33,17 @@ cp $GIT_FOLDER/scripts/demarrer*.py $BUNDLE_FOLDER
 # Copier fichier de reference pour la configuration de tous les domaines
 cp $GIT_FOLDER/scripts/*.json $BUNDLE_FOLDER
 
+groupadd -g 980 millegrilles
+
+useradd -r -u 980 -g millegrilles mg_python
+mkdir -p /opt/millegrilles/dist/secure/pki
+chown mg_python:millegrilles /opt/millegrilles/dist/secure/pki
+chmod 770 /opt/millegrilles/dist/secure/pki
+
+useradd -r -u 981 -g millegrilles maitredescles
+mkdir -p /opt/millegrilles/dist/secure/maitredescles
+chown mg_python:root /opt/millegrilles/dist/secure/maitredescles
+chmod 700 /opt/millegrilles/dist/secure/maitredescles
+
 cd $BUNDLE_FOLDER
 rm -rf $BUILD_FOLDER

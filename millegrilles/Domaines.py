@@ -216,11 +216,11 @@ class GestionnaireDomaine:
         self._logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
         # self.configurer()  # Deja fait durant l'initialisation
         self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
-        self._contexte.message_dao.register_channel_listener(self)
 
-        for essai in range(0, 6):
+        for essai in range(0, 11):
+            self._contexte.message_dao.register_channel_listener(self)
             self._logger.info("Attente Q et routes prets")
-            self.wait_Q_ready.wait(5)
+            self.wait_Q_ready.wait(1)  # Donner 1 seconde a MQ, puis reessayer
             if self.wait_Q_ready.is_set():
                 break
 
