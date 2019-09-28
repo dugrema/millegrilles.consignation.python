@@ -50,6 +50,9 @@ class TransactionConfiguration:
             Constantes.CONFIG_PKI_CERT_AUTORITE: Constantes.DEFAUT_PKI_CERT_AUTORITE,
             Constantes.CONFIG_PKI_KEY_AUTORITE: Constantes.DEFAUT_PKI_KEY_AUTORITE,
             Constantes.CONFIG_PKI_PASSWORD_AUTORITE: Constantes.DEFAUT_PKI_PASSWORD_AUTORITE,
+            Constantes.CONFIG_PKI_CERT_MAITREDESCLES: Constantes.DEFAUT_PKI_CERT_MAITREDESCLES,
+            Constantes.CONFIG_PKI_KEY_MAITREDESCLES: Constantes.DEFAUT_PKI_KEY_MAITREDESCLES,
+            Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES: Constantes.DEFAUT_PKI_PASSWORD_MAITREDESCLES,
             Constantes.CONFIG_CA_PASSWORDS: Constantes.DEFAULT_CA_PASSWORDS,
         }
 

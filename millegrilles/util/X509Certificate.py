@@ -422,7 +422,8 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
         # Preparer une nouvelle cle et CSR pour la millegrille
         clecert = super()._preparer_key_request(
             unit_name=self._organization_name,
-            common_name=self._common_name
+            common_name=self._common_name,
+            generer_password=self.generer_password
         )
 
         # Signer avec l'autorite pour obtenir le certificat de MilleGrille
@@ -461,6 +462,10 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
         clecert.set_chaine(chaine)
 
         return clecert
+
+    @property
+    def generer_password(self):
+        return False
 
 
 class GenererDeployeur(GenerateurNoeud):
@@ -572,6 +577,32 @@ class GenererMaitredescles(GenerateurNoeud):
         )
 
         return builder
+
+
+class GenererMaitredesclesCryptage(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MAITREDESCLES).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+    @property
+    def generer_password(self):
+        return True
 
 
 class GenererTransactions(GenerateurNoeud):

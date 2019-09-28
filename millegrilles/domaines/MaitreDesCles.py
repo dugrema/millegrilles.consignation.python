@@ -6,7 +6,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -19,6 +19,7 @@ import datetime
 import os
 import re
 import json
+import socket
 
 
 class ConstantesMaitreDesCles:
@@ -88,14 +89,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
-        nom_millegrille = contexte.configuration.nom_millegrille
-
         self.__repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
 
+        self.__nomfichier_maitredescles_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MAITREDESCLES]
+        self.__nomfichier_maitredescles_key = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MAITREDESCLES]
+        self.__nomfichier_maitredescles_password = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES]
         self.__clecert_millegrille = None  # Cle et certificat de millegrille
         self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
         self.__certificat_courant_pem = None
         self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
+        self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
 
         # Queue message handlers
         self.__handler_requetes_noeuds = None
@@ -105,6 +108,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
+        self.charger_ca_chaine()
         self.__clecert_millegrille = self.charger_clecert_millegrille()
 
         try:
@@ -128,6 +132,22 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
+    def charger_ca_chaine(self):
+        self.__dict_ca = dict()
+
+        self._logger.warning("CA FILE: %s" % self.configuration.pki_cafile)
+        ca_chain_file = self.configuration.pki_cafile
+        with open(ca_chain_file, 'r') as fichier:
+            chaine = fichier.read()
+            certs = chaine.split('-----END CERTIFICATE-----')
+            for cert in certs[0:-1]:
+                cert = '%s-----END CERTIFICATE-----\n' % cert
+                self._logger.warning("Loading CA cert :\n%s" % cert)
+                cert = cert.encode('utf-8')
+                x509_cert = x509.load_pem_x509_certificate(cert, backend=default_backend())
+                skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
+                self.__dict_ca[skid] = x509_cert
+
     def charger_clecert_millegrille(self) -> EnveloppeCleCert:
         repertoire_secrets = self.configuration.pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
         passwords_ca = self.configuration.pki_config[Constantes.CONFIG_CA_PASSWORDS]
@@ -145,20 +165,43 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return clecert
 
+    def creer_certificat_maitredescles(self):
+        self._logger.info("Generation de nouveau certificat de maitre des cles")
+        hostname = socket.gethostname()
+        generateurMaitreDesCles = GenererMaitredesclesCryptage(
+            self.configuration.nom_millegrille,
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+            hostname,
+            self.__dict_ca,
+            self.__clecert_millegrille
+        )
+        clecert = generateurMaitreDesCles.generer()
+
+        repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
+        self._logger.debug("Sauvegarde cert maitre des cles: %s" % self.__nomfichier_maitredescles_cert)
+        with open('%s/%s' % (repertoire_maitredescles, self.__nomfichier_maitredescles_key), 'wb') as fichier:
+            fichier.write(clecert.private_key_bytes)
+        with open('%s/%s' % (repertoire_maitredescles, self.__nomfichier_maitredescles_password), 'wb') as fichier:
+            fichier.write(clecert.password)
+        with open('%s/%s' % (repertoire_maitredescles, self.__nomfichier_maitredescles_cert), 'wb') as fichier:
+            fichier.write(clecert.cert_bytes)
+
+        self.__clecert_maitredescles = clecert
+
     def charger_certificat_courant(self):
-        fichier_cert = '%s/%s.cert.pem' % (self.__repertoire_maitredescles, self.__prefix_maitredescles)
-        fichier_cle = '%s/%s.key.pem' % (self.__repertoire_maitredescles, self.__prefix_maitredescles)
-        mot_de_passe = '%s/%s.password.txt' % (self.__repertoire_maitredescles, self.__prefix_maitredescles)
+        fichier_cert = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert)
+        fichier_cle = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key)
+        mot_de_passe = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password)
 
         with open(mot_de_passe, 'rb') as motpasse_courant:
-            motpass = motpasse_courant.readline()[0:-1]  # Enlever newline a la fin.
-            with open(fichier_cle, "rb") as keyfile:
-                cle = serialization.load_pem_private_key(
-                    keyfile.read(),
-                    password=motpass,
-                    backend=default_backend()
-                )
-                self.__cle_courante = cle
+            motpass = motpasse_courant.readline().strip()
+        with open(fichier_cle, "rb") as keyfile:
+            cle = serialization.load_pem_private_key(
+                keyfile.read(),
+                password=motpass,
+                backend=default_backend()
+            )
+            self.__cle_courante = cle
 
         self._logger.info("Cle courante: %s" % str(self.__cle_courante))
 
