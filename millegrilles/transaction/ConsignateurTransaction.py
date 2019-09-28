@@ -185,10 +185,23 @@ class ConsignateurTransactionCallback(BaseCallback):
         nom_collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine_transaction)
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
-        # Verifier la signature de la transaction
-        enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
-        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
-            enveloppe_certificat.authority_key_identifier
+        # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
+        signature_valide = False
+        entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        try:
+            enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+            enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
+                enveloppe_certificat.authority_key_identifier
+            signature_valide = True
+        except ValueError:
+            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+            self._logger.warning(
+                "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
+                    fingerprint, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                )
+            )
+            # Emettre demande pour le certificat manquant
+            self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
@@ -196,8 +209,10 @@ class ConsignateurTransactionCallback(BaseCallback):
         date_estampille = datetime.datetime.fromtimestamp(estampille)
         evenements = {
             Constantes.EVENEMENT_DOCUMENT_PERSISTE: datetime.datetime.now(tz=datetime.timezone.utc),
-            Constantes.EVENEMENT_SIGNATURE_VERIFIEE: datetime.datetime.now(tz=datetime.timezone.utc)
         }
+        if signature_valide:
+            evenements[Constantes.EVENEMENT_SIGNATURE_VERIFIEE] = datetime.datetime.now(tz=datetime.timezone.utc)
+
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
             Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,
             Constantes.EVENEMENT_TRANSACTION_COMPLETE: False,

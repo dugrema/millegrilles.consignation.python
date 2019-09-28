@@ -399,6 +399,11 @@ class PikaDAO:
         # Utiliser delivery mode 2 (persistent) pour les notifications
         self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
 
+    def transmettre_demande_certificat(self, fingerprint):
+        routing_key = 'pki.requete.%s' % fingerprint
+        # Utiliser delivery mode 2 (persistent) pour les notifications
+        self.transmettre_message({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
+
     def transmettre_evenement_persistance(self, id_document, id_transaction, nom_domaine, properties_mq):
         message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
