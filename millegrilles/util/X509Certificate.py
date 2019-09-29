@@ -102,6 +102,10 @@ class EnveloppeCleCert:
         return bytes.hex(self.cert.fingerprint(hashes.SHA1()))
 
     @property
+    def not_valid_after(self):
+        return self.cert.not_valid_after
+
+    @property
     def private_key_bytes(self):
         if self.password is not None:
             cle_privee_bytes = self.private_key.private_bytes(
