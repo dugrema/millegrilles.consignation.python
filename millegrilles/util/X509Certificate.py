@@ -63,9 +63,33 @@ class EnveloppeCleCert:
         self.chaine = chaine
 
     def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
-        self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
         self.private_key = serialization.load_pem_private_key(
             private_key_bytes,
+            password=password_bytes,
+            backend=default_backend()
+        )
+
+        self.cert_from_pem_bytes(cert_bytes)
+
+    def cert_from_pem_bytes(self, cert_bytes):
+        self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+
+    def cle_correspondent(self):
+        if self.private_key is not None and self.cert is not None:
+            # Verifier que le cert et la cle privee correspondent
+            public1 = self.private_key.public_key().public_numbers()
+            public2 = self.cert.public_key().public_numbers()
+
+            n1 = public1.n
+            n2 = public2.n
+
+            return n1 == n2
+
+        return False
+
+    def key_from_pem_bytes(self, key_bytes, password_bytes=None):
+        self.private_key = serialization.load_pem_private_key(
+            key_bytes,
             password=password_bytes,
             backend=default_backend()
         )
@@ -75,11 +99,7 @@ class EnveloppeCleCert:
             self.cert = x509.load_pem_x509_certificate(fichier.read(), default_backend())
 
         with open(private_key, 'rb') as fichier:
-            self.private_key = serialization.load_pem_private_key(
-                fichier.read(),
-                password=password_bytes,
-                backend=default_backend()
-            )
+            self.private_key = self.key_from_pem_bytes(fichier.read(), password_bytes)
 
     @property
     def cert_bytes(self):

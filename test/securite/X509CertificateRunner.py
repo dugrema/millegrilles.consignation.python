@@ -58,10 +58,33 @@ class RunnerCertMilleGrille:
             with open('%s/%s.password.txt' % (self.folder_output, nom), 'wb') as fichier:
                 fichier.write(clecert.password)
 
+    def charger_cle_cert(self):
+        clecert = EnveloppeCleCert()
 
+        with open('%s/%s.key.pem' % (self.folder_output, ConstantesGenerateurCertificat.ROLE_DEPLOYEUR), 'rb') as fichier:
+            key_bytes = fichier.read()
+            clecert.key_from_pem_bytes(key_bytes)
+
+        with open('%s/%s.cert.pem' % (self.folder_output, ConstantesGenerateurCertificat.ROLE_DEPLOYEUR), 'rb') as fichier:
+            cert_bytes = fichier.read()
+            clecert.cert_from_pem_bytes(cert_bytes)
+
+        # Verifier que les cles correspondent
+        corresp = clecert.cle_correspondent()
+        print("Cle et cert deployeur correspondent: %s" % corresp)
+
+        with open('%s/%s.cert.pem' % (self.folder_output, ConstantesGenerateurCertificat.ROLE_MQ), 'rb') as fichier:
+            cert_bytes = fichier.read()
+            clecert.cert_from_pem_bytes(cert_bytes)
+
+        # Verifier que les cles ne correspondent pas
+        corresp = clecert.cle_correspondent()
+        print("Cle deployeur et cert mq correspondent: %s" % corresp)
 
 
 # ******** MAIN *********
 runner = RunnerCertMilleGrille()
 runner.generer_initiale()
 runner.generer_certs_noeuds()
+
+runner.charger_cle_cert()
