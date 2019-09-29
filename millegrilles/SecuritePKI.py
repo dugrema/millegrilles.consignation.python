@@ -644,9 +644,9 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
         self.__channel = channel
-        self.__channel.queue_declare(queue='', exclusive=True, callback=self.register_mq_hanlder)
+        self.__channel.queue_declare(queue='', exclusive=True, callback=self.register_mq_handler)
 
-    def register_mq_hanlder(self, queue):
+    def register_mq_handler(self, queue):
         nom_queue = queue.method.queue
         self.__queue_reponse = nom_queue
 
@@ -689,6 +689,8 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         if routing_key == self.__routing_cert:
             # Transmettre notre certificat
             self.transmettre_certificat()
+        else:
+            raise Exception("Routing non gere: %s" % routing_key)
 
 
 class CertificatInvalide(Exception):
