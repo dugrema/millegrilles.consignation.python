@@ -31,6 +31,13 @@ class ConstantesGenerateurCertificat:
     ROLE_MONGOEXPRESS = 'mongoexpress'
     ROLE_NGINX = 'nginx'
 
+    ROLES_ACCES_MONGO = [
+        ROLE_TRANSACTIONS,
+        ROLE_DOMAINES,
+        ROLE_MONGOEXPRESS,
+        ROLE_MAITREDESCLES,
+    ]
+
     # Custom OIDs
 
     # Composant avec acces interne.
