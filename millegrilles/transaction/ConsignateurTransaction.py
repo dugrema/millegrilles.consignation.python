@@ -352,7 +352,7 @@ class EntretienCollectionsDomaines(BaseCallback):
 
                         # Copier properties utiles
                         self.contexte.message_dao.transmettre_evenement_persistance(
-                            str(doc_transaction['_id']), uuid_transaction, domaine)
+                            str(doc_transaction['_id']), uuid_transaction, domaine, {})
 
                     except ValueError:
                         fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
