@@ -39,6 +39,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
 
     TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
+    TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
 
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
@@ -684,7 +685,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         """
         transaction = self.transaction
         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
-        csr = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR]
+        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
 
         # Trouver generateur pour le role
         generateur = None

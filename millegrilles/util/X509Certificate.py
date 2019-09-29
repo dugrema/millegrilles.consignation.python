@@ -106,7 +106,7 @@ class EnveloppeCleCert:
             self.cert = x509.load_pem_x509_certificate(fichier.read(), default_backend())
 
         with open(private_key, 'rb') as fichier:
-            self.private_key = self.key_from_pem_bytes(fichier.read(), password_bytes)
+            self.key_from_pem_bytes(fichier.read(), password_bytes)
 
     @property
     def cert_bytes(self):
@@ -206,7 +206,7 @@ class GenerateurCertificat:
 
         return builder
 
-    def _preparer_key_request(self, unit_name, common_name, generer_password=False) -> EnveloppeCleCert:
+    def preparer_key_request(self, unit_name, common_name, generer_password=False) -> EnveloppeCleCert:
         clecert = EnveloppeCleCert()
         clecert.generer_private_key(generer_password=generer_password)
 
@@ -331,7 +331,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
         :return:
         """
         # Preparer une nouvelle cle et CSR pour la millegrille
-        clecert = super()._preparer_key_request(
+        clecert = super().preparer_key_request(
             unit_name=u'MilleGrille',
             common_name=self._nom_millegrille,
             generer_password=True
@@ -461,7 +461,7 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
 
     def generer(self) -> EnveloppeCleCert:
         # Preparer une nouvelle cle et CSR pour la millegrille
-        clecert = super()._preparer_key_request(
+        clecert = super().preparer_key_request(
             unit_name=self._organization_name,
             common_name=self._common_name,
             generer_password=self.generer_password
