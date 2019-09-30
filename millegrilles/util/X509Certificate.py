@@ -129,6 +129,10 @@ class EnveloppeCleCert:
         return bytes.hex(self.cert.fingerprint(hashes.SHA1()))
 
     @property
+    def not_valid_before(self):
+        return self.cert.not_valid_before
+
+    @property
     def not_valid_after(self):
         return self.cert.not_valid_after
 
@@ -170,6 +174,16 @@ class EnveloppeCleCert:
         subjectKeyIdentifier = certificat.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
         key_id = bytes.hex(subjectKeyIdentifier.value.digest)
         return key_id
+
+    def formatter_subject(self):
+        sujet_dict = {}
+
+        sujet = self.cert.subject
+        for elem in sujet:
+            sujet_dict[elem.oid._name] = elem.value
+
+        return sujet_dict
+
 
 
 class GenerateurCertificat:
@@ -905,6 +919,21 @@ class RenouvelleurCertificat:
         # Conserver le cert en memoire en attendant confirmation d'activation par le deployeur
         # Permet d'eviter un redemarrage pour charger les nouveaux secrets dans Docker
         self.__clecert_millegrille_nouveau = clecert
+
+        return clecert
+
+    def renouveller_avec_csr(self, role, csr_bytes: bytes):
+        generateur = self.__generateurs_par_role[role]
+        generateur_instance = generateur(
+            self.__nom_millegrille, role, role, self.__dict_ca, self.__millegrille)
+
+        csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+
+        certificat = generateur_instance.signer(csr)
+        chaine = generateur_instance.aligner_chaine(certificat)
+
+        clecert = EnveloppeCleCert(cert=certificat)
+        clecert.chaine = chaine
 
         return clecert
 

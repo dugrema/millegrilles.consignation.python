@@ -6,7 +6,8 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat
+from millegrilles.domaines.Pki import ConstantesPki
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -103,6 +104,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
 
+        self.__renouvelleur_certificat = None
+
         # Queue message handlers
         self.__handler_requetes_noeuds = None
 
@@ -113,6 +116,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.charger_ca_chaine()
         self.__clecert_millegrille = self.charger_clecert_millegrille()
+
+        self.__renouvelleur_certificat = RenouvelleurCertificat(
+            self.configuration.nom_millegrille,
+            self.__dict_ca,
+            self.__clecert_millegrille
+        )
 
         try:
             self.charger_certificat_courant()
@@ -333,6 +342,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     @property
     def version_domaine(self):
         return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+
+    @property
+    def renouvelleur_certificat(self):
+        return self.__renouvelleur_certificat
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
@@ -680,6 +693,8 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         # Les certs de noeuds middleware sont demandes par le module lui-meme ou le deployeur
         self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
 
+        return {'role': role}
+
     def generer_cert(self):
         """
         Generer cert et creer nouvelle transaction pour PKI
@@ -690,24 +705,50 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
 
         # Trouver generateur pour le role
-        generateur = None
+        generateur = self._controleur.gestionnaire.renouvelleur_certificat
+        clecert = generateur.renouveller_avec_csr(role, csr_bytes)
 
+        # Generer nouvelle transaction pour sauvegarder le certificat
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+        self._controleur.generateur_transactions.soumettre_transaction(
+            transaction,
+            domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
 
         self.set_etape_suivante(ProcessusRenouvellerCertificat.transmettre.__name__)
+
+        return {
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
 
     def transmettre(self):
         """
         Transmettre certificat au demandeur.
         :return:
         """
+        cert = self.parametres['cert']
+        fullchain = self.parametres['fullchain']
+        role = self.parametres['role']
 
-        self.set_etape_suivante(ProcessusRenouvellerCertificat.emettre.__name__)
-
-    def emettre(self):
-        """
-        Emettre le nouveau certificat (broadcast)
-        :return:
-        """
+        reponse = {
+            'cert': cert,
+            'fullchain': fullchain,
+            'role': role,
+        }
+        self._controleur.generateur_transactions.transmettre_requete(
+            reponse,
+            domaine='deployeur.reponseRenouvellement',
+            correlation_id=role
+        )
 
         self.set_etape_suivante()  # Termine
 
