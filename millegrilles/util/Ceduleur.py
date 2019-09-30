@@ -12,6 +12,21 @@ from pika.exceptions import ConnectionClosed, ChannelClosed
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 
+# Exemple message complet
+# {
+# 	"evenement": "ceduleur",
+# 	"indicateurs": ["UTC", "heure", "jour", "mois", "annee", "semaine", "Canada/Eastern", "heure", "jour", "mois", "annee", "semaine"],
+# 	"timestamp": {
+# 		"UTC": [2019, 9, 30, 14, 30, 2, 0, 273, 0],
+# 		"indicateurs_partz": {
+# 			"Canada/Eastern": ["heure", "jour", "mois", "annee", "semaine"],
+# 			"UTC": ["heure", "jour", "mois", "annee", "semaine"]
+# 		},
+# 		"joursemaine": 0,
+# 		"timezones": ["UTC", "Canada/Eastern"]
+# 	}
+# }
+
 class CeduleurMilleGrilles(ModeleConfiguration):
 
     def __init__(self):
@@ -69,6 +84,8 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         if timestamp_utc.minute == 0:
             indicateurs.append('heure')
 
+        indicateurs_partimezone = dict()
+
         nom_timezones = []
         for tz in timezones:
             timestamp_tz = timestamp_utc.astimezone(tz=tz)
@@ -79,8 +96,10 @@ class CeduleurMilleGrilles(ModeleConfiguration):
             if len(indicateurs_tz) > 0:
                 indicateurs.append(local_tz_name)
             indicateurs.extend(indicateurs_tz)
+            indicateurs_partimezone[local_tz_name] = indicateurs_tz
 
         ts_dict['timezones'] = nom_timezones
+        ts_dict['indicateurs_partz'] = indicateurs_partimezone
 
         self.contexte.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
 
