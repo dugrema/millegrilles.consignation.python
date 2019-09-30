@@ -78,6 +78,10 @@ class MGPProcesseur:
         return self.__contexte.generateur_transactions
 
     @property
+    def verificateur_transaction(self):
+        return self.__contexte.verificateur_transaction
+
+    @property
     def configuration(self):
         return self.__contexte.configuration
 

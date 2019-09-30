@@ -95,6 +95,36 @@ class EnveloppeCertificat:
         return str(self.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8')
 
     @property
+    def get_roles(self):
+        MQ_ROLES_OID = x509.ObjectIdentifier('1.2.3.4.1')
+        extensions = self._certificat.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_ROLES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
+
+    @property
+    def get_exchanges(self):
+        MQ_EXCHANGES_OID = x509.ObjectIdentifier('1.2.3.4.0')
+        extensions = self._certificat.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_EXCHANGES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
+
+    @property
+    def get_domaines(self):
+        MQ_DOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.2')
+        extensions = self._certificat.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_DOMAINES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
+
+    @property
     def subject_organizational_unit_name(self):
         return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
 

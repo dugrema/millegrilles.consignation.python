@@ -682,18 +682,34 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, la nouvelle cle est re-sauvegardee sous une nouvelle transaction dans PKI """
+        """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
         pass
 
     def initiale(self):
         transaction = self.transaction
         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
 
-        # Verifier origine du demandeur.
-        # Les certs de noeuds middleware sont demandes par le module lui-meme ou le deployeur
-        self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
+        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+        roles_cert = enveloppe_cert.get_roles
+        if 'deployeur' in roles_cert or 'maitredescles' in roles_cert:
+            # Le deployeur et le maitre des cles ont l'autorisation de renouveller n'importe quel certificat
+            self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
+        else:
+            self.set_etape_suivante(ProcessusRenouvellerCertificat.refuser_generation.__name__)
+            return {
+                'autorise': False,
+                'role': role,
+                'description': 'demandeur non autorise a renouveller ce certificat',
+                'roles_demandeur': roles_cert
+            }
 
-        return {'role': role}
+        return {
+            'autorise': True,
+            'role': role,
+            'roles_demandeur': roles_cert
+        }
 
     def generer_cert(self):
         """
@@ -723,38 +739,12 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
             domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
         )
 
-        self.set_etape_suivante(ProcessusRenouvellerCertificat.transmettre.__name__)
+        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
 
         return {
             'cert': clecert.cert_bytes.decode('utf-8'),
             'fullchain': clecert.chaine,
         }
-
-    def transmettre(self):
-        """
-        Transmettre certificat au demandeur.
-        :return:
-        """
-        cert = self.parametres['cert']
-        fullchain = self.parametres['fullchain']
-        properties = self.parametres['properties']
-        role = self.parametres['role']
-        correlation_id = properties['correlation_id']
-        reply_to = properties['reply_to']
-
-        reponse = {
-            Constantes.EVENEMENT_MESSAGE_EVENEMENT: ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT,
-            'cert': cert,
-            'fullchain': fullchain,
-            'role': role,
-        }
-        # self._controleur.generateur_transactions.transmettre_reponse(
-        #     reponse,
-        #     replying_to=reply_to,
-        #     correlation_id=correlation_id,
-        # )
-
-        self.set_etape_suivante()  # Termine
 
     def refuser_generation(self):
         """
