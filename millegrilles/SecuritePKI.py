@@ -17,7 +17,7 @@ from cryptography import x509
 from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import BaseCallback
+from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 
@@ -579,7 +579,7 @@ class VerificateurCertificats(UtilCertificats):
                 self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
         else:
-            raise ValueError("Certificat ne peut pas etre charge")
+            raise CertificatInconnu("Certificat ne peut pas etre charge", fingerprint=fingerprint)
 
         return enveloppe
 
@@ -732,6 +732,7 @@ class CertificatInvalide(Exception):
     @property
     def key_subject_identifier(self):
         return self.__key_subject_identifier
+
 
 class HachageInvalide(Exception):
     def __init__(self, message, errors=None):

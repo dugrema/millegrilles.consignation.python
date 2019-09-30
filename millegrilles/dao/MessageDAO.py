@@ -705,12 +705,17 @@ class TraitementMessageCallback:
         self.__json_helper = JSONHelper()
         self.__message_dao = message_dao
         self.__configuration = configuration
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def callbackAvecAck(self, ch, method, properties, body):
         try:
             self.traiter_message(ch, method, properties, body)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.__logger.warning("Certificat inconnu, on fait la demande %s" % fingerprint)
+            self.message_dao.transmettre_demande_certificat(fingerprint)
         except Exception as e:
-            logging.exception("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            self.__logger.error("Erreur dans callbackAvecAck, exception: %s" % str(e))
             self.transmettre_erreur(ch, body, e)
         finally:
             self.transmettre_ack(ch, method)
@@ -814,19 +819,25 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
-        # routing_key = method.routing_key
-        # exchange = method.exchange
-        # evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        try:
+            self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
-        resultats = list()
-        for requete in message_dict['requetes']:
-            resultat = self.executer_requete(requete)
-            resultats.append(resultat)
+            # routing_key = method.routing_key
+            # exchange = method.exchange
+            # evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
-        # Genere message reponse
-        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+            resultats = list()
+            for requete in message_dict['requetes']:
+                resultat = self.executer_requete(requete)
+                resultats.append(resultat)
+
+            # Genere message reponse
+            self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.message_dao.transmettre_demande_certificat(fingerprint)
+
 
     def executer_requete(self, requete):
         collection = self.gestionnaire.get_collection()
@@ -882,3 +893,15 @@ class TraitementMessageCedule(TraitementMessageDomaine):
 
 class ExceptionConnectionFermee(Exception):
     pass
+
+
+class CertificatInconnu(Exception):
+
+    def __init__(self, message, errors=None, fingerprint=None):
+        super().__init__(message, errors)
+        self.errors = errors
+        self.__fingerprint = fingerprint
+
+    @property
+    def fingerprint(self):
+        return self.__fingerprint
