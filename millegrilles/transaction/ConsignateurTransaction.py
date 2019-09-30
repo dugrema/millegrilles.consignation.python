@@ -1,7 +1,7 @@
 # Programme principal pour transferer les nouvelles transactions vers MongoDB
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback
+from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
 from millegrilles import Constantes
@@ -196,7 +196,7 @@ class ConsignateurTransactionCallback(BaseCallback):
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
-        except ValueError:
+        except CertificatInconnu:
             fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
             self._logger.warning(
                 "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
