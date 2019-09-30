@@ -688,6 +688,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
     def initiale(self):
         transaction = self.transaction
         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+        node = transaction['node']
 
         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
@@ -708,7 +709,8 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         return {
             'autorise': True,
             'role': role,
-            'roles_demandeur': roles_cert
+            'roles_demandeur': roles_cert,
+            'node': node,
         }
 
     def generer_cert(self):
@@ -718,11 +720,12 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         """
         transaction = self.transaction
         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+        node_name = self.parametres['node']
         csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
 
         # Trouver generateur pour le role
         generateur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = generateur.renouveller_avec_csr(role, csr_bytes)
+        clecert = generateur.renouveller_avec_csr(role, node_name, csr_bytes)
 
         # Generer nouvelle transaction pour sauvegarder le certificat
         transaction = {

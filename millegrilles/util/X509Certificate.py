@@ -923,10 +923,10 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def renouveller_avec_csr(self, role, csr_bytes: bytes):
+    def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes):
         generateur = self.__generateurs_par_role[role]
         generateur_instance = generateur(
-            self.__nom_millegrille, role, role, self.__dict_ca, self.__millegrille)
+            self.__nom_millegrille, role, node_name, self.__dict_ca, self.__millegrille)
 
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
 
