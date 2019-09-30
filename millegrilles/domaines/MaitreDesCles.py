@@ -239,6 +239,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocument"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
