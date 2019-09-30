@@ -1,6 +1,5 @@
 # Programme principal pour transferer les nouvelles transactions vers MongoDB
 
-from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 
@@ -363,6 +362,14 @@ class EntretienCollectionsDomaines(BaseCallback):
                         )
                         # Emettre demande pour le certificat manquant
                         self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+
+                except CertificatInconnu as ci:
+                    fingerprint = ci.fingerprint
+                    self.__logger.warning(
+                        "Resoumission, certificat manquant. On le redemande. Fingerprint: %s" % fingerprint)
+                    # Emettre demande pour le certificat manquant
+                    self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+
                 except Exception as e:
                     self.__logger.error("Erreur resoumission transaction (collection %s): %s" % (nom_collection_transaction, str(e)))
 
