@@ -737,18 +737,22 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         """
         cert = self.parametres['cert']
         fullchain = self.parametres['fullchain']
+        properties = self.parametres['properties']
         role = self.parametres['role']
+        correlation_id = properties['correlation_id']
+        reply_to = properties['reply_to']
 
         reponse = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT,
             'cert': cert,
             'fullchain': fullchain,
             'role': role,
         }
-        self._controleur.generateur_transactions.transmettre_requete(
-            reponse,
-            domaine='deployeur.reponseRenouvellement',
-            correlation_id=role
-        )
+        # self._controleur.generateur_transactions.transmettre_reponse(
+        #     reponse,
+        #     replying_to=reply_to,
+        #     correlation_id=correlation_id,
+        # )
 
         self.set_etape_suivante()  # Termine
 
