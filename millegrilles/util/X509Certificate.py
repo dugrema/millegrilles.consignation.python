@@ -32,6 +32,7 @@ class ConstantesGenerateurCertificat:
     ROLE_NGINX = 'nginx'
 
     ROLES_ACCES_MONGO = [
+        ROLE_MONGO,
         ROLE_TRANSACTIONS,
         ROLE_DOMAINES,
         ROLE_MONGOEXPRESS,
