@@ -20,30 +20,22 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def notification_tache(self):
         formatteur = FormatteurEvenementNotification(
             TachesConstantes.DOMAINE_NOM,
-            TachesConstantes.COLLECTION_DOCUMENTS_NOM
+            TachesConstantes.COLLECTION_DOCUMENTS_NOM,
+            self.contexte.generateur_transactions,
         )
 
         source = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration',
         }
-        regles = [
-            'regle1',
-        ]
+        collateur = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration_4',
+        }
         valeurs = {
-            'config': 1
+            'version': 4
         }
 
-        transaction = formatteur.formatter_notification(source, regles, valeurs)
-
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction,
-            TachesConstantes.TRANSACTION_NOUVELLE_TACHE,
-            reply_to=self.queue_name,
-            correlation_id='efgh'
-        )
-
-        print("Sent: %s" % enveloppe_val)
-        return enveloppe_val
+        formatteur.emettre_notification_tache(source, collateur, valeurs)
+        print("Sent")
 
 
 # --- MAIN ---

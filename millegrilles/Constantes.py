@@ -197,7 +197,7 @@ EVENEMENT_NOTIFICATION = 'notification'
 EVENEMENT_RESUMER = 'resumer'
 EVENEMENT_PKI = 'pki'
 
-DOCUMENT_NOTIFICATION_REGLESIMPLE = 'regle_simple'
+DOCUMENT_TACHE_NOTIFICATION = 'tache_notification'
 
 SECURITE_PUBLIC = '1.public'    # Niveau 1, le moins securitaire. Accessible a n'importe qui.
 SECURITE_PRIVE = '2.prive'      # Niveau 2, accessible aux personnes authentifiees

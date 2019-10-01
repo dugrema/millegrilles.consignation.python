@@ -4,6 +4,7 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.EmailDAO import SmtpDAO
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 from bson import ObjectId
 
@@ -20,13 +21,14 @@ class TachesConstantes:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
 
     TRANSACTION_NOUVELLE_TACHE = 'millegrilles.domaines.Taches.nouvelle'
+    TRANSACTION_NOTIFICATION_TACHE = 'millegrilles.domaines.Taches.notification'
     TRANSACTION_ACTION_TACHE = 'millegrilles.domaines.Taches.actionUsager'
 
     # Niveaux d'une notification de tache
-    SUIVI = 'suivi'                  # Niveau bas avec limite de temps
-    INFORMATION = 'information'      # Plus bas niveau sans limite de temps
-    AVERTISSEMENT = 'avertissement'  # Niveau par defaut / grave
-    ALERTE = 'alerte'                # Plus haut niveau / critique
+    NIVEAU_SUIVI = 'suivi'                  # Niveau bas avec limite de temps
+    NIVEAU_INFORMATION = 'information'      # Plus bas niveau sans limite de temps
+    NIVEAU_AVERTISSEMENT = 'avertissement'  # Niveau par defaut / grave
+    NIVEAU_ALERTE = 'alerte'                # Plus haut niveau / critique
 
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
@@ -37,6 +39,12 @@ class TachesConstantes:
     ACTION_RAPPEL = 'rappel'   # L'usager demande un rappel apres une periode de temps. Cachee en attendant.
     ACTION_SURVEILLE = 'surveille'  # L'usager demande de ne pas etre informe (cacher la notif) si l'evenement ne survient pas a nouveau
 
+    LIBELLE_DOMAINE = 'domaine'
+    LIBELLE_SOURCE = 'source'
+    LIBELLE_COLLATEUR = 'collateur'
+    LIBELLE_VALEURS = 'valeurs'
+    LIBELLE_DATE = 'date'
+    LIBELLE_ACTIVITE = 'activite'
     LIBELLE_ETAT = 'etat_notification'
     LIBELLE_DERNIERE_ACTION = 'derniere_action'
     LIBELLE_PERIODE_ATTENTE = 'periode_attente'
@@ -76,7 +84,7 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE:
             processus = "millegrilles_domaines_Taches:ProcessusActionUsager"
-        elif domaine_transaction == TachesConstantes.TRANSACTION_NOUVELLE_TACHE:
+        elif domaine_transaction == TachesConstantes.TRANSACTION_NOTIFICATION_TACHE:
             # Notification recue
             processus = "millegrilles_domaines_Taches:ProcessusNotificationRecue"
         else:
@@ -139,58 +147,116 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
     def initiale(self):
         transaction = self.transaction
+        domaine = transaction[TachesConstantes.LIBELLE_DOMAINE]
+        source = transaction[TachesConstantes.LIBELLE_SOURCE]
+        collateur = transaction[TachesConstantes.LIBELLE_COLLATEUR]
+
         self._logger.debug("Traitement notification tache: %s" % str(transaction))
         collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
-        nouveaux_documents_notification = []
-
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE
+            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_TACHE_NOTIFICATION,
+            TachesConstantes.LIBELLE_DOMAINE: domaine,
+            TachesConstantes.LIBELLE_COLLATEUR: collateur,
         }
 
-        # Extraire la source en elements distincts, sinon Mongo compare le dict() en "ordre" (aleatoire)
-        for source_val in transaction['source']:
-            cle = 'source.%s' % source_val
-            filtre[cle] = transaction['source'][source_val]
+        # Trouver document de tache
+        taches_cursor = collection.find(filtre)
+        taches = list()
+        for tache in taches_cursor:
+            taches.append(tache)
 
-        # L'etape suivante est determine par l'etat des notifications (nouvelles, existantes, rappel, etc.)
-        etape_suivante = 'finale'
-        for regle in transaction['regles']:
-            self._logger.debug("Traitement document %s regle %s" % (json.dumps(transaction['source'], indent=2), regle))
-            filtre_regle = filtre.copy()
-            for cle_regle in regle:
-                cle_regle_mongo = 'regle.%s' % cle_regle
-                elements_regle = regle[cle_regle]
-                for cle_elem in elements_regle:
-                    cle_elem_regle = '%s.%s' % (cle_regle_mongo, cle_elem)
-                    filtre_regle[cle_elem_regle] = elements_regle[cle_elem]
-                    if isinstance(filtre_regle[cle_elem_regle], list) or isinstance(filtre_regle[cle_elem_regle], dict):
-                        raise ValueError(
-                            "list/dict Pas encore supporte, il va falloir faire du code recursif pour debobiner"
-                        )
-
-            self._logger.debug("Verifier si document existe: %s" % str(filtre_regle))
-            document_notification = collection.find_one(filtre_regle)
-
-            if document_notification is None:
-                id_doc = self._creer_nouveau_document_(collection, {'regle': regle})
-                if id_doc is not None:
-                    nouveaux_documents_notification.append(id_doc)
-                etape_suivante = ProcessusNotificationRecue.avertir_usager.__name__
-            else:
-                self._logger.debug("Document existant: %s" % str(document_notification))
-                resultat = self._traiter_notification_existante(collection, document_notification, regle)
-                if 'notification_requise' in resultat:
-                    self._logger.debug("Notification requise, on va envoyer courriel")
-                    etape_suivante = ProcessusNotificationRecue.avertir_usager.__name__
+        if len(taches) == 0:
+            # Tache n'existe pas, on va en creer une nouvelle
+            etape_suivante = ProcessusNotificationRecue.creer_tache.__name__
+        else:
+            # On a plusieurs taches qui correspondent, on va traiter chaque tache individuellement
+            etape_suivante = ProcessusNotificationRecue.traiter_plusieurs_taches.__name__
 
         self.set_etape_suivante(etape_suivante)
 
-        resultat_etape = dict()
-        if len(nouveaux_documents_notification) > 0:
-            resultat_etape['nouveaux_documents_notification'] = nouveaux_documents_notification
+        return {
+            'source': source,
+            'taches': [str(t['_id']) for t in taches],
+        }
 
-        return resultat_etape
+    def creer_tache(self):
+        transaction = self.transaction
+        domaine = transaction[TachesConstantes.LIBELLE_DOMAINE]
+        collateur = transaction[TachesConstantes.LIBELLE_COLLATEUR]
+        niveau = transaction[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
+
+        entree_historique = self.__generer_entree_historique(transaction)
+
+        push_op = {
+            TachesConstantes.LIBELLE_ACTIVITE: entree_historique
+        }
+
+        on_insert_op = {
+            TachesConstantes.LIBELLE_DOMAINE: domaine,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_TACHE_NOTIFICATION,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: niveau,
+            TachesConstantes.LIBELLE_COLLATEUR: collateur
+        }
+
+        ops = {
+            '$push': push_op,
+            '$setOnInsert': on_insert_op,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        # Inserer par upsert
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        update_result = collection.update_one(filter=on_insert_op, update=ops, upsert=True)
+
+        self.set_etape_suivante()  # Termine
+
+        return {
+            'taches': [update_result.upserted_id]
+        }
+
+    def traiter_plusieurs_taches(self):
+        transaction = self.transaction
+
+        for tache_id in self.parametres['taches']:
+            ops = {
+                '$push': {
+                    # Ajouter a la liste d'activite
+                    # Trier en ordre decroissant, conserver uniquement les 100 dernieres entrees.
+                    TachesConstantes.LIBELLE_ACTIVITE: {
+                        '$each': [self.__generer_entree_historique(transaction)],
+                        '$sort': {TachesConstantes.LIBELLE_DATE: -1},
+                        '$slice': 100,
+                    }
+                },
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            }
+
+            filtre = {
+                '_id': ObjectId(tache_id)
+            }
+
+            # Inserer par upsert
+            collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+            collection.update_one(filter=filtre, update=ops, upsert=False)
+
+        self.set_etape_suivante()  # Termine
+
+    def __generer_entree_historique(self, transaction):
+        source = transaction[TachesConstantes.LIBELLE_SOURCE]
+        valeurs = transaction[TachesConstantes.LIBELLE_VALEURS]
+        date_activite = datetime.datetime.utcfromtimestamp(transaction[TachesConstantes.LIBELLE_DATE])
+        niveau = transaction[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
+
+        entree_historique = {
+            TachesConstantes.LIBELLE_SOURCE: source,
+            TachesConstantes.LIBELLE_VALEURS: valeurs,
+            TachesConstantes.LIBELLE_DATE: date_activite,
+            TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: niveau,
+        }
+
+        return entree_historique
 
     def avertir_usager(self):
         configuration = self._controleur.configuration
@@ -204,78 +270,6 @@ class ProcessusNotificationRecue(ProcessusTaches):
         smtp_dao.envoyer_notification(sujet, contenu)
 
         self.set_etape_suivante()  # Termine le processus
-
-    def _creer_nouveau_document_(self, collection, filtre):
-        parametres = self.parametres
-
-        self._logger.debug("Document n'existe pas, on l'ajoute")
-        date_creation = datetime.datetime.utcnow()
-        document_notification = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE,
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_creation,
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_creation,
-            TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE,
-            TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: TachesConstantes.INFORMATION,
-            TachesConstantes.LIBELLE_COMPTEUR: 1,
-            'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
-            'valeurs': parametres['valeurs'],
-            'source': parametres['source']
-        }
-        document_notification.update(filtre)  # Copier les cles
-
-        resultat = collection.insert(document_notification)
-        self._logger.debug("Resultat insertion %s: %s" % (str(document_notification), str(resultat)))
-        if resultat is None:
-            self._logger.error("Erreur insertion notification: %s" % str(document_notification))
-
-        return resultat
-
-    def _traiter_notification_existante(self, collection, document_notification, regle):
-        parametres = self.parametres
-
-        resultats = dict()
-
-        filtre = {'_id': document_notification['_id']}
-        operations = {
-            '$set': {
-                'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
-                'valeurs': parametres['valeurs']
-            },
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$inc': {
-                TachesConstantes.LIBELLE_COMPTEUR: 1
-            }
-        }
-        resultat_update = collection.find_one_and_update(filtre, operations)
-        self._logger.debug("Resultat update %s: %s" % (str(filtre), str(resultat_update)))
-
-        if resultat_update is None:
-            raise ValueError("Update notification inexistante: %s" % str(filtre))
-
-        # Verifier si la notification a une action / regle, ou un workflow en cours
-        # Pour etat complet, on reactive. Sinon rien a faire.
-        etat_precedent = resultat_update[TachesConstantes.LIBELLE_ETAT]
-        etats_reactive = [TachesConstantes.ETAT_COMPLETEE, TachesConstantes.ETAT_SURVEILLE]
-        if etat_precedent in etats_reactive:
-            operations_set = {
-                TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE
-            }
-            if etat_precedent == TachesConstantes.ETAT_COMPLETEE:
-                # Reset le compteur, la notification etait completee.
-                operations_set[TachesConstantes.LIBELLE_COMPTEUR] = 1
-
-            # On va reouvrir la notification
-            collection.update_one(filtre, {
-                '$set': operations_set,
-                '$unset': {
-                    TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
-                }
-            })
-
-            # Il faudrait aussi envoyer une notification a l'usager
-            resultats['notification_requise'] = True
-
-        return resultats
 
 
 class ProcessusActionUsager(ProcessusTaches):
@@ -357,32 +351,53 @@ class FormatteurEvenementNotification:
 
     TEMPLATE_NOTIFICATION = {
         "domaine": None,
+
+        "niveau": None,
+
         Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_NOTIFICATION,
         "source": {
-            "_collection": None,
-            "_id": None
+            "collection": None,
         },
-        "regles": [],
-        "valeurs": {}
+
+        # Le collateur de tache - permet d'identifier la tache de maniere unique dans le domaine
+        "collateur": {
+        },
+
+        "valeurs": {
+        },
     }
 
-    def __init__(self, domaine, collection):
+    def __init__(self, domaine: str, nom_collection: str, generateur_transactions: GenerateurTransaction):
         self._domaine = domaine
-        self._collection = collection
+        self._collection = nom_collection
+        self._generateur_transactions = generateur_transactions
 
         self._template = FormatteurEvenementNotification.TEMPLATE_NOTIFICATION.copy()
         self._template['domaine'] = domaine
-        self._template['source']['_collection'] = collection
+        self._template['source']['collection'] = nom_collection
 
-    def formatter_notification(self, source: dict, regles: list, valeurs: dict):
+    def __formatter_notification(
+            self, source: dict, collateur: dict, valeurs: dict, niveau: str):
         notification = self._template.copy()
-        notification['source'] = source
+        notification['niveau'] = niveau
+        notification['source'].update(source)
+        notification['collateur'] = collateur
         notification['valeurs'] = valeurs
         notification['date'] = int(datetime.datetime.utcnow().timestamp())
 
-        if isinstance(regles, list):
-            notification['regles'] = regles
-        else:
-            notification['regles'] = [regles]
-
         return notification
+
+    def emettre_notification_tache(
+            self, source: dict, collateur: dict, valeurs: dict, niveau: str = TachesConstantes.NIVEAU_INFORMATION):
+        """
+        Emet une nouvelle notification pour une tache.
+
+        :param source: Business key de la source
+        :param collateur: Collateur de tache
+        :param valeurs: Regles en cause avec leur valeurs
+        :param niveau: Niveau de notification
+        """
+
+        notification = self.__formatter_notification(source, collateur, valeurs, niveau)
+        routing = TachesConstantes.TRANSACTION_NOTIFICATION_TACHE
+        self._generateur_transactions.soumettre_transaction(notification, routing)
