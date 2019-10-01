@@ -8,6 +8,7 @@ from millegrilles.dao.EmailDAO import SmtpDAO
 from bson import ObjectId
 
 import datetime
+import json
 
 
 class TachesConstantes:
@@ -137,15 +138,8 @@ class ProcessusNotificationRecue(ProcessusTaches):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        parametres = self.parametres
-        self._logger.debug("Traitement notification: %s" % str(parametres))
-
-        # Verifier si on concatene l'information a un document existant ou si on cree un nouveau document
-        self.set_etape_suivante(ProcessusNotificationRecue.sauvegarder_notification.__name__)
-
-    def sauvegarder_notification(self):
-        parametres = self.parametres
-        self._logger.debug("sauvegarder_notification %s" % (str(parametres)))
+        transaction = self.transaction
+        self._logger.debug("Traitement notification tache: %s" % str(transaction))
         collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
         nouveaux_documents_notification = []
@@ -155,14 +149,14 @@ class ProcessusNotificationRecue(ProcessusTaches):
         }
 
         # Extraire la source en elements distincts, sinon Mongo compare le dict() en "ordre" (aleatoire)
-        for source_val in parametres['source']:
+        for source_val in transaction['source']:
             cle = 'source.%s' % source_val
-            filtre[cle] = parametres['source'][source_val]
+            filtre[cle] = transaction['source'][source_val]
 
         # L'etape suivante est determine par l'etat des notifications (nouvelles, existantes, rappel, etc.)
         etape_suivante = 'finale'
-        for regle in parametres['regles']:
-            self._logger.debug("Traitement document %s regle %s" % (str(parametres['source']), str(regle)))
+        for regle in transaction['regles']:
+            self._logger.debug("Traitement document %s regle %s" % (json.dumps(transaction['source'], indent=2), regle))
             filtre_regle = filtre.copy()
             for cle_regle in regle:
                 cle_regle_mongo = 'regle.%s' % cle_regle
