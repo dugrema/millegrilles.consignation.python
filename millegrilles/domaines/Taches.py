@@ -146,7 +146,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
     def sauvegarder_notification(self):
         parametres = self.parametres
         self._logger.debug("sauvegarder_notification %s" % (str(parametres)))
-        collection = self.document_dao().get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
         nouveaux_documents_notification = []
 
