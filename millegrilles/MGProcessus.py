@@ -921,12 +921,14 @@ class MGProcessusDocInitial(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-
         document = transaction[Constantes.DOCUMENT_INFODOC_SOUSDOCUMENT]
+
+        on_insert = document.copy()
+        on_insert[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = datetime.datetime.utcnow()
         mg_libelle = document[Constantes.DOCUMENT_INFODOC_LIBELLE]
         operations = {
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$setOnInsert': document
+            '$setOnInsert': on_insert
         }
 
         collection_documents = self._controleur.get_collection_documents()

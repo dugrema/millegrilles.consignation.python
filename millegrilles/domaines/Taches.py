@@ -30,6 +30,8 @@ class TachesConstantes:
     NIVEAU_AVERTISSEMENT = 'avertissement'  # Niveau par defaut / grave
     NIVEAU_ALERTE = 'alerte'                # Plus haut niveau / critique
 
+    LIBVAL_NOTIFICATIONS = 'notifications'
+
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
     LIBELLE_NIVEAU_NOTIFICATION = 'niveau'  # Niveau d'urgence de la notification
@@ -46,6 +48,7 @@ class TachesConstantes:
     LIBELLE_DATE = 'date'
     LIBELLE_ACTIVITE = 'activite'
     LIBELLE_ETAT = 'etat_notification'
+    LIBELLE_NOTIFICATIONS = 'notifications'
     LIBELLE_DERNIERE_ACTION = 'derniere_action'
     LIBELLE_PERIODE_ATTENTE = 'periode_attente'
     LIBELLE_DATE_ACTION = 'date_action'  # Date de prise d'action
@@ -55,12 +58,21 @@ class TachesConstantes:
     ETAT_RAPPEL = 'rappel'        # En attente de rappel aupres de l'usager. Cachee en attendant.
     ETAT_SURVEILLE = 'surveille'  # Notification surveille, va etre escaladee si survient a nouveau. Sinon elle se complete.
 
+    DOC_NOTIFICATIONS = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_NOTIFICATIONS,
+        LIBELLE_NOTIFICATIONS: list(),
+    }
+
 
 class GestionnaireTaches(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
         self._traitement_message = None
+
+    def demarrer(self):
+        super().demarrer()
+        self.initialiser_document(TachesConstantes.LIBVAL_NOTIFICATIONS, TachesConstantes.DOC_NOTIFICATIONS)
 
     def get_nom_queue(self):
         return TachesConstantes.QUEUE_SUFFIXE
