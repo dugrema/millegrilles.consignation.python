@@ -267,7 +267,7 @@ class PikaDAO:
         try:
             self.connectionmq.ioloop.start()
         except AMQPConnectionError as e:
-            self._logger.error("Erreur ouverture connexion MQ", e)
+            self._logger.error("Erreur ouverture connexion MQ: %s" % str(e))
             self.enter_error_state()
         self._logger.info("Fin execution MQ-IOLoop")
 
