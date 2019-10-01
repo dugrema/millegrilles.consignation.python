@@ -7,6 +7,8 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
 from millegrilles.dao.MessageDAO import JSONHelper
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
+from cryptography.hazmat.primitives import serialization
 
 from threading import Thread, Event
 
@@ -31,6 +33,27 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
         self.channel.queue_declare(durable=True, exclusive=True, callback=self.set_cb_queue)
         self.queue_name = None
         self.pret.wait(5)
+
+    def transmettre_certificat(self):
+        cert_filename = self.configuration.pki_certfile
+        with open(cert_filename, 'r') as fichier:
+            cert_pem = fichier.read()
+        enveloppe = EnveloppeCertificat(certificat_pem=cert_pem)
+
+        message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
+        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii
+        message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = str(
+            enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
+        )
+
+        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
+        self.contexte.message_dao.transmettre_message(
+            message_evenement, routing, channel=self.channel
+        )
+        self.contexte.message_dao.transmettre_message_noeuds(
+            message_evenement, routing
+        )
+
 
     def set_cb_queue(self, queue):
         self.queue_name = queue.method.queue

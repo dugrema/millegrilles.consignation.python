@@ -16,7 +16,7 @@ class TachesConstantes:
     QUEUE_SUFFIXE = DOMAINE_NOM
     COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
 
     TRANSACTION_NOUVELLE_TACHE = 'millegrilles.domaines.Taches.nouvelle'
     TRANSACTION_ACTION_TACHE = 'millegrilles.domaines.Taches.actionUsager'
@@ -122,7 +122,16 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
                 collection_taches.update_one({'_id': taches['_id']}, operations)
 
 
-class ProcessusNotificationRecue(MGProcessus):
+class ProcessusTaches(MGProcessusTransaction):
+
+    def get_collection_transaction_nom(self):
+        return TachesConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return TachesConstantes.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusNotificationRecue(ProcessusTaches):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -275,7 +284,7 @@ class ProcessusNotificationRecue(MGProcessus):
         return resultats
 
 
-class ProcessusActionUsager(MGProcessusTransaction):
+class ProcessusActionUsager(ProcessusTaches):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)

@@ -1,12 +1,14 @@
 # Script de test pour transmettre message de transaction
 
+from millegrilles import Constantes
 from millegrilles.util.BaseSendMessage import BaseEnvoyerMessageEcouter
-
+from millegrilles.domaines.Taches import FormatteurEvenementNotification, TachesConstantes
 
 class MessagesSample(BaseEnvoyerMessageEcouter):
 
     def __init__(self):
         super().__init__()
+        self.transmettre_certificat()
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
@@ -16,13 +18,26 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print(body)
 
     def notification_tache(self):
-        transaction = {
+        formatteur = FormatteurEvenementNotification(
+            TachesConstantes.DOMAINE_NOM,
+            TachesConstantes.COLLECTION_DOCUMENTS_NOM
+        )
 
+        source = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration',
         }
+        regles = [
+            'regle1',
+        ]
+        valeurs = {
+            'config': 1
+        }
+
+        transaction = formatteur.formatter_notification(source, regles, valeurs)
 
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction,
-            ConstantesTaches.TRANSACTION_,
+            TachesConstantes.TRANSACTION_NOUVELLE_TACHE,
             reply_to=self.queue_name,
             correlation_id='efgh'
         )
