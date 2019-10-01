@@ -28,10 +28,10 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
             Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration',
         }
         collateur = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration_5',
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration_12',
         }
         valeurs = {
-            'version': 4
+            'version': 1
         }
 
         formatteur.emettre_notification_tache(source, collateur, valeurs)

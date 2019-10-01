@@ -58,7 +58,7 @@ class TachesConstantes:
     LIBELLE_UUID_TACHE = 'tache_uuid'
     LIBELLE_TITRE = 'titre'
     LIBELLE_ACTIONS_NOTIFICATION = 'actions_notifications'
-    LIBELLE_ACTIONS_VISUALISER_DOC = 'inclure_visualliser_document'
+    LIBELLE_ACTIONS_VISUALISER_DOC = 'inclure_visualiser_document'
     LIBELLE_ACTIONS_DOMAINES = 'actions_domaine'
     LIBELLE_ACTION_DOMAINE = 'action'
     LIBELLE_ACTION_LIBELLE = 'libelle'
@@ -68,18 +68,22 @@ class TachesConstantes:
     ETAT_COMPLETEE = 'completee'  # La notification a ete actionnee par l'usager, plus rien a faire.
     ETAT_RAPPEL = 'rappel'        # En attente de rappel aupres de l'usager. Cachee en attendant.
 
-    DOC_TACHE_NOTIFICATION = {
-
-    }
-
     DOC_NOTIFICATIONS = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_NOTIFICATIONS,
         LIBELLE_NOTIFICATIONS: list(),
     }
 
+    DOC_SUMMARY_NOTIFICATION = {
+        LIBELLE_TITRE: None,
+        LIBELLE_DATE: None,
+        LIBELLE_UUID_TACHE: None,
+        LIBELLE_NIVEAU_NOTIFICATION: None,
+        LIBELLE_ACTIONS_NOTIFICATION: True,
+    }
+
     DOC_TACHES_TABLEAU = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_TACHES_TABLEAU,
-        LIBELLE_TACHES_ACTIVES: list(),  # Docs type DOC_TACHE_TABLEAU_TEMPLATE
+        LIBELLE_TACHES_ACTIVES: dict(),  # Docs type DOC_TACHE_TABLEAU_TEMPLATE
     }
 
     DOC_TACHE_TABLEAU_TEMPLATE = {
@@ -217,7 +221,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
         taches_cursor = collection.find(filtre)
         taches = list()
         for tache in taches_cursor:
-            taches.append(tache)
+            taches.append(tache['_id'])
 
         if len(taches) == 0:
             # Tache n'existe pas, on va en creer une nouvelle
@@ -228,11 +232,14 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
         self.set_etape_suivante(etape_suivante)
 
+        titre = self.__formatter_titre_notification(transaction)
+
         return {
             'source': source,
             'domaine': domaine,
             'taches': taches,
             'collateur': collateur,
+            'titre': titre,
         }
 
     def creer_tache(self):
@@ -241,7 +248,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
         collateur = transaction[TachesConstantes.LIBELLE_COLLATEUR]
         niveau = transaction[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
 
-        entree_historique = self.__generer_entree_historique(transaction)
+        entree_historique = self.__generer_entree_historique(transaction, self.parametres['titre'])
 
         push_op = {
             TachesConstantes.LIBELLE_ACTIVITE: entree_historique
@@ -284,7 +291,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
                     # Ajouter a la liste d'activite
                     # Trier en ordre decroissant, conserver uniquement les 100 dernieres entrees.
                     TachesConstantes.LIBELLE_ACTIVITE: {
-                        '$each': [self.__generer_entree_historique(transaction)],
+                        '$each': [self.__generer_entree_historique(transaction, self.parametres['titre'])],
                         '$sort': {TachesConstantes.LIBELLE_DATE: -1},
                         '$slice': 100,
                     }
@@ -308,19 +315,21 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
     def maj_dash_notifications(self):
         collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
-        taches = collection.find({'_id': {'$in': self.parametres['taches']}})
+        liste_tacheids = self.parametres['taches']
+        taches = collection.find({'_id': {'$in': liste_tacheids}})
 
         liste_avertir_usager = list()
         for tache in taches:
             # Verifier si la tache est en mode suivi (snooze)
             etat = tache[TachesConstantes.LIBELLE_ETAT]
+            uuid_tache = tache[TachesConstantes.LIBELLE_UUID_TACHE]
 
             dashboard_update = TachesConstantes.DOC_TACHE_TABLEAU_TEMPLATE.copy()
             dashboard_update[TachesConstantes.LIBELLE_DATE] = self.parametres['date']  # Date plus recente activite
-            dashboard_update[TachesConstantes.LIBELLE_TITRE] = None  # Courte description de la tache (64 chars)
+            dashboard_update[TachesConstantes.LIBELLE_TITRE] = self.parametres['titre']  # Courte description de la tache (64 chars)
             dashboard_update[TachesConstantes.LIBELLE_DOMAINE] = tache[TachesConstantes.LIBELLE_DOMAINE]
             dashboard_update[TachesConstantes.LIBELLE_COLLATEUR] = tache[TachesConstantes.LIBELLE_COLLATEUR]
-            dashboard_update[TachesConstantes.LIBELLE_UUID_TACHE] = tache[TachesConstantes.LIBELLE_UUID_TACHE]
+            dashboard_update[TachesConstantes.LIBELLE_UUID_TACHE] = uuid_tache
             dashboard_update[TachesConstantes.LIBELLE_ACTIONS_NOTIFICATION] = True    # Boutons: Vue, Rappel, Suivre
             dashboard_update[TachesConstantes.LIBELLE_ACTIONS_VISUALISER_DOC] = True  # Bouton, redirige vers domaine doc d'origine
 
@@ -335,6 +344,37 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
             if generer_notification:
                 liste_avertir_usager.append(dashboard_update)
+
+                # Ajouter notification dans mongo
+                doc_notification = TachesConstantes.DOC_SUMMARY_NOTIFICATION.copy()
+                doc_notification[TachesConstantes.LIBELLE_TITRE] = self.parametres['titre']
+                doc_notification[TachesConstantes.LIBELLE_DATE] = self.parametres['date']
+                doc_notification[TachesConstantes.LIBELLE_UUID_TACHE] = uuid_tache
+                doc_notification[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION] = tache[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
+                doc_notification[TachesConstantes.LIBELLE_ACTIONS_NOTIFICATION] = True
+
+                ops = {
+                    '$push': {
+                        TachesConstantes.LIBELLE_NOTIFICATIONS: doc_notification
+                    },
+                    '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+                }
+                filtre = {
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_NOTIFICATIONS
+                }
+                collection.update_one(filtre, ops)
+
+            # Mettre a jour dashboard
+            ops_tableau = {
+                '$set': {
+                    '%s.%s' % (TachesConstantes.LIBELLE_TACHES_ACTIVES, uuid_tache): dashboard_update,
+                },
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            }
+            filtre_tableau = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHES_TABLEAU
+            }
+            collection.update_one(filtre_tableau, ops_tableau)
 
         if len(liste_avertir_usager) > 0:
             self.set_etape_suivante(ProcessusNotificationRecue.avertir_usager.__name__)  # Termine
@@ -359,7 +399,23 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
         self.set_etape_suivante()  # Termine le processus
 
-    def __generer_entree_historique(self, transaction):
+    def __formatter_titre_notification(self, transaction):
+        configuration = self._controleur.configuration
+        domaine = transaction[TachesConstantes.LIBELLE_DOMAINE]
+        valeurs = transaction[TachesConstantes.LIBELLE_VALEURS]
+
+        niveau = transaction[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
+        short_domaine = domaine.split('.')[-1]
+        description = ', '.join(['%s=%s' % (key, value) for key, value in valeurs.items()])
+
+        titre = '%s %s %s: %s' % (configuration.nom_millegrille, niveau, short_domaine, description)
+
+        if len(titre) > 64:
+            titre = titre[0:64]
+
+        return titre
+
+    def __generer_entree_historique(self, transaction, titre):
         source = transaction[TachesConstantes.LIBELLE_SOURCE]
         valeurs = transaction[TachesConstantes.LIBELLE_VALEURS]
         date_activite = datetime.datetime.utcfromtimestamp(transaction[TachesConstantes.LIBELLE_DATE])
@@ -370,6 +426,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
             TachesConstantes.LIBELLE_VALEURS: valeurs,
             TachesConstantes.LIBELLE_DATE: date_activite,
             TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: niveau,
+            TachesConstantes.LIBELLE_TITRE: titre,
         }
 
         return entree_historique
