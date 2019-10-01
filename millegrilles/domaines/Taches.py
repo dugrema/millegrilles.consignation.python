@@ -41,7 +41,6 @@ class TachesConstantes:
     LIBELLE_ACTION = 'action'  # Libelle (etiquette) de l'action a faire
     ACTION_VUE = 'vue'         # La notification a ete vue, pas d'autres action requise
     ACTION_RAPPEL = 'rappel'   # L'usager demande un rappel apres une periode de temps. Cachee en attendant.
-    ACTION_SURVEILLE = 'surveille'  # L'usager demande de ne pas etre informe (cacher la notif) si l'evenement ne survient pas a nouveau
 
     LIBELLE_DOMAINE = 'domaine'
     LIBELLE_SOURCE = 'source'
@@ -57,11 +56,21 @@ class TachesConstantes:
     LIBELLE_DATE_ATTENTE_ACTION = 'date_attente_action'  # Date a partir de laquelle on fait un rappel, de-snooze, etc.
     LIBELLE_TACHES_ACTIVES = 'taches_actives'
     LIBELLE_UUID_TACHE = 'tache_uuid'
+    LIBELLE_TITRE = 'titre'
+    LIBELLE_ACTIONS_NOTIFICATION = 'actions_notifications'
+    LIBELLE_ACTIONS_VISUALISER_DOC = 'inclure_visualliser_document'
+    LIBELLE_ACTIONS_DOMAINES = 'actions_domaine'
+    LIBELLE_ACTION_DOMAINE = 'action'
+    LIBELLE_ACTION_LIBELLE = 'libelle'
 
+    ETAT_NOUVELLE = 'nouvelle'    # Nouvelle tache, notification non generee
     ETAT_ACTIVE = 'active'        # Notification active, pas encore actionee par l'usager
     ETAT_COMPLETEE = 'completee'  # La notification a ete actionnee par l'usager, plus rien a faire.
     ETAT_RAPPEL = 'rappel'        # En attente de rappel aupres de l'usager. Cachee en attendant.
-    ETAT_SURVEILLE = 'surveille'  # Notification surveille, va etre escaladee si survient a nouveau. Sinon elle se complete.
+
+    DOC_TACHE_NOTIFICATION = {
+
+    }
 
     DOC_NOTIFICATIONS = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_NOTIFICATIONS,
@@ -70,9 +79,27 @@ class TachesConstantes:
 
     DOC_TACHES_TABLEAU = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_TACHES_TABLEAU,
+        LIBELLE_TACHES_ACTIVES: list(),  # Docs type DOC_TACHE_TABLEAU_TEMPLATE
+    }
 
-        # Liste taches actives, dict: {}
-        LIBELLE_TACHES_ACTIVES: list(),
+    DOC_TACHE_TABLEAU_TEMPLATE = {
+        LIBELLE_NIVEAU_NOTIFICATION: NIVEAU_INFORMATION,
+        LIBELLE_DATE: None,  # Date plus recente activite
+        LIBELLE_TITRE: None,  # Courte description de la tache (64 chars)
+        LIBELLE_DOMAINE: None,
+        LIBELLE_COLLATEUR: dict(),
+        LIBELLE_UUID_TACHE: None,
+        LIBELLE_ACTIONS_NOTIFICATION: True,    # Boutons: Vue, Rappel, Suivre
+        LIBELLE_ACTIONS_VISUALISER_DOC: True,  # Bouton, redirige vers domaine doc d'origine
+
+        # Ajoute au domaine, envoye en transaction (domaine.action). Notification est vue.
+        # Objet DOC_ACTION_DOMAINE
+        LIBELLE_ACTIONS_DOMAINES: list(),
+    }
+
+    DOC_ACTION_DOMAINE = {
+        LIBELLE_ACTION_DOMAINE: None,
+        LIBELLE_ACTION_LIBELLE: None,
     }
 
 
@@ -85,6 +112,8 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
         self.initialiser_document(TachesConstantes.LIBVAL_NOTIFICATIONS, TachesConstantes.DOC_NOTIFICATIONS)
+        self.initialiser_document(TachesConstantes.LIBVAL_TACHES_TABLEAU, TachesConstantes.DOC_TACHES_TABLEAU)
+
 
     def get_nom_queue(self):
         return TachesConstantes.QUEUE_SUFFIXE
@@ -201,7 +230,9 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
         return {
             'source': source,
-            'taches': [str(t['_id']) for t in taches],
+            'domaine': domaine,
+            'taches': taches,
+            'collateur': collateur,
         }
 
     def creer_tache(self):
@@ -223,6 +254,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
             TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: niveau,
             TachesConstantes.LIBELLE_COLLATEUR: collateur,
             TachesConstantes.LIBELLE_UUID_TACHE: str(uuid.uuid4()),
+            TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_NOUVELLE,
         }
 
         ops = {
@@ -235,14 +267,16 @@ class ProcessusNotificationRecue(ProcessusTaches):
         collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
         update_result = collection.update_one(filter=on_insert_op, update=ops, upsert=True)
 
-        self.set_etape_suivante()  # Termine
+        self.set_etape_suivante(ProcessusNotificationRecue.maj_dash_notifications.__name__)  # Termine
 
         return {
-            'taches': [update_result.upserted_id]
+            'taches': [update_result.upserted_id],
+            'date': entree_historique[TachesConstantes.LIBELLE_DATE],
         }
 
     def traiter_plusieurs_taches(self):
         transaction = self.transaction
+        date_activite = datetime.datetime.utcfromtimestamp(transaction[TachesConstantes.LIBELLE_DATE])
 
         for tache_id in self.parametres['taches']:
             ops = {
@@ -259,14 +293,71 @@ class ProcessusNotificationRecue(ProcessusTaches):
             }
 
             filtre = {
-                '_id': ObjectId(tache_id)
+                '_id': tache_id
             }
 
             # Inserer par upsert
             collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
             collection.update_one(filter=filtre, update=ops, upsert=False)
 
-        self.set_etape_suivante()  # Termine
+        self.set_etape_suivante(ProcessusNotificationRecue.maj_dash_notifications.__name__)  # Termine
+
+        return {
+            'date': date_activite,
+        }
+
+    def maj_dash_notifications(self):
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        taches = collection.find({'_id': {'$in': self.parametres['taches']}})
+
+        liste_avertir_usager = list()
+        for tache in taches:
+            # Verifier si la tache est en mode suivi (snooze)
+            etat = tache[TachesConstantes.LIBELLE_ETAT]
+
+            dashboard_update = TachesConstantes.DOC_TACHE_TABLEAU_TEMPLATE.copy()
+            dashboard_update[TachesConstantes.LIBELLE_DATE] = self.parametres['date']  # Date plus recente activite
+            dashboard_update[TachesConstantes.LIBELLE_TITRE] = None  # Courte description de la tache (64 chars)
+            dashboard_update[TachesConstantes.LIBELLE_DOMAINE] = tache[TachesConstantes.LIBELLE_DOMAINE]
+            dashboard_update[TachesConstantes.LIBELLE_COLLATEUR] = tache[TachesConstantes.LIBELLE_COLLATEUR]
+            dashboard_update[TachesConstantes.LIBELLE_UUID_TACHE] = tache[TachesConstantes.LIBELLE_UUID_TACHE]
+            dashboard_update[TachesConstantes.LIBELLE_ACTIONS_NOTIFICATION] = True    # Boutons: Vue, Rappel, Suivre
+            dashboard_update[TachesConstantes.LIBELLE_ACTIONS_VISUALISER_DOC] = True  # Bouton, redirige vers domaine doc d'origine
+
+            # Ajoute au domaine, envoye en transaction (domaine.action). Notification est vue.
+            # Objet DOC_ACTION_DOMAINE
+            dashboard_update[TachesConstantes.LIBELLE_ACTIONS_DOMAINES] = None
+
+            generer_notification = False
+            if etat in [TachesConstantes.ETAT_NOUVELLE, TachesConstantes.ETAT_COMPLETEE]:
+                # On va faire un toggle de l'etat de la tache a actif, generer notification.
+                generer_notification = True
+
+            if generer_notification:
+                liste_avertir_usager.append(dashboard_update)
+
+        if len(liste_avertir_usager) > 0:
+            self.set_etape_suivante(ProcessusNotificationRecue.avertir_usager.__name__)  # Termine
+            return {
+                'liste_avertir_usager': liste_avertir_usager
+            }
+        else:
+            self.set_etape_suivante()  # Termine
+
+    def avertir_usager(self):
+        configuration = self._controleur.configuration
+
+        sujet = "Notification %s" % configuration.nom_millegrille
+
+        for notification in self.parametres['liste_avertir_usager']:
+            contenu = "Nouvelle notification pour la MilleGrille %s\n\n%s" % (configuration.nom_millegrille, str(notification))
+            self._logger.info("Transmission notifcation par courriel: %s" % sujet)
+            self._logger.debug(contenu)
+
+            # smtp_dao = SmtpDAO(self._controleur.configuration)
+            # smtp_dao.envoyer_notification(sujet, contenu)
+
+        self.set_etape_suivante()  # Termine le processus
 
     def __generer_entree_historique(self, transaction):
         source = transaction[TachesConstantes.LIBELLE_SOURCE]
@@ -282,19 +373,6 @@ class ProcessusNotificationRecue(ProcessusTaches):
         }
 
         return entree_historique
-
-    def avertir_usager(self):
-        configuration = self._controleur.configuration
-
-        sujet = "Notification %s" % configuration.nom_millegrille
-        contenu = "Nouvelle notification pour MilleGrille %s" % configuration.nom_millegrille
-
-        self._logger.info("Transmission notifcation par courriel: %s" % contenu)
-
-        smtp_dao = SmtpDAO(self._controleur.configuration)
-        smtp_dao.envoyer_notification(sujet, contenu)
-
-        self.set_etape_suivante()  # Termine le processus
 
 
 class ProcessusActionUsager(ProcessusTaches):

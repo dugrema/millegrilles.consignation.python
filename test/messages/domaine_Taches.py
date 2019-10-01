@@ -28,7 +28,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
             Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration',
         }
         collateur = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration_4',
+            Constantes.DOCUMENT_INFODOC_LIBELLE: 'configuration_5',
         }
         valeurs = {
             'version': 4
