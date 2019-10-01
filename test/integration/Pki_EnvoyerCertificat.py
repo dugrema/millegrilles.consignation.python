@@ -1,7 +1,7 @@
 # Test pour transmettre un certificat au domaine PKI
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import PikaDAO
-from millegrilles.domaines.Notifications import NotificationsConstantes
+from millegrilles.domaines.Taches import TachesConstantes
 from millegrilles import Constantes
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.domaines.Pki import ConstantesPki

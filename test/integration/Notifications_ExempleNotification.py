@@ -1,6 +1,6 @@
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.MessageDAO import PikaDAO
-from millegrilles.domaines.Notifications import NotificationsConstantes
+from millegrilles.domaines.Taches import TachesConstantes
 from millegrilles import Constantes
 
 import datetime
@@ -40,7 +40,7 @@ class NotificationExempleTest:
             }
         })
 
-        self.message_dao.transmettre_notification(notification, NotificationsConstantes.AVERTISSEMENT)
+        self.message_dao.transmettre_notification(notification, TachesConstantes.AVERTISSEMENT)
 
         print("Sent notification: %s" % notification)
 

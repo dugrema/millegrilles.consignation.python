@@ -8,7 +8,7 @@ from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStanda
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, TraitementMessageDomaineMiddleware
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-from millegrilles.domaines.Notifications import FormatteurEvenementNotification, NotificationsConstantes
+from millegrilles.domaines.Taches import FormatteurEvenementNotification, TachesConstantes
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations, GenerateurTransaction
 from bson.objectid import ObjectId
 
@@ -712,7 +712,7 @@ class VerificateurNotificationsSenseursPassifs:
                 except Exception as e:
                     self._logger.exception("Erreur notification")
 
-    def transmettre_notification(self, nom_regle, parametres, message, niveau=NotificationsConstantes.AVERTISSEMENT):
+    def transmettre_notification(self, nom_regle, parametres, message, niveau=TachesConstantes.AVERTISSEMENT):
         """
         Formatte et transmet une notification.
 

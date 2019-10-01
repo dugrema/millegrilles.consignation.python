@@ -1,6 +1,6 @@
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.MessageDAO import PikaDAO
-from millegrilles.domaines.Notifications import NotificationsConstantes
+from millegrilles.domaines.Taches import TachesConstantes
 from millegrilles import Constantes
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
@@ -24,12 +24,12 @@ class NotificationActionExempleTest:
     def test1(self):
 
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
-        domaine = NotificationsConstantes.TRANSACTION_ACTION_NOTIFICATION
+        domaine = TachesConstantes.TRANSACTION_ACTION_NOTIFICATION
 
         transaction_message = dict({
-            NotificationsConstantes.LIBELLE_ID_NOTIFICATION: '5c152457e094095d8c8d314e',
-            NotificationsConstantes.LIBELLE_ACTION: NotificationsConstantes.ACTION_VUE,
-            NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: 180
+            TachesConstantes.LIBELLE_ID_NOTIFICATION: '5c152457e094095d8c8d314e',
+            TachesConstantes.LIBELLE_ACTION: TachesConstantes.ACTION_VUE,
+            TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION: 180
         })
 
         self.generateur_transaction.soumettre_transaction(transaction_message, domaine)

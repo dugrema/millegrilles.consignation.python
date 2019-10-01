@@ -1,4 +1,4 @@
-# Module du domaine des notifications.
+# Module du domaine des taches.
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine
@@ -11,21 +11,22 @@ from bson import ObjectId
 import datetime
 
 
-class NotificationsConstantes:
+class TachesConstantes:
 
-    DOMAINE_NOM = 'millegrilles.domaines.Notifications'
+    DOMAINE_NOM = 'millegrilles.domaines.Taches'
     QUEUE_SUFFIXE = DOMAINE_NOM
     COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
 
-    TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Notifications.actionUsager'
+    TRANSACTION_NOUVELLE_NOTIFICATION = 'millegrilles.domaines.Taches.nouvelle'
+    TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Taches.actionUsager'
 
-    # Niveaux d'une notification
+    # Niveaux d'une notification de tache
     SUIVI = 'suivi'                  # Niveau bas avec limite de temps
     INFORMATION = 'information'      # Plus bas niveau sans limite de temps
-    AVERTISSEMENT = 'avertissement'  # Niveau par defaut
-    ALERTE = 'alerte'                # Plus haut niveau
+    AVERTISSEMENT = 'avertissement'  # Niveau par defaut / grave
+    ALERTE = 'alerte'                # Plus haut niveau / critique
 
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
@@ -47,74 +48,51 @@ class NotificationsConstantes:
     ETAT_SURVEILLE = 'surveille'  # Notification surveille, va etre escaladee si survient a nouveau. Sinon elle se complete.
 
 
-class GestionnaireNotifications(GestionnaireDomaine):
+class GestionnaireTaches(GestionnaireDomaine):
 
     def __init__(self, contexte):
         super().__init__(contexte)
         self._traitement_message = None
 
     def get_nom_queue(self):
-        return NotificationsConstantes.QUEUE_SUFFIXE
+        return TachesConstantes.QUEUE_SUFFIXE
 
     def get_nom_collection(self):
-        return NotificationsConstantes.COLLECTION_DOCUMENTS_NOM
+        return TachesConstantes.COLLECTION_DOCUMENTS_NOM
 
     def get_collection_transaction_nom(self):
-        return NotificationsConstantes.COLLECTION_TRANSACTIONS_NOM
+        return TachesConstantes.COLLECTION_TRANSACTIONS_NOM
 
     def get_collection_processus_nom(self):
-        return NotificationsConstantes.COLLECTION_PROCESSUS_NOM
+        return TachesConstantes.COLLECTION_PROCESSUS_NOM
 
-    def traiter_transaction(self, ch, method, properties, body):
-        self._traitement_message.callbackAvecAck(ch, method, properties, body)
+    def get_nom_domaine(self):
+        return TachesConstantes.DOMAINE_NOM
 
     def traiter_cedule(self, message):
-        indicateurs = message['indicateurs']
-        self._logger.debug("Cedule GestionnaireNotifications: %s" % str(indicateurs))
-        # Declencher la verification des actions sur notifications
+        # Declencher la verification des actions sur taches
         self.verifier_notifications_actionsdues(message)
-
-    def traiter_notification(self, notification):
-        processus = "millegrilles_domaines_Notifications:ProcessusNotificationRecue"
-        self.demarrer_processus(processus, notification)
 
     def configurer(self):
         super().configurer()
         self._traitement_message = TraitementMessageNotification(self)
 
-    def setup_rabbitmq(self, channel):
-        nom_queue_notification = self.get_nom_queue()
+    def get_queue_configuration(self):
+        pass
 
-        # Configurer la Queue pour les notifications sur RabbitMQ
-        self.message_dao.channel.queue_declare(
-            queue=nom_queue_notification,
-            durable=True,
-            callback=self.callback_queue_transaction
-        )
+    def identifier_processus(self, domaine_transaction):
+        if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_NOTIFICATION:
+            processus = "millegrilles_domaines_Taches:ProcessusActionUsagerNotification"
+        elif domaine_transaction == TachesConstantes.TRANSACTION_NOUVELLE_NOTIFICATION:
+            # Notification recue
+            processus = "millegrilles_domaines_Taches:ProcessusNotificationRecue"
+        else:
+            processus = super().identifier_processus(domaine_transaction)
 
-        self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_notification,
-            routing_key='notification.#',
-            callback=None,
-        )
-
-        self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_notification,
-            routing_key='destinataire.domaine.%s.#' % NotificationsConstantes.QUEUE_SUFFIXE,
-            callback=None,
-        )
-
-        self.message_dao.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_queue_notification,
-            routing_key='ceduleur.#',
-            callback=None,
-        )
+        return processus
 
     def verifier_notifications_actionsdues(self, message):
-        collection_notifications = self.document_dao.get_collection(NotificationsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_notifications = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {
             'date_attente_action': {'$lt': datetime.datetime.utcnow()}
@@ -126,33 +104,30 @@ class GestionnaireNotifications(GestionnaireDomaine):
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             },
             '$unset': {
-                NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
+                TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
             }
         }
 
         for notification in curseur:
             etat_notification = notification['etat_notification']
 
-            if etat_notification == NotificationsConstantes.ETAT_SURVEILLE:
+            if etat_notification == TachesConstantes.ETAT_SURVEILLE:
                 # La notification est completee (aucun changement depuis qu'elle est en etat de surveillance)
                 operations = operations_template.copy()
                 operations['$set'] = {
-                    NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_COMPLETEE
+                    TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_COMPLETEE
                 }
                 self._logger.debug("Completer notification (surveillee): %s" % str(notification))
                 collection_notifications.update_one({'_id': notification['_id']}, operations)
 
-            elif etat_notification == NotificationsConstantes.ETAT_RAPPEL:
+            elif etat_notification == TachesConstantes.ETAT_RAPPEL:
                 # C'est l'heure du rappel. On remet la notification au mode actif.
                 operations = operations_template.copy()
                 operations['$set'] = {
-                    NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE
+                    TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE
                 }
                 self._logger.debug("Rappeler notification: %s" % str(notification))
                 collection_notifications.update_one({'_id': notification['_id']}, operations)
-
-    def get_nom_domaine(self):
-        return NotificationsConstantes.DOMAINE_NOM
 
 
 class TraitementMessageNotification(TraitementMessageDomaine):
@@ -182,7 +157,7 @@ class TraitementMessageNotification(TraitementMessageDomaine):
                 'destinataire.domaine.',
                 ''
             )
-            if routing_key_sansprefixe == NotificationsConstantes.TRANSACTION_ACTION_NOTIFICATION:
+            if routing_key_sansprefixe == TachesConstantes.TRANSACTION_ACTION_NOTIFICATION:
                 processus = "millegrilles_domaines_Notifications:ProcessusActionUsagerNotification"
                 self._gestionnaire.demarrer_processus(processus, message_dict)
             else:
@@ -208,7 +183,7 @@ class ProcessusNotificationRecue(MGProcessus):
     def sauvegarder_notification(self):
         parametres = self.parametres
         self._logger.debug("sauvegarder_notification %s" % (str(parametres)))
-        collection = self.document_dao().get_collection(NotificationsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection = self.document_dao().get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
         nouveaux_documents_notification = []
 
@@ -282,9 +257,9 @@ class ProcessusNotificationRecue(MGProcessus):
             Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_NOTIFICATION_REGLESIMPLE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_creation,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_creation,
-            NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE,
-            NotificationsConstantes.LIBELLE_NIVEAU_NOTIFICATION: NotificationsConstantes.INFORMATION,
-            NotificationsConstantes.LIBELLE_COMPTEUR: 1,
+            TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE,
+            TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: TachesConstantes.INFORMATION,
+            TachesConstantes.LIBELLE_COMPTEUR: 1,
             'derniere_notification': datetime.datetime.fromtimestamp(parametres['date']),
             'valeurs': parametres['valeurs'],
             'source': parametres['source']
@@ -311,7 +286,7 @@ class ProcessusNotificationRecue(MGProcessus):
             },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             '$inc': {
-                NotificationsConstantes.LIBELLE_COMPTEUR: 1
+                TachesConstantes.LIBELLE_COMPTEUR: 1
             }
         }
         resultat_update = collection.find_one_and_update(filtre, operations)
@@ -322,21 +297,21 @@ class ProcessusNotificationRecue(MGProcessus):
 
         # Verifier si la notification a une action / regle, ou un workflow en cours
         # Pour etat complet, on reactive. Sinon rien a faire.
-        etat_precedent = resultat_update[NotificationsConstantes.LIBELLE_ETAT]
-        etats_reactive = [NotificationsConstantes.ETAT_COMPLETEE, NotificationsConstantes.ETAT_SURVEILLE]
+        etat_precedent = resultat_update[TachesConstantes.LIBELLE_ETAT]
+        etats_reactive = [TachesConstantes.ETAT_COMPLETEE, TachesConstantes.ETAT_SURVEILLE]
         if etat_precedent in etats_reactive:
             operations_set = {
-                NotificationsConstantes.LIBELLE_ETAT: NotificationsConstantes.ETAT_ACTIVE
+                TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE
             }
-            if etat_precedent == NotificationsConstantes.ETAT_COMPLETEE:
+            if etat_precedent == TachesConstantes.ETAT_COMPLETEE:
                 # Reset le compteur, la notification etait completee.
-                operations_set[NotificationsConstantes.LIBELLE_COMPTEUR] = 1
+                operations_set[TachesConstantes.LIBELLE_COMPTEUR] = 1
 
             # On va reouvrir la notification
             collection.update_one(filtre, {
                 '$set': operations_set,
                 '$unset': {
-                    NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
+                    TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
                 }
             })
 
@@ -353,44 +328,44 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
     def initiale(self):
         parametres = self.parametres
-        transaction = self.charger_transaction(NotificationsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        collection_notifications = self.contexte.document_dao.get_collection(NotificationsConstantes.COLLECTION_DOCUMENTS_NOM)
+        transaction = self.charger_transaction(TachesConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_notifications = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
         self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
         self._logger.debug("Message de l'action usager: %s" % str(transaction))
-        id_notification = transaction[NotificationsConstantes.LIBELLE_ID_NOTIFICATION]
-        action_usager = transaction[NotificationsConstantes.LIBELLE_ACTION]
+        id_notification = transaction[TachesConstantes.LIBELLE_ID_NOTIFICATION]
+        action_usager = transaction[TachesConstantes.LIBELLE_ACTION]
 
         filtre_notification = {'_id': ObjectId(id_notification)}
         operations_set = {
-            NotificationsConstantes.LIBELLE_DERNIERE_ACTION: action_usager
+            TachesConstantes.LIBELLE_DERNIERE_ACTION: action_usager
         }
         operations_unset = dict()
         operations = {
             '$set': operations_set,
             '$currentDate': {
-                NotificationsConstantes.LIBELLE_DATE_ACTION: True,
+                TachesConstantes.LIBELLE_DATE_ACTION: True,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             }
         }
 
-        if action_usager == NotificationsConstantes.ACTION_VUE:
+        if action_usager == TachesConstantes.ACTION_VUE:
             # Marquer la notification comme vue. A moins qu'une autre notification soit recue,
             # l'usager a fait ce qu'il avait a faire au sujet de cette notification.
-            operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_COMPLETEE
-            operations_unset[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = ''
+            operations_set[TachesConstantes.LIBELLE_ETAT] = TachesConstantes.ETAT_COMPLETEE
+            operations_unset[TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION] = ''
 
-        elif action_usager == NotificationsConstantes.ACTION_RAPPEL:
+        elif action_usager == TachesConstantes.ACTION_RAPPEL:
             # Calculer la date de rappel
             date_prochaine_action = self._calculer_periode_attente(transaction)
-            operations_set[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
-            operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_RAPPEL
+            operations_set[TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
+            operations_set[TachesConstantes.LIBELLE_ETAT] = TachesConstantes.ETAT_RAPPEL
 
-        elif action_usager == NotificationsConstantes.ACTION_SURVEILLE:
+        elif action_usager == TachesConstantes.ACTION_SURVEILLE:
             # Calculer la date d'arret de surveillance
             date_prochaine_action = self._calculer_periode_attente(transaction)
-            operations_set[NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
-            operations_set[NotificationsConstantes.LIBELLE_ETAT] = NotificationsConstantes.ETAT_SURVEILLE
+            operations_set[TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
+            operations_set[TachesConstantes.LIBELLE_ETAT] = TachesConstantes.ETAT_SURVEILLE
 
         if len(operations_unset) > 0:
             operations['$unset'] = operations_unset
@@ -411,7 +386,7 @@ class ProcessusActionUsagerNotification(MGProcessusTransaction):
 
         estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
 
-        attente_secondes = transaction.get(NotificationsConstantes.LIBELLE_DATE_ATTENTE_ACTION)
+        attente_secondes = transaction.get(TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION)
         if attente_secondes is None:
             # Defaut 24h
             attente_secondes = 24 * 60 * 60
@@ -442,9 +417,9 @@ class FormatteurEvenementNotification:
         self._template['domaine'] = domaine
         self._template['source']['_collection'] = collection
 
-    def formatter_notification(self, id_document, regles, valeurs):
+    def formatter_notification(self, source: dict, regles: list, valeurs: dict):
         notification = self._template.copy()
-        notification['source']['_id'] = str(id_document)
+        notification['source'] = source
         notification['valeurs'] = valeurs
         notification['date'] = int(datetime.datetime.utcnow().timestamp())
 
