@@ -199,6 +199,33 @@ class ProcessusTaches(MGProcessusTransaction):
         tableau_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHES_TABLEAU}
         collection.update_one(tableau_filtre, tableau_ops)
 
+    def ajouter_notification(self, tache):
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        titre = tache[TachesConstantes.LIBELLE_UUID_TACHE]
+        uuid_tache = tache[TachesConstantes.LIBELLE_UUID_TACHE]
+        niveau = tache[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
+        date_activite = tache[TachesConstantes.LIBELLE_ACTIVITE][0][TachesConstantes.LIBELLE_DATE]
+
+        # Ajouter notification dans mongo
+        doc_notification = TachesConstantes.DOC_SUMMARY_NOTIFICATION.copy()
+        doc_notification[TachesConstantes.LIBELLE_TITRE] = titre
+        doc_notification[TachesConstantes.LIBELLE_DATE] = date_activite
+        doc_notification[TachesConstantes.LIBELLE_UUID_TACHE] = uuid_tache
+        doc_notification[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION] = niveau
+        doc_notification[TachesConstantes.LIBELLE_ACTIONS_NOTIFICATION] = True
+        ops = {
+            '$push': {
+                TachesConstantes.LIBELLE_NOTIFICATIONS: doc_notification
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_NOTIFICATIONS
+        }
+
+        collection.update_one(filtre, ops)
+
 
 class ProcessusNotificationRecue(ProcessusTaches):
 
@@ -333,6 +360,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
             dashboard_update[TachesConstantes.LIBELLE_DOMAINE] = tache[TachesConstantes.LIBELLE_DOMAINE]
             dashboard_update[TachesConstantes.LIBELLE_COLLATEUR] = tache[TachesConstantes.LIBELLE_COLLATEUR]
             dashboard_update[TachesConstantes.LIBELLE_UUID_TACHE] = uuid_tache
+            dashboard_update[TachesConstantes.LIBELLE_ETAT] = etat
             dashboard_update[TachesConstantes.LIBELLE_ACTIONS_NOTIFICATION] = True    # Boutons: Vue, Rappel, Suivre
             dashboard_update[TachesConstantes.LIBELLE_ACTIONS_VISUALISER_DOC] = True  # Bouton, redirige vers domaine doc d'origine
 
@@ -353,25 +381,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
 
             if generer_notification:
                 liste_avertir_usager.append(dashboard_update)
-
-                # Ajouter notification dans mongo
-                doc_notification = TachesConstantes.DOC_SUMMARY_NOTIFICATION.copy()
-                doc_notification[TachesConstantes.LIBELLE_TITRE] = self.parametres['titre']
-                doc_notification[TachesConstantes.LIBELLE_DATE] = self.parametres['date']
-                doc_notification[TachesConstantes.LIBELLE_UUID_TACHE] = uuid_tache
-                doc_notification[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION] = tache[TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION]
-                doc_notification[TachesConstantes.LIBELLE_ACTIONS_NOTIFICATION] = True
-
-                ops = {
-                    '$push': {
-                        TachesConstantes.LIBELLE_NOTIFICATIONS: doc_notification
-                    },
-                    '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-                }
-                filtre = {
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_NOTIFICATIONS
-                }
-                collection.update_one(filtre, ops)
+                self.ajouter_notification(tache)
 
             # Mettre a jour dashboard
             ops_tableau = {
@@ -471,17 +481,31 @@ class ProcessusActionRappel(ProcessusTaches):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        transaction = self.transaction
         collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        transaction = self.transaction
         uuid_tache = transaction[TachesConstantes.LIBELLE_UUID_TACHE]
         epoch_rappel = transaction[TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP]
         date_rappel = datetime.datetime.fromtimestamp(epoch_rappel)
+
+        # Modifier etat de la tache
         filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
         ops = {'$set': {
             TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_RAPPEL,
             TachesConstantes.LIBELLE_TACHE_DATE_RAPPEL: date_rappel,
         }}
         resultat = collection.update_one(filtre, ops)
+
+        # Update tableau
+        tableau_ops = {
+            '$set': {
+                '%s.%s.%s' % (TachesConstantes.LIBELLE_TACHES_ACTIVES, uuid_tache, TachesConstantes.LIBELLE_ETAT): TachesConstantes.ETAT_RAPPEL
+            }
+        }
+        tableau_filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHES_TABLEAU
+        }
+        collection.update_one(tableau_filtre, tableau_ops)
 
         # Supprimer du document de notifications
         self.supprimer_notification(collection, uuid_tache)
@@ -490,6 +514,40 @@ class ProcessusActionRappel(ProcessusTaches):
             raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusRappelExpire(ProcessusTaches):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        uuid_tache = transaction[TachesConstantes.LIBELLE_UUID_TACHE]
+
+        filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
+        ops = {
+            '$set': {
+                TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE,
+            },
+            '$unset': {
+                TachesConstantes.LIBELLE_TACHE_DATE_RAPPEL: 1,
+            }
+        }
+        resultat = collection.update_one(filtre, ops)
+
+        # Remettre notification
+        tache = collection.find_one({TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache})
+        self.ajouter_notification(tache)
+
+        if resultat.modified_count == 0:
+            raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
+
+        self.set_etape_suivante()  # Termine
+
+    def avertir_usager(self):
+        pass
 
 
 class FormatteurEvenementNotification:
