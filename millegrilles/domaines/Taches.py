@@ -10,6 +10,7 @@ from bson import ObjectId
 
 import datetime
 import json
+import uuid
 
 
 class TachesConstantes:
@@ -31,6 +32,7 @@ class TachesConstantes:
     NIVEAU_ALERTE = 'alerte'                # Plus haut niveau / critique
 
     LIBVAL_NOTIFICATIONS = 'notifications'
+    LIBVAL_TACHES_TABLEAU = 'taches_tableau'
 
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
@@ -53,6 +55,9 @@ class TachesConstantes:
     LIBELLE_PERIODE_ATTENTE = 'periode_attente'
     LIBELLE_DATE_ACTION = 'date_action'  # Date de prise d'action
     LIBELLE_DATE_ATTENTE_ACTION = 'date_attente_action'  # Date a partir de laquelle on fait un rappel, de-snooze, etc.
+    LIBELLE_TACHES_ACTIVES = 'taches_actives'
+    LIBELLE_UUID_TACHE = 'tache_uuid'
+
     ETAT_ACTIVE = 'active'        # Notification active, pas encore actionee par l'usager
     ETAT_COMPLETEE = 'completee'  # La notification a ete actionnee par l'usager, plus rien a faire.
     ETAT_RAPPEL = 'rappel'        # En attente de rappel aupres de l'usager. Cachee en attendant.
@@ -61,6 +66,13 @@ class TachesConstantes:
     DOC_NOTIFICATIONS = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_NOTIFICATIONS,
         LIBELLE_NOTIFICATIONS: list(),
+    }
+
+    DOC_TACHES_TABLEAU = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_TACHES_TABLEAU,
+
+        # Liste taches actives, dict: {}
+        LIBELLE_TACHES_ACTIVES: list(),
     }
 
 
@@ -209,7 +221,8 @@ class ProcessusNotificationRecue(ProcessusTaches):
             Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.DOCUMENT_TACHE_NOTIFICATION,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             TachesConstantes.LIBELLE_NIVEAU_NOTIFICATION: niveau,
-            TachesConstantes.LIBELLE_COLLATEUR: collateur
+            TachesConstantes.LIBELLE_COLLATEUR: collateur,
+            TachesConstantes.LIBELLE_UUID_TACHE: str(uuid.uuid4()),
         }
 
         ops = {
