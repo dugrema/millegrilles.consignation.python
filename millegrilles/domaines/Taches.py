@@ -63,6 +63,7 @@ class TachesConstantes:
     LIBELLE_ACTIONS_DOMAINES = 'actions_domaine'
     LIBELLE_ACTION_DOMAINE = 'action'
     LIBELLE_ACTION_LIBELLE = 'libelle'
+    LIBELLE_TACHE_DATE_RAPPEL = 'rappel'
     LIBELLE_RAPPEL_TIMESTAMP = 'timestamp'
 
     ETAT_NOUVELLE = 'nouvelle'    # Nouvelle tache, notification non generee
@@ -115,11 +116,28 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
         super().__init__(contexte)
         self._traitement_message = None
 
+    def configurer(self):
+        super().configurer()
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine.create_index([
+            (TachesConstantes.LIBELLE_UUID_TACHE, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ], unique=True)
+
+        collection_domaine.create_index([
+            (TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP, -1)
+        ])
+
+        collection_domaine.create_index([
+            (TachesConstantes.LIBELLE_DOMAINE, 1),
+            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+        ])
+
     def demarrer(self):
         super().demarrer()
         self.initialiser_document(TachesConstantes.LIBVAL_NOTIFICATIONS, TachesConstantes.DOC_NOTIFICATIONS)
         self.initialiser_document(TachesConstantes.LIBVAL_TACHES_TABLEAU, TachesConstantes.DOC_TACHES_TABLEAU)
-
 
     def get_nom_queue(self):
         return TachesConstantes.QUEUE_SUFFIXE
@@ -164,6 +182,22 @@ class ProcessusTaches(MGProcessusTransaction):
 
     def get_collection_processus_nom(self):
         return TachesConstantes.COLLECTION_PROCESSUS_NOM
+
+    def supprimer_notification(self, collection, uuid_tache):
+        notifications_ops = {
+            '$pull': {
+                TachesConstantes.LIBVAL_NOTIFICATIONS: {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
+            }
+        }
+        notifications_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_NOTIFICATIONS}
+        collection.update_one(notifications_filtre, notifications_ops)
+
+    def supprimer_sur_tableau(self, collection, uuid_tache):
+        tableau_ops = {
+            "$unset": {"%s.%s" % (TachesConstantes.LIBELLE_TACHES_ACTIVES, uuid_tache): 1}
+        }
+        tableau_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHES_TABLEAU}
+        collection.update_one(tableau_filtre, tableau_ops)
 
 
 class ProcessusNotificationRecue(ProcessusTaches):
@@ -311,6 +345,12 @@ class ProcessusNotificationRecue(ProcessusTaches):
                 # On va faire un toggle de l'etat de la tache a actif, generer notification.
                 generer_notification = True
 
+                if etat == TachesConstantes.ETAT_COMPLETEE:
+                    # On reactive la tache
+                    filtre_tache = {"_id": tache['_id']}
+                    ops_tache = {"$set": {TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_NOUVELLE}}
+                    collection.update_one(filtre_tache, ops_tache)
+
             if generer_notification:
                 liste_avertir_usager.append(dashboard_update)
 
@@ -412,23 +452,12 @@ class ProcessusActionCompletee(ProcessusTaches):
         uuid_tache = transaction[TachesConstantes.LIBELLE_UUID_TACHE]
 
         filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
-        ops = {'$set': {TachesConstantes.ETAT_ACTIVE: TachesConstantes.ETAT_COMPLETEE}}
+        ops = {'$set': {TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_COMPLETEE}}
         resultat = collection.update_one(filtre, ops)
 
         # Nettoyer tableau et notifications
-        notifications_ops = {
-            '$pull': {
-                TachesConstantes.LIBVAL_NOTIFICATIONS: {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
-            }
-        }
-        notifications_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_NOTIFICATIONS}
-        collection.update_one(notifications_filtre, notifications_ops)
-
-        tableau_ops = {
-            "$unset": {"%s.%s" % (TachesConstantes.LIBELLE_TACHES_ACTIVES, uuid_tache): 1}
-        }
-        tableau_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHES_TABLEAU}
-        collection.update_one(tableau_filtre, tableau_ops)
+        self.supprimer_notification(collection, uuid_tache)
+        self.supprimer_sur_tableau(collection, uuid_tache)
 
         if resultat.modified_count == 0:
             raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
@@ -449,10 +478,13 @@ class ProcessusActionRappel(ProcessusTaches):
         date_rappel = datetime.datetime.fromtimestamp(epoch_rappel)
         filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
         ops = {'$set': {
-            TachesConstantes.LIBELLE_ACTION: TachesConstantes.ETAT_COMPLETEE,
-            TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP: date_rappel,
+            TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_RAPPEL,
+            TachesConstantes.LIBELLE_TACHE_DATE_RAPPEL: date_rappel,
         }}
         resultat = collection.update_one(filtre, ops)
+
+        # Supprimer du document de notifications
+        self.supprimer_notification(collection, uuid_tache)
 
         if resultat.modified_count == 0:
             raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)

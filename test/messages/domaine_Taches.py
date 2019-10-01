@@ -66,13 +66,13 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         generateur.soumettre_transaction(transaction, domaine)
 
 # --- MAIN ---
-sample = MessagesSample(uuid='0dcd20a9-b871-4c1c-8ea2-3b1559bad11d')
+sample = MessagesSample(uuid='3d9c78e7-eefa-4564-9352-4a33527a7315')
 
 # TEST
 # enveloppe = sample.maj_email_smtp_sanspassword()
 # enveloppe = sample.notification_tache()
-enveloppe = sample.marquer_tache_completee()
-# enveloppe = sample.marquer_tache_rappel()
+# enveloppe = sample.marquer_tache_completee()
+enveloppe = sample.marquer_tache_rappel()
 
 
 sample.recu.wait(10)
