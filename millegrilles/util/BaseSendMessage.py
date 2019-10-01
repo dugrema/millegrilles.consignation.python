@@ -14,12 +14,13 @@ from threading import Thread, Event
 class BaseEnvoyerMessageEcouter(BaseCallback):
 
     def __init__(self):
-        super().__init__(ContexteRessourcesMilleGrilles())
-        self.contexte.initialiser(init_document=False)
+        contexte = ContexteRessourcesMilleGrilles()
+        contexte.initialiser(init_document=False)
+        super().__init__(contexte)
+
         self.__thread_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
         self.__thread_ioloop.start()
         self.generateur = self.contexte.generateur_transactions
-        self.message_dao = self.contexte.message_dao
         self.pret = Event()
         self.recu = Event()
 

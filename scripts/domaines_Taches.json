@@ -1,8 +1,8 @@
 {
   "domaines": [
     {
-      "module": "millegrilles.domaines.Notifications",
-      "classe": "GestionnaireNotifications"
+      "module": "millegrilles.domaines.Taches",
+      "classe": "GestionnaireTaches"
     }
   ]
 }

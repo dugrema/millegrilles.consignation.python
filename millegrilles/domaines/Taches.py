@@ -1,8 +1,7 @@
 # Module du domaine des taches.
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.dao.EmailDAO import SmtpDAO
 
@@ -19,8 +18,8 @@ class TachesConstantes:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
 
-    TRANSACTION_NOUVELLE_NOTIFICATION = 'millegrilles.domaines.Taches.nouvelle'
-    TRANSACTION_ACTION_NOTIFICATION = 'millegrilles.domaines.Taches.actionUsager'
+    TRANSACTION_NOUVELLE_TACHE = 'millegrilles.domaines.Taches.nouvelle'
+    TRANSACTION_ACTION_TACHE = 'millegrilles.domaines.Taches.actionUsager'
 
     # Niveaux d'une notification de tache
     SUIVI = 'suivi'                  # Niveau bas avec limite de temps
@@ -48,7 +47,7 @@ class TachesConstantes:
     ETAT_SURVEILLE = 'surveille'  # Notification surveille, va etre escaladee si survient a nouveau. Sinon elle se complete.
 
 
-class GestionnaireTaches(GestionnaireDomaine):
+class GestionnaireTaches(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
@@ -71,19 +70,12 @@ class GestionnaireTaches(GestionnaireDomaine):
 
     def traiter_cedule(self, message):
         # Declencher la verification des actions sur taches
-        self.verifier_notifications_actionsdues(message)
-
-    def configurer(self):
-        super().configurer()
-        self._traitement_message = TraitementMessageNotification(self)
-
-    def get_queue_configuration(self):
-        pass
+        self.verifier_taches_actionsdues(message)
 
     def identifier_processus(self, domaine_transaction):
-        if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_NOTIFICATION:
-            processus = "millegrilles_domaines_Taches:ProcessusActionUsagerNotification"
-        elif domaine_transaction == TachesConstantes.TRANSACTION_NOUVELLE_NOTIFICATION:
+        if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE:
+            processus = "millegrilles_domaines_Taches:ProcessusActionUsager"
+        elif domaine_transaction == TachesConstantes.TRANSACTION_NOUVELLE_TACHE:
             # Notification recue
             processus = "millegrilles_domaines_Taches:ProcessusNotificationRecue"
         else:
@@ -91,13 +83,13 @@ class GestionnaireTaches(GestionnaireDomaine):
 
         return processus
 
-    def verifier_notifications_actionsdues(self, message):
-        collection_notifications = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+    def verifier_taches_actionsdues(self, message):
+        collection_taches = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
 
         filtre = {
             'date_attente_action': {'$lt': datetime.datetime.utcnow()}
         }
-        curseur = collection_notifications.find(filtre)
+        curseur = collection_taches.find(filtre)
 
         operations_template = {
             '$currentDate': {
@@ -108,64 +100,26 @@ class GestionnaireTaches(GestionnaireDomaine):
             }
         }
 
-        for notification in curseur:
-            etat_notification = notification['etat_notification']
+        for taches in curseur:
+            etat_tache = taches['etat_tache']
 
-            if etat_notification == TachesConstantes.ETAT_SURVEILLE:
+            if etat_tache == TachesConstantes.ETAT_SURVEILLE:
                 # La notification est completee (aucun changement depuis qu'elle est en etat de surveillance)
                 operations = operations_template.copy()
                 operations['$set'] = {
                     TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_COMPLETEE
                 }
-                self._logger.debug("Completer notification (surveillee): %s" % str(notification))
-                collection_notifications.update_one({'_id': notification['_id']}, operations)
+                self._logger.debug("Completer tache (surveillee): %s" % str(taches))
+                collection_taches.update_one({'_id': taches['_id']}, operations)
 
-            elif etat_notification == TachesConstantes.ETAT_RAPPEL:
+            elif etat_tache == TachesConstantes.ETAT_RAPPEL:
                 # C'est l'heure du rappel. On remet la notification au mode actif.
                 operations = operations_template.copy()
                 operations['$set'] = {
                     TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE
                 }
-                self._logger.debug("Rappeler notification: %s" % str(notification))
-                collection_notifications.update_one({'_id': notification['_id']}, operations)
-
-
-class TraitementMessageNotification(TraitementMessageDomaine):
-    """ Classe helper pour traiter les transactions de la queue de notifications """
-
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire)
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        routing_key = method.routing_key
-
-        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
-            # Chaining vers le gestionnaire de processus du domaine
-            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
-        elif evenement == Constantes.EVENEMENT_CEDULEUR:
-            # Ceduleur, verifier si action requise
-            self._gestionnaire.traiter_cedule(message_dict)
-        elif evenement == Constantes.EVENEMENT_NOTIFICATION:
-            # Notification recue
-            self._gestionnaire.traiter_notification(message_dict)
-        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
-            # Verifier quel processus demarrer. On match la valeur dans la routing key.
-            routing_key = method.routing_key
-            routing_key_sansprefixe = routing_key.replace(
-                'destinataire.domaine.',
-                ''
-            )
-            if routing_key_sansprefixe == TachesConstantes.TRANSACTION_ACTION_NOTIFICATION:
-                processus = "millegrilles_domaines_Notifications:ProcessusActionUsagerNotification"
-                self._gestionnaire.demarrer_processus(processus, message_dict)
-            else:
-                # Type de transaction inconnue, on lance une exception
-                raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-        else:
-            # Type d'evenement inconnu, on lance une exception
-            raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
+                self._logger.debug("Rappeler tache: %s" % str(taches))
+                collection_taches.update_one({'_id': taches['_id']}, operations)
 
 
 class ProcessusNotificationRecue(MGProcessus):
@@ -321,7 +275,7 @@ class ProcessusNotificationRecue(MGProcessus):
         return resultats
 
 
-class ProcessusActionUsagerNotification(MGProcessusTransaction):
+class ProcessusActionUsager(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)

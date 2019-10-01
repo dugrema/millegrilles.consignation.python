@@ -24,7 +24,7 @@ class NotificationActionExempleTest:
     def test1(self):
 
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
-        domaine = TachesConstantes.TRANSACTION_ACTION_NOTIFICATION
+        domaine = TachesConstantes.TRANSACTION_ACTION_TACHE
 
         transaction_message = dict({
             TachesConstantes.LIBELLE_ID_NOTIFICATION: '5c152457e094095d8c8d314e',
