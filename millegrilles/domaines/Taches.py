@@ -11,6 +11,7 @@ from bson import ObjectId
 import datetime
 import json
 import uuid
+import logging
 
 
 class TachesConstantes:
@@ -25,6 +26,7 @@ class TachesConstantes:
     TRANSACTION_NOTIFICATION_TACHE = '%s.notification' % DOMAINE_NOM
     TRANSACTION_ACTION_TACHE_COMPLETEE = '%s.actionUsager.completee' % DOMAINE_NOM
     TRANSACTION_ACTION_TACHE_RAPPEL = '%s.actionUsager.rappel' % DOMAINE_NOM
+    TRANSACTION_TACHE_ACTION_DUE = '%s.actionDue' % DOMAINE_NOM
 
     # Niveaux d'une notification de tache
     NIVEAU_SUIVI = 'suivi'                  # Niveau bas avec limite de temps
@@ -34,6 +36,7 @@ class TachesConstantes:
 
     LIBVAL_NOTIFICATIONS = 'notifications'
     LIBVAL_TACHES_TABLEAU = 'taches_tableau'
+    LIBVAL_TACHE_NOTIFICATION = 'tache_notification'
 
     # Action posee par l'usager sur la notification
     LIBELLE_ID_NOTIFICATION = 'id_notification'  # _id de la notification
@@ -155,8 +158,11 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
         return TachesConstantes.DOMAINE_NOM
 
     def traiter_cedule(self, message):
-        # Declencher la verification des actions sur taches
-        self.verifier_taches_actionsdues(message)
+        timestamp_message = message['timestamp']['UTC']
+        if timestamp_message[4] % 6 == 0:
+            self._logger.debug("Traiter actions dues")
+            # Declencher la verification des actions sur taches
+            self.verifier_taches_actionsdues(message)
 
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE_COMPLETEE:
@@ -166,6 +172,8 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
         elif domaine_transaction == TachesConstantes.TRANSACTION_NOTIFICATION_TACHE:
             # Notification recue
             processus = "millegrilles_domaines_Taches:ProcessusNotificationRecue"
+        elif domaine_transaction == TachesConstantes.TRANSACTION_TACHE_ACTION_DUE:
+            processus = "millegrilles_domaines_Taches:ProcessusActionDue"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -173,6 +181,23 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
 
     def verifier_taches_actionsdues(self, message):
         collection_taches = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        maintenant = datetime.datetime.utcnow()
+
+        filtre = {
+            TachesConstantes.LIBELLE_TACHE_DATE_RAPPEL: {'$lt': maintenant},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHE_NOTIFICATION,
+        }
+
+        generateur_transactions = self.generateur_transactions
+        taches = collection_taches.find(filtre)
+        for tache in taches:
+            uuid_tache = tache[TachesConstantes.LIBELLE_UUID_TACHE]
+            self._logger.debug("Tache due: %s" % uuid_tache)
+            transaction = {
+                TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache
+            }
+            domaine = TachesConstantes.TRANSACTION_TACHE_ACTION_DUE
+            generateur_transactions.soumettre_transaction(transaction, domaine)
 
 
 class ProcessusTaches(MGProcessusTransaction):
@@ -516,15 +541,18 @@ class ProcessusActionRappel(ProcessusTaches):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusRappelExpire(ProcessusTaches):
+class ProcessusActionDue(ProcessusTaches):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
         transaction = self.transaction
         collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
         uuid_tache = transaction[TachesConstantes.LIBELLE_UUID_TACHE]
+
+        self.__logger.debug("Marquer tache comme expiree (due): %s" % uuid_tache)
 
         filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
         ops = {
@@ -536,13 +564,12 @@ class ProcessusRappelExpire(ProcessusTaches):
             }
         }
         resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count == 0:
+            raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
 
         # Remettre notification
         tache = collection.find_one({TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache})
         self.ajouter_notification(tache)
-
-        if resultat.modified_count == 0:
-            raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
 
         self.set_etape_suivante()  # Termine
 

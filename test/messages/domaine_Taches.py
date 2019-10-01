@@ -66,7 +66,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         generateur.soumettre_transaction(transaction, domaine)
 
 # --- MAIN ---
-sample = MessagesSample(uuid='cb21763c-fcb6-49ef-b035-13044b96eb5b')
+sample = MessagesSample(uuid='3d9c78e7-eefa-4564-9352-4a33527a7315')
 
 # TEST
 # enveloppe = sample.maj_email_smtp_sanspassword()
