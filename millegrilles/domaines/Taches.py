@@ -21,9 +21,10 @@ class TachesConstantes:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
 
-    TRANSACTION_NOUVELLE_TACHE = 'millegrilles.domaines.Taches.nouvelle'
-    TRANSACTION_NOTIFICATION_TACHE = 'millegrilles.domaines.Taches.notification'
-    TRANSACTION_ACTION_TACHE = 'millegrilles.domaines.Taches.actionUsager'
+    TRANSACTION_NOUVELLE_TACHE = '%s.nouvelle' % DOMAINE_NOM
+    TRANSACTION_NOTIFICATION_TACHE = '%s.notification' % DOMAINE_NOM
+    TRANSACTION_ACTION_TACHE_COMPLETEE = '%s.actionUsager.completee' % DOMAINE_NOM
+    TRANSACTION_ACTION_TACHE_RAPPEL = '%s.actionUsager.rappel' % DOMAINE_NOM
 
     # Niveaux d'une notification de tache
     NIVEAU_SUIVI = 'suivi'                  # Niveau bas avec limite de temps
@@ -62,6 +63,7 @@ class TachesConstantes:
     LIBELLE_ACTIONS_DOMAINES = 'actions_domaine'
     LIBELLE_ACTION_DOMAINE = 'action'
     LIBELLE_ACTION_LIBELLE = 'libelle'
+    LIBELLE_RAPPEL_TIMESTAMP = 'timestamp'
 
     ETAT_NOUVELLE = 'nouvelle'    # Nouvelle tache, notification non generee
     ETAT_ACTIVE = 'active'        # Notification active, pas encore actionee par l'usager
@@ -139,8 +141,10 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
         self.verifier_taches_actionsdues(message)
 
     def identifier_processus(self, domaine_transaction):
-        if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE:
-            processus = "millegrilles_domaines_Taches:ProcessusActionUsager"
+        if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE_COMPLETEE:
+            processus = "millegrilles_domaines_Taches:ProcessusActionCompletee"
+        elif domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE_RAPPEL:
+            processus = "millegrilles_domaines_Taches:ProcessusActionRappel"
         elif domaine_transaction == TachesConstantes.TRANSACTION_NOTIFICATION_TACHE:
             # Notification recue
             processus = "millegrilles_domaines_Taches:ProcessusNotificationRecue"
@@ -151,41 +155,6 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
 
     def verifier_taches_actionsdues(self, message):
         collection_taches = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
-
-        filtre = {
-            'date_attente_action': {'$lt': datetime.datetime.utcnow()}
-        }
-        curseur = collection_taches.find(filtre)
-
-        operations_template = {
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            },
-            '$unset': {
-                TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION: ''
-            }
-        }
-
-        for taches in curseur:
-            etat_tache = taches['etat_tache']
-
-            if etat_tache == TachesConstantes.ETAT_SURVEILLE:
-                # La notification est completee (aucun changement depuis qu'elle est en etat de surveillance)
-                operations = operations_template.copy()
-                operations['$set'] = {
-                    TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_COMPLETEE
-                }
-                self._logger.debug("Completer tache (surveillee): %s" % str(taches))
-                collection_taches.update_one({'_id': taches['_id']}, operations)
-
-            elif etat_tache == TachesConstantes.ETAT_RAPPEL:
-                # C'est l'heure du rappel. On remet la notification au mode actif.
-                operations = operations_template.copy()
-                operations['$set'] = {
-                    TachesConstantes.LIBELLE_ETAT: TachesConstantes.ETAT_ACTIVE
-                }
-                self._logger.debug("Rappeler tache: %s" % str(taches))
-                collection_taches.update_one({'_id': taches['_id']}, operations)
 
 
 class ProcessusTaches(MGProcessusTransaction):
@@ -432,79 +401,63 @@ class ProcessusNotificationRecue(ProcessusTaches):
         return entree_historique
 
 
-class ProcessusActionUsager(ProcessusTaches):
+class ProcessusActionCompletee(ProcessusTaches):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        parametres = self.parametres
-        transaction = self.charger_transaction(TachesConstantes.COLLECTION_TRANSACTIONS_NOM)
-        collection_notifications = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        transaction = self.transaction
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        uuid_tache = transaction[TachesConstantes.LIBELLE_UUID_TACHE]
 
-        self._logger.debug("Parametres de l'action usager: %s" % str(parametres))
-        self._logger.debug("Message de l'action usager: %s" % str(transaction))
-        id_notification = transaction[TachesConstantes.LIBELLE_ID_NOTIFICATION]
-        action_usager = transaction[TachesConstantes.LIBELLE_ACTION]
+        filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
+        ops = {'$set': {TachesConstantes.ETAT_ACTIVE: TachesConstantes.ETAT_COMPLETEE}}
+        resultat = collection.update_one(filtre, ops)
 
-        filtre_notification = {'_id': ObjectId(id_notification)}
-        operations_set = {
-            TachesConstantes.LIBELLE_DERNIERE_ACTION: action_usager
-        }
-        operations_unset = dict()
-        operations = {
-            '$set': operations_set,
-            '$currentDate': {
-                TachesConstantes.LIBELLE_DATE_ACTION: True,
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+        # Nettoyer tableau et notifications
+        notifications_ops = {
+            '$pull': {
+                TachesConstantes.LIBVAL_NOTIFICATIONS: {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
             }
         }
+        notifications_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_NOTIFICATIONS}
+        collection.update_one(notifications_filtre, notifications_ops)
 
-        if action_usager == TachesConstantes.ACTION_VUE:
-            # Marquer la notification comme vue. A moins qu'une autre notification soit recue,
-            # l'usager a fait ce qu'il avait a faire au sujet de cette notification.
-            operations_set[TachesConstantes.LIBELLE_ETAT] = TachesConstantes.ETAT_COMPLETEE
-            operations_unset[TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION] = ''
+        tableau_ops = {
+            "$unset": {"%s.%s" % (TachesConstantes.LIBELLE_TACHES_ACTIVES, uuid_tache): 1}
+        }
+        tableau_filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: TachesConstantes.LIBVAL_TACHES_TABLEAU}
+        collection.update_one(tableau_filtre, tableau_ops)
 
-        elif action_usager == TachesConstantes.ACTION_RAPPEL:
-            # Calculer la date de rappel
-            date_prochaine_action = self._calculer_periode_attente(transaction)
-            operations_set[TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
-            operations_set[TachesConstantes.LIBELLE_ETAT] = TachesConstantes.ETAT_RAPPEL
+        if resultat.modified_count == 0:
+            raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
 
-        elif action_usager == TachesConstantes.ACTION_SURVEILLE:
-            # Calculer la date d'arret de surveillance
-            date_prochaine_action = self._calculer_periode_attente(transaction)
-            operations_set[TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION] = date_prochaine_action
-            operations_set[TachesConstantes.LIBELLE_ETAT] = TachesConstantes.ETAT_SURVEILLE
-
-        if len(operations_unset) > 0:
-            operations['$unset'] = operations_unset
-        document_notification = collection_notifications.find_one_and_update(filtre_notification, operations)
-
-        if document_notification is None:
-            raise ValueError("Document notification _id:%s n'a pas ete trouve" % id_notification)
-
-        # Selon la valeur precedente ou association a un workflow, il pourrait falloir prendre
-        # differentss actions.
         self.set_etape_suivante()  # Termine
 
-        return {"notification_precedente": document_notification}
 
-    def _calculer_periode_attente(self, transaction):
-        """ Calcule le delai d'attente pour une action. Utilise l'estampille de la transaction pour calculer
-            le delai. """
+class ProcessusActionRappel(ProcessusTaches):
 
-        estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
 
-        attente_secondes = transaction.get(TachesConstantes.LIBELLE_DATE_ATTENTE_ACTION)
-        if attente_secondes is None:
-            # Defaut 24h
-            attente_secondes = 24 * 60 * 60
+    def initiale(self):
+        transaction = self.transaction
+        collection = self.document_dao.get_collection(TachesConstantes.COLLECTION_DOCUMENTS_NOM)
+        uuid_tache = transaction[TachesConstantes.LIBELLE_UUID_TACHE]
+        epoch_rappel = transaction[TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP]
+        date_rappel = datetime.datetime.fromtimestamp(epoch_rappel)
+        filtre = {TachesConstantes.LIBELLE_UUID_TACHE: uuid_tache}
+        ops = {'$set': {
+            TachesConstantes.LIBELLE_ACTION: TachesConstantes.ETAT_COMPLETEE,
+            TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP: date_rappel,
+        }}
+        resultat = collection.update_one(filtre, ops)
 
-        prochaine_action = estampille + datetime.timedelta(seconds=attente_secondes)
+        if resultat.modified_count == 0:
+            raise Exception("Erreur marquage tache %s comme vue = (0 document trouve)" % uuid_tache)
 
-        return prochaine_action
+        self.set_etape_suivante()  # Termine
 
 
 class FormatteurEvenementNotification:
