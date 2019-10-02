@@ -17,6 +17,7 @@ class ConstantesParametres:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
+    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_Parametres.documents'
 
     TRANSACTION_MODIFIER_EMAIL_SMTP = '%s.modifierEmailSmtp' % DOMAINE_NOM
     TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
@@ -55,7 +56,8 @@ class ConstantesParametres:
     LIBVAL_CONFIGURATION_PUBLIQUE = 'publique.configuration'
     DOCUMENT_PUBLIQUE_ACTIF = 'actif'
     DOCUMENT_PUBLIQUE_UPNP_SUPPORTE = 'upnp_supporte'
-    DOCUMENT_PUBLIQUE_URL = 'url'
+    DOCUMENT_PUBLIQUE_URL_WEB = 'url_web'
+    DOCUMENT_PUBLIQUE_URL_MQ = 'url_mq'
     DOCUMENT_PUBLIQUE_PORT_EXTERIEUR = 'port_ext'
     DOCUMENT_PUBLIQUE_PORT_INTERNE = 'port_int'
     DOCUMENT_PUBLIQUE_IPV4_EXTERNE = 'ipv4_externe'
@@ -96,7 +98,8 @@ class ConstantesParametres:
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION_PUBLIQUE,
         DOCUMENT_PUBLIQUE_ACTIF: False,
         DOCUMENT_PUBLIQUE_UPNP_SUPPORTE: False,
-        DOCUMENT_PUBLIQUE_URL: None,
+        DOCUMENT_PUBLIQUE_URL_WEB: None,
+        DOCUMENT_PUBLIQUE_URL_MQ: None,
         DOCUMENT_PUBLIQUE_IPV4_EXTERNE: None,
         DOCUMENT_PUBLIQUE_ROUTEUR_STATUS: None,
 
@@ -147,6 +150,10 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         document_config_id['nom_millegrille'] = nom_millegrille
         document_config_id['adresse_url_base'] = 'mg-%s.local' % nom_millegrille
         self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, document_config_id)
+
+        self.demarrer_watcher_collection(
+            ConstantesParametres.COLLECTION_DOCUMENTS_NOM, ConstantesParametres.QUEUE_ROUTING_CHANGEMENTS)
+
 
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {
