@@ -25,7 +25,7 @@ class ConstantesParametres:
     TRANSACTION_EXPOSER_PORT_ROUTEUR = '%s.public.routeur.exposerPort' % DOMAINE_NOM
     TRANSACTION_RETIRER_PORT_ROUTEUR = '%s.public.routeur.retirerPort' % DOMAINE_NOM
     TRANSACTION_CONFIRMATION_ROUTEUR = '%s.public.routeur.confirmerAction' % DOMAINE_NOM
-    TRANSACTION_SET_URL_PUBLIC = '%s.public.setUrl' % DOMAINE_NOM
+    TRANSACTION_SAUVER_CONFIG_PUBLIC = '%s.public.sauvegarder' % DOMAINE_NOM
     TRANSACTION_DEPLOYER_ACCES_PUBLIC = '%s.public.deployer' % DOMAINE_NOM
     TRANSACTION_RETIRER_ACCES_PUBLIC = '%s.public.retirer' % DOMAINE_NOM
     TRANSACTION_RENOUVELLER_CERTIFICAT_PUBLIC = '%s.public.renouvellerCertificat' % DOMAINE_NOM
@@ -58,6 +58,9 @@ class ConstantesParametres:
     DOCUMENT_PUBLIQUE_UPNP_SUPPORTE = 'upnp_supporte'
     DOCUMENT_PUBLIQUE_URL_WEB = 'url_web'
     DOCUMENT_PUBLIQUE_URL_MQ = 'url_mq'
+    DOCUMENT_PUBLIQUE_PORT_HTTP = 'port_http'
+    DOCUMENT_PUBLIQUE_PORT_HTTPS = 'port_https'
+    DOCUMENT_PUBLIQUE_PORT_MQ = 'port_mq'
     DOCUMENT_PUBLIQUE_PORT_EXTERIEUR = 'port_ext'
     DOCUMENT_PUBLIQUE_PORT_INTERNE = 'port_int'
     DOCUMENT_PUBLIQUE_IPV4_EXTERNE = 'ipv4_externe'
@@ -102,6 +105,9 @@ class ConstantesParametres:
         DOCUMENT_PUBLIQUE_URL_MQ: None,
         DOCUMENT_PUBLIQUE_IPV4_EXTERNE: None,
         DOCUMENT_PUBLIQUE_ROUTEUR_STATUS: None,
+        DOCUMENT_PUBLIQUE_PORT_HTTP: 80,
+        DOCUMENT_PUBLIQUE_PORT_HTTPS: 443,
+        DOCUMENT_PUBLIQUE_PORT_MQ: 5673,
 
         # Cle: port exterieur, Valeur: DOCUMENT_CONFIGURATION_PUBLIQUE_MAPPINGS
         DOCUMENT_PUBLIQUE_MAPPINGS_IPV4: dict(),
@@ -211,8 +217,8 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Parametres:ProcessusRetirerPortRouteur"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_CONFIRMATION_ROUTEUR:
             processus = "millegrilles_domaines_Parametres:ProcessusConfirmationRouteur"
-        elif domaine_transaction == ConstantesParametres.TRANSACTION_SET_URL_PUBLIC:
-            processus = "millegrilles_domaines_Parametres:ProcessusSetUrlPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_SAUVER_CONFIG_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusSauverConfigPublique"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_DEPLOYER_ACCES_PUBLIC:
             processus = "millegrilles_domaines_Parametres:ProcessusDeployerAccesPublic"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_RETIRER_ACCES_PUBLIC:
@@ -413,9 +419,57 @@ class ProcessusConfirmationRouteur(ProcessusParametres):
     pass
 
 
-class ProcessusSetUrlPublic(ProcessusParametres):
-    pass
+class ProcessusSauverConfigPublique(ProcessusParametres):
 
+    def initiale(self):
+        transaction = self.transaction
+
+        activite = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE.copy()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE] = datetime.datetime.utcnow()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self.__description(transaction)
+
+        transaction_detail = dict()
+        champs_detail = [
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTPS,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_MQ,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MQ
+        ]
+        for champ in champs_detail:
+            transaction_detail[champ] = transaction.get(champ)
+
+        activite.update(transaction_detail)
+
+        collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': transaction_detail,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$push': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE: {
+                    '$each': [activite],
+                    '$sort': {ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE: -1},
+                    '$slice': 100,
+                }
+            }
+        }
+
+        resultat = collection.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE},
+            ops
+        )
+        if resultat.modified_count == 0:
+            raise Exception(
+                "Erreur ajout activite a configuration publique, document %s n'existe pas" %
+                ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
+            )
+
+        self.set_etape_suivante()  # Termine
+
+    def __description(self, transaction):
+        desc = 'Mise a jour configuration'
+        return desc
 
 class ProcessusDeployerAccesPublic(ProcessusParametres):
     pass
