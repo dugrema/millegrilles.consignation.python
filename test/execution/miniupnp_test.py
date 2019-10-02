@@ -44,19 +44,29 @@ while True:
     print('%s %s' % (i, p))
     i = i + 1
 
-print('%s' % upnp.getspecificportmapping(port, proto))
-try:
-    print('%s' % upnp.getportmappingnumberofentries())
-except Exception as e:
-  print('GetPortMappingNumberOfEntries() is not supported : %s' % e)
+    mapping = {
+        'port_ext': p[0],
+        'protocol': p[1],
+        'ip_int': p[2][0],
+        'port_int': p[2][1],
+        'nom': p[3],
+    }
 
-fw_status = upnp.upnp_getfirewallstatus()
-print('%s' % fw_status)
+    print(str(mapping))
+
+# print('%s' % upnp.getspecificportmapping(port, proto))
+# try:
+#     print('%s' % upnp.getportmappingnumberofentries())
+# except Exception as e:
+#   print('GetPortMappingNumberOfEntries() is not supported : %s' % e)
+#
+# fw_status = upnp.upnp_getfirewallstatus()
+# print('%s' % fw_status)
 
 # time.sleep(3)
 
 print("Suppression mappings")
 # upnp.deleteportmapping(port1, 'TCP')
-# upnp.deleteportmapping(5122, 'TCP')
+upnp.deleteportmapping(5122, 'TCP')
 
 print("Termine")
