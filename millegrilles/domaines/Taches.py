@@ -2,14 +2,11 @@
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard
-from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.EmailDAO import SmtpDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
-from bson import ObjectId
-
 import datetime
-import json
 import uuid
 import logging
 
