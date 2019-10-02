@@ -680,123 +680,123 @@ class ProducteurDocumentNoeud:
         collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
 
 
-class VerificateurNotificationsSenseursPassifs:
-
-    def __init__(self, message_dao, regles, doc_senseur):
-        self.message_dao = message_dao
-        self.regles = regles
-        self.doc_senseur = doc_senseur
-        self._logger = logging.getLogger('%s.VerificateurNotificationsSenseursPassifs' % __name__)
-        self._formatteur_notification = FormatteurEvenementNotification(
-            SenseursPassifsConstantes.DOMAINE_NOM,
-            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM
-        )
-
-    ''' Traite les regles et envoit les notifications au besoin. '''
-    def traiter_regles(self):
-        self._logger.debug("Traiter regles: %s" % self.regles)
-
-        # Les regles sont dans une liste, elles doivent etre executees en ordre
-        for regle in self.regles:
-            self._logger.debug("Ligne regle: %s" % str(regle))
-            for nom_regle in regle:
-                parametres = regle[nom_regle]
-                self._logger.debug("Regle: %s, parametres: %s" % (nom_regle, str(parametres)))
-
-                try:
-                    # Le nom de la regle correspond a la methode de cette classe
-                    methode_regle = getattr(self, nom_regle)
-                    methode_regle(parametres)
-                except AttributeError as ae:
-                    self._logger.exception("Erreur regle de notification inconnue: %s" % nom_regle)
-                except Exception as e:
-                    self._logger.exception("Erreur notification")
-
-    def transmettre_notification(self, nom_regle, parametres, message, niveau=TachesConstantes.AVERTISSEMENT):
-        """
-        Formatte et transmet une notification.
-
-        :param nom_regle: Nom de la regle enfreinte
-        :param parametres: Parametres de la regle enfreinte (copie de la regle)
-        :param message: Valeurs du senseur au moment de l'execution de la regle.
-        :param niveau: Niveau de la notification (voir classe NotificationsConstantes)
-        """
-        notification_formattee = self._formatteur_notification.formatter_notification(
-            self.doc_senseur['_id'],
-            {nom_regle: parametres},
-            message
-        )
-        self.message_dao.transmettre_notification(notification_formattee, niveau)
-
-    ''' Regle qui envoit une notification si la valeur du senseur sort de l'intervalle. '''
-    def avertissement_hors_intervalle(self, parametres):
-        nom_element = parametres['element']
-        valeur_min = parametres['min']
-        valeur_max = parametres['max']
-
-        valeur_courante = self.doc_senseur[nom_element]
-        if not valeur_min <= valeur_courante <= valeur_max:
-            self._logger.debug(
-                "Valeur %s hors des limites (%f), on transmet une notification" % (nom_element, valeur_courante)
-            )
-            nom_regle = 'avertissement_hors_intervalle'
-            message = {
-                'element': nom_element,
-                'valeur': valeur_courante
-            }
-            self.transmettre_notification(nom_regle, parametres, message)
-
-    ''' Regle qui envoit une notification si la valeur du senseur est dans l'intervalle. '''
-    def avertissement_dans_intervalle(self, parametres):
-        nom_element = parametres['element']
-        valeur_min = parametres['min']
-        valeur_max = parametres['max']
-
-        valeur_courante = self.doc_senseur[nom_element]
-        if valeur_min <= valeur_courante <= valeur_max:
-            self._logger.debug(
-                "Valeur %s dans les limites (%f), on transmet une notification" % (nom_element, valeur_courante)
-            )
-            nom_regle = 'avertissement_dans_intervalle'
-            message = {
-                'element': nom_element,
-                'valeur': valeur_courante
-            }
-            self.transmettre_notification(nom_regle, parametres, message)
-
-    ''' Regle qui envoit une notification si la valeur du senseur est inferieure. '''
-    def avertissement_inferieur(self, parametres):
-        nom_element = parametres['element']
-        valeur_min = parametres['min']
-
-        valeur_courante = self.doc_senseur[nom_element]
-        if valeur_courante < valeur_min:
-            self._logger.debug(
-                "Valeur %s sous la limite (%f), on transmet une notification" % (nom_element, valeur_courante)
-            )
-            nom_regle = 'avertissement_inferieur'
-            message = {
-                'element': nom_element,
-                'valeur': valeur_courante
-            }
-            self.transmettre_notification(nom_regle, parametres, message)
-
-    ''' Regle qui envoit une notification si la valeur du senseur est inferieure. '''
-    def avertissement_superieur(self, parametres):
-        nom_element = parametres['element']
-        valeur_max = parametres['max']
-
-        valeur_courante = self.doc_senseur[nom_element]
-        if valeur_courante > valeur_max:
-            self._logger.debug(
-                "Valeur %s au-dessus de la limite (%f), on transmet une notification" % (nom_element, valeur_courante)
-            )
-            nom_regle = 'avertissement_superieur'
-            message = {
-                'element': nom_element,
-                'valeur': valeur_courante
-            }
-            self.transmettre_notification(nom_regle, parametres, message)
+# class VerificateurNotificationsSenseursPassifs:
+#
+#     def __init__(self, message_dao, regles, doc_senseur):
+#         self.message_dao = message_dao
+#         self.regles = regles
+#         self.doc_senseur = doc_senseur
+#         self._logger = logging.getLogger('%s.VerificateurNotificationsSenseursPassifs' % __name__)
+#         self._formatteur_notification = FormatteurEvenementNotification(
+#             SenseursPassifsConstantes.DOMAINE_NOM,
+#             SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM
+#         )
+#
+#     ''' Traite les regles et envoit les notifications au besoin. '''
+#     def traiter_regles(self):
+#         self._logger.debug("Traiter regles: %s" % self.regles)
+#
+#         # Les regles sont dans une liste, elles doivent etre executees en ordre
+#         for regle in self.regles:
+#             self._logger.debug("Ligne regle: %s" % str(regle))
+#             for nom_regle in regle:
+#                 parametres = regle[nom_regle]
+#                 self._logger.debug("Regle: %s, parametres: %s" % (nom_regle, str(parametres)))
+#
+#                 try:
+#                     # Le nom de la regle correspond a la methode de cette classe
+#                     methode_regle = getattr(self, nom_regle)
+#                     methode_regle(parametres)
+#                 except AttributeError as ae:
+#                     self._logger.exception("Erreur regle de notification inconnue: %s" % nom_regle)
+#                 except Exception as e:
+#                     self._logger.exception("Erreur notification")
+#
+#     def transmettre_notification(self, nom_regle, parametres, message, niveau=TachesConstantes.AVERTISSEMENT):
+#         """
+#         Formatte et transmet une notification.
+#
+#         :param nom_regle: Nom de la regle enfreinte
+#         :param parametres: Parametres de la regle enfreinte (copie de la regle)
+#         :param message: Valeurs du senseur au moment de l'execution de la regle.
+#         :param niveau: Niveau de la notification (voir classe NotificationsConstantes)
+#         """
+#         notification_formattee = self._formatteur_notification.formatter_notification(
+#             self.doc_senseur['_id'],
+#             {nom_regle: parametres},
+#             message
+#         )
+#         self.message_dao.transmettre_notification(notification_formattee, niveau)
+#
+#     ''' Regle qui envoit une notification si la valeur du senseur sort de l'intervalle. '''
+#     def avertissement_hors_intervalle(self, parametres):
+#         nom_element = parametres['element']
+#         valeur_min = parametres['min']
+#         valeur_max = parametres['max']
+#
+#         valeur_courante = self.doc_senseur[nom_element]
+#         if not valeur_min <= valeur_courante <= valeur_max:
+#             self._logger.debug(
+#                 "Valeur %s hors des limites (%f), on transmet une notification" % (nom_element, valeur_courante)
+#             )
+#             nom_regle = 'avertissement_hors_intervalle'
+#             message = {
+#                 'element': nom_element,
+#                 'valeur': valeur_courante
+#             }
+#             self.transmettre_notification(nom_regle, parametres, message)
+#
+#     ''' Regle qui envoit une notification si la valeur du senseur est dans l'intervalle. '''
+#     def avertissement_dans_intervalle(self, parametres):
+#         nom_element = parametres['element']
+#         valeur_min = parametres['min']
+#         valeur_max = parametres['max']
+#
+#         valeur_courante = self.doc_senseur[nom_element]
+#         if valeur_min <= valeur_courante <= valeur_max:
+#             self._logger.debug(
+#                 "Valeur %s dans les limites (%f), on transmet une notification" % (nom_element, valeur_courante)
+#             )
+#             nom_regle = 'avertissement_dans_intervalle'
+#             message = {
+#                 'element': nom_element,
+#                 'valeur': valeur_courante
+#             }
+#             self.transmettre_notification(nom_regle, parametres, message)
+#
+#     ''' Regle qui envoit une notification si la valeur du senseur est inferieure. '''
+#     def avertissement_inferieur(self, parametres):
+#         nom_element = parametres['element']
+#         valeur_min = parametres['min']
+#
+#         valeur_courante = self.doc_senseur[nom_element]
+#         if valeur_courante < valeur_min:
+#             self._logger.debug(
+#                 "Valeur %s sous la limite (%f), on transmet une notification" % (nom_element, valeur_courante)
+#             )
+#             nom_regle = 'avertissement_inferieur'
+#             message = {
+#                 'element': nom_element,
+#                 'valeur': valeur_courante
+#             }
+#             self.transmettre_notification(nom_regle, parametres, message)
+#
+#     ''' Regle qui envoit une notification si la valeur du senseur est inferieure. '''
+#     def avertissement_superieur(self, parametres):
+#         nom_element = parametres['element']
+#         valeur_max = parametres['max']
+#
+#         valeur_courante = self.doc_senseur[nom_element]
+#         if valeur_courante > valeur_max:
+#             self._logger.debug(
+#                 "Valeur %s au-dessus de la limite (%f), on transmet une notification" % (nom_element, valeur_courante)
+#             )
+#             nom_regle = 'avertissement_superieur'
+#             message = {
+#                 'element': nom_element,
+#                 'valeur': valeur_courante
+#             }
+#             self.transmettre_notification(nom_regle, parametres, message)
 
 
 # Processus pour enregistrer une transaction d'un senseur passif
@@ -841,31 +841,33 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
         producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
-        # Verifier si on doit executer les notifications
-        if self._document_processus['parametres'].get("verifier_notifications"):
-            # On a des regles de notifications, c'est la prochaine etape.
-            self.set_etape_suivante(ProcessusTransactionSenseursPassifsLecture.notifications.__name__)
-        else:
-            # Il ne reste rien a faire
-            self.set_etape_suivante()  # Etape finale
+        self.set_etape_suivante()  # Etape finale
 
-    def notifications(self):
-        # Identifier et transmettre les notifications
-        id_document_senseur = self._document_processus['parametres']['id_document_senseur']
-        collection = self._controleur.document_dao().get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document_senseur = collection.find_one(id_document_senseur)
-        regles_notification = document_senseur[SenseursPassifsConstantes.SENSEUR_REGLES_NOTIFICATIONS]
-
-        self._logger.debug("Document senseur, regles de notification: %s" % regles_notification)
-        verificateur = VerificateurNotificationsSenseursPassifs(
-            self._controleur.message_dao(),
-            regles_notification,
-            document_senseur
-        )
-        verificateur.traiter_regles()
-
-        # Terminer ce processus
-        self.set_etape_suivante()
+    #     # Verifier si on doit executer les notifications
+    #     if self._document_processus['parametres'].get("verifier_notifications"):
+    #         # On a des regles de notifications, c'est la prochaine etape.
+    #         self.set_etape_suivante(ProcessusTransactionSenseursPassifsLecture.notifications.__name__)
+    #     else:
+    #         # Il ne reste rien a faire
+    #         self.set_etape_suivante()  # Etape finale
+    #
+    # def notifications(self):
+    #     # Identifier et transmettre les notifications
+    #     id_document_senseur = self._document_processus['parametres']['id_document_senseur']
+    #     collection = self._controleur.document_dao().get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+    #     document_senseur = collection.find_one(id_document_senseur)
+    #     regles_notification = document_senseur[SenseursPassifsConstantes.SENSEUR_REGLES_NOTIFICATIONS]
+    #
+    #     self._logger.debug("Document senseur, regles de notification: %s" % regles_notification)
+    #     verificateur = VerificateurNotificationsSenseursPassifs(
+    #         self._controleur.message_dao(),
+    #         regles_notification,
+    #         document_senseur
+    #     )
+    #     verificateur.traiter_regles()
+    #
+    #     # Terminer ce processus
+    #     self.set_etape_suivante()
 
     def get_collection_transaction_nom(self):
         return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM

@@ -20,10 +20,20 @@ class ConstantesParametres:
 
     TRANSACTION_MODIFIER_EMAIL_SMTP = '%s.modifierEmailSmtp' % DOMAINE_NOM
     TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
+    TRANSACTION_ETAT_ROUTEUR = '%s.public.routeur.etatRouteur' % DOMAINE_NOM
+    TRANSACTION_EXPOSER_PORT_ROUTEUR = '%s.public.routeur.exposerPort' % DOMAINE_NOM
+    TRANSACTION_RETIRER_PORT_ROUTEUR = '%s.public.routeur.retirerPort' % DOMAINE_NOM
+    TRANSACTION_CONFIRMATION_ROUTEUR = '%s.public.routeur.confirmerAction' % DOMAINE_NOM
+    TRANSACTION_SET_URL_PUBLIC = '%s.public.setUrl' % DOMAINE_NOM
+    TRANSACTION_DEPLOYER_ACCES_PUBLIC = '%s.public.deployer' % DOMAINE_NOM
+    TRANSACTION_RETIRER_ACCES_PUBLIC = '%s.public.retirer' % DOMAINE_NOM
+    TRANSACTION_RENOUVELLER_CERTIFICAT_PUBLIC = '%s.public.renouvellerCertificat' % DOMAINE_NOM
+    TRANSACTION_MAJ_CERTIFICAT_PUBLIC = '%s.public.majCertificat' % DOMAINE_NOM
 
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
 
+    # Courriel
     DOCUMENT_CHAMP_COURRIEL_ORIGINE = 'origine'
     DOCUMENT_CHAMP_COURRIEL_DESTINATIONS = 'destinations'
     DOCUMENT_CHAMP_HOST = 'host'
@@ -32,7 +42,6 @@ class ConstantesParametres:
     DOCUMENT_CHAMP_PASSWORD = 'password'
     DOCUMENT_CHAMP_NOM_MILLEGRILLE = 'nom_millegrille'
     DOCUMENT_CHAMP_URL_BASE = 'adresse_url_base'
-
     DOCUMENT_CHAMP_ACTIF = 'actif'
 
     LIBVAL_CONFIGURATION = 'configuration'
@@ -41,6 +50,26 @@ class ConstantesParametres:
     LIBVAL_CERTS_WEB = 'certs.web'
     LIBVAL_CERTS_SSL = 'certs.ssl'
     LIBVAL_ID_MILLEGRILLE = 'millegrille.id'
+
+    # Configuration Publique
+    LIBVAL_CONFIGURATION_PUBLIQUE = 'publique.configuration'
+    DOCUMENT_PUBLIQUE_ACTIF = 'actif'
+    DOCUMENT_PUBLIQUE_UPNP_SUPPORTE = 'upnp_supporte'
+    DOCUMENT_PUBLIQUE_URL = 'url'
+    DOCUMENT_PUBLIQUE_PORT_EXTERIEUR = 'port_ext'
+    DOCUMENT_PUBLIQUE_PORT_INTERNE = 'port_int'
+    DOCUMENT_PUBLIQUE_IPV4_EXTERNE = 'ipv4_externe'
+    DOCUMENT_PUBLIQUE_IPV4_INTERNE = 'ipv4_interne'
+    DOCUMENT_PUBLIQUE_PROTOCOL = 'protocol'
+    DOCUMENT_PUBLIQUE_PORT_MAPPING_NOM = 'port_mapping_nom'
+    DOCUMENT_PUBLIQUE_MAPPINGS_IPV4 = 'mappings_ipv4'
+    DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES = 'mappings_ipv4_demandes'
+    DOCUMENT_PUBLIQUE_ROUTEUR_STATUS = 'status_info'
+    DOCUMENT_PUBLIQUE_ACTIVITE = 'activite'
+
+    DOCUMENT_PUBLIQUE_ACTIVITE_DATE = 'date'
+    DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION = 'description'
+    DOCUMENT_PUBLIQUE_ACTIVITE_DETAIL = 'detail'
 
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
@@ -63,6 +92,33 @@ class ConstantesParametres:
         Constantes.DOCUMENT_SECTION_CRYPTE: None,  # DOCUMENT_CHAMP_PASSWORD
     }
 
+    DOCUMENT_CONFIGURATION_PUBLIQUE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION_PUBLIQUE,
+        DOCUMENT_PUBLIQUE_ACTIF: False,
+        DOCUMENT_PUBLIQUE_UPNP_SUPPORTE: False,
+        DOCUMENT_PUBLIQUE_URL: None,
+        DOCUMENT_PUBLIQUE_IPV4_EXTERNE: None,
+        DOCUMENT_PUBLIQUE_ROUTEUR_STATUS: None,
+
+        # Cle: port exterieur, Valeur: DOCUMENT_CONFIGURATION_PUBLIQUE_MAPPINGS
+        DOCUMENT_PUBLIQUE_MAPPINGS_IPV4: dict(),
+        DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: dict(),
+        DOCUMENT_PUBLIQUE_ACTIVITE: list(),
+    }
+
+    DOCUMENT_CONFIGURATION_PUBLIQUE_MAPPINGS = {
+        DOCUMENT_PUBLIQUE_PORT_EXTERIEUR: None,
+        DOCUMENT_PUBLIQUE_IPV4_INTERNE: None,
+        DOCUMENT_PUBLIQUE_PORT_INTERNE: None,
+        DOCUMENT_PUBLIQUE_PORT_MAPPING_NOM: None,
+    }
+
+    DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE = {
+        DOCUMENT_PUBLIQUE_ACTIVITE_DATE: datetime.datetime.utcnow(),
+        DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION: '',
+        DOCUMENT_PUBLIQUE_ACTIVITE_DETAIL: dict(),
+    }
+
 
 class GestionnaireParametres(GestionnaireDomaineStandard):
 
@@ -83,6 +139,8 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesParametres.LIBVAL_CONFIGURATION, ConstantesParametres.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesParametres.LIBVAL_EMAIL_SMTP, ConstantesParametres.DOCUMENT_EMAIL_SMTP)
+        self.initialiser_document(
+            ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE, ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE)
 
         document_config_id = ConstantesParametres.DOCUMENT_ID_MILLEGRILLE.copy()
         nom_millegrille = self.configuration.nom_millegrille
@@ -138,6 +196,24 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Parametres:ProcessusTransactionModifierEmailSmtp"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_CLES_RECUES:
             processus = "millegrilles_domaines_Parametres:ProcessusTransactionClesRecues"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_ETAT_ROUTEUR:
+            processus = "millegrilles_domaines_Parametres:ProcessusEtatRouteur"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_EXPOSER_PORT_ROUTEUR:
+            processus = "millegrilles_domaines_Parametres:ProcessusExposerPortRouteur"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_RETIRER_PORT_ROUTEUR:
+            processus = "millegrilles_domaines_Parametres:ProcessusRetirerPortRouteur"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_CONFIRMATION_ROUTEUR:
+            processus = "millegrilles_domaines_Parametres:ProcessusConfirmationRouteur"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_SET_URL_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusSetUrlPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_DEPLOYER_ACCES_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusDeployerAccesPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_RETIRER_ACCES_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusRetirerAccesPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_RENOUVELLER_CERTIFICAT_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusRenouvellerCertificatPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_MAJ_CERTIFICAT_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusMajCertificatPublic"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -254,3 +330,97 @@ class ProcessusTransactionClesRecues(ProcessusParametres):
 
         self.set_etape_suivante()  # Termine
         return {ConstantesParametres.TRANSACTION_CHAMP_MGLIBELLE: mg_libelle}
+
+
+class ProcessusEtatRouteur(ProcessusParametres):
+
+    def initiale(self):
+        transaction = self.transaction
+
+        activite = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE.copy()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE] = datetime.datetime.utcnow()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self.__description(transaction)
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DETAIL] = {
+            ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE: transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE),
+            ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS: transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS),
+            ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4: transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4),
+        }
+
+        collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
+
+        document_status = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS)
+        upnp_supporte = document_status is not None
+
+        ops = {
+            '$set': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_UPNP_SUPPORTE: upnp_supporte,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE: transaction.get(
+                    ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE),
+                ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4: transaction.get(
+                    ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4),
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS: transaction.get(
+                    ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS),
+
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$push': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE: {
+                    '$each': [activite],
+                    '$sort': {ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE: -1},
+                    '$slice': 100,
+                }
+            }
+        }
+
+        resultat = collection.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE},
+            ops
+        )
+        if resultat.modified_count == 0:
+            raise Exception(
+                "Erreur ajout activite a configuration publique, document %s n'existe pas" %
+                ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
+            )
+
+        self.set_etape_suivante()  # Termine
+
+
+    def __description(self, transaction):
+        desc = 'IP ext: %s, etat %s' % (
+            transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE),
+            str(transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS))
+        )
+        return desc
+
+
+
+class ProcessusExposerPortRouteur(ProcessusParametres):
+    pass
+
+
+class ProcessusRetirerPortRouteur(ProcessusParametres):
+    pass
+
+
+class ProcessusConfirmationRouteur(ProcessusParametres):
+    pass
+
+
+class ProcessusSetUrlPublic(ProcessusParametres):
+    pass
+
+
+class ProcessusDeployerAccesPublic(ProcessusParametres):
+    pass
+
+
+class ProcessusRetirerAccesPublic(ProcessusParametres):
+    pass
+
+
+class ProcessusRenouvellerCertificatPublic(ProcessusParametres):
+    pass
+
+
+class ProcessusMajCertificatPublic(ProcessusParametres):
+    pass
