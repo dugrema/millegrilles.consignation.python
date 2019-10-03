@@ -554,6 +554,7 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
                 ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID: noeud_docker_id,
                 ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE: ipv4_interne,
                 ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: mappings_demandes,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIF: True,
             },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             '$push': {
@@ -633,6 +634,7 @@ class ProcessusPrivatiserNoeud(ProcessusParametres):
                 ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID: None,
                 ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE: None,
                 ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: None,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIF: False,
             },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             '$push': {
