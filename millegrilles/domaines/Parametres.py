@@ -582,10 +582,11 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
         # Creer commande pour deployer public avec docker
         champs_docker_mappings = [
             ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID,
         ]
         commande_docker_mappings = dict()
         for mapping in champs_docker_mappings:
-            commande_docker_mappings[mapping]: configuration_publique[mapping]
+            commande_docker_mappings[mapping] = configuration_publique[mapping]
 
         self.generateur_transactions.transmettre_commande(commande_docker_mappings, 'commande.monitor.publierNoeudDocker')
 
