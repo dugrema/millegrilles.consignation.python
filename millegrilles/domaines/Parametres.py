@@ -30,6 +30,7 @@ class ConstantesParametres:
     TRANSACTION_RETIRER_ACCES_PUBLIC = '%s.public.retirer' % DOMAINE_NOM
     TRANSACTION_RENOUVELLER_CERTIFICAT_PUBLIC = '%s.public.renouvellerCertificat' % DOMAINE_NOM
     TRANSACTION_MAJ_CERTIFICAT_PUBLIC = '%s.public.majCertificat' % DOMAINE_NOM
+    TRANSACTION_PRIVATISER_NOEUD = '%s.public.privatiser' % DOMAINE_NOM
 
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
@@ -230,6 +231,8 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Parametres:ProcessusRenouvellerCertificatPublic"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_MAJ_CERTIFICAT_PUBLIC:
             processus = "millegrilles_domaines_Parametres:ProcessusMajCertificatPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_PRIVATISER_NOEUD:
+            processus = "millegrilles_domaines_Parametres:ProcessusPrivatiserNoeud"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -609,6 +612,77 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
         desc = 'Publier sur noeud %s' % transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER]
         return desc
 
+
+class ProcessusPrivatiserNoeud(ProcessusParametres):
+    """
+    Utilise le monitor pour privatiser le node label netzone.public=true et returer les mappings du routeur.
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
+
+        activite = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE.copy()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE] = datetime.datetime.utcnow()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self._description(transaction)
+
+        # Enlever toutes les valeurs
+        ops = {
+            '$set': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER: None,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID: None,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE: None,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: None,
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$push': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE: {
+                    '$each': [activite],
+                    '$sort': {ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE: -1},
+                    '$slice': ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_TAILLEMAX,
+                }
+            }
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
+        }
+
+        updated = collection.update_one(filtre, ops)
+        if updated.modified_count == 0:
+            raise Exception(
+                "Erreur ajout activite a configuration publique, document %s n'existe pas" %
+                ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
+            )
+
+        self.set_etape_suivante(ProcessusDeployerAccesPublic.transmettre_commandes.__name__)
+
+    def transmettre_commandes(self):
+        collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
+        transaction = self.transaction
+
+        # Creer commande pour deployer public avec docker
+        champs_docker_mappings = [
+            ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID,
+        ]
+        commande_docker_mappings = dict()
+        for mapping in champs_docker_mappings:
+            commande_docker_mappings[mapping] = transaction[mapping]
+
+        self.generateur_transactions.transmettre_commande(commande_docker_mappings, 'commande.monitor.privatiserNoeudDocker')
+
+        # Creer commande pour ajouter mappings sur le routeur
+        self.generateur_transactions.transmettre_commande({'tous': True}, 'commande.monitor.retirerPorts')
+
+        self.set_etape_suivante()
+
+        return {
+            'docker': commande_docker_mappings,
+        }
+
+    def _description(self, transaction):
+        desc = 'Privatiser le noeud %s' % transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER]
+        return desc
 
 class ProcessusRetirerAccesPublic(ProcessusParametres):
     pass

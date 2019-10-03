@@ -147,6 +147,19 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
+    def emettre_message(self, message_dict, routing_key):
+        enveloppe = self.preparer_enveloppe(message_dict)
+
+        uuid_transaction = enveloppe.get(
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+
+        self._contexte.message_dao.transmettre_message_noeuds(
+            message_dict=enveloppe, routing_key=routing_key
+        )
+
+        return uuid_transaction
+
 
 class TransactionOperations:
 
