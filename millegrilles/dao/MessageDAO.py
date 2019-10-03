@@ -394,6 +394,32 @@ class PikaDAO:
         self.transmettre_message(
             document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
+    def transmettre_commande(self, document_commande, routing_key, channel=None):
+        """
+        Sert a transmettre une commande vers un noeud
+        :param document_commande:
+        :param routing_key:
+        :param channel:
+        :return:
+        """
+        if channel is None:
+            channel = self.channel
+
+        if self.connectionmq is None or self.connectionmq.is_closed:
+            raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        properties = pika.BasicProperties(delivery_mode=1)
+
+        message_utf8 = self.json_helper.dict_vers_json(document_commande, json.JSONEncoder)
+        with self._lock_transmettre_message:
+            channel.basic_publish(
+                exchange=self.configuration.exchange_noeuds,
+                routing_key=routing_key,
+                body=message_utf8,
+                properties=properties,
+                mandatory=True)
+        self._in_error = False
+
     def transmettre_notification(self, document_transaction, sub_routing_key):
         routing_key = 'notification.%s' % sub_routing_key
         # Utiliser delivery mode 2 (persistent) pour les notifications

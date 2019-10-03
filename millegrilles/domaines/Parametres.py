@@ -1,7 +1,7 @@
 # Domaine de gestion et d'administration de MilleGrilles
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, RoutingKeyInconnue
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import  MGProcessusTransaction
 
 import logging
@@ -22,7 +22,7 @@ class ConstantesParametres:
     TRANSACTION_MODIFIER_EMAIL_SMTP = '%s.modifierEmailSmtp' % DOMAINE_NOM
     TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
     TRANSACTION_ETAT_ROUTEUR = '%s.public.routeur.etatRouteur' % DOMAINE_NOM
-    TRANSACTION_EXPOSER_PORTS_ROUTEUR = '%s.public.routeur.exposerPortS' % DOMAINE_NOM
+    TRANSACTION_EXPOSER_PORTS_ROUTEUR = '%s.public.routeur.exposerPorts' % DOMAINE_NOM
     TRANSACTION_RETIRER_PORTS_ROUTEUR = '%s.public.routeur.retirerPorts' % DOMAINE_NOM
     TRANSACTION_CONFIRMATION_ROUTEUR = '%s.public.routeur.confirmerAction' % DOMAINE_NOM
     TRANSACTION_SAUVER_CONFIG_PUBLIC = '%s.public.sauvegarder' % DOMAINE_NOM
@@ -56,6 +56,8 @@ class ConstantesParametres:
     LIBVAL_CONFIGURATION_PUBLIQUE = 'publique.configuration'
     DOCUMENT_PUBLIQUE_ACTIF = 'actif'
     DOCUMENT_PUBLIQUE_UPNP_SUPPORTE = 'upnp_supporte'
+    DOCUMENT_PUBLIQUE_NOEUD_DOCKER = 'noeud_docker_hostname'
+    DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID = 'noeud_docker_id'
     DOCUMENT_PUBLIQUE_URL_WEB = 'url_web'
     DOCUMENT_PUBLIQUE_URL_MQ = 'url_mq'
     DOCUMENT_PUBLIQUE_PORT_HTTP = 'port_http'
@@ -74,7 +76,8 @@ class ConstantesParametres:
 
     DOCUMENT_PUBLIQUE_ACTIVITE_DATE = 'date'
     DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION = 'description'
-    DOCUMENT_PUBLIQUE_ACTIVITE_DETAIL = 'detail'
+
+    DOCUMENT_PUBLIQUE_ACTIVITE_TAILLEMAX = 50
 
     DOCUMENT_DEFAUT = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
@@ -100,6 +103,7 @@ class ConstantesParametres:
     DOCUMENT_CONFIGURATION_PUBLIQUE = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION_PUBLIQUE,
         DOCUMENT_PUBLIQUE_ACTIF: False,
+        DOCUMENT_PUBLIQUE_NOEUD_DOCKER: None,
         DOCUMENT_PUBLIQUE_UPNP_SUPPORTE: False,
         DOCUMENT_PUBLIQUE_URL_WEB: None,
         DOCUMENT_PUBLIQUE_URL_MQ: None,
@@ -125,7 +129,6 @@ class ConstantesParametres:
     DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE = {
         DOCUMENT_PUBLIQUE_ACTIVITE_DATE: datetime.datetime.utcnow(),
         DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION: '',
-        DOCUMENT_PUBLIQUE_ACTIVITE_DETAIL: dict(),
     }
 
 
@@ -288,7 +291,7 @@ class ProcessusSauverConfigPublique(ProcessusParametres):
 
         activite = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE.copy()
         activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE] = datetime.datetime.utcnow()
-        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self.__description(transaction)
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self._description(transaction)
 
         transaction_detail = dict()
         champs_detail = [
@@ -301,8 +304,6 @@ class ProcessusSauverConfigPublique(ProcessusParametres):
         for champ in champs_detail:
             transaction_detail[champ] = transaction.get(champ)
 
-        activite.update(transaction_detail)
-
         collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
 
         ops = {
@@ -312,7 +313,7 @@ class ProcessusSauverConfigPublique(ProcessusParametres):
                 ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE: {
                     '$each': [activite],
                     '$sort': {ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE: -1},
-                    '$slice': 100,
+                    '$slice': ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_TAILLEMAX,
                 }
             }
         }
@@ -327,8 +328,19 @@ class ProcessusSauverConfigPublique(ProcessusParametres):
                 ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
             )
 
-    def __description(self, transaction):
-        desc = 'Mise a jour configuration'
+    def _description(self, transaction):
+        ports = list()
+
+        port_http = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP)
+        port_https = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTPS)
+        port_mq = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MQ)
+
+        ports.append('%s->%s' % (port_http, port_http))
+        ports.append('%s->%s' % (port_https, port_https))
+        ports.append('%s->%s' % (port_mq, port_mq))
+
+        desc = 'MAJ mappings: %s' % ', '.join(ports)
+
         return desc
 
 
@@ -407,12 +419,7 @@ class ProcessusEtatRouteur(ProcessusParametres):
 
         activite = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE.copy()
         activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE] = datetime.datetime.utcnow()
-        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self.__description(transaction)
-        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DETAIL] = {
-            ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE: transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE),
-            ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS: transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS),
-            ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4: transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4),
-        }
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self._description(transaction)
 
         collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
 
@@ -435,7 +442,7 @@ class ProcessusEtatRouteur(ProcessusParametres):
                 ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE: {
                     '$each': [activite],
                     '$sort': {ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE: -1},
-                    '$slice': 100,
+                    '$slice': ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_TAILLEMAX,
                 }
             }
         }
@@ -452,8 +459,7 @@ class ProcessusEtatRouteur(ProcessusParametres):
 
         self.set_etape_suivante()  # Termine
 
-
-    def __description(self, transaction):
+    def _description(self, transaction):
         desc = 'IP ext: %s, etat %s' % (
             transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_EXTERNE),
             str(transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_ROUTEUR_STATUS))
@@ -461,32 +467,146 @@ class ProcessusEtatRouteur(ProcessusParametres):
         return desc
 
 
-class ProcessusExposerPortsRouteur(ProcessusSauverConfigPublique):
-    """
-    La transaction est la meme que celle pour la mise a jour de la configuraiton, avec action necessaire.
-    """
+# class ProcessusExposerPortsRouteur(ProcessusSauverConfigPublique):
+#     """
+#     La transaction est la meme que celle pour la mise a jour de la configuraiton, avec action necessaire.
+#     """
+#
+#     def initiale(self):
+#         self._sauvegarder_configuration()
+#         self.set_etape_suivante(ProcessusExposerPortsRouteur.exposer_ports.__name__)
+#
+#     def exposer_ports(self):
+#         """
+#         Transmet une demande d'exposition des ports au Monitor de la MilleGrille
+#         :return:
+#         """
+#
+#         self.set_etape_suivante()  # Termine
+#
+#     def _description(self, transaction):
+#         ports = list()
+#
+#         port_http = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP)
+#         port_https = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTPS)
+#         port_mq = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MQ)
+#
+#         ports.append('%s->%s' % (port_http, port_http))
+#         ports.append('%s->%s' % (port_https, port_https))
+#         ports.append('%s->%s' % (port_mq, port_mq))
+#
+#         desc = 'Ajout mappings externes: %s' % ', '.join(ports)
+#
+#         return desc
 
-    def initiale(self):
-        self._sauvegarder_configuration()
-        self.set_etape_suivante(ProcessusExposerPortsRouteur.exposer_ports.__name__)
 
-    def exposer_ports(self):
-        """
-        Transmet une demande d'exposition des ports au Monitor de la MilleGrille
-        :return:
-        """
-        pass
-
-
-class ProcessusRetirerPortRouteur(ProcessusParametres):
-    pass
+# class ProcessusRetirerPortRouteur(ProcessusParametres):
+#     pass
 
 
 class ProcessusConfirmationRouteur(ProcessusParametres):
     pass
 
+
 class ProcessusDeployerAccesPublic(ProcessusParametres):
-    pass
+    """
+    Utilise le monitor pour deployer le node label netzone.public=true et ajouter mappings au routeur.
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
+
+        activite = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_ACTIVITE.copy()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE] = datetime.datetime.utcnow()
+        activite[ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION] = self._description(transaction)
+
+        # Fixer les mappings demandes
+        configuration_publique = collection.find_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE})
+        noeud_docker = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER]
+        noeud_docker_id = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID]
+        ipv4_interne = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE]
+
+        champs_mapping = [
+            ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTPS,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MQ,
+        ]
+        mappings_demandes = dict()
+        for champ in champs_mapping:
+            mapping_http = ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE_MAPPINGS.copy()
+            port = configuration_publique[champ]
+            mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_INTERNE] = port
+            mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_EXTERIEUR] = port
+            mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE] = ipv4_interne
+            mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MAPPING_NOM] = \
+                'mg_%s_%s' % (self._controleur.configuration.nom_millegrille, champ)
+
+            mappings_demandes[str(port)] = mapping_http
+
+        ops = {
+            '$set': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER: noeud_docker,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID: noeud_docker_id,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE: ipv4_interne,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: mappings_demandes,
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$push': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE: {
+                    '$each': [activite],
+                    '$sort': {ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_DATE: -1},
+                    '$slice': ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIVITE_TAILLEMAX,
+                }
+            }
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
+        }
+
+        updated = collection.update_one(filtre, ops)
+        if updated.modified_count == 0:
+            raise Exception(
+                "Erreur ajout activite a configuration publique, document %s n'existe pas" %
+                ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE
+            )
+
+        self.set_etape_suivante(ProcessusDeployerAccesPublic.transmettre_commandes.__name__)
+
+    def transmettre_commandes(self):
+        collection = self.document_dao.get_collection(ConstantesParametres.COLLECTION_DOCUMENTS_NOM)
+        configuration_publique = collection.find_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE})
+
+        # Creer commande pour deployer public avec docker
+        champs_docker_mappings = [
+            ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER,
+        ]
+        commande_docker_mappings = dict()
+        for mapping in champs_docker_mappings:
+            commande_docker_mappings[mapping]: configuration_publique[mapping]
+
+        self.generateur_transactions.transmettre_commande(commande_docker_mappings, 'commande.monitor.publierNoeudDocker')
+
+        # Creer commande pour ajouter mappings sur le routeur
+        mappings_demandes = configuration_publique[ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES]
+        commande = {
+            ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: mappings_demandes
+        }
+
+        self.generateur_transactions.transmettre_commande(commande, 'commande.monitor.exposerPorts')
+
+        self.set_etape_suivante()
+
+        return {
+            'mappings': commande,
+            'docker': commande_docker_mappings,
+        }
+
+    def _description(self, transaction):
+        desc = 'Publier sur noeud %s' % transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER]
+        return desc
 
 
 class ProcessusRetirerAccesPublic(ProcessusParametres):
