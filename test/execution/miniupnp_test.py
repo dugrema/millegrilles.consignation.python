@@ -22,7 +22,16 @@ port1 = 43210
 print("Ouverture %d" % port1)
 # addportmapping(external-port, protocol, internal-host, internal-port, description, remote-host)
 # upnp.addportmapping(port, 'TCP', upnp.lanaddr, port, 'testing', '')
-# upnp.addportmapping(5122, 'TCP', upnp.lanaddr, 22, 'ssh dev2', '')
+# resultat_ajout = upnp.addportmapping(5122, 'TCP', upnp.lanaddr, 22, 'ssh dev2', '')
+# print('Ajout port 5122: %s' % str(resultat_ajout))
+
+resultat_ajout = upnp.addportmapping(5163, 'TCP', upnp.lanaddr, 5163, 'MQ', '')
+print('Ajout port 5163: %s' % str(resultat_ajout))
+resultat_ajout = upnp.addportmapping(80, 'TCP', upnp.lanaddr, 80, 'http', '')
+print('Ajout port 80: %s' % str(resultat_ajout))
+resultat_ajout = upnp.addportmapping(443, 'TCP', upnp.lanaddr, 443, 'https', '')
+print('Ajout port 443: %s' % str(resultat_ajout))
+
 
 print("Port %d ouvert?" % port1)
 
@@ -67,6 +76,9 @@ while True:
 
 print("Suppression mappings")
 # upnp.deleteportmapping(port1, 'TCP')
-upnp.deleteportmapping(5122, 'TCP')
+# resultat_delete = upnp.deleteportmapping(5122, 'TCP')   # NoSuchEntryInArray
+# print('Delete: %s' % str(resultat_delete))
+# resultat_delete = upnp.deleteportmapping(443, 'TCP')   # NoSuchEntryInArray
+# print('Delete: %s' % str(resultat_delete))
 
 print("Termine")

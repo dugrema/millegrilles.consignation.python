@@ -905,3 +905,14 @@ class CertificatInconnu(Exception):
     @property
     def fingerprint(self):
         return self.__fingerprint
+
+
+class RoutingKeyInconnue(Exception):
+
+    def __init__(self, message, routing_key=None):
+        super().__init__(message)
+        self.__routing_key = routing_key
+
+    @property
+    def routing_key(self):
+        return self.__routing_key
