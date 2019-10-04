@@ -21,6 +21,7 @@ class ConstantesPki:
 
     TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat' % DOMAINE_NOM
     TRANSACTION_WEB_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat.web' % DOMAINE_NOM
+    TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
@@ -34,6 +35,8 @@ class ConstantesPki:
     LIBELLE_SUBJECT_KEY = 'subject_key'
     LIBELLE_AUTHORITY_KEY = 'authority_key'
     LIBELLE_TRANSACTION_FAITE = 'transaction_faite'
+    LIBELLE_CHAINES = 'chaines'
+    LIBELLE_MGLIBELLE = 'mg-libelle'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_CERTIFICAT_ROOT = 'certificat.root'
@@ -201,6 +204,10 @@ class GestionnairePki(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT:
             processus = "millegrilles_domaines_Pki:ProcessusAjouterCertificat"
+        elif domaine_transaction == ConstantesPki.TRANSACTION_WEB_NOUVEAU_CERTIFICAT:
+            processus = "millegrilles_domaines_Pki:ProcessusAjouterCertificatWeb"
+        elif domaine_transaction == ConstantesPki.TRANSACTION_CLES_RECUES:
+            processus = "millegrilles_domaines_Pki:ProcessusClesRecues"
         else:
             processus = super().identifier_processus(domaine_transaction)
         return processus
@@ -397,6 +404,58 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         return ConstantesPki.COLLECTION_PROCESSUS_NOM
 
 
+class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
+        fingerprint = transaction['fingerprint']
+        self._logger.debug("Chargement certificat web, nouveau fingerprint %s" % fingerprint)
+
+        # Verifier si on a deja les certificats
+        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+
+        certificat_web = transaction[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+        enveloppe_cert = EnveloppeCertificat(certificat_pem=certificat_web)
+        not_valid_before = enveloppe_cert.not_valid_before
+        not_valid_after = enveloppe_cert.not_valid_after
+
+        ops = {
+            '$set': {
+                ConstantesPki.LIBELLE_CERTIFICAT_PEM: transaction[ConstantesPki.LIBELLE_CERTIFICAT_PEM],
+                ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+                ConstantesPki.LIBELLE_CHAINES: transaction[ConstantesPki.LIBELLE_CHAINES],
+                ConstantesPki.LIBELLE_SUBJECT: transaction[ConstantesPki.LIBELLE_SUBJECT],
+                ConstantesPki.LIBELLE_NOT_VALID_BEFORE: not_valid_before,
+                ConstantesPki.LIBELLE_NOT_VALID_AFTER: not_valid_after,
+            },
+            '$setOnInsert': {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_PKI_WEB,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            },
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        token_resumer = '%s:%s:%s' % (ConstantesPki.TRANSACTION_CLES_RECUES, ConstantesPki.LIBVAL_PKI_WEB, uuid)
+        self.set_etape_suivante(
+            ProcessusAjouterCertificatWeb.transmettre_commande_majweb.__name__,
+            token_attente=[token_resumer]
+        )
+
+        return {
+            'fingerprint': fingerprint,
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: not_valid_before,
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: not_valid_after,
+        }
+
+
+    def transmettre_commande_majweb(self):
+        self.set_etape_suivante() # Termine
+
+
 class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
 
     PARAM_A_VERIFIER = 'fingerprints_a_verifier'
@@ -503,3 +562,27 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
     def transmettre_certificat(self, properties, message_dict):
         pass
+
+
+class ProcessusClesRecues(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        pass  # Rien a faire pour cette transaction
+
+    def initiale(self):
+        """
+        Emet un evenement pour indiquer que les cles sont recues par le MaitreDesCles.
+        """
+        transaction = self.charger_transaction()
+        identificateurs_documents = transaction['identificateurs_document']
+        mg_libelle = identificateurs_documents[Constantes.DOCUMENT_INFODOC_LIBELLE]
+        uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        token_resumer = '%s:%s:%s' % (ConstantesPki.TRANSACTION_CLES_RECUES, mg_libelle, uuid)
+        self.resumer_processus([token_resumer])
+
+        self.set_etape_suivante()  # Termine
+        return {ConstantesPki.LIBELLE_MGLIBELLE: mg_libelle}
