@@ -414,9 +414,6 @@ class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
         fingerprint = transaction['fingerprint']
         self._logger.debug("Chargement certificat web, nouveau fingerprint %s" % fingerprint)
 
-        # Verifier si on a deja les certificats
-        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-
         certificat_web = transaction[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
         enveloppe_cert = EnveloppeCertificat(certificat_pem=certificat_web)
         not_valid_before = enveloppe_cert.not_valid_before
@@ -438,6 +435,11 @@ class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
+        # Sauvegarder document
+        filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_PKI_WEB}
+        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+        collection.update_one(filtre, ops, upsert=True)
+
         uuid = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         token_resumer = '%s:%s:%s' % (ConstantesPki.TRANSACTION_CLES_RECUES, ConstantesPki.LIBVAL_PKI_WEB, uuid)
         self.set_etape_suivante(
@@ -451,9 +453,19 @@ class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
             ConstantesPki.LIBELLE_NOT_VALID_AFTER: not_valid_after,
         }
 
-
     def transmettre_commande_majweb(self):
-        self.set_etape_suivante() # Termine
+        """
+        Transmettre une commande pour mettre a jour les certificats web
+        :return:
+        """
+
+        commande = {
+            'fingerprint': self.parametres['fingerprint'],
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(self.parametres[ConstantesPki.LIBELLE_NOT_VALID_AFTER].timestamp())
+        }
+        self.generateur_transactions.transmettre_commande(commande, 'commande.monitor.maj.cerificatsWeb')
+
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
