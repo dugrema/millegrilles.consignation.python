@@ -712,7 +712,7 @@ class JSONHelper:
     def __init__(self):
         self.reader = codecs.getreader("utf-8")
 
-    def dict_vers_json(self, enveloppe_dict, encoding=json.JSONEncoder):
+    def dict_vers_json(self, enveloppe_dict: dict, encoding=json.JSONEncoder) -> str:
         message_utf8 = json.dumps(enveloppe_dict, sort_keys=True, ensure_ascii=False, cls=encoding)
         return message_utf8
 

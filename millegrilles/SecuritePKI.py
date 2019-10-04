@@ -8,16 +8,18 @@ import os
 import datetime
 import subprocess
 import tempfile
+import secrets
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu
+from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, JSONHelper
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 
 
@@ -398,9 +400,9 @@ class SignateurTransaction(UtilCertificats):
 
         signature = self._cle.sign(
             message_bytes,
-            padding.PSS(
-                mgf=padding.MGF1(self._sign_hash_function()),
-                salt_length=padding.PSS.MAX_LENGTH
+            asymmetric.padding.PSS(
+                mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
+                salt_length=asymmetric.padding.PSS.MAX_LENGTH
             ),
             self._sign_hash_function()
         )
@@ -496,9 +498,9 @@ class VerificateurTransaction(UtilCertificats):
         cle_publique.verify(
             signature_bytes,
             message_bytes,
-            padding.PSS(
-                mgf=padding.MGF1(self._sign_hash_function()),
-                salt_length=padding.PSS.MAX_LENGTH
+            asymmetric.padding.PSS(
+                mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
+                salt_length=asymmetric.padding.PSS.MAX_LENGTH
             ),
             self._sign_hash_function()
         )
@@ -653,6 +655,47 @@ class VerificateurCertificats(UtilCertificats):
         if self.__untrusted_CAs_writer is not None:
             self.__untrusted_CAs_writer.close()
             os.unlink(self.__untrusted_CAs_filename)
+
+
+class EncryptionHelper:
+
+    def __init__(self, enveloppe_certificat: EnveloppeCertificat):
+        self.__enveloppe_certificat = enveloppe_certificat
+        self.__json_helper = JSONHelper()
+
+    def __ouvrir_cipher(self, cert):
+        password = secrets.token_bytes(32)  # AES-256 = 32 bytes
+        cle_publique = cert.public_key()
+        password_crypte = cle_publique.encrypt(
+            password,
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
+        iv = secrets.token_bytes(16)
+        backend = default_backend()
+        cipher = Cipher(algorithms.AES(password), modes.CBC(iv), backend=backend)
+
+        return password_crypte, iv, cipher
+
+    def crypter_dict(self, contenu_dict: dict):
+
+        cert = self.__enveloppe_certificat.certificat
+        password_crypte, iv, cipher = self.__ouvrir_cipher(cert)
+
+        # Crypter contenu du dictionnaire (cle symmetrique)
+        encryptor = cipher.encryptor()
+
+        padder = padding.PKCS7(128).padder()
+        dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, MongoJSONEncoder).encode('utf-8')
+        dict_padded = padder.update(dict_bytes) + padder.finalize()
+        dict_crypte_bytes = encryptor.update(dict_padded) + encryptor.finalize()
+        dict_crypte_str = base64.b64encode(dict_crypte_bytes).decode('utf-8')
+
+        return dict_crypte_str, password_crypte, iv
 
 
 class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):

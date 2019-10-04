@@ -20,6 +20,7 @@ class ConstantesPki:
     QUEUE_NOM_CERTIFICATS = '%s.certificats' % QUEUE_NOM
 
     TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat' % DOMAINE_NOM
+    TRANSACTION_WEB_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat.web' % DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
@@ -39,6 +40,7 @@ class ConstantesPki:
     LIBVAL_CERTIFICAT_INTERMEDIAIRE = 'certificat.intermediaire'
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
     LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
+    LIBVAL_PKI_WEB = 'pki.web'
 
     REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
     REQUETE_CERTIFICAT_DEMANDE = 'pki.requete.certificat'
