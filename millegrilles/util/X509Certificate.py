@@ -1,9 +1,12 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.x509.name import NameOID
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import asymmetric
+
+
 import datetime
 import secrets
 import base64
@@ -69,6 +72,13 @@ class EnveloppeCleCert:
 
     def set_chaine(self, chaine: list):
         self.chaine = chaine
+
+    def set_chaine_str(self, chaine: str):
+        chaine_list = chaine.split('-----END PRIVATE KEY-----')
+        self.chaine = list()
+        for cert in chaine_list:
+            cert = cert + '-----END PRIVATE KEY-----'
+            self.chaine.append(cert)
 
     def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
         self.private_key = serialization.load_pem_private_key(
@@ -158,7 +168,7 @@ class EnveloppeCleCert:
         if generer_password:
             self.password = base64.b64encode(secrets.token_bytes(16))
 
-        self.private_key = rsa.generate_private_key(
+        self.private_key = asymmetric.rsa.generate_private_key(
             public_exponent=public_exponent,
             key_size=keysize,
             backend=default_backend()
@@ -184,8 +194,6 @@ class EnveloppeCleCert:
             sujet_dict[elem.oid._name] = elem.value
 
         return sujet_dict
-
-
 
 class GenerateurCertificat:
 
@@ -945,3 +953,40 @@ class RenouvelleurCertificat:
 
         cert_dict = generateur_instance.generer()
         return cert_dict
+
+
+class DecryptionHelper:
+
+    def __init__(self, clecert: EnveloppeCleCert):
+        self.__clecert = clecert
+
+    def decrypter_asymmetrique(self, contenu: str):
+        """
+        Utilise la cle privee en memoire pour decrypter le contenu.
+        :param contenu:
+        :return:
+        """
+        contenu_bytes = base64.b64decode(contenu)
+
+        contenu_decrypte = self.__clecert.private_key.decrypt(
+            contenu_bytes,
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return contenu_decrypte
+
+    def decrypter_symmetrique(self, cle_secrete: bytes, iv: bytes, contenu_crypte: bytes):
+        backend = default_backend()
+
+        cipher = Cipher(algorithms.AES(cle_secrete), modes.CBC(iv), backend=backend)
+        unpadder = padding.PKCS7(256).unpadder()
+        decryptor = cipher.decryptor()
+
+        contenu_decrypte = decryptor.update(contenu_crypte) + decryptor.finalize()
+        contenu_unpadde = unpadder.update(contenu_decrypte) + unpadder.finalize()
+
+        return contenu_unpadde[16:]  # Enleve 16 premiers bytes, c'est l'IV
+

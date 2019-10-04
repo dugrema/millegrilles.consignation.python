@@ -689,11 +689,16 @@ class EncryptionHelper:
         # Crypter contenu du dictionnaire (cle symmetrique)
         encryptor = cipher.encryptor()
 
-        padder = padding.PKCS7(128).padder()
+        padder = padding.PKCS7(256).padder()
         dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, MongoJSONEncoder).encode('utf-8')
+
+        # Inserer IV dans les premiers 16 bytes - pas vraiment le choix, c'est l'algo:
+        # https://stackoverflow.com/questions/26928012/wrong-16-bytes-in-decryption-using-aes
+        dict_bytes = iv + dict_bytes
         dict_padded = padder.update(dict_bytes) + padder.finalize()
         dict_crypte_bytes = encryptor.update(dict_padded) + encryptor.finalize()
-        dict_crypte_str = base64.b64encode(dict_crypte_bytes).decode('utf-8')
+        dict_crypte_strbytes = base64.b64encode(dict_crypte_bytes)
+        dict_crypte_str = dict_crypte_strbytes.decode('utf-8')
 
         return dict_crypte_str, password_crypte, iv
 
