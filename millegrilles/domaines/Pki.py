@@ -133,6 +133,14 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 'exchange': self.configuration.exchange_inter,
                 'callback': self.__traitement_certificats.callbackAvecAck
             },
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
+                'routing': [
+                    'requete.#',
+                ],
+                'exchange': self.configuration.exchange_noeuds,
+                'callback': self.get_handler_requetes_noeuds().callbackAvecAck
+            },
         ]
 
         configuration.extend(configuration_pki)
