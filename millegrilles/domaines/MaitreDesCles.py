@@ -367,10 +367,10 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         if routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
             # Transmettre le certificat courant du maitre des cles
             self.transmettre_certificat(properties)
-
         elif routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
             self.transmettre_cle_grosfichier(message_dict, properties)
-
+        elif routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
+            self.transmettre_cle_document(message_dict, properties)
         else:
             # Type de transaction inconnue, on lance une exception
             raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
@@ -435,6 +435,58 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         self._gestionnaire.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )
+
+    def transmettre_cle_document(self, evenement, properties):
+        """
+        Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
+        :param evenement:
+        :param properties:
+        :return:
+        """
+        self._logger.debug("Transmettre cle document a %s" % properties.reply_to)
+
+        # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
+        # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
+        # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
+
+        reponse_requetes = list()
+        for requete in evenement['requetes']:
+            reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+            self._logger.debug(
+                "Verification signature requete cle document. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+
+            ## AJOUTER FILTRE SUR DOMAINE PERMIS PAR LE CERTIFICAT ##
+
+            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: requete['filtre']
+            }
+            document = collection_documents.find_one(filtre)
+            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+            if document is not None:
+                self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
+                if acces_permis:
+                    cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
+                    cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(
+                        cle_secrete, enveloppe_certificat.certificat)
+                    reponse = {
+                        'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                        'iv': document['iv'],
+                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                    }
+
+            # Ajouter la reponse a la liste
+            reponse_requetes.append(reponse)
+
+        dict_resultats = {'resultats': reponse_requetes}
+        self._gestionnaire.generateur_transactions.transmettre_reponse(
+            dict_resultats, properties.reply_to, properties.correlation_id
+        )
+
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
