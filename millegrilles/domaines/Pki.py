@@ -37,6 +37,7 @@ class ConstantesPki:
     LIBELLE_TRANSACTION_FAITE = 'transaction_faite'
     LIBELLE_CHAINES = 'chaines'
     LIBELLE_MGLIBELLE = 'mg-libelle'
+    LIBELLE_CLE_CRYPTEE = 'cle_cryptee'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_CERTIFICAT_ROOT = 'certificat.root'
@@ -136,7 +137,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
                 'routing': [
-                    'requete.#',
+                    'requete.millegrilles.domaines.Pki.#',
                 ],
                 'exchange': self.configuration.exchange_noeuds,
                 'callback': self.get_handler_requetes_noeuds().callbackAvecAck
@@ -435,6 +436,7 @@ class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
                 ConstantesPki.LIBELLE_SUBJECT: transaction[ConstantesPki.LIBELLE_SUBJECT],
                 ConstantesPki.LIBELLE_NOT_VALID_BEFORE: not_valid_before,
                 ConstantesPki.LIBELLE_NOT_VALID_AFTER: not_valid_after,
+                ConstantesPki.LIBELLE_CLE_CRYPTEE: transaction[ConstantesPki.LIBELLE_CLE_CRYPTEE],
             },
             '$setOnInsert': {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_PKI_WEB,
