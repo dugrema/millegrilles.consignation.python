@@ -20,7 +20,9 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.message_handler = None
         self.handler_entretien = None
         self.__stop_event = Event()
+        self.__init_config_event = Event()
         self.__channel = None
+        self.__queue_name = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -34,11 +36,21 @@ class ConsignateurTransaction(ModeleConfiguration):
         if self.args.debug:
             logging.getLogger('millegrilles.SecuritePKI').setLevel(logging.DEBUG)
 
-        # Executer la configuration pour RabbitMQ
         self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
         self.handler_entretien.entretien_initial()
 
         self.contexte.message_dao.register_channel_listener(self)
+
+        # Attendre que la connexion a MQ soit prete
+        self.__init_config_event.wait(30)
+
+        # Executer la configuration pour RabbitMQ
+        self.contexte.message_dao.configurer_rabbitmq()
+        self.message_handler = ConsignateurTransactionCallback(self.contexte)
+
+        queue_name = self.contexte.configuration.queue_nouvelles_transactions
+        self.__channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
+
         self.contexte.message_dao.register_channel_listener(self.handler_entretien)
 
         self.__logger.info("Configuration et connection completee")
@@ -46,12 +58,7 @@ class ConsignateurTransaction(ModeleConfiguration):
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
         self.__channel = channel
-        self.contexte.message_dao.configurer_rabbitmq()
-
-        queue_name = self.contexte.configuration.queue_nouvelles_transactions
-        self.message_handler = ConsignateurTransactionCallback(self.contexte)
-        channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
-        # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+        self.__init_config_event.set()
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
