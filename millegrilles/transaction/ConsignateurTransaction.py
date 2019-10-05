@@ -18,6 +18,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         super().__init__()
         self.json_helper = JSONHelper()
         self.message_handler = None
+        self.handler_entretien = None
         self.__stop_event = Event()
         self.__channel = None
 
@@ -33,12 +34,10 @@ class ConsignateurTransaction(ModeleConfiguration):
         if self.args.debug:
             logging.getLogger('millegrilles.SecuritePKI').setLevel(logging.DEBUG)
 
-        self.message_handler = ConsignateurTransactionCallback(self.contexte)
-
+        # Executer la configuration pour RabbitMQ
         self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
         self.handler_entretien.entretien_initial()
 
-        # Executer la configuration pour RabbitMQ
         self.contexte.message_dao.register_channel_listener(self)
         self.contexte.message_dao.register_channel_listener(self.handler_entretien)
 
@@ -47,9 +46,10 @@ class ConsignateurTransaction(ModeleConfiguration):
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
         self.__channel = channel
-
         self.contexte.message_dao.configurer_rabbitmq()
+
         queue_name = self.contexte.configuration.queue_nouvelles_transactions
+        self.message_handler = ConsignateurTransactionCallback(self.contexte)
         channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
         # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
