@@ -472,45 +472,10 @@ class ProcessusEtatRouteur(ProcessusParametres):
         return desc
 
 
-# class ProcessusExposerPortsRouteur(ProcessusSauverConfigPublique):
-#     """
-#     La transaction est la meme que celle pour la mise a jour de la configuraiton, avec action necessaire.
-#     """
-#
-#     def initiale(self):
-#         self._sauvegarder_configuration()
-#         self.set_etape_suivante(ProcessusExposerPortsRouteur.exposer_ports.__name__)
-#
-#     def exposer_ports(self):
-#         """
-#         Transmet une demande d'exposition des ports au Monitor de la MilleGrille
-#         :return:
-#         """
-#
-#         self.set_etape_suivante()  # Termine
-#
-#     def _description(self, transaction):
-#         ports = list()
-#
-#         port_http = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP)
-#         port_https = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTPS)
-#         port_mq = transaction.get(ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MQ)
-#
-#         ports.append('%s->%s' % (port_http, port_http))
-#         ports.append('%s->%s' % (port_https, port_https))
-#         ports.append('%s->%s' % (port_mq, port_mq))
-#
-#         desc = 'Ajout mappings externes: %s' % ', '.join(ports)
-#
-#         return desc
-
-
-# class ProcessusRetirerPortRouteur(ProcessusParametres):
-#     pass
-
-
 class ProcessusConfirmationRouteur(ProcessusParametres):
-    pass
+
+    def initiale(self):
+        self.set_etape_suivante()  # Pour l'instant on ne fait rien avec cette transaction
 
 
 class ProcessusDeployerAccesPublic(ProcessusParametres):
