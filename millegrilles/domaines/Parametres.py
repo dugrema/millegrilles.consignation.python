@@ -60,6 +60,7 @@ class ConstantesParametres:
     DOCUMENT_PUBLIQUE_NOEUD_DOCKER = 'noeud_docker_hostname'
     DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID = 'noeud_docker_id'
     DOCUMENT_PUBLIQUE_URL_WEB = 'url_web'
+    DOCUMENT_PUBLIQUE_URL_COUPDOEIL = 'url_coupdoeil'
     DOCUMENT_PUBLIQUE_URL_MQ = 'url_mq'
     DOCUMENT_PUBLIQUE_PORT_HTTP = 'port_http'
     DOCUMENT_PUBLIQUE_PORT_HTTPS = 'port_https'
@@ -299,6 +300,7 @@ class ProcessusSauverConfigPublique(ProcessusParametres):
         transaction_detail = dict()
         champs_detail = [
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_COUPDOEIL,
             ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP,
             ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTPS,
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_MQ,
@@ -530,6 +532,8 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
         noeud_docker = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER]
         noeud_docker_id = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER_ID]
         ipv4_interne = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE]
+        url_web = configuration_publique[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+        url_coupdoeil = configuration_publique[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_COUPDOEIL]
 
         champs_mapping = [
             ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_HTTP,
@@ -555,6 +559,8 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
                 ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE: ipv4_interne,
                 ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: mappings_demandes,
                 ConstantesParametres.DOCUMENT_PUBLIQUE_ACTIF: True,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_web,
+                ConstantesParametres.DOCUMENT_PUBLIQUE_URL_COUPDOEIL: url_coupdoeil,
             },
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
             '$push': {
@@ -596,8 +602,12 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
 
         # Creer commande pour ajouter mappings sur le routeur
         mappings_demandes = configuration_publique[ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES]
+        url_web = configuration_publique[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+        url_coupdoeil = configuration_publique[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_COUPDOEIL]
         commande = {
-            ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: mappings_demandes
+            ConstantesParametres.DOCUMENT_PUBLIQUE_MAPPINGS_IPV4_DEMANDES: mappings_demandes,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_web,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_COUPDOEIL: url_coupdoeil,
         }
 
         self.generateur_transactions.transmettre_commande(commande, 'commande.monitor.exposerPorts')
