@@ -5,6 +5,7 @@ import json
 import traceback
 import logging
 import ssl
+import time
 
 from threading import Lock, Event, Thread
 
@@ -185,79 +186,63 @@ class PikaDAO:
 
     def configurer_rabbitmq(self):
 
-        self.attendre_channel(timeout=30)
-        if not self._attendre_channel.is_set():
-            raise Exception("Channel MQ n'est pas ouvert")
-
-        # S'assurer que toutes les queues durables existes. Ces queues doivent toujours exister
-        # pour eviter que des messages de donnees originales ne soient perdus.
-        # nom_echange_evenements = self.configuration.exchange_evenements
-        nom_echange_middleware = self.configuration.exchange_middleware
+        # Generer liste de callbacks
         nom_echanges = [
-            nom_echange_middleware,
+            self.configuration.exchange_middleware,
             self.configuration.exchange_inter,
             self.configuration.exchange_noeuds,
             self.configuration.exchange_public
         ]
-        nom_q_nouvelles_transactions = self.queuename_nouvelles_transactions()
-        nom_q_erreurs_processus = self.queuename_erreurs_processus()
 
-        # Creer l'echange de type topics pour toutes les MilleGrilles
+        self.attendre_channel(timeout=30)
+        if not self._attendre_channel.is_set():
+            raise Exception("Channel MQ n'est pas ouvert")
+
+        setupHandler = PikaSetupHandler()
+
+        # Q nouvelle.transactions, existe sur tous les exchanges
         for nom_echange in nom_echanges:
-            self.channel.exchange_declare(
-                exchange=nom_echange,
-                exchange_type='topic',
-                durable=True
-            )
+            queue = self.queuename_nouvelles_transactions()
+            routing_key = Constantes.TRANSACTION_ROUTING_EVENEMENT
 
-        # Creer la Q de nouvelles transactions pour cette MilleGrille
-        self.channel.queue_declare(
-            queue=nom_q_nouvelles_transactions,
-            durable=True,
-            callback=None
-        )
+            handler_callback_nouvelle_transaction = PikaSetupCallbackHandler(
+                self.channel, nom_echange, queue, [routing_key], queue_durable=True)
+            setupHandler.add_configuration(handler_callback_nouvelle_transaction)
 
-        for nom_echange in nom_echanges:
-            self.channel.queue_bind(
-                exchange=nom_echange,
-                queue=nom_q_nouvelles_transactions,
-                routing_key=Constantes.TRANSACTION_ROUTING_NOUVELLE,
-                callback=None
-            )
+        exchange_middleware = self.configuration.exchange_middleware
 
-        self.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=nom_q_nouvelles_transactions,
-            routing_key=Constantes.TRANSACTION_ROUTING_EVENEMENT,
-            callback=None
-        )
+        # Q erreurs
+        setupHandler.add_configuration(PikaSetupCallbackHandler(
+            self.channel,
+            exchange_middleware,
+            self.queuename_erreurs_processus(),
+            ['processus.erreur'],
+            queue_durable=True
+        ))
 
-        self.channel.queue_declare(
-            queue=Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
-            durable=False,
-            callback=None
-        )
+        # Q entretien (ceduleur)
+        setupHandler.add_configuration(PikaSetupCallbackHandler(
+            self.channel,
+            exchange_middleware,
+            Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
+            ['ceduleur.#'],
+            queue_durable=True
+        ))
 
-        self.channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
-            routing_key='ceduleur.#',
-            callback=None
-        )
+        # On attend l'execution de la configuration
+        configurations_manquantes = None
+        for essai in range(2, 5):
+            configurations_manquantes = setupHandler.attendre()
 
-        # Creer la Q d'erreurs dans les processus pour cette MilleGrille
-        self.channel.queue_declare(
-            queue=nom_q_erreurs_processus,
-            durable=True,
-            callback=None
-        )
+            if configurations_manquantes is not None:
+                self._logger.warning("Erreur configuration MQ, Q  incompletes: %s" % ['%s/%s' % (c.exchange, c.queue) for c in configurations_manquantes])
+                self._logger.warning("On tente de re-executer configuration (essai %d de 3)" % essai)
+                setupHandler.executer_incompletes()
+            else:
+                break
 
-        self.channel.queue_bind(
-            exchange=nom_echange_middleware,
-            queue=nom_q_erreurs_processus,
-            routing_key='processus.erreur',
-            callback=None
-        )
+        if configurations_manquantes is not None:
+            raise Exception("Configuration Q incomplete: %s" % ['%s/%s' % (c.exchange, c.queue) for c in configurations_manquantes])
 
     def start_consuming(self):
         self._logger.warning("start_consuming(): Deprecated, gere dans MessageDAO")
@@ -915,6 +900,149 @@ class TraitementMessageCedule(TraitementMessageDomaine):
 
     def traiter_evenement(self, message):
         self.gestionnaire.traiter_cedule(message)
+
+
+class PikaSetupCallbackHandler:
+
+    class RoutingKeyCallback:
+
+        def __init__(self, handler, routing_key):
+            self.__handler = handler
+            self.__routing_key = routing_key
+
+        def callback(self, method):
+            self.__handler.routing_key_complete(self.__routing_key)
+
+    def __init__(self, channel, exchange: str, queue: str, routing_keys: list, queue_durable=False):
+        """
+        Callback qui permet de declarer un exchange / queue pour une liste de routing keys. Garde aussi le compte
+        pour savoir si l'exchange, la Q et les routing keys ont ete configures
+
+        RabbitMQ utilise une interface stable, alors declarer les Q et XCHG pluieurs fois ne cause pas de problemes.
+        :param exchange:
+        :param queues:
+        :param routing:
+        """
+        self.__channel = channel
+        self.__exchange = exchange
+        self.__queue = queue
+        self.__queue_durable = queue_durable
+        self.__routing_keys = routing_keys
+        self.__callback_when_done = None
+
+        self.__nombre_routing_keys_restant = 0
+        self.__exchange_complete = exchange is None
+        self.__queue_complete = queue is None
+        if routing_keys is not None:
+            self.__nombre_routing_keys_restant = len(routing_keys)
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def exchange_callback(self, method):
+        self.__logger.debug("Exchange configure: %s" % self.exchange)
+        self.__exchange_complete = True
+        if self.__queue is not None:
+            self.__channel.queue_declare(
+                queue=self.__queue,
+                durable=self.__queue_durable,
+                callback=self.queue_callback
+            )
+
+    def queue_callback(self, method):
+        self.__logger.debug("Q configuree: %s" % self.queue)
+        self.__queue_complete = True
+        if self.__routing_keys is not None:
+            for routing_key in self.__routing_keys:
+                rk_callback = PikaSetupCallbackHandler.RoutingKeyCallback(self, routing_key)
+                self.__channel.queue_bind(
+                    exchange=self.__exchange,
+                    queue=self.__queue,
+                    routing_key=routing_key,
+                    callback=rk_callback.callback
+                )
+
+    def routing_key_complete(self, routing_key):
+        self.__logger.debug("Routing key configuree: %s" % routing_key)
+        self.__nombre_routing_keys_restant = self.__nombre_routing_keys_restant - 1
+
+        if self.__callback_when_done is not None and self.complete:
+            self.__logger.debug("Configuration complete, exchange/queue: %s/%s" % (self.exchange, self.queue))
+            self.__callback_when_done(self)
+
+    def set_callback_when_done(self, callback):
+        self.__callback_when_done = callback
+
+    @property
+    def channel(self):
+        return self.__channel
+
+    @property
+    def queue(self):
+        return self.__queue
+
+    @property
+    def exchange(self):
+        return self.__exchange
+
+    @property
+    def complete(self):
+        return self.__queue_complete and self.__exchange_complete and self.__nombre_routing_keys_restant <= 0
+
+
+class PikaSetupHandler:
+
+    def __init__(self):
+        self.__config_list = list()
+        self.__wait_event = Event()
+        self.__config_completee = list()
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def add_configuration(self, handler: PikaSetupCallbackHandler):
+        self.__logger.debug("Ajout configuration exchange/queue: %s/%s" % (handler.exchange, handler.queue))
+        handler.set_callback_when_done(self.config_completee)
+        self.__config_list.append(handler)
+        self.executer_exchange(handler)
+
+    def executer_exchange(self, handler):
+        self.__logger.debug("Executer configuration exchange/queue: %s/%s" % (handler.exchange, handler.queue))
+        handler.channel.exchange_declare(
+            exchange=handler.exchange,
+            exchange_type='topic',
+            durable=True,
+            callback=handler.exchange_callback
+        )
+
+    def config_completee(self, handler: PikaSetupCallbackHandler):
+        self.__config_completee.append(handler)
+
+        if len(self.__config_completee) == len(self.__config_list):
+            self.__logger.debug("Configuration MQ completee")
+            self.__wait_event.set()
+
+    def attendre(self):
+        """
+        Attend l'execution de la configuration, retourne la liste des configuration incompletes
+        :return:
+        """
+        self.__wait_event.wait(15)
+
+        if self.__wait_event.is_set() or len(self.__config_completee) == len(self.__config_list):
+            # Toutes les configurations ont ete appliques
+            self.__logger.debug("Attendre - termine, toutes configuration completees")
+            return None
+        else:
+            # Il manque certaines configurations, on fait la liste
+            return [c for c in self.__config_list if not c.complete]
+
+    def executer_incompletes(self):
+        self.__logger.info("Re-execution config incomplete")
+        # Reset execution
+        self.__config_list = [c for c in self.__config_list if not c.complete]
+        self.__config_completee = list()
+
+        for handler in self.__config_list:
+            self.executer_exchange(handler)
 
 
 class ExceptionConnectionFermee(Exception):

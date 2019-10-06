@@ -429,11 +429,8 @@ class EntretienCollectionsDomaines(BaseCallback):
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
         self.__channel = channel
-
-        self.contexte.message_dao.configurer_rabbitmq()
         queue_name = Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS
         channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
-        # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
