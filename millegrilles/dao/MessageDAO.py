@@ -201,14 +201,22 @@ class PikaDAO:
 
         # Q nouvelle.transactions, existe sur tous les exchanges
         for nom_echange in nom_echanges:
-            queue = self.queuename_nouvelles_transactions()
-            routing_key = Constantes.TRANSACTION_ROUTING_EVENEMENT
-
-            handler_callback_nouvelle_transaction = PikaSetupCallbackHandler(
-                self.channel, nom_echange, queue, [routing_key], queue_durable=True)
-            setupHandler.add_configuration(handler_callback_nouvelle_transaction)
+            setupHandler.add_configuration(PikaSetupCallbackHandler(
+                self.channel,
+                nom_echange,
+                self.queuename_nouvelles_transactions(),
+                [Constantes.TRANSACTION_ROUTING_NOUVELLE],
+                queue_durable=True
+            ))
 
         exchange_middleware = self.configuration.exchange_middleware
+        setupHandler.add_configuration(PikaSetupCallbackHandler(
+            self.channel,
+            exchange_middleware,
+            self.queuename_nouvelles_transactions(),
+            [Constantes.TRANSACTION_ROUTING_EVENEMENT],
+            queue_durable=True
+        ))
 
         # Q erreurs
         setupHandler.add_configuration(PikaSetupCallbackHandler(

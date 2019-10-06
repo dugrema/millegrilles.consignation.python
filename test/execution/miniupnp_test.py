@@ -75,10 +75,18 @@ while True:
 # time.sleep(3)
 
 print("Suppression mappings")
+
+resultat_delete = upnp.deleteportmapping(80, 'TCP')   # NoSuchEntryInArray
+resultat_delete = upnp.deleteportmapping(443, 'TCP')   # NoSuchEntryInArray
+# resultat_delete = upnp.deleteportmapping(5173, 'TCP')   # NoSuchEntryInArray
+
+
 # upnp.deleteportmapping(port1, 'TCP')
 resultat_delete = upnp.deleteportmapping(5163, 'TCP')   # NoSuchEntryInArray
 print('Delete: %s' % str(resultat_delete))
 # resultat_delete = upnp.deleteportmapping(443, 'TCP')   # NoSuchEntryInArray
 # print('Delete: %s' % str(resultat_delete))
+
+
 
 print("Termine")
