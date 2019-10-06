@@ -44,7 +44,7 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         channel.add_on_close_callback(self.__on_channel_close)
         self.__channel = channel
 
-        self.contexte.message_dao.configurer_rabbitmq()
+        # self.contexte.message_dao.configurer_rabbitmq()
         # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
