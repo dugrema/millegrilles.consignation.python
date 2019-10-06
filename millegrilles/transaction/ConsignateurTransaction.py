@@ -36,16 +36,14 @@ class ConsignateurTransaction(ModeleConfiguration):
         if self.args.debug:
             logging.getLogger('millegrilles.SecuritePKI').setLevel(logging.DEBUG)
 
-        self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
-        self.handler_entretien.entretien_initial()
-
         self.contexte.message_dao.register_channel_listener(self)
 
-        # Attendre que la connexion a MQ soit prete
-        self.__init_config_event.wait(30)
-
         # Executer la configuration pour RabbitMQ
-        self.contexte.message_dao.configurer_rabbitmq()
+        self.contexte.message_dao.configurer_rabbitmq()  # Possede un timer pour attendre le channel dao
+
+        self.__init_config_event.wait(30)
+        self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
+        self.handler_entretien.entretien_initial()
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
 
         queue_name = self.contexte.configuration.queue_nouvelles_transactions
