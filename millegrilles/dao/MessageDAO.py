@@ -5,7 +5,6 @@ import json
 import traceback
 import logging
 import ssl
-import time
 
 from threading import Lock, Event, Thread
 
@@ -920,8 +919,9 @@ class PikaSetupCallbackHandler:
 
         RabbitMQ utilise une interface stable, alors declarer les Q et XCHG pluieurs fois ne cause pas de problemes.
         :param exchange:
-        :param queues:
-        :param routing:
+        :param queue:
+        :param routing_keys:
+        :param queue_durable:
         """
         self.__channel = channel
         self.__exchange = exchange
