@@ -216,7 +216,7 @@ class DemarreurNoeud(Daemon):
     def transmettre_lecture_callback(self, dict_lecture):
         try:
             if not self.contexte.message_dao.in_error:
-                self._producteur_transaction.transmettre_lecture_senseur(dict_lecture)
+                self._producteur_transaction.transmettre_lecture_senseur(dict_lecture, version=5)
             else:
                 self._logger.info("Message ajoute au backlog: %s" % str(dict_lecture))
                 if len(self._backlog_messages) < self._max_backlog:

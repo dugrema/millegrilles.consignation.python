@@ -1236,7 +1236,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         self._noeud = noeud
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
-    def transmettre_lecture_senseur(self, dict_lecture):
+    def transmettre_lecture_senseur(self, dict_lecture, version=4):
         # Preparer le dictionnaire a transmettre pour la lecture
         message = dict_lecture.copy()
 
@@ -1254,7 +1254,11 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
         self._logger.debug("Message a transmettre: %s" % str(message))
 
-        uuid_transaction = self.soumettre_transaction(message, SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE)
+        uuid_transaction = self.soumettre_transaction(
+            message,
+            SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
+            version=version
+        )
 
         return uuid_transaction
 
