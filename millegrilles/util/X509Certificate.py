@@ -195,6 +195,7 @@ class EnveloppeCleCert:
 
         return sujet_dict
 
+
 class GenerateurCertificat:
 
     def __init__(self, nom_millegrille):
@@ -887,6 +888,25 @@ class GenererNginx(GenerateurNoeud):
         return builder
 
 
+class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
+
+    def __init__(self, nom_millegrille, domaines: list, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(nom_millegrille, dict_ca, autorite)
+        self.__domaines = domaines
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ','.join(self.__domaines)
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class RenouvelleurCertificat:
 
     def __init__(self, nom_millegrille, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
@@ -908,6 +928,8 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
         }
+
+        self.__generateur_par_csr = GenerateurCertificateParRequest
 
         self.__generateur_millegrille = None
         if ca_autorite is not None:
@@ -940,6 +962,19 @@ class RenouvelleurCertificat:
 
         certificat = generateur_instance.signer(csr)
         chaine = generateur_instance.aligner_chaine(certificat)
+
+        clecert = EnveloppeCleCert(cert=certificat)
+        clecert.chaine = chaine
+
+        return clecert
+
+    def signer_noeud(self, csr_bytes: bytes, domaines: list = None):
+        generateur = GenerateurCertificateNoeud(self.__nom_millegrille, domaines, self.__dict_ca, self.__millegrille)
+
+        csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+
+        certificat = generateur.signer(csr)
+        chaine = generateur.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)
         clecert.chaine = chaine

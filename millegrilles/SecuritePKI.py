@@ -127,6 +127,10 @@ class EnveloppeCertificat:
         return attribute_values
 
     @property
+    def subject_organization_name(self):
+        return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
+
+    @property
     def subject_organizational_unit_name(self):
         return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
 

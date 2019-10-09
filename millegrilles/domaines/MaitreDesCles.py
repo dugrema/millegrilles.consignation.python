@@ -6,7 +6,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, GenerateurCertificateParRequest
 from millegrilles.domaines.Pki import ConstantesPki
 
 from cryptography.hazmat.backends import default_backend
@@ -41,6 +41,7 @@ class ConstantesMaitreDesCles:
 
     TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
     TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
+    TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
 
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
@@ -50,6 +51,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
+    TRANSACTION_CHAMP_DOMAINES = 'domaines'
     TRANSACTION_CHAMP_IDDOC = 'id-doc'
     TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
@@ -250,6 +252,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_SIGNER_CERTIFICAT_NOEUD:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCertificatNoeud"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -746,8 +750,10 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
         roles_cert = enveloppe_cert.get_roles
-        if 'deployeur' in roles_cert or 'maitredescles' in roles_cert:
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.nom_millegrille and \
+            'deployeur' in roles_cert or 'maitredescles' in roles_cert:
             # Le deployeur et le maitre des cles ont l'autorisation de renouveller n'importe quel certificat
+            # Coupdoeil a tous les acces au niveau secure
             self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
         else:
             self.set_etape_suivante(ProcessusRenouvellerCertificat.refuser_generation.__name__)
@@ -778,6 +784,88 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         # Trouver generateur pour le role
         generateur = self._controleur.gestionnaire.renouvelleur_certificat
         clecert = generateur.renouveller_avec_csr(role, node_name, csr_bytes)
+
+        # Generer nouvelle transaction pour sauvegarder le certificat
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+        self._controleur.generateur_transactions.soumettre_transaction(
+            transaction,
+            domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
+
+        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+
+        return {
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
+
+    def refuser_generation(self):
+        """
+        Refuser la creation d'un nouveau certificat.
+        :return:
+        """
+        # Repondre au demandeur avec le refus
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+        pass
+
+    def initiale(self):
+        transaction = self.transaction
+        domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
+
+        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+        roles_cert = enveloppe_cert.get_roles
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.nom_millegrille and \
+            'coupdoeil' in roles_cert or 'deployeur' in roles_cert:
+            # Le coupdoeil a l'autorisation de signer n'importe quel certificat
+            self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
+        else:
+            self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
+            return {
+                'autorise': False,
+                'domaines': domaines,
+                'description': 'demandeur non autorise a signer ce certificat',
+                'roles_demandeur': roles_cert
+            }
+
+        return {
+            'autorise': True,
+            'domaines': domaines,
+            'roles_demandeur': roles_cert,
+        }
+
+    def generer_cert(self):
+        """
+        Generer cert et creer nouvelle transaction pour PKI
+        :return:
+        """
+        transaction = self.transaction
+        domaines = self.parametres['domaines']
+        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+
+        # Trouver generateur pour le role
+        renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
+        clecert = renouvelleur.signer_noeud(csr_bytes)
 
         # Generer nouvelle transaction pour sauvegarder le certificat
         transaction = {
