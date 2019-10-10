@@ -333,7 +333,7 @@ class ProducteurDocumentSenseurPassif:
         date_lecture_epoch = copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
 
         # Transformer les donnees en format natif (plus facile a utiliser plus tard)
-        date_lecture = datetime.datetime.fromtimestamp(date_lecture_epoch)   # Mettre en format date standard
+        date_lecture = datetime.datetime.utcfromtimestamp(date_lecture_epoch)   # Mettre en format date standard
         copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
 
         # Extraire les donnees de la liste "senseurs" pour les utiliser plus facilement
@@ -985,12 +985,11 @@ class ProcessusChangementAttributSenseur(ProcessusMAJSenseurPassif):
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
-            "senseur": document_transaction['senseur'],
-            "noeud": document_transaction['noeud'],
+            "uuid_senseur": document_transaction['uuid_senseur'],
         }
         valeurs_modifiees = dict()
         for cle in document_transaction:
-            if not cle.startswith('_') and cle not in ['senseur', 'noeud']:
+            if not cle.startswith('_') and cle not in ['uuid_senseur']:
                 valeurs_modifiees[cle] = document_transaction[cle]
         valeurs = {
             '$set': valeurs_modifiees,
