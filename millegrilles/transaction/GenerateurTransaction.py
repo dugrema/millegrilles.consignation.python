@@ -71,7 +71,7 @@ class GenerateurTransaction:
 
         return message_signe
 
-    def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None):
+    def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None, domaine_direct=False):
         """
         Transmet une requete au backend de MilleGrilles. La requete va etre vu par un des workers du domaine. La
         reponse va etre transmise vers la "message_dao.queue_reponse", et le correlation_id permet de savoir a
@@ -91,7 +91,10 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        routing_key = 'requete.%s' % domaine
+        if domaine_direct:
+            routing_key = domaine
+        else:
+            routing_key = 'requete.%s' % domaine
         self._contexte.message_dao.transmettre_message_noeuds(
             enveloppe, routing_key, encoding=self.encodeur_json,
             reply_to=reply_to, correlation_id=correlation_id)

@@ -627,7 +627,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'requete.noeuds'),
                 'routing': [
-                    'requete.%s.#' % self.get_nom_domaine()
+                    'requete.%s.#' % self.get_nom_domaine(),
+                    'pki.ca',
                 ],
                 'exchange': self.configuration.exchange_noeuds,
                 'callback': self.get_handler_requetes_noeuds().callbackAvecAck

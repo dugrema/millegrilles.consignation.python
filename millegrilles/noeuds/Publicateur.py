@@ -19,6 +19,7 @@ from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
+from millegrilles.domaines.Pki import ConstantesPki
 
 
 class ConstantesPublicateur:
@@ -103,6 +104,16 @@ class Publicateur(ModeleConfiguration):
 
         self.__channel.basic_consume(self._message_handler.callbackAvecAck, queue=nom_queue, no_ack=False)
 
+        # Demander le certificat CA
+        requete = {}
+        self.contexte.generateur_transactions.transmettre_requete(
+            requete,
+            ConstantesPki.REQUETE_LISTE_CA,
+            'certs.ca',
+            reply_to=nom_queue,
+            domaine_direct=True
+        )
+
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
         self.deconnecter()
@@ -174,15 +185,13 @@ class TraitementPublication(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         correlation_id = properties.correlation_id
-        exchange = method.exchange
 
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        # enveloppe_certificat = self.contexte.verificateur_transaction.verifier(message_dict)
 
-        if correlation_id is not None:
-            # C'est une reponse
-            raise ValueError("Reponse non supportee. Correlation_id: %s" % correlation_id)
+        if correlation_id == 'certs.ca':
+            # Sauvegarder liste des certificats ca
+            exporteur = PublierCertificatCA(self._publicateur, message_dict)
+            exporteur.exporter()
         elif routing_key is not None:
             if routing_key in ['publicateur.plume.publierDocument']:
                 exporteur = ExporterPlume(self._publicateur, message_dict)
@@ -201,6 +210,9 @@ class TraitementPublication(BaseCallback):
                 exporteur.exporter_categorie()
             elif routing_key == 'commande.publicateur.publierCertificat':
                 exporteur = PublierCertificat(self._publicateur, message_dict)
+                exporteur.exporter()
+            elif routing_key == 'commande.publicateur.publierCA':
+                exporteur = PublierCertificatCA(self._publicateur, message_dict)
                 exporteur.exporter()
             else:
                 raise ValueError("Message routing inconnu: %s" % routing_key)
@@ -476,7 +488,7 @@ class PublierCertificat:
         webroot = self._publicateur.webroot
         return '%s/certs' % webroot
 
-    def exporter(self):
+    def _get_pem(self):
         cert_pem = self._message_publication[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
         enveloppe = EnveloppeCertificat(certificat_pem=cert_pem)
         cn = enveloppe.subject_common_name
@@ -484,8 +496,23 @@ class PublierCertificat:
         org = enveloppe.subject_organization_name
 
         nom_fichier = '%s.%s.%s.cert.pem' % (cn, ou, org)
+        return cert_pem, nom_fichier
+
+    def exporter(self):
+        cert_pem, nom_fichier = self._get_pem()
         dir_fichier = self._chemin_fichier()
         path_fichier = os.path.join(self._chemin_fichier(), nom_fichier)
         os.makedirs(dir_fichier, exist_ok=True)
         with open(path_fichier, 'w') as fichier:
             fichier.write(cert_pem)
+
+
+class PublierCertificatCA(PublierCertificat):
+
+    def _get_pem(self):
+        cert_pem = self._message_publication[ConstantesSecurityPki.LIBELLE_CHAINE_PEM]
+        enveloppe = EnveloppeCertificat(certificat_pem=cert_pem)
+        org = enveloppe.subject_organization_name
+
+        nom_fichier = '%s.CA.cert.pem' % org
+        return cert_pem, nom_fichier

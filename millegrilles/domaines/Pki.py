@@ -2,7 +2,7 @@
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete, CertificatInconnu
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 
@@ -48,6 +48,7 @@ class ConstantesPki:
 
     REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
     REQUETE_CERTIFICAT_DEMANDE = 'pki.requete.certificat'
+    REQUETE_LISTE_CA = 'pki.requete.ca'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
     # Indique que c'est un evenement avec un certificat (reference)
@@ -122,6 +123,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
                 'routing': [
                     '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                    ConstantesPki.REQUETE_LISTE_CA,
                 ],
                 'exchange': self.configuration.exchange_noeuds,
                 'callback': self.__traitement_certificats.callbackAvecAck
@@ -575,6 +577,8 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
             self.recevoir_certificat(message_dict)
         elif method.routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
             self.transmettre_certificat(properties, message_dict)
+        elif method.routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
+            self.transmettre_liste_ca(properties, message_dict)
         else:
             raise Exception("Type evenement inconnu: %s" % method.routing_key)
 
@@ -585,6 +589,19 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
     def transmettre_certificat(self, properties, message_dict):
         pass
+
+    def transmettre_liste_ca(self, properties, message_dict):
+        ca_file = self.configuration.mq_cafile
+
+        with open(ca_file, 'r') as f:
+            contenu = f.read()
+
+        reponse = {
+            ConstantesSecurityPki.LIBELLE_CHAINE_PEM: contenu
+        }
+
+        self.gestionnaire.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
 
 
 class ProcessusClesRecues(MGProcessusTransaction):
