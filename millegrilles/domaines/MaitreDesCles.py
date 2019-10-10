@@ -879,7 +879,16 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
         }
         self._controleur.generateur_transactions.soumettre_transaction(
             transaction,
-            domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
+
+        # Creer une commande pour que le monitor genere le compte sur RabbitMQ
+        commande_creation_compte = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+        }
+        self._controleur.generateur_transactions.transmettre_commande(
+            commande_creation_compte,
+            'commande.monitor.ajouterCompteMq'
         )
 
         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
