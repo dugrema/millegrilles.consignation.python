@@ -386,6 +386,12 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
             if enveloppe is not None:
                 verificateur.verifier_chaine(enveloppe)
                 valide = True
+
+                commande_publier_certificat = {
+                    ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
+                }
+                self.generateur_transactions.transmettre_commande(commande_publier_certificat, 'commande.publicateur.publierCertificat')
+
         except Exception as e:
             self._logger.warn("Certificat invalide: %s" % fingerprint)
             self._logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
@@ -393,6 +399,9 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         if valide:
             helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
             helper.marquer_certificats_valides([fingerprint])
+
+        # Transmettre commande au publicateur pour inserer le certificat dans le repertoire certs
+
 
         self.set_etape_suivante()  # Termine
 

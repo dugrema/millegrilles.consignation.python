@@ -18,6 +18,7 @@ from distutils import dir_util
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
 
 
 class ConstantesPublicateur:
@@ -59,7 +60,7 @@ class Publicateur(ModeleConfiguration):
 
         self._webroot = self.args.webroot
         if self._webroot is None:
-            self._webroot = '/opt/millegrilles/%s/mounts/nginx/www-public' % nom_millegrille
+            self._webroot = '/opt/millegrilles/%s/mounts/nginx' % nom_millegrille
 
         self._template_path = self.args.templates
         if self._template_path is None:
@@ -95,7 +96,7 @@ class Publicateur(ModeleConfiguration):
         self.__queue_reponse = nom_queue
         self._logger.debug("Resultat creation queue: %s" % nom_queue)
 
-        routing_keys = ['publicateur.#']
+        routing_keys = ['publicateur.#', 'commande.publicateur.#']
 
         for routing_key in routing_keys:
             self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
@@ -198,6 +199,9 @@ class TraitementPublication(BaseCallback):
                 # Mettre a jour le catalogue d'une categorie plume
                 exporteur = PublierCataloguePlume(self._publicateur, message_dict)
                 exporteur.exporter_categorie()
+            elif routing_key == 'commande.publicateur.publierCertificat':
+                exporteur = PublierCertificat(self._publicateur, message_dict)
+                exporteur.exporter()
             else:
                 raise ValueError("Message routing inconnu: %s" % routing_key)
         else:
@@ -458,3 +462,30 @@ class PublierGrosFichiers:
 
     def __init__(self):
         pass
+
+
+class PublierCertificat:
+
+    def __init__(self, publicateur, message_publication):
+        super().__init__()
+        self._publicateur = publicateur
+        self._message_publication = message_publication
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def _chemin_fichier(self):
+        webroot = self._publicateur.webroot
+        return '%s/certs' % webroot
+
+    def exporter(self):
+        cert_pem = self._message_publication[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+        enveloppe = EnveloppeCertificat(certificat_pem=cert_pem)
+        cn = enveloppe.subject_common_name
+        ou = enveloppe.subject_organizational_unit_name
+        org = enveloppe.subject_organization_name
+
+        nom_fichier = '%s.%s.%s.cert.pem' % (cn, ou, org)
+        dir_fichier = self._chemin_fichier()
+        path_fichier = os.path.join(self._chemin_fichier(), nom_fichier)
+        os.makedirs(dir_fichier, exist_ok=True)
+        with open(path_fichier, 'w') as fichier:
+            fichier.write(cert_pem)
