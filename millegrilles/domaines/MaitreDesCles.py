@@ -865,7 +865,7 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
 
         # Trouver generateur pour le role
         renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = renouvelleur.signer_noeud(csr_bytes)
+        clecert = renouvelleur.signer_noeud(csr_bytes, domaines)
 
         # Generer nouvelle transaction pour sauvegarder le certificat
         transaction = {

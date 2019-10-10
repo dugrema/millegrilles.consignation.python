@@ -898,7 +898,7 @@ class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
         builder = super()._get_keyusage(builder)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ','.join(self.__domaines)
+        roles = ','.join(self.__domaines).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
