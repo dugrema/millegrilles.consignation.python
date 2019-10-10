@@ -5,10 +5,9 @@ import logging
 
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard
-from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, TraitementMessageDomaineMiddleware
-from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
+from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
+from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-from millegrilles.domaines.Taches import FormatteurEvenementNotification, TachesConstantes
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations, GenerateurTransaction
 from bson.objectid import ObjectId
 
@@ -28,6 +27,8 @@ class SenseursPassifsConstantes:
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
     LIBELLE_DOCUMENT_GROUPE = 'groupe.senseurs'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE = 'senseur.rapport.annee'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE = 'senseur.rapport.semaine'
     LIBVAL_CONFIGURATION = 'configuration'
 
     TRANSACTION_NOEUD = 'noeud'
@@ -202,8 +203,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
     def creer_regenerateur_documents(self):
         return RegenerateurSenseursPassifs(self)
 
-    def get_handler_transaction(self):
-        return TraitementRapportsSenseursPassifs(self)
+    # def get_handler_transaction(self):
+    #     return TraitementRapportsSenseursPassifs(self)
 
 
 class TraitementMessageLecture(TraitementMessageDomaine):
@@ -293,20 +294,47 @@ class TraitementMessageRequete(TraitementMessageDomaine):
         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, reply_to, correlation_id)
 
 
-class TraitementRapportsSenseursPassifs(TraitementMessageDomaineMiddleware):
+# Classe qui gere le document pour un noeud. Supporte une mise a jour incrementale des donnees.
+class ProducteurDocumentNoeud:
 
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+    def __init__(self, document_dao):
+        self._document_dao = document_dao
 
-        if evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
-        elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
-            self._gestionnaire.demarrer_processus(processus, message_dict)
-        else:
-            super().traiter_message(ch, method, properties, body)
+    '''
+    Mise a jour du document de noeud par une transaction senseur passif
+    
+    :param id_document_senseur: _id du document du senseur.
+    '''
+    def maj_document_noeud_senseurpassif(self, id_document_senseur):
+
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
+
+        noeud = document_senseur['noeud']
+        no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+
+        champs_a_exclure = ['en-tete', 'moyennes_dernier_jour', 'extremes_dernier_mois']
+
+        valeurs = document_senseur.copy()
+        operations_filtre = TransactionOperations()
+        valeurs = operations_filtre.enlever_champsmeta(valeurs, champs_a_exclure)
+
+        donnees_senseur = {
+            'dict_senseurs.%s' % str(no_senseur): valeurs
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_NOEUD,
+            'noeud': noeud
+        }
+
+        update = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': filtre,
+            '$set': donnees_senseur
+        }
+
+        collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
@@ -318,10 +346,11 @@ class ProducteurDocumentSenseurPassif:
 
     ''' 
     Extrait l'information d'une lecture de senseur passif pour creer ou mettre a jour le document du senseur.
-    
+
     :param transaction: Document de la transaction.
     :return: L'identificateur mongo _id du document de senseur qui a ete cree/modifie.
     '''
+
     def maj_document_senseur(self, transaction):
 
         # Verifier si toutes les cles sont presentes
@@ -333,7 +362,7 @@ class ProducteurDocumentSenseurPassif:
         date_lecture_epoch = copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
 
         # Transformer les donnees en format natif (plus facile a utiliser plus tard)
-        date_lecture = datetime.datetime.utcfromtimestamp(date_lecture_epoch)   # Mettre en format date standard
+        date_lecture = datetime.datetime.utcfromtimestamp(date_lecture_epoch)  # Mettre en format date standard
         copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
 
         # Extraire les donnees de la liste "senseurs" pour les utiliser plus facilement
@@ -400,298 +429,6 @@ class ProducteurDocumentSenseurPassif:
 
         return document_senseur
 
-    ''' 
-    Calcule les moyennes de la derniere journee pour un senseur avec donnees numeriques. 
-    
-    :param id_document_senseur: _id de base de donnees Mongo pour le senseur a mettre a jour.
-    '''
-    def calculer_aggregation_journee(self, id_document_senseur):
-
-        senseur_objectid_key = {"_id": ObjectId(id_document_senseur)}
-
-        # Charger l'information du senseur
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document_senseur = collection_senseurs.find_one(senseur_objectid_key)
-
-        self._logger.debug("Document charge: %s" % str(document_senseur))
-
-        noeud = document_senseur[SenseursPassifsConstantes.TRANSACTION_NOEUD]
-        no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-
-        regroupement_champs = {
-            'temperature-moyenne': {'$avg': '$temperature'},
-            'humidite-moyenne': {'$avg': '$humidite'},
-            'pression-moyenne': {'$avg': '$pression'}
-        }
-
-        # Creer l'intervalle pour les donnees. Utiliser timezone pour s'assurer de remonter un nombre d'heures correct
-        time_range_from, time_range_to = ProducteurDocumentSenseurPassif.calculer_daterange(hours=25)
-
-        # Transformer en epoch (format de la transaction)
-        time_range_to = int(time_range_to.timestamp())
-        time_range_from = int(time_range_from.timestamp())
-
-        self._logger.debug("Requete time range %d a %d" % (time_range_from, time_range_to))
-
-        selection = {
-            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            'temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
-            'senseur': no_senseur,
-            'noeud': noeud
-        }
-
-        # Noter l'absence de timezone - ce n'est pas important pour le regroupement par heure.
-        regroupement_periode = {
-            'year': {'$year': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
-            'month': {'$month': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
-            'day': {'$dayOfMonth': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
-            'hour': {'$hour': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}}},
-        }
-
-        regroupement = {
-            '_id': {
-                'noeud': '$noeud',
-                'senseur': '$senseur',
-                'periode': {
-                    '$dateFromParts': regroupement_periode
-                }
-            }
-        }
-        regroupement.update(regroupement_champs)
-
-        operation = [
-            {'$match': selection},
-            {'$group': regroupement},
-        ]
-
-        self._logger.debug("Operation aggregation: %s" % str(operation))
-
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        resultat_curseur = collection_transactions.aggregate(operation)
-
-        resultat = []
-        for res in resultat_curseur:
-            # Extraire la date, retirer le reste de la cle (redondant, ca va deja etre dans le document du senseur)
-            res['periode'] = res['_id']['periode']
-            del res['_id']
-            resultat.append(res)
-            self._logger.debug("Resultat: %s" % str(res))
-
-            self._logger.debug("Document %s, Nombre resultats: %d" % (id_document_senseur, len(resultat)))
-
-        # Trier les resultats en ordre decroissant de date
-        resultat.sort(key=lambda res2: res2['periode'], reverse=True)
-        for res in resultat:
-            self._logger.debug("Resultat trie: %s" % res)
-
-        operation_set = {'moyennes_dernier_jour': resultat}
-
-        # Si on a des lectures de pression atmospheriques, on peut calculer la tendance
-        if len(resultat) > 1:
-            heure_1 = resultat[0].get('pression-moyenne')
-            heure_2 = resultat[1].get('pression-moyenne')
-
-            if heure_1 is not None and heure_2 is not None:
-                # Note: il faudrait aussi verifier l'intervalle entre les lectures (aucunes lectures pendant des heures)
-                tendance = '='
-                if heure_1 > heure_2:
-                    tendance = '+'
-                elif heure_2 > heure_1:
-                    tendance = '-'
-                operation_set['pression_tendance'] = tendance
-                self._logger.debug("Tendance pour %s / %s: %s" % (heure_1, heure_2, tendance))
-            else:
-                self._logger.debug("Pas de pression atmospherique %s" % id_document_senseur)
-
-        else:
-            self._logger.debug("Pas assez de donnees pour tendance: %s" % id_document_senseur)
-
-        # Sauvegarde de l'information dans le document du senseur
-        operation_update = {
-            '$set': operation_set,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
-        collection_senseurs.update_one(filter=senseur_objectid_key, update=operation_update, upsert=False)
-
-    '''
-    Calcule les moyennes/min/max du dernier mois pour un senseur avec donnees numeriques.
-    
-    :param id_document_senseur: _id de base de donnees Mongo pour le senseur a mettre a jour.
-    '''
-    def calculer_aggregation_mois(self, id_document_senseur):
-        senseur_objectid_key = {"_id": ObjectId(id_document_senseur)}
-
-        # Charger l'information du senseur
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document_senseur = collection_senseurs.find_one(senseur_objectid_key)
-
-        self._logger.debug("Document charge: %s" % str(document_senseur))
-
-        noeud = document_senseur[SenseursPassifsConstantes.TRANSACTION_NOEUD]
-        no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-
-        regroupement_champs = {
-            'temperature-maximum': {'$max': '$temperature'},
-            'temperature-minimum': {'$min': '$temperature'},
-            'humidite-maximum': {'$max': '$humidite'},
-            'humidite-minimum': {'$min': '$humidite'},
-            'pression-maximum': {'$max': '$pression'},
-            'pression-minimum': {'$min': '$pression'}
-        }
-
-        # Creer l'intervalle pour les donnees
-        time_range_from, time_range_to = ProducteurDocumentSenseurPassif.calculer_daterange(days=31)
-
-        # Transformer en epoch (format de la transaction)
-        time_range_to = int(time_range_to.timestamp())
-        time_range_from = int(time_range_from.timestamp())
-
-        selection = {
-            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            'temps_lecture': {'$gte': time_range_from, '$lt': time_range_to},
-            'senseur': no_senseur,
-            'noeud': noeud
-        }
-
-        # Noter l'utilisation de la timezone pour le regroupement. Important pour faire la separation des donnees
-        # correctement.
-        # Noter l'absence de timezone - ce n'est pas important pour le regroupement par heure.
-        regroupement_periode = {
-            'year': {'$year': {
-                'date': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}},
-                'timezone': 'America/Montreal'
-            }},
-            'month': {'$month': {
-                'date': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}},
-                'timezone': 'America/Montreal'
-            }},
-            'day': {'$dayOfMonth': {
-                'date': {'$toDate': {'$multiply': ['$temps_lecture', 1000]}},
-                'timezone': 'America/Montreal'
-            }}
-        }
-
-        regroupement = {
-            '_id': {
-                'noeud': '$noeud',
-                'senseur': '$senseur',
-                'periode': {
-                    '$dateFromParts': regroupement_periode
-                }
-            }
-        }
-        regroupement.update(regroupement_champs)
-
-        operation = [
-            {'$match': selection},
-            {'$group': regroupement},
-        ]
-
-        self._logger.debug("Operation aggregation: %s" % str(operation))
-
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        resultat_curseur = collection_transactions.aggregate(operation)
-
-        resultat = []
-        for res in resultat_curseur:
-            # Extraire la date, retirer le reste de la cle (redondant, ca va deja etre dans le document du senseur)
-            res['periode'] = res['_id']['periode']
-            del res['_id']
-            resultat.append(res)
-
-        # Trier les resultats en ordre decroissant de date
-        resultat.sort(key=lambda res2: res2['periode'], reverse=True)
-        for res in resultat:
-            self._logger.debug("Resultat: %s" % res)
-
-        # Sauvegarde de l'information dans le document du senseur
-        operation_update = {
-            '$set': {'extremes_dernier_mois': resultat},
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
-        collection_senseurs.update_one(filter=senseur_objectid_key, update=operation_update, upsert=False)
-
-    ''' 
-    Methode qui calcule un date range a partir de maintenant
-    
-    :param days: Nombre de jour a remonter (passe) 
-    :param hours: Nombre de jour a remonter (passe)
-    :return: Format datetime, from, to 
-    '''
-    @staticmethod
-    def calculer_daterange(days=0, hours=0):
-        date_reference = datetime.datetime.utcnow()
-        time_range_to = datetime.datetime(date_reference.year, date_reference.month,
-                                          date_reference.day,
-                                          date_reference.hour)
-        time_range_from = time_range_to - datetime.timedelta(days=days, hours=hours)
-        time_range_from = time_range_from.replace(minute=0, second=0, microsecond=0)
-        if days > 0 and hours == 0:  # Ajuster pour avoir la journee au complet
-            time_range_from = time_range_from.replace(hour=0)
-
-        return time_range_from, time_range_to
-
-    '''
-    Retourne les _id de tous les documents de senseurs. 
-    '''
-    def trouver_id_documents_senseurs(self):
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-
-        selection = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
-        }
-        documents = collection_senseurs.find(filter=selection, projection={'_id': 1})
-
-        # Extraire les documents du curseur, change de ObjectId vers un string
-        document_ids = []
-        for doc in documents:
-            document_ids.append(str(doc['_id']))
-
-        return document_ids
-
-
-# Classe qui gere le document pour un noeud. Supporte une mise a jour incrementale des donnees.
-class ProducteurDocumentNoeud:
-
-    def __init__(self, document_dao):
-        self._document_dao = document_dao
-
-    '''
-    Mise a jour du document de noeud par une transaction senseur passif
-    
-    :param id_document_senseur: _id du document du senseur.
-    '''
-    def maj_document_noeud_senseurpassif(self, id_document_senseur):
-
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
-
-        noeud = document_senseur['noeud']
-        no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-
-        champs_a_exclure = ['en-tete', 'moyennes_dernier_jour', 'extremes_dernier_mois']
-
-        valeurs = document_senseur.copy()
-        operations_filtre = TransactionOperations()
-        valeurs = operations_filtre.enlever_champsmeta(valeurs, champs_a_exclure)
-
-        donnees_senseur = {
-            'dict_senseurs.%s' % str(no_senseur): valeurs
-        }
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_NOEUD,
-            'noeud': noeud
-        }
-
-        update = {
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$setOnInsert': filtre,
-            '$set': donnees_senseur
-        }
-
-        collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
-
 
 # Processus pour enregistrer une transaction d'un senseur passif
 class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
@@ -737,207 +474,6 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
 
     def get_collection_processus_nom(self):
         return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusTransactionSenseursPassifsMAJHoraire(MGProcessus):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        # Faire liste des documents a mettre a jour
-        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
-        liste_documents = producteur.trouver_id_documents_senseurs()
-
-        parametres = {}
-        if len(liste_documents) > 0:
-            parametres['documents_senseurs'] = liste_documents
-            self.set_etape_suivante(ProcessusTransactionSenseursPassifsMAJHoraire.calculer_moyennes.__name__)
-        else:
-            self.set_etape_suivante()   # Rien a faire, etape finale
-
-        return parametres
-
-    def calculer_moyennes(self):
-        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
-
-        liste_documents = self._document_processus['parametres']['documents_senseurs']
-        for doc_senseur in liste_documents:
-            producteur.calculer_aggregation_journee(doc_senseur)
-
-        self.set_etape_suivante()  # Rien a faire, etape finale
-
-    def get_collection_transaction_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-
-    def get_collection_processus_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusTransactionSenseursPassifsMAJQuotidienne(MGProcessus):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        # Faire liste des documents a mettre a jour
-        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
-        liste_documents = producteur.trouver_id_documents_senseurs()
-
-        parametres = {}
-        if len(liste_documents) > 0:
-            parametres['documents_senseurs'] = liste_documents
-            self.set_etape_suivante(
-                ProcessusTransactionSenseursPassifsMAJQuotidienne.calculer_valeurs_quotidiennes.__name__)
-        else:
-            self.set_etape_suivante()   # Rien a faire, etape finale
-
-        return parametres
-
-    def calculer_valeurs_quotidiennes(self):
-        producteur = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
-
-        liste_documents = self._document_processus['parametres']['documents_senseurs']
-        for doc_senseur in liste_documents:
-            producteur.calculer_aggregation_mois(doc_senseur)
-
-        self.set_etape_suivante()  # Rien a faire, etape finale
-
-    def get_collection_transaction_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-
-    def get_collection_processus_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
-
-
-class TraitementBacklogLecturesSenseursPassifs:
-
-    def __init__(self, document_dao, demarreur_processus):
-        self._document_dao = document_dao
-        self._logger = logging.getLogger('%s.TraitementBacklogLecturesSenseursPassifs' % __name__)
-
-        # self.demarreur_processus = MGPProcessusDemarreur(self._contexte)
-        self.demarreur_processus = demarreur_processus
-
-    ''' 
-    Identifie la transaction de lecture la plus recente pour chaque noeud/senseur. Cherche uniquement dans
-    les transactions qui ne sont pas marquees comme traitees. 
-    
-    :returns: Liste de noeud/senseurs avec temps_lecture de la transaction la plus recente. 
-    '''
-    def run_requete_plusrecentetransactionlecture_parsenseur(self):
-        filtre = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            'evenements.transaction_traitee': {'$exists': False}
-        }
-
-        # Trouver la request la plus recente pour chaque noeud/senseur.
-        regroupement = {
-            '_id': {
-                'noeud': '$charge-utile.noeud',
-                'senseur': '$charge-utile.senseur'
-            },
-            'temps_lecture': {'$max': '$charge-utile.temps_lecture'}
-        }
-
-        operation = [
-            {'$match': filtre},
-            {'$group': regroupement}
-        ]
-
-        self._logger.debug("Operation aggregation: %s" % str(operation))
-
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        resultat_curseur = collection_transactions.aggregate(operation)
-
-        liste_transaction_senseurs = []
-        for res in resultat_curseur:
-            transaction = {
-                'noeud': res['_id']['noeud'],
-                'senseur': res['_id']['senseur'],
-                'temps_lecture': res['temps_lecture']
-            }
-            liste_transaction_senseurs.append(transaction)
-            self._logger.debug("Resultat: %s" % str(transaction))
-
-        return liste_transaction_senseurs
-
-    '''
-    Identifier le _id des transaction les plus recentes pour chaque noeud/senseur et lance un message pour
-    effectuer le traitement.
-    
-    Marque toutes les transactions anterieures comme traitees (elles n'ont aucun impact).
-    
-    :param liste_senseurs: Liste des senseurs avec temps_lecture de la plus recente transaction pour chaque.
-    '''
-    def run_requete_genererdeclencheur_parsenseur(self, liste_senseurs):
-
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-
-        for transaction_senseur in liste_senseurs:
-            filtre = {
-                'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-                'charge-utile.noeud': transaction_senseur['noeud'],
-                'charge-utile.senseur': transaction_senseur['senseur'],
-                'charge-utile.temps_lecture': transaction_senseur['temps_lecture']
-            }
-            projection = {
-                '_id': 1
-            }
-            resultat_curseur = collection_transactions.find(filter=filtre, projection=projection)
-
-            for res in resultat_curseur:
-                # Preparer un message pour declencher la transaction
-                self._logger.debug("Transaction a declencher: _id = %s" % str(res['_id']))
-                processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
-                message_dict = {
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(res['_id']),
-                    'senseur': transaction_senseur
-                }
-                self.demarreur_processus.demarrer_processus(processus, message_dict)
-
-                # Marquer toutes les transaction anterieures comme traitees
-                filtre['evenements.transaction_traitee'] = {'$exists': False}
-                filtre['charge-utile.temps_lecture'] = {'$lt': transaction_senseur['temps_lecture']}
-
-                operation = {
-                    '$push': {'evenements.transaction_traitee': datetime.datetime.utcnow()}
-                }
-
-                collection_transactions.update_many(filter=filtre, update=operation)
-
-    def declencher_calculs(self):
-        """ Declencher le calcul des moyennes horaires """
-
-        processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
-        self.demarreur_processus.demarrer_processus(processus, {})
-
-        processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
-        self.demarreur_processus.demarrer_processus(processus, {})
-
-    def declencher_maj_manuelle(self):
-        """ Re-declencher les transactions de mise a jour manuelles qui n'ont pas ete executees. """
-
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        filtre = {
-            'info-transaction.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR,
-            'evenements.transaction_traitee': {'$exists': False}
-        }
-        projection = {
-            '_id': 1,
-            'info-transaction.uuid-transaction': 1
-        }
-        tri = [
-            ('info-transaction.estampille', 1)
-        ]
-
-        curseur = collection_transactions.find(filtre, projection, sort=tri)
-
-        processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajManuelle"
-        for transaction in curseur:
-            transaction['_id-transaction'] = transaction['_id']  # Copier le _id pour que le processus ait la bonne cle
-            self._logger.debug("Redemarrer processus pour ProcessusMajManuelle _id:%s" % transaction['_id'])
-            self.demarreur_processus.demarrer_processus(processus, transaction)
 
 
 # Processus pour mettre a jour un document de noeud suite a une transaction de senseur passif
