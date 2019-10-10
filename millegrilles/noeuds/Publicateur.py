@@ -52,6 +52,9 @@ class Publicateur(ModeleConfiguration):
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+        # Flags pour elements qu'on veut s'assurer de charger au demarrage
+        self.flag_certs_ca = False
+
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
 
@@ -104,7 +107,13 @@ class Publicateur(ModeleConfiguration):
 
         self.__channel.basic_consume(self._message_handler.callbackAvecAck, queue=nom_queue, no_ack=False)
 
-        # Demander le certificat CA
+    def requete_certs_ca(self, nom_queue):
+        """
+        Demander les certificats CA a PKI.
+        :param nom_queue: 
+        :return: 
+        """
+        self._logger.debug("Requete certificats CA pour la millegrille")
         requete = {}
         self.contexte.generateur_transactions.transmettre_requete(
             requete,
@@ -144,7 +153,6 @@ class Publicateur(ModeleConfiguration):
             help="Repertoire pour les modeles (templates) html et autres ressources"
         )
 
-
     def set_logging_level(self):
         super().set_logging_level()
         """ Utilise args pour ajuster le logging level (debug, info) """
@@ -160,7 +168,12 @@ class Publicateur(ModeleConfiguration):
         self._stop_event.clear()  # Pret a l'execution
 
         while not self._stop_event.is_set():
+
+            if not self.flag_certs_ca:
+                self.requete_certs_ca(self.__queue_reponse)
+
             self._stop_event.wait(30)
+
 
     @property
     def webroot(self):
@@ -192,6 +205,7 @@ class TraitementPublication(BaseCallback):
             # Sauvegarder liste des certificats ca
             exporteur = PublierCertificatCA(self._publicateur, message_dict)
             exporteur.exporter()
+            self._publicateur.flag_certs_ca = True
         elif routing_key is not None:
             if routing_key in ['publicateur.plume.publierDocument']:
                 exporteur = ExporterPlume(self._publicateur, message_dict)
@@ -253,7 +267,6 @@ class ExporterVersHtml:
     def exporter_html(self, nom_section: str = 'ACCUEIL'):
         """
         Sauvegarde le contenu HTML dans un fichier
-        :param delta_html:
         :param nom_section:
         :return:
         """
