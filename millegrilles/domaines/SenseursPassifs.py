@@ -31,8 +31,8 @@ class SenseursPassifsConstantes:
     LIBVAL_CONFIGURATION = 'configuration'
 
     TRANSACTION_NOEUD = 'noeud'
-    TRANSACTION_ID_SENSEUR = 'senseur'
-    TRANSACTION_DATE_LECTURE = 'temps_lecture'
+    TRANSACTION_ID_SENSEUR = 'uuid_senseur'
+    TRANSACTION_DATE_LECTURE = 'timestamp'
     TRANSACTION_LOCATION = 'location'
     TRANSACTION_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
     TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR = '%s.changementAttributSenseur' % DOMAINE_NOM

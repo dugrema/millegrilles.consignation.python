@@ -128,7 +128,7 @@ class DemarreurNoeud(Daemon):
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
         self.__channel = channel
-        self.__certificat_event_handler.initialiser(channel)
+        self.__certificat_event_handler.initialiser()
 
     def on_channel_close(self):
         self.__channel = None
