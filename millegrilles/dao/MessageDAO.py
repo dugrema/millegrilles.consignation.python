@@ -491,6 +491,10 @@ class PikaDAO:
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
+            self.channel.basic_publish(
+                exchange=self.configuration.exchange_noeuds,
+                routing_key=routing_key,
+                body=message_utf8)
 
     '''
     Transmet un declencheur pour une etape de processus MilleGrilles.
