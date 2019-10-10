@@ -798,6 +798,15 @@ class GenererFichiers(GenerateurNoeud):
             critical=False
         )
 
+        liste_dns = [
+            x509.DNSName(u'consignationfichiers'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+        ]
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
         return builder
 
 
