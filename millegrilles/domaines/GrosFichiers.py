@@ -154,6 +154,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
+    def get_queue_configuration(self):
+        queue_config = super().get_queue_configuration()
+        queue_config.append(
+            {
+                'nom': '%s.%s' % (self.get_nom_queue(), 'transactions'),
+                'routing': [
+                    'destinataire.domaine.%s.#' % self.get_nom_domaine(),
+                ],
+                'exchange': self.configuration.exchange_noeuds,
+                'callback': self.get_handler_transaction().callbackAvecAck
+            },
+        )
+        return queue_config
+
     def identifier_processus(self, domaine_transaction):
         # Fichiers
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
