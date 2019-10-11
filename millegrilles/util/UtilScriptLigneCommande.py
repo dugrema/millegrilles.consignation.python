@@ -5,6 +5,7 @@ import signal
 import logging
 import threading
 import time
+import sys
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -131,6 +132,17 @@ class ModeleConfiguration:
             for thread in threading.enumerate():
                 if thread.name not in ok_threads:
                     self._logger.error("Thread ouverte apres demande de fermeture: %s" % thread.name)
+
+            time.sleep(5)
+            thread_encore_ouverte = False
+            for thread in threading.enumerate():
+                if thread.name not in ok_threads:
+                    self._logger.error("Thread encore ouverte apres demande de fermeture: %s" % thread.name)
+                    thread_encore_ouverte = True
+
+            if thread_encore_ouverte:
+                self._logger.error("Threads encore ouvertes, on force la sortie")
+                sys.exit(2)
 
     @property
     def contexte(self):
