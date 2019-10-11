@@ -31,6 +31,7 @@ class ConstantesParametres:
     TRANSACTION_RENOUVELLER_CERTIFICAT_PUBLIC = '%s.public.renouvellerCertificat' % DOMAINE_NOM
     TRANSACTION_MAJ_CERTIFICAT_PUBLIC = '%s.public.majCertificat' % DOMAINE_NOM
     TRANSACTION_PRIVATISER_NOEUD = '%s.public.privatiser' % DOMAINE_NOM
+    TRANSACTION_FERMER_MILLEGRILLE = '%s.fermerMilleGrilles' % DOMAINE_NOM
 
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
@@ -234,6 +235,9 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Parametres:ProcessusMajCertificatPublic"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_PRIVATISER_NOEUD:
             processus = "millegrilles_domaines_Parametres:ProcessusPrivatiserNoeud"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_FERMER_MILLEGRILLE:
+            processus = "millegrilles_domaines_Parametres:FermerMilleGrilles"
+
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -660,6 +664,20 @@ class ProcessusPrivatiserNoeud(ProcessusParametres):
     def _description(self, transaction):
         desc = 'Privatiser le noeud %s' % transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_NOEUD_DOCKER]
         return desc
+
+
+class FermerMilleGrilles(ProcessusParametres):
+    """
+    Transmet la commande de shutdown au moniteur.
+    """
+
+    def initiale(self):
+        commande = {}
+        domaine = 'commande.monitor.fermerMilleGrilles'
+        self.generateur_transactions.transmettre_commande(commande, domaine)
+
+        self.set_etape_suivante()
+
 
 class ProcessusRetirerAccesPublic(ProcessusParametres):
     pass
