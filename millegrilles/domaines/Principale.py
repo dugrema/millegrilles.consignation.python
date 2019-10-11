@@ -61,6 +61,10 @@ class ConstantesPrincipale:
                 'rang': 1,
                 'description': 'Plume'
             },
+            'Pki': {
+                'rang': 1,
+                'description': 'Pki'
+            },
             'Parametres': {
                 'rang': 1,
                 'description': 'Parametres'
@@ -71,6 +75,7 @@ class ConstantesPrincipale:
             'GrosFichiers',
             'Plume',
             'SenseursPassifs',
+            'Pki',
             'Parametres',
         ]
     }
