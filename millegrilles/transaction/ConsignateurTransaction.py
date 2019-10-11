@@ -300,26 +300,38 @@ class EntretienCollectionsDomaines(BaseCallback):
                 champ_traitee = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
 
                 # en-tete.uuid-transaction
-                collection.create_index([
-                    ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID), 1)
-                ])
+                collection.create_index(
+                    [
+                        ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID), 1)
+                    ],
+                    name='uuid_transaction'
+                )
 
                 # _evenements.estampille
-                collection.create_index([
-                    ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE), -1)
-                ])
+                collection.create_index(
+                    [
+                        ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE), -1)
+                    ],
+                    name='estampille'
+                )
 
                 # _evenements.NOM_MILLEGRILLE.transaction_traitee
-                collection.create_index([
-                    (champ_complete, 1),
-                    (champ_traitee, 1)
-                ])
+                collection.create_index(
+                    [
+                        (champ_complete, 1),
+                        (champ_traitee, 1)
+                    ],
+                    name='transaction_traitee'
+                )
 
                 # _evenements.NOM_MILLEGRILLE.transaction_persistee
-                collection.create_index([
-                    (champ_complete, 1),
-                    (champ_persiste, 1)
-                ])
+                collection.create_index(
+                    [
+                        (champ_complete, 1),
+                        (champ_persiste, 1)
+                    ],
+                    name='transaction_persistee'
+                )
 
             except Exception:
                 self.__logger.exception("Erreur creation index de transactions dans %s" % nom_collection_transaction)
