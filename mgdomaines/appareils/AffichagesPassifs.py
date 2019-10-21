@@ -171,7 +171,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         filtre = {
             "_mg-libelle": "senseur.individuel",
             "senseur": {
-                "$in": [int(senseur) for senseur in self._senseur_ids]
+                "$in": [senseur for senseur in self._senseur_ids]
             }
         }
         return filtre
