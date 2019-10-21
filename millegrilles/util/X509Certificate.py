@@ -776,6 +776,23 @@ class GenererCoupdoeil(GenerateurNoeud):
             critical=False
         )
 
+        liste_dns = [
+            x509.DNSName(u'www'),
+            x509.DNSName(u'www-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+            x509.DNSName(u'coupdoeil-%s' % self._nom_millegrille),
+            x509.DNSName(u'coupdoeil-%s.local' % self._nom_millegrille),
+        ]
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+                liste_dns.append(x509.DNSName(u'coupdoeil.%s' % domaine))
+
+        # Ajouter noms DNS valides pour CoupDoeil
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
         return builder
 
 
@@ -828,6 +845,23 @@ class GenererVitrine(GenerateurNoeud):
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
         )
+
+        liste_dns = [
+            x509.DNSName(u'www'),
+            x509.DNSName(u'www-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+            x509.DNSName(u'vitrine-%s' % self._nom_millegrille),
+            x509.DNSName(u'vitrine-%s.local' % self._nom_millegrille),
+        ]
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+                liste_dns.append(x509.DNSName(u'vitrine.%s' % domaine))
+
+        # Ajouter noms DNS valides pour CoupDoeil
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
 
         return builder
 
