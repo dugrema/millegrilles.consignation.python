@@ -170,7 +170,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
     def get_filtre(self):
         filtre = {
             "_mg-libelle": "senseur.individuel",
-            "senseur": {
+            "uuid_senseur": {
                 "$in": [senseur for senseur in self._senseur_ids]
             }
         }
