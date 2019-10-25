@@ -263,9 +263,9 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
                 if len(senseur.get('location')) > AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph:
                     senseur['location'] = senseur['location'][:AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph]
             else:
-                senseur['location'] = '%s' % senseur.get('senseur')
+                senseur['location'] = '%s' % senseur.get('uuid_senseur')
 
-            derniere_lecture = senseur['temps_lecture']
+            derniere_lecture = senseur['timestamp']
             date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
             date_expiration = date_chargee + self._age_donnee_expiree_timedelta
             self.__logger.debug("Date expiration lecture: %s, datenow: %s" % (date_expiration, date_now))
