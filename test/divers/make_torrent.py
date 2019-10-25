@@ -1,8 +1,8 @@
 from torf import Torrent
-t = Torrent(path='/home/mathieu/tmp/torrent_Test1',
+t = Torrent(path='/opt/millegrilles/dev3/mounts/consignation/local/2019/10/11',
             trackers=['https://mg-dev3.local:3004/announce'],
-            comment='This is a comment')
+            comment='Archive 11 octobre 2019 UTC')
 t.private = True
 t.generate()
-t.write('/home/mathieu/tmp/UnTestTorrent.torrent')
+t.write('/home/mathieu/tmp/dev3_archive_20191011UTC.torrent')
 
