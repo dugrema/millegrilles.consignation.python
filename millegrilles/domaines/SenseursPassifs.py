@@ -374,7 +374,6 @@ class ProducteurDocumentSenseurPassif:
                     copie_transaction['bat_mv'] = senseur['millivolt']
                     copie_transaction['bat_reserve'] = senseur['reserve']
                 else:
-                    cle = 'affichage'
                     if senseur.get('type') == 'onewire/temperature':
                         # 1W: copier avec l'adresse unique du senseur comme cle d'affichage
                         cle = 'affichage.1W%s' % senseur['adresse']

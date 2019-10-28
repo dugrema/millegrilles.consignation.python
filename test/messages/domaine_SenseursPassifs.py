@@ -21,35 +21,55 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
 
         senseurs = [
-            {
-                "humidite": 31.6,
-                "temperature": 26,
-                "type": "am2302",
-            },
-            {
-                "humidite": 20,
-                "temperature": 27,
-                "type": "th",
-            },
+            # {
+            #     "humidite": 31.6,
+            #     "temperature": 26,
+            #     "type": "am2302",
+            # },
+            # {
+            #     "humidite": 20,
+            #     "temperature": 27,
+            #     "type": "th",
+            # },
             {
                 "pression": 99.8,
                 "temperature": 38,
                 "type": "tp",
             },
             {
-                "temperature": None,
+                "temperature": 19.2,
                 "type": "onewire/temperature",
                 "adresse": '2854ab799711030c'
+            },
+            {
+                "temperature": 22.1,
+                "type": "onewire/temperature",
+                "adresse": '3854ab799711030c'
+            },
+            {
+                "temperature": -12.9,
+                "type": "onewire/temperature",
+                "adresse": '4854ab799711030c'
             },
             {
                 "temperature": None,
                 "type": "tpvide",
             },
+            {
+                "temperature": None,
+                "type": "battery",
+            },
+            {
+                "alerte": 0,
+                "millivolt": 4047,
+                "reserve": 92,
+                "type": "batterie"
+            }
 
         ]
 
         message_dict = dict()
-        message_dict['uuid_senseur'] = 'f14951f2f43211e99259b827eb53ee51'
+        message_dict['uuid_senseur'] = '514951f2f43211e99259b827eb53ee51'
         message_dict['noeud'] = 'domaine_SenseursPassifs'
         message_dict['timestamp'] = int(temps_lecture.timestamp())
         message_dict['senseurs'] = senseurs
