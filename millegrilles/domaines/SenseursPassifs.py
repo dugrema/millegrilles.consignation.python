@@ -367,16 +367,28 @@ class ProducteurDocumentSenseurPassif:
 
         # Extraire les donnees de la liste "senseurs" pour les utiliser plus facilement
         senseurs = copie_transaction.get('senseurs')
-        valeurs_speciales = ['temperature', 'humidite', 'pression']
+
         if senseurs is not None:
             for senseur in copie_transaction.get('senseurs'):
                 if senseur.get('type') == 'batterie':
                     copie_transaction['bat_mv'] = senseur['millivolt']
                     copie_transaction['bat_reserve'] = senseur['reserve']
                 else:
-                    for valeur_speciale in valeurs_speciales:
-                        if senseur.get(valeur_speciale) is not None:
-                            copie_transaction[valeur_speciale] = senseur[valeur_speciale]
+                    cle = 'affichage'
+                    if senseur.get('type') == 'onewire/temperature':
+                        # 1W: copier avec l'adresse unique du senseur comme cle d'affichage
+                        cle = 'affichage.1W%s' % senseur['adresse']
+                    else:
+                        # Pour les types sans adresses uniques, on fait juste copier le type
+                        cle = 'affichage.%s' % senseur['type']
+
+                    for elem, valeur in senseur.items():
+                        if elem not in ['type', 'adresse'] and valeur is not None:
+                            cle_elem = '%s.%s' % (cle, elem)
+                            copie_transaction[cle_elem] = valeur
+
+                            cle_date = '%s.timestamp' % (cle)
+                            copie_transaction[cle_date] = date_lecture
 
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         selection = {

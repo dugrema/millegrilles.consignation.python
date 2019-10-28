@@ -20,26 +20,42 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         temps_lecture = datetime.datetime.now()
         # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
 
+        senseurs = [
+            {
+                "humidite": 31.6,
+                "temperature": 26,
+                "type": "am2302",
+            },
+            {
+                "humidite": 20,
+                "temperature": 27,
+                "type": "th",
+            },
+            {
+                "pression": 99.8,
+                "temperature": 38,
+                "type": "tp",
+            },
+            {
+                "temperature": None,
+                "type": "onewire/temperature",
+                "adresse": '2854ab799711030c'
+            },
+            {
+                "temperature": None,
+                "type": "tpvide",
+            },
+
+        ]
+
         message_dict = dict()
-        message_dict['senseur'] = 8
+        message_dict['uuid_senseur'] = 'f14951f2f43211e99259b827eb53ee51'
         message_dict['noeud'] = 'domaine_SenseursPassifs'
-        message_dict['temps_lecture'] = int(temps_lecture.timestamp())
-        message_dict['temperature'] = 32.1
-        message_dict['humidite'] = 67.3
-        message_dict['pression'] = 103.3
-        message_dict['bat_mv'] = 3498
-        message_dict['hachi-parmentier'] = '5G_ Washington appelle à la prudence Techno.pdf'
-
-        message = {
-            "fuuid": "5a9dda40-c618-11e9-9c91-472b85679e72", "securite": "2.prive",
-             "repertoire_uuid": "b6138062-c5de-11e9-b6d2-02420a0000d7",
-             "nom": "5G_ Washington appelle à la prudence Techno.pdf", "taille": 565352, "mimetype": "application/pdf",
-             "reception": {"methode": "coupdoeil", "noeud": "public1.maple.mdugre.info"},
-
-        }
+        message_dict['timestamp'] = int(temps_lecture.timestamp())
+        message_dict['senseurs'] = senseurs
 
         enveloppe_val = self.generateur.soumettre_transaction(
-            message, 'millegrilles.domaines.SenseursPassifs.lecture', reply_to=self.queue_name, correlation_id='efgh')
+            message_dict, 'millegrilles.domaines.SenseursPassifs.lecture', reply_to=self.queue_name, correlation_id='efgh')
 
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
