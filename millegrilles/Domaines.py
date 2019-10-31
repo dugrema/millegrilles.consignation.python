@@ -237,6 +237,9 @@ class GestionnaireDomaine:
             self.regenerer_documents()
             self.changer_version_collection(self.version_domaine)
 
+        # Lance le processus de regeneration des rapports sur cedule pour s'assurer d'avoir les donnees a jour
+        self.regenerer_rapports_sur_cedule()
+
     def on_channel_open(self, channel):
         """
         Callback pour l"ouverture ou la reouverture du channel MQ
@@ -387,6 +390,10 @@ class GestionnaireDomaine:
             raise TransactionTypeInconnuError("Type de transaction inconnue: routing: %s" % domaine_transaction)
 
         return processus
+
+    def regenerer_rapports_sur_cedule(self):
+        """ Permet de regenerer les documents de rapports sur cedule lors du demarrage du domaine """
+        pass
 
     def regenerer_documents(self, stop_consuming=True):
         self._logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
@@ -762,20 +769,28 @@ class WatcherCollectionMongoThread:
                 try:
                     change_event = self.__curseur_changements.next()
                     self.__logger.debug("Watcher event recu: %s" % str(change_event))
-                    full_document = change_event['fullDocument']
-                    self.__logger.debug("Watcher document recu: %s" % str(full_document))
 
-                    # Ajuster la routing key pour ajouter information si necessaire.
-                    routing_key = self.__routing_key
-                    mg_libelle = full_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-                    if mg_libelle is not None:
-                        routing_key = '%s.%s' % (routing_key, mg_libelle)
+                    operation_type = change_event['operationType']
+                    if operation_type in ['insert', 'update', 'replace']:
+                        full_document = change_event['fullDocument']
+                        self.__logger.debug("Watcher document recu: %s" % str(full_document))
 
-                    # Transmettre document sur MQ
-                    self.__contexte.message_dao.transmettre_message_noeuds(
-                        full_document, routing_key, encoding=MongoJSONEncoder)
+                        # Ajuster la routing key pour ajouter information si necessaire.
+                        routing_key = self.__routing_key
+                        mg_libelle = full_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+                        if mg_libelle is not None:
+                            routing_key = '%s.%s' % (routing_key, mg_libelle)
+
+                        # Transmettre document sur MQ
+                        self.__contexte.message_dao.transmettre_message_noeuds(
+                            full_document, routing_key, encoding=MongoJSONEncoder)
+                    else:
+                        self.__logger.debug("Evenement non supporte: %s" % operation_type)
                 except StopIteration:
                     self.__logger.info("Arret watcher dans l'iteration courante")
+                except Exception:
+                    self.__logger.exception("Erreur dans le traitement du watcher")
+                    self.__stop_event.wait(1)  # Attendre 1 seconde, throttle
 
             else:
                 self.__stop_event.wait(5)  # Attendre 5 secondes, throttle

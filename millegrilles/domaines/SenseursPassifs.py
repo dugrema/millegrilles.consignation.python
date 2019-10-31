@@ -42,8 +42,8 @@ class SenseursPassifsConstantes:
     TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR = '%s.suppressionSenseur' % DOMAINE_NOM
     SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
 
-    EVENEMENT_MAJ_HORAIRE = 'miseajour.horaire'
-    EVENEMENT_MAJ_QUOTIDIENNE = 'miseajour.quotidienne'
+    EVENEMENT_MAJ_HORAIRE = '%s.MAJHoraire' % DOMAINE_NOM
+    EVENEMENT_MAJ_QUOTIDIENNE = '%s.MAJQuotidienne' % DOMAINE_NOM
 
     DOCUMENT_DEFAUT_CONFIGURATION = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
@@ -192,6 +192,10 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusChangementAttributSenseur"
         elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusSupprimerSenseur"
+        elif domaine_transaction == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreHoraireRapport"
+        elif domaine_transaction == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreQuotidienneRapport"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -207,6 +211,10 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     # def get_handler_transaction(self):
     #     return TraitementRapportsSenseursPassifs(self)
+
+    def regenerer_rapports_sur_cedule(self):
+        """ Permet de regenerer les documents de rapports sur cedule lors du demarrage du domaine """
+        self.demarrer_processus('millegrilles_domaines_SenseursPassifs:ProcessusRegenererFenetresRapport', {})
 
 
 class TraitementMessageLecture(TraitementMessageDomaine):
@@ -232,10 +240,10 @@ class TraitementMessageLecture(TraitementMessageDomaine):
             processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
             self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJHoraire"
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreHoraireRapport"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsMAJQuotidienne"
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreQuotidienneRapport"
             self._gestionnaire.demarrer_processus(processus, message_dict)
         elif evenement == Constantes.EVENEMENT_CEDULEUR:
             self._gestionnaire.traiter_cedule(message_dict)
@@ -454,6 +462,14 @@ class ProducteurDocumentSenseurPassif:
             temps_fin_rapport: datetime.datetime = datetime.datetime.utcnow(),
             range_rapport: datetime.timedelta = datetime.timedelta(days=7)
     ):
+        """
+        Effectue une requete d'aggregation des transactions de senseurs passifs.
+        :param uuid_senseur: Senseur a utiliser (None == tous)
+        :param niveau_regroupement: hour ou day
+        :param temps_fin_rapport: datetime de fin du rapport. Defaut = now
+        :param range_rapport: timedelta qui represente l'intervalle du rapport
+        :return: Un curseur d'aggregation
+        """
         collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
         # LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE
@@ -467,7 +483,8 @@ class ProducteurDocumentSenseurPassif:
             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
                 '$gte': temps_debut_rapport.timestamp(),
                 '$lt': temps_fin_rapport.timestamp(),
-            }
+            },
+            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE): SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
         }
         if uuid_senseur is not None:
             filtre_rapport[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR] = uuid_senseur
@@ -504,7 +521,11 @@ class ProducteurDocumentSenseurPassif:
             {'$group': regroupement},
         ]
 
-        resultat = collection_transactions.aggregate(operation)
+        # S'assurer d'utiliser l'index sur l'estampille - permet au match de filtrer par date
+        hint = {'_evenements._estampille': -1}
+
+        resultat = collection_transactions.aggregate(operation, hint=hint)
+
         return resultat
 
     def parse_resultat_aggregation(self, curseur):
@@ -896,8 +917,31 @@ class ProcessusGenererRapport(ProcessusMAJSenseurPassif):
         self.set_etape_suivante()
 
 
-class ProcessusMajFenetresRapport(ProcessusMAJSenseurPassif):
-    """ Processus de calcul des fenetres d'aggregation pour les senseurs """
+class ProcessusRegenererFenetresRapport(ProcessusMAJSenseurPassif):
+    """ Processus de calcul des fenetres d'aggregation horaire pour les senseurs. Ajoute la derniere heure. """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Regenerer les rapports de fenetre mobile horaire """
+
+        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
+        producteur.generer_fenetre_horaire()
+
+        self.set_etape_suivante(ProcessusRegenererFenetresRapport.rapport_annuel.__name__)  # Termine
+
+    def rapport_annuel(self):
+        """ Regenerer les rapports de fenetre mobile quotidienne """
+
+        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
+        producteur.generer_fenetre_quotidienne()
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusMajFenetreQuotidienneRapport(ProcessusMAJSenseurPassif):
+    """ Processus de calcul des fenetres d'aggregation quotidienne pour les senseurs. Ajoute le dernier jour. """
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -905,9 +949,39 @@ class ProcessusMajFenetresRapport(ProcessusMAJSenseurPassif):
     def initiale(self):
         """ Mettre a jour les documents de senseurs """
 
-        # Obtenir la liste des senseurs, lancer un processus de mise a jour pour chaque senseur
+        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
+        producteur.ajouter_dernierjour_fenetre_quotidienne()
 
-        self.set_etape_suivante()
+        self.set_etape_suivante()  # Termine
+
+class ProcessusMajFenetreHoraireRapport(ProcessusMAJSenseurPassif):
+    """ Processus de calcul des fenetres d'aggregation horaire pour les senseurs. Ajoute la derniere heure. """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour les documents de senseurs """
+
+        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
+        producteur.ajouter_derniereheure_fenetre_horaire()
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusMajFenetreQuotidienneRapport(ProcessusMAJSenseurPassif):
+    """ Processus de calcul des fenetres d'aggregation quotidienne pour les senseurs. Ajoute le dernier jour. """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour les documents de senseurs """
+
+        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
+        producteur.ajouter_dernierjour_fenetre_quotidienne()
+
+        self.set_etape_suivante()  # Termine
 
 
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):

@@ -818,23 +818,19 @@ class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
 
-        if evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
-            # Verifier quel processus demarrer.
-            routing_key_sansprefixe = routing_key.replace(
-                'destinataire.domaine.',
-                ''
-            )
+        # Verifier quel processus demarrer.
+        routing_key_sansprefixe = routing_key.replace(
+            'destinataire.domaine.',
+            ''
+        )
 
-            try:
-                processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
-                self.gestionnaire.demarrer_processus(processus, message_dict)
-            except Exception as e:
-                self.gestionnaire.marquer_transaction_en_erreur(message_dict)
-                raise e
-        else:
-            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+        try:
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+            self.gestionnaire.demarrer_processus(processus, message_dict)
+        except Exception as e:
+            self.gestionnaire.marquer_transaction_en_erreur(message_dict)
+            raise e
 
 
 class TraitementMessageDomaineRequete(TraitementMessageDomaine):
