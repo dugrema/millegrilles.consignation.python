@@ -18,10 +18,11 @@ class GenererRapportsFenetresSenseurs:
 
         self._producteur_doc_senseurspassifs = ProducteurDocumentSenseurPassif(self._contexte.document_dao)
 
-    def calculer_fenetre_derniereheure(self):
-        resultats = self._producteur_doc_senseurspassifs.maj_fenetre_derniereheure()
+    def calculer_fenetre_horaire(self):
+        self._producteur_doc_senseurspassifs.generer_fenetre_horaire()
 
-        self._logger.info("Derniere heure: \n%s" % str(resultats))
+    def calculer_fenetre_derniereheure(self):
+        self._producteur_doc_senseurspassifs.ajouter_derniereheure_fenetre_horaire()
 
     # def rapport_senseurs(
     #         self,
@@ -144,7 +145,8 @@ def main():
     # resultats = test.rapport_senseurs()
     # test.inserer_resultats_rapport(resultats)
 
-    test.calculer_fenetre_derniereheure()
+    test.calculer_fenetre_horaire()
+    # test.calculer_fenetre_derniereheure()
 
 
 if __name__ == '__main__':

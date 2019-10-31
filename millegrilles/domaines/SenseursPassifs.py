@@ -544,6 +544,44 @@ class ProducteurDocumentSenseurPassif:
 
         return resultats_par_senseur
 
+    def remplacer_resultats_rapport(self, resultats: dict, infodoc_libelle, nombre_resultats_limite: int = 366):
+
+        collection_documents = self._document_dao.get_collection(
+            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        for uuid_senseur, appareils in resultats.items():
+            self._logger.info("Inserer resultats dans document %s" % uuid_senseur)
+            set_operation = dict()
+            for appareil, valeurs in appareils.items():
+                # Ajouter les valeurs en ordre croissant de timestamp.
+                valeurs = sorted(valeurs, key=lambda valeur: valeur['timestamp'])
+
+                # Garder les "nombre_resultats_limite" plus recents
+                valeurs = valeurs[- nombre_resultats_limite:]
+
+                set_operation['appareils.%s' % appareil] = valeurs
+
+            self._logger.info('Operation push: %s' % str(set_operation))
+
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
+                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+            }
+
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+            }
+
+            operations = {
+                '$setOnInsert': set_on_insert,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+                '$set': set_operation,
+            }
+
+            collection_documents.update_one(filter=filtre, update=operations, upsert=True)
+
     def inserer_resultats_rapport(self, resultats: dict, infodoc_libelle, nombre_resultats_limite: int = 366):
 
         collection_documents = self._document_dao.get_collection(
@@ -582,7 +620,7 @@ class ProducteurDocumentSenseurPassif:
 
             collection_documents.update_one(filter=filtre, update=operations, upsert=True)
 
-    def maj_fenetre_derniereheure(self):
+    def generer_fenetre_horaire(self):
         curseur_aggregation = self._requete_aggregation_senseurs(
             niveau_regroupement='hour',
             range_rapport=datetime.timedelta(days=7)
@@ -590,10 +628,24 @@ class ProducteurDocumentSenseurPassif:
 
         resultats = self.parse_resultat_aggregation(curseur_aggregation)
 
-        self.inserer_resultats_rapport(
+        self.remplacer_resultats_rapport(
             resultats,
             SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
             nombre_resultats_limite=170
+        )
+
+    def ajouter_derniereheure_fenetre_horaire(self):
+        curseur_aggregation = self._requete_aggregation_senseurs(
+            niveau_regroupement='hour',
+            range_rapport=datetime.timedelta(hours=1)
+        )
+
+        resultats = self.parse_resultat_aggregation(curseur_aggregation)
+
+        self.inserer_resultats_rapport(
+            resultats,
+            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
+            nombre_resultats_limite=3
         )
 
     def calculer_fenetre_dernierjour(self):
