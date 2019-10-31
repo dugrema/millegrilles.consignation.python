@@ -645,15 +645,36 @@ class ProducteurDocumentSenseurPassif:
         self.inserer_resultats_rapport(
             resultats,
             SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
-            nombre_resultats_limite=3
+            nombre_resultats_limite=170
         )
 
-    def calculer_fenetre_dernierjour(self):
-        pass
+    def generer_fenetre_quotidienne(self):
+        curseur_aggregation = self._requete_aggregation_senseurs(
+            niveau_regroupement='day',
+            range_rapport=datetime.timedelta(days=366)
+        )
 
-    def calcul_rapport_granularite_quotidienne(self):
-        """ Calcule les valeurs pour un rapport a granularite quoditienne (chaque point est un jour) """
-        pass
+        resultats = self.parse_resultat_aggregation(curseur_aggregation)
+
+        self.remplacer_resultats_rapport(
+            resultats,
+            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
+            nombre_resultats_limite=366
+        )
+
+    def ajouter_dernierjour_fenetre_quotidienne(self):
+        curseur_aggregation = self._requete_aggregation_senseurs(
+            niveau_regroupement='day',
+            range_rapport=datetime.timedelta(days=1)
+        )
+
+        resultats = self.parse_resultat_aggregation(curseur_aggregation)
+
+        self.inserer_resultats_rapport(
+            resultats,
+            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
+            nombre_resultats_limite=366
+        )
 
 
 # Processus pour enregistrer une transaction d'un senseur passif

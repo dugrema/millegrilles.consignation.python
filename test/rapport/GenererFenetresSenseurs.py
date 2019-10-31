@@ -24,6 +24,12 @@ class GenererRapportsFenetresSenseurs:
     def calculer_fenetre_derniereheure(self):
         self._producteur_doc_senseurspassifs.ajouter_derniereheure_fenetre_horaire()
 
+    def calculer_fenetre_quotidienne(self):
+        self._producteur_doc_senseurspassifs.generer_fenetre_quotidienne()
+
+    def calculer_fenetre_dernierjour(self):
+        self._producteur_doc_senseurspassifs.ajouter_dernierjour_fenetre_quotidienne()
+
     # def rapport_senseurs(
     #         self,
     #         uuid_senseur: str = None,
@@ -147,6 +153,9 @@ def main():
 
     test.calculer_fenetre_horaire()
     # test.calculer_fenetre_derniereheure()
+
+    test.calculer_fenetre_quotidienne()
+    # test.calculer_fenetre_dernierjour()
 
 
 if __name__ == '__main__':
