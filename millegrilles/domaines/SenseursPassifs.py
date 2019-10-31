@@ -27,6 +27,8 @@ class SenseursPassifsConstantes:
     LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
     LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
     LIBELLE_DOCUMENT_GROUPE = 'groupe.senseurs'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE = 'senseur.rapport.gq'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_QUOTIDIEN = 'senseur.rapport.gh'
     LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE = 'senseur.rapport.annee'
     LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE = 'senseur.rapport.semaine'
     LIBVAL_CONFIGURATION = 'configuration'
@@ -440,6 +442,44 @@ class ProducteurDocumentSenseurPassif:
 
         return document_senseur
 
+    def calcul_rapport_granularite_horaire(self, uuid_senseur: str):
+        """ Calcule les valeurs pour un rapport a granularite horaire (chaque point est une heure) """
+        collection = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        selection_document_senseur = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur
+        }
+
+        # Obtenir la liste des appareils qui sont utilises
+        document_senseur = collection.find_one(filter=selection_document_senseur)
+        appareils = [a for a in document_senseur['affichage'].keys()]
+
+        # Par defaut on fait un calcul incremental (derniere heure ajoutee a la liste) pour chaque appareil d'un senseur
+        calcul_incremental = False  # A FAIRE: determiner si on ajoute la derniere heure ou si on recalcule tout
+
+        # LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE
+        temps_fin_rapport = datetime.datetime.utcnow()
+        temps_fin_rapport.replace(minute=0, second=0)  # Debut de l'heure courante est la fin du rapport
+        range_rapport = datetime.timedelta(days=7)  # 7 Jours a calculer pour les heures
+        temps_debut_rapport = temps_fin_rapport - range_rapport
+
+        self._logger.debug("Rapport fait entre %s et %s" % (str(temps_debut_rapport), str(temps_fin_rapport)))
+
+        filtre_rapport = {
+            SenseursPassifsConstantes.TRANSACTION_NOEUD: document_senseur[SenseursPassifsConstantes.TRANSACTION_NOEUD],
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
+                '$gte': temps_debut_rapport.timestamp(),
+                '$lt': temps_fin_rapport.timestamp(),
+            }
+        }
+
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+
+    def calcul_rapport_granularite_quotidienne(self):
+        """ Calcule les valeurs pour un rapport a granularite quoditienne (chaque point est un jour) """
+        pass
+
 
 # Processus pour enregistrer une transaction d'un senseur passif
 class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
@@ -635,6 +675,43 @@ class ProcessusMajManuelle(ProcessusMAJSenseurPassif):
 
         # Retourner l'id du document pour mettre a jour le noeud
         return {'id_document_senseur': document['_id']}
+
+
+class ProcessusGenererRapport(ProcessusMAJSenseurPassif):
+    """ Processus de calcul d'un rapport pour les senseurs """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour le document de senseur """
+
+        document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+
+        uuid_senseur = document_transaction.get(SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR)
+
+        # Granularite: quoditien, horaire
+        granularite = document_transaction.get('granularite')
+
+        # Si True, le rapport est sauvegarde sous forme de transaction.
+        date_debut = document_transaction.get('date_debut')
+        date_fin = document_transaction.get('date_fin')
+
+        self.set_etape_suivante()
+
+
+class ProcessusMajFenetresRapport(ProcessusMAJSenseurPassif):
+    """ Processus de calcul des fenetres d'aggregation pour les senseurs """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        """ Mettre a jour les documents de senseurs """
+
+        # Obtenir la liste des senseurs, lancer un processus de mise a jour pour chaque senseur
+
+        self.set_etape_suivante()
 
 
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
