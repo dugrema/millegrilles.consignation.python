@@ -346,6 +346,11 @@ class ProducteurDocumentSenseurPassif:
         self._document_dao = document_dao
         self._logger = logging.getLogger("%s.ProducteurDocumentSenseurPassif" % __name__)
 
+        self._regroupement_elem_numeriques = [
+            'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
+        ]
+        self._accumulateurs = ['max', 'min', 'avg']
+
     ''' 
     Extrait l'information d'une lecture de senseur passif pour creer ou mettre a jour le document du senseur.
 
@@ -442,39 +447,157 @@ class ProducteurDocumentSenseurPassif:
 
         return document_senseur
 
-    def calcul_rapport_granularite_horaire(self, uuid_senseur: str):
-        """ Calcule les valeurs pour un rapport a granularite horaire (chaque point est une heure) """
-        collection = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        selection_document_senseur = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur
-        }
-
-        # Obtenir la liste des appareils qui sont utilises
-        document_senseur = collection.find_one(filter=selection_document_senseur)
-        appareils = [a for a in document_senseur['affichage'].keys()]
-
-        # Par defaut on fait un calcul incremental (derniere heure ajoutee a la liste) pour chaque appareil d'un senseur
-        calcul_incremental = False  # A FAIRE: determiner si on ajoute la derniere heure ou si on recalcule tout
+    def _requete_aggregation_senseurs(
+            self,
+            uuid_senseur: str = None,
+            niveau_regroupement: str = 'hour',
+            temps_fin_rapport: datetime.datetime = datetime.datetime.utcnow(),
+            range_rapport: datetime.timedelta = datetime.timedelta(days=7)
+    ):
+        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
         # LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE
-        temps_fin_rapport = datetime.datetime.utcnow()
         temps_fin_rapport.replace(minute=0, second=0)  # Debut de l'heure courante est la fin du rapport
-        range_rapport = datetime.timedelta(days=7)  # 7 Jours a calculer pour les heures
+        if niveau_regroupement == 'day':
+            temps_fin_rapport.replace(hour=0)  # Minuit
+
         temps_debut_rapport = temps_fin_rapport - range_rapport
 
-        self._logger.debug("Rapport fait entre %s et %s" % (str(temps_debut_rapport), str(temps_fin_rapport)))
-
         filtre_rapport = {
-            SenseursPassifsConstantes.TRANSACTION_NOEUD: document_senseur[SenseursPassifsConstantes.TRANSACTION_NOEUD],
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
                 '$gte': temps_debut_rapport.timestamp(),
                 '$lt': temps_fin_rapport.timestamp(),
             }
         }
+        if uuid_senseur is not None:
+            filtre_rapport[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR] = uuid_senseur
 
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        regroupement_periode = {
+            'year': {'$year': '$_evenements._estampille'},
+            'month': {'$month': '$_evenements._estampille'},
+        }
+        if niveau_regroupement == 'day':
+            regroupement_periode['day'] = {'$dayOfMonth': '$_evenements._estampille'}
+        elif niveau_regroupement == 'hour':
+            regroupement_periode['day'] = {'$dayOfMonth': '$_evenements._estampille'}
+            regroupement_periode['hour'] = {'$hour': '$_evenements._estampille'}
+
+        regroupement = {
+            '_id': {
+                'uuid_senseur': '$uuid_senseur',
+                'appareil_type': '$senseurs.type',
+                'appareil_adresse': '$senseurs.adresse',
+                'timestamp': {
+                    '$dateFromParts': regroupement_periode
+                },
+            },
+        }
+
+        for elem_regroupement in self._regroupement_elem_numeriques:
+            for accumulateur in self._accumulateurs:
+                key = '%s_%s' % (elem_regroupement, accumulateur)
+                regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
+
+        operation = [
+            {'$match': filtre_rapport},
+            {'$unwind': '$senseurs'},
+            {'$group': regroupement},
+        ]
+
+        resultat = collection_transactions.aggregate(operation)
+        return resultat
+
+    def parse_resultat_aggregation(self, curseur):
+
+        # Key=uuid_senseur, Value=[{appareil_type, appareil_adresse, timestamp, accums...}, ...]
+        resultats_par_senseur = dict()
+
+        for ligne_rapport in curseur:
+            # self._logger.info(str(ligne_rapport))
+            resultats_appareil = resultats_par_senseur.get(ligne_rapport['_id']['uuid_senseur'])
+            if resultats_appareil is None:
+                resultats_appareil = dict()
+                resultats_par_senseur[ligne_rapport['_id']['uuid_senseur']] = resultats_appareil
+
+            # Reorganiser valeurs pour insertion dans document de rapport
+            cle_appareil = ligne_rapport['_id']['appareil_type']
+            if cle_appareil == 'onewire/temperature':
+                adresse = ligne_rapport['_id'].get('appareil_adresse')
+                cle_appareil = '1W%s' % adresse
+
+            liste_valeurs = resultats_appareil.get(cle_appareil)
+            if liste_valeurs is None:
+                liste_valeurs = list()
+                resultats_appareil[cle_appareil] = liste_valeurs
+
+            ligne_formattee = dict()
+            liste_valeurs.append(ligne_formattee)
+
+            ligne_formattee['timestamp'] = ligne_rapport['_id']['timestamp']
+
+            for elem_regroupement in self._regroupement_elem_numeriques:
+                for accumulateur in self._accumulateurs:
+                    key = '%s_%s' % (elem_regroupement, accumulateur)
+                    valeur = ligne_rapport[key]
+                    if valeur is not None:
+                        ligne_formattee[key] = valeur
+
+        return resultats_par_senseur
+
+    def inserer_resultats_rapport(self, resultats: dict, infodoc_libelle, nombre_resultats_limite: int = 366):
+
+        collection_documents = self._document_dao.get_collection(
+            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        for uuid_senseur, appareils in resultats.items():
+            self._logger.info("Inserer resultats dans document %s" % uuid_senseur)
+            push_operation = dict()
+            for appareil, valeurs in appareils.items():
+                # Ajouter les valeurs en ordre croissant de timestamp.
+                # Garder les "nombre_resultats_limite" plus recents (~1 semaine)
+                push_operation['appareils.%s' % appareil] = {
+                    '$each': valeurs,
+                    '$sort': {SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: 1},
+                    '$slice': - nombre_resultats_limite,
+                }
+
+            self._logger.info('Operation push: %s' % str(push_operation))
+
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
+                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+            }
+
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+            }
+
+            operations = {
+                '$setOnInsert': set_on_insert,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+                '$push': push_operation
+            }
+
+            collection_documents.update_one(filter=filtre, update=operations, upsert=True)
+
+    def maj_fenetre_derniereheure(self):
+        curseur_aggregation = self._requete_aggregation_senseurs(
+            niveau_regroupement='hour',
+            range_rapport=datetime.timedelta(days=7)
+        )
+
+        resultats = self.parse_resultat_aggregation(curseur_aggregation)
+
+        self.inserer_resultats_rapport(
+            resultats,
+            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
+            nombre_resultats_limite=170
+        )
+
+    def calculer_fenetre_dernierjour(self):
+        pass
 
     def calcul_rapport_granularite_quotidienne(self):
         """ Calcule les valeurs pour un rapport a granularite quoditienne (chaque point est un jour) """
