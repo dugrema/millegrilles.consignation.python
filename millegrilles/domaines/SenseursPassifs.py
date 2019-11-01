@@ -571,7 +571,7 @@ class ProducteurDocumentSenseurPassif:
             SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
 
         for uuid_senseur, appareils in resultats.items():
-            self._logger.info("Inserer resultats dans document %s" % uuid_senseur)
+            self._logger.debug("Inserer resultats dans document %s" % uuid_senseur)
             set_operation = dict()
             for appareil, valeurs in appareils.items():
                 # Ajouter les valeurs en ordre croissant de timestamp.
@@ -582,7 +582,7 @@ class ProducteurDocumentSenseurPassif:
 
                 set_operation['appareils.%s' % appareil] = valeurs
 
-            self._logger.info('Operation push: %s' % str(set_operation))
+            self._logger.debug('Operation push: %s' % str(set_operation))
 
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
