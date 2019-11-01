@@ -3,6 +3,7 @@ import traceback
 import datetime
 import logging
 import time
+import pytz
 from threading import Thread, Event
 
 # from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
@@ -54,18 +55,19 @@ class DocumentCallback(BaseCallback):
 class AfficheurDocumentMAJDirecte:
 
     # :params intervalle_secs: Intervalle (secondes) entre rafraichissements si watch ne fonctionne pas.
-    def __init__(self, contexte, intervalle_secs=30):
+    def __init__(self, contexte, timezone_horloge: str = None, intervalle_secs=30):
         self._contexte = contexte
         self._documents = dict()
         self._intervalle_secs = intervalle_secs
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
         self._cycles_entre_rafraichissements = 20  # 20 Cycles
-        self._age_donnee_expiree = 120  # Secondes pour considerer une lecture comme expiree (stale)
+        self._age_donnee_expiree = 300  # Secondes pour considerer une lecture comme expiree (stale)
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
 
         # self._collection = None
         # self._curseur_changements = None  # Si None, on fonctionne par timer
         # self._watch_desactive = False  # Si true, on utilise watch. Sinon on utilise le timer
+        self._timezone_horloge = None
         self._thread_maj_document = None
         self._thread_watchdog = None  # Thread qui s'assure que les connexions fonctionnent
         self._compteur_cycle = 0  # Utilise pour savoir quand on rafraichit, tente de reparer connexion, etc.
@@ -75,6 +77,9 @@ class AfficheurDocumentMAJDirecte:
         self._queue_reponse = None
 
         self.traitement_callback = None
+
+        if timezone_horloge is not None:
+            self._timezone_horloge = pytz.timezone(timezone_horloge)
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -155,8 +160,8 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
     ligne_tph_format = "{location:<%d} {temperature: 5.1f}C/{humidite:2.0f}%%" % taille_titre_tph
     ligne_pression_format = "{titre:<%d} {pression:5.1f}kPa{tendance}" % taille_titre_press
 
-    def __init__(self, contexte, senseur_ids, intervalle_secs=30):
-        super().__init__(contexte, intervalle_secs)
+    def __init__(self, contexte, timezone_horloge: str = 'America/Toronto', senseur_ids: list = None, intervalle_secs=30):
+        super().__init__(contexte, timezone_horloge, intervalle_secs)
         self._senseur_ids = senseur_ids
         self._thread_affichage = None
         self._thread_horloge = None
@@ -210,6 +215,8 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             except Exception as e:
                 logging.error("Erreur durant affichage: %s" % str(e))
                 traceback.print_exc()
+                # Throttling
+                self._stop_event.wait(5)
                 # self.reconnecter()
 
     def maj_affichage(self, lignes_affichage):
@@ -239,7 +246,9 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
             nb_secs -= 1
 
             # Prendre heure courante, formatter
-            now = datetime.datetime.now()
+            now = datetime.datetime.utcnow().astimezone(pytz.UTC)  # Set date a UTC
+            if self._timezone_horloge is not None:
+                now = now.astimezone(self._timezone_horloge)  # Converti vers timezone demande
             datestring = now.strftime('%Y-%m-%d')
             timestring = now.strftime('%H:%M:%S')
 
@@ -259,30 +268,40 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         date_now = datetime.datetime.now()
         for senseur_id in self._documents:
             senseur = self._documents[senseur_id].copy()
-            if senseur.get('location') is not None:
-                if len(senseur.get('location')) > AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph:
-                    senseur['location'] = senseur['location'][:AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph]
+
+            liste_affichage = senseur.get('affichage')
+            if liste_affichage is not None:
+                for cle_appareil, appareil in liste_affichage.items():
+                    appareil_copy = appareil.copy()
+
+                    location = appareil.get('location')
+                    if location is None:
+                        location = senseur.get('location')
+                        if location is None:
+                            location = senseur.get('uuid_senseur')
+
+                    appareil_copy['location'] = location[:AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph]
+
+                    derniere_lecture = appareil['timestamp']
+                    date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
+                    date_expiration = date_chargee + self._age_donnee_expiree_timedelta
+                    self.__logger.debug("Date expiration lecture: %s, datenow: %s" % (date_expiration, date_now))
+                    if date_expiration < date_now:
+                        ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_expiree_format.format(**appareil_copy)
+                    else:
+                        ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_tph_format.format(**appareil_copy)
+
+                    # S'assurer d'utiliser une pression recente
+                    pression_senseur = appareil.get('pression')
+                    if pression is None and pression_senseur is not None and pression_senseur > 0.0:
+                        pression = pression_senseur
+
+                    if tendance is None :
+                        tendance = senseur.get('pression_tendance')
+
+                    lignes.append(ligne_donnee)
             else:
-                senseur['location'] = '%s' % senseur.get('uuid_senseur')
-
-            derniere_lecture = senseur['timestamp']
-            date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
-            date_expiration = date_chargee + self._age_donnee_expiree_timedelta
-            self.__logger.debug("Date expiration lecture: %s, datenow: %s" % (date_expiration, date_now))
-            if date_expiration < date_now:
-                ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_expiree_format.format(**senseur)
-            else:
-                ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_tph_format.format(**senseur)
-
-                # S'assurer d'utiliser une pression recente
-                pression_senseur = senseur.get('pression')
-                if pression is None and pression_senseur is not None and pression_senseur > 0.0:
-                    pression = pression_senseur
-
-                if tendance is None and senseur.get('pression_tendance') is not None:
-                    tendance = senseur['pression_tendance']
-
-            lignes.append(ligne_donnee)
+                self.__logger.warning("Senseur %s n'a pas d'element affichage" % senseur_id)
 
         if pression is not None:
             lecture = {'titre': 'Press.', 'pression': pression, 'tendance': tendance}

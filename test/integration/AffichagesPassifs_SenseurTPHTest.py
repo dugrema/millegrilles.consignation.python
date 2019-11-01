@@ -1,6 +1,5 @@
 from mgdomaines.appareils.AffichagesPassifs import AfficheurSenseurPassifTemperatureHumiditePression
-from millegrilles.dao.Configuration import TransactionConfiguration
-from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 import time
 import traceback
 
@@ -8,28 +7,19 @@ import traceback
 class AfficheurSenseurPassifTemperatureHumiditePressionTest(AfficheurSenseurPassifTemperatureHumiditePression):
 
     def __init__(self):
-        self.configuration = TransactionConfiguration()
-        self.configuration.loadEnvironment()
-        self.document_dao = MongoDAO(self.configuration)
-        self.document_dao.connecter()  # Tester reconnexion
+        contexte = ContexteRessourcesMilleGrilles()
+        print("contexte.initialiser()")
+        contexte.initialiser(init_document=False)
 
-        self.document_ids = ['5bf98475a9f65540c1bcc016']
+        self.document_ids = ['514951f2f43211e99259b827eb53ee51']
 
-        super().__init__(self.configuration, self.document_dao, senseur_ids=self.document_ids, intervalle_secs=5)
+        super().__init__(contexte, senseur_ids=self.document_ids, timezone_horloge='America/Toronto', intervalle_secs=5)
 
     def test(self):
         for document_id in self.get_documents():
             print("Document charge: %s" % str(self._documents[document_id]))
 
         while True:
-            if not self.document_dao.est_enligne():
-                try:
-                    self.document_dao.connecter()
-                    print("TEST: Connexion a Mongo etablie")
-                except Exception as ce:
-                    print("Erreur reconnexion Mongo: %s" % str(ce))
-                    traceback.print_exc()
-
             time.sleep(10)
 
     def maj_affichage(self, lignes_affichage):
@@ -56,4 +46,4 @@ except Exception as e:
     traceback.print_exc()
 finally:
     test.fermer()
-    test._document_dao.deconnecter()
+    test.contexte.deconnecter()
