@@ -7,6 +7,7 @@ from bson.objectid import ObjectId
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
+from threading import Thread, Event
 
 
 class MGPProcesseur:
@@ -120,13 +121,56 @@ class MGPProcesseur:
 
 
 class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine):
+    """
+    Classe qui recoit les messages de MQ et gere une thread de travail longue duree.
+    Si le nombre de messages recus de MQ depasse la limite, un basic cancel et transmis et
+    (interruption du consommateur) et le travail se poursuit jusqu'a l'epuisement de la Q locale.
+    """
 
-    def __init__(self, contexte, gestionnaire_domaine=None):
+    def __init__(self, contexte, stop_event, gestionnaire_domaine=None):
         super().__init__(contexte=contexte, gestionnaire_domaine=gestionnaire_domaine)
 
         self._json_helper = JSONHelper()
         self._gestionnaire_domaine = gestionnaire_domaine
+        self.__stop_event = stop_event
+
+        # Liste de messages a traiter
+        self._q_locale = list()
+
+        # Si limite est depasse, un cesse de consommer des messages dans MQ
+        self._max_q_size = 5
+        self._consume_actif = True
+        self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'processus')
+
+        self._thread_traitement = Thread(target=self.__run, name="MGPProcess")
+        self.__wait_event = Event()
+
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self._thread_traitement.start()
+
+    def __run(self):
+
+        self.__logger.info("Demarrage thread MGPProcessus")
+
+        while not self.__stop_event.is_set():
+            self.__wait_event.wait(10)
+            try:
+                if len(self._q_locale) > 0:
+                    self.__prochain_message()
+                elif not self._consume_actif:
+                    # Reactiver le consume
+                    self.gestionnaire.inscrire_basicconsume(self._q_processus, self.callbackAvecAck)
+                    self._consume_actif = True
+                else:
+                    # Toutes les operations en suspend sont completees, reactiver le wait
+                    self.__wait_event.clear()
+
+            except Exception:
+                self.__logger.exception("Erreur thread MGPProcessus")
+                self.__stop_event.wait(5)  # Throttle, 5 secondes d'attente sur erreur
+
+        self.__logger.info("Fin thread MGPProcessus")
 
     def initialiser(self, collection_processus_noms: list):
         # Configuration pour les processus
@@ -277,12 +321,38 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
     Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
     '''
     def traiter_message(self, ch, method, properties, body):
-
         id_doc_processus = None
         try:
             # Decoder l'evenement qui contient l'information sur l'etape a traiter
             evenement_dict = self.extraire_evenement(body)
             evenement_type = evenement_dict.get('evenement')
+
+            self._q_locale.append({
+                'evenement_dict': evenement_dict,
+                'evenement_type': evenement_type,
+            })
+
+            if len(self._q_locale) > self._max_q_size:
+                # On va arreter la consommation de messages pour passer au travers de la liste en memoire
+                self.__logger.warning("Throttling Q processus : %s" % self._q_processus)
+                self._consume_actif = False
+                # ch.basic_ack(delivery_tag=method.delivery_tag)  # Transmettre ACK avant stop consuming
+                self.gestionnaire.stop_consuming(self._q_processus)
+
+            # Activer la thread de traitement
+            self.__wait_event.set()
+
+        except Exception as e:
+            # Mettre le message d'erreur sur la Q erreur processus
+            self.erreur_fatale(id_doc_processus, str(body), e)
+
+    def __prochain_message(self):
+        id_doc_processus = None
+        message = self._q_locale.pop(0)
+        try:
+            evenement_dict = message['evenement_dict']
+            evenement_type = message['evenement_type']
+
             if evenement_type == Constantes.EVENEMENT_RESUMER:
                 self.traiter_resumer(evenement_dict)
             else:
@@ -291,7 +361,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
                 self.traiter_evenement(evenement_dict)
         except Exception as e:
             # Mettre le message d'erreur sur la Q erreur processus
-            self.erreur_fatale(id_doc_processus, str(body), e)
+            self.erreur_fatale(id_doc_processus, str(message), e)
 
     def traiter_resumer(self, evenement_dict):
         id_doc_attente = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE)

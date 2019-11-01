@@ -208,7 +208,7 @@ class GestionnaireDomaine:
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     def configurer(self):
-        self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte, gestionnaire_domaine=self)
+        self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte, self._stop_event, gestionnaire_domaine=self)
         self._traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         self.demarreur_processus = MGPProcessusDemarreur(
@@ -282,9 +282,7 @@ class GestionnaireDomaine:
 
             def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config, in_consume=consume):
                 if in_consume:
-                    ctag = gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
-                    # Conserver le ctag - permet de faire cancel au besoin (e.g. long running process)
-                    self._consumer_tags_parQ[queue] = ctag
+                    gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
                 for routing in in_queue_config['routing']:
                     channel.queue_bind(
                         exchange=in_queue_config['exchange'],
@@ -376,9 +374,18 @@ class GestionnaireDomaine:
         :param callback:
         :return: Consumer tag (ctag)
         """
-        nom_queue = queue.method.queue
+        if isinstance(queue, str):
+            nom_queue = queue
+        else:
+            nom_queue = queue.method.queue
+
         self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
-        return self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
+        ctag = self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
+
+        # Conserver le ctag - permet de faire cancel au besoin (e.g. long running process)
+        self._consumer_tags_parQ[nom_queue] = ctag
+
+        return ctag
 
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """
