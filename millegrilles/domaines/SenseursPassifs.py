@@ -6,7 +6,7 @@ import logging
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations, GenerateurTransaction
 from bson.objectid import ObjectId
@@ -794,7 +794,10 @@ class ProcessusChangementAttributSenseur(ProcessusMAJSenseurPassif):
         valeurs_modifiees = dict()
         for cle in document_transaction:
             if not cle.startswith('_') and cle not in ['uuid_senseur']:
-                valeurs_modifiees[cle] = document_transaction[cle]
+                # Remplacer les / en . (probleme de sauvegarde de la transaction originale si on utilise des .
+                cleModifiee = cle.replace('/', '.').replace("'", "")
+                valeurs_modifiees[cleModifiee] = document_transaction[cle]
+
         valeurs = {
             '$set': valeurs_modifiees,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
@@ -917,7 +920,7 @@ class ProcessusGenererRapport(ProcessusMAJSenseurPassif):
         self.set_etape_suivante()
 
 
-class ProcessusRegenererFenetresRapport(ProcessusMAJSenseurPassif):
+class ProcessusRegenererFenetresRapport(MGProcessus):
     """ Processus de calcul des fenetres d'aggregation horaire pour les senseurs. Ajoute la derniere heure. """
 
     def __init__(self, controleur, evenement):
@@ -940,7 +943,7 @@ class ProcessusRegenererFenetresRapport(ProcessusMAJSenseurPassif):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusMajFenetreQuotidienneRapport(ProcessusMAJSenseurPassif):
+class ProcessusMajFenetreQuotidienneRapport(MGProcessus):
     """ Processus de calcul des fenetres d'aggregation quotidienne pour les senseurs. Ajoute le dernier jour. """
 
     def __init__(self, controleur, evenement):
@@ -954,7 +957,8 @@ class ProcessusMajFenetreQuotidienneRapport(ProcessusMAJSenseurPassif):
 
         self.set_etape_suivante()  # Termine
 
-class ProcessusMajFenetreHoraireRapport(ProcessusMAJSenseurPassif):
+
+class ProcessusMajFenetreHoraireRapport(MGProcessus):
     """ Processus de calcul des fenetres d'aggregation horaire pour les senseurs. Ajoute la derniere heure. """
 
     def __init__(self, controleur, evenement):
@@ -965,21 +969,6 @@ class ProcessusMajFenetreHoraireRapport(ProcessusMAJSenseurPassif):
 
         producteur = ProducteurDocumentSenseurPassif(self.document_dao)
         producteur.ajouter_derniereheure_fenetre_horaire()
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusMajFenetreQuotidienneRapport(ProcessusMAJSenseurPassif):
-    """ Processus de calcul des fenetres d'aggregation quotidienne pour les senseurs. Ajoute le dernier jour. """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Mettre a jour les documents de senseurs """
-
-        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
-        producteur.ajouter_dernierjour_fenetre_quotidienne()
 
         self.set_etape_suivante()  # Termine
 

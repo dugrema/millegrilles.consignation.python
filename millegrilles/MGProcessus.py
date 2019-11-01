@@ -895,7 +895,7 @@ class MGProcessusTransaction(MGProcessus):
 
     def marquer_evenement_transaction(self, evenement):
         info_transaction = self.trouver_id_transaction()
-        id_transaction = info_transaction['id_transaction']
+        id_transaction = info_transaction.get('id_transaction')
         nom_collection = info_transaction['nom_collection']
 
         evenement = {

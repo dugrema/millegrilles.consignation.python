@@ -37,17 +37,17 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
                 "type": "tp",
             },
             {
-                "temperature": 19.3,
+                "temperature": 52.1,
                 "type": "onewire/temperature",
                 "adresse": '2854ab799711030c'
             },
             {
-                "temperature": 22.1,
+                "temperature": 32.1,
                 "type": "onewire/temperature",
                 "adresse": '3854ab799711030c'
             },
             {
-                "temperature": -12.9,
+                "temperature": -22.9,
                 "type": "onewire/temperature",
                 "adresse": '4854ab799711030c'
             },
