@@ -296,7 +296,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
                     date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
                     date_expiration = date_chargee + self._age_donnee_expiree_timedelta
                     self.__logger.debug("Date expiration lecture: %s, datenow: %s" % (date_expiration, date_now))
-                    if date_expiration > date_now:
+                    if date_expiration < date_now:
                         ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_expiree_format.format(**appareil_copy)
                     else:
                         ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_tph_format.format(**appareil_copy)
