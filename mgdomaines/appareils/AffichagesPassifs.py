@@ -157,7 +157,7 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
     taille_titre_press = taille_ecran - 10
 
     ligne_expiree_format = "{location:<%d} <Expire>" % taille_titre_press
-    ligne_tph_format = "{location:<%d} {temperature: 5.1f}C/{humidite:2.0f}%%" % taille_titre_tph
+    ligne_tph_format = "{location:<%d} {temperature}/{humidite}" % taille_titre_tph
     ligne_pression_format = "{titre:<%d} {pression:5.1f}kPa{tendance}" % taille_titre_press
 
     def __init__(self, contexte, timezone_horloge: str = 'America/Toronto', senseur_ids: list = None, intervalle_secs=30):
@@ -282,11 +282,21 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
 
                     appareil_copy['location'] = location[:AfficheurSenseurPassifTemperatureHumiditePression.taille_titre_tph]
 
+                    # S'assurer d'avoir une valeur pour formatter temperature et humidite
+                    if appareil_copy.get('temperature') is not None:
+                        appareil_copy['temperature'] = '{temperature: 5.1f}C'.format(**appareil_copy)
+                    else:
+                        appareil_copy['temperature'] = 'N.D'
+                    if appareil_copy.get('humidite') is not None:
+                        appareil_copy['humidite'] = '{humidite:2.0f}%%'.format(**appareil_copy)
+                    else:
+                        appareil_copy['humidite'] = 'N.D'
+
                     derniere_lecture = appareil['timestamp']
                     date_chargee = datetime.datetime.fromtimestamp(derniere_lecture)
                     date_expiration = date_chargee + self._age_donnee_expiree_timedelta
                     self.__logger.debug("Date expiration lecture: %s, datenow: %s" % (date_expiration, date_now))
-                    if date_expiration < date_now:
+                    if date_expiration > date_now:
                         ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_expiree_format.format(**appareil_copy)
                     else:
                         ligne_donnee = AfficheurSenseurPassifTemperatureHumiditePression.ligne_tph_format.format(**appareil_copy)

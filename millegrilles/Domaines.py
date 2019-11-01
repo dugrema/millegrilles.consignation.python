@@ -201,6 +201,8 @@ class GestionnaireDomaine:
         self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
         self.nb_routes_a_config = 0
 
+        self._consumer_tags_parQ = dict()
+
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
@@ -280,7 +282,9 @@ class GestionnaireDomaine:
 
             def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config, in_consume=consume):
                 if in_consume:
-                    gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
+                    ctag = gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
+                    # Conserver le ctag - permet de faire cancel au besoin (e.g. long running process)
+                    self._consumer_tags_parQ[queue] = ctag
                 for routing in in_queue_config['routing']:
                     channel.queue_bind(
                         exchange=in_queue_config['exchange'],
@@ -308,15 +312,20 @@ class GestionnaireDomaine:
             # Il ne reste plus de routes a configurer, set flag comme pret
             self.wait_Q_ready.set()
 
-    def stop_consuming(self):
+    def stop_consuming(self, queue = None):
         """
         Deconnecte les consommateur queues du domaine pour effectuer du travail offline.
         """
         channel = self.channel_mq
-        tags = channel.consumer_tags
-        for tag in tags:
-            self._logger.debug("Removing ctag %s" % tag)
-            channel.basic_cancel(consumer_tag=tag, nowait=True)
+        if queue is None:
+            tags = channel.consumer_tags
+            for tag in tags:
+                self._logger.debug("Removing ctag %s" % tag)
+                channel.basic_cancel(consumer_tag=tag, nowait=True)
+        else:
+            ctag = self._consumer_tags_parQ.get(queue)
+            if ctag is not None:
+                channel.basic_cancel(consumer_tag=ctag, nowait=True)
 
     def resoumettre_transactions(self):
         """
@@ -361,9 +370,15 @@ class GestionnaireDomaine:
         self.channel_mq = None
 
     def inscrire_basicconsume(self, queue, callback):
+        """
+        Inscrit le channel sur la queue.
+        :param queue:
+        :param callback:
+        :return: Consumer tag (ctag)
+        """
         nom_queue = queue.method.queue
         self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
-        self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
+        return self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
 
     def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
         """
