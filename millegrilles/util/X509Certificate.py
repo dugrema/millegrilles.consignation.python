@@ -4,12 +4,14 @@ from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.x509.name import NameOID
+from cryptography.x509.extensions import ExtensionNotFound
 from cryptography.hazmat.primitives import asymmetric
 
 
 import datetime
 import secrets
 import base64
+import logging
 from millegrilles import Constantes
 
 
@@ -256,6 +258,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         super().__init__(nom_millegrille)
         self._dict_ca = dict_ca
         self._autorite = autorite
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def _get_keyusage(self, builder):
         builder = builder.add_extension(
@@ -289,6 +292,14 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
             critical=False
         )
+
+        # Copier les extensions fournies dans la requete (exemple subject alt names)
+        try:
+            subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            alt_name_list = subject_alt_names.value
+            builder = builder.add_extension(x509.SubjectAlternativeName(alt_name_list), critical=False)
+        except ExtensionNotFound:
+            pass
 
         ski = cert_autorite.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
         builder = builder.add_extension(
