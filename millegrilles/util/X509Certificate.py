@@ -288,18 +288,17 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         builder = self._preparer_builder_from_csr(
             csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
 
+        # Ajouter noms DNS valides pour MQ
+        try:
+            subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            builder = builder.add_extension(x509.SubjectAlternativeName(subject_alt_names.value), critical=False)
+        except ExtensionNotFound:
+            pass
+
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
             critical=False
         )
-
-        # Copier les extensions fournies dans la requete (exemple subject alt names)
-        try:
-            subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-            alt_name_list = subject_alt_names.value
-            builder = builder.add_extension(x509.SubjectAlternativeName(alt_name_list), critical=False)
-        except ExtensionNotFound:
-            pass
 
         ski = cert_autorite.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
         builder = builder.add_extension(
@@ -717,6 +716,10 @@ class GenererMQ(GenerateurNoeud):
             x509.DNSName(u'%s.local' % self._common_name),
         ]
 
+        # Ajouter la liste des domaines publics recus du CSR
+        if self._domaines_publics is not None:
+            liste_dns.extend(self._domaines_publics)
+
         # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
         if self._common_name != 'mg-%s' % self._nom_millegrille:
             liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
@@ -1008,11 +1011,22 @@ class RenouvelleurCertificat:
         return clecert
 
     def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes):
+        csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+
+        # Extraire les extensions pour alt names
+        # Copier les extensions fournies dans la requete (exemple subject alt names)
+        domaines_publics = None
+        try:
+            subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            domaines_publics = subject_alt_names.value
+        except ExtensionNotFound:
+            pass
+
         generateur = self.__generateurs_par_role[role]
         generateur_instance = generateur(
-            self.__nom_millegrille, role, node_name, self.__dict_ca, self.__millegrille)
-
-        csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+            self.__nom_millegrille, role, node_name, self.__dict_ca, self.__millegrille,
+            domaines_publics=domaines_publics
+        )
 
         certificat = generateur_instance.signer(csr)
         chaine = generateur_instance.aligner_chaine(certificat)
