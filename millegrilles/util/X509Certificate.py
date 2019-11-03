@@ -204,6 +204,7 @@ class GenerateurCertificat:
         self._nom_millegrille = nom_millegrille
         self.__public_exponent = 65537
         self.__keysize = 2048
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     @staticmethod
     def split_chaine(chaine: str) -> list:
@@ -232,18 +233,26 @@ class GenerateurCertificat:
 
         return builder
 
-    def preparer_key_request(self, unit_name, common_name, generer_password=False) -> EnveloppeCleCert:
+    def preparer_key_request(self, unit_name, common_name, generer_password=False, alt_names: list = None) -> EnveloppeCleCert:
         clecert = EnveloppeCleCert()
         clecert.generer_private_key(generer_password=generer_password)
 
+        builder = x509.CertificateSigningRequestBuilder()
         name = x509.Name([
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._nom_millegrille),
             x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name),
             x509.NameAttribute(NameOID.COMMON_NAME, common_name),
         ])
-
-        builder = x509.CertificateSigningRequestBuilder()
         builder = builder.subject_name(name)
+
+        if alt_names is not None:
+            self.__logger.debug("Preparer requete %s avec urls publics: %s" % (common_name, str(alt_names)))
+            liste_names = list()
+            for alt_name in alt_names:
+                liste_names.append(x509.DNSName(alt_name))
+            # Ajouter noms DNS valides pour MQ
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_names), critical=False)
+
         request = builder.sign(
             clecert.private_key, hashes.SHA256(), default_backend()
         )
@@ -254,10 +263,11 @@ class GenerateurCertificat:
 
 class GenerateurCertificateParRequest(GenerateurCertificat):
 
-    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
         super().__init__(nom_millegrille)
         self._dict_ca = dict_ca
         self._autorite = autorite
+        self.__domaines_publics = domaines_publics
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def _get_keyusage(self, builder):
@@ -289,11 +299,11 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
 
         # Ajouter noms DNS valides pour MQ
-        try:
-            subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-            builder = builder.add_extension(x509.SubjectAlternativeName(subject_alt_names.value), critical=False)
-        except ExtensionNotFound:
-            pass
+        # try:
+        #     subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+        #     builder = builder.add_extension(x509.SubjectAlternativeName(subject_alt_names.value), critical=False)
+        # except ExtensionNotFound:
+        #     pass
 
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
@@ -488,7 +498,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 class GenerateurNoeud(GenerateurCertificateParRequest):
 
     def __init__(self, nom_millegrille, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
-        super().__init__(nom_millegrille, dict_ca, autorite)
+        super().__init__(nom_millegrille, dict_ca, autorite, domaines_publics)
         self._organization_name = organization_nom
         self._common_name = common_name
         self._domaines_publics = domaines_publics
@@ -718,17 +728,12 @@ class GenererMQ(GenerateurNoeud):
 
         # Ajouter la liste des domaines publics recus du CSR
         if self._domaines_publics is not None:
-            liste_dns.extend(self._domaines_publics)
+            liste_dns.extend([x509.DNSName(d) for d in self._domaines_publics])
 
         # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
         if self._common_name != 'mg-%s' % self._nom_millegrille:
             liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
             liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
-
-        if self._domaines_publics is not None:
-            for domaine in self._domaines_publics:
-                liste_dns.append(x509.DNSName(u'%s' % domaine))
-                liste_dns.append(x509.DNSName(u'mq.%s' % domaine))
 
         # Ajouter noms DNS valides pour MQ
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -1018,7 +1023,7 @@ class RenouvelleurCertificat:
         domaines_publics = None
         try:
             subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-            domaines_publics = subject_alt_names.value
+            domaines_publics = [d.value for d in subject_alt_names.value]
         except ExtensionNotFound:
             pass
 
