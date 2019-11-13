@@ -1,6 +1,6 @@
 # Fichier d'information pour le build Docker
 
-REPO=registry.maple.mdugre.info:5000
+REPO=docker.maceroc.com
 GITHUB_REPO=dugremat
 NAME=millegrilles_consignation_python_main
 BRANCH=`git name-rev --name-only HEAD`
