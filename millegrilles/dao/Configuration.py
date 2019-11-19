@@ -85,7 +85,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_EMAIL_FROM: None
         }
 
-    def loadEnvironment(self):
+    def loadEnvironment(self, additionals: list = None):
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
         if fichier_json_path is not None:
@@ -94,6 +94,9 @@ class TransactionConfiguration:
             with open(fichier_json_path) as fjson:
                 dict_fichier_json = json.load(fjson)
                 # logging.debug("Config JSON: %s" % str(dict_fichier_json))
+
+        if additionals is not None:
+            [dict_fichier_json.update(a) for a in additionals]
 
         # Faire la liste des dictionnaires de configuration a charger
         configurations = [
@@ -316,18 +319,20 @@ class TransactionConfiguration:
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """
 
-    def __init__(self, configuration=None, message_dao=None, document_dao=None):
+    def __init__(self, configuration=None, message_dao=None, document_dao=None, additionals: list = None):
         """
         Init classe. Fournir les ressources deja initialisee ou utiliser methode initialiser().
 
         :param configuration: Optionnel, configuration MilleGrilles deja initialisee.
         :param message_dao: Optionnel, message_dao deja initialise.
         :param document_dao: Optionnel, document_dao deja initialise.
+        :param additionals: Fichiers de config additionels a combiner
         """
 
         self._configuration = configuration
         self._message_dao = message_dao
         self._document_dao = document_dao
+        self._additionnals = additionals
 
         self._email_dao = None
         self._verificateur_certificats = None
@@ -345,7 +350,7 @@ class ContexteRessourcesMilleGrilles:
         """
 
         self._configuration = TransactionConfiguration()
-        self._configuration.loadEnvironment()
+        self._configuration.loadEnvironment(additionals=self._additionnals)
         self._message_dao = None
         self._document_dao = None
 
