@@ -432,7 +432,7 @@ class ProducteurDocumentSenseurPassif:
 
         collection = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document_senseur = collection.find_one_and_update(
-            filter=selection, update=operation, upsert=False, fields="_id:1")
+            filter=selection, update=operation, upsert=False, fields={"_id": 1})
 
         # Verifier si un document a ete modifie.
         if document_senseur is None:
