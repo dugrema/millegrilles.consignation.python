@@ -175,7 +175,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Index pour trouver un fichier par UUID
         collection_domaine.create_index([
             (ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID, 1),
-        ], unique=True)
+        ])
 
         # Index pour trouver une version de fichier par FUUID
         collection_domaine.create_index([
@@ -183,7 +183,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
              (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
               ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID),
              1),
-        ], unique=True)
+        ])
 
         # Index par SHA256 / taille. Permet de determiner si le fichier existe deja (et juste faire un lien).
         collection_domaine.create_index([
@@ -195,7 +195,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
              (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
               ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE),
              1),
-        ], unique=True)
+        ])
 
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM
@@ -333,6 +333,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             '$set': set_operation
         })
         self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
+
+    def maj_libelles_fichier(self, uuid_fichier, libelles: list):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_LIBELLES: libelles
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation
+        })
+        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
 
 # ******************* Processus *******************
@@ -481,5 +496,21 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
         self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, commentaire)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionChangerLibellesFichier(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        libelles = {}
+        for libelle in transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_LIBELLES]:
+            libelles[libelle] = True
+        self._controleur._gestionnaire_domaine.maj_libelles_fichier(uuid_fichier, libelles)
 
         self.set_etape_suivante()  # Termine

@@ -76,37 +76,25 @@ class MessagesSample(BaseCallback):
         print("Envoi transfert complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_creer_repertoire(self):
+    def transaction_creer_collection(self):
         transaction = {
             "parent_id": "019a03fd-d8f0-11e9-8a7f-00155d011f00",
             "nom": "test1",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.creerRepertoire',
+            transaction, 'millegrilles.domaines.GrosFichiers.creerCollection',
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Envoi transfert complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_renommer_repertoire(self):
+    def transaction_renommer_collection(self):
         transaction = {
-            "repertoire_uuid": "8e2cb4f4-b7bc-11e9-a426-00155d011f00",
+            "uuid": "8e2cb4f4-b7bc-11e9-a426-00155d011f00",
             "nom": "sous_test_change_2",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.renommerRepertoire',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Renommer repertoire complete: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def transaction_deplacer_repertoire(self):
-        transaction = {
-            "repertoire_uuid": "92ddd276-b7c6-11e9-81e1-00155d011f00",
-            "parent_id": 'b805e784-b7ba-11e9-b4bb-00155d011f00',
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.deplacerRepertoire',
+            transaction, 'millegrilles.domaines.GrosFichiers.renommerCollection',
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -114,7 +102,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_renommer_fichier(self):
         transaction = {
-            "uuid": "ec2626aa-b7ce-11e9-a706-00155d011f00",
+            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
             "nom": 'Bashir Bouzouka 3!',
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -124,30 +112,19 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_deplacer_fichier(self):
+    def transaction_changerlibelle_fichier(self):
         transaction = {
-            "uuid": "ec2626aa-b7ce-11e9-a706-00155d011f00",
-            "repertoire_uuid": 'c6da1c6e-b7cc-11e9-8c97-00155d011f00',
+            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
+            "libelles": ['abcd', '1234', 'public', 'disseminer']
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.deplacerFichier',
+            transaction, 'millegrilles.domaines.GrosFichiers.changerLibellesFichier',
             reply_to=self.queue_name, correlation_id='abcd')
 
-        print("Renommer repertoire complete: %s" % enveloppe_val)
+        print("Changer libelle complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_supprimer_fichier(self):
-        transaction = {
-            "uuid": "ec2626aa-b7ce-11e9-a706-00155d011f00",
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.supprimerFichier',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Renommer repertoire complete: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def transaction_supprimer_repertoire(self):
+    def transaction_supprimer_collection(self):
         transaction = {
             "repertoire_uuid": "392405b4-b7cd-11e9-831d-00155d011f00",
         }
@@ -158,7 +135,7 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_commenter_repertoire(self):
+    def transaction_commenter_collection(self):
         transaction = {
             "repertoire_uuid": "408f2b1c-b7cd-11e9-831d-00155d011f00",
             "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
@@ -170,21 +147,9 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_changersecurite_repertoire(self):
-        transaction = {
-            "repertoire_uuid": "16e474e6-c116-11e9-a058-00155d011f00",
-            "securite": "2.prive"
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.changerSecuriteRepertoire',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Renommer repertoire complete: %s" % enveloppe_val)
-        return enveloppe_val
-
     def transaction_commenter_fichier(self):
         transaction = {
-            "uuid": "1127ef4a-b7d1-11e9-8ec6-00155d011f00",
+            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
             "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -196,18 +161,20 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
+
         # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
-        enveloppe3 = sample.transaction_creer_repertoire()
-        # enveloppe4 = sample.transaction_renommer_repertoire()
-        # enveloppe5 = sample.transaction_deplacer_repertoire()
         # enveloppe6 = sample.transaction_renommer_fichier()
-        # enveloppe7 = sample.transaction_deplacer_fichier()
-        # enveloppe8 = sample.transaction_supprimer_fichier()
+        # enveloppe11 = sample.transaction_commenter_fichier()
+        enveloppe8 = sample.transaction_changerlibelle_fichier()
+
+        # enveloppe3 = sample.transaction_creer_collection()
+        # enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe9 = sample.transaction_supprimer_repertoire()
         # enveloppe10 = sample.transaction_commenter_repertoire()
-        # enveloppe11 = sample.transaction_commenter_fichier()
         # enveloppe12 = sample.transaction_changersecurite_repertoire()
+
+        pass
 
 
 # --- MAIN ---
