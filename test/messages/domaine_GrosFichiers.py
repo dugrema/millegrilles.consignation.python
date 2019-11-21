@@ -76,30 +76,6 @@ class MessagesSample(BaseCallback):
         print("Envoi transfert complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_creer_collection(self):
-        transaction = {
-            "parent_id": "019a03fd-d8f0-11e9-8a7f-00155d011f00",
-            "nom": "test1",
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.creerCollection',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Envoi transfert complete: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def transaction_renommer_collection(self):
-        transaction = {
-            "uuid": "8e2cb4f4-b7bc-11e9-a426-00155d011f00",
-            "nom": "sous_test_change_2",
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.renommerCollection',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Renommer repertoire complete: %s" % enveloppe_val)
-        return enveloppe_val
-
     def transaction_renommer_fichier(self):
         transaction = {
             "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
@@ -122,6 +98,41 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Changer libelle complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_commenter_fichier(self):
+        transaction = {
+            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
+            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.commenterFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_creer_collection(self):
+        transaction = {
+            "nom": "Une collection",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.nouvelleCollection',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Complete : %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_renommer_collection(self):
+        transaction = {
+            "uuid": "3a72810c-0bf6-11ea-bb74-00155d011f09",
+            "nom": "sous_test_change_2",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.renommerCollection',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
     def transaction_supprimer_collection(self):
@@ -147,18 +158,6 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_commenter_fichier(self):
-        transaction = {
-            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
-            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
-        }
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.commenterFichier',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Renommer repertoire complete: %s" % enveloppe_val)
-        return enveloppe_val
-
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -166,10 +165,10 @@ class MessagesSample(BaseCallback):
         # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
-        enveloppe8 = sample.transaction_changerlibelle_fichier()
+        # enveloppe8 = sample.transaction_changerlibelle_fichier()
 
         # enveloppe3 = sample.transaction_creer_collection()
-        # enveloppe4 = sample.transaction_renommer_collection()
+        enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe9 = sample.transaction_supprimer_repertoire()
         # enveloppe10 = sample.transaction_commenter_repertoire()
         # enveloppe12 = sample.transaction_changersecurite_repertoire()

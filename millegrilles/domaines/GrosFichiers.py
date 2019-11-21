@@ -7,6 +7,7 @@ from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import logging
 import uuid
+import datetime
 
 
 class ConstantesGrosFichiers:
@@ -26,8 +27,8 @@ class ConstantesGrosFichiers:
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_FICHIER = 'fichier'
+    LIBVAL_COLLECTION = 'collection'
 
-    DOCUMENT_SECURITE = 'securite'
     DOCUMENT_COMMENTAIRES = 'commentaires'
 
     DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
@@ -43,6 +44,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_SHA256 = 'sha256'
     DOCUMENT_FICHIER_LIBELLES = 'libelles'
 
+    DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
+
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
     DOCUMENT_VERSION_DATE_VERSION = 'date_version'
@@ -54,9 +57,16 @@ class ConstantesGrosFichiers:
     TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM
     TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM
     TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
-    TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
     TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
     TRANSACTION_CHANGER_LIBELLES_FICHIER = '%s.changerLibellesFichier' % DOMAINE_NOM
+
+    TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
+    TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
+    TRANSACTION_COMMENTER_COLLECTION = '%s.commenterCollection' % DOMAINE_NOM
+    TRANSACTION_CHANGER_LIBELLES_COLLECTION = '%s.changerLibellesCollection' % DOMAINE_NOM
+    TRANSACTION_FIGER_COLLECTION = '%s.figerCollection' % DOMAINE_NOM
+    TRANSACTION_CREERTORRENT_COLLECTION = '%s.creerTorrentCollection' % DOMAINE_NOM
+    TRANSACTION_CLONER_COLLECTION = '%s.clonerCollection' % DOMAINE_NOM
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
@@ -66,7 +76,6 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
         DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
-        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
         DOCUMENT_COMMENTAIRES: None,                        # Commentaires
         DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
         DOCUMENT_FICHIER_LIBELLES: None,                    # Liste de libelles du fichier
@@ -80,6 +89,22 @@ class ConstantesGrosFichiers:
         DOCUMENT_VERSION_DATE_VERSION: None,
         DOCUMENT_FICHIER_TAILLE: None,
         DOCUMENT_FICHIER_SHA256: None,
+        DOCUMENT_COMMENTAIRES: None,
+    }
+
+    DOCUMENT_COLLECTION = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_COLLECTION,
+        DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
+        DOCUMENT_COLLECTION_FICHIERS: dict(),  # Dictionnaire de fichiers, key=uuid, value=summmaryinfo
+        DOCUMENT_FICHIER_LIBELLES: dict(),
+    }
+
+    DOCUMENT_COLLECTION_FICHIER = {
+        DOCUMENT_FICHIER_UUID_DOC: None,    # uuid du fichier
+        DOCUMENT_FICHIER_FUUID: None,       # fuuid de la version du fichier
+        DOCUMENT_FICHIER_NOMFICHIER: None,  # Nom du fichier
+        DOCUMENT_VERSION_DATE_FICHIER: None,
+        DOCUMENT_FICHIER_TAILLE: None,
         DOCUMENT_COMMENTAIRES: None,
     }
 
@@ -131,6 +156,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_LIBELLES_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerLibellesFichier"
+
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_LIBELLES_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerLibellesCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_FIGER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionFigerCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREERTORRENT_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerTorrentCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CLONER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionClonerCollection"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -234,8 +274,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
 
-        set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-
         operation_currentdate = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
         }
@@ -257,7 +295,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
-            ConstantesGrosFichiers.DOCUMENT_SECURITE,
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
         ]
         date_version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT].get('_estampille')
@@ -347,6 +384,42 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation
         })
+        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+    def creer_collection(self, uuid_collection: str, nom_collection: str):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        collection = ConstantesGrosFichiers.DOCUMENT_COLLECTION.copy()
+        collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_collection
+        collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_collection
+
+        date_creation = datetime.datetime.utcnow()
+        collection[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = date_creation
+        collection[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = date_creation
+
+        # Inserer la nouvelle collection
+        resultat = collection_domaine.insert_one(collection)
+        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+    def renommer_collection(self, uuid_collection: str, nouveau_nom_collection: str):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: nouveau_nom_collection
+            },
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+
+        # Inserer la nouvelle collection
+        resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
 
@@ -514,3 +587,81 @@ class ProcessusTransactionChangerLibellesFichier(ProcessusGrosFichiers):
         self._controleur._gestionnaire_domaine.maj_libelles_fichier(uuid_fichier, libelles)
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+
+        uuid_collection = str(uuid.uuid1())
+
+        self._controleur._gestionnaire_domaine.creer_collection(uuid_collection, nom_collection)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid': uuid_collection}
+
+
+class ProcessusTransactionRenommerCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        nouveau_nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        self._controleur._gestionnaire_domaine.renommer_collection(uuid_collection, nouveau_nom_collection)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionCommenterCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        pass
+
+
+class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        pass
+
+
+class ProcessusTransactionFigerCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        pass
+
+
+class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        pass
+
+
+class ProcessusTransactionClonerCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        pass
