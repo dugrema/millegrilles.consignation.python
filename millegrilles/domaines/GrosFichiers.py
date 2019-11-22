@@ -28,6 +28,7 @@ class ConstantesGrosFichiers:
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_FICHIER = 'fichier'
     LIBVAL_COLLECTION = 'collection'
+    LIBVAL_FAVORIS = 'favoris'
     LIBVAL_RAPPORT = 'rapport'
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
 
@@ -50,6 +51,8 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_FIGEE = 'figee'
+
+    DOCUMENT_FAVORIS_LISTE = 'favoris'
 
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
@@ -116,6 +119,17 @@ class ConstantesGrosFichiers:
         DOCUMENT_COMMENTAIRES: None,
     }
 
+    DOCUMENT_FAVORIS = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FAVORIS,
+        DOCUMENT_FAVORIS_LISTE: list(),     # Liste DOCUMENT_FAVORIS_INFO
+    }
+
+    DOCUMENT_FAVORIS_INFO = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: None,      # Type document
+        'nom': None,                                    # Nom affiche a l'ecran
+        'uuid': None,                                   # Lien vers document, doit etre unique dans la liste de favoris
+    }
+
     # Prototype de document liste de recherche
     # Represente une liste maintenue et triee par un champ particulier (date) de resultats
     # pour acces rapide.
@@ -148,6 +162,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
+
+        # Ajout document favoris
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_FAVORIS, ConstantesGrosFichiers.DOCUMENT_FAVORIS)
 
         # Creation liste de recherche speciale pour l'activite des fichiers
         liste_recherche = ConstantesGrosFichiers.DOCUMENT_RAPPORT_RECHERCHE.copy()
