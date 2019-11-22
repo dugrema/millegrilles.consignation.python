@@ -87,7 +87,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
         DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
-        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
+        DOCUMENT_SECURITE: Constantes.SECURITE_SECURE,      # Niveau de securite
         DOCUMENT_COMMENTAIRES: None,                        # Commentaires
         DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
         DOCUMENT_FICHIER_ETIQUETTES: None,                    # Liste de libelles du fichier
@@ -327,6 +327,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] =\
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
+
+        set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
 
         operation_currentdate = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True

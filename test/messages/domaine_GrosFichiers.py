@@ -191,7 +191,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_ajouter_favoris(self):
         transaction = {
-            'uuid': '7b3724da-0be8-11ea-bb74-00155d011f09'
+            'uuid': 'b9abef30-0ccd-11ea-bb74-00155d011f09'
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
