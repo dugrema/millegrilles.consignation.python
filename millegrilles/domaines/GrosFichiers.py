@@ -23,12 +23,15 @@ class ConstantesGrosFichiers:
     TRANSACTION_TYPE_METADATA = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata'
     TRANSACTION_TYPE_TRANSFERTCOMPLETE = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.transfertComplete'
 
-    TRANSACTION_CHAMP_LIBELLE = 'libelle'
+    TRANSACTION_CHAMP_ETIQUETTE = 'etiquette'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_FICHIER = 'fichier'
     LIBVAL_COLLECTION = 'collection'
+    LIBVAL_RAPPORT = 'rapport'
+    LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
 
+    DOCUMENT_SECURITE = 'securite'
     DOCUMENT_COMMENTAIRES = 'commentaires'
 
     DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
@@ -42,9 +45,11 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
     DOCUMENT_FICHIER_TAILLE = 'taille'
     DOCUMENT_FICHIER_SHA256 = 'sha256'
-    DOCUMENT_FICHIER_LIBELLES = 'libelles'
+    DOCUMENT_FICHIER_SUPPRIME = 'supprime'
+    DOCUMENT_FICHIER_ETIQUETTES = 'etiquettes'
 
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
+    DOCUMENT_COLLECTION_FIGEE = 'figee'
 
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
@@ -75,9 +80,11 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
         DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
+        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
         DOCUMENT_COMMENTAIRES: None,                        # Commentaires
         DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
-        DOCUMENT_FICHIER_LIBELLES: None,                    # Liste de libelles du fichier
+        DOCUMENT_FICHIER_ETIQUETTES: None,                    # Liste de libelles du fichier
+        DOCUMENT_FICHIER_SUPPRIME: False,                   # True si le fichier est supprime
     }
 
     SOUSDOCUMENT_VERSION_FICHIER = {
@@ -93,9 +100,11 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_COLLECTION = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_COLLECTION,
-        DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
-        DOCUMENT_COLLECTION_FICHIERS: dict(),  # Dictionnaire de fichiers, key=uuid, value=summmaryinfo
-        DOCUMENT_FICHIER_LIBELLES: dict(),
+        DOCUMENT_FICHIER_UUID_DOC: None,        # Identificateur unique du fichier (UUID trans initiale)
+        DOCUMENT_COLLECTION_FICHIERS: dict(),   # Dictionnaire de fichiers, key=uuid, value=DOCUMENT_COLLECTION_FICHIER
+        DOCUMENT_FICHIER_ETIQUETTES: dict(),    # Etiquettes de la collection
+        DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
+        DOCUMENT_COLLECTION_FIGEE: False,       # True si la collection est figee (ne peut plus etre modifiee)
     }
 
     DOCUMENT_COLLECTION_FICHIER = {
@@ -105,6 +114,21 @@ class ConstantesGrosFichiers:
         DOCUMENT_VERSION_DATE_FICHIER: None,
         DOCUMENT_FICHIER_TAILLE: None,
         DOCUMENT_COMMENTAIRES: None,
+    }
+
+    # Prototype de document liste de recherche
+    # Represente une liste maintenue et triee par un champ particulier (date) de resultats
+    # pour acces rapide.
+    # Peut etre utilise pour garder une liste des N derniers fichiers changes, fichiers
+    # avec libelles '2019 et 'photos', etc.
+    DOCUMENT_RAPPORT_RECHERCHE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_RAPPORT,
+        'description': None,                    # Description (nom) de la liste de recherche
+        DOCUMENT_SECURITE: None,                # Niveau de securite de cette liste
+        'filtre_libelles': dict(),              # Libelles utilises pour filtrer la liste des changements
+        DOCUMENT_COLLECTION_FICHIERS: list(),   # Dictionnaire de fichiers, valeur=DOCUMENT_COLLECTION_FICHIER
+        'tri': [{DOCUMENT_VERSION_DATE_FICHIER: -1}],   # Tri de la liste, utilise pour tronquer
+        'compte_max': 100,                      # Nombre maximal d'entree dans la liste
     }
 
 
@@ -124,6 +148,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
+
+        # Creation liste de recherche speciale pour l'activite des fichiers
+        liste_recherche = ConstantesGrosFichiers.DOCUMENT_RAPPORT_RECHERCHE.copy()
+        liste_recherche[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
+        liste_recherche['description'] = "Activite recente"
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE, liste_recherche)
+
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
@@ -372,7 +403,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_LIBELLES: libelles
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES: libelles
         }
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
@@ -428,7 +459,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         ops = {
             '$set': {
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_LIBELLES: nouveaux_libelles
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES: nouveaux_libelles
             },
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
@@ -505,6 +536,65 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('supprimer fichiers resultat: %s' % str(resultat))
 
+    def maj_fichier_rapports_et_collections(self, uuid_fichier: str):
+        """
+        Met a jour les listes et collections qui correspondent au fichier.
+        :param uuid_fichier:
+        :return:
+        """
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        fichier = collection_domaine.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+        })
+        etiquettes = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+
+        # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
+        # doivent etre presentes dans le document)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
+        }
+        ops = {
+            '$push': {
+                'fichiers': {
+                    '$each': [fichier],
+                    '$sort': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: -1},
+                    '$slice': - 200,
+                }
+            }
+        }
+        collection_domaine.update(filtre, ops)
+
+    def maj_collections_rapports_et_collections(self, uuid_collection: str):
+        """
+        Met a jour les listes et collections qui correspondent au fichier.
+        :param uuid_fichier:
+        :return:
+        """
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection = collection_domaine.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        })
+        etiquettes = collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+
+        # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
+        # doivent etre presentes dans le document)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
+        }
+        ops = {
+            '$push': {
+                'fichiers': {
+                    '$each': [collection],
+                    '$sort': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: -1},
+                    '$slice': - 200,
+                }
+            }
+        }
+        collection_domaine.update(filtre, ops)
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -516,7 +606,32 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
 
 
-class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiers):
+class ProcessusGrosFichiersMetadata(ProcessusGrosFichiers):
+
+    def set_etape_suivante(self, etape_suivante=None, token_attente: list = None):
+        if etape_suivante is None:
+            etape_suivante = ProcessusGrosFichiersMetadata.mettre_a_jour_listes_et_collections.__name__
+        super().set_etape_suivante(etape_suivante, token_attente)
+
+    def mettre_a_jour_listes_et_collections(self):
+        """
+        Met a jour les liens dans les listes et collections correspondantes
+        :return:
+        """
+        # Le processus a deja extrait les uuid vers les parametres (return ...)
+        uuid_fichier = self.parametres.get('uuid_fichier')
+        uuid_collection = self.parametres.get('uuid_collection')
+
+        if uuid_fichier is not None:
+            self._controleur.gestionnaire.maj_fichier_rapports_et_collections(uuid_fichier)
+
+        if uuid_collection is not None:
+            self._controleur.gestionnaire.maj_collections_rapports_et_collections(uuid_collection)
+
+        self.set_etape_suivante('finale')  # Executer etape finale
+
+
+class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersMetadata):
     """
     Processus de d'ajout de nouveau fichier ou nouvelle version d'un fichier
     C'est le processus principal qui depend de deux sous-processus:
@@ -622,7 +737,7 @@ class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
         return {'fuuid': fuuid}
 
 
-class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiers):
+class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -635,14 +750,14 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiers):
         resultat = self._controleur._gestionnaire_domaine.renommer_deplacer_fichier(uuid_doc, nouveau_nom)
 
         # Le resultat a deja ancien_repertoire_uuid. On ajoute le nouveau pour permettre de traiter les deux.
-        resultat['fichier_uuid'] = uuid_doc
+        resultat['uuid_fichier'] = uuid_doc
 
         self.set_etape_suivante()  # Termine
 
         return resultat
 
 
-class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
+class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -655,8 +770,10 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
 
+        return {'uuid_fichier': uuid_fichier}
 
-class ProcessusTransactionChangerLibellesFichier(ProcessusGrosFichiers):
+
+class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -664,15 +781,17 @@ class ProcessusTransactionChangerLibellesFichier(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        libelles = {}
-        for libelle in transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_LIBELLES]:
-            libelles[libelle] = True
-        self._controleur._gestionnaire_domaine.maj_libelles_fichier(uuid_fichier, libelles)
+        etiquettes = {}
+        for etiquette in transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]:
+            etiquettes[etiquette] = True
+        self._controleur._gestionnaire_domaine.maj_libelles_fichier(uuid_fichier, etiquettes)
 
         self.set_etape_suivante()  # Termine
 
+        return {'uuid_fichier': uuid_fichier}
 
-class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiers):
+
+class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -687,10 +806,10 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
 
-        return {'uuid': uuid_collection}
+        return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionRenommerCollection(ProcessusGrosFichiers):
+class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -704,23 +823,27 @@ class ProcessusTransactionRenommerCollection(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
 
+        return {'uuid_collection': uuid_collection}
 
-class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiers):
+
+class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
         transaction = self.charger_transaction()
-        uuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        libelles = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_LIBELLES]
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        libelles = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
 
-        self._controleur._gestionnaire_domaine.changer_libelles_collection(uuid, libelles)
+        self._controleur._gestionnaire_domaine.changer_libelles_collection(uuid_collection, libelles)
 
         self.set_etape_suivante()  # Termine
 
+        return {'uuid_collection': uuid_collection}
 
-class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiers):
+
+class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -731,10 +854,12 @@ class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiers):
         :return:
         """
         transaction = self.charger_transaction()
-        uuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur._gestionnaire_domaine.figer_collection(uuid, uuid)
+        self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
         self.set_etape_suivante(ProcessusTransactionCreerTorrentCollection.creer_fichier_torrent.__name__)
+
+        return {'uuid_collection': uuid_collection}
 
     def creer_fichier_torrent(self):
         """

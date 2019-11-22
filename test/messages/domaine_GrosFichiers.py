@@ -18,7 +18,7 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
-        self.fichier_fuuid = "39c1e1b0-b6ee-11e9-b0cd-d30e8fab841g"
+        self.fichier_fuuid = "39c1e1b0-b6ee-11e9-b0cd-d30e8fab842j"
 
         self.channel = None
         self.event_recu = Event()
@@ -49,7 +49,7 @@ class MessagesSample(BaseCallback):
         transaction = {
             "fuuid": self.fichier_fuuid,
             "securite": "2.prive",
-            "nom": "ExplorationGrosFichiers7.txt",
+            "nom": "ExplorationGrosFichiers10.txt",
             "taille": 5478,
             "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
             "mimetype": "test/plain",
@@ -192,8 +192,8 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
-        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
-        # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+        enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
         # enveloppe8 = sample.transaction_changerlibelle_fichier()
@@ -201,7 +201,7 @@ class MessagesSample(BaseCallback):
         # enveloppe3 = sample.transaction_creer_collection()
         # enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe5 = sample.transaction_changer_libelle_collection()
-        enveloppe7 = sample.transaction_ajouter_fichiers_collection()
+        # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
 
         pass
