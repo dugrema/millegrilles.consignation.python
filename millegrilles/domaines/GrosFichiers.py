@@ -8,6 +8,7 @@ from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 import logging
 import uuid
 import datetime
+import json
 
 
 class ConstantesGrosFichiers:
@@ -74,6 +75,9 @@ class ConstantesGrosFichiers:
     TRANSACTION_CREERTORRENT_COLLECTION = '%s.creerTorrentCollection' % DOMAINE_NOM
     TRANSACTION_AJOUTER_FICHIERS_COLLECTION = '%s.ajouterFichiersCollection' % DOMAINE_NOM
     TRANSACTION_RETIRER_FICHIERS_COLLECTION = '%s.retirerFichiersCollection' % DOMAINE_NOM
+
+    TRANSACTION_AJOUTER_FAVORI = '%s.ajouterFavori' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_FAVORI = '%s.supprimerFavori' % DOMAINE_NOM
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
@@ -216,6 +220,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
+
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FAVORI:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFavori"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FAVORI:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFavori"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -613,6 +622,70 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update(filtre, ops)
 
+    def ajouter_favori(self, doc_uuid: str):
+        self._logger.debug("Ajouter favor %s" % doc_uuid)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        filtre_docs = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                '$in': [ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION]
+            },
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: doc_uuid,
+        }
+        self._logger.debug("Trouver docs pour favoris: %s" % json.dumps(filtre_docs))
+        documents = collection_domaine.find(filtre_docs)
+
+        favoris = list()
+        for document in documents:
+            # Creer favori
+            favori = ConstantesGrosFichiers.DOCUMENT_FAVORIS_INFO.copy()
+
+            favori[Constantes.DOCUMENT_INFODOC_LIBELLE] = document[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            favori[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = document[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+            favori[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = document[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+
+            favoris.append(favori)
+
+        ops = {
+            '$push': {
+                ConstantesGrosFichiers.DOCUMENT_FAVORIS_LISTE: {
+                    '$each': favoris
+                }
+            }
+        }
+
+        # Le filtre s'assure que le favori n'est pas deja dans la liste ($not...)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FAVORIS,
+            ConstantesGrosFichiers.DOCUMENT_FAVORIS_LISTE: {'$not': {'$elemMatch': {'uuid': doc_uuid}}}
+        }
+        resultat = collection_domaine.update_one(filtre, ops)
+        self._logger.debug("Ajout favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
+
+        return resultat
+
+    def supprimer_favori(self, doc_uuid: str):
+        self._logger.debug("Supprimer favori %s" % doc_uuid)
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$pull': {
+                ConstantesGrosFichiers.DOCUMENT_FAVORIS_LISTE: {
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: doc_uuid
+                }
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FAVORIS
+        }
+        resultat = collection_domaine.update_one(filtre, ops)
+        self._logger.debug("Supprimer favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
+
+        return resultat
+
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
 
@@ -918,4 +991,28 @@ class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
         collectionuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         fichiersuuid = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_FICHIERS]
         self._controleur._gestionnaire_domaine.retirer_fichiers_collection(collectionuuid, fichiersuuid)
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionAjouterFavori(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+        self._controleur._gestionnaire_domaine.ajouter_favori(doc_uuid)
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionSupprimerFavori(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+        self._controleur._gestionnaire_domaine.supprimer_favori(doc_uuid)
         self.set_etape_suivante()

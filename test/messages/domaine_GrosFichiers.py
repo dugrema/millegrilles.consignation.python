@@ -189,11 +189,35 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_ajouter_favoris(self):
+        transaction = {
+            'uuid': '7b3724da-0be8-11ea-bb74-00155d011f09'
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.ajouterFavori',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Ajouter favori: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_supprimer_favoris(self):
+        transaction = {
+            'uuid': '8671512c-0c06-11ea-bb74-00155d011f09'
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.supprimerFavori',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Supprimer favori: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
-        enveloppe1 = sample.transaction_nouvelle_version_metadata()
-        enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
+        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
         # enveloppe8 = sample.transaction_changerlibelle_fichier()
@@ -203,6 +227,9 @@ class MessagesSample(BaseCallback):
         # enveloppe5 = sample.transaction_changer_libelle_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
+
+        enveloppe = sample.transaction_ajouter_favoris()
+        # enveloppe = sample.transaction_supprimer_favoris()
 
         pass
 
