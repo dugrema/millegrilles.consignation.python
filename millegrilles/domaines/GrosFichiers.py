@@ -40,6 +40,7 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_FICHIER_NOMFICHIER = 'nom'
     DOCUMENT_FICHIER_UUID_DOC = 'uuid'                    # UUID du document de fichier (metadata)
+    DOCUMENT_UUID_GENERIQUE = 'documentuuid'            # Represente un UUID de n'import quel type de document
     DOCUMENT_FICHIER_FUUID = 'fuuid'                    # UUID (v1) du fichier
     DOCUMENT_FICHIER_DATEVCOURANTE = 'date_v_courante'  # Date de la version courante
     DOCUMENT_FICHIER_UUIDVCOURANTE = 'fuuid_v_courante'  # FUUID de la version courante
@@ -318,15 +319,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
-        uuid_fichier = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-        if uuid_fichier is None:
-            # Chercher a identifier le fichier par chemin et nom
-            doc_fichier = collection_domaine.find_one({
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+        uuid_generique = transaction.get(ConstantesGrosFichiers.DOCUMENT_UUID_GENERIQUE)
+        super_document = None
+        if uuid_generique is not None:
+            # Chercher a identifier le fichier ou la collection ou cette nouvelle version va aller
+            super_document = collection_domaine.find_one({
+                Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                    ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                    ConstantesGrosFichiers.LIBVAL_FICHIER
+                ]},
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_generique
             })
-
-            if doc_fichier is not None:
-                uuid_fichier = doc_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
         nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
 
@@ -343,13 +346,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         plus_recente_version = True  # Lors d<une MAJ, on change la plus recente version seulement si necessaire
         set_operations = {}
-        if uuid_fichier is None:
-            # On n'a pas reussi a identifier le fichier. On prepare un nouveau document.
+        if super_document is None or super_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE) == ConstantesGrosFichiers.LIBVAL_COLLECTION:
+            # Le super document n'est pas un fichier, on genere un nouveau fichier
+            # Le nouveau fichier va utiliser le UUID de la transaction
             uuid_fichier = set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
             operation_currentdate[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = True
         else:
-            document_fichier = collection_domaine.find_one({Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_fichier})
-            # Determiner si le fichier est la plus recente version
+            # Le super-document est un fichier. On ajoute une version a ce fichier.
+            uuid_fichier = uuid_generique
 
         # Filtrer transaction pour creer l'entree de version dans le fichier
         masque_transaction = [
