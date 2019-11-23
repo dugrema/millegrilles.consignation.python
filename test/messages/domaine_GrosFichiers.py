@@ -113,6 +113,28 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_supprimer_fichier(self):
+        transaction = {
+            "uuid": "c0f8649e-0ccd-11ea-bb74-00155d011f09",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.supprimerFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_recuperer_fichier(self):
+        transaction = {
+            "uuid": "c0f8649e-0ccd-11ea-bb74-00155d011f09",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.recupererFichier',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
     def transaction_creer_collection(self):
         transaction = {
             "nom": "Une collection",
@@ -221,6 +243,8 @@ class MessagesSample(BaseCallback):
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
         # enveloppe8 = sample.transaction_changerlibelle_fichier()
+        # enveloppe = sample.transaction_supprimer_fichier()
+        enveloppe = sample.transaction_recuperer_fichier()
 
         # enveloppe3 = sample.transaction_creer_collection()
         # enveloppe4 = sample.transaction_renommer_collection()
@@ -228,7 +252,7 @@ class MessagesSample(BaseCallback):
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
 
-        enveloppe = sample.transaction_ajouter_favoris()
+        # enveloppe = sample.transaction_ajouter_favoris()
         # enveloppe = sample.transaction_supprimer_favoris()
 
         pass

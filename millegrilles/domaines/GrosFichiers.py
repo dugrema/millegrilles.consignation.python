@@ -58,6 +58,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
     DOCUMENT_VERSION_DATE_VERSION = 'date_version'
+    DOCUMENT_VERSION_DATE_SUPPRESSION = 'date_suppression'
 
     DOCUMENT_DEFAULT_MIMETYPE = 'application/binary'
 
@@ -68,6 +69,8 @@ class ConstantesGrosFichiers:
     TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
     TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
     TRANSACTION_CHANGER_LIBELLES_FICHIER = '%s.changerLibellesFichier' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
+    TRANSACTION_RECUPERER_FICHIER = '%s.recupererFichier' % DOMAINE_NOM
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
@@ -207,6 +210,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_LIBELLES_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerLibellesFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
@@ -441,6 +448,41 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             '$set': set_operation
         })
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+    def supprimer_fichier(self, uuid_fichier):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True,
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_SUPPRESSION: datetime.datetime.utcnow()
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation
+        })
+        self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
+
+    def recuperer_fichier(self, uuid_fichier):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False
+        }
+        unset_operation = {
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_SUPPRESSION: True
+        }
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation,
+            '$unset': unset_operation
+        })
+        self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
 
     def creer_collection(self, uuid_collection: str, nom_collection: str):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -839,10 +881,12 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersMetadata)
         uuid_doc = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         nouveau_nom = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
 
-        resultat = self._controleur._gestionnaire_domaine.renommer_deplacer_fichier(uuid_doc, nouveau_nom)
+        self._controleur._gestionnaire_domaine.renommer_deplacer_fichier(uuid_doc, nouveau_nom)
 
         # Le resultat a deja ancien_repertoire_uuid. On ajoute le nouveau pour permettre de traiter les deux.
-        resultat['uuid_fichier'] = uuid_doc
+        resultat = {
+            'uuid_fichier': uuid_doc
+        }
 
         self.set_etape_suivante()  # Termine
 
@@ -877,6 +921,36 @@ class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersMetadata
         for etiquette in transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]:
             etiquettes[etiquette] = True
         self._controleur._gestionnaire_domaine.maj_libelles_fichier(uuid_fichier, etiquettes)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid_fichier': uuid_fichier}
+
+
+class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersMetadata):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        self._controleur._gestionnaire_domaine.supprimer_fichier(uuid_fichier)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid_fichier': uuid_fichier}
+
+
+class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersMetadata):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        self._controleur._gestionnaire_domaine.recuperer_fichier(uuid_fichier)
 
         self.set_etape_suivante()  # Termine
 
