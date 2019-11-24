@@ -135,9 +135,22 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_creer_collection(self):
+    def transaction_creer_collection_vide(self):
         transaction = {
-            "nom": "Une collection",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.nouvelleCollection',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Complete : %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_creer_collection_2docs(self):
+        transaction = {
+            "documents": [
+                {'uuid': 'b63c5771-d2c8-4d5c-9db5-fdbe0a35ac36'},
+                {'uuid': 'ff754f4a-6df1-4fbc-ab64-70693c7c487f'},
+            ]
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.nouvelleCollection',
@@ -148,7 +161,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_renommer_collection(self):
         transaction = {
-            "uuid": "3a72810c-0bf6-11ea-bb74-00155d011f09",
+            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
             "nom": "sous_test_change_2",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -183,11 +196,10 @@ class MessagesSample(BaseCallback):
 
     def transaction_ajouter_fichiers_collection(self):
         transaction = {
-            "uuid": "3a72810c-0bf6-11ea-bb74-00155d011f09",
-            "fichiers": [
-                '049fb738-0c06-11ea-bb74-00155d011f09',
-                '7ccf5aa6-0c06-11ea-bb74-00155d011f09',
-                '8671512c-0c06-11ea-bb74-00155d011f09',
+            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
+            "documents": [
+                'def78794-0ec7-11ea-bb74-00155d011f09',
+                '3c2e929e-57d4-432f-8b63-89131739af68',
             ]
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -199,9 +211,9 @@ class MessagesSample(BaseCallback):
 
     def transaction_retirer_fichiers_collection(self):
         transaction = {
-            "uuid": "3a72810c-0bf6-11ea-bb74-00155d011f09",
-            "fichiers": [
-                '7b3724da-0be8-11ea-bb74-00155d011f09',
+            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
+            "documents": [
+                '3c2e929e-57d4-432f-8b63-89131739af68',
             ]
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -244,13 +256,14 @@ class MessagesSample(BaseCallback):
         # enveloppe11 = sample.transaction_commenter_fichier()
         # enveloppe8 = sample.transaction_changerlibelle_fichier()
         # enveloppe = sample.transaction_supprimer_fichier()
-        enveloppe = sample.transaction_recuperer_fichier()
+        # enveloppe = sample.transaction_recuperer_fichier()
 
-        # enveloppe3 = sample.transaction_creer_collection()
-        # enveloppe4 = sample.transaction_renommer_collection()
-        # enveloppe5 = sample.transaction_changer_libelle_collection()
+        # enveloppe3 = sample.transaction_creer_collection_vide()
+        # enveloppe3 = sample.transaction_creer_collection_2docs()
+        enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
+        # enveloppe5 = sample.transaction_changer_libelle_collection()
 
         # enveloppe = sample.transaction_ajouter_favoris()
         # enveloppe = sample.transaction_supprimer_favoris()
@@ -266,3 +279,4 @@ sample = MessagesSample()
 # FIN TEST
 sample.event_recu.wait(10)
 sample.deconnecter()
+
