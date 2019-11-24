@@ -291,10 +291,15 @@ class GestionnaireDomaine:
                         callback=self.__compter_route
                     )
 
+            args = {}
+            if queue_config.get('ttl'):
+                args['x-message-ttl'] = queue_config['ttl']
+
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=False,
                 callback=callback_init_transaction,
+                arguments=args,
             )
 
     def __compter_route(self, arg1):
@@ -643,6 +648,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'ceduleur.#',
                 ],
                 'exchange': self.configuration.exchange_middleware,
+                'ttl': 30000,
                 'callback': self.get_handler_cedule().callbackAvecAck
             },
             {
