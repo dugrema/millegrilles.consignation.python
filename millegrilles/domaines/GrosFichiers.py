@@ -76,6 +76,9 @@ class ConstantesGrosFichiers:
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_COLLECTION = '%s.supprimerCollection' % DOMAINE_NOM
+    TRANSACTION_RECUPERER_COLLECTION = '%s.recupererCollection' % DOMAINE_NOM
+    TRANSACTION_FIGER_COLLECTION = '%s.figerCollection' % DOMAINE_NOM
     TRANSACTION_CHANGER_LIBELLES_COLLECTION = '%s.changerLibellesCollection' % DOMAINE_NOM
     TRANSACTION_CREERTORRENT_COLLECTION = '%s.creerTorrentCollection' % DOMAINE_NOM
     TRANSACTION_AJOUTER_FICHIERS_COLLECTION = '%s.ajouterFichiersCollection' % DOMAINE_NOM
@@ -221,6 +224,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_FIGER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionFigerCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_LIBELLES_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerLibellesCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREERTORRENT_COLLECTION:
@@ -525,6 +534,69 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         ops = {
             '$set': {
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: nouveau_nom_collection
+            },
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+
+        # Inserer la nouvelle collection
+        resultat = collection_domaine.update_one(filtre, ops)
+        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+    def supprimer_collection(self, uuid_collection: str):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True
+            },
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+
+        # Inserer la nouvelle collection
+        resultat = collection_domaine.update_one(filtre, ops)
+        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+    def recuperer_collection(self, uuid_collection: str):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False
+            },
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+
+        # Inserer la nouvelle collection
+        resultat = collection_domaine.update_one(filtre, ops)
+        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+    def figer_collection(self, uuid_collection: str):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_COLLECTION_FIGEE: True
             },
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
@@ -1024,6 +1096,54 @@ class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersMetadata):
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
         self._controleur._gestionnaire_domaine.renommer_collection(uuid_collection, nouveau_nom_collection)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid_collection': uuid_collection}
+
+
+class ProcessusTransactionSupprimerCollection(ProcessusGrosFichiersMetadata):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        self._controleur._gestionnaire_domaine.supprimer_collection(uuid_collection)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid_collection': uuid_collection}
+
+
+class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersMetadata):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        self._controleur._gestionnaire_domaine.recuperer_collection(uuid_collection)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid_collection': uuid_collection}
+
+
+class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
 
         self.set_etape_suivante()  # Termine
 

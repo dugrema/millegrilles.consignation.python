@@ -173,10 +173,32 @@ class MessagesSample(BaseCallback):
 
     def transaction_supprimer_collection(self):
         transaction = {
-            "repertoire_uuid": "392405b4-b7cd-11e9-831d-00155d011f00",
+            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.supprimerRepertoire',
+            transaction, 'millegrilles.domaines.GrosFichiers.supprimerCollection',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_recuperer_collection(self):
+        transaction = {
+            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.recupererCollection',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transaction_figer_collection(self):
+        transaction = {
+            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.figerCollection',
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -260,10 +282,13 @@ class MessagesSample(BaseCallback):
 
         # enveloppe3 = sample.transaction_creer_collection_vide()
         # enveloppe3 = sample.transaction_creer_collection_2docs()
-        enveloppe4 = sample.transaction_renommer_collection()
+        # enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
         # enveloppe5 = sample.transaction_changer_libelle_collection()
+        # enveloppe5 = sample.transaction_figer_collection()
+        # enveloppe5 = sample.transaction_supprimer_collection()
+        enveloppe5 = sample.transaction_recuperer_collection()
 
         # enveloppe = sample.transaction_ajouter_favoris()
         # enveloppe = sample.transaction_supprimer_favoris()
