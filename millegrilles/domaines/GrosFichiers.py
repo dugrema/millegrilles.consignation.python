@@ -920,8 +920,9 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersMetadata)
             ProcessusTransactionNouvelleVersionMetadata.ajouter_version_fichier.__name__)
 
         fuuid = transaction['fuuid']
+        document_uuid = transaction.get('documentuuid')  # Represente la collection, si present
 
-        return {'fuuid': fuuid, 'securite': transaction['securite']}
+        return {'fuuid': fuuid, 'securite': transaction['securite'], 'collection_uuid': document_uuid}
 
     def ajouter_version_fichier(self):
         # Ajouter version au fichier
@@ -947,6 +948,20 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersMetadata)
             return
 
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
+
+        collection_uuid = self.parametres.get('collection_uuid')
+        if collection_uuid is None:
+            self.set_etape_suivante()  # Processus termine
+        else:
+            self.set_etape_suivante(
+                ProcessusTransactionNouvelleVersionMetadata.ajouter_a_collection.__name__)
+
+    def ajouter_a_collection(self):
+        fichier_uuid = self.parametres.get('uuid_fichier')
+        collection_uuid = self.parametres.get('collection_uuid')
+
+        self._controleur._gestionnaire_domaine.ajouter_documents_collection(collection_uuid, [fichier_uuid])
+
         self.set_etape_suivante()  # Processus termine
 
     def _get_tokens_attente(self):
