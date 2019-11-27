@@ -18,8 +18,8 @@ class JavascriptPythonAsymetric:
 
     def __init__(self):
         self._logger = logging.getLogger('%s' % self.__class__.__name__)
-        self.fichier_cle = '/opt/millegrilles/dev2/pki/keys/dev2_middleware.key.pem'
-        self.fichier_cert = '/opt/millegrilles/dev2/pki/certs/dev2_middleware.cert.pem'
+        self.fichier_cle = '/opt/millegrilles/dev3/pki/deployeur/deployeur.key.pem'
+        self.fichier_cert = '/opt/millegrilles/dev3/pki/deployeur/deployeur.cert.pem'
         self.cert = None
         self.private = None
 
@@ -46,6 +46,15 @@ class JavascriptPythonAsymetric:
             self.cert = cert
 
         self._logger.info("Certificat courant: %s" % str(self.cert))
+
+    def afficher_cle_publique(self):
+        cle_publique_base64 = self.cert.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode('utf-8')
+        cle_publique_base64 = cle_publique_base64\
+            .replace('-----BEGIN PUBLIC KEY-----', '')\
+            .replace('-----END PUBLIC KEY-----', '')\
+            .replace('\n', '')
+        self._logger.info("Cle publique:\n%s" % cle_publique_base64)
 
     def decrypter_contenu(self, contenu):
         """
@@ -82,14 +91,15 @@ class JavascriptPythonAsymetric:
 
     def executer(self):
 
-        contenu = 'hmCC9S5uvAvGekDsl5afneMDyjzwaWATOgbYANgHKqVa/fIEfmij1Afc8Qgyv95UGtY5Efp9cIKo9QsXCZXvL5owtVE4tt/P0OHNNgLBzTDxf4CpA3wjpS4cjuRBZY0KT11UQTLqaFoFmBqcjtf3yoC6qjacr8ciAzgJEmFwV6eYRlX98ITUinUEfDQ8mes7bykDkfor0oYFMZXB5F8pDWA1+wGPjOQcGldv+5h9vTSqKvI+i0lbGR7u3no6TPkdGEtySMLYFxRXFvz+xGVewoT+jWsbYjQqb6R4OX+UMhFMZkkiqGDbFvSQo3K6QOaBGDIDZQ4YRoTN3PtVLI4LyQ=='
+        contenu = 'nin4VhwdVN9xs3UU/gUU7EC/Zgy/FXkaQdfmZn5Pr/u06okDJyXpkpxApZhQUj4dfG6OhAWbNEdCkMy3fuS0yREixaYnXaM0S9bSYW5SwFZ02ZkUm5BLOH//+MhVcIkos9mh9/EeJI+RGomZynHcoKkgnazy22g7FzlakiKHNgNegRHkvI4znv49geKnwEQkNjzLESLCqSW75CqSBwJyO/h6RfeOgRGILoohA6/8Mgm1iC4HRzuniftoslmRI4G0tpb/uiIrAT0NFGk7Nr8wJTg2TpfFEVHhmM/GWfBEB6T2Ce6n2ErmxBVfHOoeI4Ii8INi8rWdMo418JtGcOED4Q=='
 
         resultat = self.decrypter_contenu(contenu)
         self._logger.info("Decrypter, Resultat est:  %s" % resultat)
+        self._logger.info("UTf-8:  %s" % b64encode(resultat).decode('utf-8'))
 
-        secret = b'Mon mot de passe, ce serait un secret. Je dis!'
-        secret_crypte = self.crypter_contenu(secret)
-        self._logger.info("Crypter: %s" % b64encode(secret_crypte).decode('utf-8'))
+        # secret = b'Mon mot de passe, ce serait un secret. Je dis!'
+        # secret_crypte = self.crypter_contenu(secret)
+        # self._logger.info("Crypter: %s" % b64encode(secret_crypte).decode('utf-8'))
 
 
 class JavascriptPythonSymmetric:
@@ -109,18 +119,21 @@ class JavascriptPythonSymmetric:
         self._logger.info("Message decrypte (%d):\n%s" % (len(resultat), binascii.hexlify(resultat)))
 
         # On utilise AES 256, blocks de taille 256 bits.
-        unpadder = PKCS7(256).unpadder()
+        unpadder = PKCS7(128).unpadder()
         resultat_unpadded = unpadder.update(resultat) + unpadder.finalize()
         self._logger.info("Message unpadded (%d):\n%s" % (len(resultat_unpadded), binascii.hexlify(resultat_unpadded)))
 
-        with open('/home/mathieu/output.tar.gz', 'wb') as output:
-            output.write(resultat_unpadded)
+        resultat_string = resultat_unpadded.decode('utf-8')
+        self._logger.info("Message string: %s" % resultat_string)
+
+        # with open('/home/mathieu/output.tar.gz', 'wb') as output:
+        #    output.write(resultat_unpadded)
 
     def executer(self):
         self.decrypter_contenu(
-            key='AxuAY0oDJIh0bVLayHTp2uy2KPqj7Fx7PZhNqt9ZVxE=',
-            iv='/9W0JEbFziynzG4xYl+GTw==',
-            contenu='ScLql5g+y4T1JeyzfFV7z72kw4v7ZKMTANjPERC1aP8cSG6s/1hTuxQgenx3p2DJy7AFvJbGj5E9mBUJydQpaClOYwjU0NIWs13HSidtWjmcUDFCRYAaInPgC8nQYuIseiqMjEUkSEXL8cF/oqXppabI9noTeYQdA0zg4fHRXPJ905J54T7R9qQjkIyUg4WpfRx3buig0aoJ2CCdF/p9MPrq/r7bHz2fHOIlHNLrCrkqlyYMWxlcD3eL+SsBk6gM'
+            key='LOEiSnjmsZ33Xy1RCQIZV/iYPGvoDfGrG5NSktHtS9Q=',
+            iv='NgATLl8QaCQSMsXP+2BPPQ==',
+            contenu='MGrrV4eTplusTLgalwGQjXO8lbwbw28xAAReVaoen6pkoSQhe/l7rQtrr+RjEIVB/bxVa3xQkWO9322ZYfAp5hYBb84H4jRMNQXWIDbOmFc='
         )
 
 
@@ -130,7 +143,8 @@ logging.getLogger('JavascriptPythonAsymetric').setLevel(logging.DEBUG)
 logging.getLogger('JavascriptPythonSymmetric').setLevel(logging.DEBUG)
 
 asymetric = JavascriptPythonAsymetric()
+asymetric.afficher_cle_publique()
 asymetric.executer()
 
-symetric = JavascriptPythonSymmetric()
-symetric.executer()
+# symetric = JavascriptPythonSymmetric()
+# symetric.executer()
