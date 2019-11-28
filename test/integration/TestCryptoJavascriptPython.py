@@ -129,11 +129,41 @@ class JavascriptPythonSymmetric:
         # with open('/home/mathieu/output.tar.gz', 'wb') as output:
         #    output.write(resultat_unpadded)
 
+    def decrypter_fichier(self, nom_fichier, secret, iv):
+        """
+        Utilise la cle privee en memoire pour decrypter le contenu.
+        :param contenu:
+        :return:
+        """
+        self._logger.info('------- JavascriptPythonSymetric.decrypter_fichier() ----------')
+        keyb = b64decode(secret)
+        ivb = b64decode(iv)
+
+        with open('/tmp/dict_encrypt/%s' % nom_fichier, 'rb') as fichier:
+            contenub = fichier.read()
+
+        cipher = Cipher(algorithms.AES(keyb), modes.CBC(ivb), backend=default_backend())
+        decryptor = cipher.decryptor()
+
+        resultat = decryptor.update(contenub) + decryptor.finalize()
+        # self._logger.info("Message decrypte (%d)" % len(resultat))
+
+        # On utilise AES 256, blocks de taille 256 bits.
+        unpadder = PKCS7(128).unpadder()
+        resultat_unpadded = unpadder.update(resultat) + unpadder.finalize()
+        # self._logger.info("Message unpadded (%d):\n%s" % (len(resultat_unpadded), binascii.hexlify(resultat_unpadded)))
+
+        # resultat_string = resultat_unpadded.decode('utf-8')
+        # self._logger.info("Message string: %s" % resultat_string)
+
+        with open('/tmp/dict_encrypt/decrypt/%s' % nom_fichier, 'wb') as output:
+            output.write(resultat_unpadded)
+
     def executer(self):
-        self.decrypter_contenu(
-            key='LOEiSnjmsZ33Xy1RCQIZV/iYPGvoDfGrG5NSktHtS9Q=',
-            iv='NgATLl8QaCQSMsXP+2BPPQ==',
-            contenu='MGrrV4eTplusTLgalwGQjXO8lbwbw28xAAReVaoen6pkoSQhe/l7rQtrr+RjEIVB/bxVa3xQkWO9322ZYfAp5hYBb84H4jRMNQXWIDbOmFc='
+        self.decrypter_fichier(
+            nom_fichier='GandhiNuke.jpg',
+            secret='TlIflfFiRQoTtbc1ZuHIDNARiGwvkiXw10FeuIbizYE=',
+            iv='PVHe0cKrqjjfqNbG3oxiMw=='
         )
 
 
@@ -142,9 +172,9 @@ logging.basicConfig(level=logging.WARN)
 logging.getLogger('JavascriptPythonAsymetric').setLevel(logging.DEBUG)
 logging.getLogger('JavascriptPythonSymmetric').setLevel(logging.DEBUG)
 
-asymetric = JavascriptPythonAsymetric()
-asymetric.afficher_cle_publique()
-asymetric.executer()
+# asymetric = JavascriptPythonAsymetric()
+# asymetric.afficher_cle_publique()
+# asymetric.executer()
 
-# symetric = JavascriptPythonSymmetric()
-# symetric.executer()
+symetric = JavascriptPythonSymmetric()
+symetric.executer()
