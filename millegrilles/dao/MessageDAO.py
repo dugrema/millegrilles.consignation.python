@@ -206,12 +206,11 @@ class PikaDAO:
                 nom_echange,
                 self.queuename_nouvelles_transactions(),
                 [Constantes.TRANSACTION_ROUTING_NOUVELLE],
-                queue_durable=True
+                queue_durable=True,
+                arguments={'x-queue-mode': 'lazy'}
             ))
 
         # Ajouter TTL de 30 secondes pour certaines Q
-        args_ttl30 = dict()
-        args_ttl30['x-message-ttl'] = 30000
 
         exchange_middleware = self.configuration.exchange_middleware
         setupHandler.add_configuration(PikaSetupCallbackHandler(
@@ -219,7 +218,8 @@ class PikaDAO:
             exchange_middleware,
             self.queuename_nouvelles_transactions(),
             [Constantes.TRANSACTION_ROUTING_NOUVELLE],
-            queue_durable=True
+            queue_durable=True,
+            arguments={'x-queue-mode': 'lazy'},
         ))
 
         setupHandler.add_configuration(PikaSetupCallbackHandler(
@@ -246,8 +246,9 @@ class PikaDAO:
             Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
             ['ceduleur.#'],
             queue_durable=False,
-            arguments=args_ttl30
+            arguments={'x-message-ttl': 30000}
         ))
+
 
         # On attend l'execution de la configuration
         configurations_manquantes = None
