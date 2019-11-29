@@ -37,6 +37,8 @@ class ConstantesSecurityPki:
 
     REGLE_LIMITE_CHAINE = 4  # Longeur maximale de la chaine de certificats
 
+    SYMETRIC_PADDING = 128
+
     # Document utilise pour publier un certificat
     DOCUMENT_EVENEMENT_CERTIFICAT = {
         Constantes.EVENEMENT_MESSAGE_EVENEMENT: EVENEMENT_CERTIFICAT,
@@ -694,7 +696,7 @@ class EncryptionHelper:
         # Crypter contenu du dictionnaire (cle symmetrique)
         encryptor = cipher.encryptor()
 
-        padder = padding.PKCS7(256).padder()
+        padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
         dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, MongoJSONEncoder).encode('utf-8')
 
         # Inserer IV dans les premiers 16 bytes - pas vraiment le choix, c'est l'algo:

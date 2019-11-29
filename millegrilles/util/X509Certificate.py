@@ -13,6 +13,7 @@ import secrets
 import base64
 import logging
 from millegrilles import Constantes
+from millegrilles.SecuritePKI import ConstantesSecurityPki
 
 
 class ConstantesGenerateurCertificat:
@@ -1090,7 +1091,7 @@ class DecryptionHelper:
         backend = default_backend()
 
         cipher = Cipher(algorithms.AES(cle_secrete), modes.CBC(iv), backend=backend)
-        unpadder = padding.PKCS7(256).unpadder()
+        unpadder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).unpadder()
         decryptor = cipher.decryptor()
 
         contenu_decrypte = decryptor.update(contenu_crypte) + decryptor.finalize()
