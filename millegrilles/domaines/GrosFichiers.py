@@ -198,6 +198,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     'destinataire.domaine.%s.#' % self.get_nom_domaine(),
                 ],
                 'exchange': self.configuration.exchange_noeuds,
+                'ttl': 300000,
                 'callback': self.get_handler_transaction().callbackAvecAck
             },
         )

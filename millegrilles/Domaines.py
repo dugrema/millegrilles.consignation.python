@@ -295,6 +295,7 @@ class GestionnaireDomaine:
             if queue_config.get('ttl'):
                 args['x-message-ttl'] = queue_config['ttl']
 
+            self._logger.info("Declarer Q %s" % queue_config['nom'])
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=False,
@@ -640,6 +641,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'destinataire.domaine.%s.#' % self.get_nom_domaine(),
                 ],
                 'exchange': self.configuration.exchange_middleware,
+                'ttl': 300000,
                 'callback': self.get_handler_transaction().callbackAvecAck
             },
             {
@@ -657,6 +659,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'processus.domaine.%s.#' % self.get_nom_domaine()
                 ],
                 'exchange': self.configuration.exchange_middleware,
+                'ttl': 600000,
                 'callback': self._traitement_evenements.callbackAvecAck
             },
             {
@@ -666,6 +669,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'pki.ca',
                 ],
                 'exchange': self.configuration.exchange_noeuds,
+                'ttl': 20000,
                 'callback': self.get_handler_requetes_noeuds().callbackAvecAck
             },
         ]
