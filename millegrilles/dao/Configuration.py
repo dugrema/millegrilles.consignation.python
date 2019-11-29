@@ -22,6 +22,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_MQ_HEARTBEAT: Constantes.DEFAUT_MQ_HEARTBEAT,
             Constantes.CONFIG_MQ_VIRTUAL_HOST: Constantes.DEFAUT_MQ_VIRTUAL_HOST,
             Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
+            Constantes.CONFIG_QUEUE_EVENEMENTS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_EVENEMENTS_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_ERREURS_TRANSACTIONS: Constantes.DEFAUT_QUEUE_ERREURS_TRANSACTIONS,
             Constantes.CONFIG_QUEUE_MGP_PROCESSUS: Constantes.DEFAUT_QUEUE_MGP_PROCESSUS,
             Constantes.CONFIG_QUEUE_ERREURS_PROCESSUS: Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
@@ -250,6 +251,10 @@ class TransactionConfiguration:
     @property
     def queue_nouvelles_transactions(self):
         return self._mq_config[Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS]
+
+    @property
+    def queue_evenements_transactions(self):
+        return self._mq_config[Constantes.CONFIG_QUEUE_EVENEMENTS_TRANSACTIONS]
 
     @property
     def queue_erreurs_transactions(self):

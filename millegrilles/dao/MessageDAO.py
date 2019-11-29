@@ -209,11 +209,23 @@ class PikaDAO:
                 queue_durable=True
             ))
 
+        # Ajouter TTL de 30 secondes pour certaines Q
+        args_ttl30 = dict()
+        args_ttl30['x-message-ttl'] = 30000
+
         exchange_middleware = self.configuration.exchange_middleware
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.channel,
             exchange_middleware,
             self.queuename_nouvelles_transactions(),
+            [Constantes.TRANSACTION_ROUTING_NOUVELLE],
+            queue_durable=True
+        ))
+
+        setupHandler.add_configuration(PikaSetupCallbackHandler(
+            self.channel,
+            exchange_middleware,
+            self.queuename_evenements_transactions(),
             [Constantes.TRANSACTION_ROUTING_EVENEMENT],
             queue_durable=True
         ))
@@ -233,7 +245,8 @@ class PikaDAO:
             exchange_middleware,
             Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
             ['ceduleur.#'],
-            queue_durable=True
+            queue_durable=False,
+            arguments=args_ttl30
         ))
 
         # On attend l'execution de la configuration
@@ -684,6 +697,9 @@ class PikaDAO:
     def queuename_nouvelles_transactions(self):
         return self.configuration.queue_nouvelles_transactions
 
+    def queuename_evenements_transactions(self):
+        return self.configuration.queue_evenements_transactions
+
     def queuename_erreurs_transactions(self):
         return self.configuration.queue_erreurs_transactions
 
@@ -920,7 +936,7 @@ class PikaSetupCallbackHandler:
         def callback(self, method):
             self.__handler.routing_key_complete(self.__routing_key)
 
-    def __init__(self, channel, exchange: str, queue: str, routing_keys: list, queue_durable=False):
+    def __init__(self, channel, exchange: str, queue: str, routing_keys: list, queue_durable=False, arguments=None):
         """
         Callback qui permet de declarer un exchange / queue pour une liste de routing keys. Garde aussi le compte
         pour savoir si l'exchange, la Q et les routing keys ont ete configures
@@ -937,6 +953,7 @@ class PikaSetupCallbackHandler:
         self.__queue_durable = queue_durable
         self.__routing_keys = routing_keys
         self.__callback_when_done = None
+        self.__arguments = arguments
 
         self.__nombre_routing_keys_restant = 0
         self.__exchange_complete = exchange is None
@@ -953,7 +970,8 @@ class PikaSetupCallbackHandler:
             self.__channel.queue_declare(
                 queue=self.__queue,
                 durable=self.__queue_durable,
-                callback=self.queue_callback
+                callback=self.queue_callback,
+                arguments=self.__arguments
             )
 
     def queue_callback(self, method):

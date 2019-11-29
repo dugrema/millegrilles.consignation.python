@@ -10,6 +10,7 @@ from threading import Thread, Event
 import logging
 import datetime
 import traceback
+import psutil
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -19,6 +20,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.json_helper = JSONHelper()
         self.message_handler = None
         self.handler_entretien = None
+        self.evenements_handler = None
         self.__stop_event = Event()
         self.__init_config_event = Event()
         self.__channel = None
@@ -45,9 +47,13 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
         self.handler_entretien.entretien_initial()
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
+        self.evenements_handler = EvenementTransactionCallback(self.contexte)
 
         queue_name = self.contexte.configuration.queue_nouvelles_transactions
         self.__channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
+
+        evenements_queue_name = self.contexte.configuration.queue_evenements_transactions
+        self.__channel.basic_consume(self.evenements_handler.callbackAvecAck, queue=evenements_queue_name, no_ack=False)
 
         self.contexte.message_dao.register_channel_listener(self.handler_entretien)
 
@@ -87,12 +93,10 @@ class ConsignateurTransactionCallback(BaseCallback):
         routing_key = method.routing_key
         exchange = method.exchange
         if routing_key == Constantes.TRANSACTION_ROUTING_NOUVELLE:
-            self.traiter_nouvelle_transaction(message_dict, exchange, properties)
-        elif exchange == self.contexte.configuration.exchange_middleware:
-            if routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENT:
-                self.ajouter_evenement(message_dict)
-            else:
-                raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+            try:
+                self.traiter_nouvelle_transaction(message_dict, exchange, properties)
+            except Exception as e:
+                self._logger.exception("Erreur traitement transaction")
         else:
             raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
 
@@ -126,7 +130,6 @@ class ConsignateurTransactionCallback(BaseCallback):
             )
             message_traceback = traceback.format_exc()
             self.traiter_erreur_persistance(message_dict, e, message_traceback)
-            raise e  # Relancer l'exception pour traitement independant
 
     def traiter_erreur_persistance(self, dict_message, error, message_traceback):
         document_staging = {
@@ -143,44 +146,6 @@ class ConsignateurTransactionCallback(BaseCallback):
         }
         collection_erreurs = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
         collection_erreurs.insert_one(document_staging)
-
-    def ajouter_evenement(self, message_dict):
-        id_transaction =  message_dict[Constantes.MONGO_DOC_ID]
-        nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        evenement = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENT]
-        self.ajouter_evenement_transaction(id_transaction, nom_collection, evenement)
-
-    def ajouter_evenement_transaction(self, id_transaction, nom_collection, evenement):
-        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
-
-        transaction_complete = False
-        if evenement in [
-            Constantes.EVENEMENT_TRANSACTION_TRAITEE,
-            Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT,
-            Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE
-        ]:
-            transaction_complete = True
-
-        libelle_transaction_traitee = '%s.%s.%s' % (
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            self.contexte.configuration.nom_millegrille,
-            evenement
-        )
-        libelle_transaction_complete = '%s.%s' %  (
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            Constantes.EVENEMENT_TRANSACTION_COMPLETE
-        )
-        selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
-        operation = {
-            '$set': {
-                libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc),
-                libelle_transaction_complete: transaction_complete,
-            }
-        }
-        resultat = collection_transactions.update_one(selection, operation)
-
-        if resultat.modified_count != 1:
-            raise Exception("Erreur ajout evenement transaction, updated: %d, ObjectId: %s, collection: %s, evenement: %s" % (resultat.modified_count, str(id_transaction), nom_collection, evenement))
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction, exchange):
 
@@ -230,6 +195,75 @@ class ConsignateurTransactionCallback(BaseCallback):
         doc_id = resultat.inserted_id
 
         return doc_id, signature_valide
+
+    @staticmethod
+    def identifier_collection_domaine(domaine):
+
+        domaine_split = domaine.split('.')
+
+        nom_collection = None
+        if domaine_split[0] == 'millegrilles' and domaine_split[1] == 'domaines':
+            nom_collection = '.'.join(domaine_split[0:3])
+
+        return nom_collection
+
+
+class EvenementTransactionCallback(BaseCallback):
+
+    def __init__(self, contexte):
+        super().__init__(contexte)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    # Methode pour recevoir le callback pour les nouvelles transactions.
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        exchange = method.exchange
+        if exchange == self.contexte.configuration.exchange_middleware:
+            if routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENT:
+                self.ajouter_evenement(message_dict)
+            else:
+                raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+        else:
+            raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+
+    def ajouter_evenement(self, message_dict):
+        id_transaction = message_dict[Constantes.MONGO_DOC_ID]
+        nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        evenement = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENT]
+        self.ajouter_evenement_transaction(id_transaction, nom_collection, evenement)
+
+    def ajouter_evenement_transaction(self, id_transaction, nom_collection, evenement):
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
+
+        transaction_complete = False
+        if evenement in [
+            Constantes.EVENEMENT_TRANSACTION_TRAITEE,
+            Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT,
+            Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE
+        ]:
+            transaction_complete = True
+
+        libelle_transaction_traitee = '%s.%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            self.contexte.configuration.nom_millegrille,
+            evenement
+        )
+        libelle_transaction_complete = '%s.%s' %  (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            Constantes.EVENEMENT_TRANSACTION_COMPLETE
+        )
+        selection = {Constantes.MONGO_DOC_ID: ObjectId(id_transaction)}
+        operation = {
+            '$set': {
+                libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc),
+                libelle_transaction_complete: transaction_complete,
+            }
+        }
+        resultat = collection_transactions.update_one(selection, operation)
+
+        if resultat.modified_count != 1:
+            raise Exception("Erreur ajout evenement transaction, updated: %d, ObjectId: %s, collection: %s, evenement: %s" % (resultat.modified_count, str(id_transaction), nom_collection, evenement))
 
     @staticmethod
     def identifier_collection_domaine(domaine):
@@ -435,12 +469,17 @@ class EntretienCollectionsDomaines(BaseCallback):
         exchange = method.exchange
         indicateurs = message_dict['indicateurs']
 
-        if 'heure' in indicateurs and self.__thread_entretien is None:
-            self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
-            self.__thread_entretien.start()
+        cpu_load = psutil.getloadavg()[0]
+        if cpu_load < 3.0:
+            if self.__thread_entretien is None:
+                if 'heure' in indicateurs:
+                    self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
+                    self.__thread_entretien.start()
+                else:
+                    self.__thread_entretien = Thread(target=self._verifier_signature, name="Entretien")
+                    self.__thread_entretien.start()
         else:
-            self.__thread_entretien = Thread(target=self._verifier_signature, name="Entretien")
-            self.__thread_entretien.start()
+            self.__logger.warning("CPU load %s > 2.5, pas d'entetien de transactions" % cpu_load)
 
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)

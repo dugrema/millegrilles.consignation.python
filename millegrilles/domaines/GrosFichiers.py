@@ -1191,22 +1191,6 @@ class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersMetadata):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-
-        self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
-
-        self.set_etape_suivante()  # Termine
-
-        return {'uuid_collection': uuid_collection}
-
-
 class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
@@ -1224,7 +1208,7 @@ class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersMetadat
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1238,7 +1222,7 @@ class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiersMetadata):
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
         self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
-        self.set_etape_suivante(ProcessusTransactionCreerTorrentCollection.creer_fichier_torrent.__name__)
+        self.set_etape_suivante(ProcessusTransactionFigerCollection.creer_fichier_torrent.__name__)
 
         return {'uuid_collection': uuid_collection}
 
@@ -1248,7 +1232,7 @@ class ProcessusTransactionCreerTorrentCollection(ProcessusGrosFichiersMetadata):
         :return:
         """
 
-        self.set_etape_suivante(ProcessusTransactionCreerTorrentCollection.publier_torrent.__name__)
+        self.set_etape_suivante(ProcessusTransactionFigerCollection.publier_torrent.__name__)
 
     def publier_torrent(self):
         """
