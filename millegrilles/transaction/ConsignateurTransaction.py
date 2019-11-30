@@ -87,6 +87,7 @@ class ConsignateurTransactionCallback(BaseCallback):
     def __init__(self, contexte):
         super().__init__(contexte)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.__compteur = 0
 
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def traiter_message(self, ch, method, properties, body):
@@ -95,6 +96,8 @@ class ConsignateurTransactionCallback(BaseCallback):
         exchange = method.exchange
         if routing_key == Constantes.TRANSACTION_ROUTING_NOUVELLE:
             try:
+                self.__compteur = self.__compteur + 1
+                self._logger.info("Nouvelle transaction %d: %s" % (self.__compteur, str(message_dict['en-tete']['domaine'])))
                 self.traiter_nouvelle_transaction(message_dict, exchange, properties)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
@@ -285,6 +288,7 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         self.__thread_entretien = None
         self.__channel = None
+        self.__throttle_event = Event()
 
         self.__liste_domaines = [
             'millegrilles.domaines.GrosFichiers',
@@ -372,7 +376,7 @@ class EntretienCollectionsDomaines(BaseCallback):
                 self.__logger.exception("Erreur creation index de transactions dans %s" % nom_collection_transaction)
 
     def _verifier_signature(self):
-        delta_verif = datetime.timedelta(hours=6)
+        delta_verif = datetime.timedelta(minutes=5)
         date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
         date_verif = date_courante - delta_verif
 
@@ -382,10 +386,10 @@ class EntretienCollectionsDomaines(BaseCallback):
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_verif},
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$lt': date_verif},
             }
             collection_transaction = self.contexte.document_dao.get_collection(nom_collection_transaction)
-            curseur_transactions = collection_transaction.find(filtre)
+            curseur_transactions = collection_transaction.find(filtre).limit(2000)
             for doc_transaction in curseur_transactions:
                 try:
                     entete = doc_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
@@ -420,6 +424,8 @@ class EntretienCollectionsDomaines(BaseCallback):
                         # Emettre demande pour le certificat manquant
                         self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
 
+                    self.__throttle_event.wait(0.01)
+
                 except CertificatInconnu as ci:
                     fingerprint = ci.fingerprint
                     self.__logger.warning(
@@ -429,6 +435,9 @@ class EntretienCollectionsDomaines(BaseCallback):
 
                 except Exception as e:
                     self.__logger.error("Erreur resoumission transaction (collection %s): %s" % (nom_collection_transaction, str(e)))
+
+                finally:
+                    self.__thread_entretien = None
 
     def _nettoyer_transactions_expirees(self):
         """
@@ -472,7 +481,7 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         cpu_load = psutil.getloadavg()[0]
         if cpu_load < 3.0:
-            if self.__thread_entretien is None:
+            if self.__thread_entretien is None or not self.__thread_entretien.is_alive():
                 if 'heure' in indicateurs:
                     self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
                     self.__thread_entretien.start()

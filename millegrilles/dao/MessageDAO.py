@@ -28,14 +28,6 @@ class PikaDAO:
         self._attendre_channel = Event()
         self.configuration = configuration
 
-        # Connexions de lecture (downstream) et transmission (upstream)
-        # self.__connexionmq_downstream = None
-        # self.__channel_downstream = None
-        # self.__thread_ioloop_downstream = None
-        # self.__connexionmq_upstream = None
-        # self.__channel_upstream = None
-        # self.__thread_ioloop_upstream = None
-
         self.__stop_event = Event()
 
         # Wrappers pour connexions MQ
@@ -66,188 +58,9 @@ class PikaDAO:
 
         self.json_helper = JSONHelper()
 
-    # def preparer_connexion(self):
-    #     """ Retourne un dictionnaire avec les parametres de connexion a RabbitMQ """
-    #
-    #     connection_parameters = {
-    #         'host': self.configuration.mq_host,
-    #         'port': self.configuration.mq_port,
-    #         'virtual_host': self.configuration.nom_millegrille,
-    #         'heartbeat': self.configuration.mq_heartbeat,
-    #         'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
-    #     }
-    #
-    #     self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
-    #
-    #     if self.configuration.mq_auth_cert == 'on':
-    #         # Va faire la connection via plugin configure dans MQ, normalement c'est rabbitmq_auth_mechanism_ssl
-    #         connection_parameters['credentials'] = ExternalCredentials()
-    #     else:
-    #         credentials = {
-    #             'username': self.configuration.mq_user,
-    #             'password': self.configuration.mq_password,
-    #             'erase_on_connect': True
-    #         }
-    #         connection_parameters['credentials'] = PlainCredentials(**credentials)
-    #
-    #     if self.configuration.mq_ssl == 'on':
-    #         ssl_options = {
-    #             'ssl_version': ssl.PROTOCOL_TLSv1_2,
-    #             'keyfile': self.configuration.mq_keyfile,
-    #             'certfile': self.configuration.mq_certfile,
-    #             'ca_certs': self.configuration.mq_cafile,
-    #             'cert_reqs': ssl.CERT_REQUIRED
-    #         }
-    #
-    #         connection_parameters['ssl'] = True
-    #         connection_parameters['ssl_options'] = ssl_options
-    #
-    #     return connection_parameters
-
-    # def connecter(self, separer=False):
-    #     """
-    #     Connecter au serveur RabbitMQ
-    #     Le callback est une methode qui va etre appelee lorsqu'un message est recu
-    #
-    #     :param separer: Si False, la connexion est ouverte pour l'instance PikaDAO, Si True, on retourne la connexion
-    #                     sans conserver de pointeur.
-    #     :return: Connexion a RabbitMQ.
-    #     """
-    #
-    #     self._logger.info("Connecter RabbitMQ")
-    #
-    #     if self.__connexionmq_downstream is not None:
-    #         self._logger.warning("Appel de connecter avec connection deja ouverte")
-    #         connectionmq = self.__connexionmq_downstream
-    #         self.__connexionmq_downstream = None
-    #         self.__channel_downstream = None
-    #         self.__thread_ioloop_downstream = None
-    #
-    #         try:
-    #             connectionmq.close()
-    #         except Exception as e:
-    #             self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
-    #
-    #     if self.__connexionmq_upstream is not None:
-    #         try:
-    #             self.__connexionmq_upstream.close()
-    #         except Exception as e:
-    #             self._logger.debug("Erreur fermeture MQ transmission avant de reconnecter: %s" % str(e))
-    #
-    #     try:
-    #         self.lock_initialiser_connection.acquire(blocking=True, timeout=5)
-    #         self.lock_initialiser_connection_transmission.acquire(blocking=True, timeout=5)
-    #         parametres_connexion = self.preparer_connexion()
-    #         parametres = pika.ConnectionParameters(**parametres_connexion)
-    #         self.__connexionmq_downstream = pika.SelectConnection(
-    #             parameters=parametres,
-    #             on_open_callback=self.__on_connection_open,
-    #             on_close_callback=self.__on_connection_close,
-    #         )
-    #         self.__thread_ioloop_downstream = Thread(name='MQ-IOloop', target=self.__run_ioloop)
-    #         self.__thread_ioloop_downstream.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
-    #
-    #         self.__connexionmq_upstream = pika.SelectConnection(
-    #             parameters=parametres,
-    #             on_open_callback=self.__on_connection_transmission_open,
-    #             on_close_callback=self.__on_connection_transmission_close,
-    #         )
-    #         thread_transmission = Thread(name="MQ-IOLoopTrans", target=self.__connexionmq_upstream.ioloop.start)
-    #         thread_transmission.start()
-    #
-    #     except Exception as e:
-    #         self.enter_error_state()
-    #         raise e  # S'assurer de mettre le flag d'erreur
-    #
-    #     self._actif = True  # Le fait de se connecter indique que le DAO doit est actif
-    #     return self.__connexionmq_downstream
-    #
-    # def __on_connection_open(self, connection):
-    #     self._logger.info("Callback connection, on ouvre le channel")
-    #     connection.add_on_close_callback(self.__on_connection_close)
-    #     connection.channel(on_open_callback=self.__on_channel_open)
-    #
-    #     # Aussi allouer un channel a chaque listener inscrit
-    #     if self.__liste_listeners_channels is not None:
-    #         for listener in self.__liste_listeners_channels:
-    #             self.__ouvrir_channel_listener(listener)
-    #
-    # def __on_channel_open(self, channel):
-    #     self.__channel_downstream = channel
-    #     channel.basic_qos(prefetch_count=1)
-    #     channel.add_on_close_callback(self.__on_channel_close)
-    #     self._actif = True
-    #     self._in_error = False
-    #
-    #     self.__stop_event.clear()
-    #     self.lock_initialiser_connection.release()
-    #
-    #     self._logger.info("Connection / channel prets")
-    #
-    # def __on_connection_close(self, connection=None, code=None, reason=None):
-    #     self.__connexionmq_downstream = None
-    #     self.__channel_downstream = None
-    #     self.__thread_ioloop_downstream = None
-    #     if not self.__stop_event.is_set():
-    #         self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
-    #         self.enter_error_state()
-    #     else:
-    #         self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
-    #
-    # def __on_channel_close(self, channel=None, code=None, reason=None):
-    #     self._logger.warning("Channel ferme: %s, %s" % (code, reason))
-    #     self.__channel_downstream = None
-    #     self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
-    #
-    # def __on_connection_transmission_open(self, connection):
-    #     self._logger.info("Callback connection, on ouvre le channel")
-    #     connection.add_on_close_callback(self.__on_connection_close)
-    #     connection.channel(on_open_callback=self.__on_channel_transmission_open)
-    #
-    #     # Aussi allouer un channel a chaque listener inscrit
-    #     if self.__liste_listeners_channels is not None:
-    #         for listener in self.__liste_listeners_channels:
-    #             self.__ouvrir_channel_listener(listener)
-    #
-    # def __on_channel_transmission_open(self, channel):
-    #     self.__channel_upstream = channel
-    #     self.__channel_upstream.basic_qos(prefetch_count=1)
-    #     self.__channel_upstream.add_on_close_callback(self.__on_channel_transmission_close)
-    #
-    #     self.lock_initialiser_connection_transmission.release()
-    #     with self.lock_initialiser_connection:
-    #         self._attendre_channel.set()  # Declenche execution processus en attente de la connexion
-    #
-    #     self._logger.info("Connection / channel tranmission prets")
-    #
-    # def __on_connection_transmission_close(self, connection=None, code=None, reason=None):
-    #     self.__channel_upstream = None
-    #     self.__connexionmq_upstream = None
-    #     if not self.__stop_event.is_set():
-    #         self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
-    #         self.enter_error_state()
-    #     else:
-    #         self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
-
-    # def __on_channel_transmission_close(self, channel=None, code=None, reason=None):
-    #     self._logger.warning("Channel transmission ferme: %s, %s" % (code, reason))
-    #     self.__channel_upstream = None
-    #     self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
-    #
     def register_channel_listener(self, listener):
         self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
         self.__connexionmq_consumer.register_channel_listener(listener)
-    #     if self.__liste_listeners_channels is None:
-    #         self.__liste_listeners_channels = list()
-    #     self.__liste_listeners_channels.append(listener)
-    #     self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
-    #
-    #     # On verifie si on peut ouvrir le channel immediatement
-    #     if self.__connexionmq_downstream is not None and not self.__connexionmq_downstream.is_closed and not self._in_error:
-    #         self.__ouvrir_channel_listener(listener)
-    #
-    # def __ouvrir_channel_listener(self, listener):
-    #     self.__connexionmq_downstream.channel(on_open_callback=listener.on_channel_open)
 
     def connecter(self):
 
@@ -350,15 +163,6 @@ class PikaDAO:
     def start_consuming(self):
         self._logger.warning("start_consuming(): Deprecated, gere dans MessageDAO")
 
-    # def __run_ioloop(self):
-    #     self._logger.info("Demarrage MQ-IOLoop")
-    #     try:
-    #         self.__connexionmq_downstream.ioloop.start()
-    #     except AMQPConnectionError as e:
-    #         self._logger.error("Erreur ouverture connexion MQ: %s" % str(e))
-    #         self.enter_error_state()
-    #     self._logger.info("Fin execution MQ-IOLoop")
-
     def run_ioloop(self):
         self._logger.warning("run_ioloop(): Deprecated, gere dans MessageDAO")
 
@@ -431,7 +235,9 @@ class PikaDAO:
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8,
-                properties=properties)
+                properties=properties,
+                mandatory=True)
+            self.__stop_event.wait(0.01)  # Throttle
         self._in_error = False
 
     ''' 
@@ -461,6 +267,7 @@ class PikaDAO:
                 body=message_utf8,
                 properties=properties,
                 mandatory=True)
+            self.__stop_event.wait(0.01)  # Throttle
         self._in_error = False
 
     def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
@@ -536,6 +343,7 @@ class PikaDAO:
         routing_key = 'destinataire.domaine.%s' % nom_domaine
 
         with self.lock_transmettre_message:
+            self._logger.info("Transmission evenement persistance %s pour %s" % (routing_key, id_transaction))
             self.__channel_publisher.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
@@ -623,10 +431,6 @@ class PikaDAO:
             message[Constantes.PROCESSUS_DOCUMENT_LIBELLE_INFO] = info
 
         message_utf8 = self.json_helper.dict_vers_json(message)
-
-        # routing_key = 'mgpprocessus.%s.%s' % \
-        #               (nom_processus,
-        #                nom_etape)
 
         routing_key = 'processus.domaine.%s.%s.%s' % \
                       (nom_domaine, nom_processus, nom_etape)
@@ -719,24 +523,6 @@ class PikaDAO:
 
         self.__maintenance_event.set()
 
-        # try:
-        #     if self.__channel_downstream is not None:
-        #         self.__channel_downstream.close()
-        # except Exception as e:
-        #     self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
-        # finally:
-        #     self.__channel_downstream = None
-        #
-        # try:
-        #     if self.__connexionmq_downstream is not None:
-        #         self.__connexionmq_downstream.close()
-        # except Exception as e:
-        #     self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
-        # finally:
-        #     # self.__connexionmq_downstream = None
-        #     # self.__thread_ioloop_downstream = None
-        #     self.__maintenance_event.set()
-
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
         self._actif = False
@@ -745,15 +531,6 @@ class PikaDAO:
 
         for connexion in self.__connexionsmq:
             connexion.deconnecter()
-
-        # if self.__connexionmq_downstream is not None:
-        #     try:
-        #         self.__connexionmq_downstream.close()
-        #     finally:
-        #         self.__connexionmq_downstream = None
-        #
-        # self.__channel_downstream = None
-        # self.__thread_ioloop_downstream = None
 
     def executer_maintenance_connexions(self):
         self._logger.info("Demarrage maintenance")
@@ -833,6 +610,8 @@ class ConnexionWrapper:
         self.__liste_listeners_channels = None
 
         self.__lock_init = None
+
+        self.__last_publish = None
 
     def preparer_connexion(self):
         """ Retourne un dictionnaire avec les parametres de connexion a RabbitMQ """
@@ -1003,6 +782,7 @@ class ConnexionWrapper:
         self.__channel = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.__on_channel_close)
+        channel.confirm_delivery(self.__confirm_delivery)
         self._in_error = False
 
         self.__stop_event.clear()
@@ -1030,6 +810,12 @@ class ConnexionWrapper:
 
     def __ouvrir_channel_listener(self, listener):
         self.__connexionmq.channel(on_open_callback=listener.on_channel_open)
+
+    def __confirm_delivery(self, frame):
+        self._logger.error("Delivery: %s" % str(frame))
+        if isinstance(frame.method, pika.spec.Basic.Nack):
+            self._logger.error("Delivery NACK")
+            self.enter_error_state()
 
     @property
     def channel(self):
