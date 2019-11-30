@@ -164,9 +164,24 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         if barrier.broken:
             raise Exception("Erreur connexion MQ %s" % self.__class__.__name__)
 
+        maintenance_delta = datetime.timedelta(seconds=20)
+        derniere_maintenance = datetime.datetime.now()
+
         while not self.__stop_event.is_set():
             try:
-                self.__connectionmq_publisher.executer_maintenance()
+                temps_courant = datetime.datetime.now()
+
+                if self.__connectionmq_publisher.is_closed:
+
+                    # La connexion est fermee. Traitement interrompu jusque reconnexion
+                    barrier = Barrier(2)
+                    self.__connectionmq_publisher.connecter(barrier)
+                    barrier.wait(10)
+
+                elif temps_courant - maintenance_delta > derniere_maintenance:
+                    derniere_maintenance = temps_courant
+
+                    self.__connectionmq_publisher.executer_maintenance()
 
                 if len(self._q_locale) > 0:
                     self.__prochain_message()
@@ -358,7 +373,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
                 'evenement_type': evenement_type,
             })
 
-            if len(self._q_locale) > self._max_q_size:
+            if len(self._q_locale) > self._max_q_size or self.__connectionmq_publisher.is_closed:
                 # On va arreter la consommation de messages pour passer au travers de la liste en memoire
                 self.__logger.warning("Throttling Q processus : %s" % self._q_processus)
                 self._consume_actif = False
