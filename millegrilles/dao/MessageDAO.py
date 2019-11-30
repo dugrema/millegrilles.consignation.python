@@ -615,6 +615,10 @@ class ConnexionWrapper:
         self.__channel = None
         self.__thread_ioloop = None
 
+        self.__publish_confirm_event = Event()
+        self.__published = False
+        self.__thread_publishing_watchdog = None
+
         self._in_error = False
         self.__liste_listeners_channels = None
 
@@ -711,6 +715,7 @@ class ConnexionWrapper:
             finally:
                 self.__connexionmq = None
 
+        self.__publish_confirm_event.set()
         self.__channel = None
         self.__thread_ioloop = None
 
@@ -836,6 +841,46 @@ class ConnexionWrapper:
         if isinstance(frame.method, pika.spec.Basic.Nack):
             self._logger.error("Delivery NACK")
             self.enter_error_state()
+        else:
+            self.__publish_confirm_event.set()
+
+    def publish_watch(self):
+        """
+        Indique qu'on veut savoir si la connexion fonctionne (on s'attend a recevoir un confirm delivery moment donne)
+        :return:
+        """
+        if not self.__published:
+
+            if self.__thread_publishing_watchdog is None:
+                pass
+                self.__thread_publishing_watchdog = Thread(name="PubDog", target=self.__run_publishing_watchdog, daemon=True)
+                self.__thread_publishing_watchdog.start()
+            else:
+                # Reset timer du watchdog, aucun evenement en attente
+                self.__publish_confirm_event.set()
+
+            self.__published = True
+
+    def __run_publishing_watchdog(self):
+
+        self._logger.warning("Demarrage watchdog publishing")
+
+        while not self.__stop_event.is_set():
+
+            if self.__published:
+
+                self.__publish_confirm_event.wait(1)
+
+                if not self.__publish_confirm_event.is_set():
+                    self._logger.warning("Confirmation de publish non recue, erreur sur connexion")
+                    self.enter_error_state()
+
+                self.__published = False
+
+            else:
+                self.__publish_confirm_event.wait(600)
+
+            self.__publish_confirm_event.clear()
 
     @property
     def channel(self):

@@ -312,10 +312,16 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape, tokens,
             channel=self.__connectionmq_publisher.channel)
 
+        # Indique qu'il faut surveiller si la connexion est active
+        self.__connectionmq_publisher.publish_watch()
+
     def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
         self._contexte.message_dao.transmettre_evenement_mgp_resumer(
             self._gestionnaire_domaine.get_nom_domaine(), id_document_declencheur, tokens, id_document_processus_attente,
             channel=self.__connectionmq_publisher.channel)
+
+        # Indique qu'il faut surveiller si la connexion est active
+        self.__connectionmq_publisher.publish_watch()
 
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
         document_processus = self.charger_document_processus(
@@ -329,6 +335,9 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             info=tokens,
             channel=self.__connectionmq_publisher.channel
         )
+
+        # Indique qu'il faut surveiller si la connexion est active
+        self.__connectionmq_publisher.publish_watch()
 
     def preparer_document_helper(self, collection, classe):
         helper = classe(self._contexte.document_dao.get_collection(collection))
