@@ -24,12 +24,15 @@ class PikaDAO:
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.lock_transmettre_message = RLock()
         self.lock_initialiser_connection = Lock()
+        self.lock_initialiser_connection_transmission = Lock()
 
         self._attendre_channel = Event()
 
         self.configuration = configuration
         self.connectionmq = None
+        self.connectionmq_transmission = None
         self.channel = None
+        self.channel_tranmission = None
 
         self._queue_reponse = None
 
@@ -40,6 +43,7 @@ class PikaDAO:
 
         # Thread utilisee pour verifier le fonctionnement correct de MQ
         self.__stop_event = Event()
+        self.__maintenance_event = Event()
         self.__thread_ioloop = None
         self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
         self.__thread_maintenance = Thread(target=self.executer_maintenance, name="MQ-Maint")
@@ -58,8 +62,8 @@ class PikaDAO:
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
             'virtual_host': self.configuration.nom_millegrille,
-            'heartbeat': 5,  #self.configuration.mq_heartbeat,
-            'blocked_connection_timeout': self.configuration.mq_heartbeat/3
+            'heartbeat': self.configuration.mq_heartbeat,
+            'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
         }
 
         self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
@@ -113,8 +117,15 @@ class PikaDAO:
             except Exception as e:
                 self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
 
+        if self.connectionmq_transmission is not None:
+            try:
+                self.connectionmq_transmission.close()
+            except Exception as e:
+                self._logger.debug("Erreur fermeture MQ transmission avant de reconnecter: %s" % str(e))
+
         try:
             self.lock_initialiser_connection.acquire(blocking=True, timeout=5)
+            self.lock_initialiser_connection_transmission.acquire(blocking=True, timeout=5)
             parametres_connexion = self.preparer_connexion()
             parametres = pika.ConnectionParameters(**parametres_connexion)
             self.connectionmq = pika.SelectConnection(
@@ -124,6 +135,14 @@ class PikaDAO:
             )
             self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop)
             self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
+
+            self.connectionmq_transmission = pika.SelectConnection(
+                parameters=parametres,
+                on_open_callback=self.__on_connection_transmission_open,
+                on_close_callback=self.__on_connection_transmission_close,
+            )
+            thread_transmission = Thread(name="MQ-IOLoopTrans", target=self.connectionmq_transmission.ioloop.start)
+            thread_transmission.start()
 
         except Exception as e:
             self.enter_error_state()
@@ -150,7 +169,6 @@ class PikaDAO:
         self._in_error = False
 
         self.__stop_event.clear()
-        self._attendre_channel.set()  # Declenche execution processus en attente de la connexion
         self.lock_initialiser_connection.release()
 
         self._logger.info("Connection / channel prets")
@@ -168,6 +186,41 @@ class PikaDAO:
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warning("Channel ferme: %s, %s" % (code, reason))
         self.channel = None
+        self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
+
+    def __on_connection_transmission_open(self, connection):
+        self._logger.info("Callback connection, on ouvre le channel")
+        connection.add_on_close_callback(self.__on_connection_close)
+        connection.channel(on_open_callback=self.__on_channel_transmission_open)
+
+        # Aussi allouer un channel a chaque listener inscrit
+        if self.__liste_listeners_channels is not None:
+            for listener in self.__liste_listeners_channels:
+                self.__ouvrir_channel_listener(listener)
+
+    def __on_channel_transmission_open(self, channel):
+        self.channel_tranmission = channel
+        self.channel_tranmission.basic_qos(prefetch_count=1)
+        self.channel_tranmission.add_on_close_callback(self.__on_channel_transmission_close)
+
+        self.lock_initialiser_connection_transmission.release()
+        with self.lock_initialiser_connection:
+            self._attendre_channel.set()  # Declenche execution processus en attente de la connexion
+
+        self._logger.info("Connection / channel tranmission prets")
+
+    def __on_connection_transmission_close(self, connection=None, code=None, reason=None):
+        self.channel_tranmission = None
+        self.connectionmq_transmission = None
+        if not self.__stop_event.is_set():
+            self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
+            self.enter_error_state()
+        else:
+            self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
+
+    def __on_channel_transmission_close(self, channel=None, code=None, reason=None):
+        self._logger.warning("Channel transmission ferme: %s, %s" % (code, reason))
+        self.channel_tranmission = None
         self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
     def register_channel_listener(self, listener):
@@ -298,12 +351,12 @@ class PikaDAO:
             bindings.add('reponse.%s' % nom_queue)
             with self.lock_transmettre_message:
                 for routing_key in bindings:
-                    self.channel.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
+                    self.channel_tranmission.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
                 tag_queue = self.channel.basic_consume(callback_in, queue=nom_queue, no_ack=False)
                 self._logger.debug("Tag queue: %s" % tag_queue)
 
                 self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
-                self.channel.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
+                self.channel_tranmission.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
@@ -333,11 +386,11 @@ class PikaDAO:
 
         if channel is None:
             # Utiliser le channel implicite
-            if self.channel is None:
+            if self.channel_tranmission is None:
                 # Le channel n'est pas pret, on va l'attendre max 30 secondes (cycle de maintenance)
                 with self.lock_transmettre_message:
                     pass  # On fait juste attendre que le channel soit pret
-            channel = self.channel
+            channel = self.channel_tranmission
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
         if reply_to is not None:
@@ -375,7 +428,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
-            self.channel.basic_publish(
+            self.channel_tranmission.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
                 body=message_utf8,
@@ -393,7 +446,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
-            self.channel.basic_publish(
+            self.channel_tranmission.basic_publish(
                 exchange='',  # Exchange default
                 routing_key=replying_to,
                 body=message_utf8,
@@ -416,7 +469,7 @@ class PikaDAO:
         :return:
         """
         if channel is None:
-            channel = self.channel
+            channel = self.channel_tranmission
 
         if self.connectionmq is None or self.connectionmq.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
@@ -456,7 +509,7 @@ class PikaDAO:
         routing_key = 'destinataire.domaine.%s' % nom_domaine
 
         with self.lock_transmettre_message:
-            self.channel.basic_publish(
+            self.channel_tranmission.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
@@ -508,7 +561,7 @@ class PikaDAO:
         routing_key = 'ceduleur.minute%s' % ind_routing_key
 
         with self.lock_transmettre_message:
-            self.channel.basic_publish(
+            self.channel_tranmission.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
@@ -552,7 +605,7 @@ class PikaDAO:
                       (nom_domaine, nom_processus, nom_etape)
 
         with self.lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
+            self.channel_tranmission.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key=routing_key,
                                        body=message_utf8)
 
@@ -571,7 +624,7 @@ class PikaDAO:
         routing_key = 'processus.domaine.%s.resumer' % nom_domaine
 
         with self.lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
+            self.channel_tranmission.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key=routing_key,
                                        body=message_utf8)
 
@@ -598,7 +651,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         with self.lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
+            self.channel_tranmission.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key='transaction.erreur',
                                        body=message_utf8)
 
@@ -625,7 +678,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         with self.lock_transmettre_message:
-            self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
+            self.channel_tranmission.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key='processus.erreur',
                                        body=message_utf8)
 
@@ -650,11 +703,13 @@ class PikaDAO:
         finally:
             self.connectionmq = None
             self.__thread_ioloop = None
+            self.__maintenance_event.set()
 
     # Se deconnecter de RabbitMQ
     def deconnecter(self):
         self._actif = False
         self.__stop_event.set()
+        self.__maintenance_event.set()
 
         if self.connectionmq is not None:
             try:
@@ -666,11 +721,11 @@ class PikaDAO:
         self.__thread_ioloop = None
 
     def executer_maintenance(self):
-
         self._logger.info("Demarrage maintenance")
-        self.__stop_event.wait(self._intervalle_maintenance)  # Attendre avant premier cycle de maintenance
+        self.__maintenance_event.wait(self._intervalle_maintenance)  # Attendre avant premier cycle de maintenance
 
         while not self.__stop_event.is_set():
+            self.__maintenance_event.clear()
             self._logger.debug("Maintenance MQ, in error: %s" % self._in_error)
 
             try:
@@ -695,7 +750,7 @@ class PikaDAO:
                 self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
                 self.enter_error_state()
 
-            self.__stop_event.wait(self._intervalle_maintenance)
+            self.__maintenance_event.wait(self._intervalle_maintenance)
 
         self._logger.info("MQ-Maint closing")
 

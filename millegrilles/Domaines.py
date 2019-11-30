@@ -42,7 +42,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
     def on_channel_open(self, channel):
         super().on_channel_open(channel)
-        channel.basic_qos(prefetch_count=500)
+        channel.basic_qos(prefetch_count=10)
         channel.add_on_close_callback(self.on_channel_close)
         self.__channel = channel
 

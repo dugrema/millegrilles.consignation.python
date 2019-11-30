@@ -138,7 +138,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         self._q_locale = list()
 
         # Si limite est depasse, un cesse de consommer des messages dans MQ
-        self._max_q_size = 500
+        self._max_q_size = 50
         self._consume_actif = True
         self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'processus')
 
