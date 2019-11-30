@@ -238,6 +238,11 @@ class PikaDAO:
                 properties=properties,
                 mandatory=True)
             self.__stop_event.wait(0.01)  # Throttle
+
+        if channel is self.__channel_publisher:
+            # Utiliser pubdog pour la connexion publishing par defaut
+            self.__connexionmq_publisher.publish_watch()
+
         self._in_error = False
 
     ''' 
@@ -267,7 +272,10 @@ class PikaDAO:
                 body=message_utf8,
                 properties=properties,
                 mandatory=True)
-            self.__stop_event.wait(0.01)  # Throttle
+
+        # Utiliser pubdog pour la connexion publishing par defaut
+        self.__connexionmq_publisher.publish_watch()
+
         self._in_error = False
 
     def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
@@ -286,6 +294,10 @@ class PikaDAO:
                 body=message_utf8,
                 properties=properties,
                 mandatory=True)
+
+        # Utiliser pubdog pour la connexion publishing par defaut
+        self.__connexionmq_publisher.publish_watch()
+
         self._in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction, reply_to, correlation_id, channel=None):
@@ -318,6 +330,11 @@ class PikaDAO:
                 body=message_utf8,
                 properties=properties,
                 mandatory=True)
+
+        # Utiliser pubdog pour la connexion publishing par defaut
+        if channel is self.__channel_publisher:
+            self.__connexionmq_publisher.publish_watch()
+
         self._in_error = False
 
     def transmettre_notification(self, document_transaction, sub_routing_key):
@@ -348,6 +365,8 @@ class PikaDAO:
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
+
+        self.__connexionmq_publisher.publish_watch()
 
     ''' 
     Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
@@ -444,6 +463,10 @@ class PikaDAO:
                                                    routing_key=routing_key,
                                                    body=message_utf8)
 
+        if channel is self.__channel_publisher:
+            self.__connexionmq_publisher.publish_watch()
+
+
     def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, tokens: list,
                                           id_document_processus_attente=None,
                                           channel = None):
@@ -466,6 +489,8 @@ class PikaDAO:
             channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                                    routing_key=routing_key,
                                                    body=message_utf8)
+
+        self.__connexionmq_publisher.publish_watch()
 
     '''
     Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
@@ -494,6 +519,8 @@ class PikaDAO:
                                                    routing_key='transaction.erreur',
                                                    body=message_utf8)
 
+        self.__connexionmq_publisher.publish_watch()
+
     '''
      Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
 
@@ -520,6 +547,7 @@ class PikaDAO:
             self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
                                                    routing_key='processus.erreur',
                                                    body=message_utf8)
+        self.__connexionmq_publisher.publish_watch()
 
     # Mettre la classe en etat d'erreur
     def enter_error_state(self):
