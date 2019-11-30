@@ -160,7 +160,6 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             try:
                 if len(self._q_locale) > 0:
                     self.__prochain_message()
-                    last_consume = datetime.datetime.now()
                 elif not self._consume_actif:
                     # Reactiver le consume
                     self.gestionnaire.inscrire_basicconsume(self._q_processus, self.callbackAvecAck)
