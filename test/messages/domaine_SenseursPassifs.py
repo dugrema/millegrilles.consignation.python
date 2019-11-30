@@ -132,13 +132,19 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def load_lectures(self, nb_messages):
+        for n in range(0, nb_messages):
+            self.transmettre_lecture()
+
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-enveloppe = sample.transmettre_lecture()
+# enveloppe = sample.transmettre_lecture()
 # enveloppe = sample.changer_nom()
 # enveloppe = sample.supprimer_senseur()
+
+sample.load_lectures(8000)
 
 sample.recu.wait(60)
 

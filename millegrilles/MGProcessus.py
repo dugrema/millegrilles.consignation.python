@@ -138,7 +138,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         self._q_locale = list()
 
         # Si limite est depasse, un cesse de consommer des messages dans MQ
-        self._max_q_size = 5
+        self._max_q_size = 500
         self._consume_actif = True
         self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'processus')
 
@@ -152,12 +152,15 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
     def __run(self):
 
         self.__logger.info("Demarrage thread MGPProcessus")
+        last_consume = datetime.datetime.now()
+        consume_delta = datetime.timedelta(seconds=30)
 
         while not self.__stop_event.is_set():
             self.__wait_event.wait(10)
             try:
                 if len(self._q_locale) > 0:
                     self.__prochain_message()
+                    last_consume = datetime.datetime.now()
                 elif not self._consume_actif:
                     # Reactiver le consume
                     self.gestionnaire.inscrire_basicconsume(self._q_processus, self.callbackAvecAck)

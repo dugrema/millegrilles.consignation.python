@@ -42,7 +42,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
     def on_channel_open(self, channel):
         super().on_channel_open(channel)
-        channel.basic_qos(prefetch_count=1)
+        channel.basic_qos(prefetch_count=500)
         channel.add_on_close_callback(self.on_channel_close)
         self.__channel = channel
 
@@ -322,14 +322,16 @@ class GestionnaireDomaine:
         """
         channel = self.channel_mq
         if queue is None:
-            tags = channel.consumer_tags
-            for tag in tags:
+           tags = channel.consumer_tags
+           for tag in tags:
                 self._logger.debug("Removing ctag %s" % tag)
-                channel.basic_cancel(consumer_tag=tag, nowait=True)
+                with self.message_dao.lock_transmettre_message:
+                    channel.basic_cancel(consumer_tag=tag, nowait=True)
         else:
-            ctag = self._consumer_tags_parQ.get(queue)
-            if ctag is not None:
-                channel.basic_cancel(consumer_tag=ctag, nowait=True)
+           ctag = self._consumer_tags_parQ.get(queue)
+           if ctag is not None:
+               with self.message_dao.lock_transmettre_message:
+                    channel.basic_cancel(consumer_tag=ctag, nowait=True)
 
     def resoumettre_transactions(self):
         """
@@ -386,7 +388,8 @@ class GestionnaireDomaine:
             nom_queue = queue.method.queue
 
         self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
-        ctag = self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
+        with self.message_dao.lock_transmettre_message:
+            ctag = self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
 
         # Conserver le ctag - permet de faire cancel au besoin (e.g. long running process)
         self._consumer_tags_parQ[nom_queue] = ctag

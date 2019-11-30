@@ -6,7 +6,7 @@ import traceback
 import logging
 import ssl
 
-from threading import Lock, Event, Thread
+from threading import Lock, RLock, Event, Thread
 
 from millegrilles import Constantes
 from pika.credentials import PlainCredentials, ExternalCredentials
@@ -22,7 +22,8 @@ class PikaDAO:
 
     def __init__(self, configuration):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._lock_transmettre_message = Lock()
+        self.lock_transmettre_message = RLock()
+        self.lock_initialiser_connection = Lock()
 
         self._attendre_channel = Event()
 
@@ -57,7 +58,7 @@ class PikaDAO:
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
             'virtual_host': self.configuration.nom_millegrille,
-            'heartbeat': self.configuration.mq_heartbeat,
+            'heartbeat': 5,  #self.configuration.mq_heartbeat,
             'blocked_connection_timeout': self.configuration.mq_heartbeat/3
         }
 
@@ -113,7 +114,7 @@ class PikaDAO:
                 self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
 
         try:
-            self._lock_transmettre_message.acquire(blocking=True, timeout=5)
+            self.lock_initialiser_connection.acquire(blocking=True, timeout=5)
             parametres_connexion = self.preparer_connexion()
             parametres = pika.ConnectionParameters(**parametres_connexion)
             self.connectionmq = pika.SelectConnection(
@@ -150,7 +151,7 @@ class PikaDAO:
 
         self.__stop_event.clear()
         self._attendre_channel.set()  # Declenche execution processus en attente de la connexion
-        self._lock_transmettre_message.release()
+        self.lock_initialiser_connection.release()
 
         self._logger.info("Connection / channel prets")
 
@@ -236,7 +237,8 @@ class PikaDAO:
             exchange_middleware,
             self.queuename_erreurs_processus(),
             ['processus.erreur'],
-            queue_durable=True
+            queue_durable=True,
+            arguments={'x-queue-mode': 'lazy'},
         ))
 
         # Q entretien (ceduleur)
@@ -282,7 +284,8 @@ class PikaDAO:
 
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
-        self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
+        with self.lock_transmettre_message:
+            self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
         def callback_inscrire(
@@ -293,24 +296,27 @@ class PikaDAO:
             bindings = set()
             bindings.update(routing_in)
             bindings.add('reponse.%s' % nom_queue)
-            for routing_key in bindings:
-                self.channel.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
-            tag_queue = self.channel.basic_consume(callback_in, queue=nom_queue, no_ack=False)
-            self._logger.debug("Tag queue: %s" % tag_queue)
+            with self.lock_transmettre_message:
+                for routing_key in bindings:
+                    self.channel.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
+                tag_queue = self.channel.basic_consume(callback_in, queue=nom_queue, no_ack=False)
+                self._logger.debug("Tag queue: %s" % tag_queue)
 
-        self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
-        self.channel.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
+                self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
+                self.channel.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
-        self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
+        with self.message_dao.lock_transmettre_message:
+            self.channel.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def demarrer_lecture_etape_processus(self, callback):
         """ Demarre la lecture de la queue mgp_processus. Appel bloquant. """
 
-        self.channel.basic_consume(callback,
-                                   queue=self.queuename_mgp_processus(),
-                                   no_ack=False)
+        with self.message_dao.lock_transmettre_message:
+            self.channel.basic_consume(callback,
+                                       queue=self.queuename_mgp_processus(),
+                                       no_ack=False)
         self.start_consuming()
 
     ''' 
@@ -329,7 +335,7 @@ class PikaDAO:
             # Utiliser le channel implicite
             if self.channel is None:
                 # Le channel n'est pas pret, on va l'attendre max 30 secondes (cycle de maintenance)
-                with self._lock_transmettre_message:
+                with self.lock_transmettre_message:
                     pass  # On fait juste attendre que le channel soit pret
             channel = self.channel
 
@@ -340,7 +346,7 @@ class PikaDAO:
             properties.correlation_id = correlation_id
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             channel.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
@@ -368,7 +374,7 @@ class PikaDAO:
             properties.correlation_id = correlation_id
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
@@ -386,7 +392,7 @@ class PikaDAO:
         properties.correlation_id = correlation_id
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(
                 exchange='',  # Exchange default
                 routing_key=replying_to,
@@ -418,7 +424,7 @@ class PikaDAO:
         properties = pika.BasicProperties(delivery_mode=1)
 
         message_utf8 = self.json_helper.dict_vers_json(document_commande, json.JSONEncoder)
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             channel.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
@@ -449,7 +455,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
         routing_key = 'destinataire.domaine.%s' % nom_domaine
 
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
@@ -501,7 +507,7 @@ class PikaDAO:
             ind_routing_key = '.%s' % ind_routing_key
         routing_key = 'ceduleur.minute%s' % ind_routing_key
 
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
@@ -545,7 +551,7 @@ class PikaDAO:
         routing_key = 'processus.domaine.%s.%s.%s' % \
                       (nom_domaine, nom_processus, nom_etape)
 
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key=routing_key,
                                        body=message_utf8)
@@ -564,7 +570,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
         routing_key = 'processus.domaine.%s.resumer' % nom_domaine
 
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key=routing_key,
                                        body=message_utf8)
@@ -591,7 +597,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key='transaction.erreur',
                                        body=message_utf8)
@@ -618,7 +624,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        with self._lock_transmettre_message:
+        with self.lock_transmettre_message:
             self.channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                        routing_key='processus.erreur',
                                        body=message_utf8)
@@ -761,7 +767,8 @@ class TraitementMessageCallback:
             self.transmettre_ack(ch, method)
 
     def transmettre_ack(self, ch, method):
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        with self.message_dao.lock_transmettre_message:
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def transmettre_erreur(self, ch, body, erreur):
         message = {
@@ -774,9 +781,10 @@ class TraitementMessageCallback:
 
         message_utf8 = self.__json_helper.dict_vers_json(message)
 
-        ch.basic_publish(exchange=self.__configuration.exchange_middleware,
-                         routing_key='processus.erreur',
-                         body=message_utf8)
+        with self.message_dao.lock_transmettre_message:
+            ch.basic_publish(exchange=self.__configuration.exchange_middleware,
+                             routing_key='processus.erreur',
+                             body=message_utf8)
 
     def decoder_message_json(self, body):
         return self.__json_helper.bin_utf8_json_vers_dict(body)

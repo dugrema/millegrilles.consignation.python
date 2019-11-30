@@ -59,7 +59,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         self.__traitement_lecture = None
         self.__traitement_requetes = None
         self._traitement_backlog_lectures = None
-        self.__channel = None
 
         self._logger = logging.getLogger("%s.GestionnaireSenseursPassifs" % __name__)
 
