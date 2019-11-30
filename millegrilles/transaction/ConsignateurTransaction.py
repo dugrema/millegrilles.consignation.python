@@ -61,6 +61,7 @@ class ConsignateurTransaction(ModeleConfiguration):
 
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=5)
         self.__channel = channel
         self.__init_config_event.set()
 
@@ -484,6 +485,7 @@ class EntretienCollectionsDomaines(BaseCallback):
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
         self.__channel = channel
+        channel.basic_qos(prefetch_count=50)
         queue_name = Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS
         channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
 
