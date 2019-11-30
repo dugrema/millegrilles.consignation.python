@@ -605,9 +605,10 @@ class ConnexionWrapper:
     Prepare une connexion et un channel. Lance le ioloop dans une thread.
     """
 
-    def __init__(self, configuration, stop_event: Event):
+    def __init__(self, configuration, stop_event: Event, heartbeat=None):
         self.configuration = configuration
         self.__stop_event = stop_event
+        self.__heartbeat = heartbeat
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
         self.__connexionmq = None
@@ -624,11 +625,14 @@ class ConnexionWrapper:
     def preparer_connexion(self):
         """ Retourne un dictionnaire avec les parametres de connexion a RabbitMQ """
 
+        if self.__heartbeat is None:
+            self.__heartbeat = self.configuration.mq_heartbeat
+
         connection_parameters = {
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
             'virtual_host': self.configuration.nom_millegrille,
-            'heartbeat': self.configuration.mq_heartbeat,
+            'heartbeat': self.__heartbeat,
             'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
         }
 
