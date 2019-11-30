@@ -272,7 +272,7 @@ class PikaDAO:
 
     def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
 
-        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
+        if self.__connexionmq_publisher is None or self.__connexionmq_publisher.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
@@ -417,7 +417,11 @@ class PikaDAO:
 
     def transmettre_evenement_mgpprocessus(self, nom_domaine: str, id_document, nom_processus, nom_etape='initiale',
                                            tokens=None,
-                                           info=None):
+                                           info=None,
+                                           channel=None):
+        if channel is None:
+            channel = self.__channel_publisher
+
         message = {
             Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS: str(id_document),
             Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS: nom_processus,
@@ -436,12 +440,16 @@ class PikaDAO:
                       (nom_domaine, nom_processus, nom_etape)
 
         with self.lock_transmettre_message:
-            self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
+            channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                                    routing_key=routing_key,
                                                    body=message_utf8)
 
     def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, tokens: list,
-                                          id_document_processus_attente=None):
+                                          id_document_processus_attente=None,
+                                          channel = None):
+        if channel is None:
+            channel = self.__channel_publisher
+
         message = {
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_RESUMER,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_domaine,
@@ -455,7 +463,7 @@ class PikaDAO:
         routing_key = 'processus.domaine.%s.resumer' % nom_domaine
 
         with self.lock_transmettre_message:
-            self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
+            channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                                    routing_key=routing_key,
                                                    body=message_utf8)
 
@@ -783,6 +791,8 @@ class ConnexionWrapper:
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.__on_channel_close)
         channel.confirm_delivery(self.__confirm_delivery)
+        channel.add_on_flow_callback(self.__on_flow)
+        channel.add_on_return_callback(self.__on_return)
         self._in_error = False
 
         self.__stop_event.clear()
@@ -808,11 +818,17 @@ class ConnexionWrapper:
         if not self.__stop_event.is_set():
             self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
+    def __on_flow(self, frame):
+        self._logger.warning("Flow callback: %s" % str(frame))
+
+    def __on_return(self, channel, method, properties, body):
+        self._logger.warning("Return callback %s:\n%s" % (str(method), str(body)))
+
     def __ouvrir_channel_listener(self, listener):
         self.__connexionmq.channel(on_open_callback=listener.on_channel_open)
 
     def __confirm_delivery(self, frame):
-        self._logger.error("Delivery: %s" % str(frame))
+        self._logger.info("Delivery: %s" % str(frame))
         if isinstance(frame.method, pika.spec.Basic.Nack):
             self._logger.error("Delivery NACK")
             self.enter_error_state()

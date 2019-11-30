@@ -5,9 +5,9 @@ import datetime
 from bson.objectid import ObjectId
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
-from threading import Thread, Event
+from threading import Thread, Event, Barrier
 
 
 class MGPProcesseur:
@@ -143,6 +143,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'processus')
 
         self._thread_traitement = Thread(target=self.__run, name="MGPProcess")
+        self.__connectionmq_publisher = ConnexionWrapper(self.configuration, self.__stop_event)
         self.__wait_event = Event()
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
@@ -151,13 +152,22 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
     def arreter(self):
         self.__wait_event.set()
+        self.__connectionmq_publisher.deconnecter()
 
     def __run(self):
 
         self.__logger.info("Demarrage thread MGPProcessus")
 
+        barrier = Barrier(2)
+        self.__connectionmq_publisher.connecter(barrier)
+        barrier.wait()
+        if barrier.broken:
+            raise Exception("Erreur connexion MQ %s" % self.__class__.__name__)
+
         while not self.__stop_event.is_set():
             try:
+                self.__connectionmq_publisher.executer_maintenance()
+
                 if len(self._q_locale) > 0:
                     self.__prochain_message()
                 elif not self._consume_actif:
@@ -299,11 +309,13 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
         self._contexte.message_dao.transmettre_evenement_mgpprocessus(
-            self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape, tokens)
+            self._gestionnaire_domaine.get_nom_domaine(), id_document_processus, nom_processus, nom_etape, tokens,
+            channel=self.__connectionmq_publisher.channel)
 
     def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
         self._contexte.message_dao.transmettre_evenement_mgp_resumer(
-            self._gestionnaire_domaine.get_nom_domaine(), id_document_declencheur, tokens, id_document_processus_attente)
+            self._gestionnaire_domaine.get_nom_domaine(), id_document_declencheur, tokens, id_document_processus_attente,
+            channel=self.__connectionmq_publisher.channel)
 
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
         document_processus = self.charger_document_processus(
@@ -314,7 +326,8 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             id_document_processus,
             document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
             document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
-            info=tokens
+            info=tokens,
+            channel=self.__connectionmq_publisher.channel
         )
 
     def preparer_document_helper(self, collection, classe):
@@ -461,6 +474,9 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         if processus is not None:
             processus.marquer_evenement_transaction(Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT)
 
+    @property
+    def connectionmq_publisher(self):
+        return self.__connectionmq_publisher
 
 class StubMessageDao:
 
@@ -921,6 +937,10 @@ class MGProcessus:
     def get_collection_processus_nom(self):
         return self._controleur.collection_processus_nom
 
+    @property
+    def controleur(self):
+        return self._controleur
+
 
 # Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
 # comme ayant ete completee.
@@ -978,7 +998,8 @@ class MGProcessusTransaction(MGProcessus):
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
         }
-        self._controleur.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+        self._controleur.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT,
+                                                         channel=self.controleur.connectionmq_publisher.channel)
 
     @property
     def transaction(self):

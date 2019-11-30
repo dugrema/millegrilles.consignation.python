@@ -1,8 +1,8 @@
 {
   "domaines": [
     {
-      "module": "millegrilles.domaines.MaitreDesCles",
-      "classe": "GestionnaireMaitreDesCles"
+      "module": "millegrilles.domaines.SenseursPassifs",
+      "classe": "GestionnaireSenseursPassifs"
     }
   ]
 }
