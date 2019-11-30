@@ -36,7 +36,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
         super().initialiser(init_document, init_message, connecter)
-        self.__mq_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop)
+        self.__mq_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop, daemon=True)
         self.__mq_ioloop.start()
         self.contexte.message_dao.register_channel_listener(self)
 
@@ -447,6 +447,7 @@ class GestionnaireDomaine:
         self._stop_event.set()
         if self.channel_mq is not None:
             self.channel_mq.close()
+        self._traitement_evenements.arreter()
 
     def demarrer_processus(self, processus, parametres):
         self.demarreur_processus.demarrer_processus(processus, parametres)
@@ -789,7 +790,7 @@ class WatcherCollectionMongoThread:
     def start(self):
         self.__logger.info("Demarrage thread watcher:%s vers routing:%s" % (
             self.__nom_collection_mongo, self.__routing_key))
-        self.__thread = Thread(name="DocWatcher", target=self.run)
+        self.__thread = Thread(name="DocWatcher", target=self.run, daemon=True)
         self.__thread.start()
 
     def stop(self):

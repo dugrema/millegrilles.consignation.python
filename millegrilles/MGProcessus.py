@@ -149,14 +149,14 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
         self._thread_traitement.start()
 
+    def arreter(self):
+        self.__wait_event.set()
+
     def __run(self):
 
         self.__logger.info("Demarrage thread MGPProcessus")
-        last_consume = datetime.datetime.now()
-        consume_delta = datetime.timedelta(seconds=30)
 
         while not self.__stop_event.is_set():
-            self.__wait_event.wait(10)
             try:
                 if len(self._q_locale) > 0:
                     self.__prochain_message()
@@ -172,6 +172,8 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             except Exception:
                 self.__logger.exception("Erreur thread MGPProcessus")
                 self.__stop_event.wait(5)  # Throttle, 5 secondes d'attente sur erreur
+
+            self.__wait_event.wait(10)
 
         self.__logger.info("Fin thread MGPProcessus")
 

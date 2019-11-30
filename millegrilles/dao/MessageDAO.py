@@ -904,7 +904,7 @@ class ConnexionWrapper:
                 on_open_callback=self.__on_connection_open,
                 on_close_callback=self.__on_connection_close,
             )
-            self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop)
+            self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop, daemon=True)
             self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
 
         except Exception as e:
