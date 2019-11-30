@@ -144,9 +144,9 @@ sample = MessagesSample()
 # enveloppe = sample.changer_nom()
 # enveloppe = sample.supprimer_senseur()
 
-sample.load_lectures(8000)
+sample.load_lectures(1000)
 
-sample.recu.wait(60)
+sample.recu.wait(1)
 
 # FIN TEST
 sample.deconnecter()

@@ -23,7 +23,7 @@ class PikaDAO:
     def __init__(self, configuration):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.lock_transmettre_message = RLock()
-        self.lock_initialiser_connections = Barrier(2)  # S'assurer d'avoir up et downstream
+        self.lock_initialiser_connections = Barrier(2)  # S'assurer d'avoir consumer et publisher
 
         self._attendre_channel = Event()
         self.configuration = configuration
@@ -40,12 +40,12 @@ class PikaDAO:
 
         # Wrappers pour connexions MQ
         # Pour les modules avec beaucoup d'activite bidirectionnelle simultanee, il faut au moins une connexion
-        # downstream et une connexion upstream.
-        self.__connexionmq_downstream = ConnexionWrapper(
+        # consumer et une connexion publisher.
+        self.__connexionmq_consumer = ConnexionWrapper(
             self.configuration, self.__stop_event)
-        self.__connexionmq_upstream = ConnexionWrapper(
+        self.__connexionmq_publisher = ConnexionWrapper(
             self.configuration, self.__stop_event)
-        self.__connexionsmq = [self.__connexionmq_downstream, self.__connexionmq_upstream]
+        self.__connexionsmq = [self.__connexionmq_consumer, self.__connexionmq_publisher]
 
         self._queue_reponse = None
 
@@ -236,7 +236,7 @@ class PikaDAO:
     #
     def register_channel_listener(self, listener):
         self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
-        self.__connexionmq_downstream.register_channel_listener(listener)
+        self.__connexionmq_consumer.register_channel_listener(listener)
     #     if self.__liste_listeners_channels is None:
     #         self.__liste_listeners_channels = list()
     #     self.__liste_listeners_channels.append(listener)
@@ -284,7 +284,7 @@ class PikaDAO:
         # Q nouvelle.transactions, existe sur tous les exchanges
         for nom_echange in nom_echanges:
             setupHandler.add_configuration(PikaSetupCallbackHandler(
-                self.__channel_downstream,
+                self.__channel_consumer,
                 nom_echange,
                 self.queuename_nouvelles_transactions(),
                 [Constantes.TRANSACTION_ROUTING_NOUVELLE],
@@ -296,7 +296,7 @@ class PikaDAO:
 
         exchange_middleware = self.configuration.exchange_middleware
         setupHandler.add_configuration(PikaSetupCallbackHandler(
-            self.__channel_downstream,
+            self.__channel_consumer,
             exchange_middleware,
             self.queuename_nouvelles_transactions(),
             [Constantes.TRANSACTION_ROUTING_NOUVELLE],
@@ -305,7 +305,7 @@ class PikaDAO:
         ))
 
         setupHandler.add_configuration(PikaSetupCallbackHandler(
-            self.__channel_downstream,
+            self.__channel_consumer,
             exchange_middleware,
             self.queuename_evenements_transactions(),
             [Constantes.TRANSACTION_ROUTING_EVENEMENT],
@@ -314,7 +314,7 @@ class PikaDAO:
 
         # Q erreurs
         setupHandler.add_configuration(PikaSetupCallbackHandler(
-            self.__channel_downstream,
+            self.__channel_consumer,
             exchange_middleware,
             self.queuename_erreurs_processus(),
             ['processus.erreur'],
@@ -324,7 +324,7 @@ class PikaDAO:
 
         # Q entretien (ceduleur)
         setupHandler.add_configuration(PikaSetupCallbackHandler(
-            self.__channel_downstream,
+            self.__channel_consumer,
             exchange_middleware,
             Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
             ['ceduleur.#'],
@@ -365,7 +365,7 @@ class PikaDAO:
     def enregistrer_callback(self, queue, callback):
         queue_name = queue
         with self.lock_transmettre_message:
-            self.__channel_downstream.basic_consume(callback, queue=queue_name, no_ack=False)
+            self.__channel_consumer.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def inscrire_topic(self, exchange, routing: list, callback):
         def callback_inscrire(
@@ -378,25 +378,25 @@ class PikaDAO:
             bindings.add('reponse.%s' % nom_queue)
             with self.lock_transmettre_message:
                 for routing_key in bindings:
-                    self.__channel_upstream.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
-                tag_queue = self.__channel_downstream.basic_consume(callback_in, queue=nom_queue, no_ack=False)
+                    self.__channel_publisher.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
+                tag_queue = self.__channel_consumer.basic_consume(callback_in, queue=nom_queue, no_ack=False)
                 self._logger.debug("Tag queue: %s" % tag_queue)
 
                 self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
-                self.__channel_upstream.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
+                self.__channel_publisher.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions
         with self.lock_transmettre_message:
-            self.__channel_downstream.basic_consume(callback, queue=queue_name, no_ack=False)
+            self.__channel_consumer.basic_consume(callback, queue=queue_name, no_ack=False)
 
     def demarrer_lecture_etape_processus(self, callback):
         """ Demarre la lecture de la queue mgp_processus. Appel bloquant. """
 
         with self.lock_transmettre_message:
-            self.__channel_downstream.basic_consume(callback,
-                                                    queue=self.queuename_mgp_processus(),
-                                                    no_ack=False)
+            self.__channel_consumer.basic_consume(callback,
+                                                  queue=self.queuename_mgp_processus(),
+                                                  no_ack=False)
         self.start_consuming()
 
     ''' 
@@ -408,16 +408,16 @@ class PikaDAO:
 
     def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None, correlation_id=None, channel=None):
 
-        if self.__connexionmq_downstream is None or self.__connexionmq_downstream.is_closed:
+        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         if channel is None:
             # Utiliser le channel implicite
-            if self.__channel_upstream is None:
+            if self.__channel_publisher is None:
                 # Le channel n'est pas pret, on va l'attendre max 30 secondes (cycle de maintenance)
                 with self.lock_transmettre_message:
                     pass  # On fait juste attendre que le channel soit pret
-            channel = self.__channel_upstream
+            channel = self.__channel_publisher
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
         if reply_to is not None:
@@ -444,7 +444,7 @@ class PikaDAO:
     def transmettre_message_noeuds(self, message_dict, routing_key, delivery_mode_v=1,
                                    encoding=json.JSONEncoder, reply_to=None, correlation_id=None):
 
-        if self.__connexionmq_downstream is None or self.__connexionmq_downstream.is_closed:
+        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
@@ -455,7 +455,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(
+            self.__channel_publisher.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
                 body=message_utf8,
@@ -465,7 +465,7 @@ class PikaDAO:
 
     def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
 
-        if self.__connexionmq_downstream is None or self.__connexionmq_downstream.is_closed:
+        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
@@ -473,7 +473,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(
+            self.__channel_publisher.basic_publish(
                 exchange='',  # Exchange default
                 routing_key=replying_to,
                 body=message_utf8,
@@ -496,9 +496,9 @@ class PikaDAO:
         :return:
         """
         if channel is None:
-            channel = self.__channel_upstream
+            channel = self.__channel_publisher
 
-        if self.__connexionmq_downstream is None or self.__connexionmq_downstream.is_closed:
+        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         properties = pika.BasicProperties(delivery_mode=1)
@@ -536,7 +536,7 @@ class PikaDAO:
         routing_key = 'destinataire.domaine.%s' % nom_domaine
 
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(
+            self.__channel_publisher.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
@@ -588,11 +588,11 @@ class PikaDAO:
         routing_key = 'ceduleur.minute%s' % ind_routing_key
 
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(
+            self.__channel_publisher.basic_publish(
                 exchange=self.configuration.exchange_middleware,
                 routing_key=routing_key,
                 body=message_utf8)
-            self.__channel_downstream.basic_publish(
+            self.__channel_consumer.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
                 routing_key=routing_key,
                 body=message_utf8)
@@ -632,9 +632,9 @@ class PikaDAO:
                       (nom_domaine, nom_processus, nom_etape)
 
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                  routing_key=routing_key,
-                                                  body=message_utf8)
+            self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
+                                                   routing_key=routing_key,
+                                                   body=message_utf8)
 
     def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, tokens: list,
                                           id_document_processus_attente=None):
@@ -651,9 +651,9 @@ class PikaDAO:
         routing_key = 'processus.domaine.%s.resumer' % nom_domaine
 
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                  routing_key=routing_key,
-                                                  body=message_utf8)
+            self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
+                                                   routing_key=routing_key,
+                                                   body=message_utf8)
 
     '''
     Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
@@ -678,9 +678,9 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                  routing_key='transaction.erreur',
-                                                  body=message_utf8)
+            self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
+                                                   routing_key='transaction.erreur',
+                                                   body=message_utf8)
 
     '''
      Methode a utiliser pour mettre fin a l'execution d'un processus pour une transaction suite a une erreur fatale.
@@ -705,9 +705,9 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message)
 
         with self.lock_transmettre_message:
-            self.__channel_upstream.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                  routing_key='processus.erreur',
-                                                  body=message_utf8)
+            self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
+                                                   routing_key='processus.erreur',
+                                                   body=message_utf8)
 
     # Mettre la classe en etat d'erreur
     def enter_error_state(self):
@@ -798,12 +798,12 @@ class PikaDAO:
         return self.configuration.queue_mgp_processus
 
     @property
-    def __channel_downstream(self):
-        return self.__connexionmq_downstream.channel
+    def __channel_consumer(self):
+        return self.__connexionmq_consumer.channel
 
     @property
-    def __channel_upstream(self):
-        return self.__connexionmq_upstream.channel
+    def __channel_publisher(self):
+        return self.__connexionmq_publisher.channel
 
     @property
     def queue_reponse(self):
