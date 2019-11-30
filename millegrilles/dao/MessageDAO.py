@@ -825,9 +825,9 @@ class ConnexionWrapper:
         self.__stop_event = stop_event
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self.__connexionmq_downstream = None
-        self.__channel_downstream = None
-        self.__thread_ioloop_downstream = None
+        self.__connexionmq = None
+        self.__channel = None
+        self.__thread_ioloop = None
 
         self._in_error = False
         self.__liste_listeners_channels = None
@@ -884,12 +884,12 @@ class ConnexionWrapper:
         self._logger.info("Connecter RabbitMQ")
         self.__lock_init = lock_init
 
-        if self.__connexionmq_downstream is not None:
+        if self.__connexionmq is not None:
             self._logger.warning("Appel de connecter avec connection deja ouverte")
-            connectionmq = self.__connexionmq_downstream
-            self.__connexionmq_downstream = None
-            self.__channel_downstream = None
-            self.__thread_ioloop_downstream = None
+            connectionmq = self.__connexionmq
+            self.__connexionmq = None
+            self.__channel = None
+            self.__thread_ioloop = None
 
             try:
                 connectionmq.close()
@@ -899,29 +899,29 @@ class ConnexionWrapper:
         try:
             parametres_connexion = self.preparer_connexion()
             parametres = pika.ConnectionParameters(**parametres_connexion)
-            self.__connexionmq_downstream = pika.SelectConnection(
+            self.__connexionmq = pika.SelectConnection(
                 parameters=parametres,
                 on_open_callback=self.__on_connection_open,
                 on_close_callback=self.__on_connection_close,
             )
-            self.__thread_ioloop_downstream = Thread(name='MQ-IOloop', target=self.__run_ioloop)
-            self.__thread_ioloop_downstream.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
+            self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop)
+            self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
 
         except Exception as e:
             self.enter_error_state()
             raise e  # S'assurer de mettre le flag d'erreur
 
-        return self.__connexionmq_downstream
+        return self.__connexionmq
 
     def deconnecter(self):
-        if self.__connexionmq_downstream is not None:
+        if self.__connexionmq is not None:
             try:
-                self.__connexionmq_downstream.close()
+                self.__connexionmq.close()
             finally:
-                self.__connexionmq_downstream = None
+                self.__connexionmq = None
 
-        self.__channel_downstream = None
-        self.__thread_ioloop_downstream = None
+        self.__channel = None
+        self.__thread_ioloop = None
 
     def register_channel_listener(self, listener):
         self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
@@ -931,7 +931,7 @@ class ConnexionWrapper:
         self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
 
         # On verifie si on peut ouvrir le channel immediatement
-        if self.__connexionmq_downstream is not None and not self.__connexionmq_downstream.is_closed and not self._in_error:
+        if self.__connexionmq is not None and not self.__connexionmq.is_closed and not self._in_error:
             self.__ouvrir_channel_listener(listener)
 
     # Mettre la classe en etat d'erreur
@@ -940,29 +940,29 @@ class ConnexionWrapper:
         self._in_error = True
 
         try:
-            if self.__channel_downstream is not None:
-                self.__channel_downstream.close()
+            if self.__channel is not None:
+                self.__channel.close()
         except Exception as e:
             self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
         finally:
-            self.__channel_downstream = None
+            self.__channel = None
 
         try:
-            if self.__connexionmq_downstream is not None:
-                self.__connexionmq_downstream.close()
+            if self.__connexionmq is not None:
+                self.__connexionmq.close()
         except Exception as e:
             self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
         finally:
-            self.__connexionmq_downstream = None
-            self.__thread_ioloop_downstream = None
+            self.__connexionmq = None
+            self.__thread_ioloop = None
 
     def executer_maintenance(self):
         self._logger.debug("Maintenance connexion MQ, in error: %s" % self._in_error)
         try:
-            if self.__connexionmq_downstream is not None and self.__channel_downstream is None:
+            if self.__connexionmq is not None and self.__channel is None:
                 self._logger.error("La connection MQ est invalide - channel n'est pas ouvert.")
                 self.enter_error_state()
-            elif self.__connexionmq_downstream is None or self.__connexionmq_downstream.is_closed:
+            elif self.__connexionmq is None or self.__connexionmq.is_closed:
                 self._logger.warning("La connection MQ est fermee. On tente de se reconnecter.")
                 self.connecter()
             else:
@@ -983,7 +983,7 @@ class ConnexionWrapper:
     def __run_ioloop(self):
         self._logger.info("Demarrage MQ-IOLoop")
         try:
-            self.__connexionmq_downstream.ioloop.start()
+            self.__connexionmq.ioloop.start()
         except AMQPConnectionError as e:
             self._logger.error("Erreur ouverture connexion MQ: %s" % str(e))
             self.enter_error_state()
@@ -1000,7 +1000,7 @@ class ConnexionWrapper:
                 self.__ouvrir_channel_listener(listener)
 
     def __on_channel_open(self, channel):
-        self.__channel_downstream = channel
+        self.__channel = channel
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.__on_channel_close)
         self._in_error = False
@@ -1013,9 +1013,9 @@ class ConnexionWrapper:
         self._logger.info("Connexion / channel prets")
 
     def __on_connection_close(self, connection=None, code=None, reason=None):
-        self.__connexionmq_downstream = None
-        self.__channel_downstream = None
-        self.__thread_ioloop_downstream = None
+        self.__connexionmq = None
+        self.__channel = None
+        self.__thread_ioloop = None
         if not self.__stop_event.is_set():
             self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
             self.enter_error_state()
@@ -1024,21 +1024,21 @@ class ConnexionWrapper:
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warning("Channel ferme: %s, %s" % (code, reason))
-        self.__channel_downstream = None
+        self.__channel = None
         if not self.__stop_event.is_set():
             self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
 
     def __ouvrir_channel_listener(self, listener):
-        self.__connexionmq_downstream.channel(on_open_callback=listener.on_channel_open)
+        self.__connexionmq.channel(on_open_callback=listener.on_channel_open)
 
     @property
     def channel(self):
-        return self.__channel_downstream
+        return self.__channel
 
     @property
     def is_closed(self):
-        return self.__connexionmq_downstream is None or self.__channel_downstream is None or \
-               self.__connexionmq_downstream.is_closed or self.__channel_downstream.is_closed
+        return self.__connexionmq is None or self.__channel is None or \
+               self.__connexionmq.is_closed or self.__channel.is_closed
 
 
 # Classe avec utilitaires pour JSON
