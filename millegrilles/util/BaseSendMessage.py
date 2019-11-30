@@ -29,8 +29,10 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
         # Enregistrer la reply-to queue
         print("Attente du channel")
         self.contexte.message_dao.attendre_channel(5)
-        self.channel = self.message_dao.channel
-        self.channel.queue_declare(durable=True, exclusive=True, callback=self.set_cb_queue)
+
+        self.message_dao.inscrire_topic(self.configuration.exchange_noeuds, [], self.set_cb_queue)
+        # self.channel = self.message_dao.channel
+        # self.channel.queue_declare(durable=True, exclusive=True, callback=self.set_cb_queue)
         self.queue_name = None
         self.pret.wait(5)
 
@@ -48,17 +50,16 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
 
         routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
         self.contexte.message_dao.transmettre_message(
-            message_evenement, routing, channel=self.channel
+            message_evenement, routing
         )
         self.contexte.message_dao.transmettre_message_noeuds(
             message_evenement, routing
         )
 
-
     def set_cb_queue(self, queue):
         self.queue_name = queue.method.queue
         print("Queue: %s" % str(self.queue_name))
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        # self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
         self.pret.set()
 
     def deconnecter(self):
