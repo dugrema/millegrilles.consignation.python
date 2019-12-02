@@ -865,6 +865,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return resultat
 
+    def creer_torrent(self, uuid_collection_figee):
+        """
+        Genere un repertoire de seeding et un
+        :param uuid_collection_figee:
+        :return:
+        """
+
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
 
