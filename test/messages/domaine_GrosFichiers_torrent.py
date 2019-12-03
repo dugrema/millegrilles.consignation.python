@@ -8,13 +8,17 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
 from threading import Thread, Event
+import json
+
+
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser(init_document=False)
 
 
 class MessagesSample(BaseCallback):
 
     def __init__(self):
-        super().__init__(ContexteRessourcesMilleGrilles())
-        self.contexte.initialiser(init_document=False)
+        super().__init__(contexte)
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
@@ -43,7 +47,8 @@ class MessagesSample(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(body)
+        message = json.loads(str(body, 'utf-8'))
+        print(json.dumps(message, indent=4))
 
     def transmettre_commande_nouveau_torrent(self):
         commande = {
@@ -74,9 +79,18 @@ class MessagesSample(BaseCallback):
         print("Envoi commande torrent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transmettre_demande_etat_torrent(self):
+        requete = {}
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, 'torrent.etat', 'abcd', self.queue_name)
+
+        print("Envoi requete etat torrent: %s" % enveloppe_val)
+        return enveloppe_val
+
 
     def executer(self):
-        enveloppe = sample.transmettre_commande_nouveau_torrent()
+        # enveloppe = sample.transmettre_commande_nouveau_torrent()
+        sample.transmettre_demande_etat_torrent()
 
 # --- MAIN ---
 sample = MessagesSample()
@@ -84,6 +98,6 @@ sample = MessagesSample()
 # TEST
 
 # FIN TEST
-sample.event_recu.wait(2)
+sample.event_recu.wait(5)
 sample.deconnecter()
 

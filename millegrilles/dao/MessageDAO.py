@@ -880,7 +880,6 @@ class ConnexionWrapper:
         if not self.__published:
 
             if self.__thread_publishing_watchdog is None:
-                pass
                 self.__thread_publishing_watchdog = Thread(name="PubDog", target=self.__run_publishing_watchdog, daemon=True)
                 self.__thread_publishing_watchdog.start()
             else:
@@ -890,6 +889,9 @@ class ConnexionWrapper:
             self.__published = True
 
     def __run_publishing_watchdog(self):
+        """
+        Main du watchdog de publication. Permet de detecter rapidement une connexion MQ qui ne repond plus.
+        """
 
         self._logger.warning("Demarrage watchdog publishing")
 
@@ -897,6 +899,7 @@ class ConnexionWrapper:
 
             if self.__published:
 
+                # Attendre timeout ou confirmation de publication du message
                 self.__publish_confirm_event.wait(1)
 
                 if not self.__publish_confirm_event.is_set():
@@ -905,10 +908,9 @@ class ConnexionWrapper:
 
                 self.__published = False
 
-            else:
-                self.__publish_confirm_event.wait(600)
-
+            # Attendre prochain evenement de publish
             self.__publish_confirm_event.clear()
+            self.__publish_confirm_event.wait(600)
 
     @property
     def channel(self):
