@@ -58,7 +58,8 @@ class MessagesSample(BaseCallback):
                     # La millegrille qui recoit ce torrent va agir de la meme facon quelle le ferait avec une nouvelle
                     # transaction (qui sera extraite et soumise sur reception du torrent).
                     'uuid': '264ca437-4574-4b1d-8088-142af87a6954',  # uuid fichier
-                    'fuuid': '50f05190-0d6b-11ea-80d1-bf0de6b5e47c',  # fuuid version
+                    'fuuid': '0b6e8fe0-0d63-11ea-80d1-bf0de6b5e47c',
+                    # 'fuuid': '50f05190-0d6b-11ea-80d1-bf0de6b5e47c',  # fuuid version
                     'nom': 'Estheticians dont have to wax male genitalia against their will BC tribunal .pdf',
                     'mimetype': 'application/pdf',
                     'securite': '3.protege',
