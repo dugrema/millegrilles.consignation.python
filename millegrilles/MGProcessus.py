@@ -6,7 +6,6 @@ from bson.objectid import ObjectId
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
-from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 from threading import Thread, Event, Barrier
 
 
@@ -445,7 +444,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
                 Constantes.MONGO_DOC_ID: ObjectId(id_doc_attente)
             }
             processus = collection_processus.find_one(filtre)
-            self.__logger.error("Resumer document %s en attente de %s:\n%s" % (id_doc_attente, str(tokens), str(processus)))
+            self.__logger.debug("Resumer document %s en attente de %s:\n%s" % (id_doc_attente, str(tokens), str(processus)))
             self._resumer_processus(processus, tokens, id_declencheur)
 
     def _resumer_processus(self, processus, tokens, id_declencheur):
@@ -500,7 +499,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             tokens_resumer = processus['resumer_token']
             processus_resumer_id = processus.get(Constantes.MONGO_DOC_ID)
 
-            self.__logger.error("Emettre message resumer %s pour tokens %s" % (id_document_attente, str(tokens_resumer)))
+            self.__logger.debug("Emettre message resumer %s pour tokens %s" % (id_document_attente, str(tokens_resumer)))
             self.transmettre_message_resumer(processus_resumer_id, tokens_resumer, id_document_attente)
 
     '''
@@ -1034,7 +1033,7 @@ class MGProcessus:
         return self._controleur.collection_processus_nom
 
     @property
-    def controleur(self):
+    def controleur(self) -> MGPProcesseur:
         return self._controleur
 
 

@@ -791,19 +791,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
         # doivent etre presentes dans le document)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
-        }
-        ops = {
-            '$push': {
-                'fichiers': {
-                    '$each': [fichier],
-                    '$sort': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: -1},
-                    '$slice': - 200,
-                }
-            }
-        }
-        collection_domaine.update(filtre, ops)
+        self.__ajouter_activite(fichier, 'Nouveau fichier')
 
     def maj_collections_rapports_et_collections(self, uuid_collection: str):
         """
@@ -821,19 +809,36 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
         # doivent etre presentes dans le document)
+        self.__ajouter_activite(collection, 'Nouvelle collection')
+
+    def __ajouter_activite(self, activite, type_activite):
+        wrapper_activite = {
+            'date': datetime.datetime.utcnow(),
+            'uuid_activite': str(uuid.uuid1()),
+            'type_activite': type_activite,
+            'sujet': activite
+        }
+
+        ops = {
+            '$push': {
+                'activites': {
+                    '$each': [wrapper_activite],
+                    '$sort': {'date': -1},
+                    '$slice': 100,
+                }
+            },
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
         }
-        ops = {
-            '$push': {
-                'fichiers': {
-                    '$each': [collection],
-                    '$sort': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: -1},
-                    '$slice': - 200,
-                }
-            }
-        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.update(filtre, ops)
+
 
     def ajouter_favori(self, doc_uuid: str):
         self._logger.debug("Ajouter favor %s" % doc_uuid)
