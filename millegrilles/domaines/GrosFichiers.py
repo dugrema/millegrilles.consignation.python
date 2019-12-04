@@ -381,6 +381,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE,
         ]
         date_version = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT].get('_estampille')
         info_version = {
@@ -737,6 +738,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         entree_filtree = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: type_document,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: fichier_uuid,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: entree.get(ConstantesGrosFichiers.DOCUMENT_SECURITE),
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: entree.get(ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES),
         }
 
@@ -747,15 +749,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             entree_filtree.update(version_courante)
             entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = entree.get(
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
-
-            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID] = fuuid
-            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION] = entree[
-            #     ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE]
-            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = entree[
-            #     ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
-            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_SECURITE] = entree[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
-            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256] = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256]
 
         return entree_filtree
 
@@ -1311,35 +1304,6 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
 
         for uuid_doc, doc in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
             documents.append(doc)
-
-        # commande = {
-        #     'nom': 'ma_collection_figee',
-        #     'securite': '1.public',  # Niveau de securite global du torrent
-        #     'uuid': parametres['uuid_collection'],
-        #     'uuid-fige': parametres['uuid_collection_figee'],
-        #     'etiquettes': parametres[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES],
-        #     'commentaires': "J'aime bian les torrents",
-        #     'documents': [
-        #         {
-        #             # Contenu equivalent a une transaction millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata
-        #             # La millegrille qui recoit ce torrent va agir de la meme facon quelle le ferait avec une nouvelle
-        #             # transaction (qui sera extraite et soumise sur reception du torrent).
-        #             # 'fuuid': '50f05190-0d6b-11ea-80d1-bf0de6b5e47c',  # fuuid version
-        #             'uuid': '264ca437-4574-4b1d-8088-142af87a6954',  # uuid fichier
-        #             'nom': 'Estheticians dont have to wax male genitalia against their will BC tribunal .pdf',
-        #             "taille": 807264,
-        #
-        #             'fuuid': '0b6e8fe0-0d63-11ea-80d1-bf0de6b5e47c',  # fuuid_v_courante
-        #
-        #             'mimetype': 'application/pdf',
-        #             'securite': '3.protege',
-        #             'sha256': '6f8378ec73a354453dec5c955c617f5295d55fe873cae3d49b3ea87aea13adbd',
-        #         }
-        #     ],
-        #     'trackers': [
-        #         'https://mg-dev3.maple.maceroc.com:3004'
-        #     ]
-        # }
 
         commande['trackers'] = [
             'https://mg-dev3.maple.maceroc.com:3004'

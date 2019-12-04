@@ -197,6 +197,7 @@ EVENEMENT_DOCUMENT_AJOUTE = 'document_ajoute'
 EVENEMENT_CEDULEUR = 'ceduleur'
 EVENEMENT_NOTIFICATION = 'notification'
 EVENEMENT_RESUMER = 'resumer'
+EVENEMENT_VERIFIER_RESUMER = 'verifier.resumer'
 EVENEMENT_PKI = 'pki'
 
 DOCUMENT_TACHE_NOTIFICATION = 'tache_notification'

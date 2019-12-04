@@ -53,6 +53,9 @@ class MGPProcesseur:
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
         raise NotImplementedError("Pas Implemente")
 
+    def transmettre_message_verifier_resumer(self, id_document_processus_attente, tokens:list):
+        raise NotImplementedError("Pas Implemente")
+
     def transmettre_message_resumer(self, id_document_declencheur, tokens: list, id_document_processus_attente=None):
         raise NotImplementedError("Pas Implemente")
 
@@ -338,6 +341,14 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         # Indique qu'il faut surveiller si la connexion est active
         self.__connectionmq_publisher.publish_watch()
 
+    def transmettre_message_verifier_resumer(self, id_document_processus_attente, tokens: list):
+        self._contexte.message_dao.transmettre_evenement_mgp_verifier_resumer(
+            self._gestionnaire_domaine.get_nom_domaine(), id_document_processus_attente, tokens,
+            channel=self.__connectionmq_publisher.channel)
+
+        # Indique qu'il faut surveiller si la connexion est active
+        self.__connectionmq_publisher.publish_watch()
+
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
         document_processus = self.charger_document_processus(
             id_document_processus, self._gestionnaire_domaine.get_collection_processus_nom())
@@ -396,6 +407,10 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
             if evenement_type == Constantes.EVENEMENT_RESUMER:
                 self.traiter_resumer(evenement_dict)
+
+            elif evenement_type == Constantes.EVENEMENT_VERIFIER_RESUMER:
+                self.verifier_resumer(evenement_dict)
+
             else:
                 id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
                 logging.debug("Recu evenement processus: %s" % str(evenement_dict))
@@ -406,12 +421,14 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
     def traiter_resumer(self, evenement_dict):
         id_doc_attente = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE)
+        id_declencheur = evenement_dict.get('_id_document_processus_declencheur')
         tokens = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKENS)
 
         nom_collection_processus = self._gestionnaire_domaine.get_collection_processus_nom()
         collection_processus = self._contexte.document_dao.get_collection(nom_collection_processus)
 
         if id_doc_attente is None:
+            # Faire la liste des documents en attente et les resumer un par un
             filtre = {
                 Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE: {"$in": tokens}
             }
@@ -420,33 +437,71 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
             # Declencher le traitement des processus trouves
             for processus in curseur_processus:
-                self.__logger.debug("Resumer processus %s" % str(processus))
-                filtre_processus = {Constantes.MONGO_DOC_ID: processus.get(Constantes.MONGO_DOC_ID)}
-
-                tokens_restants = list()
-                tokens_connectes = dict()
-                for token in processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE):
-                    if token not in tokens:
-                        tokens_restants.append(token)
-                    else:
-                        token_dockey = '%s.%s' % (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES, token)
-                        tokens_connectes[token_dockey] = evenement_dict.get('_id_document_processus_declencheur')
-
-                set_update = dict()
-                set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_restants
-                set_update.update(tokens_connectes)
-                collection_processus.update_one(filtre_processus, {'$set': set_update})
-
-                self.message_etape_suivante(processus.get('_id'),
-                                            processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
-                                            processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
-                                            tokens={
-                                                'processus': evenement_dict.get('_id_document_processus_declencheur'),
-                                                'tokens': tokens}
-                                            )
+                self._resumer_processus(processus, tokens, id_declencheur)
 
         else:
-            self.__logger.debug("Resumer document %s en attente de %s" % (id_doc_attente, str(tokens)))
+            # Document en attente est connu
+            filtre = {
+                Constantes.MONGO_DOC_ID: ObjectId(id_doc_attente)
+            }
+            processus = collection_processus.find_one(filtre)
+            self.__logger.error("Resumer document %s en attente de %s:\n%s" % (id_doc_attente, str(tokens), str(processus)))
+            self._resumer_processus(processus, tokens, id_declencheur)
+
+    def _resumer_processus(self, processus, tokens, id_declencheur):
+        self.__logger.debug("Resumer processus %s" % str(processus))
+        filtre_processus = {Constantes.MONGO_DOC_ID: processus.get(Constantes.MONGO_DOC_ID)}
+
+        nom_collection_processus = self._gestionnaire_domaine.get_collection_processus_nom()
+        collection_processus = self._contexte.document_dao.get_collection(nom_collection_processus)
+
+        tokens_restants = list()
+        tokens_connectes = dict()
+        for token in processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE):
+            if token not in tokens:
+                tokens_restants.append(token)
+            else:
+                token_dockey = '%s.%s' % (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES, token)
+                tokens_connectes[token_dockey] = id_declencheur
+
+        set_update = dict()
+        set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_restants
+        set_update.update(tokens_connectes)
+        collection_processus.update_one(filtre_processus, {'$set': set_update})
+
+        self.message_etape_suivante(processus.get('_id'),
+                                    processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
+                                    processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
+                                    tokens={
+                                        'processus': id_declencheur,
+                                        'tokens': tokens}
+                                    )
+
+    def verifier_resumer(self, evenement_dict: dict):
+        """
+        Verifier si les tokens resumer sont arrives pour un processus. Si des tokens sont trouves,
+        ils sont associes au processus en attente.
+        """
+        # raise Exception("Pas complete")
+        # Requete pour verifier si on a recu des transactions pour resumer le processus
+        tokens = evenement_dict['resumer_tokens']
+        filtre = {
+            Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER: {"$in": tokens}
+        }
+
+        self.__logger.debug("Trouver tokens resumer pour : %s" % str(tokens))
+        nom_collection_processus = self._gestionnaire_domaine.get_collection_processus_nom()
+        collection_processus = self._contexte.document_dao.get_collection(nom_collection_processus)
+        curseur_processus = collection_processus.find(filtre)
+
+        # Declencher le traitement des processus trouves
+        id_document_attente = evenement_dict['_id_document_processus_attente']
+        for processus in curseur_processus:
+            tokens_resumer = processus['resumer_token']
+            processus_resumer_id = processus.get(Constantes.MONGO_DOC_ID)
+
+            self.__logger.error("Emettre message resumer %s pour tokens %s" % (id_document_attente, str(tokens_resumer)))
+            self.transmettre_message_resumer(processus_resumer_id, tokens_resumer, id_document_attente)
 
     '''
     Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
@@ -696,12 +751,12 @@ class MGProcessus:
 
         return methode_a_executer
 
-    '''
-    Prepare un message qui peut etre mis sur la Q de MGPProcessus pour declencher l'execution de l'etape suivante.
-    
-    :returns: Libelle identifiant l'etape suivante a executer.
-    '''
     def transmettre_message_etape_suivante(self, parametres=None):
+        """'
+        Prepare un message qui peut etre mis sur la Q de MGPProcessus pour declencher l'execution de l'etape suivante.
+
+        :returns: Libelle identifiant l'etape suivante a executer.
+        """
         # Verifier que l'etape a ete executee avec succes.
         if not self._etape_complete or self._etape_suivante is None:
             raise ErreurEtapePasEncoreExecutee("L'etape n'a pas encore ete executee ou l'etape suivante est inconnue")
@@ -717,6 +772,21 @@ class MGProcessus:
             self._document_processus[Constantes.MONGO_DOC_ID],
             nom_processus,
             self._etape_suivante
+        )
+
+    def transmettre_message_verifier_resumer(self):
+        """'
+        Prepare un message qui peut etre mis sur la Q de MGPProcessus pour declencher l'execution de l'etape suivante.
+
+        :returns: Libelle identifiant l'etape suivante a executer.
+        """
+        # Verifier que l'etape a ete executee avec succes.
+        if not self._etape_complete or self._etape_suivante is None:
+            raise ErreurEtapePasEncoreExecutee("L'etape n'a pas encore ete executee ou l'etape suivante est inconnue")
+
+        self._controleur.transmettre_message_verifier_resumer(
+            self._document_processus[Constantes.MONGO_DOC_ID],
+            self._ajouter_token_attente
         )
 
     '''
@@ -746,7 +816,7 @@ class MGProcessus:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
 
             # Verifier si on peut eviter d'attenre des tockens
-            self.verifier_attendre_token()
+            # self.verifier_attendre_token()
 
             # Ajouter tokens pour synchronisation inter-transaction.
             tokens = {}
@@ -768,6 +838,8 @@ class MGProcessus:
                     id_document_processus, self._ajouter_token_resumer)
             elif not self._processus_complete and self._ajouter_token_attente is None:
                 self.transmettre_message_etape_suivante(resultat)
+            elif self._ajouter_token_attente is not None:
+                self.transmettre_message_verifier_resumer()
 
             # Verifier s'il faut avertir d'autres processus que le traitement de l'etape est complete
             if self._evenement.get('resumer_token') is not None:
@@ -1152,3 +1224,7 @@ class ErreurMAJProcessus(Exception):
 
     def __init__(self, message=None):
         super().__init__(message)
+
+
+class ErreurProcessusComplet(Exception):
+    pass

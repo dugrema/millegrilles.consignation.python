@@ -473,7 +473,7 @@ class PikaDAO:
 
     def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, tokens: list,
                                           id_document_processus_attente=None,
-                                          channel = None):
+                                          channel=None):
         if channel is None:
             channel = self.__channel_publisher
 
@@ -493,6 +493,28 @@ class PikaDAO:
             channel.basic_publish(exchange=self.configuration.exchange_middleware,
                                                    routing_key=routing_key,
                                                    body=message_utf8)
+
+        self.__connexionmq_publisher.publish_watch()
+
+    def transmettre_evenement_mgp_verifier_resumer(self, nom_domaine, id_document_processus_attente, tokens: list,
+                                                   channel=None):
+        if channel is None:
+            channel = self.__channel_publisher
+
+        message = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_VERIFIER_RESUMER,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_domaine,
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE: str(id_document_processus_attente),
+            Constantes.PROCESSUS_MESSAGE_LIBELLE_RESUMER_TOKENS: tokens,
+        }
+
+        message_utf8 = self.json_helper.dict_vers_json(message)
+        routing_key = 'processus.domaine.%s.verifier.resumer' % nom_domaine
+
+        with self.lock_transmettre_message:
+            channel.basic_publish(exchange=self.configuration.exchange_middleware,
+                                  routing_key=routing_key,
+                                  body=message_utf8)
 
         self.__connexionmq_publisher.publish_watch()
 
