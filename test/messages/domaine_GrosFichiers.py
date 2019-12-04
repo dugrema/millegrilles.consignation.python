@@ -198,7 +198,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_figer_collection(self):
         transaction = {
-            "uuid": "2693a46c-1638-11ea-afcd-00155d011f09",
+            "uuid": "a80c39cc-16ca-11ea-9318-00155d011f09",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.figerCollection',

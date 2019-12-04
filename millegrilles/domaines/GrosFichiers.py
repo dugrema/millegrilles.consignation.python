@@ -67,6 +67,8 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_DEFAULT_MIMETYPE = 'application/binary'
 
+    DOCUMENT_TORRENT_HASHSTRING = 'torrent_hashstring'
+
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM
@@ -90,6 +92,9 @@ class ConstantesGrosFichiers:
 
     TRANSACTION_AJOUTER_FAVORI = '%s.ajouterFavori' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_FAVORI = '%s.supprimerFavori' % DOMAINE_NOM
+
+    TRANSACTION_TORRENT_NOUVEAU = '%s.nouveauTorrent' % DOMAINE_NOM
+    TRANSACTION_TORRENT_SEEDING = '%s.seedingTorrent' % DOMAINE_NOM
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
@@ -251,6 +256,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFavori"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FAVORI:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFavori"
+
+        # Torrent
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_NOUVEAU:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentNouveau"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_SEEDING:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentSeeding"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -911,6 +922,25 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         :return:
         """
 
+    def associer_seeding_torrent(self, collection_figee: str, hashstring: str):
+        self._logger.debug("associer_seeding_torrent %s, hashstring %s" % (collection_figee, hashstring))
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_TORRENT_HASHSTRING: hashstring
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: collection_figee
+        }
+        resultat = collection_domaine.update_one(filtre, ops)
+        self._logger.debug("Supprimer favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
+
+        return resultat
+
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
 
@@ -1368,4 +1398,27 @@ class ProcessusTransactionSupprimerFavori(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
         self._controleur._gestionnaire_domaine.supprimer_favori(doc_uuid)
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        # Rien a faire...
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionTorrentSeeding(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_collection_figee = transaction['uuid-collection']
+        hashstring = transaction['hashstring-torrent']
+        self._controleur._gestionnaire_domaine.associer_seeding_torrent(uuid_collection_figee, hashstring)
         self.set_etape_suivante()
