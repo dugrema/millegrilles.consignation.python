@@ -29,6 +29,7 @@ class ConstantesGrosFichiers:
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_FICHIER = 'fichier'
     LIBVAL_COLLECTION = 'collection'
+    LIBVAL_COLLECTION_FIGEE = 'collection.figee'
     LIBVAL_FAVORIS = 'favoris'
     LIBVAL_RAPPORT = 'rapport'
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
@@ -53,7 +54,9 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
-    DOCUMENT_COLLECTION_FIGEE = 'figee'
+    DOCUMENT_COLLECTION_UUID_SOURCE_FIGE = 'uuid_source_fige'
+    DOCUMENT_COLLECTIONS_FIGEES = 'figees'
+    DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
 
@@ -120,7 +123,6 @@ class ConstantesGrosFichiers:
         DOCUMENT_COLLECTION_LISTEDOCS: dict(),   # Dictionnaire de fichiers, key=uuid, value=DOCUMENT_COLLECTION_FICHIER
         DOCUMENT_FICHIER_ETIQUETTES: dict(),    # Etiquettes de la collection
         DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
-        DOCUMENT_COLLECTION_FIGEE: False,       # True si la collection est figee (ne peut plus etre modifiee)
         DOCUMENT_COMMENTAIRES: None,
     }
 
@@ -620,9 +622,30 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def figer_collection(self, uuid_collection: str):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
+        # Charger la collection et la re-sauvegarder avec _mg-libelle = collection.figee
+        # Aussi generer un uuidv1 pour uuid-fige
+        collection_figee = collection_domaine.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        })
+
+        uuid_collection_figee = str(uuid.uuid1())
+        collection_figee[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE
+        collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_FIGE] = uuid_collection_figee
+
+        # Inserer collection figee (copie de la collection originale)
+        resultat_insertion_figee = collection_domaine.insert_one(collection_figee)
+
+        info_collection_figee = {
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_FIGEE_DATE: datetime.datetime.utcnow(),
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_FIGE: uuid_collection_figee,
+        }
         ops = {
-            '$set': {
-                ConstantesGrosFichiers.DOCUMENT_COLLECTION_FIGEE: True
+            '$push': {
+                ConstantesGrosFichiers.DOCUMENT_COLLECTIONS_FIGEES: {
+                    '$each': [info_collection_figee],
+                    '$sort': {ConstantesGrosFichiers.DOCUMENT_COLLECTION_FIGEE_DATE: -1},
+                }
             },
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
@@ -637,6 +660,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Inserer la nouvelle collection
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+
+        return {
+            'uuid_collection_figee': uuid_collection_figee,
+            'etiquettes': collection_figee[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+        }
 
     def changer_libelles_collection(self, uuid_collection: str, libelles: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -703,18 +731,25 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         entree_filtree = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: type_document,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: fichier_uuid,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: entree.get(
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER),
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: entree.get(ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES),
         }
 
         if type_document == ConstantesGrosFichiers.LIBVAL_FICHIER:
             fuuid = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE]
-            entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE] = fuuid
-            entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE] = entree[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE]
-            entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = entree[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
+            version_courante = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS].get(fuuid)
+
+            entree_filtree.update(version_courante)
+            entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = entree.get(
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
+
+            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID] = fuuid
+            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION] = entree[
+            #     ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE]
+            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = entree[
+            #     ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
+            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_SECURITE] = entree[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
+            # entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256] = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256]
 
         return entree_filtree
 
@@ -1229,24 +1264,85 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
         transaction = self.charger_transaction()
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
+        info_collection = self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
+        info_collection['uuid_collection'] = uuid_collection
+
         self.set_etape_suivante(ProcessusTransactionFigerCollection.creer_fichier_torrent.__name__)
 
-        return {'uuid_collection': uuid_collection}
+        return info_collection
 
     def creer_fichier_torrent(self):
         """
         Generer un fichier torrent et transmettre au module de consignation.
         :return:
         """
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-        self.set_etape_suivante(ProcessusTransactionFigerCollection.publier_torrent.__name__)
+        parametres = self.parametres
 
-    def publier_torrent(self):
-        """
-        Transmet des messages pour informer les publicateurs de la creation d'un nouveau torrent.
-        :return:
-        """
+        # Charger la collection et la re-sauvegarder avec _mg-libelle = collection.figee
+        # Aussi generer un uuidv1 pour uuid-fige
+        collection_figee = collection_domaine.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: parametres['uuid_collection_figee'],
+        })
+
+        champs_copier = [
+            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES,
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+        ]
+
+        documents = []
+        commande = {
+            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM: documents,
+        }
+        for champ in champs_copier:
+            commande[champ] = collection_figee.get(champ)
+
+        for doc in collection_figee[ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM]:
+            documents.append(doc)
+
+        # commande = {
+        #     'nom': 'ma_collection_figee',
+        #     'securite': '1.public',  # Niveau de securite global du torrent
+        #     'uuid': parametres['uuid_collection'],
+        #     'uuid-fige': parametres['uuid_collection_figee'],
+        #     'etiquettes': parametres[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES],
+        #     'commentaires': "J'aime bian les torrents",
+        #     'documents': [
+        #         {
+        #             # Contenu equivalent a une transaction millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata
+        #             # La millegrille qui recoit ce torrent va agir de la meme facon quelle le ferait avec une nouvelle
+        #             # transaction (qui sera extraite et soumise sur reception du torrent).
+        #             # 'fuuid': '50f05190-0d6b-11ea-80d1-bf0de6b5e47c',  # fuuid version
+        #             'uuid': '264ca437-4574-4b1d-8088-142af87a6954',  # uuid fichier
+        #             'nom': 'Estheticians dont have to wax male genitalia against their will BC tribunal .pdf',
+        #             "taille": 807264,
+        #
+        #             'fuuid': '0b6e8fe0-0d63-11ea-80d1-bf0de6b5e47c',  # fuuid_v_courante
+        #
+        #             'mimetype': 'application/pdf',
+        #             'securite': '3.protege',
+        #             'sha256': '6f8378ec73a354453dec5c955c617f5295d55fe873cae3d49b3ea87aea13adbd',
+        #         }
+        #     ],
+        #     'trackers': [
+        #         'https://mg-dev3.maple.maceroc.com:3004'
+        #     ]
+        # }
+
+        commande['trackers'] = [
+            'https://mg-dev3.maple.maceroc.com:3004'
+        ]
+
+        self.generateur_transactions.transmettre_commande(commande, 'commande.torrent.creerNouveau')
 
         self.set_etape_suivante()
 

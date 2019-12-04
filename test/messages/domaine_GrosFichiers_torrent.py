@@ -8,7 +8,9 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
 from threading import Thread, Event
+
 import json
+import uuid
 
 
 contexte = ContexteRessourcesMilleGrilles()
@@ -55,6 +57,7 @@ class MessagesSample(BaseCallback):
             'nom': 'ma_collection_figee',
             'securite': '1.public',  # Niveau de securite global du torrent
             'uuid': '7fd1c894-0f15-11ea-bb74-00155d011f09',
+            'uuid-fige': str(uuid.uuid1()),
             'etiquettes': {},
             'commentaires': "J'aime bian les torrents",
             'documents': [
@@ -72,6 +75,9 @@ class MessagesSample(BaseCallback):
                     'sha256': '6f8378ec73a354453dec5c955c617f5295d55fe873cae3d49b3ea87aea13adbd',
                 }
             ],
+            'trackers': [
+                'https://mg-dev3.maple.maceroc.com:3004'
+            ]
         }
         enveloppe_val = self.generateur.transmettre_commande(
             commande, 'commande.torrent.creerNouveau')
@@ -88,7 +94,7 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def transmettre_supprimer_torrent(self):
-        hashlist = ['2714d9aa2abc323157a3d00b327c4382bfae2a04']
+        hashlist = ['6e8fa41a357b4f5ed375246724d9822540e187eb']
 
         commande = {
             'hashlist': hashlist,
@@ -101,8 +107,8 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # enveloppe = sample.transmettre_commande_nouveau_torrent()
-        enveloppe = sample.transmettre_supprimer_torrent()
+        enveloppe = sample.transmettre_commande_nouveau_torrent()
+        # enveloppe = sample.transmettre_supprimer_torrent()
         # sample.transmettre_demande_etat_torrent()
 
 # --- MAIN ---

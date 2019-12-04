@@ -201,7 +201,7 @@ class MessagesSample(BaseCallback):
             transaction, 'millegrilles.domaines.GrosFichiers.figerCollection',
             reply_to=self.queue_name, correlation_id='abcd')
 
-        print("Renommer repertoire complete: %s" % enveloppe_val)
+        print("transaction_figer_collection: %s" % enveloppe_val)
         return enveloppe_val
 
     def transaction_changer_libelle_collection(self):
@@ -286,9 +286,9 @@ class MessagesSample(BaseCallback):
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
         # enveloppe5 = sample.transaction_changer_libelle_collection()
-        # enveloppe5 = sample.transaction_figer_collection()
+        enveloppe5 = sample.transaction_figer_collection()
         # enveloppe5 = sample.transaction_supprimer_collection()
-        enveloppe5 = sample.transaction_recuperer_collection()
+        # enveloppe5 = sample.transaction_recuperer_collection()
 
         # enveloppe = sample.transaction_ajouter_favoris()
         # enveloppe = sample.transaction_supprimer_favoris()
