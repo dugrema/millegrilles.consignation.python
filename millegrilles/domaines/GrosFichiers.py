@@ -54,7 +54,7 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
-    DOCUMENT_COLLECTION_UUID_SOURCE_FIGE = 'uuid_source_fige'
+    DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE = 'uuid_source_figee'
     DOCUMENT_COLLECTIONS_FIGEES = 'figees'
     DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
 
@@ -124,6 +124,7 @@ class ConstantesGrosFichiers:
         DOCUMENT_FICHIER_ETIQUETTES: dict(),    # Etiquettes de la collection
         DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
         DOCUMENT_COMMENTAIRES: None,
+        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
     }
 
     DOCUMENT_COLLECTION_FICHIER = {
@@ -629,16 +630,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
         })
 
+        # Retirer ObjectID Mongo pour reinserer le document
+        del collection_figee[Constantes.MONGO_DOC_ID]
+
+        # Modifier les cles de la collection pour la 'figer'
         uuid_collection_figee = str(uuid.uuid1())
         collection_figee[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE
-        collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_FIGE] = uuid_collection_figee
+        collection_figee[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_collection_figee
+        collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE] = uuid_collection
 
-        # Inserer collection figee (copie de la collection originale)
+        # Re-inserer collection (c'est maintenant une copie figee de la collection MongoDB originale)
         resultat_insertion_figee = collection_domaine.insert_one(collection_figee)
 
         info_collection_figee = {
             ConstantesGrosFichiers.DOCUMENT_COLLECTION_FIGEE_DATE: datetime.datetime.utcnow(),
-            ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_FIGE: uuid_collection_figee,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection_figee,
         }
         ops = {
             '$push': {
@@ -1288,25 +1294,22 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
         })
 
         champs_copier = [
-            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
             ConstantesGrosFichiers.DOCUMENT_SECURITE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
-            ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGE,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES,
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
         ]
 
         documents = []
         commande = {
-            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM: documents,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS: documents,
         }
         for champ in champs_copier:
             commande[champ] = collection_figee.get(champ)
 
-        for doc in collection_figee[ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM]:
+        for uuid_doc, doc in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
             documents.append(doc)
 
         # commande = {
@@ -1341,6 +1344,8 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
         commande['trackers'] = [
             'https://mg-dev3.maple.maceroc.com:3004'
         ]
+
+        self._logger.debug("Commande creation torrent:\n%s" % str(commande))
 
         self.generateur_transactions.transmettre_commande(commande, 'commande.torrent.creerNouveau')
 

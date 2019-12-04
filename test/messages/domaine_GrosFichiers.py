@@ -10,11 +10,14 @@ from millegrilles.domaines.Principale import ConstantesPrincipale
 from threading import Thread, Event
 
 
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser(init_document=False)
+
+
 class MessagesSample(BaseCallback):
 
     def __init__(self):
-        super().__init__(ContexteRessourcesMilleGrilles())
-        self.contexte.initialiser(init_document=False)
+        super().__init__(contexte)
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
@@ -195,7 +198,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_figer_collection(self):
         transaction = {
-            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
+            "uuid": "2693a46c-1638-11ea-afcd-00155d011f09",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, 'millegrilles.domaines.GrosFichiers.figerCollection',

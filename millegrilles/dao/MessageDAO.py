@@ -9,6 +9,7 @@ import ssl
 from threading import Lock, RLock, Event, Thread, Barrier
 
 from millegrilles import Constantes
+from millegrilles.util.JSONEncoders import MongoJSONEncoder
 from pika.credentials import PlainCredentials, ExternalCredentials
 from pika.exceptions import AMQPConnectionError
 
@@ -16,6 +17,8 @@ from pika.exceptions import AMQPConnectionError
 DAO vers la messagerie
 Connection a un moteur de messagerie via Pika.
 '''
+
+jsonEncoder = MongoJSONEncoder()
 
 
 class PikaDAO:
@@ -306,12 +309,13 @@ class PikaDAO:
         self.transmettre_message(
             document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
-    def transmettre_commande(self, document_commande, routing_key, channel=None):
+    def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder):
         """
         Sert a transmettre une commande vers un noeud
         :param document_commande:
         :param routing_key:
         :param channel:
+        :param encoding:
         :return:
         """
         if channel is None:
@@ -322,7 +326,7 @@ class PikaDAO:
 
         properties = pika.BasicProperties(delivery_mode=1)
 
-        message_utf8 = self.json_helper.dict_vers_json(document_commande, json.JSONEncoder)
+        message_utf8 = self.json_helper.dict_vers_json(document_commande, encoding)
         with self.lock_transmettre_message:
             channel.basic_publish(
                 exchange=self.configuration.exchange_noeuds,
