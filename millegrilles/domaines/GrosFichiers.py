@@ -341,8 +341,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         :return: True si c'est la version la plus recent, false si la transaction est plus vieille.
         """
         domaine = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE)
-        if domaine != ConstantesGrosFichiers.TRANSACTION_TYPE_METADATA:
-            raise ValueError('La transaction doit etre de type metadata. Trouve: %s' % domaine)
+        if domaine not in [ConstantesGrosFichiers.TRANSACTION_TYPE_METADATA, ConstantesGrosFichiers.TRANSACTION_TORRENT_NOUVEAU]:
+            raise ValueError('La transaction doit etre de type metadata ou nouveau torrent. Trouve: %s' % domaine)
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
@@ -798,7 +798,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
         })
-        etiquettes = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+        etiquettes = fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES)
 
         # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
         # doivent etre presentes dans le document)
@@ -1401,14 +1401,30 @@ class ProcessusTransactionSupprimerFavori(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
 
-class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiers):
+class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersMetadata):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
-        # Rien a faire...
+        transaction = self.charger_transaction()
+
+        # Appliquer quelques changements pour pouvoir reutiliser maj_fichier
+        transaction_copie = transaction.copy()
+        transaction_copie['nom'] = '%s.torrent' % transaction_copie['nom']
+        transaction_copie[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES] = ['torrent']
+        transaction_copie['fuuid'] = transaction['uuid']
+        transaction_copie['mimetype'] = 'application/x-bittorrent'
+
+        # Hack - testing
+        transaction_copie['taille'] = 1234
+
+        # Conserver l'information du fichier torrent (comme nouveau fichier)
+        resultat = self._controleur.gestionnaire.maj_fichier(transaction_copie)
+
         self.set_etape_suivante()
+
+        return resultat
 
 
 class ProcessusTransactionTorrentSeeding(ProcessusGrosFichiers):

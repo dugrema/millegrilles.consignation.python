@@ -107,21 +107,20 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def transmettre_seeder_torrent(self):
-        hashlist = ['43ca6267d3f2bfa83cff025678bba17bf6abd4bd']
-
         commande = {
-            'hashlist': hashlist,
+            'uuid': 'f445941e-16cf-11ea-9318-00155d011f09',
         }
 
         enveloppe_val = self.generateur.transmettre_commande(
-            commande, 'commande.torrent.supprimer')
+            commande, 'commande.torrent.seederTorrent')
 
-        print("Envoi commande torrent: %s" % enveloppe_val)
+        print("Envoi commande seeder torrent: %s" % enveloppe_val)
         return enveloppe_val
 
     def executer(self):
         # enveloppe = sample.transmettre_commande_nouveau_torrent()
         enveloppe = sample.transmettre_supprimer_torrent()
+        # enveloppe = sample.transmettre_seeder_torrent()
         # sample.transmettre_demande_etat_torrent()
 
 # --- MAIN ---
