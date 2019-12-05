@@ -316,6 +316,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
              1),
         ])
 
+        # Index pour la recherche temps reel
+        collection_domaine.create_index([
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES, 1),
+        ])
+
         # Index par SHA256 / taille. Permet de determiner si le fichier existe deja (et juste faire un lien).
         collection_domaine.create_index([
             ('%s.%s' %
