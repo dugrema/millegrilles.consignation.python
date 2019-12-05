@@ -262,7 +262,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
         # Optimistic locking - force une correspondance sur l'etape qui vient d'etre traitee
         # Permet d'identifier des situations ou plusieurs messages sont envoyes pour un meme processus
-        self.__logger.error("Dict etape:\n%s" % json.dumps(dict_etape, indent=4))
+        self.__logger.debug("Dict etape:\n%s" % json.dumps(dict_etape, indent=4))
         id_document[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE] = dict_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE)
 
         doc_etape = dict_etape.copy()
@@ -328,7 +328,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         resultat = collection_processus.update_one(id_document, operation)
 
         if resultat.modified_count != 1:
-            raise ErreurMAJProcessus("Erreur MAJ processus: %s" % str(resultat))
+            raise ErreurOptimisticLocking("MAJ processus - Echec optimistic locking: %s" % str(resultat))
 
     def message_etape_suivante(self, id_document_processus, nom_processus, nom_etape, tokens=None):
         self._contexte.message_dao.transmettre_evenement_mgpprocessus(
@@ -856,6 +856,9 @@ class MGProcessus:
                     {'processus': id_document_processus, 'tokens': info_tokens_resume.get('tokens')}
                 )
 
+        except ErreurOptimisticLocking:
+            self._logger.info("Echec optimistic locking, on abandonne le travail pour cette thread")
+
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
             self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur, processus=self)
@@ -1232,4 +1235,8 @@ class ErreurMAJProcessus(Exception):
 
 
 class ErreurProcessusComplet(Exception):
+    pass
+
+
+class ErreurOptimisticLocking(Exception):
     pass
