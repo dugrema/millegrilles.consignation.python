@@ -16,12 +16,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from base64 import b64encode
 
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser(init_document=False)
 
 class MessagesSample(BaseCallback):
 
     def __init__(self):
-        super().__init__(ContexteRessourcesMilleGrilles())
-        self.contexte.initialiser(init_document=False)
+        super().__init__(contexte)
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
         self.channel = None
@@ -29,7 +30,7 @@ class MessagesSample(BaseCallback):
         # self.thread_ioloop = Thread(target=self.run_ioloop)
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
-        with open('/opt/millegrilles/dev2/pki/certs/dev2_maitredescles.cert.pem', 'rb') as certificat_pem:
+        with open('/home/mathieu/mgdev/certs/pki.maitredescles.cert', 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
             cert = x509.load_pem_x509_certificate(
                 certificat_courant_pem,
@@ -157,12 +158,29 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_declasser_grosfichier(self):
+
+        transaction = {
+            'fuuid': '0fb79c10-17a7-11ea-a230-753132c4535d'
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction,
+            ConstantesMaitreDesCles.TRANSACTION_DECLASSER_CLE_GROSFICHIER,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
 
     def executer(self):
         # enveloppe = self.requete_cert_maitredescles()
         # enveloppe = self.nouvelle_cle_grosfichiers()
-        enveloppe = self.nouvelle_cle_document()
+        # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.requete_decryptage_cle_fuuid()
+        enveloppe = self.transaction_declasser_grosfichier()
+
 
 # --- MAIN ---
 sample = MessagesSample()

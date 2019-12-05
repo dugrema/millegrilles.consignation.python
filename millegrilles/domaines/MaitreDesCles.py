@@ -42,6 +42,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
     TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
     TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
+    TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
 
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
@@ -254,6 +255,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_SIGNER_CERTIFICAT_NOEUD:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCertificatNoeud"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_DECLASSER_CLE_GROSFICHIER:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusDeclasserCleGrosFichier"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -304,6 +307,35 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         )
         fingerprint = self.get_fingerprint_cert(cert)
         return cle_secrete_backup, fingerprint
+
+    def decrypter_grosfichier(self, fuuid):
+        """
+        Verifie si la requete de cle est valide, puis transmet une reponse en clair.
+        Le fichier est maintenant declasse, non protege.
+        :param evenement:
+        :param properties:
+        :return:
+        """
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                'fuuid': fuuid,
+            }
+        }
+        document = collection_documents.find_one(filtre)
+        # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+        if document is not None:
+            self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
+            cle_secrete = self.decrypter_cle(document['cles'])
+            reponse = {
+                'cle_secrete_decryptee': b64encode(cle_secrete).decode('utf-8'),
+                'iv': document['iv'],
+                Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+            }
+
+        return reponse
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
@@ -490,7 +522,6 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         self._gestionnaire.generateur_transactions.transmettre_reponse(
             dict_resultats, properties.reply_to, properties.correlation_id
         )
-
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -904,6 +935,34 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
         :return:
         """
         # Repondre au demandeur avec le refus
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+        self._logger.warning("Declasser grosfichier, transmettre cle secrete decryptee pour %s" % transaction['fuuid'])
+
+        # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
+        # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
+        # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
+        enveloppe_certificat = self.controleur.verificateur_transaction.verifier(transaction)
+        # Aucune exception lancee, la signature de transaction est valide et provient d'un certificat autorise et connu
+
+        acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+        self._logger.debug(
+            "Verification signature requete cle grosfichier. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+
+        fuuid = transaction['fuuid']
+
+        if acces_permis:
+            cle_decryptee = self.controleur.gestionnaire.decrypter_grosfichier(fuuid)
+
+            self.controleur.generateur_transactions.soumettre_transaction(
+                cle_decryptee, ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER
+            )
 
         self.set_etape_suivante()  # Termine
 

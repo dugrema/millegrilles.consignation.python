@@ -78,6 +78,9 @@ class ConstantesGrosFichiers:
     TRANSACTION_CHANGER_ETIQUETTES_FICHIER = '%s.changerEtiquettesFichier' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
     TRANSACTION_RECUPERER_FICHIER = '%s.recupererFichier' % DOMAINE_NOM
+    TRANSACTION_DECRYPTER_FICHIER = '%s.decrypterFichier' % DOMAINE_NOM
+    TRANSACTION_CLESECRETE_FICHIER = '%s.cleSecreteFichier' % DOMAINE_NOM
+    TRANSACTION_NOUVEAU_FICHIER_DECRYPTE = '%s.nouveauFichierDecrypte' % DOMAINE_NOM
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
