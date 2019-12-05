@@ -922,10 +922,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         :return:
         """
 
-    def associer_seeding_torrent(self, collection_figee: str, hashstring: str):
+    def associer_hashstring_torrent(self, collection_figee: str, hashstring: str):
         self._logger.debug("associer_seeding_torrent %s, hashstring %s" % (collection_figee, hashstring))
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
+        # Ajouter hashstring a la collection figee
         ops = {
             '$set': {
                 ConstantesGrosFichiers.DOCUMENT_TORRENT_HASHSTRING: hashstring
@@ -936,10 +937,27 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: collection_figee
         }
-        resultat = collection_domaine.update_one(filtre, ops)
-        self._logger.debug("Supprimer favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
+        collection_figee = collection_domaine.find_one_and_update(filtre, ops)
+        self._logger.debug("associer_seeding_torrent : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
 
-        return resultat
+        # Ajouter hashstring a la liste des collections figees de la collection originale
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE]
+        }
+        collection_active = collection_domaine.find_one(filtre)
+        liste_collections_figees = collection_active[ConstantesGrosFichiers.DOCUMENT_COLLECTIONS_FIGEES]
+        for sommaire_fige in liste_collections_figees:
+            if sommaire_fige['uuid'] == collection_figee['uuid']:
+                sommaire_fige[ConstantesGrosFichiers.DOCUMENT_TORRENT_HASHSTRING] = hashstring
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_COLLECTIONS_FIGEES: liste_collections_figees
+            }
+        }
+        collection_domaine.update_one(filtre, ops)
+
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -1436,5 +1454,8 @@ class ProcessusTransactionTorrentSeeding(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         uuid_collection_figee = transaction['uuid-collection']
         hashstring = transaction['hashstring-torrent']
-        self._controleur._gestionnaire_domaine.associer_seeding_torrent(uuid_collection_figee, hashstring)
+        self._controleur._gestionnaire_domaine.associer_hashstring_torrent(uuid_collection_figee, hashstring)
         self.set_etape_suivante()
+
+        return {'uuid_collection_figee': uuid_collection_figee, 'hashstring': hashstring}
+
