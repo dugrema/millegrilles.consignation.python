@@ -191,7 +191,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Creation liste de recherche speciale pour l'activite des fichiers
         liste_recherche = ConstantesGrosFichiers.DOCUMENT_RAPPORT_RECHERCHE.copy()
         liste_recherche[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
-        liste_recherche['description'] = "Activite recente"
+        liste_recherche['description'] = "Activité récente"
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE, liste_recherche)
 
         self.demarrer_watcher_collection(
