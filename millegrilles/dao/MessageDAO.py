@@ -891,7 +891,7 @@ class ConnexionWrapper:
         self.__connexionmq.channel(on_open_callback=listener.on_channel_open)
 
     def __confirm_delivery(self, frame):
-        self._logger.info("Delivery: %s" % str(frame))
+        self._logger.debug("Delivery: %s" % str(frame))
         if isinstance(frame.method, pika.spec.Basic.Nack):
             self._logger.error("Delivery NACK")
             self.enter_error_state()
