@@ -107,7 +107,7 @@ class ConstantesGrosFichiers:
         DOCUMENT_SECURITE: Constantes.SECURITE_SECURE,      # Niveau de securite
         DOCUMENT_COMMENTAIRES: None,                        # Commentaires
         DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
-        DOCUMENT_FICHIER_ETIQUETTES: None,                    # Liste de libelles du fichier
+        DOCUMENT_FICHIER_ETIQUETTES: list(),                # Liste de libelles du fichier
         DOCUMENT_FICHIER_SUPPRIME: False,                   # True si le fichier est supprime
     }
 
@@ -125,8 +125,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTION = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_COLLECTION,
         DOCUMENT_FICHIER_UUID_DOC: None,        # Identificateur unique du fichier (UUID trans initiale)
-        DOCUMENT_COLLECTION_LISTEDOCS: dict(),   # Dictionnaire de fichiers, key=uuid, value=DOCUMENT_COLLECTION_FICHIER
-        DOCUMENT_FICHIER_ETIQUETTES: dict(),    # Etiquettes de la collection
+        DOCUMENT_COLLECTION_LISTEDOCS: dict(),  # Dictionnaire de fichiers, key=uuid, value=DOCUMENT_COLLECTION_FICHIER
+        DOCUMENT_FICHIER_ETIQUETTES: list(),    # Etiquettes de la collection
         DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
         DOCUMENT_COMMENTAIRES: None,
         DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
@@ -468,7 +468,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         })
         self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
 
-    def maj_etiquettes_fichier(self, uuid_fichier, etiquettes: list):
+    def maj_etiquettes(self, uuid_fichier, type_document, etiquettes: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         # Mettre les etiquettes en lowercase, dedupliquer et trier par ordre naturel
@@ -480,7 +480,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
+            Constantes.DOCUMENT_INFODOC_LIBELLE: type_document
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation
@@ -687,31 +687,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'uuid_collection_figee': uuid_collection_figee,
             'etiquettes': collection_figee[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
         }
-
-    def changer_libelles_collection(self, uuid_collection: str, libelles: list):
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
-        nouveaux_libelles = dict()
-        for libelle in libelles:
-            nouveaux_libelles[libelle] = True
-
-        ops = {
-            '$set': {
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES: nouveaux_libelles
-            },
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
-        }
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-        }
-
-        # Inserer la nouvelle collection
-        resultat = collection_domaine.update_one(filtre, ops)
-        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
     def ajouter_documents_collection(self, uuid_collection: str, uuid_documents: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1175,7 +1150,7 @@ class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite
         etiquettes = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
         self._logger.error("Etiquettes: %s" % etiquettes)
 
-        self._controleur._gestionnaire_domaine.maj_etiquettes_fichier(uuid_fichier, etiquettes)
+        self._controleur._gestionnaire_domaine.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
 
         self.set_etape_suivante()  # Termine
 
@@ -1297,7 +1272,7 @@ class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersActivite):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersActivite):
+class ProcessusTransactionChangerEtiquettesCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1307,7 +1282,7 @@ class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersActivit
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         libelles = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
 
-        self._controleur._gestionnaire_domaine.changer_libelles_collection(uuid_collection, libelles)
+        self._controleur._gestionnaire_domaine.maj_etiquettes(uuid_collection, ConstantesGrosFichiers.LIBVAL_COLLECTION, libelles)
 
         self.set_etape_suivante()  # Termine
 

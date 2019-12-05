@@ -207,13 +207,13 @@ class MessagesSample(BaseCallback):
         print("transaction_figer_collection: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_changer_libelle_collection(self):
+    def transaction_changer_etiquettes_collection(self):
         transaction = {
-            "uuid": "3a72810c-0bf6-11ea-bb74-00155d011f09",
-            "libelles": ['abcd', '1234']
+            "uuid": "a80c39cc-16ca-11ea-9318-00155d011f09",
+            "etiquettes": ['abcd', '1234']
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.changerLibellesCollection',
+            transaction, 'millegrilles.domaines.GrosFichiers.changerEtiquettesCollection',
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -279,7 +279,7 @@ class MessagesSample(BaseCallback):
         # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
-        enveloppe8 = sample.transaction_changer_etiquettes_fichier()
+        # enveloppe8 = sample.transaction_changer_etiquettes_fichier()
         # enveloppe = sample.transaction_supprimer_fichier()
         # enveloppe = sample.transaction_recuperer_fichier()
 
@@ -288,7 +288,7 @@ class MessagesSample(BaseCallback):
         # enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
         # enveloppe7 = sample.transaction_retirer_fichiers_collection()
-        # enveloppe5 = sample.transaction_changer_libelle_collection()
+        # enveloppe = sample.transaction_changer_etiquettes_collection()
         # enveloppe5 = sample.transaction_figer_collection()
         # enveloppe5 = sample.transaction_supprimer_collection()
         # enveloppe5 = sample.transaction_recuperer_collection()
