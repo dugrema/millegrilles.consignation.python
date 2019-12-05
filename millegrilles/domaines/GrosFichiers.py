@@ -857,7 +857,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         filtre_docs = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {
-                '$in': [ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION]
+                '$in': [ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION, ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE]
             },
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: doc_uuid,
         }
