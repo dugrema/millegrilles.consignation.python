@@ -786,7 +786,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('supprimer fichiers resultat: %s' % str(resultat))
 
-    def maj_fichier_rapports_et_collections(self, uuid_fichier: str):
+    def maj_fichier_rapports_et_collections(self, uuid_fichier: str, type_operation: str):
         """
         Met a jour les listes et collections qui correspondent au fichier.
         :param uuid_fichier:
@@ -802,7 +802,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
         # doivent etre presentes dans le document)
-        self.__ajouter_activite(fichier, 'Nouveau fichier')
+        self.__ajouter_activite(fichier, type_operation)
 
     def maj_collections_rapports_et_collections(self, uuid_collection: str):
         """
@@ -969,11 +969,11 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
 
 
-class ProcessusGrosFichiersMetadata(ProcessusGrosFichiers):
+class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
 
     def set_etape_suivante(self, etape_suivante=None, token_attente: list = None):
         if etape_suivante is None:
-            etape_suivante = ProcessusGrosFichiersMetadata.mettre_a_jour_listes_et_collections.__name__
+            etape_suivante = ProcessusGrosFichiersActivite.mettre_a_jour_listes_et_collections.__name__
         super().set_etape_suivante(etape_suivante, token_attente)
 
     def mettre_a_jour_listes_et_collections(self):
@@ -981,20 +981,24 @@ class ProcessusGrosFichiersMetadata(ProcessusGrosFichiers):
         Met a jour les liens dans les listes et collections correspondantes
         :return:
         """
+
         # Le processus a deja extrait les uuid vers les parametres (return ...)
         uuid_fichier = self.parametres.get('uuid_fichier')
         uuid_collection = self.parametres.get('uuid_collection')
+        type_operation = self.parametres.get('type_operation')
+        if type_operation is None:
+            type_operation = self.__class__.__name__
 
         if uuid_fichier is not None:
-            self._controleur.gestionnaire.maj_fichier_rapports_et_collections(uuid_fichier)
+            self._controleur.gestionnaire.maj_fichier_rapports_et_collections(uuid_fichier, type_operation)
 
         if uuid_collection is not None:
-            self._controleur.gestionnaire.maj_collections_rapports_et_collections(uuid_collection)
+            self._controleur.gestionnaire.maj_collections_rapports_et_collections(uuid_collection, type_operation)
 
         self.set_etape_suivante('finale')  # Executer etape finale
 
 
-class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite):
     """
     Processus de d'ajout de nouveau fichier ou nouvelle version d'un fichier
     C'est le processus principal qui depend de deux sous-processus:
@@ -1017,7 +1021,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersMetadata)
         fuuid = transaction['fuuid']
         document_uuid = transaction.get('documentuuid')  # Represente la collection, si present
 
-        return {'fuuid': fuuid, 'securite': transaction['securite'], 'collection_uuid': document_uuid}
+        return {'fuuid': fuuid, 'securite': transaction['securite'], 'collection_uuid': document_uuid, 'type_operation': 'Nouveau fichier'}
 
     def ajouter_version_fichier(self):
         # Ajouter version au fichier
@@ -1035,12 +1039,12 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersMetadata)
             self._get_tokens_attente())
 
     def confirmer_hash(self):
-        if self.parametres.get('attente_token') is not None:
-            # Il manque des tokens, on boucle.
-            self._logger.debug('attendre_transaction_transfertcomplete(): Il reste des tokens actifs, on boucle')
-            self.set_etape_suivante(
-                ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__)
-            return
+        # if self.parametres.get('attente_token') is not None:
+        #     # Il manque des tokens, on boucle.
+        #     self._logger.debug('attendre_transaction_transfertcomplete(): Il reste des tokens actifs, on boucle')
+        #     self.set_etape_suivante(
+        #         ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__)
+        #     return
 
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
 
@@ -1115,7 +1119,7 @@ class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
         return {'fuuid': fuuid}
 
 
-class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1137,7 +1141,7 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersMetadata)
         return resultat
 
 
-class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1153,7 +1157,7 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersMetadata):
         return {'uuid_fichier': uuid_fichier}
 
 
-class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1171,7 +1175,7 @@ class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersMetadata
         return {'uuid_fichier': uuid_fichier}
 
 
-class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1186,7 +1190,7 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersMetadata):
         return {'uuid_fichier': uuid_fichier}
 
 
-class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1201,7 +1205,7 @@ class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersMetadata):
         return {'uuid_fichier': uuid_fichier}
 
 
-class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1220,7 +1224,7 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersMetadata):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1237,7 +1241,7 @@ class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersMetadata):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionCommenterCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionCommenterCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1254,7 +1258,7 @@ class ProcessusTransactionCommenterCollection(ProcessusGrosFichiersMetadata):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionSupprimerCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionSupprimerCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1270,7 +1274,7 @@ class ProcessusTransactionSupprimerCollection(ProcessusGrosFichiersMetadata):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1286,7 +1290,7 @@ class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersMetadata):
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1303,7 +1307,7 @@ class ProcessusTransactionChangerLibellesCollection(ProcessusGrosFichiersMetadat
         return {'uuid_collection': uuid_collection}
 
 
-class ProcessusTransactionFigerCollection(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -1419,7 +1423,7 @@ class ProcessusTransactionSupprimerFavori(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
 
-class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersMetadata):
+class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)

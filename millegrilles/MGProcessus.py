@@ -3,6 +3,7 @@ import logging
 import datetime
 
 from bson.objectid import ObjectId
+import json
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
@@ -258,6 +259,11 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             id_document = {Constantes.MONGO_DOC_ID: id_document_processus}
         else:
             id_document = {Constantes.MONGO_DOC_ID: ObjectId(id_document_processus)}
+
+        # Optimistic locking - force une correspondance sur l'etape qui vient d'etre traitee
+        # Permet d'identifier des situations ou plusieurs messages sont envoyes pour un meme processus
+        self.__logger.error("Dict etape:\n%s" % json.dumps(dict_etape, indent=4))
+        id_document[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE] = dict_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE)
 
         doc_etape = dict_etape.copy()
         doc_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_DATEEXECUTION] = datetime.datetime.utcnow()
