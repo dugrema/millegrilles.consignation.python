@@ -804,7 +804,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # doivent etre presentes dans le document)
         self.__ajouter_activite(fichier, type_operation)
 
-    def maj_collections_rapports_et_collections(self, uuid_collection: str):
+    def maj_collections_rapports_et_collections(self, uuid_collection: str, type_operation: str = None):
         """
         Met a jour les listes et collections qui correspondent au fichier.
         :param uuid_fichier:
@@ -820,7 +820,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
         # doivent etre presentes dans le document)
-        self.__ajouter_activite(collection, 'Nouvelle collection')
+        self.__ajouter_activite(collection, type_operation)
 
     def __ajouter_activite(self, activite, type_activite):
         wrapper_activite = {
