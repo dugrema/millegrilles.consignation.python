@@ -75,7 +75,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM
     TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
     TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
-    TRANSACTION_CHANGER_LIBELLES_FICHIER = '%s.changerLibellesFichier' % DOMAINE_NOM
+    TRANSACTION_CHANGER_ETIQUETTES_FICHIER = '%s.changerEtiquettesFichier' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
     TRANSACTION_RECUPERER_FICHIER = '%s.recupererFichier' % DOMAINE_NOM
 
@@ -85,7 +85,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_SUPPRIMER_COLLECTION = '%s.supprimerCollection' % DOMAINE_NOM
     TRANSACTION_RECUPERER_COLLECTION = '%s.recupererCollection' % DOMAINE_NOM
     TRANSACTION_FIGER_COLLECTION = '%s.figerCollection' % DOMAINE_NOM
-    TRANSACTION_CHANGER_LIBELLES_COLLECTION = '%s.changerLibellesCollection' % DOMAINE_NOM
+    TRANSACTION_CHANGER_ETIQUETTES_COLLECTION = '%s.changerEtiquettesCollection' % DOMAINE_NOM
     TRANSACTION_CREERTORRENT_COLLECTION = '%s.creerTorrentCollection' % DOMAINE_NOM
     TRANSACTION_AJOUTER_FICHIERS_COLLECTION = '%s.ajouterFichiersCollection' % DOMAINE_NOM
     TRANSACTION_RETIRER_FICHIERS_COLLECTION = '%s.retirerFichiersCollection' % DOMAINE_NOM
@@ -224,8 +224,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_LIBELLES_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerLibellesFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
@@ -243,8 +243,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_FIGER_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionFigerCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_LIBELLES_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerLibellesCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREERTORRENT_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerTorrentCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION:
@@ -468,11 +468,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         })
         self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
 
-    def maj_libelles_fichier(self, uuid_fichier, libelles: list):
+    def maj_etiquettes_fichier(self, uuid_fichier, etiquettes: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
+        # Mettre les etiquettes en lowercase, dedupliquer et trier par ordre naturel
+        etiquettes_triees = list(set([e.lower() for e in etiquettes]))
+        etiquettes_triees.sort()
+
         set_operation = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES: libelles
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES: etiquettes_triees
         }
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
@@ -1161,14 +1165,17 @@ class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        etiquettes = {}
-        for etiquette in transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]:
-            etiquettes[etiquette] = True
-        self._controleur._gestionnaire_domaine.maj_libelles_fichier(uuid_fichier, etiquettes)
+
+        # Eliminer doublons
+        etiquettes = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+        self._logger.error("Etiquettes: %s" % etiquettes)
+
+        self._controleur._gestionnaire_domaine.maj_etiquettes_fichier(uuid_fichier, etiquettes)
 
         self.set_etape_suivante()  # Termine
 
@@ -1363,7 +1370,7 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
             documents.append(doc)
 
         commande['trackers'] = [
-            'https://mg-dev3.maple.maceroc.com:3004'
+            'https://mg-dev3.maple.maceroc.com:3004/announce'
         ]
 
         self._logger.debug("Commande creation torrent:\n%s" % str(commande))
