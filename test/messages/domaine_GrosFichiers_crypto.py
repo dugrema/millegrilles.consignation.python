@@ -64,8 +64,19 @@ class MessagesSample(BaseCallback):
         print("Envoi commande torrent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transmettre_transaction_decrypterFichier(self):
+        commande = {
+            'fuuid': 'be7fbda0-17ba-11ea-8ac1-478d8dc0ec27',
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            commande, 'millegrilles.domaines.GrosFichiers.decrypterFichier')
+
+        print("Envoi transaction decryter fichier: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
-        enveloppe = sample.transmettre_commande_decrypter_fichier()
+        enveloppe = sample.transmettre_transaction_decrypterFichier()
+        # enveloppe = sample.transmettre_commande_decrypter_fichier()
 
 
 # --- MAIN ---

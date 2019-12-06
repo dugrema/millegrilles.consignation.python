@@ -1468,8 +1468,21 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
 
     def initiale(self):
         transaction = self.charger_transaction()
+        fuuid = transaction['fuuid']
 
-        self.set_etape_suivante()
+        # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
+
+        token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+        self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
+
+        return {'fuuid': fuuid}
+
+    def decrypter_fichier(self):
+
+        fuuid = self.parametres['fuuid']
+        token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+
+        self.set_etape_suivante('finale')
 
 
 class ProcessusTransactionCleSecretFichier(ProcessusGrosFichiers):
@@ -1481,10 +1494,18 @@ class ProcessusTransactionCleSecretFichier(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
 
         fuuid = transaction.get('fuuid')
+        cle_secrete = transaction['cle_secrete_decryptee']
+        iv = transaction['iv']
         token_resumer = 'decrypterFichier_cleSecrete:%s' % fuuid
         self.resumer_processus([token_resumer])
 
         self.set_etape_suivante()
+
+        return {
+            'fuuid': fuuid,
+            'cle_secrete_decryptee': cle_secrete,
+            'iv': iv,
+        }
 
 
 class ProcessusTransactionNouveauFichierDecrypte(ProcessusGrosFichiers):
