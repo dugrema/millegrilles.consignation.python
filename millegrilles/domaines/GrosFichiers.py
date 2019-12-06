@@ -1408,6 +1408,12 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
 
         self.set_etape_suivante(ProcessusTransactionFigerCollection.creer_fichier_torrent.__name__)
 
+        # Faire une requete pour les parametres de trackers
+        requete = {"requetes": [{"filtre": {
+            '_mg-libelle': 'publique.configuration'
+        }}]}
+        self.set_requete('millegrilles.domaines.Parametres', requete)
+
         return info_collection
 
     def creer_fichier_torrent(self):
@@ -1445,8 +1451,17 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         for uuid_doc, doc in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
             documents.append(doc)
 
+        reponse_parametres = self.parametres['reponse'][0][0][0]
+        url_public = reponse_parametres['url_web']
+        port_public = reponse_parametres['port_https']
+        if port_public != 443:
+            url_tracker = 'https://%s:%d/announce' % (url_public, port_public)
+        else:
+            url_tracker = 'https://%s/announce' % url_public
+
         commande['trackers'] = [
-            'https://mg-dev3.maple.maceroc.com:3004/announce'
+            url_tracker,
+            # 'https://mg-dev3.maple.maceroc.com:3004/announce'
         ]
 
         self._logger.debug("Commande creation torrent:\n%s" % str(commande))

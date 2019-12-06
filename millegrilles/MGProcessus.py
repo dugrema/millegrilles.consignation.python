@@ -773,6 +773,7 @@ class MGProcessus:
         self._processus_complete = False
         self._ajouter_token_attente = None
         self._ajouter_token_resumer = None
+        self._requete = None
         self._tokens_connectes = None
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
@@ -873,11 +874,25 @@ class MGProcessus:
             if len(tokens) > 0:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKENS] = tokens
 
+            if self._requete:
+                document_etape['_requete'] = self._requete
+
             self._controleur.sauvegarder_etape_processus(
                 self.get_collection_processus_nom(), id_document_processus, document_etape, self._etape_suivante)
 
+            # Transmettre la requete inter-domaine, au besoin
+            if self._requete is not None:
+                self.generateur_transactions.transmettre_requete(
+                    self._requete['requete'],
+                    self._requete['domaine'],
+                    str(self.document_processus['_id']),
+                    '%s.processus' % self.controleur.gestionnaire.get_nom_queue()
+                )
+
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
-            if self._ajouter_token_resumer is not None:
+            if self._requete is not None:
+                pass  # Arrete traitement pour attendre reponse
+            elif self._ajouter_token_resumer is not None:
                 self._controleur.transmettre_message_resumer(
                     id_document_processus, self._ajouter_token_resumer)
             elif not self._processus_complete and self._ajouter_token_attente is None:
@@ -988,6 +1003,12 @@ class MGProcessus:
         self._etape_complete = True
         self._etape_suivante = etape_suivante
         self._ajouter_token_attente = token_attente
+
+    def set_requete(self, domaine, requete):
+        self._requete = {
+            'domaine': domaine,
+            'requete': requete,
+        }
 
     def resumer_processus(self, tokens: list):
         """
