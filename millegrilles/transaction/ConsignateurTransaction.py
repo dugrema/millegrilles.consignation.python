@@ -244,7 +244,8 @@ class EvenementTransactionCallback(BaseCallback):
         if evenement in [
             Constantes.EVENEMENT_TRANSACTION_TRAITEE,
             Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT,
-            Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE
+            Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE,
+            Constantes.EVENEMENT_TRANSACTION_ERREUR_RESOUMISSION,
         ]:
             transaction_complete = True
 
@@ -382,6 +383,12 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         nom_millegrille = self.configuration.nom_millegrille
 
+        label_date_resoumise = '%s.%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            nom_millegrille,
+            Constantes.EVENEMENT_TRANSACTION_DATE_RESOUMISE
+        )
+
         verificateur_transaction = self.contexte.verificateur_transaction
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
@@ -392,27 +399,71 @@ class EntretienCollectionsDomaines(BaseCallback):
             curseur_transactions = collection_transaction.find(filtre).limit(2000)
             for doc_transaction in curseur_transactions:
                 try:
+                    transaction_id = doc_transaction['_id']
                     entete = doc_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
                     uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                    evenements_transaction = doc_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT)
+
                     self.__logger.info("Resoumission transaction non terminee: %s" % uuid_transaction)
                     try:
                         verificateur_transaction.verifier(doc_transaction)
-                        # Signature valide, on trigger le traitement de persistance
-                        label_signature = '%s.%s.%s' % (
-                            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                            nom_millegrille,
-                            Constantes.EVENEMENT_SIGNATURE_VERIFIEE
-                        )
-                        collection_transaction.update_one(
-                            {'_id': doc_transaction['_id']},
-                            {'$set': {label_signature: date_courante}}
-                        )
 
-                        domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+                        compteur_resoumission = 0
+                        if evenements_transaction is not None:
+                            evenements_millegrille = evenements_transaction.get(nom_millegrille)
+                            if evenements_millegrille is not None:
+                                resoumissions = evenements_millegrille.get(Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE)
+                                if resoumissions is not None:
+                                    compteur_resoumission = resoumissions
 
-                        # Copier properties utiles
-                        self.contexte.message_dao.transmettre_evenement_persistance(
-                            str(doc_transaction['_id']), uuid_transaction, domaine, {})
+                        if compteur_resoumission < 3:
+                            compteur_resoumission = compteur_resoumission + 1
+
+                            # Signature valide, on trigger le traitement de persistance
+                            label_signature = '%s.%s.%s' % (
+                                Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                                nom_millegrille,
+                                Constantes.EVENEMENT_SIGNATURE_VERIFIEE
+                            )
+                            label_compte_resoumise = '%s.%s.%s' % (
+                                Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                                nom_millegrille,
+                                Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE
+                            )
+                            collection_transaction.update_one(
+                                {'_id': transaction_id},
+                                {'$set': {
+                                    label_signature: date_courante,
+                                    label_compte_resoumise: compteur_resoumission,
+                                    label_date_resoumise: datetime.datetime.utcnow(),
+                                }}
+                            )
+
+                            domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+
+                            # Copier properties utiles
+                            self.contexte.message_dao.transmettre_evenement_persistance(
+                                str(transaction_id), uuid_transaction, domaine, {})
+                        else:
+                            # La transaction a ete re-soumise trop de fois, on la met en erreur
+                            self.__logger.error("Marquer transaction comme resoumise trop de fois %s" % str(transaction_id))
+                            libelle_transaction_traitee = '%s.%s.%s' % (
+                                Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                                self.contexte.configuration.nom_millegrille,
+                                Constantes.EVENEMENT_TRANSACTION_ERREUR_RESOUMISSION
+                            )
+                            libelle_transaction_complete = '%s.%s' % (
+                                Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                                Constantes.EVENEMENT_TRANSACTION_COMPLETE
+                            )
+                            selection = {Constantes.MONGO_DOC_ID: transaction_id}
+                            operation = {
+                                '$set': {
+                                    libelle_transaction_traitee: datetime.datetime.now(tz=datetime.timezone.utc),
+                                    libelle_transaction_complete: True,
+                                }
+                            }
+                            collection_transaction.update_one(selection, operation)
 
                     except ValueError:
                         fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
