@@ -234,6 +234,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
 
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecretFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
+
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_COLLECTION:
@@ -1453,3 +1460,47 @@ class ProcessusTransactionTorrentSeeding(ProcessusGrosFichiers):
 
         return {'uuid_collection_figee': uuid_collection_figee, 'hashstring': hashstring}
 
+
+class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionCleSecretFichier(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        fuuid = transaction.get('fuuid')
+        token_resumer = 'decrypterFichier_cleSecrete:%s' % fuuid
+        self.resumer_processus([token_resumer])
+
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionNouveauFichierDecrypte(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        fuuid_crypte = transaction.get('fuuid_crypte')
+        fuuid_decrypte = transaction.get('fuuid_decrypte')
+
+        token_resumer = 'decrypterFichier_nouveauFichier:%s' % fuuid_crypte
+        self.resumer_processus([token_resumer])
+
+        self.set_etape_suivante()
+
+        return {'fuuid_crypte': fuuid_decrypte, 'fuuid_decrypte': fuuid_decrypte}
