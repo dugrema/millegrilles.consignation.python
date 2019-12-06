@@ -960,8 +960,11 @@ class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
         if acces_permis:
             cle_decryptee = self.controleur.gestionnaire.decrypter_grosfichier(fuuid)
 
+            transaction = cle_decryptee.copy()
+            transaction['fuuid'] = fuuid
+
             self.controleur.generateur_transactions.soumettre_transaction(
-                cle_decryptee, ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER
+                transaction, ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER
             )
 
         self.set_etape_suivante()  # Termine
