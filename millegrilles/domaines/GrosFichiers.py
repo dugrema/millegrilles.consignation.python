@@ -1451,6 +1451,17 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         for uuid_doc, doc in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
             documents.append(doc)
 
+        # Creer le URL pour le tracker torrent
+        commande['trackers'] = self.__url_trackers()
+
+        self._logger.debug("Commande creation torrent:\n%s" % str(commande))
+
+        self.generateur_transactions.transmettre_commande(commande, 'commande.torrent.creerNouveau')
+
+        self.set_etape_suivante()
+
+    def __url_trackers(self):
+        # Creer le URL pour le tracker torrent
         reponse_parametres = self.parametres['reponse'][0][0][0]
         url_public = reponse_parametres['url_web']
         port_public = reponse_parametres['port_https']
@@ -1459,16 +1470,7 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         else:
             url_tracker = 'https://%s/announce' % url_public
 
-        commande['trackers'] = [
-            url_tracker,
-            # 'https://mg-dev3.maple.maceroc.com:3004/announce'
-        ]
-
-        self._logger.debug("Commande creation torrent:\n%s" % str(commande))
-
-        self.generateur_transactions.transmettre_commande(commande, 'commande.torrent.creerNouveau')
-
-        self.set_etape_suivante()
+        return [url_tracker]
 
 
 class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
