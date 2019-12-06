@@ -238,7 +238,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecretFichier"
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecreteFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
 
@@ -1493,10 +1493,21 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         fuuid = self.parametres['fuuid']
         token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
 
-        self.set_etape_suivante('finale')
+        # Transmettre commande a grosfichiers
+
+        commande = {
+            'fuuid': fuuid,
+            'cleSecreteDecryptee': cle_secrete,
+            'iv': iv,
+        }
+
+        self.controleur.generateur_transactions.transmettre_commande(
+            commande, 'commande.grosfichiers.decrypterFichier')
+
+        self.set_etape_suivante('finale', [token_attente])
 
 
-class ProcessusTransactionCleSecretFichier(ProcessusGrosFichiers):
+class ProcessusTransactionCleSecreteFichier(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)

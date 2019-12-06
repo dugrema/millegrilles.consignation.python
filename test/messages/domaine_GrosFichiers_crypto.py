@@ -66,7 +66,7 @@ class MessagesSample(BaseCallback):
 
     def transmettre_transaction_decrypterFichier(self):
         commande = {
-            'fuuid': 'be7fbda0-17ba-11ea-8ac1-478d8dc0ec27',
+            'fuuid': '234e3250-17b8-11ea-b5e9-a545397863a8',
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             commande, 'millegrilles.domaines.GrosFichiers.decrypterFichier')
