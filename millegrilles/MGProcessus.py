@@ -384,10 +384,17 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             evenement_dict = self.extraire_evenement(body)
             evenement_type = evenement_dict.get('evenement')
 
-            self._q_locale.append({
+            message = {
                 'evenement_dict': evenement_dict,
                 'evenement_type': evenement_type,
-            })
+            }
+            if properties.correlation_id is not None:
+                message['correlation_id'] = properties.correlation_id
+
+                if evenement_type is None:
+                    message['evenement_type'] = 'reponse'
+
+            self._q_locale.append(message)
 
             if len(self._q_locale) > self._max_q_size or self.__connectionmq_publisher.is_closed:
                 # On va arreter la consommation de messages pour passer au travers de la liste en memoire
@@ -409,12 +416,16 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         try:
             evenement_dict = message['evenement_dict']
             evenement_type = message['evenement_type']
+            correlation_id = message.get('correlation_id')
 
             if evenement_type == Constantes.EVENEMENT_RESUMER:
                 self.traiter_resumer(evenement_dict)
 
             elif evenement_type == Constantes.EVENEMENT_VERIFIER_RESUMER:
                 self.verifier_resumer(evenement_dict)
+
+            elif evenement_type == Constantes.EVENEMENT_REPONSE:
+                self.ajouter_reponse(evenement_dict, correlation_id)
 
             else:
                 id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
@@ -512,6 +523,29 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
             self.__logger.debug("Emettre message resumer %s pour tokens %s" % (id_document_attente, str(tokens_resumer)))
             self.transmettre_message_resumer(processus_resumer_id, tokens_resumer, id_document_attente)
+
+    def ajouter_reponse(self, evenement_dict: dict, processus_id: str):
+        """
+        Reponse a une requete d'un processus
+        On ajoute le resultat de la requete dans le processus et on redemarre l'execution.
+        """
+        nom_collection_processus = self._gestionnaire_domaine.get_collection_processus_nom()
+        collection_processus = self._contexte.document_dao.get_collection(nom_collection_processus)
+
+        filtre = {
+            '_id': ObjectId(processus_id)
+        }
+        processus = collection_processus.find_one(filtre)
+
+        ops = {
+            '$push': {
+                'parametres.reponse': evenement_dict.get('resultats')
+            }
+        }
+        collection_processus.update_one(filtre, ops)
+
+        # Redemarrer le processus
+        self.transmettre_message_continuer(processus_id)
 
     '''
     Sauvegarde un nouveau document dans la collection de processus pour l'initialisation d'un processus.
