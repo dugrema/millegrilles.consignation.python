@@ -802,7 +802,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def maj_collections_rapports_et_collections(self, uuid_collection: str, type_operation: str = None):
         """
         Met a jour les listes et collections qui correspondent au fichier.
-        :param uuid_fichier:
+        :param uuid_collection:
+        :param type_operation:
         :return:
         """
 
@@ -811,7 +812,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
         })
-        etiquettes = collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
+        # etiquettes = collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
 
         # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
         # doivent etre presentes dans le document)
@@ -953,6 +954,65 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update_one(filtre, ops)
 
+    def enregistrer_fichier_decrypte(self, fuuid_crypte, fuuid_decrypte):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        label_versions_fuuid_crypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_crypte)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            label_versions_fuuid_crypte: {'$exists': True},
+        }
+        document_fichier = collection_domaine.find_one(filtre)
+
+        info_fichier_decrypte = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER],
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: datetime.datetime.utcnow(),
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: fuuid_decrypte,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
+
+            # Taille
+            # SHA256
+        }
+
+        label_versions_fuuid_decrypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_decrypte)
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                label_versions_fuuid_decrypte: info_fichier_decrypte,
+            },
+        }
+        collection_domaine.update_one(filtre, ops)
+
+        return {
+            'uuid': document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+            'info_fichier_decrypte': info_fichier_decrypte,
+        }
+
+    def maj_fichier_dans_collection(self, uuid_fichier):
+        """
+        Mettre a jour l'element _documents_ de toutes les collections avec le fichier.
+        """
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        fichier = collection_domaine.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+        })
+
+        sommaire_fichier = self.__filtrer_entree_collection(fichier)
+
+        label_versions_fuuid = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, uuid_fichier)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            label_versions_fuuid: {'$exists': True},
+        }
+        ops = {
+            '$set': {
+                label_versions_fuuid: sommaire_fichier
+            }
+        }
+        collection_domaine.update(filtre, ops)
+
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -1030,10 +1090,10 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
     def attendre_transaction_transfertcomplete(self):
         self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__,
+            ProcessusTransactionNouvelleVersionMetadata.confirmer_hash_update_collections.__name__,
             self._get_tokens_attente())
 
-    def confirmer_hash(self):
+    def confirmer_hash_update_collections(self):
         # if self.parametres.get('attente_token') is not None:
         #     # Il manque des tokens, on boucle.
         #     self._logger.debug('attendre_transaction_transfertcomplete(): Il reste des tokens actifs, on boucle')
@@ -1042,6 +1102,10 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         #     return
 
         # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
+
+        # Met a jour les collections existantes avec ce fichier
+        uuid_fichier = self.parametres['uuid_fichier']
+        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
         collection_uuid = self.parametres.get('collection_uuid')
         if collection_uuid is None:
@@ -1131,6 +1195,9 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersActivite)
             'uuid_fichier': uuid_doc
         }
 
+        # Met a jour les collections existantes avec ce fichier
+        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_doc)
+
         self.set_etape_suivante()  # Termine
 
         return resultat
@@ -1146,6 +1213,9 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
         self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, commentaire)
+
+        # Met a jour les collections existantes avec ce fichier
+        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
         self.set_etape_suivante()  # Termine
 
@@ -1473,6 +1543,11 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         fuuid = transaction['fuuid']
 
         # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
+        transaction_maitredescles = {
+            'fuuid': fuuid
+        }
+        domaine = 'millegrilles.domaines.MaitreDesCles.declasserCleGrosFichier'
+        self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
 
         token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
         self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
@@ -1491,7 +1566,7 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
 
         fuuid = self.parametres['fuuid']
-        token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+        token_attente = 'decrypterFichier_nouveauFichier:%s' % fuuid
 
         # Transmettre commande a grosfichiers
 
@@ -1540,6 +1615,11 @@ class ProcessusTransactionNouveauFichierDecrypte(ProcessusGrosFichiers):
 
         fuuid_crypte = transaction.get('fuuid_crypte')
         fuuid_decrypte = transaction.get('fuuid_decrypte')
+
+        info_fichier = self.controleur.gestionnaire.enregistrer_fichier_decrypte(fuuid_crypte, fuuid_decrypte)
+        uuid_fichier = info_fichier['uuid']
+
+        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
         token_resumer = 'decrypterFichier_nouveauFichier:%s' % fuuid_crypte
         self.resumer_processus([token_resumer])
