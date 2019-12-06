@@ -9,6 +9,7 @@ import logging
 import uuid
 import datetime
 import json
+from bson.objectid import ObjectId
 
 
 class ConstantesGrosFichiers:
@@ -1465,6 +1466,7 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
         transaction = self.charger_transaction()
@@ -1478,6 +1480,15 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         return {'fuuid': fuuid}
 
     def decrypter_fichier(self):
+        transaction_id = self.parametres['decrypterFichier_cleSecrete'].get('_id-transaction')
+        collection_transaction_nom = self.controleur.gestionnaire.get_collection_transaction_nom()
+        collection_transaction = self.controleur.document_dao.get_collection(collection_transaction_nom)
+        transaction_cle_secrete = collection_transaction.find_one({'_id': ObjectId(transaction_id)})
+
+        cle_secrete = transaction_cle_secrete['cle_secrete_decryptee']
+        iv = transaction_cle_secrete['iv']
+
+        self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
 
         fuuid = self.parametres['fuuid']
         token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid

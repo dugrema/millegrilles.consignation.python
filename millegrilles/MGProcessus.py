@@ -460,16 +460,21 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         nom_collection_processus = self._gestionnaire_domaine.get_collection_processus_nom()
         collection_processus = self._contexte.document_dao.get_collection(nom_collection_processus)
 
+        filtre_declencheur = {Constantes.MONGO_DOC_ID: ObjectId(id_declencheur)}
+        processus_declencheur = collection_processus.find_one(filtre_declencheur)
+        parametres_declencheur = processus_declencheur.get('parametres')
+
         tokens_restants = list()
         tokens_connectes = dict()
+        set_update = dict()
         for token in processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE):
             if token not in tokens:
                 tokens_restants.append(token)
             else:
                 token_dockey = '%s.%s' % (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES, token)
                 tokens_connectes[token_dockey] = id_declencheur
+                set_update['parametres.%s' % token.split(':')[0]] = parametres_declencheur
 
-        set_update = dict()
         set_update[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = tokens_restants
         set_update.update(tokens_connectes)
         collection_processus.update_one(filtre_processus, {'$set': set_update})
