@@ -108,7 +108,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
         DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
-        DOCUMENT_SECURITE: Constantes.SECURITE_SECURE,      # Niveau de securite
+        # DOCUMENT_SECURITE: Constantes.SECURITE_SECURE,      # Niveau de securite
         DOCUMENT_COMMENTAIRES: None,                        # Commentaires
         DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
         DOCUMENT_FICHIER_ETIQUETTES: list(),                # Liste de libelles du fichier
@@ -383,7 +383,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
 
-        set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+        # set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
 
         operation_currentdate = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
@@ -427,6 +427,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
             set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = \
                 transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
+            set_operations[ConstantesGrosFichiers.DOCUMENT_SECURITE] = \
+                transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
 
         operations = {
             '$set': set_operations,
@@ -438,8 +440,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
 
-        self._logger.debug("maj_fichier: filtre = %s" % filtre)
-        self._logger.debug("maj_fichier: operations = %s" % operations)
+        self._logger.error("maj_fichier: filtre = %s" % filtre)
+        self._logger.error("maj_fichier: operations = %s" % operations)
         try:
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
         except DuplicateKeyError as dke:
@@ -954,7 +956,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update_one(filtre, ops)
 
-    def enregistrer_fichier_decrypte(self, fuuid_crypte, fuuid_decrypte):
+    def enregistrer_fichier_decrypte(self, transaction):
+
+        fuuid_crypte = transaction.get('fuuid_crypte')
+        fuuid_decrypte = transaction.get('fuuid_decrypte')
+        taille = transaction.get('taille')
+        sha256_fichier = transaction.get('sha256Hash')
+
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         label_versions_fuuid_crypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_crypte)
@@ -972,9 +980,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid_decrypte,
             ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
-
-            # Taille
-            # SHA256
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE: taille,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256_fichier
         }
 
         label_versions_fuuid_decrypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_decrypte)
@@ -1624,7 +1631,7 @@ class ProcessusTransactionNouveauFichierDecrypte(ProcessusGrosFichiers):
         fuuid_crypte = transaction.get('fuuid_crypte')
         fuuid_decrypte = transaction.get('fuuid_decrypte')
 
-        info_fichier = self.controleur.gestionnaire.enregistrer_fichier_decrypte(fuuid_crypte, fuuid_decrypte)
+        info_fichier = self.controleur.gestionnaire.enregistrer_fichier_decrypte(transaction)
         uuid_fichier = info_fichier['uuid']
 
         self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
