@@ -161,7 +161,7 @@ class MessagesSample(BaseCallback):
     def transaction_declasser_grosfichier(self):
 
         transaction = {
-            'fuuid': '0fb79c10-17a7-11ea-a230-753132c4535d'
+            'fuuid': 'be7fbda0-17ba-11ea-8ac1-478d8dc0ec27'
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
