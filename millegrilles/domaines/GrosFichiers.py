@@ -964,10 +964,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         document_fichier = collection_domaine.find_one(filtre)
 
+        date_now = datetime.datetime.utcnow()
+
         info_fichier_decrypte = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER],
-            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: datetime.datetime.utcnow(),
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: fuuid_decrypte,
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: date_now,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid_decrypte,
             ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
 
@@ -979,8 +981,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         ops = {
             '$set': {
                 ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE: fuuid_decrypte,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE: date_now,
+                # Taille maj
                 label_versions_fuuid_decrypte: info_fichier_decrypte,
             },
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
         }
         collection_domaine.update_one(filtre, ops)
 
@@ -1001,9 +1009,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         sommaire_fichier = self.__filtrer_entree_collection(fichier)
 
-        label_versions_fuuid = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, uuid_fichier)
+        label_versions_fuuid = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS, uuid_fichier)
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
             label_versions_fuuid: {'$exists': True},
         }
         ops = {
