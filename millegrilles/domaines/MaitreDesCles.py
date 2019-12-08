@@ -6,7 +6,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, GenerateurCertificateParRequest
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
 from millegrilles.domaines.Pki import ConstantesPki
 
 from cryptography.hazmat.backends import default_backend
@@ -980,7 +980,6 @@ class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-        domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
 
         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
@@ -994,14 +993,12 @@ class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
             self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
             return {
                 'autorise': False,
-                'domaines': domaines,
                 'description': 'demandeur non autorise a demander la signateur de ce certificat',
                 'roles_demandeur': roles_cert
             }
 
         return {
             'autorise': True,
-            'domaines': domaines,
             'roles_demandeur': roles_cert,
         }
 
@@ -1011,12 +1008,14 @@ class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
         :return:
         """
         transaction = self.transaction
-        domaines = self.parametres['domaines']
-        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+        public_key_str = transaction['cle_publique']
+        wrapped_public_key = PemHelpers.wrap_public_key(public_key_str)
+
+        sujet = transaction['sujet']
 
         # Trouver generateur pour le role
         renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = renouvelleur.signer_noeud(csr_bytes, domaines)
+        clecert = renouvelleur.signer_navigateur(wrapped_public_key, sujet)
 
         # Generer nouvelle transaction pour sauvegarder le certificat
         transaction = {
@@ -1033,18 +1032,14 @@ class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
         )
 
-        # Creer une commande pour que le monitor genere le compte sur RabbitMQ
-        commande_creation_compte = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-        }
-        self._controleur.generateur_transactions.transmettre_commande(
-            commande_creation_compte,
-            'commande.monitor.ajouterCompteMq'
-        )
+        # Creer une reponse pour coupdoeil
+        info_cert = transaction.copy()
+        del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
 
-        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+        self.set_etape_suivante()  # Termine - va repondre automatiquement
 
         return {
+            'certificat_info': info_cert,
             'cert': clecert.cert_bytes.decode('utf-8'),
             'fullchain': clecert.chaine,
         }

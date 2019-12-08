@@ -1248,3 +1248,18 @@ class DecryptionHelper:
 
         return contenu_unpadde[16:]  # Enleve 16 premiers bytes, c'est l'IV
 
+
+class PemHelpers:
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def wrap_public_key(public_key_str: str):
+        wrapped_public_key = ''
+        while len(public_key_str) > 0:
+            wrapped_public_key = wrapped_public_key + '\n' + public_key_str[0:64]
+            public_key_str = public_key_str[64:]
+
+        wrapped_public_key = '-----BEGIN PUBLIC KEY-----' + wrapped_public_key + '\n-----END PUBLIC KEY-----'
+        return wrapped_public_key
