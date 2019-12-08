@@ -1,4 +1,8 @@
 import json
+import logging
+from cryptography import x509
+
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from millegrilles.util.X509Certificate import RenouvelleurCertificat, EnveloppeCleCert
@@ -7,6 +11,8 @@ from millegrilles.util.X509Certificate import RenouvelleurCertificat, EnveloppeC
 class EnvCert:
 
     def __init__(self):
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
         self.dict_ca = dict()
         self.cle_millegrille = EnveloppeCleCert()   # EnveloppeCleCert
         self.ca_autorite = EnveloppeCleCert()       # EnveloppeCleCert
@@ -27,7 +33,23 @@ class EnvCert:
 
         self.cle_millegrille.from_pem_bytes(mg_key, mg_cert, passwords['pki.ca.millegrille'].encode('utf-8'))
 
+        self.charger_ca_chaine()
         self.renouvelleur = RenouvelleurCertificat('testMG', self.dict_ca, self.cle_millegrille, self.ca_autorite)
+
+    def charger_ca_chaine(self):
+        self.dict_ca = dict()
+
+        ca_chain_file = '/home/mathieu/mgdev/certs/pki.ca.millegrille.fullchain'
+        with open(ca_chain_file, 'r') as fichier:
+            chaine = fichier.read()
+            certs = chaine.split('-----END CERTIFICATE-----')
+            for cert in certs[0:-1]:
+                cert = '%s-----END CERTIFICATE-----\n' % cert
+                self._logger.warning("Loading CA cert :\n%s" % cert)
+                cert = cert.encode('utf-8')
+                x509_cert = x509.load_pem_x509_certificate(cert, backend=default_backend())
+                skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
+                self.dict_ca[skid] = x509_cert
 
 
 class TestSignerCertNavigateur:
@@ -43,10 +65,18 @@ class TestSignerCertNavigateur:
         public_key = private_key.public_key()
         public_key = public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
 
-        public_key_str = str(public_key, 'utf-8')
+        public_key_str = public_key.decode('utf-8')
 
         print('Public key:\n%s' % public_key_str)
-        envcert.renouvelleur.generer_certificat_navigateur('nav_test', public_key)
+        certificat = envcert.renouvelleur.signer_cle_publique(public_key_str, 'testNavigateur')
+
+        cert_output = certificat.cert_bytes.decode('utf-8')
+
+        print("Certificat:")
+        print(cert_output)
+
+        with open('/home/mathieu/mgdev/output/generer_cert_navigateur.pem', 'wb') as f:
+            f.write(certificat.cert_bytes)
 
     def utiliser_publickey_navigateur(self):
 
@@ -55,6 +85,8 @@ class TestSignerCertNavigateur:
 
 
 # ----
+logging.basicConfig(level=logging.INFO)
+
 envcert = EnvCert()
 envcert.charger()
 

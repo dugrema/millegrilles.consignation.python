@@ -21,6 +21,7 @@ class ConstantesGenerateurCertificat:
     DUREE_CERT_ROOT = datetime.timedelta(days=3655)
     DUREE_CERT_MILLEGRILLE = datetime.timedelta(days=730)
     DUREE_CERT_NOEUD = datetime.timedelta(days=366)
+    DUREE_CERT_NAVIGATEUR = datetime.timedelta(weeks=6)
     ONE_DAY = datetime.timedelta(1, 0, 0)
 
     ROLE_MQ = 'mq'
@@ -260,6 +261,124 @@ class GenerateurCertificat:
         clecert.set_csr(request)
 
         return clecert
+
+
+class GenerateurCertificateParClePublique(GenerateurCertificat):
+
+    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
+        super().__init__(nom_millegrille)
+        self._dict_ca = dict_ca
+        self._autorite = autorite
+        self.__domaines_publics = domaines_publics
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def _get_keyusage(self, builder):
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+
+        builder = builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=True,
+                key_encipherment=True,
+                data_encipherment=True,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
+            ),
+            critical=False
+        )
+
+        return builder
+
+    def preparer_builder(self, cle_publique_pem: str, sujet: str,
+                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NAVIGATEUR) -> x509.CertificateBuilder:
+
+        builder = x509.CertificateBuilder()
+
+        name = x509.Name([
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._nom_millegrille),
+            x509.NameAttribute(NameOID.COMMON_NAME, sujet),
+        ])
+        builder = builder.subject_name(name)
+
+        builder = builder.issuer_name(self._autorite.cert.subject)
+        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
+        builder = builder.not_valid_after(datetime.datetime.today() + duree_cert)
+        builder = builder.serial_number(x509.random_serial_number())
+
+        public_key = serialization.load_pem_public_key(
+            cle_publique_pem.encode('utf8'),
+            backend=default_backend()
+        )
+
+        builder = builder.public_key(public_key)
+
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(public_key),
+            critical=False
+        )
+
+        ski = self._autorite.cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier(
+                ski.value.digest,
+                None,
+                None
+            ),
+            critical=False
+        )
+
+        # Ajouter les acces specifiques a ce type de cert
+        builder = self._get_keyusage(builder)
+
+        return builder
+
+    def signer(self, builder) -> x509.Certificate:
+
+        cle_autorite = self._autorite.private_key
+        certificate = builder.sign(
+            private_key=cle_autorite,
+            algorithm=hashes.SHA512(),
+            backend=default_backend()
+        )
+
+        return certificate
+
+    def aligner_chaine(self, certificat: x509.Certificate):
+        """
+        Genere la chaine PEM str avec le certificat et les certificats intermediares. Exclue root.
+        :param certificat:
+        :return:
+        """
+        chaine = [certificat]
+
+        akid_autorite = EnveloppeCleCert.get_authority_identifier(certificat)
+        idx = 0
+        for idx in range(0, 100):
+            cert_autorite = self._dict_ca.get(akid_autorite)
+
+            if cert_autorite is None:
+                raise Exception("Erreur, autorite introuvable")
+
+            chaine.append(cert_autorite)
+            akid_autorite_suivante = EnveloppeCleCert.get_authority_identifier(cert_autorite)
+
+            if akid_autorite == akid_autorite_suivante:
+                # On est rendu au root
+                break
+
+            akid_autorite = akid_autorite_suivante
+
+        if idx == 100:
+            raise Exception("Depasse limite profondeur")
+
+        # Generer la chaine de certificats avec les intermediaires
+        return [c.public_bytes(serialization.Encoding.PEM).decode('utf-8') for c in chaine]
 
 
 class GenerateurCertificateParRequest(GenerateurCertificat):
@@ -1062,6 +1181,18 @@ class RenouvelleurCertificat:
 
         cert_dict = generateur_instance.generer()
         return cert_dict
+
+    def signer_cle_publique(self, public_key_pem: str, sujet: str):
+        generateur = GenerateurCertificateParClePublique(self.__nom_millegrille, self.__dict_ca, self.__millegrille)
+
+        builder = generateur.preparer_builder(public_key_pem, sujet)
+        certificat = generateur.signer(builder)
+        chaine = generateur.aligner_chaine(certificat)
+
+        clecert = EnveloppeCleCert(cert=certificat)
+        clecert.chaine = chaine
+
+        return clecert
 
 
 class DecryptionHelper:
