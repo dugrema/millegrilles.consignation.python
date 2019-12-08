@@ -81,7 +81,27 @@ class TestSignerCertNavigateur:
     def utiliser_publickey_navigateur(self):
 
         # Cle generee par le crypto subtle dans le navigateur
-        cle = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqYE8pRzlFVwAgc2uB3ot6Ffd8pPpG4Sb8btFdjArvYcbuWvsRntBUgm/w6c831GpEoOrDr/EoEPRgTjJ81zxa1tkFprsmw9t8HJ0IOV9WF6p1X8gvf4FZaeLW6wTcA6LGhk1lRoN0jIr0VhNBejX4Xl7m7B1hR+pgmafG9Qm9acAZx2+opi9cYkG0lcl33R/106x8nnaF3jwjhBjFEazH5roHN9W253Y1subRXYC0Uq6SIlzN2HDPLn0oHLujAmf0NP6PrqHmDxfrnWc+KKuSJD2Dyf8w07AjJwJgpmWa9JrcqvYjR/BViI06/CqrtJpSAHpCguSQB3QbidSzbFF3wIDAQAB'
+        public_key_str = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqYE8pRzlFVwAgc2uB3ot6Ffd8pPpG4Sb8btFdjArvYcbuWvsRntBUgm/w6c831GpEoOrDr/EoEPRgTjJ81zxa1tkFprsmw9t8HJ0IOV9WF6p1X8gvf4FZaeLW6wTcA6LGhk1lRoN0jIr0VhNBejX4Xl7m7B1hR+pgmafG9Qm9acAZx2+opi9cYkG0lcl33R/106x8nnaF3jwjhBjFEazH5roHN9W253Y1subRXYC0Uq6SIlzN2HDPLn0oHLujAmf0NP6PrqHmDxfrnWc+KKuSJD2Dyf8w07AjJwJgpmWa9JrcqvYjR/BViI06/CqrtJpSAHpCguSQB3QbidSzbFF3wIDAQAB'
+
+        wrapped_public_key = ''
+        while len(public_key_str) > 0:
+            wrapped_public_key = wrapped_public_key + '\n' + public_key_str[0:64]
+            public_key_str = public_key_str[64:]
+
+        wrapped_public_key = '-----BEGIN PUBLIC KEY-----' + wrapped_public_key + '\n-----END PUBLIC KEY-----'
+
+        print('utiliser_publickey_navigateur:\n%s' % wrapped_public_key)
+        certificat = envcert.renouvelleur.signer_navigateur(wrapped_public_key, 'testNavigateur')
+
+        cert_output = certificat.cert_bytes.decode('utf-8')
+        fingerprint = certificat.fingerprint
+        date_expiration = certificat.not_valid_after
+
+        print("Certificat: fingerprint: %s, date expiration: %s" % (fingerprint, date_expiration))
+        print(cert_output)
+
+        with open('/home/mathieu/mgdev/output/utiliser_publickey_navigateur.pem', 'wb') as f:
+            f.write(certificat.cert_bytes)
 
 
 # ----
@@ -91,4 +111,5 @@ envcert = EnvCert()
 envcert.charger()
 
 test = TestSignerCertNavigateur()
-test.generer_cert_navigateur()
+# test.generer_cert_navigateur()
+test.utiliser_publickey_navigateur()
