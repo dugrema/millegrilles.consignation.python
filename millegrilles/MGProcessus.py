@@ -262,7 +262,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
         # Optimistic locking - force une correspondance sur l'etape qui vient d'etre traitee
         # Permet d'identifier des situations ou plusieurs messages sont envoyes pour un meme processus
-        self.__logger.debug("Dict etape:\n%s" % json.dumps(dict_etape, indent=4))
+        # self.__logger.debug("Dict etape:\n%s" % json.dumps(dict_etape, indent=4))  # Peut faire planter a cause du ObjectId
         id_document[Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE] = dict_etape.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_NOMETAPE)
 
         doc_etape = dict_etape.copy()
