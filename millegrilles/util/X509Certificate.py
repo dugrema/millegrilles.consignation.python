@@ -1089,6 +1089,24 @@ class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
         return builder
 
 
+class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
+
+    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(nom_millegrille, dict_ca, autorite)
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = 'coupdoeil.navigateur'.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class RenouvelleurCertificat:
 
     def __init__(self, nom_millegrille, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
@@ -1182,8 +1200,8 @@ class RenouvelleurCertificat:
         cert_dict = generateur_instance.generer()
         return cert_dict
 
-    def signer_cle_publique(self, public_key_pem: str, sujet: str):
-        generateur = GenerateurCertificateParClePublique(self.__nom_millegrille, self.__dict_ca, self.__millegrille)
+    def signer_navigateur(self, public_key_pem: str, sujet: str):
+        generateur = GenerateurCertificateNavigateur(self.__nom_millegrille, self.__dict_ca, self.__millegrille)
 
         builder = generateur.preparer_builder(public_key_pem, sujet)
         certificat = generateur.signer(builder)

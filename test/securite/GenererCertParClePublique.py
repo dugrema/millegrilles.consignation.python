@@ -68,7 +68,7 @@ class TestSignerCertNavigateur:
         public_key_str = public_key.decode('utf-8')
 
         print('Public key:\n%s' % public_key_str)
-        certificat = envcert.renouvelleur.signer_cle_publique(public_key_str, 'testNavigateur')
+        certificat = envcert.renouvelleur.signer_navigateur(public_key_str, 'testNavigateur')
 
         cert_output = certificat.cert_bytes.decode('utf-8')
 
