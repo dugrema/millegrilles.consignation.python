@@ -42,6 +42,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
     TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
     TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
+    TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR = '%s.genererCertificatNavigateur' % DOMAINE_NOM
     TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
 
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
@@ -255,6 +256,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_SIGNER_CERTIFICAT_NOEUD:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCertificatNoeud"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatNavigateur"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_DECLASSER_CLE_GROSFICHIER:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusDeclasserCleGrosFichier"
         else:
@@ -966,6 +969,92 @@ class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
             self.controleur.generateur_transactions.soumettre_transaction(
                 transaction, ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER
             )
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
+    """
+    Generer un certificat pour un navigateur a partir d'une cle publique.
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
+
+        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+        roles_cert = enveloppe_cert.get_roles
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.nom_millegrille and \
+                'coupdoeil' in roles_cert:
+            # Le coupdoeil peut demander un certificat de navigateur
+            self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
+        else:
+            self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
+            return {
+                'autorise': False,
+                'domaines': domaines,
+                'description': 'demandeur non autorise a demander la signateur de ce certificat',
+                'roles_demandeur': roles_cert
+            }
+
+        return {
+            'autorise': True,
+            'domaines': domaines,
+            'roles_demandeur': roles_cert,
+        }
+
+    def generer_cert(self):
+        """
+        Generer cert et creer nouvelle transaction pour PKI
+        :return:
+        """
+        transaction = self.transaction
+        domaines = self.parametres['domaines']
+        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+
+        # Trouver generateur pour le role
+        renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
+        clecert = renouvelleur.signer_noeud(csr_bytes, domaines)
+
+        # Generer nouvelle transaction pour sauvegarder le certificat
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+        self._controleur.generateur_transactions.soumettre_transaction(
+            transaction,
+            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
+
+        # Creer une commande pour que le monitor genere le compte sur RabbitMQ
+        commande_creation_compte = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+        }
+        self._controleur.generateur_transactions.transmettre_commande(
+            commande_creation_compte,
+            'commande.monitor.ajouterCompteMq'
+        )
+
+        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+
+        return {
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
+
+    def refuser_generation(self):
+        """
+        Refuser la creation d'un nouveau certificat.
+        :return:
+        """
+        # Repondre au demandeur avec le refus
 
         self.set_etape_suivante()  # Termine
 
