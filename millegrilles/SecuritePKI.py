@@ -104,11 +104,11 @@ class EnveloppeCertificat:
         public_key = self.certificat.public_key().public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
         public_key_str = str(public_key, 'utf-8')
 
-        # Enlever strings autour de la cle
-        public_key_str = public_key_str \
-            .replace('-----BEGIN PUBLIC KEY-----', '') \
-            .replace('-----END PUBLIC KEY-----', '') \
-            .replace('\n', '')
+        # # Enlever strings autour de la cle
+        # public_key_str = public_key_str \
+        #     .replace('-----BEGIN PUBLIC KEY-----', '') \
+        #     .replace('-----END PUBLIC KEY-----', '') \
+        #     .replace('\n', '')
 
         return public_key_str
 

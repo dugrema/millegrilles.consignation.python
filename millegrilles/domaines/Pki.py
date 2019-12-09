@@ -672,7 +672,7 @@ class TraitementRequetePki(TraitementRequetesNoeuds):
 
                 # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
                 cle_publique = enveloppe_cert.public_key
-                reponse['cle_publique'] = cle_publique
+                reponse['certificat'] = enveloppe_cert.certificat_pem
                 reponse['roles'] = enveloppe_cert.get_roles
 
             else:
