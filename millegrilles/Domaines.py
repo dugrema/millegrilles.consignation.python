@@ -588,6 +588,10 @@ class GestionnaireDomaine:
     def verificateur_transaction(self):
         return self._contexte.verificateur_transaction
 
+    @property
+    def verificateur_certificats(self):
+        return self._contexte.verificateur_certificats
+
     def creer_regenerateur_documents(self):
         return RegenerateurDeDocuments(self)
 

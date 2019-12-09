@@ -124,6 +124,16 @@ class EnveloppeCleCert:
             self.key_from_pem_bytes(fichier.read(), password_bytes)
 
     @property
+    def get_roles(self):
+        MQ_ROLES_OID = x509.ObjectIdentifier('1.2.3.4.1')
+        extensions = self.cert.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_ROLES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
+
+    @property
     def cert_bytes(self):
         return self.cert.public_bytes(serialization.Encoding.PEM)
 

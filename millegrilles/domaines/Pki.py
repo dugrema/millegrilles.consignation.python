@@ -1,7 +1,7 @@
 # Domaine Public Key Infrastructure (PKI)
 
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
+from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet, TraitementRequetesNoeuds
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete, CertificatInconnu
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
@@ -22,6 +22,7 @@ class ConstantesPki:
     TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat' % DOMAINE_NOM
     TRANSACTION_WEB_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat.web' % DOMAINE_NOM
     TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
+    TRANSACTION_CONFIRMER_CERTIFICAT = '%s.confirmerCertificat' % DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
@@ -77,11 +78,13 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         self._pki_document_helper = None
         self.__traitement_certificats = None
+        self.__traitement_requetes_noeuds = None
 
     def configurer(self):
         super().configurer()
         self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
         self.__traitement_certificats = TraitementRequeteCertificat(self, self._pki_document_helper)
+        self.__traitement_requetes_noeuds = TraitementRequetePki(self, self._pki_document_helper)
 
         self.initialiser_mgca()  # S'assurer que les certs locaux sont prets avant les premieres transactions
 
@@ -217,6 +220,9 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def creer_regenerateur_documents(self):
         return RegenerateurDeDocumentsSansEffet(self)
+
+    def get_handler_requetes_noeuds(self):
+        return self.__traitement_requetes_noeuds
 
 
 class PKIDocumentHelper:
@@ -579,6 +585,9 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
             self.transmettre_certificat(properties, message_dict)
         elif method.routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
             self.transmettre_liste_ca(properties, message_dict)
+        elif method.routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
+            self.confirmer_certificat(properties, message_dict)
+
         else:
             raise Exception("Type evenement inconnu: %s" % method.routing_key)
 
@@ -590,6 +599,30 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
     def transmettre_certificat(self, properties, message_dict):
         pass
 
+    def confirmer_certificat(self, properties, message_dict):
+        """
+        Confirme la validute d'un certificat.
+        """
+        reponse = dict()
+        if message_dict.get('fingerprint'):
+            fingerprint = message_dict['fingerprint']
+            self.__logger.debug("Requete verification certificat par fingerprint: %s" % fingerprint)
+            # Charge un certificat connu
+            enveloppe_cert = self.configuration.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+            if enveloppe_cert is not None:
+                reponse['valide'] = True
+
+                # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
+
+            else:
+                reponse['valide'] = False
+        else:
+            reponse['valide'] = False
+
+        self.gestionnaire.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
+
+
     def transmettre_liste_ca(self, properties, message_dict):
         ca_file = self.configuration.mq_cafile
 
@@ -599,6 +632,53 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
         reponse = {
             ConstantesSecurityPki.LIBELLE_CHAINE_PEM: contenu
         }
+
+        self.gestionnaire.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
+
+
+class TraitementRequetePki(TraitementRequetesNoeuds):
+
+    def __init__(self, gestionnaire_domaine, pki_document_helper):
+        super().__init__(gestionnaire_domaine)
+        self.__pki_document_helper = pki_document_helper
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        # Pas de verification du contenu - le certificat est sa propre validation via CAs
+        # self.gestionnaire.verificateur_transaction.verifier(message_dict)
+
+        domaine_routing_key = method.routing_key.replace('requete.', '')
+
+        if domaine_routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
+            self.confirmer_certificat(properties, message_dict)
+
+        else:
+            super().traiter_message(ch, method, properties, body)
+
+    def confirmer_certificat(self, properties, message_dict):
+        """
+        Confirme la validute d'un certificat.
+        """
+        reponse = dict()
+        if message_dict.get('fingerprint'):
+            fingerprint = message_dict['fingerprint']
+            self.__logger.debug("Requete verification certificat par fingerprint: %s" % fingerprint)
+            # Charge un certificat connu
+            enveloppe_cert = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+            if enveloppe_cert is not None:
+                reponse['valide'] = enveloppe_cert.est_verifie
+
+                # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
+                cle_publique = enveloppe_cert.public_key
+                reponse['cle_publique'] = cle_publique
+                reponse['roles'] = enveloppe_cert.get_roles
+
+            else:
+                reponse['valide'] = False
+        else:
+            reponse['valide'] = False
 
         self.gestionnaire.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id)

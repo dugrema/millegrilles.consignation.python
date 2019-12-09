@@ -100,6 +100,19 @@ class EnveloppeCertificat:
         return str(self.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8')
 
     @property
+    def public_key(self):
+        public_key = self.certificat.public_key().public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+        public_key_str = str(public_key, 'utf-8')
+
+        # Enlever strings autour de la cle
+        public_key_str = public_key_str \
+            .replace('-----BEGIN PUBLIC KEY-----', '') \
+            .replace('-----END PUBLIC KEY-----', '') \
+            .replace('\n', '')
+
+        return public_key_str
+
+    @property
     def get_roles(self):
         MQ_ROLES_OID = x509.ObjectIdentifier('1.2.3.4.1')
         extensions = self._certificat.extensions
