@@ -32,6 +32,7 @@ class ConstantesGenerateurCertificat:
     ROLE_CEDULEUR = 'ceduleur'
     ROLE_DOMAINES = 'domaines'
     ROLE_COUPDOEIL = 'coupdoeil'
+    ROLE_COUPDOEIL_NAVIGATEUR = 'coupdoeil.navigateur'
     ROLE_FICHIERS = 'fichiers'
     ROLE_VITRINE = 'vitrine'
     ROLE_PUBLICATEUR = 'publicateur'

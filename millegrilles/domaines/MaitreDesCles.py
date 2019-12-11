@@ -4,7 +4,7 @@
 from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInconnu
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
 from millegrilles.domaines.Pki import ConstantesPki
@@ -443,11 +443,33 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
         enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(evenement)
+
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
-        acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
-        self._logger.debug(
-            "Verification signature requete cle grosfichier. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+        # Verifier si on utilise un certificat different pour re-encrypter la cle
+        fingerprint_demande = evenement.get('fingerprint')
+        if fingerprint_demande is not None:
+            self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
+            try:
+                enveloppe_certificat = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
+
+                # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
+                roles = enveloppe_certificat.get_roles
+                if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in roles:
+                    pass
+                else:
+                    self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
+                    enveloppe_certificat = None
+            except CertificatInconnu:
+                enveloppe_certificat = None
+
+        if enveloppe_certificat is None:
+            acces_permis = False
+        else:
+            self._logger.debug(
+                "Verification signature requete cle grosfichier. Cert: %s" % str(
+                    enveloppe_certificat.fingerprint_ascii))
+            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
 
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         filtre = {

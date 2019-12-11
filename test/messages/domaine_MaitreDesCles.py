@@ -78,7 +78,22 @@ class MessagesSample(BaseCallback):
 
     def requete_decryptage_cle_fuuid(self):
         requete_cert_maitredescles = {
-            'fuuid': "39c1e1b0-b6ee-11e9-b0cd-d30e8faa8419"
+            'fuuid': "b4ecca10-1c2b-11ea-904a-7b4d1a2d4432"
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def requete_decryptage_cle_fuuid_avecfingerprint(self):
+        requete_cert_maitredescles = {
+            'fuuid': "b4ecca10-1c2b-11ea-904a-7b4d1a2d4432",
+            'fingerprint': '74fd5742aec60dd37f99c75df423008a10149018'
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
@@ -197,9 +212,10 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.requete_cert_maitredescles()
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
-        # enveloppe = self.requete_decryptage_cle_fuuid()
         # enveloppe = self.transaction_declasser_grosfichier()
-        enveloppe = self.transaction_signer_certificat_navigateur()
+        # enveloppe = self.transaction_signer_certificat_navigateur()
+        # enveloppe = self.requete_decryptage_cle_fuuid()
+        enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
 
 
 # --- MAIN ---
