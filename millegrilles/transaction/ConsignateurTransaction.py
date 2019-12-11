@@ -73,7 +73,16 @@ class ConsignateurTransaction(ModeleConfiguration):
 
     def executer(self):
         while not self.__stop_event.is_set():
-            self.__stop_event.wait(3600)  # On fait juste attendre l'evenement de fermeture
+            try:
+                self.entretien()
+            except Exception as e:
+                self.__logger.exception("Erreur entretien")
+            self.__stop_event.wait(30)
+
+    def entretien(self):
+        if not self.is_channel_open or not self.handler_entretien.is_channel_open:
+            self.__logger.error("Un canal du consignateur de transactions est ferme")
+            self.contexte.message_dao.enter_error_state()
 
     def deconnecter(self):
         self.__stop_event.set()
