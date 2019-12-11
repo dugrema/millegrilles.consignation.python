@@ -824,10 +824,15 @@ class WatcherCollectionMongoThread:
                         # Transmettre document sur MQ
                         self.__contexte.message_dao.transmettre_message_noeuds(
                             full_document, routing_key, encoding=MongoJSONEncoder)
+                    elif operation_type == 'invalidate':
+                        # Curseur ferme
+                        self.__logger.warning("Curseur watch a ete invalide, on le ferme.\n%s" % str(change_event))
+                        self.__curseur_changements = None
                     else:
                         self.__logger.debug("Evenement non supporte: %s" % operation_type)
                 except StopIteration:
                     self.__logger.info("Arret watcher dans l'iteration courante")
+                    self.__curseur_changements = None
                 except Exception:
                     self.__logger.exception("Erreur dans le traitement du watcher")
                     self.__stop_event.wait(1)  # Attendre 1 seconde, throttle
