@@ -828,8 +828,13 @@ class WatcherCollectionMongoThread:
                         # Curseur ferme
                         self.__logger.warning("Curseur watch a ete invalide, on le ferme.\n%s" % str(change_event))
                         self.__curseur_changements = None
+                    elif operation_type in ['delete', 'drop', 'rename']:
+                        pass
+                    elif operation_type == 'dropDatabase':
+                        self.__logger.error("Drop database event : %s" % str(change_event))
                     else:
                         self.__logger.debug("Evenement non supporte: %s" % operation_type)
+                        self.__stop_event.wait(0.5)  # Attendre 0.5 secondes, throttle
                 except StopIteration:
                     self.__logger.info("Arret watcher dans l'iteration courante")
                     self.__curseur_changements = None
