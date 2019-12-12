@@ -44,7 +44,7 @@ class RegenererTest(BaseMongo):
         self.attendre_channel.set()
 
     def liste_documents_gros_fichiers(self):
-        nom_millegrille = self.contexte.configuration.nom_millegrille
+        nom_millegrille = self.contexte.configuration.idmg
         gestionnaire_grosfichiers = GestionnaireGrosFichiers(self.contexte)
         groupeur = GroupeurTransactionsARegenerer(gestionnaire_grosfichiers)
         for transactions in groupeur:

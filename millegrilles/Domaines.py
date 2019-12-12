@@ -343,7 +343,7 @@ class GestionnaireDomaine:
         Utilise l'ordre de persistance.
         :return:
         """
-        nom_millegrille = self.configuration.nom_millegrille
+        nom_millegrille = self.configuration.idmg
         champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
         champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
         filtre = {
@@ -936,7 +936,7 @@ class GroupeurTransactionsARegenerer:
         return collection_transactions.find(filtre).sort(index).hint(index)
 
     def __preparer_requete(self):
-        nom_millegrille = self.__gestionnaire_domaine.configuration.nom_millegrille
+        nom_millegrille = self.__gestionnaire_domaine.configuration.idmg
 
         # Parcourir l'index:
         #  - _evenements.transaction_complete

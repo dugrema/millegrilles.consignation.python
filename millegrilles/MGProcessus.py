@@ -687,7 +687,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
     def traiter_transaction_wrapper(self, transaction):
         erreurs_regeneration = []
-        nom_millegrille = self.configuration.nom_millegrille
+        nom_millegrille = self.configuration.idmg
         try:
             self.traiter_transaction(transaction)
         except Exception as e:

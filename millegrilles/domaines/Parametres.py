@@ -158,7 +158,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE, ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE)
 
         document_config_id = ConstantesParametres.DOCUMENT_ID_MILLEGRILLE.copy()
-        nom_millegrille = self.configuration.nom_millegrille
+        nom_millegrille = self.configuration.idmg
         document_config_id['nom_millegrille'] = nom_millegrille
         document_config_id['adresse_url_base'] = 'mg-%s.local' % nom_millegrille
         self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, document_config_id)
@@ -517,7 +517,7 @@ class ProcessusDeployerAccesPublic(ProcessusParametres):
             mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_EXTERIEUR] = port
             mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_IPV4_INTERNE] = ipv4_interne
             mapping_http[ConstantesParametres.DOCUMENT_PUBLIQUE_PORT_MAPPING_NOM] = \
-                'mg_%s_%s' % (self._controleur.configuration.nom_millegrille, champ)
+                'mg_%s_%s' % (self._controleur.configuration.idmg, champ)
 
             mappings_demandes[str(port)] = mapping_http
 

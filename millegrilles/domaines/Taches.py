@@ -428,10 +428,10 @@ class ProcessusNotificationRecue(ProcessusTaches):
     def avertir_usager(self):
         configuration = self._controleur.configuration
 
-        sujet = "Notification %s" % configuration.nom_millegrille
+        sujet = "Notification %s" % configuration.idmg
 
         for notification in self.parametres['liste_avertir_usager']:
-            contenu = "Nouvelle notification pour la MilleGrille %s\n\n%s" % (configuration.nom_millegrille, str(notification))
+            contenu = "Nouvelle notification pour la MilleGrille %s\n\n%s" % (configuration.idmg, str(notification))
             self._logger.info("Transmission notifcation par courriel: %s" % sujet)
             self._logger.debug(contenu)
 
@@ -449,7 +449,7 @@ class ProcessusNotificationRecue(ProcessusTaches):
         short_domaine = domaine.split('.')[-1]
         description = ', '.join(['%s=%s' % (key, value) for key, value in valeurs.items()])
 
-        titre = '%s %s %s: %s' % (configuration.nom_millegrille, niveau, short_domaine, description)
+        titre = '%s %s %s: %s' % (configuration.idmg, niveau, short_domaine, description)
 
         if len(titre) > 64:
             titre = titre[0:64]

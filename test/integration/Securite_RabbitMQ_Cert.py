@@ -25,7 +25,7 @@ class TestCertificatsRabbitMQ:
         connection_parameters = {
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
-            'virtual_host': self.configuration.nom_millegrille,
+            'virtual_host': self.configuration.idmg,
             'heartbeat': 300
         }
 

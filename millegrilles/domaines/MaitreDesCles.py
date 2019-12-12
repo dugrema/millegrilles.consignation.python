@@ -122,7 +122,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__clecert_millegrille = self.charger_clecert_millegrille()
 
         self.__renouvelleur_certificat = RenouvelleurCertificat(
-            self.configuration.nom_millegrille,
+            self.configuration.idmg,
             self.__dict_ca,
             self.__clecert_millegrille
         )
@@ -189,7 +189,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self._logger.info("Generation de nouveau certificat de maitre des cles")
         hostname = socket.gethostname()
         generateurMaitreDesCles = GenererMaitredesclesCryptage(
-            self.configuration.nom_millegrille,
+            self.configuration.idmg,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
             hostname,
             self.__dict_ca,
@@ -810,7 +810,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
         roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.nom_millegrille and \
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
             'deployeur' in roles_cert or 'maitredescles' in roles_cert:
             # Le deployeur et le maitre des cles ont l'autorisation de renouveller n'importe quel certificat
             # Coupdoeil a tous les acces au niveau secure
@@ -895,7 +895,7 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
         roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.nom_millegrille and \
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
             'coupdoeil' in roles_cert or 'deployeur' in roles_cert:
             # Le coupdoeil a l'autorisation de signer n'importe quel certificat
             self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
@@ -1011,7 +1011,7 @@ class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
         roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.nom_millegrille and \
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
                 'coupdoeil' in roles_cert:
             # Le coupdoeil peut demander un certificat de navigateur
             self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)

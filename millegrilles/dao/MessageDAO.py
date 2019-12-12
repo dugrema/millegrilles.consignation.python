@@ -689,7 +689,7 @@ class ConnexionWrapper:
         connection_parameters = {
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
-            'virtual_host': self.configuration.nom_millegrille,
+            'virtual_host': self.configuration.idmg,
             'heartbeat': self.__heartbeat,
             'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
         }

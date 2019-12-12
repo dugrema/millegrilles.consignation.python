@@ -64,7 +64,7 @@ CONFIG_MONGO_SSL_KEYFILE = 'mongo_ssl_certfile'
 MONGO_DOC_ID = '_id'
 
 # Configuration MilleGrilles
-CONFIG_NOM_MILLEGRILLE = 'nom_millegrille'
+CONFIG_IDMG = 'nom_millegrille'
 
 # Domaines
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
@@ -80,7 +80,7 @@ CONFIG_EMAIL_FROM = 'email_from'
 
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'
-DEFAUT_NOM_MILLEGRILLE = 'sansnom'
+DEFAUT_IDMG = 'sansnom'
 
 # PKI
 CONFIG_PKI_WORKDIR = 'pki_workdir'

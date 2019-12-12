@@ -1042,7 +1042,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def __preparer_curseur_lectures(self):
-        nom_millegrille = self.gestionnaire.configuration.nom_millegrille
+        nom_millegrille = self.gestionnaire.configuration.idmg
 
         match_query = {
             '_evenements.transaction_complete': True,
@@ -1068,7 +1068,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         return curseur
 
     def __preparer_curseur_autres(self):
-        nom_millegrille = self.gestionnaire.configuration.nom_millegrille
+        nom_millegrille = self.gestionnaire.configuration.idmg
 
         match_query = {
             '_evenements.transaction_complete': True,

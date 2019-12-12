@@ -201,7 +201,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
             Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,
             Constantes.EVENEMENT_TRANSACTION_COMPLETE: False,
-            self.contexte.configuration.nom_millegrille: evenements
+            self.contexte.configuration.idmg: evenements
         }
 
         resultat = collection_transactions.insert_one(enveloppe_transaction)
@@ -260,7 +260,7 @@ class EvenementTransactionCallback(BaseCallback):
 
         libelle_transaction_traitee = '%s.%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            self.contexte.configuration.nom_millegrille,
+            self.contexte.configuration.idmg,
             evenement
         )
         libelle_transaction_complete = '%s.%s' %  (
@@ -345,7 +345,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         )
 
     def _setup_index_domaines(self):
-        nom_millegrille = self.contexte.configuration.nom_millegrille
+        nom_millegrille = self.contexte.configuration.idmg
 
         for nom_collection_transaction in self.__liste_domaines:
             try:
@@ -396,7 +396,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
         date_verif = date_courante - delta_verif
 
-        nom_millegrille = self.configuration.nom_millegrille
+        nom_millegrille = self.configuration.idmg
 
         label_date_resoumise = '%s.%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
@@ -464,7 +464,7 @@ class EntretienCollectionsDomaines(BaseCallback):
                             self.__logger.error("Marquer transaction comme resoumise trop de fois %s" % str(transaction_id))
                             libelle_transaction_traitee = '%s.%s.%s' % (
                                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                self.contexte.configuration.nom_millegrille,
+                                self.contexte.configuration.idmg,
                                 Constantes.EVENEMENT_TRANSACTION_ERREUR_RESOUMISSION
                             )
                             libelle_transaction_complete = '%s.%s' % (
@@ -512,7 +512,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         """
         self.__logger.info("Entretien transactions expirees")
 
-        nom_millegrille = self.contexte.configuration.nom_millegrille
+        nom_millegrille = self.contexte.configuration.idmg
         delta_expiration = datetime.timedelta(hours=1)
         date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
         date_expiration = date_courante - delta_expiration

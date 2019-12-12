@@ -74,7 +74,7 @@ class TransactionConfiguration:
 
         # Configuration specifique a la MilleGrille
         self._millegrille_config = {
-            Constantes.CONFIG_NOM_MILLEGRILLE: Constantes.DEFAUT_NOM_MILLEGRILLE # Nom de la MilleGrille
+            Constantes.CONFIG_IDMG: Constantes.DEFAUT_IDMG # Nom de la MilleGrille
         }
 
         self._email_config = {
@@ -129,7 +129,7 @@ class TransactionConfiguration:
         """ Formatte la configuration pour connexion a Mongo """
 
         config_mongo = dict()
-        config_mongo['authSource'] = 'mg-%s' % self.nom_millegrille
+        config_mongo['authSource'] = 'mg-%s' % self.idmg
 
         parametres_mongo = ['host', 'username', 'password']
         parametres_mongo_int = ['port']
@@ -221,8 +221,8 @@ class TransactionConfiguration:
         return self._pki_config
 
     @property
-    def nom_millegrille(self):
-        return self._millegrille_config[Constantes.CONFIG_NOM_MILLEGRILLE]
+    def idmg(self):
+        return self._millegrille_config[Constantes.CONFIG_IDMG]
 
     @property
     def mongo_host(self):

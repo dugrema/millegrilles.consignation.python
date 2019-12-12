@@ -58,7 +58,7 @@ class Publicateur(ModeleConfiguration):
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
 
-        nom_millegrille = self.contexte.configuration.nom_millegrille
+        nom_millegrille = self.contexte.configuration.idmg
         if nom_millegrille is None:
             raise ValueError("Il faut fournir le nom de la MilleGrille (MG_NOM_MILLEGRILLE)")
 
@@ -303,7 +303,7 @@ class ExporterVersHtml:
 
         # Effectuer les remplacements
         # Inserer le nom de la millegrille
-        nom_millegrille = self._publicateur.contexte.configuration.nom_millegrille
+        nom_millegrille = self._publicateur.contexte.configuration.idmg
         template_complet = template_complet.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
         self.__logger.debug("Template complet: %s" % template_complet)
 
@@ -352,7 +352,7 @@ class ExporterPageHtml(ExporterVersHtml):
     def render(self, fichier):
         nom_fichier = '%s/%s' % (self._publicateur.template_path, self._nom_fichier_contenu)
         self.__logger.debug("Ouverture fichier contenu %s" % nom_fichier)
-        nom_millegrille = self._publicateur.contexte.configuration.nom_millegrille
+        nom_millegrille = self._publicateur.contexte.configuration.idmg
         with open(nom_fichier, 'rb') as fichier_contenu:
             contenu = fichier_contenu.read().decode('utf-8')
             contenu = contenu.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
