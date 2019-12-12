@@ -44,7 +44,7 @@ class RegenererTest(BaseMongo):
         self.attendre_channel.set()
 
     def liste_documents_gros_fichiers(self):
-        nom_millegrille = self.contexte.configuration.idmg
+        idmg = self.contexte.configuration.idmg
         gestionnaire_grosfichiers = GestionnaireGrosFichiers(self.contexte)
         groupeur = GroupeurTransactionsARegenerer(gestionnaire_grosfichiers)
         for transactions in groupeur:
@@ -52,7 +52,7 @@ class RegenererTest(BaseMongo):
             for transaction in transactions:
                 self.logger.debug("Transaction _id:%s, transaction_traitee: %s" % (
                     str(transaction['_id']),
-                    str(transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]))
+                    str(transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][idmg][Constantes.EVENEMENT_TRANSACTION_TRAITEE]))
                 )
 
     def regenerer_grosfichiers(self):

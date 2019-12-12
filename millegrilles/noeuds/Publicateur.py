@@ -58,13 +58,13 @@ class Publicateur(ModeleConfiguration):
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
 
-        nom_millegrille = self.contexte.configuration.idmg
-        if nom_millegrille is None:
-            raise ValueError("Il faut fournir le nom de la MilleGrille (MG_NOM_MILLEGRILLE)")
+        idmg = self.contexte.configuration.idmg
+        if idmg is None:
+            raise ValueError("Il faut fournir le nom de la MilleGrille (MG_IDMG)")
 
         self._webroot = self.args.webroot
         if self._webroot is None:
-            self._webroot = '/opt/millegrilles/%s/mounts/nginx' % nom_millegrille
+            self._webroot = '/opt/millegrilles/%s/mounts/nginx' % idmg
 
         self._template_path = self.args.templates
         if self._template_path is None:
@@ -303,8 +303,8 @@ class ExporterVersHtml:
 
         # Effectuer les remplacements
         # Inserer le nom de la millegrille
-        nom_millegrille = self._publicateur.contexte.configuration.idmg
-        template_complet = template_complet.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
+        idmg = self._publicateur.contexte.configuration.idmg
+        template_complet = template_complet.replace('${MG_IDMG}', idmg)
         self.__logger.debug("Template complet: %s" % template_complet)
 
         # Activer l'item courant dans le menu, desactiver les autres
@@ -352,10 +352,10 @@ class ExporterPageHtml(ExporterVersHtml):
     def render(self, fichier):
         nom_fichier = '%s/%s' % (self._publicateur.template_path, self._nom_fichier_contenu)
         self.__logger.debug("Ouverture fichier contenu %s" % nom_fichier)
-        nom_millegrille = self._publicateur.contexte.configuration.idmg
+        idmg = self._publicateur.contexte.configuration.idmg
         with open(nom_fichier, 'rb') as fichier_contenu:
             contenu = fichier_contenu.read().decode('utf-8')
-            contenu = contenu.replace('${MG_NOM_MILLEGRILLE}', nom_millegrille)
+            contenu = contenu.replace('${MG_IDMG}', idmg)
             fichier.write(contenu.encode('utf-8'))
 
     def supprimer_fichier(self):

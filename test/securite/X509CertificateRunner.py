@@ -6,8 +6,8 @@ class RunnerCertMilleGrille:
 
     def __init__(self):
         self.folder_output = '/home/mathieu/tmp/certs'
-        self.nom_millegrille = 'test1'
-        self.generateur_mg_initial = GenerateurInitial(self.nom_millegrille)
+        self.idmg = 'test1'
+        self.generateur_mg_initial = GenerateurInitial(self.idmg)
 
         self.self_signed = None
         self.millegrille = None
@@ -29,7 +29,7 @@ class RunnerCertMilleGrille:
             self.self_signed.skid: self.self_signed.cert,
             self.millegrille.skid: self.millegrille.cert,
         }
-        self.renouvelleur = RenouvelleurCertificat(self.nom_millegrille, dict_ca, self.millegrille, self.self_signed)
+        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.millegrille, self.self_signed)
 
     def generer_certs_noeuds(self):
         cn = 'mg-test1'

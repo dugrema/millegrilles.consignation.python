@@ -687,7 +687,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
     def traiter_transaction_wrapper(self, transaction):
         erreurs_regeneration = []
-        nom_millegrille = self.configuration.idmg
+        idmg = self.configuration.idmg
         try:
             self.traiter_transaction(transaction)
         except Exception as e:
@@ -698,7 +698,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
                 en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
                 uuid = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 domaine_transactions = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-                date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][nom_millegrille][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
+                date_traitement = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT][idmg][Constantes.EVENEMENT_TRANSACTION_TRAITEE]
             except Exception as e2:
                 uuid = transaction
             finally:

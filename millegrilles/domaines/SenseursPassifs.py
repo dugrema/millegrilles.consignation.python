@@ -1042,12 +1042,12 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def __preparer_curseur_lectures(self):
-        nom_millegrille = self.gestionnaire.configuration.idmg
+        idmg = self.gestionnaire.configuration.idmg
 
         match_query = {
             '_evenements.transaction_complete': True,
             'en-tete.domaine': 'millegrilles.domaines.SenseursPassifs.lecture',
-            '_evenements.%s.transaction_traitee' % nom_millegrille: {'$exists': True},
+            '_evenements.%s.transaction_traitee' % idmg: {'$exists': True},
             'temps_lecture': {'$exists': True},
         }
         group_query = {
@@ -1068,15 +1068,15 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         return curseur
 
     def __preparer_curseur_autres(self):
-        nom_millegrille = self.gestionnaire.configuration.idmg
+        idmg = self.gestionnaire.configuration.idmg
 
         match_query = {
             '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % nom_millegrille: {'$exists': True},
+            '_evenements.%s.transaction_traitee' % idmg: {'$exists': True},
             'en-tete.domaine': {'$not': {'$in': ['millegrilles.domaines.SenseursPassifs.lecture']}}
         }
         sort_query = [
-            ('_evenements.%s.transaction_traitee' % nom_millegrille, 1)
+            ('_evenements.%s.transaction_traitee' % idmg, 1)
         ]
 
         collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()

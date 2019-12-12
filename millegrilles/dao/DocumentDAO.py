@@ -18,7 +18,7 @@ class MongoDAO:
 
     def __init__(self, configuration):
         self._configuration = configuration
-        self._nom_millegrille = self._configuration.idmg
+        self._idmg = self._configuration.idmg
 
         self._client = None
         self._mg_database = None
@@ -38,7 +38,7 @@ class MongoDAO:
 
         self._logger.info("Connection etablie, ouverture base de donnes %s" % self._configuration.idmg)
 
-        self._mg_database = self._client[self._nom_millegrille]
+        self._mg_database = self._client[self._idmg]
         self._collection_processus = self._mg_database[Constantes.DOCUMENT_COLLECTION_PROCESSUS]
         self._collection_information_documents = self._mg_database[Constantes.DOCUMENT_COLLECTION_INFORMATION_DOCUMENTS]
 

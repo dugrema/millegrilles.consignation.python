@@ -213,8 +213,8 @@ class EnveloppeCleCert:
 
 class GenerateurCertificat:
 
-    def __init__(self, nom_millegrille):
-        self._nom_millegrille = nom_millegrille
+    def __init__(self, idmg):
+        self._idmg = idmg
         self.__public_exponent = 65537
         self.__keysize = 2048
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
@@ -252,7 +252,7 @@ class GenerateurCertificat:
 
         builder = x509.CertificateSigningRequestBuilder()
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
             x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name),
             x509.NameAttribute(NameOID.COMMON_NAME, common_name),
         ])
@@ -276,8 +276,8 @@ class GenerateurCertificat:
 
 class GenerateurCertificateParClePublique(GenerateurCertificat):
 
-    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
-        super().__init__(nom_millegrille)
+    def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
+        super().__init__(idmg)
         self._dict_ca = dict_ca
         self._autorite = autorite
         self.__domaines_publics = domaines_publics
@@ -312,7 +312,7 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         builder = x509.CertificateBuilder()
 
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
             x509.NameAttribute(NameOID.COMMON_NAME, sujet),
         ])
         builder = builder.subject_name(name)
@@ -394,8 +394,8 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
 
 class GenerateurCertificateParRequest(GenerateurCertificat):
 
-    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
-        super().__init__(nom_millegrille)
+    def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
+        super().__init__(idmg)
         self._dict_ca = dict_ca
         self._autorite = autorite
         self.__domaines_publics = domaines_publics
@@ -496,8 +496,8 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
 class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
-    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
-        super().__init__(nom_millegrille, dict_ca, autorite)
+    def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(idmg, dict_ca, autorite)
 
     def generer(self) -> EnveloppeCleCert:
         """
@@ -508,7 +508,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
         # Preparer une nouvelle cle et CSR pour la millegrille
         clecert = super().preparer_key_request(
             unit_name=u'MilleGrille',
-            common_name=self._nom_millegrille,
+            common_name=self._idmg,
             generer_password=True
         )
 
@@ -548,8 +548,8 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
 class GenerateurInitial(GenerateurCertificatMilleGrille):
 
-    def __init__(self, nom_millegrille):
-        super().__init__(nom_millegrille, None, None)
+    def __init__(self, idmg):
+        super().__init__(idmg, None, None)
 
     def generer(self) -> EnveloppeCleCert:
         """
@@ -589,7 +589,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
         builder = self.__preparer_builder(clecert.private_key, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_ROOT)
 
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
             x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'SSRoot'),
             x509.NameAttribute(NameOID.COMMON_NAME, u'SSRoot'),
         ])
@@ -628,8 +628,8 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
 class GenerateurNoeud(GenerateurCertificateParRequest):
 
-    def __init__(self, nom_millegrille, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
-        super().__init__(nom_millegrille, dict_ca, autorite, domaines_publics)
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
+        super().__init__(idmg, dict_ca, autorite, domaines_publics)
         self._organization_name = organization_nom
         self._common_name = common_name
         self._domaines_publics = domaines_publics
@@ -852,7 +852,7 @@ class GenererMQ(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'mq'),
-            x509.DNSName(u'mq-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'mq-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
         ]
@@ -861,10 +861,10 @@ class GenererMQ(GenerateurNoeud):
         if self._domaines_publics is not None:
             liste_dns.extend([x509.DNSName(d) for d in self._domaines_publics])
 
-        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
-        if self._common_name != 'mg-%s' % self._nom_millegrille:
-            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+        # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
+        if self._common_name != 'mg-%s' % self._idmg:
+            liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
+            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         # Ajouter noms DNS valides pour MQ
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -886,15 +886,15 @@ class GenererMongo(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'mongo'),
-            x509.DNSName(u'mongo-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'mongo-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
         ]
 
-        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
-        if self._common_name != 'mg-%s' % self._nom_millegrille:
-            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+        # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
+        if self._common_name != 'mg-%s' % self._idmg:
+            liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
+            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         if self._domaines_publics is not None:
             for domaine in self._domaines_publics:
@@ -928,11 +928,11 @@ class GenererCoupdoeil(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'www-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
-            x509.DNSName(u'coupdoeil-%s' % self._nom_millegrille),
-            x509.DNSName(u'coupdoeil-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'coupdoeil-%s' % self._idmg),
+            x509.DNSName(u'coupdoeil-%s.local' % self._idmg),
         ]
 
         if self._domaines_publics is not None:
@@ -998,11 +998,11 @@ class GenererVitrine(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'www-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
-            x509.DNSName(u'vitrine-%s' % self._nom_millegrille),
-            x509.DNSName(u'vitrine-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'vitrine-%s' % self._idmg),
+            x509.DNSName(u'vitrine-%s.local' % self._idmg),
         ]
 
         if self._domaines_publics is not None:
@@ -1030,15 +1030,15 @@ class GenererMongoexpress(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'mongoxp'),
-            x509.DNSName(u'mongoxp-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'mongoxp-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
         ]
 
-        # # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
-        # if self._common_name != 'mg-%s' % self._nom_millegrille:
-        #     liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
-        #     liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+        # # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
+        # if self._common_name != 'mg-%s' % self._idmg:
+        #     liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
+        #     liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         # Ajouter noms DNS valides pour MQ
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -1060,15 +1060,15 @@ class GenererNginx(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'www-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
         ]
 
-        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
-        if self._common_name != 'mg-%s' % self._nom_millegrille:
-            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+        # Si le CN == mg-idmg, on n'a pas besoin d'ajouter cette combinaison (identique)
+        if self._common_name != 'mg-%s' % self._idmg:
+            liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
+            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         if self._domaines_publics is not None:
             for domaine in self._domaines_publics:
@@ -1083,8 +1083,8 @@ class GenererNginx(GenerateurNoeud):
 
 class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
 
-    def __init__(self, nom_millegrille, domaines: list, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
-        super().__init__(nom_millegrille, dict_ca, autorite)
+    def __init__(self, idmg, domaines: list, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(idmg, dict_ca, autorite)
         self.__domaines = domaines
 
     def _get_keyusage(self, builder):
@@ -1102,8 +1102,8 @@ class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
 
 class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
 
-    def __init__(self, nom_millegrille, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
-        super().__init__(nom_millegrille, dict_ca, autorite)
+    def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(idmg, dict_ca, autorite)
 
     def _get_keyusage(self, builder):
         builder = super()._get_keyusage(builder)
@@ -1120,8 +1120,8 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
 
 class RenouvelleurCertificat:
 
-    def __init__(self, nom_millegrille, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
-        self.__nom_millegrille = nom_millegrille
+    def __init__(self, idmg, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
+        self.__idmg = idmg
         self.__dict_ca = dict_ca
         self.__millegrille = millegrille
         self.__generateurs_par_role = {
@@ -1144,7 +1144,7 @@ class RenouvelleurCertificat:
 
         self.__generateur_millegrille = None
         if ca_autorite is not None:
-            self.__generateur_millegrille = GenerateurCertificatMilleGrille(nom_millegrille, dict_ca, ca_autorite)
+            self.__generateur_millegrille = GenerateurCertificatMilleGrille(idmg, dict_ca, ca_autorite)
 
         # Permettre de conserver le nouveau cert millegrille en attendant confirmation de l'activation
         self.__clecert_millegrille_nouveau = None
@@ -1178,7 +1178,7 @@ class RenouvelleurCertificat:
 
         generateur = self.__generateurs_par_role[role]
         generateur_instance = generateur(
-            self.__nom_millegrille, role, node_name, self.__dict_ca, self.__millegrille,
+            self.__idmg, role, node_name, self.__dict_ca, self.__millegrille,
             domaines_publics=domaines_publics
         )
 
@@ -1191,7 +1191,7 @@ class RenouvelleurCertificat:
         return clecert
 
     def signer_noeud(self, csr_bytes: bytes, domaines: list = None):
-        generateur = GenerateurCertificateNoeud(self.__nom_millegrille, domaines, self.__dict_ca, self.__millegrille)
+        generateur = GenerateurCertificateNoeud(self.__idmg, domaines, self.__dict_ca, self.__millegrille)
 
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
 
@@ -1206,13 +1206,13 @@ class RenouvelleurCertificat:
     def renouveller_par_role(self, role, common_name):
         generateur = self.__generateurs_par_role[role]
         generateur_instance = generateur(
-            self.__nom_millegrille, role, common_name, self.__dict_ca, self.__millegrille)
+            self.__idmg, role, common_name, self.__dict_ca, self.__millegrille)
 
         cert_dict = generateur_instance.generer()
         return cert_dict
 
     def signer_navigateur(self, public_key_pem: str, sujet: str):
-        generateur = GenerateurCertificateNavigateur(self.__nom_millegrille, self.__dict_ca, self.__millegrille)
+        generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__millegrille)
 
         builder = generateur.preparer_builder(public_key_pem, sujet)
         certificat = generateur.signer(builder)

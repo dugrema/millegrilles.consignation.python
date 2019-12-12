@@ -345,14 +345,14 @@ class EntretienCollectionsDomaines(BaseCallback):
         )
 
     def _setup_index_domaines(self):
-        nom_millegrille = self.contexte.configuration.idmg
+        idmg = self.contexte.configuration.idmg
 
         for nom_collection_transaction in self.__liste_domaines:
             try:
                 collection = self.contexte.document_dao.get_collection(nom_collection_transaction)
                 champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
-                champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
-                champ_traitee = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
+                champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+                champ_traitee = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
 
                 # en-tete.uuid-transaction
                 collection.create_index(
@@ -370,7 +370,7 @@ class EntretienCollectionsDomaines(BaseCallback):
                     name='estampille'
                 )
 
-                # _evenements.NOM_MILLEGRILLE.transaction_traitee
+                # _evenements.IDMG.transaction_traitee
                 collection.create_index(
                     [
                         (champ_complete, 1),
@@ -379,7 +379,7 @@ class EntretienCollectionsDomaines(BaseCallback):
                     name='transaction_traitee'
                 )
 
-                # _evenements.NOM_MILLEGRILLE.transaction_persistee
+                # _evenements.IDMG.transaction_persistee
                 collection.create_index(
                     [
                         (champ_complete, 1),
@@ -396,11 +396,11 @@ class EntretienCollectionsDomaines(BaseCallback):
         date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
         date_verif = date_courante - delta_verif
 
-        nom_millegrille = self.configuration.idmg
+        idmg = self.configuration.idmg
 
         label_date_resoumise = '%s.%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            nom_millegrille,
+            idmg,
             Constantes.EVENEMENT_TRANSACTION_DATE_RESOUMISE
         )
 
@@ -408,7 +408,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$lt': date_verif},
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$lt': date_verif},
             }
             collection_transaction = self.contexte.document_dao.get_collection(nom_collection_transaction)
             curseur_transactions = collection_transaction.find(filtre).limit(2000)
@@ -425,7 +425,7 @@ class EntretienCollectionsDomaines(BaseCallback):
 
                         compteur_resoumission = 0
                         if evenements_transaction is not None:
-                            evenements_millegrille = evenements_transaction.get(nom_millegrille)
+                            evenements_millegrille = evenements_transaction.get(idmg)
                             if evenements_millegrille is not None:
                                 resoumissions = evenements_millegrille.get(Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE)
                                 if resoumissions is not None:
@@ -437,12 +437,12 @@ class EntretienCollectionsDomaines(BaseCallback):
                             # Signature valide, on trigger le traitement de persistance
                             label_signature = '%s.%s.%s' % (
                                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                nom_millegrille,
+                                idmg,
                                 Constantes.EVENEMENT_SIGNATURE_VERIFIEE
                             )
                             label_compte_resoumise = '%s.%s.%s' % (
                                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                nom_millegrille,
+                                idmg,
                                 Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE
                             )
                             collection_transaction.update_one(
@@ -512,14 +512,14 @@ class EntretienCollectionsDomaines(BaseCallback):
         """
         self.__logger.info("Entretien transactions expirees")
 
-        nom_millegrille = self.contexte.configuration.idmg
+        idmg = self.contexte.configuration.idmg
         delta_expiration = datetime.timedelta(hours=1)
         date_courante = datetime.datetime.now(tz=datetime.timezone.utc)
         date_expiration = date_courante - delta_expiration
         operations = {
             '$set': {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
                                Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE): date_courante,
             }
         }
@@ -527,7 +527,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_expiration},
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_expiration},
             }
 
             self.__logger.debug("Entretien collection %s: %s" % (nom_collection_transaction, filtre))

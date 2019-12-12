@@ -74,7 +74,7 @@ class TransactionConfiguration:
 
         # Configuration specifique a la MilleGrille
         self._millegrille_config = {
-            Constantes.CONFIG_IDMG: Constantes.DEFAUT_IDMG # Nom de la MilleGrille
+            Constantes.CONFIG_IDMG: Constantes.DEFAUT_IDMG  # Fingerprint SHA-1 en base58 du certificat racine
         }
 
         self._email_config = {

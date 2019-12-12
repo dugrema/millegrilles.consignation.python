@@ -64,7 +64,7 @@ CONFIG_MONGO_SSL_KEYFILE = 'mongo_ssl_certfile'
 MONGO_DOC_ID = '_id'
 
 # Configuration MilleGrilles
-CONFIG_IDMG = 'nom_millegrille'
+CONFIG_IDMG = 'idmg'
 
 # Domaines
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'

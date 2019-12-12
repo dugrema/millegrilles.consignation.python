@@ -111,7 +111,7 @@ class TestExportAccueilHtml:
 
     @property
     def contexte(self):
-        configuration = MicroMock(nom_millegrille='local')
+        configuration = MicroMock(idmg='local')
         return MicroMock(configuration=configuration)
 
     def render(self):

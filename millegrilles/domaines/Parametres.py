@@ -43,7 +43,7 @@ class ConstantesParametres:
     DOCUMENT_CHAMP_PORT = 'port'
     DOCUMENT_CHAMP_USER = 'user'
     DOCUMENT_CHAMP_PASSWORD = 'password'
-    DOCUMENT_CHAMP_NOM_MILLEGRILLE = 'nom_millegrille'
+    DOCUMENT_CHAMP_IDMG = 'idmg'
     DOCUMENT_CHAMP_URL_BASE = 'adresse_url_base'
     DOCUMENT_CHAMP_ACTIF = 'actif'
 
@@ -88,7 +88,7 @@ class ConstantesParametres:
 
     DOCUMENT_ID_MILLEGRILLE = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ID_MILLEGRILLE,
-        DOCUMENT_CHAMP_NOM_MILLEGRILLE: 'Sansnom',
+        DOCUMENT_CHAMP_IDMG: 'Sansnom',
         DOCUMENT_CHAMP_URL_BASE: 'sansnom.millegrilles.com',
     }
 
@@ -158,9 +158,9 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             ConstantesParametres.LIBVAL_CONFIGURATION_PUBLIQUE, ConstantesParametres.DOCUMENT_CONFIGURATION_PUBLIQUE)
 
         document_config_id = ConstantesParametres.DOCUMENT_ID_MILLEGRILLE.copy()
-        nom_millegrille = self.configuration.idmg
-        document_config_id['nom_millegrille'] = nom_millegrille
-        document_config_id['adresse_url_base'] = 'mg-%s.local' % nom_millegrille
+        idmg = self.configuration.idmg
+        document_config_id['idmg'] = idmg
+        document_config_id['adresse_url_base'] = '%s.local' % idmg
         self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, document_config_id)
 
         self.demarrer_watcher_collection(

@@ -15,8 +15,8 @@ import hashlib
 
 class GenerateurCertificat:
 
-    def __init__(self, nom_millegrille):
-        self.__nom_millegrille = nom_millegrille
+    def __init__(self, idmg):
+        self.__idmg = idmg
 
         self.__public_exponent = 65537
         self.__noeud_keysize = 2048
@@ -37,14 +37,14 @@ class GenerateurCertificat:
         public_key = private_key.public_key()
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.__nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.__idmg),
             x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'MilleGrille'),
-            x509.NameAttribute(NameOID.COMMON_NAME, self.__nom_millegrille),
+            x509.NameAttribute(NameOID.COMMON_NAME, self.__idmg),
         ]))
         builder = builder.issuer_name(x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.__nom_millegrille),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self.__idmg),
             x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'MilleGrille'),
-            x509.NameAttribute(NameOID.COMMON_NAME, self.__nom_millegrille),
+            x509.NameAttribute(NameOID.COMMON_NAME, self.__idmg),
         ]))
         builder = builder.not_valid_before(datetime.datetime.today() - self.__one_day)
         builder = builder.not_valid_after(datetime.datetime.today() + self.__duree_cert_ca)

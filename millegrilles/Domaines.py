@@ -343,9 +343,9 @@ class GestionnaireDomaine:
         Utilise l'ordre de persistance.
         :return:
         """
-        nom_millegrille = self.configuration.idmg
+        idmg = self.configuration.idmg
         champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
-        champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+        champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
         filtre = {
             champ_complete: False
         }
@@ -936,26 +936,26 @@ class GroupeurTransactionsARegenerer:
         return collection_transactions.find(filtre).sort(index).hint(index)
 
     def __preparer_requete(self):
-        nom_millegrille = self.__gestionnaire_domaine.configuration.idmg
+        idmg = self.__gestionnaire_domaine.configuration.idmg
 
         # Parcourir l'index:
         #  - _evenements.transaction_complete
-        #  - _evenements.NOM_MILLEGRILLE.transaction_traitee
+        #  - _evenements.IDMGtransaction_traitee
         index = [
             ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                         Constantes.EVENEMENT_TRANSACTION_COMPLETE), 1),
-            ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
+            ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
                            Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
         ]
         # ordre_tri = index  # L'index est trie dans l'ordre necessaire
 
         # Filtre par transaction completee:
         #  - _evenements.transaction_complete = True
-        #  - _evenements.NOM_MILLEGRILLE.transaction_traitee existe
+        #  - _evenements.IDMG.transaction_traitee existe
         filtre = {
             '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                        Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
-            '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, nom_millegrille,
+            '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
                           Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
         }
 
