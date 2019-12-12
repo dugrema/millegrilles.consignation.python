@@ -18,7 +18,7 @@ class MongoDAO:
 
     def __init__(self, configuration):
         self._configuration = configuration
-        self._nom_millegrille = "mg-%s" % self._configuration.nom_millegrille
+        self._nom_millegrille = self._configuration.nom_millegrille
 
         self._client = None
         self._mg_database = None
