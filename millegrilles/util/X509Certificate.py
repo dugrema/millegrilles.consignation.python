@@ -1029,16 +1029,16 @@ class GenererMongoexpress(GenerateurNoeud):
         )
 
         liste_dns = [
-            x509.DNSName(u'mongoexpress'),
-            x509.DNSName(u'mongoexpress-%s.local' % self._nom_millegrille),
+            x509.DNSName(u'mongoxp'),
+            x509.DNSName(u'mongoxp-%s.local' % self._nom_millegrille),
             x509.DNSName(u'%s' % self._common_name),
             x509.DNSName(u'%s.local' % self._common_name),
         ]
 
-        # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
-        if self._common_name != 'mg-%s' % self._nom_millegrille:
-            liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
+        # # Si le CN == mg-NOM_MILLEGRILLE, on n'a pas besoin d'ajouter cette combinaison (identique)
+        # if self._common_name != 'mg-%s' % self._nom_millegrille:
+        #     liste_dns.append(x509.DNSName(u'mg-%s' % self._nom_millegrille))
+        #     liste_dns.append(x509.DNSName(u'mg-%s.local' % self._nom_millegrille))
 
         # Ajouter noms DNS valides pour MQ
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
