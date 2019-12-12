@@ -222,29 +222,28 @@ class GestionnaireDomaine:
         # self.configurer()  # Deja fait durant l'initialisation
         self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
 
-#        for essai in range(0, 1):
         self._contexte.message_dao.register_channel_listener(self)
         self._logger.info("Attente Q et routes prets")
         self.wait_Q_ready.wait(5)  # Donner 5 seconde a MQ
-        # if self.wait_Q_ready.is_set():
-        #     break
 
         if not self.wait_Q_ready.is_set():
             if self.nb_routes_a_config > 0:
-                raise Exception("Les routes de Q du domaine ne sont pas configures correctement, il reste %d a configurer" % self.nb_routes_a_config)
+                self._logger.error("Les routes de Q du domaine ne sont pas configures correctement, il reste %d a configurer" % self.nb_routes_a_config)
             else:
-                self._logger.warning('wait_Q_read pas set, mais les routes sont bien configurees')
-        self._logger.info("Q et routes prets")
+                self._logger.warning('wait_Q_read pas set, on va forcer error state sur la connexion pour recuperer')
+            self.message_dao.enter_error_state()
+        else:
+            self._logger.info("Q et routes prets")
 
-        # Verifier si on doit upgrader les documents avant de commencer a ecouter
-        doit_regenerer = self.verifier_version_transactions(self.version_domaine)
+            # Verifier si on doit upgrader les documents avant de commencer a ecouter
+            doit_regenerer = self.verifier_version_transactions(self.version_domaine)
 
-        if doit_regenerer:
-            self.regenerer_documents()
-            self.changer_version_collection(self.version_domaine)
+            if doit_regenerer:
+                self.regenerer_documents()
+                self.changer_version_collection(self.version_domaine)
 
-        # Lance le processus de regeneration des rapports sur cedule pour s'assurer d'avoir les donnees a jour
-        self.regenerer_rapports_sur_cedule()
+            # Lance le processus de regeneration des rapports sur cedule pour s'assurer d'avoir les donnees a jour
+            self.regenerer_rapports_sur_cedule()
 
     def on_channel_open(self, channel):
         """
