@@ -989,8 +989,11 @@ class TraitementMessageCallback:
             self.transmettre_ack(ch, method)
 
     def transmettre_ack(self, ch, method):
-        with self.message_dao.lock_transmettre_message:
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+        try:
+            with self.message_dao.lock_transmettre_message:
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+        except AttributeError:
+            self.__logger.exception("Erreur transmission ACK")
 
     def transmettre_erreur(self, ch, body, erreur):
         message = {

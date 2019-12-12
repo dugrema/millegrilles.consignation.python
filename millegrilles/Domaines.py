@@ -230,7 +230,10 @@ class GestionnaireDomaine:
         #     break
 
         if not self.wait_Q_ready.is_set():
-            raise Exception("Les routes de Q du domaine ne sont pas configures correctement")
+            if self.nb_routes_a_config > 0:
+                raise Exception("Les routes de Q du domaine ne sont pas configures correctement, il reste %d a configurer" % self.nb_routes_a_config)
+            else:
+                self._logger.warning('wait_Q_read pas set, mais les routes sont bien configurees')
         self._logger.info("Q et routes prets")
 
         # Verifier si on doit upgrader les documents avant de commencer a ecouter
@@ -314,7 +317,7 @@ class GestionnaireDomaine:
         with self.wait_Q_ready_lock:
             self.nb_routes_a_config = self.nb_routes_a_config - 1
 
-            if self.nb_routes_a_config == 0:
+            if self.nb_routes_a_config <= 0:
                 # Il ne reste plus de routes a configurer, set flag comme pret
                 self.wait_Q_ready.set()
 
@@ -549,7 +552,7 @@ class GestionnaireDomaine:
 
     '''
     Implementer cette methode pour retourner le nom de la queue.
-    
+
     :returns: Nom de la Q a ecouter.
     '''
     def get_nom_queue(self):
