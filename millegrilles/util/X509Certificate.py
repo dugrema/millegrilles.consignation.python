@@ -27,7 +27,7 @@ class ConstantesGenerateurCertificat:
     ROLE_MQ = 'mq'
     ROLE_MONGO = 'mongo'
     ROLE_DEPLOYEUR = 'deployeur'
-    ROLE_MAITREDESCLES = 'maitredescles'
+    ROLE_MAITREDESCLES = 'maitrecles'
     ROLE_TRANSACTIONS = 'transaction'
     ROLE_CEDULEUR = 'ceduleur'
     ROLE_DOMAINES = 'domaines'
