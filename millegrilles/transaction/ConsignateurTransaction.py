@@ -327,16 +327,22 @@ class EntretienCollectionsDomaines(BaseCallback):
     def _setup_transaction(self):
         # Creer index: _mg-libelle
         collection = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
-        collection.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='mg-libelle'
+        )
         # Index domaine, _mg-libelle
-        collection.create_index([
-            ('%s.%s' %
-             (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
-             1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection.create_index(
+            [
+                ('%s.%s' %
+                 (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
+                 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='domaine-libelle'
+        )
 
     def _setup_index_domaines(self):
         nom_millegrille = self.contexte.configuration.nom_millegrille

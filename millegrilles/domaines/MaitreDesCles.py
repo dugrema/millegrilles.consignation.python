@@ -138,11 +138,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         collection_domaine = self.get_collection()
 
         # Index par identificateurs_documents, domaine
-        collection_domaine.create_index([
-            (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 1),
-            (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
-        ], unique=True)
+        collection_domaine.create_index(
+            [
+                (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 1),
+                (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+            ],
+            name='domaine-libelle',
+            unique=True,
+        )
 
     def demarrer(self):
         super().demarrer()

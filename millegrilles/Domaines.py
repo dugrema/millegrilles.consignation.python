@@ -15,7 +15,7 @@ import json
 from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure
 
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 
 
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
@@ -199,6 +199,7 @@ class GestionnaireDomaine:
         self._stop_event = Event()
         self._traitement_evenements = None
         self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
+        self.wait_Q_ready_lock = Lock()
         self.nb_routes_a_config = 0
 
         self._consumer_tags_parQ = dict()
@@ -221,12 +222,12 @@ class GestionnaireDomaine:
         # self.configurer()  # Deja fait durant l'initialisation
         self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
 
-        for essai in range(0, 11):
-            self._contexte.message_dao.register_channel_listener(self)
-            self._logger.info("Attente Q et routes prets")
-            self.wait_Q_ready.wait(1)  # Donner 1 seconde a MQ, puis reessayer
-            if self.wait_Q_ready.is_set():
-                break
+#        for essai in range(0, 1):
+        self._contexte.message_dao.register_channel_listener(self)
+        self._logger.info("Attente Q et routes prets")
+        self.wait_Q_ready.wait(5)  # Donner 5 seconde a MQ
+        # if self.wait_Q_ready.is_set():
+        #     break
 
         if not self.wait_Q_ready.is_set():
             raise Exception("Les routes de Q du domaine ne sont pas configures correctement")
@@ -310,11 +311,12 @@ class GestionnaireDomaine:
         :return:
         """
         # Indiquer qu'une route a ete configuree
-        self.nb_routes_a_config = self.nb_routes_a_config - 1
+        with self.wait_Q_ready_lock:
+            self.nb_routes_a_config = self.nb_routes_a_config - 1
 
-        if self.nb_routes_a_config == 0:
-            # Il ne reste plus de routes a configurer, set flag comme pret
-            self.wait_Q_ready.set()
+            if self.nb_routes_a_config == 0:
+                # Il ne reste plus de routes a configurer, set flag comme pret
+                self.wait_Q_ready.set()
 
     def stop_consuming(self, queue = None):
         """
