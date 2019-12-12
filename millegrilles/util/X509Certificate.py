@@ -36,7 +36,7 @@ class ConstantesGenerateurCertificat:
     ROLE_FICHIERS = 'fichiers'
     ROLE_VITRINE = 'vitrine'
     ROLE_PUBLICATEUR = 'publicateur'
-    ROLE_MONGOEXPRESS = 'mongoexpress'
+    ROLE_MONGOEXPRESS = 'mongoxp'
     ROLE_NGINX = 'nginx'
 
     ROLES_ACCES_MONGO = [
