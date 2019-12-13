@@ -92,6 +92,8 @@ class EnveloppeCleCert:
             backend=default_backend()
         )
 
+        self.password = password_bytes
+
         self.cert_from_pem_bytes(cert_bytes)
 
     def cert_from_pem_bytes(self, cert_bytes):
@@ -558,6 +560,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
         :return:
         """
         if self._autorite is None:
+            # Le certificat d'autorite n'a pas encore ete generer, on s'en occupe
             self._autorite = self._generer_self_signed()
 
         ss_cert = self._autorite.cert
