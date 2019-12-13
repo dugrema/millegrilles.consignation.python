@@ -149,7 +149,10 @@ class EnveloppeCertificat:
 
     @property
     def subject_organizational_unit_name(self):
-        return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
+        org = self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)
+        if org is not None and len(org) > 0:
+            return org[0].value
+        return None
 
     @property
     def subject_common_name(self):
