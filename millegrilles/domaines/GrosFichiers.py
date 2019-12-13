@@ -1507,7 +1507,7 @@ class ProcessusTransactionAjouterFavori(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.charger_transaction()
         doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-        self._controleur._gestionnaire_domaine.ajouter_favori(doc_uuid)
+        self._controleur.gestionnaire.ajouter_favori(doc_uuid)
         self.set_etape_suivante()
 
 
@@ -1519,7 +1519,7 @@ class ProcessusTransactionSupprimerFavori(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.charger_transaction()
         doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-        self._controleur._gestionnaire_domaine.supprimer_favori(doc_uuid)
+        self._controleur.gestionnaire.supprimer_favori(doc_uuid)
         self.set_etape_suivante()
 
 

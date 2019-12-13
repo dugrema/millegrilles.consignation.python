@@ -29,7 +29,7 @@ class GenerateurTransaction:
     '''
     def soumettre_transaction(self, message_dict, domaine=None,
                               reply_to=None, correlation_id=None,
-                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4):
+                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
         # Preparer la structure du message reconnue par MilleGrilles
         enveloppe = self.preparer_enveloppe(message_dict, domaine, version=version)
 
@@ -42,19 +42,19 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4):
+    def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
 
         # Identifier usager du systeme, nom de domaine
         signateur_transactions = self._contexte.signateur_transactions
 
-        common_name = signateur_transactions.enveloppe_certificat_courant.subject_common_name
-        identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
+        # common_name = signateur_transactions.enveloppe_certificat_courant.subject_common_name
+        # identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
 
         # Ajouter identificateur unique et temps de la transaction
         uuid_transaction = uuid.uuid1()
 
         meta = dict()
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME] = identificateur_systeme
+        meta[Constantes.CONFIG_IDMG] = self._contexte.idmg
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = version

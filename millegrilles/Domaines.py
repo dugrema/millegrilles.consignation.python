@@ -605,7 +605,7 @@ class GestionnaireDomaine:
 
     @property
     def version_domaine(self):
-        return Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4
+        return Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6
 
 
 class GestionnaireDomaineStandard(GestionnaireDomaine):

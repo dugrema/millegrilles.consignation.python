@@ -611,7 +611,7 @@ class StubGenerateurTransactions:
 
     def soumettre_transaction(self, message_dict, domaine=None,
                               reply_to=None, correlation_id=None,
-                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_4):
+                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
         pass
 
     def emettre_commande_noeuds(self, message_dict, routing_key):
@@ -749,6 +749,19 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
         pass  # Aucun effet
+
+    @property
+    def connectionmq_publisher(self):
+        return DummyConnexion()
+
+
+class DummyConnexion:
+
+    def __init__(self):
+        pass
+
+    def channel(self):
+        pass
 
 
 class MGProcessus:

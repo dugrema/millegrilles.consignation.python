@@ -429,3 +429,7 @@ class ContexteRessourcesMilleGrilles:
     @property
     def signateur_transactions(self):
         return self._signateur_transactions
+
+    @property
+    def idmg(self):
+        return self._configuration.idmg

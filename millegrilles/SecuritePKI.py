@@ -9,6 +9,7 @@ import datetime
 import subprocess
 import tempfile
 import secrets
+import base58
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
@@ -287,7 +288,8 @@ class UtilCertificats:
 
     def verifier_certificat(self, dict_message):
         # self._verifier_usage()  # Deja fait au chargement
-        self._verifier_cn(dict_message)
+        # self._verifier_cn(dict_message)
+        self._verifier_millegrille()
 
     def _charger_certificat(self):
         certfile_path = self.configuration.mq_certfile
@@ -323,29 +325,38 @@ class UtilCertificats:
         if not supporte_signature_numerique:
             raise Exception('Le certificat ne supporte pas les signatures numeriques')
 
-    def _verifier_cn(self, dict_message: dict, enveloppe: EnveloppeCertificat = None):
-        if enveloppe is not None:
-            sujet = enveloppe.certificat.subject
-        else:
-            sujet = self.certificat.subject
-        self._logger.debug('Sujet du certificat')
-        for elem in sujet:
-            self._logger.debug("%s" % str(elem))
+    def _verifier_millegrille(self):
+        """
+        Verifier la millegrille origine avec le SHA-1 base58 (champ en-tete.millegrille)
+        """
+        # Convertir IDMG (base58) en hex
+        pass
 
-        cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-        self._logger.debug("Common Name: %s" % cn)
-
-        message_noeud = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME)
-        if message_noeud is not None and '@' in message_noeud:
-            message_noeud = message_noeud.split('@')[1]
-
-        resultat_comparaison = (cn == message_noeud)
-        if not resultat_comparaison:
-            raise Exception(
-                "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
-                (message_noeud, cn)
-            )
+    # def _verifier_cn(self, dict_message: dict, enveloppe: EnveloppeCertificat = None):
+    #     if enveloppe is not None:
+    #         sujet = enveloppe.certificat.subject
+    #     else:
+    #         sujet = self.certificat.subject
+    #     self._logger.debug('Sujet du certificat')
+    #     for elem in sujet:
+    #         self._logger.debug("%s" % str(elem))
+    #
+    #     cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    #     self._logger.debug("Common Name: %s" % cn)
+    #
+    #     # message_noeud = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(
+    #     #     Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME)
+    #     # if message_noeud is not None and '@' in message_noeud:
+    #     #     message_noeud = message_noeud.split('@')[1]
+    #
+    #     # Verifier la millegrille origine avec le SHA-1 base58 (champ millegrille
+    #
+    #     resultat_comparaison = (cn == message_noeud)
+    #     if not resultat_comparaison:
+    #         raise Exception(
+    #             "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
+    #             (message_noeud, cn)
+    #         )
 
     def hacher_contenu(self, dict_message):
         """
@@ -487,8 +498,9 @@ class VerificateurTransaction(UtilCertificats):
 
         enveloppe_certificat = self._identifier_certificat(dict_message)
         self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
-        self._verifier_cn(dict_message, enveloppe=enveloppe_certificat)
+        # self._verifier_cn(dict_message, enveloppe=enveloppe_certificat)
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
+        self._verifier_millegrille()  # A FAIRE: Verifier que le cert CA du message == IDMG du message
 
         return enveloppe_certificat
 

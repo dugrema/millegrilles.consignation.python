@@ -101,20 +101,21 @@ DEFAUT_PKI_WORKDIR = '/opt/millegrilles/dist/secure/pki'
 DEFAUT_MAITREDESCLES_DIR = '/opt/millegrilles/dist/secure/maitredescles'
 DEFAUT_PKI_SECRET_DIR = '/run/secrets'
 DEFAULT_CA_PASSWORDS = 'pki.ca.passwords'
-DEFAUT_PKI_CERT_MILLEGRILLE = 'pki.ca.millegrille.cert'
-DEFAUT_PKI_KEY_MILLEGRILLE = 'pki.ca.millegrille.key'
-DEFAUT_PKI_PASSWORD_MILLEGRILLE = 'pki.ca.millegrille.password.txt'
-DEFAUT_PKI_CERT_AUTORITE = 'pki.ca.autorite.cert.pem'
-DEFAUT_PKI_KEY_AUTORITE = 'pki.ca.autorite.key.pem'
-DEFAUT_PKI_PASSWORD_AUTORITE = 'pki.ca.autorite.password.txt'
-DEFAUT_PKI_CERT_MAITREDESCLES = 'pki.ca.maitredescles.cert.pem'
-DEFAUT_PKI_KEY_MAITREDESCLES = 'pki.ca.maitredescles.key.pem'
-DEFAUT_PKI_PASSWORD_MAITREDESCLES = 'pki.ca.maitredescles.password.txt'
+DEFAUT_PKI_CERT_MILLEGRILLE = 'pki.millegrille.cert'
+DEFAUT_PKI_KEY_MILLEGRILLE = 'pki.millegrille.key'
+DEFAUT_PKI_PASSWORD_MILLEGRILLE = 'pki.millegrille.password.txt'
+DEFAUT_PKI_CERT_AUTORITE = 'pki.autorite.cert.pem'
+DEFAUT_PKI_KEY_AUTORITE = 'pki.autorite.key.pem'
+DEFAUT_PKI_PASSWORD_AUTORITE = 'pki.autorite.password.txt'
+DEFAUT_PKI_CERT_MAITREDESCLES = 'pki.maitredescles.cert.pem'
+DEFAUT_PKI_KEY_MAITREDESCLES = 'pki.maitredescles.key.pem'
+DEFAUT_PKI_PASSWORD_MAITREDESCLES = 'pki.maitredescles.password.txt'
 
 # Environnement
 PREFIXE_ENV_MG = 'MG_'
 
-TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME = 'source-systeme'
+TRANSACTION_MESSAGE_LIBELLE_IDMG = CONFIG_IDMG
+# TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME = 'source-systeme'   # Remplace par idmg
 TRANSACTION_MESSAGE_LIBELLE_ID_MONGO = '_id-transaction'
 TRANSACTION_MESSAGE_LIBELLE_UUID = 'uuid-transaction'
 TRANSACTION_MESSAGE_LIBELLE_EVENEMENT = '_evenements'  # Precedemment evenements (sans underscore)
@@ -128,8 +129,8 @@ TRANSACTION_MESSAGE_LIBELLE_DOMAINE = 'domaine'
 TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT = 'certificat'
 TRANSACTION_MESSAGE_LIBELLE_HACHAGE = 'hachage-contenu'
 TRANSACTION_MESSAGE_LIBELLE_VERSION = 'version'
-TRANSACTION_MESSAGE_LIBELLE_VERSION_4 = 4
-TRANSACTION_MESSAGE_LIBELLE_VERSION_COURANTE = TRANSACTION_MESSAGE_LIBELLE_VERSION_4
+TRANSACTION_MESSAGE_LIBELLE_VERSION_6 = 6
+TRANSACTION_MESSAGE_LIBELLE_VERSION_COURANTE = TRANSACTION_MESSAGE_LIBELLE_VERSION_6
 TRANSACTION_MESSAGE_LIBELLE_PROPERTIES_MQ = 'properties'
 TRANSACTION_MESSAGE_LIBELLE_RESOUMISSIONS = 'resoumissions'
 
@@ -215,3 +216,5 @@ SECURITE_SECURE = '4.secure'    # Niveau 4, accessible uniquement a l'usager et 
 SECURITE_LIBELLE_REPONSE = 'acces'
 SECURITE_ACCES_REFUSE = '0.refuse'
 SECURITE_ACCES_PERMIS = '1.permis'
+
+CLE_CERT_CA = 'pki.millegrille'
