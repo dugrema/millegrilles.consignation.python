@@ -129,7 +129,7 @@ class TransactionConfiguration:
         """ Formatte la configuration pour connexion a Mongo """
 
         config_mongo = dict()
-        config_mongo['authSource'] = 'mg-%s' % self.idmg
+        config_mongo['authSource'] = '%s' % self.idmg
 
         parametres_mongo = ['host', 'username', 'password']
         parametres_mongo_int = ['port']
