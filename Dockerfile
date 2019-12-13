@@ -1,7 +1,7 @@
 # Image pour scripts python millegrilles.transactionet certains domaines.
 # Note: les fichiers doivent avoir ete copies dans le repertoire courant sous src/
 
-FROM docker.maceroc.com/millegrilles_consignation_python:1.16.2
+FROM docker.maceroc.com/millegrilles_consignation_python:1.18.0
 
 ENV SRC_FOLDER=/opt/millegrilles/build/src
 
