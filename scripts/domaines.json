@@ -18,6 +18,9 @@
     },{
       "module": "millegrilles.domaines.Taches",
       "classe": "GestionnaireTaches"
+    },{
+      "module": "millegrilles.domaines.Annuaire",
+      "classe": "GestionnaireAnnuaire"
     }
   ]
 }

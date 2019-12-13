@@ -301,6 +301,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         self.__throttle_event = Event()
 
         self.__liste_domaines = [
+            'millegrilles.domaines.Annuaires',
             'millegrilles.domaines.GrosFichiers',
             'millegrilles.domaines.MaitreDesCles',
             'millegrilles.domaines.Parametres',
