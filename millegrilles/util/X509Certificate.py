@@ -548,16 +548,18 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
 class GenerateurInitial(GenerateurCertificatMilleGrille):
 
-    def __init__(self, idmg):
+    def __init__(self, idmg, autorite: EnveloppeCleCert = None):
         super().__init__(idmg, None, None)
+        self._autorite = autorite
 
     def generer(self) -> EnveloppeCleCert:
         """
         Sert a generer une chaine initiale de cles et certs CA pour une millegrille
         :return:
         """
+        if self._autorite is None:
+            self._autorite = self._generer_self_signed()
 
-        self._autorite = self._generer_self_signed()
         ss_cert = self._autorite.cert
         ss_skid = self._autorite.skid
         self._dict_ca = {ss_skid: ss_cert}
