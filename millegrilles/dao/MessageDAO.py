@@ -52,7 +52,7 @@ class PikaDAO:
         # Thread utilisee pour verifier le fonctionnement correct de MQ
         self.__maintenance_event = Event()
         self._intervalle_maintenance = 30  # secondes entre execution de maintenance de connexion
-        self.__thread_maintenance = Thread(target=self.executer_maintenance_connexions, name="MQ-Maint")
+        self.__thread_maintenance = Thread(target=self.executer_maintenance_connexions, name="MQ-Maint", daemon=True)
         self.__thread_maintenance.start()
 
         # Liste des processus qui veulent se faire allouer un channel au demarrage
