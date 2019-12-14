@@ -25,20 +25,38 @@ class AnnuaireConstantes:
     LIBELLE_DOC_SECURITE = '_securite'
     LIBELLE_DOC_LIENS_PUBLICS = 'public'
     LIBELLE_DOC_LIENS_PRIVES = 'prive'
+    LIBELLE_DOC_LIENS_RELAIS = 'relais'
     LIBELLE_DOC_USAGER = 'usager'
+    LIBELLE_DOC_DESCRIPTIF = 'descriptif'
     LIBELLE_DOC_CERTIFICAT_RACINE = 'certificat_racine'
     LIBELLE_DOC_CERTIFICAT_FULLCHAIN = 'certificat_fullchain'
     LIBELLE_DOC_CERTIFICAT_ADDITIONNELS = 'certificats_additionnels'
     LIBELLE_DOC_EXPIRATION_INSCRIPTION = 'expiration_inscription'
+    LIBELLE_DOC_RENOUVELLEMENT_INSCRIPTION = 'renouvellement_inscription'
     LIBELLE_DOC_ABONNEMENTS = 'abonnements'
+    LIBELLE_DOC_NOMBRE_FICHES = 'nombre_fiches'
 
     TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
-        LIBELLE_DOC_LISTE: list(),
+        LIBELLE_DOC_LISTE: list(),  # Liste de ENTREE_INDEX, triee par descriptif
+    }
+
+    TEMPLATE_DOCUMENT_ENTREE_INDEX = {
+        LIBELLE_DOC_DESCRIPTIF: None,
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_SECURITE: Constantes.SECURITE_PROTEGE
     }
 
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PRIVEE,
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_LIENS_PRIVES: list(),
+        LIBELLE_DOC_LIENS_RELAIS: list(),
+        LIBELLE_DOC_USAGER: dict(),
+        LIBELLE_DOC_DESCRIPTIF: None,
+        LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
+        LIBELLE_DOC_CERTIFICAT_FULLCHAIN: None,  # Liste certificats du maitredescles + intermediaires
+        LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
     }
 
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PUBLIQUE = {
@@ -50,7 +68,9 @@ class AnnuaireConstantes:
         Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
         LIBELLE_DOC_LIENS_PUBLICS: list(),
         LIBELLE_DOC_LIENS_PRIVES: list(),
+        LIBELLE_DOC_LIENS_RELAIS: list(),
         LIBELLE_DOC_USAGER: dict(),
+        LIBELLE_DOC_DESCRIPTIF: None,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,     # str
         LIBELLE_DOC_CERTIFICAT_FULLCHAIN: None,  # Liste certificats du maitredescles + intermediaires
         LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
@@ -81,7 +101,17 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
     def demarrer(self):
         super().demarrer()
-        # self.initialiser_document(TachesConstantes.LIBVAL_NOTIFICATIONS, TachesConstantes.DOC_NOTIFICATIONS)
+
+        # Initialiser fiche privee au besoin
+        fiche_privee = AnnuaireConstantes.TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE.copy()
+        fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
+        with open(self.configuration.pki_cafile,'r') as fichier:
+            ca_pem = fichier.read()
+        fiche_privee[AnnuaireConstantes.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
+        self.initialiser_document(AnnuaireConstantes.LIBVAL_FICHE_PRIVEE, fiche_privee)
+
+        # Initialiser index au besoin
+        self.initialiser_document(AnnuaireConstantes.LIBVAL_INDEX_MILLEGRILLES, AnnuaireConstantes.TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES.copy())
 
     def get_nom_queue(self):
         return AnnuaireConstantes.QUEUE_SUFFIXE
