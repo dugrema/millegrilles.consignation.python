@@ -363,12 +363,17 @@ class UtilCertificats:
 
     def hacher_contenu(self, dict_message):
         """
-        Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete.
+        Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete et les elements commencant par _.
         :param dict_message:
         :return:
         """
-        dict_message_effectif = dict_message.copy()
-        del dict_message_effectif['en-tete']  # Retirer l'en-tete, on ne fait que hacher le contenu du dict
+        # dict_message_effectif = dict_message.copy()
+        # del dict_message_effectif['en-tete']  # Retirer l'en-tete, on ne fait que hacher le contenu du dict
+        dict_message_effectif = dict()
+        for key, value in dict_message.items():
+            if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
+                dict_message_effectif[key] = value
+
         message_bytes = self.preparer_transaction_bytes(dict_message_effectif)
 
         digest = hashes.Hash(self._contenu_hash_function(), backend=default_backend())

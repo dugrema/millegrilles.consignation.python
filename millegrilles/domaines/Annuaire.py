@@ -3,12 +3,14 @@ from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
+from pymongo.collection import ReturnDocument
+
 import datetime
 import uuid
 import logging
 
 
-class AnnuaireConstantes:
+class ConstantesAnnuaire:
 
     DOMAINE_NOM = 'millegrilles.domaines.Annuaire'
     QUEUE_SUFFIXE = DOMAINE_NOM
@@ -35,6 +37,10 @@ class AnnuaireConstantes:
     LIBELLE_DOC_RENOUVELLEMENT_INSCRIPTION = 'renouvellement_inscription'
     LIBELLE_DOC_ABONNEMENTS = 'abonnements'
     LIBELLE_DOC_NOMBRE_FICHES = 'nombre_fiches'
+
+    TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
+    TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
+    TRANSACTION_MAJ_FICHETIERCE = '%s.maj.ficheTierce' % DOMAINE_NOM
 
     TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
@@ -103,30 +109,30 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         super().demarrer()
 
         # Initialiser fiche privee au besoin
-        fiche_privee = AnnuaireConstantes.TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE.copy()
+        fiche_privee = ConstantesAnnuaire.TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE.copy()
         fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
         with open(self.configuration.pki_cafile, 'r') as fichier:
             ca_pem = fichier.read()
-        fiche_privee[AnnuaireConstantes.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
-        self.initialiser_document(AnnuaireConstantes.LIBVAL_FICHE_PRIVEE, fiche_privee)
+        fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
+        self.initialiser_document(ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE, fiche_privee)
 
         # Initialiser index au besoin
-        self.initialiser_document(AnnuaireConstantes.LIBVAL_INDEX_MILLEGRILLES, AnnuaireConstantes.TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES.copy())
+        self.initialiser_document(ConstantesAnnuaire.LIBVAL_INDEX_MILLEGRILLES, ConstantesAnnuaire.TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES.copy())
 
     def get_nom_queue(self):
-        return AnnuaireConstantes.QUEUE_SUFFIXE
+        return ConstantesAnnuaire.QUEUE_SUFFIXE
 
     def get_nom_collection(self):
-        return AnnuaireConstantes.COLLECTION_DOCUMENTS_NOM
+        return ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM
 
     def get_collection_transaction_nom(self):
-        return AnnuaireConstantes.COLLECTION_TRANSACTIONS_NOM
+        return ConstantesAnnuaire.COLLECTION_TRANSACTIONS_NOM
 
     def get_collection_processus_nom(self):
-        return AnnuaireConstantes.COLLECTION_PROCESSUS_NOM
+        return ConstantesAnnuaire.COLLECTION_PROCESSUS_NOM
 
     def get_nom_domaine(self):
-        return AnnuaireConstantes.DOMAINE_NOM
+        return ConstantesAnnuaire.DOMAINE_NOM
 
     def traiter_cedule(self, message):
         timestamp_message = message['timestamp']['UTC']
@@ -135,21 +141,62 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             # Declencher la verification des actions sur taches
 
     def identifier_processus(self, domaine_transaction):
-        if domaine_transaction == '':
-            processus = "millegrilles_domaines_Annuaire:ProcessusNotificationRecue"
+        if domaine_transaction == ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPRIVEE:
+            processus = "millegrilles_domaines_Annuaire:ProcessusMajFichePrivee"
+        elif domaine_transaction == ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPUBLIQUE:
+            processus = "millegrilles_domaines_Annuaire:ProcessusMajFichePublique"
+        elif domaine_transaction == ConstantesAnnuaire.TRANSACTION_MAJ_FICHETIERCE:
+            processus = "millegrilles_domaines_Annuaire:ProcessusMajFicheTierce"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
 
+    def maj_fiche_privee(self, transaction):
+        # Extraire toutes les valeurs de la transaction qui ne commencent pas par un '_'
+        set_ops = dict()
+        for key, value in transaction.items():
+            if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
+                set_ops[key] = value
+
+        # Effectuer la mise a jour
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
+        fiche_maj = collection_domaine.find_one_and_update(filtre, update=ops, return_document=ReturnDocument.AFTER)
+
+        # Remettre l'entete et la signature pour pouvoir exporter la fiche
+        del fiche_maj['_id']  # Enlever le MongoID
+        # del fiche_maj[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]  # Enlever Entete, on va en mettre une nouvelle
+        # del fiche_maj[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]  # Enlever _signature
+
+        # Preparer la fiche pour etre exportee (transaction maj.fiche.tierce)
+        fiche_exportee = self.generateur_transactions.preparer_enveloppe(fiche_maj, ConstantesAnnuaire.TRANSACTION_MAJ_FICHETIERCE)
+        info_recalculee = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE: fiche_exportee[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE],
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE: fiche_exportee[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE],
+        }
+
+        # Mettre a jour la fiche avec la nouvelle entete et signature
+        collection_domaine.update_one(filtre, {'$set': info_recalculee})
+
 
 class ProcessusAnnuaire(MGProcessusTransaction):
 
     def get_collection_transaction_nom(self):
-        return AnnuaireConstantes.COLLECTION_TRANSACTIONS_NOM
+        return ConstantesAnnuaire.COLLECTION_TRANSACTIONS_NOM
 
     def get_collection_processus_nom(self):
-        return AnnuaireConstantes.COLLECTION_PROCESSUS_NOM
+        return ConstantesAnnuaire.COLLECTION_PROCESSUS_NOM
 
 
 class ProcessusMajFichePrivee(ProcessusAnnuaire):
@@ -162,6 +209,9 @@ class ProcessusMajFichePrivee(ProcessusAnnuaire):
 
     def initiale(self):
         transaction = self.transaction
+
+        self.controleur.gestionnaire.maj_fiche_privee(transaction)
+
         self.set_etape_suivante()  # Termine
 
 
