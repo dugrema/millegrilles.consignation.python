@@ -86,8 +86,8 @@ class PikaDAO:
         # Generer liste de callbacks
         nom_echanges = [
             self.configuration.exchange_middleware,
-            self.configuration.exchange_inter,
             self.configuration.exchange_noeuds,
+            self.configuration.exchange_prive,
             self.configuration.exchange_public
         ]
 
