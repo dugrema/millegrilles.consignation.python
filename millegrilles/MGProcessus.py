@@ -537,11 +537,21 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         }
         processus = collection_processus.find_one(filtre)
 
-        ops = {
-            '$push': {
+        ops = dict()
+        if evenement_dict.get('resultats'):
+            # Format de requete standard, on extrait les resultats
+            ops['$push'] = {
                 'parametres.reponse': evenement_dict.get('resultats')
             }
-        }
+        else:
+            # Format de requete non standard, on exclue l'entete et elements _
+            ops_set = dict()
+            ops['$push'] = {'parametres.reponse': ops_set}
+
+            for key, value in evenement_dict.items():
+                if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
+                    ops_set[key] = value
+
         collection_processus.update_one(filtre, ops)
 
         # Redemarrer le processus

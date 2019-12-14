@@ -100,11 +100,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
 
         self.__nomfichier_maitredescles_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MAITREDESCLES]
+        self.__nomfichier_autorite_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_AUTORITE]
         self.__nomfichier_maitredescles_key = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MAITREDESCLES]
         self.__nomfichier_maitredescles_password = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES]
         self.__clecert_millegrille = None  # Cle et certificat de millegrille
         self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
         self.__certificat_courant_pem = None
+        self.__certificat_intermediaires_pem = None
         self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
 
@@ -130,6 +132,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         try:
             self.charger_certificat_courant()
         except FileNotFoundError as fnf:
+            self._logger.warning("Certificat maitredescles non trouve, on va en generer un nouveau. %s" % str(fnf))
             self.creer_certificat_maitredescles()
 
         self.charger_certificats_backup()
@@ -197,19 +200,22 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         )
         clecert = generateurMaitreDesCles.generer()
 
-        repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
-        self._logger.debug("Sauvegarde cert maitre des cles: %s" % self.__nomfichier_maitredescles_cert)
-        with open('%s/%s' % (repertoire_maitredescles, self.__nomfichier_maitredescles_key), 'wb') as fichier:
+        # repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
+        self._logger.debug("Sauvegarde cert maitre des cles: %s/%s" % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert))
+        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key), 'wb') as fichier:
             fichier.write(clecert.private_key_bytes)
-        with open('%s/%s' % (repertoire_maitredescles, self.__nomfichier_maitredescles_password), 'wb') as fichier:
+        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password), 'wb') as fichier:
             fichier.write(clecert.password)
-        with open('%s/%s' % (repertoire_maitredescles, self.__nomfichier_maitredescles_cert), 'wb') as fichier:
+        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert), 'wb') as fichier:
             fichier.write(clecert.cert_bytes)
+
+        self._logger.info("Nouveau certificat MaitreDesCles genere:\n%s" % (clecert.cert_bytes.decode('utf-8')))
 
         self.__clecert_maitredescles = clecert
 
     def charger_certificat_courant(self):
         fichier_cert = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert)
+        fichier_autorite = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_autorite_cert)
         fichier_cle = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key)
         mot_de_passe = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password)
 
@@ -229,6 +235,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 backend=default_backend()
             )
             self.__certificat_courant_pem = certificat_courant_pem.decode('utf8')
+
+        with open(fichier_autorite, 'rb') as fichier:
+            certificat_autorite_pem = fichier.read()
+            self.__certificat_intermediaires_pem = certificat_autorite_pem.decode('utf8')
 
         self.__clecert_maitredescles = EnveloppeCleCert(cle, cert, motpass)
 
@@ -371,6 +381,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return self.__certificat_courant_pem
 
     @property
+    def get_intermediaires_pem(self):
+        return self.__certificat_intermediaires_pem
+
+    @property
     def get_certificats_backup(self):
         return self.__certificats_backup
 
@@ -427,7 +441,8 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
         # Genere message reponse
         message_resultat = {
-            'certificat': self._gestionnaire.get_certificat_pem
+            'certificat': self._gestionnaire.get_certificat_pem,
+            'certificats_intermediaires': [self._gestionnaire.get_intermediaires_pem],
         }
 
         self._gestionnaire.generateur_transactions.transmettre_reponse(

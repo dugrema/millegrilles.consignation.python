@@ -31,7 +31,8 @@ class ConstantesAnnuaire:
     LIBELLE_DOC_USAGER = 'usager'
     LIBELLE_DOC_DESCRIPTIF = 'descriptif'
     LIBELLE_DOC_CERTIFICAT_RACINE = 'certificat_racine'
-    LIBELLE_DOC_CERTIFICAT_FULLCHAIN = 'certificat_fullchain'
+    LIBELLE_DOC_CERTIFICAT = 'certificat'
+    LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES = 'certificats_intermediaires'
     LIBELLE_DOC_CERTIFICAT_ADDITIONNELS = 'certificats_additionnels'
     LIBELLE_DOC_EXPIRATION_INSCRIPTION = 'expiration_inscription'
     LIBELLE_DOC_RENOUVELLEMENT_INSCRIPTION = 'renouvellement_inscription'
@@ -61,7 +62,8 @@ class ConstantesAnnuaire:
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
-        LIBELLE_DOC_CERTIFICAT_FULLCHAIN: None,  # Liste certificats du maitredescles + intermediaires
+        LIBELLE_DOC_CERTIFICAT: None,  # Certificat du maitredescles
+        LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
         LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
     }
 
@@ -78,7 +80,7 @@ class ConstantesAnnuaire:
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,     # str
-        LIBELLE_DOC_CERTIFICAT_FULLCHAIN: None,  # Liste certificats du maitredescles + intermediaires
+        LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
         LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
         LIBELLE_DOC_SECURITE: Constantes.SECURITE_PROTEGE,
         LIBELLE_DOC_EXPIRATION_INSCRIPTION: None,  # Date d'expiration du certificat
@@ -189,6 +191,8 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         # Mettre a jour la fiche avec la nouvelle entete et signature
         collection_domaine.update_one(filtre, {'$set': info_recalculee})
 
+        return fiche_exportee
+
 
 class ProcessusAnnuaire(MGProcessusTransaction):
 
@@ -210,7 +214,25 @@ class ProcessusMajFichePrivee(ProcessusAnnuaire):
     def initiale(self):
         transaction = self.transaction
 
-        self.controleur.gestionnaire.maj_fiche_privee(transaction)
+        fiche_exportee = self.controleur.gestionnaire.maj_fiche_privee(transaction)
+
+        if fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT) is None:
+            # Le certificat du maitre des cles n'a pas ete ajoute. On fait une requete.
+            domaine = 'millegrilles.domaines.MaitreDesCles.certMaitreDesCles'
+            requete = {
+                '_evenements': 'certMaitreDesCles'
+            }
+
+            self.set_requete(domaine, requete)
+            self.set_etape_suivante(ProcessusMajFichePrivee.maj_maitredescles.__name__)
+
+        else:
+            self.set_etape_suivante()  # Termine
+
+    def maj_maitredescles(self):
+        reponse = self.parametres['reponse'][0]
+
+        self.controleur.gestionnaire.maj_fiche_privee(reponse)
 
         self.set_etape_suivante()  # Termine
 
