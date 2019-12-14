@@ -147,3 +147,7 @@ class ModeleConfiguration:
     @property
     def contexte(self):
         return self._contexte
+
+    @property
+    def channel(self):
+        return self.__channel

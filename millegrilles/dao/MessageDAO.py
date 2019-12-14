@@ -645,6 +645,10 @@ class PikaDAO:
         return self.__connexionmq_publisher.channel
 
     @property
+    def channel_publisher(self):
+        return self.__connexionmq_publisher.channel
+
+    @property
     def queue_reponse(self):
         return self._queue_reponse
 
