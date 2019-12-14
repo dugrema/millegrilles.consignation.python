@@ -25,8 +25,9 @@ class ConstantesAnnuaire:
 
     LIBELLE_DOC_LISTE = 'liste'
     LIBELLE_DOC_SECURITE = '_securite'
-    LIBELLE_DOC_LIENS_PUBLICS = 'public'
-    LIBELLE_DOC_LIENS_PRIVES = 'prive'
+    LIBELLE_DOC_LIENS_PUBLICS_HTTPS = 'public_https'
+    LIBELLE_DOC_LIENS_PRIVES_MQ = 'prive_mq'
+    LIBELLE_DOC_LIENS_PRIVES_HTTPS = 'prive_https'
     LIBELLE_DOC_LIENS_RELAIS = 'relais'
     LIBELLE_DOC_USAGER = 'usager'
     LIBELLE_DOC_DESCRIPTIF = 'descriptif'
@@ -45,7 +46,7 @@ class ConstantesAnnuaire:
 
     TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
-        LIBELLE_DOC_LISTE: list(),  # Liste de ENTREE_INDEX, triee par descriptif
+        LIBELLE_DOC_LISTE: dict(),  # Dict de ENTREE_INDEX, key=IDMG
     }
 
     TEMPLATE_DOCUMENT_ENTREE_INDEX = {
@@ -57,7 +58,7 @@ class ConstantesAnnuaire:
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PRIVEE,
         Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
-        LIBELLE_DOC_LIENS_PRIVES: list(),
+        LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
         LIBELLE_DOC_LIENS_RELAIS: list(),
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
@@ -74,8 +75,8 @@ class ConstantesAnnuaire:
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_TIERCE,
         Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
-        LIBELLE_DOC_LIENS_PUBLICS: list(),
-        LIBELLE_DOC_LIENS_PRIVES: list(),
+        LIBELLE_DOC_LIENS_PUBLICS_HTTPS: list(),
+        LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
         LIBELLE_DOC_LIENS_RELAIS: list(),
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
