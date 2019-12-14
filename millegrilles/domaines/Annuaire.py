@@ -39,6 +39,7 @@ class ConstantesAnnuaire:
     LIBELLE_DOC_RENOUVELLEMENT_INSCRIPTION = 'renouvellement_inscription'
     LIBELLE_DOC_ABONNEMENTS = 'abonnements'
     LIBELLE_DOC_NOMBRE_FICHES = 'nombre_fiches'
+    LIBELLE_DOC_TYPE_FICHE = 'type'
 
     TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
@@ -191,6 +192,28 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
         # Mettre a jour la fiche avec la nouvelle entete et signature
         collection_domaine.update_one(filtre, {'$set': info_recalculee})
+
+        # Mise a jour index
+        descriptif = fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_DESCRIPTIF)
+        if descriptif is None:
+            descriptif = fiche_exportee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        set_index = {
+            '%s.%s.%s' % (
+                ConstantesAnnuaire.LIBELLE_DOC_LISTE,
+                fiche_exportee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG],
+                ConstantesAnnuaire.LIBELLE_DOC_DESCRIPTIF
+            ): descriptif,
+            '%s.%s.%s' % (
+                ConstantesAnnuaire.LIBELLE_DOC_LISTE,
+                fiche_exportee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG],
+                ConstantesAnnuaire.LIBELLE_DOC_TYPE_FICHE
+            ): ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE,
+        }
+        collection_domaine.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_INDEX_MILLEGRILLES},
+            {'$set': set_index}
+        )
 
         return fiche_exportee
 
