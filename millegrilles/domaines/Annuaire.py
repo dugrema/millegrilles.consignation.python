@@ -105,7 +105,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         # Initialiser fiche privee au besoin
         fiche_privee = AnnuaireConstantes.TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE.copy()
         fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
-        with open(self.configuration.pki_cafile,'r') as fichier:
+        with open(self.configuration.pki_cafile, 'r') as fichier:
             ca_pem = fichier.read()
         fiche_privee[AnnuaireConstantes.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
         self.initialiser_document(AnnuaireConstantes.LIBVAL_FICHE_PRIVEE, fiche_privee)
@@ -143,7 +143,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         return processus
 
 
-class ProcessusTaches(MGProcessusTransaction):
+class ProcessusAnnuaire(MGProcessusTransaction):
 
     def get_collection_transaction_nom(self):
         return AnnuaireConstantes.COLLECTION_TRANSACTIONS_NOM
@@ -152,7 +152,10 @@ class ProcessusTaches(MGProcessusTransaction):
         return AnnuaireConstantes.COLLECTION_PROCESSUS_NOM
 
 
-class ProcessusNotificationRecue(ProcessusTaches):
+class ProcessusMajFichePrivee(ProcessusAnnuaire):
+    """
+    Met a jour la fiche privee
+    """
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -160,3 +163,112 @@ class ProcessusNotificationRecue(ProcessusTaches):
     def initiale(self):
         transaction = self.transaction
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusMajFichePublique(ProcessusAnnuaire):
+    """
+    Ajoute/met a jour et publie la fiche publique
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusMajFicheTierce(ProcessusAnnuaire):
+    """
+    Ajoute/met a jour une fiche de MilleGrille tierce
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusInscrireMilleGrilleTierceLocalement(ProcessusAnnuaire):
+    """
+    Processus qui genere un certificat de connexion pour la MilleGrille locale suite a une demande d'une MilleGrille tierce.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusDemandeInscrireAMilleGrilleTierce(ProcessusAnnuaire):
+    """
+    Processus qui demande un certificat a une MilleGrille tierce pour la MilleGrille locale.
+    Ce processus peut servir pour une demande initiale ou pour le renouvellement du certificat.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusCompleterInscriptionAMilleGrilleTierce(ProcessusAnnuaire):
+    """
+    Processus qui recoit un certificat de connexion a une MilleGrille tierce.
+    Ce certificat est indexe par module de connexion inter-millegrille (celui a qui la cle prive appartient).
+    La transaction est re-emise avec routing pki pour etre conservee dans le domaine pki.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusDemarrerConversation(ProcessusAnnuaire):
+    """
+    Permet de demarrer une conversation avec une MilleGrille tierce.
+    Transmet une cle secrete cryptee avec la cle publique dans la fiche tierce.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusRecevoirMessageProtege(ProcessusAnnuaire):
+    """
+    Recoit un message d'une MilleGrille tierce.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransmettreMessageProtege(ProcessusAnnuaire):
+    """
+    Transmet un message a une MilleGrille tierce.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+

@@ -68,10 +68,15 @@ class ConstantesPrincipale:
             'Parametres': {
                 'rang': 1,
                 'description': 'Parametres'
+            },
+            'Annuaire': {
+                'rang': 1,
+                'description': 'Annuaire'
             }
         },
         "menu": [
             'Principale',
+            'Annuaire',
             'GrosFichiers',
             'Plume',
             'SenseursPassifs',
