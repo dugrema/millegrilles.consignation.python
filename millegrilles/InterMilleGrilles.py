@@ -60,9 +60,8 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         self.__logger.info("Fin execution InterMilleGrilles")
 
     def exit_gracefully(self, signum=None, frame=None):
-        self.__logger.warning("Arret de GestionnaireDomaine")
+        self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
         self._stop_event.set()
-        # self.contexte.message_dao.deconnecter()
         super().exit_gracefully(signum, frame)
 
     def on_channel_open(self, channel):

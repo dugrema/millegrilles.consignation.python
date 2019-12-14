@@ -116,7 +116,7 @@ class ModeleConfiguration:
 
             self._logger.info("Debut execution")
             self.executer()  # Executer le download et envoyer message
-            self._logger.info("Fin execution")
+            self._logger.info("Fin execution " + self.__class__.__name__)
 
         except Exception as e:
             print("MAIN: Erreur fatale, voir log. Erreur %s" % str(e))
