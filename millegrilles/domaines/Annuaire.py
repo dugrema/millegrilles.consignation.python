@@ -16,6 +16,49 @@ class AnnuaireConstantes:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
 
+    LIBVAL_INDEX_MILLEGRILLES = 'index.millegrilles'
+    LIBVAL_FICHE_TIERCE = 'fiche.tierce'
+    LIBVAL_FICHE_PRIVEE = 'fiche.privee'      # Fiche privee de la millegrille locale
+    LIBVAL_FICHE_PUBLIQUE = 'fiche.publique'  # Fiche publique de la millegrille locale signee par le maitredescles
+
+    LIBELLE_DOC_LISTE = 'liste'
+    LIBELLE_DOC_SECURITE = '_securite'
+    LIBELLE_DOC_LIENS_PUBLICS = 'public'
+    LIBELLE_DOC_LIENS_PRIVES = 'prive'
+    LIBELLE_DOC_USAGER = 'usager'
+    LIBELLE_DOC_CERTIFICAT_RACINE = 'certificat_racine'
+    LIBELLE_DOC_CERTIFICAT_FULLCHAIN = 'certificat_fullchain'
+    LIBELLE_DOC_CERTIFICAT_ADDITIONNELS = 'certificats_additionnels'
+    LIBELLE_DOC_EXPIRATION_INSCRIPTION = 'expiration_inscription'
+    LIBELLE_DOC_ABONNEMENTS = 'abonnements'
+
+    TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
+        LIBELLE_DOC_LISTE: list(),
+    }
+
+    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PRIVEE,
+    }
+
+    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PUBLIQUE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PUBLIQUE,
+    }
+
+    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_TIERCE,
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_LIENS_PUBLICS: list(),
+        LIBELLE_DOC_LIENS_PRIVES: list(),
+        LIBELLE_DOC_USAGER: dict(),
+        LIBELLE_DOC_CERTIFICAT_RACINE: None,     # str
+        LIBELLE_DOC_CERTIFICAT_FULLCHAIN: None,  # Liste certificats du maitredescles + intermediaires
+        LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
+        LIBELLE_DOC_SECURITE: Constantes.SECURITE_PROTEGE,
+        LIBELLE_DOC_EXPIRATION_INSCRIPTION: None,  # Date d'expiration du certificat
+        LIBELLE_DOC_ABONNEMENTS: dict(),  # Dict d'abonnements pour cette MilleGrille
+    }
+
 
 class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
