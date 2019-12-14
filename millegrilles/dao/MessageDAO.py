@@ -309,7 +309,7 @@ class PikaDAO:
         self.transmettre_message(
             document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
-    def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder):
+    def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder, exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS):
         """
         Sert a transmettre une commande vers un noeud
         :param document_commande:
@@ -329,7 +329,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(document_commande, encoding)
         with self.lock_transmettre_message:
             channel.basic_publish(
-                exchange=self.configuration.exchange_noeuds,
+                exchange=exchange,
                 routing_key=routing_key,
                 body=message_utf8,
                 properties=properties,

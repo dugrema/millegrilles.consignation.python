@@ -115,6 +115,16 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
 
     def __init__(self, message_dao, configuration):
         super().__init__(message_dao, configuration)
+        self.__logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
+
+    def traiter_message(self, ch, method, properties, body):
+        """
+        S'occupe de l'execution d'une commande.
+        """
+        routing_key = method.routing_key
+        exchange = method.exchange
+
+        self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
 
 
 class ConnexionInterMilleGrilles:
