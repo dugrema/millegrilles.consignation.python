@@ -14,6 +14,7 @@ import datetime
 import json
 import tempfile
 import os
+import shutil
 
 
 class ConstantesInterMilleGrilles:
@@ -87,7 +88,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
     def __fermeture(self):
         self.enlever_toutes_connexions()
         try:
-            os.removedirs(self.interca_dir)
+            shutil.rmtree(self.interca_dir)
         except Exception:
             self.__logger.exception("Erreur suppression repertoire certificats")
 
@@ -248,7 +249,7 @@ class ConfigurationInterMilleGrilles:
         # Sauvegarder le ca localement
         tmp_file_ca = os.path.join(self._repertoire_interca, self._idmg + '.cert.pem')
         try:
-            with open(tmp_file_ca, 'wb') as fichier:
+            with open(tmp_file_ca, 'w') as fichier:
                 fichier.write(cert_ca_pem)
         except Exception:
             self.__logger.exception("Erreur excriture cert CA pour idmg=%s" % self._idmg)
