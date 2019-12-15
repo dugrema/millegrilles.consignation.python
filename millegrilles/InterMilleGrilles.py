@@ -3,12 +3,14 @@
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import TraitementMessageCallback
+from millegrilles.dao.MessageDAO import TraitementMessageCallback, JSONHelper
 
 from threading import Event, Thread, Lock
 
 import logging
 import datetime
+import json
+
 
 class ConstantesInterMilleGrilles:
 
@@ -42,7 +44,8 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         super().initialiser(False, True, True)
         self.__logger.info("On enregistre la queue de commandes")
 
-        self.__callback_q_locale = TraitementMessageQueueLocale(self.contexte.message_dao, self.contexte.configuration)
+        self.__callback_q_locale = TraitementMessageQueueLocale(
+            self, self.contexte.message_dao, self.contexte.configuration)
         self.__logger.info("Attente Q et routes prets")
 
         self.__attendre_q_prete.wait(10)
@@ -62,6 +65,13 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
     def exit_gracefully(self, signum=None, frame=None):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
         self._stop_event.set()
+
+        for connexion in self.__connexions.values():
+            try:
+                connexion.arreter()
+            except:
+                pass
+
         super().exit_gracefully(signum, frame)
 
     def on_channel_open(self, channel):
@@ -110,11 +120,27 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
     def __compter_route(self, frame):
         self.__logger.debug("Frame route: %s" % str(frame))
 
+    def connecter_millegrille(self, commande):
+        """
+        Tente de se connecter a une MilleGrille distante
+        """
+        idmg = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        connexion_existante = self.__connexions.get(idmg)
+        if connexion_existante is None:
+            # Creer une nouvelle connexion. La classe va s'occuper d'etablir une connexion si c'est possible.
+            connexion = ConnexionInterMilleGrilles(self, idmg)
+            self.__connexions[idmg] = connexion
+            connexion.demarrer()
+        else:
+            self.__logger.warning("Demande de connexion a %s mais une thread de connexion est deja en cours")
+            connexion_existante.poke()
+
 
 class TraitementMessageQueueLocale(TraitementMessageCallback):
 
-    def __init__(self, message_dao, configuration):
+    def __init__(self, connecteur, message_dao, configuration):
         super().__init__(message_dao, configuration)
+        self.__connecteur = connecteur
         self.__logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
 
     def traiter_message(self, ch, method, properties, body):
@@ -123,8 +149,29 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
         """
         routing_key = method.routing_key
         exchange = method.exchange
+        dict_message = json.loads(body)
+
+        if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
+            if routing_key == ConstantesInterMilleGrilles.COMMANDE_CONNECTER:
+                self.__connecteur.connecter_millegrille(dict_message)
 
         self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
+
+
+class TraitementMessageLocalVersTiers(TraitementMessageCallback):
+
+    def __init__(self, connecteur, message_dao, configuration):
+        super().__init__(message_dao, configuration)
+        self.__connecteur = connecteur
+        self.__logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
+
+    def traiter_message(self, ch, method, properties, body):
+        """
+        S'occupe de la reception d'un message en amont a transferer vers la millegrille designee.
+        """
+        routing_key = method.routing_key
+        exchange = method.exchange
+        dict_message = json.loads(body)
 
 
 class ConnexionInterMilleGrilles:
@@ -132,18 +179,78 @@ class ConnexionInterMilleGrilles:
     Represente une connexion avec une instance de RabbitMQ.
     """
 
-    def __init__(self):
-        self.__idmg = None  # IDMG de la connexion (millegrille distante)
+    def __init__(self, connecteur: ConnecteurInterMilleGrilles, idmg: str):
+        self.__connecteur = connecteur
+        self.__idmg = idmg  # IDMG de la connexion (millegrille distante)
+        self.__thread = Thread(name="CX-" + idmg, target=self.executer, daemon=True)
+
+        self.__traitement_local_vers_tiers = TraitementMessageLocalVersTiers(
+            connecteur, connecteur.contexte.message_dao, connecteur.contexte.configuration)
+        self.__ctag_local = None
+
+        self.__nom_q = idmg
+
+        self.__connexion_mq_distante = None
+        self.__channel_distant = None
+
         self.__certificat = None  # Certificat client utilise pour se connecter
         self.__cle_privee = None
-        self.__dernierer_activite = datetime.datetime.utcnow()
+        self.__derniere_activite = datetime.datetime.utcnow()
 
         # Temps d'inactivite apres lequel on ferme la connexion
         self.__temps_inactivite_secs = datetime.timedelta(seconds=300)
 
+        self.__wait_event = Event()
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def faker(self):
+        self.__certificat = self.__connecteur.contexte.configuration.mq_certfile
+        self.__cle_privee = self.__connecteur.contexte.configuration.mq_keyfile
+
+    def poke(self):
+        self.__logger.warning("On vient de se faire poker (idmg: %s)" % self.__idmg)
+
+    def demarrer(self):
+        self.__logger.info("Demarrage thread connexion a " + self.__idmg)
+        self.__thread.start()
+
+    def executer(self):
+        self.__logger.info("Execution thread connexion a " + self.__idmg)
+
+        self.definir_q_locale()
+
+        while not self.__wait_event.is_set():
+            self.__wait_event.wait(10)
+
+        self.__logger.info("Fin execution thread connexion a " + self.__idmg)
+
+    def arreter(self):
+        self.__wait_event.set()
+
     def definir_q_locale(self):
         """
         Tente d'ouvrir une Q exclusive locale au nom de la MilleGrille distante.
+        """
+        # Creer la Q sur la connexion en aval
+        self.__connecteur.channel.queue_declare(
+            queue=self.__nom_q,
+            durable=False,
+            exclusive=True,
+            callback=self.creer_bindings_local,
+        )
+
+    def creer_bindings_local(self, queue):
+        self.__logger.info("Ouverture Q locale pour %s: %s" % (self.__idmg, str(queue)))
+        self.__ctag_local = self.__connecteur.channel.basic_consume(
+            self.__traitement_local_vers_tiers.callbackAvecAck,
+            queue=self.__nom_q,
+            no_ack=False
+        )
+
+    def preparer_certificat(self):
+        """
+        S'assure d'avoir le certificat requis et la cle pour se connecter a la MilleGrille distante.
         """
         pass
 
