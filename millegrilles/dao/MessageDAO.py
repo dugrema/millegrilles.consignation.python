@@ -62,6 +62,18 @@ class ConnexionWrapper:
             'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
         }
 
+        if self.configuration.mq_ssl == 'on':
+            ssl_options = {
+                'ssl_version': ssl.PROTOCOL_TLSv1_2,
+                'keyfile': self.configuration.mq_keyfile,
+                'certfile': self.configuration.mq_certfile,
+                'ca_certs': self.configuration.mq_cafile,
+                'cert_reqs': ssl.CERT_REQUIRED
+            }
+
+            connection_parameters['ssl'] = True
+            connection_parameters['ssl_options'] = ssl_options
+
         self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
 
         if self.configuration.mq_auth_cert == 'on':
@@ -74,18 +86,6 @@ class ConnexionWrapper:
                 'erase_on_connect': True
             }
             connection_parameters['credentials'] = PlainCredentials(**credentials)
-
-        if self.configuration.mq_ssl == 'on':
-            ssl_options = {
-                'ssl_version': ssl.PROTOCOL_TLSv1_2,
-                'keyfile': self.configuration.mq_keyfile,
-                'certfile': self.configuration.mq_certfile,
-                'ca_certs': self.configuration.mq_cafile,
-                'cert_reqs': ssl.CERT_REQUIRED
-            }
-
-            connection_parameters['ssl'] = True
-            connection_parameters['ssl_options'] = ssl_options
 
         return connection_parameters
 

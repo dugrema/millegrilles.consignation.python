@@ -3,11 +3,12 @@
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import TraitementMessageCallback, JSONHelper
+from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrapper, JSONHelper
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 
-from threading import Event, Thread, Lock
+from threading import Event, Thread, Lock, Barrier
+from pika.channel import Channel
 
 import logging
 import datetime
@@ -216,8 +217,8 @@ class ConfigurationInterMilleGrilles:
         self._port = None
         self._cafile = None
 
-        self._keyfile = None
-        self._certfile = None
+        self._keyfile = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, self.idmg+'.key.pem')
+        self._certfile = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_CERTS, self.idmg+'.cert.pem')
 
         self._parse_host()
         self._extraire_cafile()
@@ -248,6 +249,7 @@ class ConfigurationInterMilleGrilles:
 
         # Sauvegarder le ca localement
         tmp_file_ca = os.path.join(self._repertoire_interca, self._idmg + '.cert.pem')
+        self._cafile = tmp_file_ca
         try:
             with open(tmp_file_ca, 'w') as fichier:
                 fichier.write(cert_ca_pem)
@@ -286,6 +288,10 @@ class ConfigurationInterMilleGrilles:
     def mq_ssl(self):
         return "on"
 
+    @property
+    def mq_auth_cert(self):
+        return "on"
+
 
 class ConnexionInterMilleGrilles:
     """
@@ -312,14 +318,10 @@ class ConnexionInterMilleGrilles:
         # Information de connexion
         self.__fiche_privee_tiers = None
         self.__configuration_connexion = None
-        self.__certificat = None  # Certificat client utilise pour se connecter
-        self.__cle_privee = None
 
         # Connexions distantes en amont et aval
         self.__connexion_mq_amont_distante = None
-        self.__channel_amont_distant = None
         self.__connexion_mq_aval_distante = None
-        self.__channel_aval_distant = None
 
         self.__derniere_activite = datetime.datetime.utcnow()
 
@@ -327,11 +329,7 @@ class ConnexionInterMilleGrilles:
         self.__temps_inactivite_secs = datetime.timedelta(seconds=300)
 
         self.__connexion_event = Event()
-        self.__wait_event = Event()
-
-    def faker(self):
-        self.__certificat = self.__connecteur.contexte.configuration.mq_certfile
-        self.__cle_privee = self.__connecteur.contexte.configuration.mq_keyfile
+        self.__stop_event = Event()
 
     def poke(self):
         self.__logger.warning("On vient de se faire poker (idmg: %s)" % self.__idmg)
@@ -349,12 +347,15 @@ class ConnexionInterMilleGrilles:
             self.ouvrir_canal_amont_local()
             self.__connexion_event.wait(10)
             if not self.__connexion_event.is_set():
-                raise Exception('Erreur connexion idmg=%s, channel pas pret' % self.__idmg)
+                raise Exception('Erreur connexion idmg=%s, channel local pas pret' % self.__idmg)
+            self.__connexion_event.clear()
 
-            self.__logger.info("Connexion amont locale %s prete" % self.__idmg)
+            self.__logger.info("Connexion amont locale %s prete, demarrage connexions distantes" % self.__idmg)
 
-            while not self.__wait_event.is_set():
-                self.__wait_event.wait(10)
+            self.connecter_mq_distant()  # Methode blocking (barrier)
+
+            while not self.__stop_event.is_set():
+                self.__stop_event.wait(10)
 
         finally:
             self._fermeture()
@@ -362,7 +363,7 @@ class ConnexionInterMilleGrilles:
         self.__logger.info("Fin execution thread connexion a " + self.__idmg)
 
     def arreter(self):
-        self.__wait_event.set()
+        self.__stop_event.set()
         self.__connexion_event.set()
 
     def _fermeture(self):
@@ -371,6 +372,16 @@ class ConnexionInterMilleGrilles:
         self.__connecteur.contexte.message_dao.enlever_channel_listener(self)
         try:
             self.__channel_amont_local.close()
+        except:
+            pass
+
+        try:
+            self.__connexion_mq_aval_distante.deconnecter()
+        except:
+            pass
+
+        try:
+            self.__connexion_mq_amont_distante.deconnecter()
         except:
             pass
 
@@ -434,33 +445,20 @@ class ConnexionInterMilleGrilles:
             no_ack=False
         )
 
-    def preparer_certificat(self):
-        """
-        S'assure d'avoir le certificat requis et la cle pour se connecter a la MilleGrille distante.
-        """
-        pass
-
     def connecter_mq_distant(self):
         """
         Se connecte a la MilleGrille distante avec le certificat approprie
         """
-        pass
+        self.__connexion_mq_aval_distante = ConnexionWrapper(self.__configuration_connexion, self.__stop_event)
+        self.__connexion_mq_amont_distante = ConnexionWrapper(self.__configuration_connexion, self.__stop_event)
 
-    def connexion_distante_ouverte(self):
-        """
-        Callback sur ouverture de connexion distante pour ouvrir un channel
-        """
-        pass
-
-    def channel_distant_ouvert(self):
-        """
-        Callback sur ouverture
-        """
-
-    def connexion_distante_fermee(self):
-        """
-        Callback sur fermeture de la connexion distante
-        """
+        # Ouvrir les connexions, donner 20 secondes max avant d'abandonner
+        barrier = Barrier(3)
+        self.__connexion_mq_aval_distante.connecter(barrier)
+        self.__connexion_mq_amont_distante.connecter(barrier)
+        barrier.wait(20)
+        if barrier.broken:
+            raise Exception("Erreur connexion a MQ distant")
 
     def demander_maj_certificat(self):
         """
