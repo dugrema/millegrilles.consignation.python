@@ -7,11 +7,12 @@ from cryptography.x509.name import NameOID
 from cryptography.x509.extensions import ExtensionNotFound
 from cryptography.hazmat.primitives import asymmetric
 
-
 import datetime
 import secrets
 import base64
 import logging
+import base58
+
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import ConstantesSecurityPki
 
@@ -155,6 +156,10 @@ class EnveloppeCleCert:
     @property
     def fingerprint(self):
         return bytes.hex(self.cert.fingerprint(hashes.SHA1()))
+
+    @property
+    def fingerprint_base58(self):
+        return base58.b58encode(self.cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
     @property
     def not_valid_before(self):

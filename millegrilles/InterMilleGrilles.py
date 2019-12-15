@@ -4,17 +4,26 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback, JSONHelper
+from millegrilles.domaines.Annuaire import ConstantesAnnuaire
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 from threading import Event, Thread, Lock
 
 import logging
 import datetime
 import json
+import tempfile
+import os
 
 
 class ConstantesInterMilleGrilles:
 
     COMMANDE_CONNECTER = 'commande.inter.connecter'
+
+    REPERTOIRE_INTER = '/opt/millegrilles/dist/inter'
+    REPERTOIRE_FICHES = os.path.join(REPERTOIRE_INTER, "fiches")
+    REPERTOIRE_CERTS = os.path.join(REPERTOIRE_INTER, "certs")
+    REPERTOIRE_SECRETS = os.path.join(REPERTOIRE_INTER, "secrets")
 
 
 class ConnecteurInterMilleGrilles(ModeleConfiguration):
@@ -34,6 +43,9 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         self.__callback_q_locale = None
         self.__ctag_local = None
         self.__q_locale = None
+
+        # Repertoire temporaire pour conserver les fichiers de certificats
+        self.interca_dir = tempfile.mkdtemp(prefix='interca_')
 
         self._stop_event = Event()
 
@@ -57,18 +69,27 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             self.__logger.info("Q et routes prets")
 
     def executer(self):
-        while not self._stop_event.is_set():
-            self._stop_event.wait(60)
 
-        self.__logger.info("Fin execution InterMilleGrilles")
+        try:
+            while not self._stop_event.is_set():
+                self._stop_event.wait(60)
+
+        finally:
+            self.__logger.info("Fin execution InterMilleGrilles")
+            self.__fermeture()
 
     def exit_gracefully(self, signum=None, frame=None):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
         self._stop_event.set()
 
-        self.enlever_toutes_connexions()
-
         super().exit_gracefully(signum, frame)
+
+    def __fermeture(self):
+        self.enlever_toutes_connexions()
+        try:
+            os.removedirs(self.interca_dir)
+        except Exception:
+            self.__logger.exception("Erreur suppression repertoire certificats")
 
     def on_channel_open(self, channel):
         """
@@ -178,6 +199,93 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
         self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
 
 
+class ConfigurationInterMilleGrilles:
+    """
+    Configuration a utiliser pour se connecter a une MilleGrille distante
+    """
+
+    def __init__(self, fiche_privee, repertoire_interca, heartbeat=30):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._fiche_privee = fiche_privee
+        self._repertoire_interca = repertoire_interca
+        self._heartbeat = heartbeat
+
+        self._idmg = fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        self._host = None
+        self._port = None
+        self._cafile = None
+
+        self._keyfile = None
+        self._certfile = None
+
+        self._parse_host()
+        self._extraire_cafile()
+
+    def _parse_host(self):
+        """
+        Separer les entree de host prives amqps en hostname,
+        """
+        hosts = self._fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_LIENS_PRIVES_MQ]
+        host = hosts[0]
+        hostname_port = host.split('/')[2].split(':')
+        self._host = hostname_port[0]
+        self._port = hostname_port[1]
+
+    def _extraire_cafile(self):
+        """
+        Extraire le CA file pour la millegrille distante (et valide le IDMG).
+        """
+        cert_ca_pem = self._fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE]
+
+        # Valider le certificat, il faut s'assurer que le fingerprint=IDMG
+        clecert_ca = EnveloppeCleCert()
+        clecert_ca.cert_from_pem_bytes(cert_bytes=cert_ca_pem.encode('utf-8'))
+        fingerprint = clecert_ca.fingerprint_base58
+
+        # if fingerprint != self._idmg:
+        #     raise Exception("Fingerprint %s du certificat CA ne correspond pas a IDMG %s" % (fingerprint, self._idmg))
+
+        # Sauvegarder le ca localement
+        tmp_file_ca = os.path.join(self._repertoire_interca, self._idmg + '.cert.pem')
+        try:
+            with open(tmp_file_ca, 'wb') as fichier:
+                fichier.write(cert_ca_pem)
+        except Exception:
+            self.__logger.exception("Erreur excriture cert CA pour idmg=%s" % self._idmg)
+
+    @property
+    def idmg(self):
+        return self._idmg
+
+    @property
+    def mq_host(self):
+        return self._host
+
+    @property
+    def mq_port(self):
+        return self._port
+
+    @property
+    def mq_heartbeat(self):
+        return self._heartbeat
+
+    @property
+    def mq_keyfile(self):
+        return self._keyfile
+
+    @property
+    def mq_certfile(self):
+        return self._certfile
+
+    @property
+    def mq_cafile(self):
+        return self._cafile
+
+    @property
+    def mq_ssl(self):
+        return "on"
+
+
 class ConnexionInterMilleGrilles:
     """
     Represente une connexion avec une instance de RabbitMQ.
@@ -200,14 +308,18 @@ class ConnexionInterMilleGrilles:
 
         self.__nom_q = 'inter.' + idmg
 
+        # Information de connexion
+        self.__fiche_privee_tiers = None
+        self.__configuration_connexion = None
+        self.__certificat = None  # Certificat client utilise pour se connecter
+        self.__cle_privee = None
+
         # Connexions distantes en amont et aval
         self.__connexion_mq_amont_distante = None
         self.__channel_amont_distant = None
         self.__connexion_mq_aval_distante = None
         self.__channel_aval_distant = None
 
-        self.__certificat = None  # Certificat client utilise pour se connecter
-        self.__cle_privee = None
         self.__derniere_activite = datetime.datetime.utcnow()
 
         # Temps d'inactivite apres lequel on ferme la connexion
@@ -231,6 +343,8 @@ class ConnexionInterMilleGrilles:
         self.__logger.info("Execution thread connexion a " + self.__idmg)
 
         try:
+            self.charger_configuration_tiers()
+
             self.ouvrir_canal_amont_local()
             self.__connexion_event.wait(10)
             if not self.__connexion_event.is_set():
@@ -251,12 +365,19 @@ class ConnexionInterMilleGrilles:
         self.__connexion_event.set()
 
     def _fermeture(self):
+        self.__logger.info("Fermeture connexion idmg %s" % self.idmg)
         self.__connecteur.enlever_connexion(self.__idmg)
         self.__connecteur.contexte.message_dao.enlever_channel_listener(self)
         try:
             self.__channel_amont_local.close()
         except:
             pass
+
+    def charger_configuration_tiers(self):
+        with open(os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_FICHES, self.idmg+'.json')) as fichier:
+            self.__fiche_privee_tiers = json.load(fichier)
+        self.__configuration_connexion = ConfigurationInterMilleGrilles(
+            self.__fiche_privee_tiers, self.connecteur.interca_dir)
 
     def ouvrir_canal_amont_local(self):
         # Enregistrer nouveau canal via DAO (managed pour les exceptions de connexions)
