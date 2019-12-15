@@ -3,7 +3,7 @@
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrapper, JSONHelper
+from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrapper, JSONHelper, CertificatInconnu
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 
@@ -16,6 +16,7 @@ import json
 import tempfile
 import os
 import shutil
+import traceback
 
 
 class ConstantesInterMilleGrilles:
@@ -307,23 +308,25 @@ class ConnexionInterMilleGrilles:
         self.__traitement_local_vers_tiers = TraitementMessageLocalVersTiers(
             self, connecteur.contexte.message_dao, connecteur.contexte.configuration)
 
+        self.__traitement_tiers_vers_local = None
+
         # Ouvrir un nouveau canal en amont local
         # Necessaire en partie parce que la verification de Q exclusive ferme le canal si la
         # Q existe deja (e.g. ouverte par MG tierce)
+        self.__nom_q_locale = 'inter.' + idmg  # IDMG distant sur MQ local
         self.__channel_amont_local = None
         self.__ctag_amont_local = None
-
-        self.__nom_q_locale = 'inter.' + idmg  # IDMG distant sur MQ local
-        self.__nom_q_distante = 'inter.' + self.connecteur.contexte.idmg  # IDMG local sur MQ distant
 
         # Information de connexion
         self.__fiche_privee_tiers = None
         self.__configuration_connexion = None
 
         # Connexions distantes en amont et aval
+        self.__nom_q_distante = 'inter.' + self.connecteur.contexte.idmg  # IDMG local sur MQ distant
         self.__connexion_mq_amont_distante = None
         self.__connexion_mq_aval_distante = None
         self.__channel_amont_distant = None
+        self.__ctag_amont_distant = None
 
         self.__derniere_activite = datetime.datetime.utcnow()
 
@@ -465,6 +468,8 @@ class ConnexionInterMilleGrilles:
         if barrier.broken:
             raise Exception("Erreur connexion a MQ distant")
 
+        self.__traitement_tiers_vers_local = TraitementMessageTiersVersLocal(self)
+
         # Creer et enregistrer un listener d'evenements en amont - sert a ouvrir un Q pour la millegrille locale
         listener_distant = ListenerDistant()
         listener_distant.on_channel_open = self.on_channel_amont_distant_open
@@ -491,6 +496,26 @@ class ConnexionInterMilleGrilles:
     def on_channel_amont_distant_close(self, channel=None, code=None, reason=None):
         self.__logger.info("MQ Channel distant ferme pour %s" % self.idmg)
 
+    def transmettre_message_vers_local(self, dict_message, routing_key, reply_to=None, correlation_id=None):
+        self.__connecteur.contexte.message_dao.recevoir_message_intermillegrilles(
+            dict_message, routing_key, reply_to=reply_to, correlation_id=correlation_id)
+
+    def transmettre_reponse_vers_local(self, dict_message, correlation_id):
+        """
+        Recevoir une reponse inter-millegrilles.
+        Le correlation id contient la reply_q et le correlation_id local.
+        """
+        params_reponse = correlation_id.split('/')
+        replying_to = params_reponse[0]
+        correlation_id_local = params_reponse[1]
+
+        self.__connecteur.contexte.message_dao.transmettre_reponse(
+            dict_message, replying_to, correlation_id_local,
+        )
+
+    def transmettre_message_vers_distant(self, dict_message, reply_q, correlation_id):
+        pass
+
     def demander_maj_certificat(self):
         """
         Demander a la millegrille distante une mise a jour du certificat
@@ -508,6 +533,12 @@ class ConnexionInterMilleGrilles:
         Prepare les bindings sur la MilleGrille distante (e.g. les abonnements)
         """
         self.__logger.info("Ouverture Q distante avec %s: %s" % (self.__idmg, str(queue)))
+
+        self.__ctag_amont_distant = self.__channel_amont_distant.basic_consume(
+            self.__traitement_tiers_vers_local.callbackAvecAck,
+            queue=self.__nom_q_distante,
+            no_ack=False
+        )
 
         # La connexion est prete
         self.__connexion_event.set()
@@ -543,12 +574,91 @@ class TraitementMessageLocalVersTiers(TraitementMessageCallback):
         exchange = method.exchange
         dict_message = json.loads(body)
 
-        self.__logger.debug("%s: Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (
+        self.__logger.debug("%s: Message inter-millegrilles recue sur echange '%s' : %s, contenu %s" % (
             self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
 
         if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
             self.__logger.debug("Message en amont sur exchange prive local, on le passe a la millegrille distante")
+            self.transferer_message_echange_prive(dict_message, method, properties)
         elif exchange == '':  # Echange direct
-            self.__logger.debug("Message sur exchange direct")
+            self.__logger.debug("Message sur exchange direct local")
+            self.transferer_message_direct(dict_message, method, properties)
+        else:
+            raise Exception("Message non traitable")
+
+    def transferer_message_direct(self, dict_message, method, properties):
+        pass
+
+    def transferer_message_echange_prive(self, dict_message, method, properties):
+        pass
+        # self.connexion.
+
+
+class TraitementMessageTiersVersLocal:
+
+    def __init__(self, connexion: ConnexionInterMilleGrilles):
+        self.__connexion = connexion
+        self.__json_helper = JSONHelper()
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def callbackAvecAck(self, ch, method, properties, body):
+        try:
+            self.traiter_message(ch, method, properties, body)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.__logger.warning("Certificat inconnu, on fait la demande %s" % fingerprint)
+            pass  # A FAIRE
+        except Exception as e:
+            self.__logger.exception("Erreur dans TraitementMessageTiersVersLocal, exception: %s" % str(e))
+            self.transmettre_erreur(ch, method, body, e)
+        finally:
+            self.transmettre_ack(ch, method)
+
+    def transmettre_ack(self, ch, method):
+        try:
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        except AttributeError:
+            self.__logger.exception("Erreur transmission ACK")
+
+    def transmettre_erreur(self, ch, method, body, erreur):
+        message = {
+            "message_original": str(body)
+        }
+        if erreur is not None:
+            message["erreur"] = str(erreur)
+            message["stacktrace"] = traceback.format_exception(etype=type(erreur), value=erreur,
+                                                               tb=erreur.__traceback__)
+
+        message_utf8 = self.__json_helper.dict_vers_json(message)
+
+        ch.basic_publish(exchange=method.exchange,
+                         routing_key='processus.erreur',
+                         body=message_utf8)
+
+    def decoder_message_json(self, body):
+        return self.__json_helper.bin_utf8_json_vers_dict(body)
+
+    @property
+    def json_helper(self):
+        return self.__json_helper
+
+    def traiter_message(self, ch, method, properties, body):
+        """
+        S'occupe de la reception d'un message en amont a transferer vers la millegrille designee.
+        """
+        routing_key = method.routing_key
+        exchange = method.exchange
+        dict_message = json.loads(body)
+
+        self.__logger.debug("%s: Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (
+            self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
+
+        if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
+            self.__logger.debug("Message en amont sur exchange prive distant, on le passe a la millegrille locale")
+            self.__connexion.transmettre_message_vers_local(
+                dict_message, routing_key, reply_to=properties.reply_to, correlation_id=properties.correlation_id)
+        elif exchange == '':  # Echange direct
+            self.__logger.debug("Message sur exchange distant")
+            self.__connexion.transmettre_reponse_vers_local(dict_message, correlation_id=properties.correlation_id)
         else:
             raise Exception("Message non traitable")

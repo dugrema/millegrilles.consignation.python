@@ -619,6 +619,32 @@ class PikaDAO:
 
         self._in_error = False
 
+    def recevoir_message_intermillegrilles(self, message_dict, routing_key, reply_to=None, correlation_id=None,
+                                           delivery_mode_v=1, encoding=json.JSONEncoder):
+
+        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
+            raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
+        if reply_to is not None:
+            properties.reply_to = reply_to
+        if correlation_id is not None:
+            properties.correlation_id = correlation_id
+
+        message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
+        with self.lock_transmettre_message:
+            self.__channel_publisher.basic_publish(
+                exchange=self.configuration.exchange_prive,  # Exchange prive pour message inter
+                routing_key=routing_key,
+                body=message_utf8,
+                properties=properties,
+                mandatory=True)
+
+        # Utiliser pubdog pour la connexion publishing par defaut
+        self.__connexionmq_publisher.publish_watch()
+
+        self._in_error = False
+
     def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
 
         if self.__connexionmq_publisher is None or self.__connexionmq_publisher.is_closed:
