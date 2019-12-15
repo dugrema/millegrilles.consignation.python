@@ -3,9 +3,11 @@
 import argparse
 import signal
 import logging
-import threading
 import time
 import sys
+import threading
+
+from threading import Thread, Event
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -20,6 +22,8 @@ class ModeleConfiguration:
         self._contexte = ContexteRessourcesMilleGrilles()
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
+
+        self.__fermeture_event = Event()
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
         self.__channel = None
@@ -46,7 +50,9 @@ class ModeleConfiguration:
 
     def on_channel_close(self, arg1, arg2, arg3):
         self.__channel = None
-        self._logger.info("MQ Channel ferme")
+        self._logger.warning("MQ Channel ferme")
+        if not self.__fermeture_event.is_set():
+            self.contexte.message_dao.enter_error_state()
 
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
@@ -65,6 +71,7 @@ class ModeleConfiguration:
         self.parser.print_help()
 
     def exit_gracefully(self, signum=None, frame=None):
+        self.__fermeture_event.set()
         self.deconnecter()
 
     def parse(self):
@@ -116,6 +123,7 @@ class ModeleConfiguration:
 
             self._logger.info("Debut execution")
             self.executer()  # Executer le download et envoyer message
+            self.__fermeture_event.set()
             self._logger.info("Fin execution " + self.__class__.__name__)
 
         except Exception as e:

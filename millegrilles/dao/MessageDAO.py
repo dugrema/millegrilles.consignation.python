@@ -915,7 +915,7 @@ class ConnexionWrapper:
         self._logger.warning("Flow callback: %s" % str(frame))
 
     def __on_return(self, channel, method, properties, body):
-        self._logger.warning("Return callback %s:\n%s" % (str(method), str(body)))
+        self._logger.warning("Return callback %s (channel: %s, properties: %s):\n%s" % (str(method), str(channel), str(properties), str(body)))
 
     def __ouvrir_channel_listener(self, listener):
         self.__connexionmq.channel(on_open_callback=listener.on_channel_open)

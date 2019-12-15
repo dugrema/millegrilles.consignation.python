@@ -52,9 +52,9 @@ class MessagesSample(BaseCallback):
         message = json.loads(str(body, 'utf-8'))
         print(json.dumps(message, indent=4))
 
-    def transmettre_commande_ouverture(self):
+    def transmettre_commande_ouverture(self, idmg):
         commande = {
-            'idmg': 'abcd'
+            'idmg': idmg
         }
 
         domaine = 'commande.inter.connecter'
@@ -63,21 +63,21 @@ class MessagesSample(BaseCallback):
         print("Envoi maj fiche privee: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transmettre_requete_directe(self):
+    def transmettre_requete_directe(self, idmg):
         requete = {
             'texte': 'On va se promener plus loin'
         }
 
         domaine = 'donne.moi.des.fichiers'
-        enveloppe_val = self.generateur.transmettre_requete(requete, domaine, idmg='abcd', correlation_id='moimoi')
+        enveloppe_val = self.generateur.transmettre_requete(requete, domaine, idmg=idmg, correlation_id='moimoi')
 
         print("Envoi maj fiche privee: %s" % enveloppe_val)
         return enveloppe_val
 
-
     def executer(self):
-        # enveloppe = sample.transmettre_commande_ouverture()
-        enveloppe = sample.transmettre_requete_directe()
+        idmg = 'pas_la_1'
+        enveloppe = sample.transmettre_commande_ouverture(idmg)
+        # enveloppe = sample.transmettre_requete_directe(idmg)
 
 
 # --- MAIN ---

@@ -66,11 +66,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
         self._stop_event.set()
 
-        for connexion in self.__connexions.values():
-            try:
-                connexion.arreter()
-            except:
-                pass
+        self.enlever_toutes_connexions()
 
         super().exit_gracefully(signum, frame)
 
@@ -79,7 +75,15 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         Appelle lors de la connexion a MQ local
         """
         super().on_channel_open(channel)
+        channel.add_on_return_callback(self._on_return)
         self.creer_q_commandes_locales()
+
+    def on_channel_close(self, arg1, arg2, arg3):
+        self._logger.warning("MQ Channel local ferme - enlever toutes les connexions")
+        self.enlever_toutes_connexions()
+
+    def _on_return(self, channel, method, properties, body):
+        self.__logger.warning("Return value: %s\n%s" % (str(method), str(body)))
 
     def creer_q_commandes_locales(self):
         """
@@ -135,6 +139,21 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             self.__logger.warning("Demande de connexion a %s mais une thread de connexion est deja en cours")
             connexion_existante.poke()
 
+    def enlever_toutes_connexions(self):
+        liste_idmg = list()
+        liste_idmg.extend(self.__connexions.keys())
+        for idmg in liste_idmg:
+            self.enlever_connexion(idmg)
+
+    def enlever_connexion(self, idmg):
+        connexion = self.__connexions.get(idmg)
+        if connexion is not None:
+            del self.__connexions[idmg]
+            try:
+                connexion.arreter()
+            except:
+                pass
+
 
 class TraitementMessageQueueLocale(TraitementMessageCallback):
 
@@ -158,31 +177,6 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
         self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
 
 
-class TraitementMessageLocalVersTiers(TraitementMessageCallback):
-
-    def __init__(self, connecteur, message_dao, configuration):
-        super().__init__(message_dao, configuration)
-        self.__connecteur = connecteur
-        self.__logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
-
-    def traiter_message(self, ch, method, properties, body):
-        """
-        S'occupe de la reception d'un message en amont a transferer vers la millegrille designee.
-        """
-        routing_key = method.routing_key
-        exchange = method.exchange
-        dict_message = json.loads(body)
-
-        self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
-
-        if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
-            self.__logger.debug("Message en amont sur exchange prive local, on le passe a la millegrille distante")
-        elif exchange == '':  # Echange direct
-            self.__logger.debug("Message sur exchange direct")
-        else:
-            raise Exception("Message non traitable")
-
-
 class ConnexionInterMilleGrilles:
     """
     Represente une connexion avec une instance de RabbitMQ.
@@ -194,7 +188,7 @@ class ConnexionInterMilleGrilles:
         self.__thread = Thread(name="CX-" + idmg, target=self.executer, daemon=True)
 
         self.__traitement_local_vers_tiers = TraitementMessageLocalVersTiers(
-            connecteur, connecteur.contexte.message_dao, connecteur.contexte.configuration)
+            self, connecteur.contexte.message_dao, connecteur.contexte.configuration)
         self.__ctag_local = None
 
         self.__nom_q = 'inter.' + idmg
@@ -227,10 +221,13 @@ class ConnexionInterMilleGrilles:
     def executer(self):
         self.__logger.info("Execution thread connexion a " + self.__idmg)
 
-        self.definir_q_locale()
+        try:
+            self.definir_q_locale()
 
-        while not self.__wait_event.is_set():
-            self.__wait_event.wait(10)
+            while not self.__wait_event.is_set():
+                self.__wait_event.wait(10)
+        finally:
+            self.__connecteur.enlever_connexion(self.__idmg)
 
         self.__logger.info("Fin execution thread connexion a " + self.__idmg)
 
@@ -297,3 +294,36 @@ class ConnexionInterMilleGrilles:
         """
         pass
 
+    @property
+    def idmg(self):
+        return self.__idmg
+
+    @property
+    def connecteur(self):
+        return self.__connecteur
+
+
+class TraitementMessageLocalVersTiers(TraitementMessageCallback):
+
+    def __init__(self, connexion: ConnexionInterMilleGrilles, message_dao, configuration):
+        super().__init__(message_dao, configuration)
+        self.__connexion = connexion
+        self.__logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
+
+    def traiter_message(self, ch, method, properties, body):
+        """
+        S'occupe de la reception d'un message en amont a transferer vers la millegrille designee.
+        """
+        routing_key = method.routing_key
+        exchange = method.exchange
+        dict_message = json.loads(body)
+
+        self.__logger.debug("%s: Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (
+            self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
+
+        if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
+            self.__logger.debug("Message en amont sur exchange prive local, on le passe a la millegrille distante")
+        elif exchange == '':  # Echange direct
+            self.__logger.debug("Message sur exchange direct")
+        else:
+            raise Exception("Message non traitable")
