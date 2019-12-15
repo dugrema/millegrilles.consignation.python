@@ -48,11 +48,14 @@ class ModeleConfiguration:
         self.__channel = channel
         self.__certificat_event_handler.initialiser()
 
-    def on_channel_close(self, arg1, arg2, arg3):
+    def on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
         self._logger.warning("MQ Channel ferme")
         if not self.__fermeture_event.is_set():
             self.contexte.message_dao.enter_error_state()
+
+    def __on_return(self, channel, method, properties, body):
+        pass
 
     def configurer_parser(self):
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
@@ -153,7 +156,7 @@ class ModeleConfiguration:
                 sys.exit(2)
 
     @property
-    def contexte(self):
+    def contexte(self) -> ContexteRessourcesMilleGrilles:
         return self._contexte
 
     @property

@@ -78,9 +78,10 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         channel.add_on_return_callback(self._on_return)
         self.creer_q_commandes_locales()
 
-    def on_channel_close(self, arg1, arg2, arg3):
+    def on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warning("MQ Channel local ferme - enlever toutes les connexions")
         self.enlever_toutes_connexions()
+        super().on_channel_close(channel, code, reason)
 
     def _on_return(self, channel, method, properties, body):
         self.__logger.warning("Return value: %s\n%s" % (str(method), str(body)))
@@ -183,18 +184,27 @@ class ConnexionInterMilleGrilles:
     """
 
     def __init__(self, connecteur: ConnecteurInterMilleGrilles, idmg: str):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__connecteur = connecteur
         self.__idmg = idmg  # IDMG de la connexion (millegrille distante)
         self.__thread = Thread(name="CX-" + idmg, target=self.executer, daemon=True)
 
         self.__traitement_local_vers_tiers = TraitementMessageLocalVersTiers(
             self, connecteur.contexte.message_dao, connecteur.contexte.configuration)
-        self.__ctag_local = None
+
+        # Ouvrir un nouveau canal en amont local
+        # Necessaire en partie parce que la verification de Q exclusive ferme le canal si la
+        # Q existe deja (e.g. ouverte par MG tierce)
+        self.__channel_amont_local = None
+        self.__ctag_amont_local = None
 
         self.__nom_q = 'inter.' + idmg
 
-        self.__connexion_mq_distante = None
-        self.__channel_distant = None
+        # Connexions distantes en amont et aval
+        self.__connexion_mq_amont_distante = None
+        self.__channel_amont_distant = None
+        self.__connexion_mq_aval_distante = None
+        self.__channel_aval_distant = None
 
         self.__certificat = None  # Certificat client utilise pour se connecter
         self.__cle_privee = None
@@ -203,9 +213,8 @@ class ConnexionInterMilleGrilles:
         # Temps d'inactivite apres lequel on ferme la connexion
         self.__temps_inactivite_secs = datetime.timedelta(seconds=300)
 
+        self.__connexion_event = Event()
         self.__wait_event = Event()
-
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def faker(self):
         self.__certificat = self.__connecteur.contexte.configuration.mq_certfile
@@ -222,33 +231,82 @@ class ConnexionInterMilleGrilles:
         self.__logger.info("Execution thread connexion a " + self.__idmg)
 
         try:
-            self.definir_q_locale()
+            self.ouvrir_canal_amont_local()
+            self.__connexion_event.wait(10)
+            if not self.__connexion_event.is_set():
+                raise Exception('Erreur connexion idmg=%s, channel pas pret' % self.__idmg)
+
+            self.__logger.info("Connexion amont locale %s prete" % self.__idmg)
 
             while not self.__wait_event.is_set():
                 self.__wait_event.wait(10)
+
         finally:
-            self.__connecteur.enlever_connexion(self.__idmg)
+            self._fermeture()
 
         self.__logger.info("Fin execution thread connexion a " + self.__idmg)
 
     def arreter(self):
         self.__wait_event.set()
+        self.__connexion_event.set()
+
+    def _fermeture(self):
+        self.__connecteur.enlever_connexion(self.__idmg)
+        self.__connecteur.contexte.message_dao.enlever_channel_listener(self)
+        try:
+            self.__channel_amont_local.close()
+        except:
+            pass
+
+    def ouvrir_canal_amont_local(self):
+        # Enregistrer nouveau canal via DAO (managed pour les exceptions de connexions)
+        self.__connecteur.contexte.message_dao.enregistrer_channel_listener(self)
+
+    def on_channel_open(self, channel):
+        """
+        Canal en amont local ouvert.
+        """
+        self.__channel_amont_local = channel
+        channel.add_on_return_callback(self._on_return_amont_local)
+        channel.add_on_close_callback(self._on_channel_amont_local_close)
+        self.definir_q_locale()
+
+    def _on_channel_amont_local_close(self, channel=None, code=None, reason=None):
+        self.__channel_amont_local = None
+        self.__logger.debug("MQ Channel idmg=%s ferme, code=%s" % (self.__idmg, str(code)))
+
+        # Verifier la raison de la fermeture
+        if code == 405:
+            self.__logger.info(
+                "Fermeture pour cause de lock sur Q existante. La connexion inter-millegrilles %s existe deja, on ferme",
+                self.__idmg
+            )
+            self.arreter()
+
+    def _on_return_amont_local(self, channel, method, properties, body):
+        self.__logger.warning("MQ Return idmg=%s, %s " % (self.__idmg, str(method)))
+
+    def is_channel_open(self):
+        return self.__channel_amont_local is not None
 
     def definir_q_locale(self):
         """
         Tente d'ouvrir une Q exclusive locale au nom de la MilleGrille distante.
         """
         # Creer la Q sur la connexion en aval
-        self.__connecteur.channel.queue_declare(
+        self.__channel_amont_local.queue_declare(
             queue=self.__nom_q,
             durable=False,
             exclusive=True,
             callback=self.creer_bindings_local,
         )
 
+        # La connexion est prete
+        self.__connexion_event.set()
+
     def creer_bindings_local(self, queue):
         self.__logger.info("Ouverture Q locale pour %s: %s" % (self.__idmg, str(queue)))
-        self.__ctag_local = self.__connecteur.channel.basic_consume(
+        self.__ctag_amont_local = self.__channel_amont_local.basic_consume(
             self.__traitement_local_vers_tiers.callbackAvecAck,
             queue=self.__nom_q,
             no_ack=False

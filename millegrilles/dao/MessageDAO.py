@@ -21,6 +21,308 @@ Connection a un moteur de messagerie via Pika.
 jsonEncoder = MongoJSONEncoder()
 
 
+class ConnexionWrapper:
+    """
+    Helper pour les connexions MQ.
+    Prepare une connexion et un channel. Lance le ioloop dans une thread.
+    """
+
+    def __init__(self, configuration, stop_event: Event, heartbeat=None):
+        self.configuration = configuration
+        self.__stop_event = stop_event
+        self.__heartbeat = heartbeat
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self.__connexionmq = None
+        self.__channel = None
+        self.__thread_ioloop = None
+
+        self.__publish_confirm_event = Event()
+        self.__published = False
+        self.__thread_publishing_watchdog = None
+
+        self._in_error = False
+        self.__liste_listeners_channels = None
+
+        self.__lock_init = None
+
+        self.__last_publish = None
+
+    def preparer_connexion(self):
+        """ Retourne un dictionnaire avec les parametres de connexion a RabbitMQ """
+
+        if self.__heartbeat is None:
+            self.__heartbeat = self.configuration.mq_heartbeat
+
+        connection_parameters = {
+            'host': self.configuration.mq_host,
+            'port': self.configuration.mq_port,
+            'virtual_host': self.configuration.idmg,
+            'heartbeat': self.__heartbeat,
+            'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
+        }
+
+        self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
+
+        if self.configuration.mq_auth_cert == 'on':
+            # Va faire la connection via plugin configure dans MQ, normalement c'est rabbitmq_auth_mechanism_ssl
+            connection_parameters['credentials'] = ExternalCredentials()
+        else:
+            credentials = {
+                'username': self.configuration.mq_user,
+                'password': self.configuration.mq_password,
+                'erase_on_connect': True
+            }
+            connection_parameters['credentials'] = PlainCredentials(**credentials)
+
+        if self.configuration.mq_ssl == 'on':
+            ssl_options = {
+                'ssl_version': ssl.PROTOCOL_TLSv1_2,
+                'keyfile': self.configuration.mq_keyfile,
+                'certfile': self.configuration.mq_certfile,
+                'ca_certs': self.configuration.mq_cafile,
+                'cert_reqs': ssl.CERT_REQUIRED
+            }
+
+            connection_parameters['ssl'] = True
+            connection_parameters['ssl_options'] = ssl_options
+
+        return connection_parameters
+
+    def connecter(self, lock_init: Barrier = None):
+        """
+        Connecter au serveur RabbitMQ
+        Le callback est une methode qui va etre appelee lorsqu'un message est recu
+
+        :param lock_init: Barrier pour synchroniser toutes les connexions
+        :return: Connexion a RabbitMQ.
+        """
+
+        self._logger.info("Connecter RabbitMQ")
+        self.__lock_init = lock_init
+
+        if self.__connexionmq is not None:
+            self._logger.warning("Appel de connecter avec connection deja ouverte")
+            connectionmq = self.__connexionmq
+            self.__connexionmq = None
+            self.__channel = None
+            self.__thread_ioloop = None
+
+            try:
+                connectionmq.close()
+            except Exception as e:
+                self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
+
+        try:
+            parametres_connexion = self.preparer_connexion()
+            parametres = pika.ConnectionParameters(**parametres_connexion)
+            self.__connexionmq = pika.SelectConnection(
+                parameters=parametres,
+                on_open_callback=self.__on_connection_open,
+                on_close_callback=self.__on_connection_close,
+            )
+            self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop, daemon=True)
+            self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
+
+        except Exception as e:
+            self.enter_error_state()
+            raise e  # S'assurer de mettre le flag d'erreur
+
+        return self.__connexionmq
+
+    def deconnecter(self):
+        if self.__connexionmq is not None:
+            try:
+                self.__connexionmq.close()
+            finally:
+                self.__connexionmq = None
+
+        self.__publish_confirm_event.set()
+        self.__channel = None
+        self.__thread_ioloop = None
+
+    def register_channel_listener(self, listener):
+        self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
+        if self.__liste_listeners_channels is None:
+            self.__liste_listeners_channels = list()
+        self.__liste_listeners_channels.append(listener)
+        self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
+
+        # On verifie si on peut ouvrir le channel immediatement
+        if self.__connexionmq is not None and not self.__connexionmq.is_closed and not self._in_error:
+            self.__ouvrir_channel_listener(listener)
+
+    def enlever_channel_listener(self, listener):
+        """
+        Enleve un listener de la liste
+        """
+        nouvelle_liste = [l for l in self.__liste_listeners_channels if l is not listener]
+        self.__liste_listeners_channels = nouvelle_liste
+
+    # Mettre la classe en etat d'erreur
+    def enter_error_state(self):
+        self._logger.warning("MQ Enter error state")
+        self._in_error = True
+
+        try:
+            if self.__channel is not None:
+                self.__channel.close()
+        except Exception as e:
+            self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
+        finally:
+            self.__channel = None
+
+        try:
+            if self.__connexionmq is not None:
+                self.__connexionmq.close()
+        except Exception as e:
+            self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
+        finally:
+            self.__connexionmq = None
+            self.__thread_ioloop = None
+
+    def executer_maintenance(self):
+        self._logger.debug("Maintenance connexion MQ, in error: %s" % self._in_error)
+        try:
+            if self.__connexionmq is not None and self.__channel is None:
+                self._logger.error("La connection MQ est invalide - channel n'est pas ouvert.")
+                self.enter_error_state()
+            elif self.__connexionmq is None or self.__connexionmq.is_closed:
+                self._logger.warning("La connection MQ est fermee. On tente de se reconnecter.")
+                self.connecter()
+            else:
+                self._logger.debug("Rien a faire pour reconnecter a MQ")
+
+                # Verifier si les listeners fonctionnent bien
+                if self.__liste_listeners_channels is not None:
+                    for listener in self.__liste_listeners_channels:
+                        if 'is_channel_open' in dir(listener):  # Methode est optionnelle
+                            if not listener.is_channel_open():
+                                self._logger.warning("Re-ouverture d'un channel de listener")
+                                self.__ouvrir_channel_listener(listener)
+
+        except Exception as e:
+            self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
+            self.enter_error_state()
+
+    def __run_ioloop(self):
+        self._logger.info("Demarrage MQ-IOLoop")
+        try:
+            self.__connexionmq.ioloop.start()
+        except AMQPConnectionError as e:
+            self._logger.error("Erreur ouverture connexion MQ: %s" % str(e))
+            self.enter_error_state()
+        self._logger.info("Fin execution MQ-IOLoop")
+
+    def __on_connection_open(self, connection):
+        self._logger.info("Callback connection, on ouvre le channel")
+        connection.add_on_close_callback(self.__on_connection_close)
+        connection.channel(on_open_callback=self.__on_channel_open)
+
+        # Aussi allouer un channel a chaque listener inscrit
+        if self.__liste_listeners_channels is not None:
+            for listener in self.__liste_listeners_channels:
+                self.__ouvrir_channel_listener(listener)
+
+    def __on_channel_open(self, channel):
+        self.__channel = channel
+        channel.basic_qos(prefetch_count=1)
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.confirm_delivery(self.__confirm_delivery)
+        channel.add_on_flow_callback(self.__on_flow)
+        channel.add_on_return_callback(self.__on_return)
+        self._in_error = False
+
+        self.__stop_event.clear()
+        if self.__lock_init is not None:
+            self.__lock_init.wait()  # Permet de synchroniser le demarrage
+        self.__lock_init = None
+
+        self._logger.info("Connexion / channel prets")
+
+    def __on_connection_close(self, connection=None, code=None, reason=None):
+        self.__connexionmq = None
+        self.__channel = None
+        self.__thread_ioloop = None
+        if not self.__stop_event.is_set():
+            self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
+            self.enter_error_state()
+        else:
+            self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self._logger.warning("Channel ferme: %s, %s" % (code, reason))
+        self.__channel = None
+        if not self.__stop_event.is_set():
+            self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
+
+    def __on_flow(self, frame):
+        self._logger.warning("Flow callback: %s" % str(frame))
+
+    def __on_return(self, channel, method, properties, body):
+        self._logger.warning("Return callback %s (channel: %s, properties: %s):\n%s" % (str(method), str(channel), str(properties), str(body)))
+
+    def __ouvrir_channel_listener(self, listener):
+        self.__connexionmq.channel(on_open_callback=listener.on_channel_open)
+
+    def __confirm_delivery(self, frame):
+        self._logger.debug("Delivery: %s" % str(frame))
+        if isinstance(frame.method, pika.spec.Basic.Nack):
+            self._logger.error("Delivery NACK")
+            self.enter_error_state()
+        else:
+            self.__publish_confirm_event.set()
+
+    def publish_watch(self):
+        """
+        Indique qu'on veut savoir si la connexion fonctionne (on s'attend a recevoir un confirm delivery moment donne)
+        :return:
+        """
+        if not self.__published:
+
+            if self.__thread_publishing_watchdog is None:
+                self.__thread_publishing_watchdog = Thread(name="PubDog", target=self.__run_publishing_watchdog, daemon=True)
+                self.__thread_publishing_watchdog.start()
+            else:
+                # Reset timer du watchdog, aucun evenement en attente
+                self.__publish_confirm_event.set()
+
+            self.__published = True
+
+    def __run_publishing_watchdog(self):
+        """
+        Main du watchdog de publication. Permet de detecter rapidement une connexion MQ qui ne repond plus.
+        """
+
+        self._logger.warning("Demarrage watchdog publishing")
+
+        while not self.__stop_event.is_set():
+
+            if self.__published:
+
+                # Attendre timeout ou confirmation de publication du message
+                self.__publish_confirm_event.wait(1)
+
+                if not self.__publish_confirm_event.is_set():
+                    self._logger.warning("Confirmation de publish non recue, erreur sur connexion")
+                    self.enter_error_state()
+
+                self.__published = False
+
+            # Attendre prochain evenement de publish
+            self.__publish_confirm_event.clear()
+            self.__publish_confirm_event.wait(600)
+
+    @property
+    def channel(self):
+        return self.__channel
+
+    @property
+    def is_closed(self):
+        return self.__connexionmq is None or self.__channel is None or \
+               self.__connexionmq.is_closed or self.__channel.is_closed
+
+
 class PikaDAO:
 
     def __init__(self, configuration):
@@ -61,9 +363,19 @@ class PikaDAO:
 
         self.json_helper = JSONHelper()
 
-    def register_channel_listener(self, listener):
+    def enregistrer_channel_listener(self, listener):
         self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
         self.__connexionmq_consumer.register_channel_listener(listener)
+
+    def enlever_channel_listener(self, listener):
+        self._logger.info("Enlever listener pour channel %s" % listener.__class__.__name__)
+        self.__connexionmq_consumer.enlever_channel_listener(listener)
+
+    def register_channel_listener(self, listener):
+        """
+        Utiliser enregistrer_channel_listener
+        """
+        self.enregistrer_channel_listener(listener)
 
     def connecter(self):
 
@@ -681,301 +993,6 @@ class PikaDAO:
     @property
     def in_error(self):
         return self._in_error
-
-
-class ConnexionWrapper:
-    """
-    Helper pour les connexions MQ.
-    Prepare une connexion et un channel. Lance le ioloop dans une thread.
-    """
-
-    def __init__(self, configuration, stop_event: Event, heartbeat=None):
-        self.configuration = configuration
-        self.__stop_event = stop_event
-        self.__heartbeat = heartbeat
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-        self.__connexionmq = None
-        self.__channel = None
-        self.__thread_ioloop = None
-
-        self.__publish_confirm_event = Event()
-        self.__published = False
-        self.__thread_publishing_watchdog = None
-
-        self._in_error = False
-        self.__liste_listeners_channels = None
-
-        self.__lock_init = None
-
-        self.__last_publish = None
-
-    def preparer_connexion(self):
-        """ Retourne un dictionnaire avec les parametres de connexion a RabbitMQ """
-
-        if self.__heartbeat is None:
-            self.__heartbeat = self.configuration.mq_heartbeat
-
-        connection_parameters = {
-            'host': self.configuration.mq_host,
-            'port': self.configuration.mq_port,
-            'virtual_host': self.configuration.idmg,
-            'heartbeat': self.__heartbeat,
-            'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
-        }
-
-        self._logger.info("Connecter RabbitMQ, parametres de connexion: %s" % str(connection_parameters))
-
-        if self.configuration.mq_auth_cert == 'on':
-            # Va faire la connection via plugin configure dans MQ, normalement c'est rabbitmq_auth_mechanism_ssl
-            connection_parameters['credentials'] = ExternalCredentials()
-        else:
-            credentials = {
-                'username': self.configuration.mq_user,
-                'password': self.configuration.mq_password,
-                'erase_on_connect': True
-            }
-            connection_parameters['credentials'] = PlainCredentials(**credentials)
-
-        if self.configuration.mq_ssl == 'on':
-            ssl_options = {
-                'ssl_version': ssl.PROTOCOL_TLSv1_2,
-                'keyfile': self.configuration.mq_keyfile,
-                'certfile': self.configuration.mq_certfile,
-                'ca_certs': self.configuration.mq_cafile,
-                'cert_reqs': ssl.CERT_REQUIRED
-            }
-
-            connection_parameters['ssl'] = True
-            connection_parameters['ssl_options'] = ssl_options
-
-        return connection_parameters
-
-    def connecter(self, lock_init: Barrier = None):
-        """
-        Connecter au serveur RabbitMQ
-        Le callback est une methode qui va etre appelee lorsqu'un message est recu
-
-        :param lock_init: Barrier pour synchroniser toutes les connexions
-        :return: Connexion a RabbitMQ.
-        """
-
-        self._logger.info("Connecter RabbitMQ")
-        self.__lock_init = lock_init
-
-        if self.__connexionmq is not None:
-            self._logger.warning("Appel de connecter avec connection deja ouverte")
-            connectionmq = self.__connexionmq
-            self.__connexionmq = None
-            self.__channel = None
-            self.__thread_ioloop = None
-
-            try:
-                connectionmq.close()
-            except Exception as e:
-                self._logger.debug("Erreur fermeture MQ avant de reconnecter: %s" % str(e))
-
-        try:
-            parametres_connexion = self.preparer_connexion()
-            parametres = pika.ConnectionParameters(**parametres_connexion)
-            self.__connexionmq = pika.SelectConnection(
-                parameters=parametres,
-                on_open_callback=self.__on_connection_open,
-                on_close_callback=self.__on_connection_close,
-            )
-            self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop, daemon=True)
-            self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
-
-        except Exception as e:
-            self.enter_error_state()
-            raise e  # S'assurer de mettre le flag d'erreur
-
-        return self.__connexionmq
-
-    def deconnecter(self):
-        if self.__connexionmq is not None:
-            try:
-                self.__connexionmq.close()
-            finally:
-                self.__connexionmq = None
-
-        self.__publish_confirm_event.set()
-        self.__channel = None
-        self.__thread_ioloop = None
-
-    def register_channel_listener(self, listener):
-        self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
-        if self.__liste_listeners_channels is None:
-            self.__liste_listeners_channels = list()
-        self.__liste_listeners_channels.append(listener)
-        self._logger.info("On a %d listeners de channels" % len(self.__liste_listeners_channels))
-
-        # On verifie si on peut ouvrir le channel immediatement
-        if self.__connexionmq is not None and not self.__connexionmq.is_closed and not self._in_error:
-            self.__ouvrir_channel_listener(listener)
-
-    # Mettre la classe en etat d'erreur
-    def enter_error_state(self):
-        self._logger.warning("MQ Enter error state")
-        self._in_error = True
-
-        try:
-            if self.__channel is not None:
-                self.__channel.close()
-        except Exception as e:
-            self._logger.warning("MessageDAO.enterErrorState: Erreur stop consuming %s" % str(e))
-        finally:
-            self.__channel = None
-
-        try:
-            if self.__connexionmq is not None:
-                self.__connexionmq.close()
-        except Exception as e:
-            self._logger.info("Erreur fermeture connexion dans enter_error_state(): %s" % str(e))
-        finally:
-            self.__connexionmq = None
-            self.__thread_ioloop = None
-
-    def executer_maintenance(self):
-        self._logger.debug("Maintenance connexion MQ, in error: %s" % self._in_error)
-        try:
-            if self.__connexionmq is not None and self.__channel is None:
-                self._logger.error("La connection MQ est invalide - channel n'est pas ouvert.")
-                self.enter_error_state()
-            elif self.__connexionmq is None or self.__connexionmq.is_closed:
-                self._logger.warning("La connection MQ est fermee. On tente de se reconnecter.")
-                self.connecter()
-            else:
-                self._logger.debug("Rien a faire pour reconnecter a MQ")
-
-                # Verifier si les listeners fonctionnent bien
-                if self.__liste_listeners_channels is not None:
-                    for listener in self.__liste_listeners_channels:
-                        if 'is_channel_open' in dir(listener):  # Methode est optionnelle
-                            if not listener.is_channel_open():
-                                self._logger.warning("Re-ouverture d'un channel de listener")
-                                self.__ouvrir_channel_listener(listener)
-
-        except Exception as e:
-            self._logger.exception("Erreur dans boucle de maintenance: %s" % str(e), exc_info=e)
-            self.enter_error_state()
-
-    def __run_ioloop(self):
-        self._logger.info("Demarrage MQ-IOLoop")
-        try:
-            self.__connexionmq.ioloop.start()
-        except AMQPConnectionError as e:
-            self._logger.error("Erreur ouverture connexion MQ: %s" % str(e))
-            self.enter_error_state()
-        self._logger.info("Fin execution MQ-IOLoop")
-
-    def __on_connection_open(self, connection):
-        self._logger.info("Callback connection, on ouvre le channel")
-        connection.add_on_close_callback(self.__on_connection_close)
-        connection.channel(on_open_callback=self.__on_channel_open)
-
-        # Aussi allouer un channel a chaque listener inscrit
-        if self.__liste_listeners_channels is not None:
-            for listener in self.__liste_listeners_channels:
-                self.__ouvrir_channel_listener(listener)
-
-    def __on_channel_open(self, channel):
-        self.__channel = channel
-        channel.basic_qos(prefetch_count=1)
-        channel.add_on_close_callback(self.__on_channel_close)
-        channel.confirm_delivery(self.__confirm_delivery)
-        channel.add_on_flow_callback(self.__on_flow)
-        channel.add_on_return_callback(self.__on_return)
-        self._in_error = False
-
-        self.__stop_event.clear()
-        if self.__lock_init is not None:
-            self.__lock_init.wait()  # Permet de synchroniser le demarrage
-        self.__lock_init = None
-
-        self._logger.info("Connexion / channel prets")
-
-    def __on_connection_close(self, connection=None, code=None, reason=None):
-        self.__connexionmq = None
-        self.__channel = None
-        self.__thread_ioloop = None
-        if not self.__stop_event.is_set():
-            self._logger.error("Connection fermee anormalement: %s, %s" % (code, reason))
-            self.enter_error_state()
-        else:
-            self._logger.info("Connection fermee normalement: %s, %s" % (code, reason))
-
-    def __on_channel_close(self, channel=None, code=None, reason=None):
-        self._logger.warning("Channel ferme: %s, %s" % (code, reason))
-        self.__channel = None
-        if not self.__stop_event.is_set():
-            self._in_error = True  # Au cas ou la fermeture ne soit pas planifiee
-
-    def __on_flow(self, frame):
-        self._logger.warning("Flow callback: %s" % str(frame))
-
-    def __on_return(self, channel, method, properties, body):
-        self._logger.warning("Return callback %s (channel: %s, properties: %s):\n%s" % (str(method), str(channel), str(properties), str(body)))
-
-    def __ouvrir_channel_listener(self, listener):
-        self.__connexionmq.channel(on_open_callback=listener.on_channel_open)
-
-    def __confirm_delivery(self, frame):
-        self._logger.debug("Delivery: %s" % str(frame))
-        if isinstance(frame.method, pika.spec.Basic.Nack):
-            self._logger.error("Delivery NACK")
-            self.enter_error_state()
-        else:
-            self.__publish_confirm_event.set()
-
-    def publish_watch(self):
-        """
-        Indique qu'on veut savoir si la connexion fonctionne (on s'attend a recevoir un confirm delivery moment donne)
-        :return:
-        """
-        if not self.__published:
-
-            if self.__thread_publishing_watchdog is None:
-                self.__thread_publishing_watchdog = Thread(name="PubDog", target=self.__run_publishing_watchdog, daemon=True)
-                self.__thread_publishing_watchdog.start()
-            else:
-                # Reset timer du watchdog, aucun evenement en attente
-                self.__publish_confirm_event.set()
-
-            self.__published = True
-
-    def __run_publishing_watchdog(self):
-        """
-        Main du watchdog de publication. Permet de detecter rapidement une connexion MQ qui ne repond plus.
-        """
-
-        self._logger.warning("Demarrage watchdog publishing")
-
-        while not self.__stop_event.is_set():
-
-            if self.__published:
-
-                # Attendre timeout ou confirmation de publication du message
-                self.__publish_confirm_event.wait(1)
-
-                if not self.__publish_confirm_event.is_set():
-                    self._logger.warning("Confirmation de publish non recue, erreur sur connexion")
-                    self.enter_error_state()
-
-                self.__published = False
-
-            # Attendre prochain evenement de publish
-            self.__publish_confirm_event.clear()
-            self.__publish_confirm_event.wait(600)
-
-    @property
-    def channel(self):
-        return self.__channel
-
-    @property
-    def is_closed(self):
-        return self.__connexionmq is None or self.__channel is None or \
-               self.__connexionmq.is_closed or self.__channel.is_closed
 
 
 # Classe avec utilitaires pour JSON

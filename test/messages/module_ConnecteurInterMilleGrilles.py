@@ -75,7 +75,7 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        idmg = 'pas_la_1'
+        idmg = 'existant'
         enveloppe = sample.transmettre_commande_ouverture(idmg)
         # enveloppe = sample.transmettre_requete_directe(idmg)
 

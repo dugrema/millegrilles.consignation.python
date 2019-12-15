@@ -379,7 +379,7 @@ class ContexteRessourcesMilleGrilles:
         return self._configuration
 
     @property
-    def message_dao(self):
+    def message_dao(self) -> PikaDAO:
         """
         Retourne un message_dao.
 
@@ -396,7 +396,7 @@ class ContexteRessourcesMilleGrilles:
         self._message_dao = message_dao
 
     @property
-    def document_dao(self):
+    def document_dao(self) -> MongoDAO:
         """
         Retourne un document_dao.
 
@@ -413,23 +413,23 @@ class ContexteRessourcesMilleGrilles:
         self._document_dao = document_dao
 
     @property
-    def verificateur_transaction(self):
+    def verificateur_transaction(self) -> VerificateurTransaction:
         return self._verificateur_transactions
 
     @property
-    def verificateur_certificats(self):
+    def verificateur_certificats(self) -> VerificateurCertificats:
         return self._verificateur_certificats
 
     @property
-    def generateur_transactions(self):
+    def generateur_transactions(self) -> GenerateurTransaction:
         if self._generateur_transactions is None:
             self._generateur_transactions = GenerateurTransaction(self)
         return self._generateur_transactions
 
     @property
-    def signateur_transactions(self):
+    def signateur_transactions(self) -> SignateurTransaction:
         return self._signateur_transactions
 
     @property
-    def idmg(self):
+    def idmg(self) -> str:
         return self._configuration.idmg
