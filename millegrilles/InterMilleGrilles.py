@@ -313,7 +313,8 @@ class ConnexionInterMilleGrilles:
         self.__channel_amont_local = None
         self.__ctag_amont_local = None
 
-        self.__nom_q = 'inter.' + idmg
+        self.__nom_q_locale = 'inter.' + idmg  # IDMG distant sur MQ local
+        self.__nom_q_distante = 'inter.' + self.connecteur.contexte.idmg  # IDMG local sur MQ distant
 
         # Information de connexion
         self.__fiche_privee_tiers = None
@@ -322,6 +323,7 @@ class ConnexionInterMilleGrilles:
         # Connexions distantes en amont et aval
         self.__connexion_mq_amont_distante = None
         self.__connexion_mq_aval_distante = None
+        self.__channel_amont_distant = None
 
         self.__derniere_activite = datetime.datetime.utcnow()
 
@@ -353,6 +355,9 @@ class ConnexionInterMilleGrilles:
             self.__logger.info("Connexion amont locale %s prete, demarrage connexions distantes" % self.__idmg)
 
             self.connecter_mq_distant()  # Methode blocking (barrier)
+            self.__connexion_event.wait(10)  # Attendre que la Q en amont distante soit prete
+            if not self.__connexion_event.is_set():
+                raise Exception('Erreur connexion idmg=%s, q en amont distante pas prete' % self.__idmg)
 
             while not self.__stop_event.is_set():
                 self.__stop_event.wait(10)
@@ -428,22 +433,22 @@ class ConnexionInterMilleGrilles:
         """
         # Creer la Q sur la connexion en aval
         self.__channel_amont_local.queue_declare(
-            queue=self.__nom_q,
+            queue=self.__nom_q_locale,
             durable=False,
             exclusive=True,
             callback=self.creer_bindings_local,
         )
 
-        # La connexion est prete
-        self.__connexion_event.set()
-
     def creer_bindings_local(self, queue):
         self.__logger.info("Ouverture Q locale pour %s: %s" % (self.__idmg, str(queue)))
         self.__ctag_amont_local = self.__channel_amont_local.basic_consume(
             self.__traitement_local_vers_tiers.callbackAvecAck,
-            queue=self.__nom_q,
+            queue=self.__nom_q_locale,
             no_ack=False
         )
+
+        # La connexion est prete
+        self.__connexion_event.set()
 
     def connecter_mq_distant(self):
         """
@@ -460,6 +465,32 @@ class ConnexionInterMilleGrilles:
         if barrier.broken:
             raise Exception("Erreur connexion a MQ distant")
 
+        # Creer et enregistrer un listener d'evenements en amont - sert a ouvrir un Q pour la millegrille locale
+        listener_distant = ListenerDistant()
+        listener_distant.on_channel_open = self.on_channel_amont_distant_open
+        listener_distant.on_channel_close = self.on_channel_amont_distant_close
+        self.__connexion_mq_amont_distante.register_channel_listener(listener_distant)
+
+    def on_channel_amont_distant_open(self, channel):
+        self.__logger.info("MQ Channel distant ouvert pour %s" % self.idmg)
+        self.__channel_amont_distant = channel
+        self.definir_q_distante()
+
+    def definir_q_distante(self):
+        """
+        Tente d'ouvrir une Q exclusive locale au nom de la MilleGrille distante.
+        """
+        # Creer la Q sur la connexion en aval
+        self.__channel_amont_distant.queue_declare(
+            queue=self.__nom_q_distante,
+            durable=False,
+            exclusive=True,
+            callback=self.creer_bindings_distant,
+        )
+
+    def on_channel_amont_distant_close(self, channel=None, code=None, reason=None):
+        self.__logger.info("MQ Channel distant ferme pour %s" % self.idmg)
+
     def demander_maj_certificat(self):
         """
         Demander a la millegrille distante une mise a jour du certificat
@@ -472,6 +503,15 @@ class ConnexionInterMilleGrilles:
         """
         pass
 
+    def creer_bindings_distant(self, queue):
+        """
+        Prepare les bindings sur la MilleGrille distante (e.g. les abonnements)
+        """
+        self.__logger.info("Ouverture Q distante avec %s: %s" % (self.__idmg, str(queue)))
+
+        # La connexion est prete
+        self.__connexion_event.set()
+
     @property
     def idmg(self):
         return self.__idmg
@@ -479,6 +519,13 @@ class ConnexionInterMilleGrilles:
     @property
     def connecteur(self):
         return self.__connecteur
+
+
+class ListenerDistant:
+
+    def __init__(self):
+        self.on_channel_open = None
+        self.on_channel_close = None
 
 
 class TraitementMessageLocalVersTiers(TraitementMessageCallback):
