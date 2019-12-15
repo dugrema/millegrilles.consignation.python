@@ -173,6 +173,15 @@ class TraitementMessageLocalVersTiers(TraitementMessageCallback):
         exchange = method.exchange
         dict_message = json.loads(body)
 
+        self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
+
+        if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
+            self.__logger.debug("Message en amont sur exchange prive local, on le passe a la millegrille distante")
+        elif exchange == '':  # Echange direct
+            self.__logger.debug("Message sur exchange direct")
+        else:
+            raise Exception("Message non traitable")
+
 
 class ConnexionInterMilleGrilles:
     """
@@ -188,7 +197,7 @@ class ConnexionInterMilleGrilles:
             connecteur, connecteur.contexte.message_dao, connecteur.contexte.configuration)
         self.__ctag_local = None
 
-        self.__nom_q = idmg
+        self.__nom_q = 'inter.' + idmg
 
         self.__connexion_mq_distante = None
         self.__channel_distant = None

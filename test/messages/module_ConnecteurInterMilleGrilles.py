@@ -63,9 +63,21 @@ class MessagesSample(BaseCallback):
         print("Envoi maj fiche privee: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transmettre_requete_directe(self):
+        requete = {
+            'texte': 'On va se promener plus loin'
+        }
+
+        domaine = 'donne.moi.des.fichiers'
+        enveloppe_val = self.generateur.transmettre_requete(requete, domaine, idmg='abcd', correlation_id='moimoi')
+
+        print("Envoi maj fiche privee: %s" % enveloppe_val)
+        return enveloppe_val
+
 
     def executer(self):
-        enveloppe = sample.transmettre_commande_ouverture()
+        # enveloppe = sample.transmettre_commande_ouverture()
+        enveloppe = sample.transmettre_requete_directe()
 
 
 # --- MAIN ---

@@ -71,14 +71,15 @@ class GenerateurTransaction:
 
         return message_signe
 
-    def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None, domaine_direct=False):
+    def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None, domaine_direct=False, idmg=None):
         """
         Transmet une requete au backend de MilleGrilles. La requete va etre vu par un des workers du domaine. La
         reponse va etre transmise vers la "message_dao.queue_reponse", et le correlation_id permet de savoir a
         quelle requete la reponse correspond.
         :param message_dict:
-        :param domaine: Domaine qui doit traiter la requete - doit correspondre a a une routing key.
         :param correlation_id: Numero utilise pour faire correspondre la reponse.
+        :param domaine: Domaine qui doit traiter la requete - doit correspondre a a une routing key.
+        :param idmg: MilleGrille distante par idmg
         :return:
         """
 
@@ -86,7 +87,7 @@ class GenerateurTransaction:
             reply_to = self._contexte.message_dao.queue_reponse
 
         enveloppe = message_dict.copy()
-        enveloppe = self.preparer_enveloppe(enveloppe, '%s.requete' % domaine)
+        enveloppe = self.preparer_enveloppe(enveloppe, 'requete.%s' % domaine)
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
@@ -95,9 +96,16 @@ class GenerateurTransaction:
             routing_key = domaine
         else:
             routing_key = 'requete.%s' % domaine
-        self._contexte.message_dao.transmettre_message_noeuds(
-            enveloppe, routing_key, encoding=self.encodeur_json,
-            reply_to=reply_to, correlation_id=correlation_id)
+
+        if idmg is None:
+            self._contexte.message_dao.transmettre_message_noeuds(
+                enveloppe, routing_key, encoding=self.encodeur_json,
+                reply_to=reply_to, correlation_id=correlation_id)
+        else:
+            self._contexte.message_dao.transmettre_message_intermillegrilles(
+                enveloppe, idmg, encoding=self.encodeur_json,
+                reply_to=reply_to, correlation_id=correlation_id)
+
 
         return uuid_transaction
 
