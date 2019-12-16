@@ -1151,7 +1151,7 @@ class ProcessusGenererDemandeInscription(MGProcessusTransaction):
         domaine = ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION
         self.generateur_transactions.soumettre_transaction(nouvelle_transaction, domaine)
 
-        self.set_etape_suivante() # Termine
+        self.set_etape_suivante()  # Termine
 
 
 class TransactionDocumentMajClesVersionMapper:

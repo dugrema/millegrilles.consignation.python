@@ -19,9 +19,9 @@ class ConstantesAnnuaire:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
 
     LIBVAL_INDEX_MILLEGRILLES = 'index.millegrilles'
-    LIBVAL_FICHE_TIERCE = 'fiche.tierce'
     LIBVAL_FICHE_PRIVEE = 'fiche.privee'      # Fiche privee de la millegrille locale
     LIBVAL_FICHE_PUBLIQUE = 'fiche.publique'  # Fiche publique de la millegrille locale signee par le maitredescles
+    LIBVAL_FICHE_TIERS = 'fiche.tiers'        # Fiche d'une MilleGrille tierce
 
     LIBELLE_DOC_LISTE = 'liste'
     LIBELLE_DOC_SECURITE = '_securite'
@@ -42,11 +42,17 @@ class ConstantesAnnuaire:
     LIBELLE_DOC_TYPE_FICHE = 'type'
     LIBELLE_DOC_FICHE_PRIVEE = 'fiche_privee'
     LIBELLE_DOC_FICHE_PUBLIQUE = 'fiche_publique'
+    LIBELLE_DOC_DATE_DEMANDE = 'date'
+    LIBELLE_DOC_DEMANDES_INSCRIPTION = 'demandes_inscription'
+    LIBELLE_DOC_DEMANDES_CSR = 'csr'
+    LIBELLE_DOC_DEMANDES_CORRELATION = 'csr_correlation'
+    LIBELLE_DOC_DEMANDES_ORIGINALE = 'demande_originale'
 
     TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHETIERCE = '%s.maj.ficheTierce' % DOMAINE_NOM
     TRANSACTION_DEMANDER_INSCRIPTION = '%s.demanderInscription' % DOMAINE_NOM
+    TRANSACTION_INSCRIRE_TIERS = '%s.inscrireTiers' % DOMAINE_NOM
 
     REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
 
@@ -79,7 +85,7 @@ class ConstantesAnnuaire:
     }
 
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_TIERCE,
+        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_TIERS,
         Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
         LIBELLE_DOC_LIENS_PUBLICS_HTTPS: list(),
         LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
@@ -102,6 +108,17 @@ class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PRIVEE:
             fiche_privee = self.gestionnaire.get_fiche_privee()
+
+            # Filtrer les champs MongoDB et MilleGrilles qui ne sont pas natifs a la fiche
+            champs_enlever = [
+                '_id',
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION,
+                Constantes.DOCUMENT_INFODOC_LIBELLE
+            ]
+            for champ in champs_enlever:
+                del fiche_privee[champ]
+
             self.transmettre_reponse(message_dict, fiche_privee, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_message(ch, method, properties, body)
@@ -172,6 +189,10 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Annuaire:ProcessusMajFichePublique"
         elif domaine_transaction == ConstantesAnnuaire.TRANSACTION_MAJ_FICHETIERCE:
             processus = "millegrilles_domaines_Annuaire:ProcessusMajFicheTierce"
+        elif domaine_transaction == ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION:
+            processus = "millegrilles_domaines_Annuaire:ProcessusDemanderInscription"
+        elif domaine_transaction == ConstantesAnnuaire.TRANSACTION_INSCRIRE_TIERS:
+            processus = "millegrilles_domaines_Annuaire:ProcessusInscrireTiersLocalement"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -256,6 +277,46 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         fiche_privee = collection_domaine.find_one(filtre)
         return fiche_privee
 
+    def ajouter_demande_inscription(self, demande_inscription):
+        # On conserver la demande au complet pour la retransmettre a la MilleGrille tierce
+        demande_copy = demande_inscription.copy()
+
+        filtrer_champs_millegrille = [
+            '_id',
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT
+        ]
+        for champ in filtrer_champs_millegrille:
+            del demande_copy[champ]
+
+        demande_csr = {
+            ConstantesAnnuaire.LIBELLE_DOC_DATE_DEMANDE: demande_inscription[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE],
+            ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: demande_inscription[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
+            ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_ORIGINALE: demande_copy,
+        }
+        idmg = demande_inscription['idmg']
+
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+        }
+
+        ops = {
+            '$push': {
+                ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_INSCRIPTION: demande_csr
+            },
+            '$setOnInsert': on_insert,
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(filtre, ops, upsert=True)
+
 
 class ProcessusAnnuaire(MGProcessusTransaction):
 
@@ -326,7 +387,7 @@ class ProcessusMajFicheTierce(ProcessusAnnuaire):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusInscrireMilleGrilleTierceLocalement(ProcessusAnnuaire):
+class ProcessusInscrireTiersLocalement(ProcessusAnnuaire):
     """
     Processus initial qui mene a generer un certificat de connexion a la MilleGrille locale
     suite a une demande d'une MilleGrille tierce. Genere une notification a l'usager avant de
@@ -362,7 +423,7 @@ class ProcessusRefuserInscriptionMilleGrilleTierceLocalement(ProcessusAnnuaire):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusDemandeInscrireAMilleGrilleTierce(ProcessusAnnuaire):
+class ProcessusDemanderInscription(ProcessusAnnuaire):
     """
     Processus qui demande un certificat a une MilleGrille tierce pour la MilleGrille locale.
     Ce processus peut servir pour une demande initiale ou pour le renouvellement du certificat.
@@ -373,6 +434,10 @@ class ProcessusDemandeInscrireAMilleGrilleTierce(ProcessusAnnuaire):
 
     def initiale(self):
         transaction = self.transaction
+
+        # Mettre la jour la fiche du tiers avec l'information de demande
+        self.controleur.gestionnaire.ajouter_demande_inscription(transaction)
+
         self.set_etape_suivante()  # Termine
 
 
