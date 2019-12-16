@@ -74,10 +74,15 @@ class MessagesSample(BaseCallback):
         print("Envoi maj fiche privee: %s" % enveloppe_val)
         return enveloppe_val
 
+    def demander_csr(self):
+        domaine = 'inter.genererCsr'
+        self.generateur.transmettre_requete({}, domaine, 'abcd', self.queue_name)
+
     def executer(self):
         idmg = 'distant'
-        enveloppe = sample.transmettre_commande_ouverture(idmg)
+        # enveloppe = sample.transmettre_commande_ouverture(idmg)
         # enveloppe = sample.transmettre_requete_directe(idmg)
+        self.demander_csr()
 
 
 # --- MAIN ---

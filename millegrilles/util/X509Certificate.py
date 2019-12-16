@@ -253,6 +253,35 @@ class GenerateurCertificat:
 
         return builder
 
+    def preparer_request(self, common_name, unit_name=None, alt_names: list = None) -> EnveloppeCleCert:
+        clecert = EnveloppeCleCert()
+        clecert.generer_private_key()
+
+        builder = x509.CertificateSigningRequestBuilder()
+
+        # Batir subject
+        name_list = [x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg)]
+        if unit_name is not None:
+            name_list.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name))
+        name_list.append(x509.NameAttribute(NameOID.COMMON_NAME, common_name))
+        name = x509.Name(name_list)
+        builder = builder.subject_name(name)
+
+        if alt_names is not None:
+            self.__logger.debug("Preparer requete %s avec urls publics: %s" % (common_name, str(alt_names)))
+            liste_names = list()
+            for alt_name in alt_names:
+                liste_names.append(x509.DNSName(alt_name))
+            # Ajouter noms DNS valides pour MQ
+            builder = builder.add_extension(x509.SubjectAlternativeName(liste_names), critical=False)
+
+        request = builder.sign(
+            clecert.private_key, hashes.SHA256(), default_backend()
+        )
+        clecert.set_csr(request)
+
+        return clecert
+
     def preparer_key_request(self, unit_name, common_name, generer_password=False, alt_names: list = None) -> EnveloppeCleCert:
         clecert = EnveloppeCleCert()
         clecert.generer_private_key(generer_password=generer_password)

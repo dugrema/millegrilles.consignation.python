@@ -5,7 +5,7 @@ from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrapper, JSONHelper, CertificatInconnu
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
-from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenerateurCertificat
 
 from threading import Event, Thread, Lock, Barrier
 from pika.channel import Channel
@@ -18,6 +18,8 @@ import os
 import shutil
 import traceback
 import pika
+import uuid
+import base64
 
 
 class ConstantesInterMilleGrilles:
@@ -30,7 +32,12 @@ class ConstantesInterMilleGrilles:
     REPERTOIRE_CERTS = os.path.join(REPERTOIRE_INTER, "certs")
     REPERTOIRE_SECRETS = os.path.join(REPERTOIRE_INTER, "secrets")
 
+    ENV_PATH_MOTDEPASSE_CLE = 'MG_MOTDEPASSECLE_PATH'
+
     ROUTING_KEY_NOTICES_INTER = 'inter.notices'
+
+    LIBELLE_CSR = 'csr'
+    LIBELLE_CORRELATION = 'correlation'
 
 
 class ConnecteurInterMilleGrilles(ModeleConfiguration):
@@ -63,6 +70,10 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         """
         super().initialiser(False, True, True)
         self.__logger.info("On enregistre la queue de commandes")
+
+        ficher_motdepasse_cle = os.environ.get(ConstantesInterMilleGrilles.ENV_PATH_MOTDEPASSE_CLE)
+        with open(ficher_motdepasse_cle, 'r') as fichier:
+            self.__mot_de_passe_cle = fichier.read().strip()
 
         self.__callback_q_locale = TraitementMessageQueueLocale(
             self, self.contexte.message_dao, self.contexte.configuration)
@@ -133,13 +144,25 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
     def creer_bindings_local(self, queue):
         self.__q_locale = queue.method.queue
 
-        routing_keys = [
+        routing_keys_prive = [
             ConstantesInterMilleGrilles.COMMANDE_CONNECTER,
         ]
 
-        for routing in routing_keys:
+        for routing in routing_keys_prive:
             self.channel.queue_bind(
                 exchange=self.contexte.configuration.exchange_prive,
+                queue=self.__q_locale,
+                routing_key=routing,
+                callback=self.__compter_route
+            )
+
+        routing_keys_protege = [
+            'requete.' + ConstantesInterMilleGrilles.REQUETE_GENERER_CSR,
+        ]
+
+        for routing in routing_keys_protege:
+            self.channel.queue_bind(
+                exchange=self.contexte.configuration.exchange_noeuds,
                 queue=self.__q_locale,
                 routing_key=routing,
                 callback=self.__compter_route
@@ -184,10 +207,36 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             except:
                 pass
 
+    def generer_csr(self, properties):
+        """
+        Generer une cle privee et un csr pour une demande d'inscription
+        """
+        generateur = GenerateurCertificat(self.contexte.idmg)
+        clecert = generateur.preparer_request('Connecteur')
+
+        correlation_cle = str(uuid.uuid4())
+
+        clecert.password = self.__mot_de_passe_cle.encode('utf-8')
+
+        private_file = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, 'new.' + correlation_cle + '.key.pem')
+        with open(private_file, 'wb') as fichier:
+            fichier.write(clecert.private_key_bytes)
+
+        csr_string = clecert.csr_bytes.decode('utf-8')
+
+        reponse = {
+            ConstantesInterMilleGrilles.LIBELLE_CSR: csr_string,
+            ConstantesInterMilleGrilles.LIBELLE_CORRELATION: correlation_cle,
+        }
+
+        reply_q = properties.reply_to
+        correlation_id = properties.correlation_id
+        self.contexte.generateur_transactions.transmettre_reponse(reponse, reply_q, correlation_id)
+
 
 class TraitementMessageQueueLocale(TraitementMessageCallback):
 
-    def __init__(self, connecteur, message_dao, configuration):
+    def __init__(self, connecteur: ConnecteurInterMilleGrilles, message_dao, configuration):
         super().__init__(message_dao, configuration)
         self.__connecteur = connecteur
         self.__logger = logging.getLogger(__name__+'.'+self.__class__.__name__)
@@ -203,8 +252,11 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
         if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
             if routing_key == ConstantesInterMilleGrilles.COMMANDE_CONNECTER:
                 self.__connecteur.connecter_millegrille(dict_message)
+            self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
 
-        self.__logger.debug("Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (exchange, routing_key, body.decode('utf-8')))
+        elif exchange == Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS:
+            if routing_key == 'requete.' + ConstantesInterMilleGrilles.REQUETE_GENERER_CSR:
+                self.__connecteur.generer_csr(properties)
 
 
 class ConfigurationInterMilleGrilles:

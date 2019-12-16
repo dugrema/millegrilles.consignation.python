@@ -61,6 +61,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_ROLE_CERTIFICAT = 'role'
     TRANSACTION_CHAMP_CSR = 'csr'
+    TRANSACTION_CHAMP_CSR_CORRELATION = 'csr_correlation'
     TRANSACTION_CHAMP_TYPEDEMANDE = 'type_demande'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
@@ -1133,18 +1134,24 @@ class ProcessusGenererDemandeInscription(MGProcessusTransaction):
         transaction = self.transaction
 
         idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-        fiche_privee = self.parametres['reponses'][0]
-        csr = self.parametres['reponses'][1]
+        fiche_privee = self.parametres['reponse'][0]
+        csr_reponse = self.parametres['reponse'][1]
+
+        csr = csr_reponse['csr']
+        csr_correlation = csr_reponse['correlation']
 
         nouvelle_transaction = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
             ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR: csr,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR_CORRELATION: csr_correlation,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_TYPEDEMANDE: ConstantesMaitreDesCles.TYPE_DEMANDE_INSCRIPTION,
         }
 
         domaine = ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION
         self.generateur_transactions.soumettre_transaction(nouvelle_transaction, domaine)
+
+        self.set_etape_suivante() # Termine
 
 
 class TransactionDocumentMajClesVersionMapper:
