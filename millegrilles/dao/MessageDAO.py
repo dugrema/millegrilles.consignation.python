@@ -1184,7 +1184,6 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
             fingerprint = ci.fingerprint
             self.message_dao.transmettre_demande_certificat(fingerprint)
 
-
     def executer_requete(self, requete):
         collection = self.gestionnaire.get_collection()
         filtre = requete.get('filtre')

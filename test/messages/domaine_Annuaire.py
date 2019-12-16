@@ -70,9 +70,12 @@ class MessagesSample(BaseCallback):
         print("Envoi maj fiche privee: %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_fiche_privee(self):
+        self.generateur.transmettre_requete({}, 'millegrilles.domaines.Annuaire.fichePrivee', reply_to=self.queue_name, correlation_id='abcd')
 
     def executer(self):
-        enveloppe = sample.transmettre_maj_fiche_privee()
+        # enveloppe = sample.transmettre_maj_fiche_privee()
+        sample.requete_fiche_privee()
 
 
 # --- MAIN ---

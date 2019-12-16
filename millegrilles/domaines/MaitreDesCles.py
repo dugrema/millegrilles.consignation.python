@@ -8,6 +8,7 @@ from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInco
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
 from millegrilles.domaines.Pki import ConstantesPki
+from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
@@ -44,6 +45,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
     TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR = '%s.genererCertificatNavigateur' % DOMAINE_NOM
     TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
+    TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
 
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
@@ -59,6 +61,9 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_ROLE_CERTIFICAT = 'role'
     TRANSACTION_CHAMP_CSR = 'csr'
+    TRANSACTION_CHAMP_TYPEDEMANDE = 'type_demande'
+
+    TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
     TRANSACTION_VERSION_COURANTE = 5
 
@@ -274,6 +279,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatNavigateur"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_DECLASSER_CLE_GROSFICHIER:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusDeclasserCleGrosFichier"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_DEMANDE_INSCRIPTION:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererDemandeInscription"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -1093,6 +1100,51 @@ class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
         # Repondre au demandeur avec le refus
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusGenererDemandeInscription(MGProcessusTransaction):
+    """
+    Generer une nouvelle transaction pour l'Annuaire, va servir a demander l'acces a une MilleGrille tierce
+    """
+
+    def initiale(self):
+        """
+        Effecuter une requete pour obtenir la plus recente fiche privee
+        """
+        domaine = ConstantesAnnuaire.REQUETE_FICHE_PRIVEE
+        self.set_requete(domaine, {})
+
+        self.set_etape_suivante(ProcessusGenererDemandeInscription.demander_csr_connecteurs.__name__)
+
+    def demander_csr_connecteurs(self):
+        """
+        Demander de nouveaux CSR aupres des connecteurs
+        """
+
+        domaine = 'inter.genererCsr'
+        self.set_requete(domaine, {})
+
+        self.set_etape_suivante(ProcessusGenererDemandeInscription.generer_transaction_annuaire.__name__)
+
+    def generer_transaction_annuaire(self):
+        """
+        Generer la transaction signee pour l'Annuaire.
+        """
+        transaction = self.transaction
+
+        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        fiche_privee = self.parametres['reponses'][0]
+        csr = self.parametres['reponses'][1]
+
+        nouvelle_transaction = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR: csr,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TYPEDEMANDE: ConstantesMaitreDesCles.TYPE_DEMANDE_INSCRIPTION,
+        }
+
+        domaine = ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION
+        self.generateur_transactions.soumettre_transaction(nouvelle_transaction, domaine)
 
 
 class TransactionDocumentMajClesVersionMapper:

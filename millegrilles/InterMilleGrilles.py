@@ -23,6 +23,7 @@ import pika
 class ConstantesInterMilleGrilles:
 
     COMMANDE_CONNECTER = 'commande.inter.connecter'
+    REQUETE_GENERER_CSR = 'inter.genererCsr'
 
     REPERTOIRE_INTER = '/opt/millegrilles/dist/inter'
     REPERTOIRE_FICHES = os.path.join(REPERTOIRE_INTER, "fiches")

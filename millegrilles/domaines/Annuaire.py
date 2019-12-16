@@ -1,5 +1,5 @@
 from millegrilles import Constantes
-from millegrilles.Domaines import GestionnaireDomaineStandard
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
@@ -46,6 +46,9 @@ class ConstantesAnnuaire:
     TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHETIERCE = '%s.maj.ficheTierce' % DOMAINE_NOM
+    TRANSACTION_DEMANDER_INSCRIPTION = '%s.demanderInscription' % DOMAINE_NOM
+
+    REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
 
     TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
         Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
@@ -92,11 +95,24 @@ class ConstantesAnnuaire:
     }
 
 
+class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PRIVEE:
+            fiche_privee = self.gestionnaire.get_fiche_privee()
+            self.transmettre_reponse(message_dict, fiche_privee, properties.reply_to, properties.correlation_id)
+        else:
+            super().traiter_message(ch, method, properties, body)
+
+
+
 class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
-        self._traitement_message = None
+        self._traitement_requetes = TraitementRequetesAnnuaire(self)
 
     def configurer(self):
         super().configurer()
@@ -139,6 +155,9 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
     def get_nom_domaine(self):
         return ConstantesAnnuaire.DOMAINE_NOM
+
+    def get_handler_requetes_noeuds(self):
+        return self._traitement_requetes
 
     def traiter_cedule(self, message):
         timestamp_message = message['timestamp']['UTC']
@@ -227,6 +246,15 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         """
         self._logger.warning("ATTENTION! valider_signature_fiche PAS IMPLEMENTE")
         return True
+
+    def get_fiche_privee(self):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
+        fiche_privee = collection_domaine.find_one(filtre)
+        return fiche_privee
 
 
 class ProcessusAnnuaire(MGProcessusTransaction):
