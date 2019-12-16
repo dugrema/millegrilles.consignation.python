@@ -30,7 +30,7 @@ class MessagesSample(BaseCallback):
         # self.thread_ioloop = Thread(target=self.run_ioloop)
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
-        with open('/home/mathieu/mgdev/certs/pki.maitredescles.cert', 'rb') as certificat_pem:
+        with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
             cert = x509.load_pem_x509_certificate(
                 certificat_courant_pem,
@@ -208,6 +208,22 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_demande_inscription_tierce(self):
+        transaction = {
+            'idmg': 'jFMV6jSR9e1oNKJi3CqwL1QGywr'
+        }
+        domaine = ConstantesMaitreDesCles.TRANSACTION_GENERER_DEMANDE_INSCRIPTION
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction,
+            domaine,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # enveloppe = self.requete_cert_maitredescles()
         # enveloppe = self.nouvelle_cle_grosfichiers()
@@ -215,7 +231,8 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
-        enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
+        # enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
+        self.transaction_demande_inscription_tierce()
 
 
 # --- MAIN ---
