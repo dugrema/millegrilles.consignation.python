@@ -619,7 +619,7 @@ class PikaDAO:
 
         self._in_error = False
 
-    def recevoir_message_intermillegrilles(self, message_dict, routing_key, reply_to=None, correlation_id=None,
+    def recevoir_message_intermillegrilles(self, message_dict, routing_key, idmg_origine: str, headers=None, reply_to=None, correlation_id=None,
                                            delivery_mode_v=1, encoding=json.JSONEncoder):
 
         if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
@@ -630,6 +630,10 @@ class PikaDAO:
             properties.reply_to = reply_to
         if correlation_id is not None:
             properties.correlation_id = correlation_id
+        properties.headers = {
+            'inter': 'true',
+            'origine': idmg_origine,
+        }
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
