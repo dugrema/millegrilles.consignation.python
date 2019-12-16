@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import secrets
 import base58
+import shutil
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
@@ -32,9 +33,13 @@ class ConstantesSecurityPki:
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'
     LIBELLE_CHAINE_PEM = 'chaine_pem'
+    LIBELLE_CA_APPROUVE = 'ca_approuve'
 
     EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
     EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
+
+    LIBVAL_CERTIFICAT_RACINE = 'certificat.root'
+    LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
 
     REGLE_LIMITE_CHAINE = 4  # Longeur maximale de la chaine de certificats
 
@@ -93,6 +98,10 @@ class EnveloppeCertificat:
         return str(binascii.hexlify(self._fingerprint), 'utf-8')
 
     @property
+    def fingerprint_base58(self):
+        return base58.b58encode(self._fingerprint).decode('utf-8')
+
+    @property
     def certificat(self):
         return self._certificat
 
@@ -145,7 +154,10 @@ class EnveloppeCertificat:
 
     @property
     def subject_organization_name(self):
-        return self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
+        organization = self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        if len(organization) > 0:
+            return organization[0].value
+        return None
 
     @property
     def subject_organizational_unit_name(self):
@@ -289,11 +301,6 @@ class UtilCertificats:
 
         return message_bytes
 
-    def verifier_certificat(self, dict_message):
-        # self._verifier_usage()  # Deja fait au chargement
-        # self._verifier_cn(dict_message)
-        self._verifier_millegrille()
-
     def _charger_certificat(self):
         certfile_path = self.configuration.mq_certfile
         self._certificat = self._charger_pem(certfile_path)
@@ -327,39 +334,6 @@ class UtilCertificats:
         supporte_signature_numerique = key_usage.digital_signature
         if not supporte_signature_numerique:
             raise Exception('Le certificat ne supporte pas les signatures numeriques')
-
-    def _verifier_millegrille(self):
-        """
-        Verifier la millegrille origine avec le SHA-1 base58 (champ en-tete.millegrille)
-        """
-        # Convertir IDMG (base58) en hex
-        pass
-
-    # def _verifier_cn(self, dict_message: dict, enveloppe: EnveloppeCertificat = None):
-    #     if enveloppe is not None:
-    #         sujet = enveloppe.certificat.subject
-    #     else:
-    #         sujet = self.certificat.subject
-    #     self._logger.debug('Sujet du certificat')
-    #     for elem in sujet:
-    #         self._logger.debug("%s" % str(elem))
-    #
-    #     cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-    #     self._logger.debug("Common Name: %s" % cn)
-    #
-    #     # message_noeud = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(
-    #     #     Constantes.TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME)
-    #     # if message_noeud is not None and '@' in message_noeud:
-    #     #     message_noeud = message_noeud.split('@')[1]
-    #
-    #     # Verifier la millegrille origine avec le SHA-1 base58 (champ millegrille
-    #
-    #     resultat_comparaison = (cn == message_noeud)
-    #     if not resultat_comparaison:
-    #         raise Exception(
-    #             "Erreur de certificat: le nom du noeud (%s) ne correspond pas au certificat utilise pour signer (%s)." %
-    #             (message_noeud, cn)
-    #         )
 
     def hacher_contenu(self, dict_message):
         """
@@ -420,8 +394,6 @@ class SignateurTransaction(UtilCertificats):
         dict_message_effectif = dict_message.copy()
         en_tete = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].copy()
         dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = en_tete
-
-        self.verifier_certificat(dict_message_effectif)  # Verifier que l'entete correspond au certificat
 
         # Ajouter information du certification dans l'en_tete
         fingerprint_cert = self._enveloppe.fingerprint_ascii
@@ -504,11 +476,14 @@ class VerificateurTransaction(UtilCertificats):
 
         self._logger.debug("Message nettoye: %s" % str(dict_message))
 
+        # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
+        # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.pem) au besoin.
+        # Retourne le idmg de la MilleGrille concernee.
         enveloppe_certificat = self._identifier_certificat(dict_message)
         self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
         # self._verifier_cn(dict_message, enveloppe=enveloppe_certificat)
+
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
-        self._verifier_millegrille()  # A FAIRE: Verifier que le cert CA du message == IDMG du message
 
         return enveloppe_certificat
 
@@ -578,10 +553,51 @@ class VerificateurCertificats(UtilCertificats):
         self._cache_certificats_fingerprint = dict()
         self._liste_CAs_connus = []  # Fingerprint de tous les CAs connus, trusted et untrusted
 
-        self.__untrusted_CAs_filename = None
-        self.__untrusted_CAs_writer = None
+        self.__workdir = tempfile.mkdtemp(prefix='validation', dir=self.configuration.pki_workdir)
 
-        self._initialiser_cas()
+    def charger_certificats_CA_millegrille(self, idmg: str):
+        """
+        Charge le certificat CA d'une MilleGrille tierce s'il est connu avec les certificats intermediaires.
+        Aucun effet si le certificat est deja charge.
+        """
+
+        file_ca_racine = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
+        if not os.path.isfile(file_ca_racine):
+            collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
+            idmg_hex = base58.b58decode(idmg).decode('utf-8')
+
+            filtre = {
+                {'$or': [
+                    {ConstantesSecurityPki.LIBELLE_FINGERPRINT: idmg_hex},
+                    {
+                        Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
+                        'sujet.commonName': idmg,
+                    }
+                ]}
+            }
+            certs = collection.find(filtre)
+
+            with open(os.path.join(self.__workdir, idmg + '.untrusted.pem'), 'w+') as filewriter_ca_untrusted:
+                for cert in certs:
+                    if cert['fingerprint'] == idmg_hex:
+                        # C'est le certificat racine, on verifie son fingerprint avant de le sauvegarder sur disque
+                        enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                        if enveloppe_ca.is_rootCA and enveloppe_ca.fingerprint_ascii == idmg_hex:
+                            # Certificat racine est valide
+                            with open(file_ca_racine, 'w') as fichier:
+                                fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                            self._ajouter_untrusted_ca(enveloppe_ca)
+                        else:
+                            raise CertificatInvalide("Le certificat racine de %s a ete altere (idmg != fingerprint)" % idmg)
+                    else:
+                        # Certificat intermediaire, on l'ajoute au untrusted (pas besoin de verifier ici, c'est untrusted)
+                        filewriter_ca_untrusted.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                        enveloppe_ca = EnveloppeCertificat(
+                            certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                        self._ajouter_untrusted_ca(enveloppe_ca)
+        else:
+            # Certificat racine pour la MilleGrille est deja charge
+            pass
 
     def charger_certificat(self, fichier=None, fingerprint=None):
         # Tenter de charger a partir d'une copie locale
@@ -608,8 +624,13 @@ class VerificateurCertificats(UtilCertificats):
         if enveloppe is not None:
 
             if not enveloppe.est_verifie:
+
+                # S'assurer que le contexte pour cette MilleGrille est charge
+                idmg = enveloppe.subject_organization_name
+                self.charger_certificats_CA_millegrille(idmg)  # Aucun effet si le cert racine est deja charge
+
                 # Verifier la chaine de ce certificat
-                if enveloppe.is_CA:
+                if enveloppe.is_CA and not enveloppe.is_rootCA:
                     # Ajouter dans le fichier temp des untrusted CAs pour openssl
                     # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
                     # sont pas chargees en ordre. On le conserve quand meme.
@@ -627,33 +648,27 @@ class VerificateurCertificats(UtilCertificats):
 
     def _ajouter_untrusted_ca(self, enveloppe: EnveloppeCertificat):
 
-        if self.__untrusted_CAs_writer is None:
-            # Ouvrir un fichier pour ecrire les untrusted CAs. Le fichier reste ouvert pour eviter qu'il soit
-            # modifie ou efface par un processus tiers.
-            workdir = self.configuration.pki_workdir
-            self.__untrusted_CAs_filename = tempfile.mktemp(prefix='untrusted.', suffix='.cert.pem', dir=workdir)
-            self.__untrusted_CAs_writer = open(self.__untrusted_CAs_filename, 'w')
+        idmg = enveloppe.subject_organization_name
 
-        self.__untrusted_CAs_writer.write(enveloppe.certificat_pem)
-        self.__untrusted_CAs_writer.flush()
-
-    def _initialiser_cas(self):
-        """
-        Initialise la liste des CA connus et ouvre un fichier pour les untrusted CAs.
-        :return:
-        """
-        # Charger le root CAs. On garde les fingerprints en memoire pour indiquer qu'il
-        # n'est pas necessaire de les ajouter au fichier untrusted CAs.
-
-        pass
+        untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
+        with open(untrusted_cas_filename, 'w+') as untrusted_cas_writer:
+            untrusted_cas_writer.write(enveloppe.certificat_pem)
 
     def verifier_chaine(self, enveloppe: EnveloppeCertificat):
         """
         Utilise les root CA et untrusted CAs pour verifier la chaine du certificat
         :return: True si le certificat est valide selon la chaine de certification, date, etc (openssl).
         """
-        workdir = self.configuration.pki_workdir
-        nom_fichier_tmp = tempfile.mktemp(suffix='.cert.pem', dir=workdir)
+        idmg = enveloppe.subject_organization_name
+        untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
+        if idmg == self.configuration.idmg:
+            # MilleGrille locale - on utilise le fichier CA pre-configure
+            trusted_ca_filename = self.configuration.pki_cafile
+        else:
+            # MilleGrille distante, on utilise un fichier CA recu
+            trusted_ca_filename = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
+
+        nom_fichier_tmp = tempfile.mktemp(suffix='.cert.pem', dir=self.__workdir)
         with open(nom_fichier_tmp, 'w') as output_cert_file :
             output_cert_file.write(enveloppe.certificat_pem)
 
@@ -661,16 +676,14 @@ class VerificateurCertificats(UtilCertificats):
             # qu'il soit altere par un autre processus.
             output_cert_file.flush()
 
-            root_ca_path = self.configuration.pki_cafile
-            self._logger.debug("Cert CA: %s, untrusted: %s" % (root_ca_path, self.__untrusted_CAs_filename))
+            self._logger.debug("Cert Racine: %s, untrusted: %s" % (trusted_ca_filename, untrusted_cas_filename))
 
             commande_openssl = [
                 'openssl', 'verify',
-                '-CAfile', root_ca_path,
+                '-CAfile', trusted_ca_filename,
+                '-untrusted', untrusted_cas_filename,
+                nom_fichier_tmp,
             ]
-            if self.__untrusted_CAs_writer is not None:
-                commande_openssl.extend(['-untrusted', self.__untrusted_CAs_filename])
-            commande_openssl.append(nom_fichier_tmp)
 
             self._logger.debug("Commande openssl: %s" % str(commande_openssl))
 
@@ -692,9 +705,8 @@ class VerificateurCertificats(UtilCertificats):
         return resultat == 0, output_txt
 
     def close(self):
-        if self.__untrusted_CAs_writer is not None:
-            self.__untrusted_CAs_writer.close()
-            os.unlink(self.__untrusted_CAs_filename)
+        # Supprimer tous les certificats mis sur le disque
+        shutil.rmtree(self.__workdir)
 
 
 class EncryptionHelper:
