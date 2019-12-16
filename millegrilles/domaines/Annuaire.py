@@ -40,6 +40,8 @@ class ConstantesAnnuaire:
     LIBELLE_DOC_ABONNEMENTS = 'abonnements'
     LIBELLE_DOC_NOMBRE_FICHES = 'nombre_fiches'
     LIBELLE_DOC_TYPE_FICHE = 'type'
+    LIBELLE_DOC_FICHE_PRIVEE = 'fiche_privee'
+    LIBELLE_DOC_FICHE_PUBLIQUE = 'fiche_publique'
 
     TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
@@ -156,10 +158,12 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
         return processus
 
-    def maj_fiche_privee(self, transaction):
+    def maj_fiche_privee(self, fiche):
+        self.valider_signature_fiche(fiche)
+
         # Extraire toutes les valeurs de la transaction qui ne commencent pas par un '_'
         set_ops = dict()
-        for key, value in transaction.items():
+        for key, value in fiche.items():
             if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
                 set_ops[key] = value
 
@@ -216,6 +220,13 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         )
 
         return fiche_exportee
+
+    def valider_signature_fiche(self, fiche):
+        """
+        Valide la signature de la fiche en utilisant les certificats racine, intermediaire et _certificat_.
+        """
+        self._logger.warning("ATTENTION! valider_signature_fiche PAS IMPLEMENTE")
+        return True
 
 
 class ProcessusAnnuaire(MGProcessusTransaction):
@@ -289,7 +300,9 @@ class ProcessusMajFicheTierce(ProcessusAnnuaire):
 
 class ProcessusInscrireMilleGrilleTierceLocalement(ProcessusAnnuaire):
     """
-    Processus qui genere un certificat de connexion pour la MilleGrille locale suite a une demande d'une MilleGrille tierce.
+    Processus initial qui mene a generer un certificat de connexion a la MilleGrille locale
+    suite a une demande d'une MilleGrille tierce. Genere une notification a l'usager avant de
+    repondre a la MilleGrille tierce.
     """
 
     def __init__(self, controleur, evenement):
@@ -297,6 +310,27 @@ class ProcessusInscrireMilleGrilleTierceLocalement(ProcessusAnnuaire):
 
     def initiale(self):
         transaction = self.transaction
+        fiche_privee = transaction[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE]
+
+        # Verification et mise a jour de la fiche de millegrille tierce.
+        self.controleur.gestionnaire.maj_fiche_privee(fiche_privee)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusRefuserInscriptionMilleGrilleTierceLocalement(ProcessusAnnuaire):
+    """
+    Processus pour refuser l'inscription d'une MilleGrille tierce.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Verification et mise a jour de la fiche de millegrille tierce.
+
         self.set_etape_suivante()  # Termine
 
 
