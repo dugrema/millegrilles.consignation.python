@@ -477,7 +477,7 @@ class VerificateurTransaction(UtilCertificats):
         self._logger.debug("Message nettoye: %s" % str(dict_message))
 
         # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
-        # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.pem) au besoin.
+        # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.cert.pem) au besoin.
         # Retourne le idmg de la MilleGrille concernee.
         enveloppe_certificat = self._identifier_certificat(dict_message)
         self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
@@ -553,7 +553,10 @@ class VerificateurCertificats(UtilCertificats):
         self._cache_certificats_fingerprint = dict()
         self._liste_CAs_connus = []  # Fingerprint de tous les CAs connus, trusted et untrusted
 
-        self.__workdir = tempfile.mkdtemp(prefix='validation', dir=self.configuration.pki_workdir)
+        self.__workdir = tempfile.mkdtemp(prefix='validation_', dir=self.configuration.pki_workdir)
+
+    def __del__(self):
+        self.close()
 
     def charger_certificats_CA_millegrille(self, idmg: str):
         """
@@ -564,37 +567,36 @@ class VerificateurCertificats(UtilCertificats):
         file_ca_racine = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
         if not os.path.isfile(file_ca_racine):
             collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-            idmg_hex = base58.b58decode(idmg).decode('utf-8')
+            idmg_hex = base58.b58decode(idmg)
+            idmg_hex = binascii.hexlify(idmg_hex).decode('utf-8')
 
             filtre = {
-                {'$or': [
+                '$or': [
                     {ConstantesSecurityPki.LIBELLE_FINGERPRINT: idmg_hex},
                     {
                         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
                         'sujet.commonName': idmg,
                     }
-                ]}
+                ]
             }
+
             certs = collection.find(filtre)
 
-            with open(os.path.join(self.__workdir, idmg + '.untrusted.pem'), 'w+') as filewriter_ca_untrusted:
-                for cert in certs:
-                    if cert['fingerprint'] == idmg_hex:
-                        # C'est le certificat racine, on verifie son fingerprint avant de le sauvegarder sur disque
-                        enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                        if enveloppe_ca.is_rootCA and enveloppe_ca.fingerprint_ascii == idmg_hex:
-                            # Certificat racine est valide
-                            with open(file_ca_racine, 'w') as fichier:
-                                fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                            self._ajouter_untrusted_ca(enveloppe_ca)
-                        else:
-                            raise CertificatInvalide("Le certificat racine de %s a ete altere (idmg != fingerprint)" % idmg)
+            for cert in certs:
+                if cert['fingerprint'] == idmg_hex:
+                    # C'est le certificat racine, on verifie son fingerprint avant de le sauvegarder sur disque
+                    enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                    if enveloppe_ca.is_rootCA and enveloppe_ca.fingerprint_ascii == idmg_hex:
+                        # Certificat racine est valide
+                        with open(file_ca_racine, 'w') as fichier:
+                            fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
                     else:
-                        # Certificat intermediaire, on l'ajoute au untrusted (pas besoin de verifier ici, c'est untrusted)
-                        filewriter_ca_untrusted.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                        enveloppe_ca = EnveloppeCertificat(
-                            certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                        self._ajouter_untrusted_ca(enveloppe_ca)
+                        raise CertificatInvalide("Le certificat racine de %s a ete altere (idmg != fingerprint)" % idmg)
+                else:
+                    # Certificat intermediaire, on l'ajoute au untrusted (pas besoin de verifier ici, c'est untrusted)
+                    enveloppe_ca = EnveloppeCertificat(
+                        certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                    self._ajouter_untrusted_ca(enveloppe_ca)
         else:
             # Certificat racine pour la MilleGrille est deja charge
             pass
@@ -706,7 +708,7 @@ class VerificateurCertificats(UtilCertificats):
 
     def close(self):
         # Supprimer tous les certificats mis sur le disque
-        shutil.rmtree(self.__workdir)
+        shutil.rmtree(self.__workdir, ignore_errors=True)
 
 
 class EncryptionHelper:

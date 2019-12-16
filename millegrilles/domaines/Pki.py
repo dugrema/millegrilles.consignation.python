@@ -136,7 +136,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 'routing': [
                     '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
-                'exchange': self.configuration.exchange_inter,
+                'exchange': self.configuration.exchange_prive,
                 'callback': self.__traitement_certificats.callbackAvecAck
             },
         ]
