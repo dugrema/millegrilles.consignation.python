@@ -511,18 +511,31 @@ class ConnexionInterMilleGrilles:
         self.__connecteur.contexte.message_dao.recevoir_message_intermillegrilles(
             dict_message, routing_key, idmg_origine=self.__idmg, reply_to=reply_to, correlation_id=correlation_id)
 
-    def transmettre_reponse_vers_local(self, dict_message, correlation_id):
+    def transmettre_message_exchdefault_vers_local(self, dict_message, method, properties):
         """
         Recevoir une reponse inter-millegrilles.
         Le correlation id contient la reply_q et le correlation_id local.
         """
-        params_reponse = correlation_id.split('/')
-        replying_to = params_reponse[0]
-        correlation_id_local = params_reponse[1]
+        reply_q = properties.reply_to
+        correlation_id = properties.correlation_id
 
-        self.__connecteur.contexte.message_dao.transmettre_reponse(
-            dict_message, replying_to, correlation_id_local,
-        )
+        if correlation_id.startswith('inter:'):
+            # On a une reponse
+            params_reponse = correlation_id.split(':')[1].split('/')
+            replying_to = params_reponse[0]
+            correlation_id_local = params_reponse[1]
+
+            self.__connecteur.contexte.message_dao.transmettre_reponse(
+                dict_message, replying_to, correlation_id_local,
+            )
+        elif reply_q is not None:
+            # On a une requete, on passe combine reply_q/correlation_id et on passe sur l'echange prive local
+            routing_key = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            correlation_id_distant = 'inter:' + reply_q + '/' + correlation_id
+            self.__connecteur.contexte.message_dao.recevoir_message_intermillegrilles(
+                dict_message, routing_key, idmg_origine=self.__idmg, reply_to=self.__nom_q_distante, correlation_id=correlation_id_distant)
+        else:
+            raise Exception("Un a un message sur exchange defaut non routable via inter-MilleGrilles")
 
     def transmettre_message_prive_vers_distant(self, dict_message, routing_key=None, reply_q=None, correlation_id=None):
         properties = pika.BasicProperties(delivery_mode=1)
@@ -555,17 +568,6 @@ class ConnexionInterMilleGrilles:
     def transmettre_message_exchdefault_vers_distant(self, dict_message, reply_q=None, correlation_id=None):
         properties = pika.BasicProperties(delivery_mode=1)
 
-        if reply_q is not None:
-            properties.correlation_id = reply_q + '/' + correlation_id
-            routing_key = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        else:
-            self.__logger.debug("Message default transmis vers distant, correlation a splitter: %s" % correlation_id)
-            correlation_id_path = correlation_id.split('/')
-            routing_key = correlation_id_path[0]
-            properties.correlation_id = correlation_id_path[1]
-
-        self.__logger.debug("Message inter-millegrilles, correlation: %s, routing: %s" % (properties.correlation_id, routing_key))
-
         # Q de reponse inter pour MilleGrille local
         properties.reply_to = 'inter.' + self.connecteur.contexte.idmg
 
@@ -576,8 +578,25 @@ class ConnexionInterMilleGrilles:
 
         message_utf8 = self.connecteur.json_helper.dict_vers_json(dict_message, encoding=json.JSONEncoder)
         channel_publisher = self.__connexion_mq_aval_distante.channel
+
+        if correlation_id.startswith('inter:'):
+            self.__logger.debug("Message default transmis vers distant, correlation a splitter: %s" % correlation_id)
+            exchange = ''  # Exchange par defaut
+            correlation_id_path = correlation_id.split(':')[1].split('/')
+            routing_key = correlation_id_path[0]
+            properties.correlation_id = correlation_id_path[1]
+        elif reply_q is not None:
+            # On a une requete, on combine reply_q/correlation_id
+            exchange = Constantes.DEFAUT_MQ_EXCHANGE_PRIVE
+            properties.correlation_id = 'inter:' + reply_q + '/' + correlation_id
+            routing_key = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        else:
+            raise Exception("Message sur exchange par defaut non routable par inter-MilleGrilles")
+
+        self.__logger.debug("Message inter-millegrilles, correlation: %s, routing: %s" % (properties.correlation_id, routing_key))
+
         channel_publisher.basic_publish(
-            exchange='',  # Exchange par defaut directement vers une Q
+            exchange=exchange,
             routing_key=routing_key,
             body=message_utf8,
             properties=properties,
@@ -747,6 +766,6 @@ class TraitementMessageTiersVersLocal:
                 self.__logger.debug("Message inter deja transmis, on l'ignore (pour eviter boucles")
         elif exchange == '':  # Echange direct
             self.__logger.debug("Message sur exchange distant")
-            self.__connexion.transmettre_reponse_vers_local(dict_message, correlation_id=properties.correlation_id)
+            self.__connexion.transmettre_message_exchdefault_vers_local(dict_message, method, properties)
         else:
             raise Exception("Message non traitable")
