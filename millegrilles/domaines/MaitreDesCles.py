@@ -1141,13 +1141,15 @@ class ProcessusGenererDemandeInscription(MGProcessusTransaction):
         csr_correlation = csr_reponse['correlation']
 
         nouvelle_transaction = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: idmg,
             ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR: csr,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR_CORRELATION: csr_correlation,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_TYPEDEMANDE: ConstantesMaitreDesCles.TYPE_DEMANDE_INSCRIPTION,
         }
 
+        # Transmettre la transaction. La correlation permet au domaine de savoir que la transaction
+        # doit etre sauvegardee et non actionnee (certificat signe)
         domaine = ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION
         self.generateur_transactions.soumettre_transaction(nouvelle_transaction, domaine)
 

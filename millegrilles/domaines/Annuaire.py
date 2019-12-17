@@ -43,10 +43,12 @@ class ConstantesAnnuaire:
     LIBELLE_DOC_FICHE_PRIVEE = 'fiche_privee'
     LIBELLE_DOC_FICHE_PUBLIQUE = 'fiche_publique'
     LIBELLE_DOC_DATE_DEMANDE = 'date'
-    LIBELLE_DOC_DEMANDES_INSCRIPTION = 'demandes_inscription'
+    LIBELLE_DOC_DEMANDES_TRANSMISES = 'demandes_transmises'
+    LIBELLE_DOC_DEMANDES_RECUES = 'demandes_recues'
     LIBELLE_DOC_DEMANDES_CSR = 'csr'
     LIBELLE_DOC_DEMANDES_CORRELATION = 'csr_correlation'
     LIBELLE_DOC_DEMANDES_ORIGINALE = 'demande_originale'
+    LIBELLE_DOC_IDMG_SOLLICITE = 'idmg_sollicite'
 
     TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
@@ -278,6 +280,19 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         return fiche_privee
 
     def ajouter_demande_inscription(self, demande_inscription):
+        # Determiner si la demande est pour une millegrille tierce si c'est une demande locale vers un tiers
+        idmg_sollicite = demande_inscription[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
+        idmg_originateur = demande_inscription[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE][Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        if idmg_sollicite == self.configuration.idmg:
+            self._logger.debug("Demande de la MilleGrille %s pour se connecter localement" % idmg_originateur)
+            champ_demande = ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_RECUES
+            idmg_distant = idmg_originateur
+        else:
+            self._logger.debug("Sauvegarder demande d'inscription vers %s" % idmg_sollicite)
+            champ_demande = ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_TRANSMISES
+            idmg_distant = idmg_sollicite
+
         # On conserver la demande au complet pour la retransmettre a la MilleGrille tierce
         demande_copy = demande_inscription.copy()
 
@@ -294,24 +309,23 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: demande_inscription[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
             ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_ORIGINALE: demande_copy,
         }
-        idmg = demande_inscription['idmg']
 
         on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg_distant,
         }
 
         ops = {
             '$push': {
-                ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_INSCRIPTION: demande_csr
+                champ_demande: demande_csr
             },
             '$setOnInsert': on_insert,
         }
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg_distant,
         }
 
         collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
@@ -425,8 +439,9 @@ class ProcessusRefuserInscriptionMilleGrilleTierceLocalement(ProcessusAnnuaire):
 
 class ProcessusDemanderInscription(ProcessusAnnuaire):
     """
-    Processus qui demande un certificat a une MilleGrille tierce pour la MilleGrille locale.
-    Ce processus peut servir pour une demande initiale ou pour le renouvellement du certificat.
+    Processus de demande de certificat a une MilleGrille tierce.
+    Pour savoir si la demande est pour la MilleGrille locale un ou tiers, il faut verifier avec le idmg
+    de la requete.
     """
 
     def __init__(self, controleur, evenement):
