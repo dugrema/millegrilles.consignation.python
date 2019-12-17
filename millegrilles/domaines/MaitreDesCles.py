@@ -6,7 +6,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInconnu
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers, GenerateurCertificatTiers
 from millegrilles.domaines.Pki import ConstantesPki
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 
@@ -46,6 +46,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR = '%s.genererCertificatNavigateur' % DOMAINE_NOM
     TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
     TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
+    TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
 
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
@@ -282,6 +283,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusDeclasserCleGrosFichier"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_DEMANDE_INSCRIPTION:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererDemandeInscription"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatPourTiers"
+
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -362,6 +366,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return reponse
 
+    def generer_certificat_connecteur(self, idmg_tiers, csr) -> EnveloppeCleCert:
+        # Trouver generateur pour le role
+        renouvelleur = self.renouvelleur_certificat
+        certificat = renouvelleur.signer_connecteur_tiers(idmg_tiers, csr)
+        clecert = EnveloppeCleCert(cert=certificat)
+
+        return clecert
+
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
 
@@ -409,7 +421,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
 
     @property
-    def renouvelleur_certificat(self):
+    def renouvelleur_certificat(self) -> RenouvelleurCertificat:
         return self.__renouvelleur_certificat
 
 
@@ -1206,3 +1218,52 @@ class TransactionDocumentMajClesVersionMapper:
     def map_version_5_to_current(self, transaction):
         """ Version courante, rien a faire """
         pass
+
+
+class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
+    """
+    Genere un certificat de connexion pour un tiers
+    """
+
+    def initiale(self):
+        """
+        Extrait le CSR et genere un nouveau certificat de connecteur.
+        """
+        transaction = self.transaction
+        idmg_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
+        csr = transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CSR]
+
+        clecert = self.controleur.gestionnaire.generer_certificat_connecteur(idmg_tiers, csr)
+
+        # Sauvegarder certificat pour tiers et transmettre vers tiers
+        self._transmettre_a_pki(clecert)
+        self._transmettre_a_annuaire(transaction, clecert)
+        self._transmettre_au_tiers(transaction, clecert)
+
+        self.set_etape_suivante()
+
+    def _transmettre_a_annuaire(self, transaction, clecert):
+        nouvelle_transaction_annuaire = {
+
+        }
+
+    def _transmettre_a_pki(self, clecert):
+        # Generer nouvelle transaction pour sauvegarder le certificat
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+        self._controleur.generateur_transactions.soumettre_transaction(
+            transaction,
+            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
+
+    def _transmettre_au_tiers(self, transaction, clecert):
+        nouvelle_transaction_tiers = {
+
+        }

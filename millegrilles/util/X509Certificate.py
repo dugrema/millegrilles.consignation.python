@@ -23,6 +23,7 @@ class ConstantesGenerateurCertificat:
     DUREE_CERT_MILLEGRILLE = datetime.timedelta(days=730)
     DUREE_CERT_NOEUD = datetime.timedelta(days=366)
     DUREE_CERT_NAVIGATEUR = datetime.timedelta(weeks=6)
+    DUREE_CERT_TIERS = datetime.timedelta(weeks=4)
     ONE_DAY = datetime.timedelta(1, 0, 0)
 
     ROLE_MQ = 'mq'
@@ -39,6 +40,7 @@ class ConstantesGenerateurCertificat:
     ROLE_PUBLICATEUR = 'publicateur'
     ROLE_MONGOEXPRESS = 'mongoxp'
     ROLE_NGINX = 'nginx'
+    ROLE_CONNECTEUR_TIERS = 'tiers'
 
     ROLES_ACCES_MONGO = [
         ROLE_MONGO,
@@ -460,7 +462,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
         return builder
 
-    def signer(self, csr) -> x509.Certificate:
+    def signer(self, csr: x509.CertificateSigningRequest) -> x509.Certificate:
         cert_autorite = self._autorite.cert
         builder = self._preparer_builder_from_csr(
             csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
@@ -1139,6 +1141,37 @@ class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
         return builder
 
 
+class GenerateurCertificatTiers(GenerateurCertificateParRequest):
+
+    def __init__(self, idmg_local, idmg_tiers, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(idmg_local, dict_ca, autorite)
+        self._idmg_tiers = idmg_tiers
+
+    def _preparer_builder_from_csr(self, csr_request, autorite_cert,
+                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_TIERS) -> x509.CertificateBuilder:
+
+        builder = x509.CertificateBuilder()
+        builder = builder.issuer_name(autorite_cert.subject)
+        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
+        builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_TIERS)
+        builder = builder.serial_number(x509.random_serial_number())
+        builder = builder.public_key(csr_request.public_key())
+
+        # Modifier le nom
+        name = x509.Name([
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
+            x509.NameAttribute(NameOID.COMMON_NAME, self._idmg_tiers),
+        ])
+
+        builder = builder.subject_name(name)
+
+        return builder
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+        return builder
+
+
 class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
 
     def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
@@ -1261,6 +1294,12 @@ class RenouvelleurCertificat:
         clecert.chaine = chaine
 
         return clecert
+
+    def signer_connecteur_tiers(self, idmg_tiers: str, csr: str):
+        generateur = GenerateurCertificatTiers(self.__idmg, idmg_tiers, self.__dict_ca, self.__millegrille)
+        csr_instance = x509.load_pem_x509_csr(csr.encode('utf-8'), default_backend())
+        certificat = generateur.signer(csr_instance)
+        return certificat
 
 
 class DecryptionHelper:
