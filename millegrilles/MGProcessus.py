@@ -7,6 +7,7 @@ import json
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
+from millegrilles.transaction import GenerateurTransaction
 from threading import Thread, Event, Barrier
 
 
@@ -78,7 +79,7 @@ class MGPProcesseur:
         return self.__contexte.document_dao
 
     @property
-    def generateur_transactions(self):
+    def generateur_transactions(self) -> GenerateurTransaction:
         return self.__contexte.generateur_transactions
 
     @property

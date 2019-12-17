@@ -1238,18 +1238,19 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
         # Sauvegarder certificat pour tiers et transmettre vers tiers
         self._transmettre_a_pki(clecert)
         self._transmettre_a_annuaire(transaction, clecert)
-        self._transmettre_au_tiers(transaction, clecert)
 
         self.set_etape_suivante()
 
     def _transmettre_a_annuaire(self, transaction, clecert: EnveloppeCleCert):
+        idmg_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
         nouvelle_transaction_annuaire = {
             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
             ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: clecert.not_valid_after.timestamp(),
             ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: clecert.cert_bytes.decode('utf-8'),
         }
         self._controleur.generateur_transactions.soumettre_transaction(
-            nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS)
+            nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS,
+            idmg_destination=idmg_tiers)
 
     def _transmettre_a_pki(self, clecert):
         # Generer nouvelle transaction pour sauvegarder le certificat
@@ -1264,10 +1265,5 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
         }
         self._controleur.generateur_transactions.soumettre_transaction(
             transaction,
-            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT,
         )
-
-    def _transmettre_au_tiers(self, transaction, clecert):
-        nouvelle_transaction_tiers = {
-
-        }

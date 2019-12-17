@@ -121,13 +121,21 @@ class ConsignateurTransactionCallback(BaseCallback):
                 entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
                 uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+                idmg_destination = entete.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION)
 
-                # Copier properties utiles
                 properties_mq = {}
-                if properties.reply_to is not None:
-                    properties_mq['reply_to'] = properties.reply_to
-                if properties.correlation_id is not None:
-                    properties_mq['correlation_id'] = properties.correlation_id
+                if idmg_destination is not None:
+                    # La transaction est pour un tiers, relayer la transaction vers le tiers
+                    # La reponse doit provenir de la MilleGrille destination
+                    self._logger.debug("Relai de la transaction %s vers %s" % (uuid_transaction, idmg_destination))
+                    self.contexte.generateur_transactions.relayer_transaction_vers_tiers(
+                        message_dict, reply_to=properties.reply_to, correlation_id=properties.correlation_id)
+                else:
+                    # La transaction est locale
+                    if properties.reply_to is not None:
+                        properties_mq['reply_to'] = properties.reply_to
+                    if properties.correlation_id is not None:
+                        properties_mq['correlation_id'] = properties.correlation_id
 
                 self.contexte.message_dao.transmettre_evenement_persistance(
                     id_document, uuid_transaction, domaine, properties_mq)
