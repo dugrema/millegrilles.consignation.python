@@ -534,21 +534,6 @@ class ProcessusSignatureInscriptionTiers(ProcessusAnnuaire):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusCompleterInscriptionAMilleGrilleTierce(ProcessusAnnuaire):
-    """
-    Processus qui recoit un certificat de connexion a une MilleGrille tierce.
-    Ce certificat est indexe par module de connexion inter-millegrille (celui a qui la cle prive appartient).
-    La transaction est re-emise avec routing pki pour etre conservee dans le domaine pki.
-    """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.transaction
-        self.set_etape_suivante()  # Termine
-
-
 class ProcessusDemarrerConversation(ProcessusAnnuaire):
     """
     Permet de demarrer une conversation avec une MilleGrille tierce.
