@@ -1247,6 +1247,7 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
             ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: clecert.not_valid_after.timestamp(),
             ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: clecert.cert_bytes.decode('utf-8'),
+            ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
         }
         self._controleur.generateur_transactions.soumettre_transaction(
             nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS,
