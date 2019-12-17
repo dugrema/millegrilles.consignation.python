@@ -40,6 +40,7 @@ class ConstantesGenerateurCertificat:
     ROLE_PUBLICATEUR = 'publicateur'
     ROLE_MONGOEXPRESS = 'mongoxp'
     ROLE_NGINX = 'nginx'
+    ROLE_CONNECTEUR = 'connecteur'
     ROLE_CONNECTEUR_TIERS = 'tiers'
 
     ROLES_ACCES_MONGO = [
@@ -879,6 +880,31 @@ class GenererDomaines(GenerateurNoeud):
         return builder
 
 
+class GenererConnecteur(GenerateurNoeud):
+    """
+    Generateur de certificats pour le connecteur inter-MilleGrilles
+    """
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ('%s,%s' % (Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, Constantes.DEFAUT_MQ_EXCHANGE_PRIVE)).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_CONNECTEUR).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class GenererMQ(GenerateurNoeud):
 
     def _get_keyusage(self, builder):
@@ -1210,6 +1236,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_PUBLICATEUR: GenererPublicateur,
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
+            ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
         }
 
         self.__generateur_par_csr = GenerateurCertificateParRequest
