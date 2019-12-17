@@ -736,7 +736,7 @@ class GenererCeduleur(GenerateurNoeud):
         exchanges_supportes = [
             Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
             Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_INTER,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
             Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
         ]
 
