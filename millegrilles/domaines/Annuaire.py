@@ -49,12 +49,14 @@ class ConstantesAnnuaire:
     LIBELLE_DOC_DEMANDES_CORRELATION = 'csr_correlation'
     LIBELLE_DOC_DEMANDES_ORIGINALE = 'demande_originale'
     LIBELLE_DOC_IDMG_SOLLICITE = 'idmg_sollicite'
+    LIBELLE_DOC_EXPIRATION = 'expiration_inscription'
 
     TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
     TRANSACTION_MAJ_FICHETIERCE = '%s.maj.ficheTierce' % DOMAINE_NOM
     TRANSACTION_DEMANDER_INSCRIPTION = '%s.demanderInscription' % DOMAINE_NOM
     TRANSACTION_INSCRIRE_TIERS = '%s.inscrireTiers' % DOMAINE_NOM
+    TRANSACTION_SIGNATURE_INSCRIPTION_TIERS = '%s.signatureInscriptionTiers' % DOMAINE_NOM
 
     REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
 

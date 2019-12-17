@@ -156,19 +156,19 @@ class EnveloppeCleCert:
         return EnveloppeCleCert.get_subject_identifier(self.cert)
 
     @property
-    def fingerprint(self):
+    def fingerprint(self) -> str:
         return bytes.hex(self.cert.fingerprint(hashes.SHA1()))
 
     @property
-    def fingerprint_base58(self):
+    def fingerprint_base58(self) -> str:
         return base58.b58encode(self.cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
     @property
-    def not_valid_before(self):
+    def not_valid_before(self) -> datetime.datetime:
         return self.cert.not_valid_before
 
     @property
-    def not_valid_after(self):
+    def not_valid_after(self) -> datetime.datetime:
         return self.cert.not_valid_after
 
     @property
