@@ -5,6 +5,9 @@ import json
 import logging
 import ssl
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.x509.name import NameOID
+
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.dao.DocumentDAO import MongoDAO
@@ -15,6 +18,7 @@ from millegrilles.SecuritePKI import VerificateurTransaction, SignateurTransacti
 class TransactionConfiguration:
 
     def __init__(self):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         # Configuration de connection a RabbitMQ
         self._mq_config = {
             Constantes.CONFIG_MQ_HOST: Constantes.DEFAUT_HOSTNAME,
@@ -119,6 +123,18 @@ class TransactionConfiguration:
                     config_dict[property] = env_value
                 elif json_value is not None:
                     config_dict[property] = json_value
+
+        # Si le IDMG n'est pas fourni, tenter de le charger a partir du certificat MQ
+        if self.idmg == Constantes.DEFAUT_IDMG:
+            try:
+                with open(self.pki_certfile, 'rb') as fichier:
+                    pem = fichier.read()
+                    certificat = default_backend().load_pem_x509_certificate(pem)
+                    organization = certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+                    if len(organization) > 0:
+                        self._millegrille_config[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = organization[0].value
+            except FileNotFoundError:
+                self.__logger.exception("IDMG inconne, on utilise sansnom")
 
     def load_property(self, map, property, env_name):
         env_value = os.environ[env_name]
