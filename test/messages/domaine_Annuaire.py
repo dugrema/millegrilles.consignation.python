@@ -74,8 +74,8 @@ class MessagesSample(BaseCallback):
         self.generateur.transmettre_requete({}, 'millegrilles.domaines.Annuaire.fichePrivee', reply_to=self.queue_name, correlation_id='abcd')
 
     def executer(self):
-        # enveloppe = sample.transmettre_maj_fiche_privee()
-        sample.requete_fiche_privee()
+        enveloppe = sample.transmettre_maj_fiche_privee()
+        # sample.requete_fiche_privee()
 
 
 # --- MAIN ---

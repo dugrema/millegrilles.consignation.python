@@ -64,6 +64,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CSR = 'csr'
     TRANSACTION_CHAMP_CSR_CORRELATION = 'csr_correlation'
     TRANSACTION_CHAMP_TYPEDEMANDE = 'type_demande'
+    TRANSACTION_CHAMP_FULLCHAIN = 'certificat_fullchain_signataire'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -241,7 +242,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 certificat_courant_pem,
                 backend=default_backend()
             )
-            self.__certificat_courant_pem = certificat_courant_pem.decode('utf8')
+            cert_fullchain = certificat_courant_pem.decode('utf8')
+            self.__certificat_courant_pem = PemHelpers.split_certificats(cert_fullchain)[0]
 
         with open(fichier_autorite, 'rb') as fichier:
             certificat_autorite_pem = fichier.read()
@@ -1152,12 +1154,33 @@ class ProcessusGenererDemandeInscription(MGProcessusTransaction):
         csr = csr_reponse['csr']
         csr_correlation = csr_reponse['correlation']
 
+        certificats_existants = list()
+        certificats_existants.append(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE])
+        certificats_existants.append(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT])
+        try:
+            certificats_existants.extend(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES])
+        except TypeError:
+            pass  # Array vide, OK
+        try:
+            certificats_existants.extend(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_ADDITIONNELS])
+        except TypeError:
+            pass  # Array vide, OK
+
+        with open(self.controleur.configuration.pki_certfile, 'r') as fichier:
+            certfile_fullchain = fichier.read()
+            certs_chain = list()
+            for cert in certfile_fullchain.split('-----END CERTIFICATE-----\n'):
+                if cert != '' and cert not in certificats_existants:
+                    cert = cert + '-----END CERTIFICATE-----\n'
+                    certs_chain.append(cert)
+
         nouvelle_transaction = {
             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: idmg,
             ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR: csr,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR_CORRELATION: csr_correlation,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_TYPEDEMANDE: ConstantesMaitreDesCles.TYPE_DEMANDE_INSCRIPTION,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FULLCHAIN: certs_chain,
         }
 
         # Transmettre la transaction. La correlation permet au domaine de savoir que la transaction

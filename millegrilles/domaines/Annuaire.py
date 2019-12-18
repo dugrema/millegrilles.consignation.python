@@ -2,6 +2,7 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.util.X509Certificate import PemHelpers
 
 from pymongo.collection import ReturnDocument
 
@@ -214,6 +215,12 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         for key, value in fiche.items():
             if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
                 set_ops[key] = value
+
+        # Ajouter certificat local
+        with open(self.configuration.pki_certfile, 'r') as fichier:
+            cert_local_fichier = fichier.read()
+            cert_local = PemHelpers.split_certificats(cert_local_fichier)[0]
+        set_ops[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_ADDITIONNELS] = [cert_local]
 
         # Effectuer la mise a jour
         ops = {

@@ -1379,3 +1379,11 @@ class PemHelpers:
 
         wrapped_public_key = '-----BEGIN PUBLIC KEY-----' + wrapped_public_key + '\n-----END PUBLIC KEY-----'
         return wrapped_public_key
+
+    @staticmethod
+    def split_certificats(certs: str):
+        liste_certs = list()
+        for cert in certs.split('-----END CERTIFICATE-----\n'):
+            if cert != '':
+                liste_certs.append(cert + '-----END CERTIFICATE-----\n')
+        return liste_certs
