@@ -250,8 +250,8 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
         # enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
-        # self.transaction_demande_inscription_tierce()
-        self.transaction_signature_inscription_tierce()
+        self.transaction_demande_inscription_tierce()
+        # self.transaction_signature_inscription_tierce()
 
 
 # --- MAIN ---

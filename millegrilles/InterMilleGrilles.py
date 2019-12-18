@@ -85,8 +85,6 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         with open(ficher_motdepasse_cle, 'r') as fichier:
             self.__mot_de_passe_cle = fichier.read().strip()
 
-        self.__callback_q_locale = TraitementMessageQueueLocale(
-            self, self.contexte.message_dao, self.contexte.configuration)
         self.__logger.info("Attente Q et routes prets")
 
         self.__attendre_q_prete.wait(10)
@@ -177,6 +175,9 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
                 routing_key=routing,
                 callback=self.__compter_route
             )
+
+        self.__callback_q_locale = TraitementMessageQueueLocale(
+            self, self.contexte.message_dao, self.contexte.configuration)
 
         self.__ctag_local = self.channel.basic_consume(
             self.__callback_q_locale.callbackAvecAck,
