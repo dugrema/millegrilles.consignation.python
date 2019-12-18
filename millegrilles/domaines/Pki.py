@@ -91,20 +91,30 @@ class GestionnairePki(GestionnaireDomaineStandard):
         # Index collection domaine
         collection_domaine = self.get_collection()
         # Index par fingerprint de certificat
-        collection_domaine.create_index([
-            (ConstantesPki.LIBELLE_FINGERPRINT, 1)
-        ], unique=True)
+        collection_domaine.create_index(
+            [
+                (ConstantesPki.LIBELLE_FINGERPRINT, 1)
+            ],
+            name='fingerprinte',
+            unique=True
+        )
         # Index par chaine de certificat verifie
-        collection_domaine.create_index([
-            (ConstantesPki.LIBELLE_CHAINE_COMPLETE, 2),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection_domaine.create_index(
+            [
+                (ConstantesPki.LIBELLE_CHAINE_COMPLETE, 2),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='complete-mglibelle'
+        )
         # Index pour trouver l'autorite qui a signe un certificat (par son subject)
-        collection_domaine.create_index([
-            (ConstantesPki.LIBELLE_SUBJECT_KEY, 1),
-            (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
-            (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
-        ])
+        collection_domaine.create_index(
+            [
+                (ConstantesPki.LIBELLE_SUBJECT_KEY, 1),
+                (ConstantesPki.LIBELLE_NOT_VALID_BEFORE, 1),
+                (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
+            ],
+            name='subject-valid'
+        )
 
     def demarrer(self):
         super().demarrer()

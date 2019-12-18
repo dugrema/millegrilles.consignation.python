@@ -33,14 +33,20 @@ class GestionnaireRapports(GestionnaireDomaine):
 
         # Creer index _mg-libelle
         collection_domaine = self.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='mglibelle'
+        )
         # Index _mg-libelle, url
-        collection_domaine.create_index([
-            ('url', 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection_domaine.create_index(
+            [
+                ('url', 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='url-mglibelle'
+        )
 
     def setup_rabbitmq(self, channel):
         nom_queue_rapports = self.get_nom_queue()

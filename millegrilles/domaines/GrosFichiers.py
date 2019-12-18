@@ -310,39 +310,54 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         # Index _mg-libelle
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
-        ])
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+            ],
+            name='mglibelle'
+        )
 
         # Index pour trouver un fichier par UUID
-        collection_domaine.create_index([
-            (ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID, 1),
-        ])
+        collection_domaine.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID, 1),
+            ],
+            name='fuuid'
+        )
 
         # Index pour trouver une version de fichier par FUUID
-        collection_domaine.create_index([
-            ('%s.%s' %
-             (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-              ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID),
-             1),
-        ])
+        collection_domaine.create_index(
+            [
+                ('%s.%s' %
+                 (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                  ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID),
+                 1),
+            ],
+            name='versions-fuuid'
+        )
 
         # Index pour la recherche temps reel
-        collection_domaine.create_index([
-            (ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES, 1),
-        ])
+        collection_domaine.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES, 1),
+            ],
+            name='etiquettes'
+        )
 
         # Index par SHA256 / taille. Permet de determiner si le fichier existe deja (et juste faire un lien).
-        collection_domaine.create_index([
-            ('%s.%s' %
-             (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-              ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256),
-             1),
-            ('%s.%s' %
-             (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-              ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE),
-             1),
-        ])
+        collection_domaine.create_index(
+            [
+                ('%s.%s' %
+                 (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                  ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256),
+                 1),
+                ('%s.%s' %
+                 (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                  ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE),
+                 1),
+            ],
+            name='sha256-taille'
+        )
 
     def get_nom_domaine(self):
         return ConstantesGrosFichiers.DOMAINE_NOM

@@ -100,9 +100,12 @@ class GestionnaireWebPoll(GestionnaireDomaine):
             self._logger.info("Document de configuration de telechargement: %s" % str(document_configuration))
 
         # Creer index _mg-libelle
-        collection_webpoll.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection_webpoll.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='mglibelle'
+        )
 
         self._downloaders['page'] = WebPageDownload(self.contexte)
         self._downloaders['rss'] = RSSFeedDownload(self.contexte)

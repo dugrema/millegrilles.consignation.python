@@ -209,17 +209,26 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         # Configuration pour les processus
         for collection_processus_nom in collection_processus_noms:
             collection = self._contexte.document_dao.get_collection(collection_processus_nom)
-            collection.create_index([
-                (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
-                (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
-                (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
-            ])
-            collection.create_index([
-                (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE, 1)
-            ])
-            collection.create_index([
+            collection.create_index(
+                [
+                    (Constantes.PROCESSUS_MESSAGE_LIBELLE_ETAPESUIVANTE, 1),
+                    (Constantes.PROCESSUS_MESSAGE_LIBELLE_PROCESSUS, 1),
+                    (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+                ],
+                name='etapesuivante-processus-creation',
+            )
+            collection.create_index(
+                [
+                    (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE, 1)
+                ],
+                name='tokenattente',
+            )
+            collection.create_index(
+                [
                 (Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER, 1)
-            ])
+                ],
+                name='tokenresumer'
+            )
 
     def extraire_evenement(self, message_body):
         """

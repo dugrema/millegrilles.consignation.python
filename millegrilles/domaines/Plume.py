@@ -72,24 +72,42 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
         collection_domaine = self.document_dao.get_collection(ConstantesPlume.COLLECTION_DOCUMENTS_NOM)
         # Index noeud, _mg-libelle
-        collection_domaine.create_index([
-            (ConstantesPlume.DOCUMENT_CATEGORIES, 1)
-        ])
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        collection_domaine.create_index([
-            (ConstantesPlume.DOCUMENT_PLUME_UUID, 1)
-        ])
-        collection_domaine.create_index([
-            (ConstantesPlume.DOCUMENT_TITRE, 1)
-        ])
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
-        ])
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
-        ])
+        collection_domaine.create_index(
+            [
+                (ConstantesPlume.DOCUMENT_CATEGORIES, 1)
+            ],
+            name='categories'
+        )
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='mglibelle'
+        )
+        collection_domaine.create_index(
+            [
+                (ConstantesPlume.DOCUMENT_PLUME_UUID, 1)
+            ],
+            name='uuid'
+        )
+        collection_domaine.create_index(
+            [
+                (ConstantesPlume.DOCUMENT_TITRE, 1)
+            ],
+            name='titre'
+        )
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+            ],
+            name='creation'
+        )
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
+            ],
+            name='dernieremodification'
+        )
 
     def demarrer(self):
         super().demarrer()

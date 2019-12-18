@@ -120,19 +120,29 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
         super().configurer()
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
-        collection_domaine.create_index([
-            (TachesConstantes.LIBELLE_UUID_TACHE, 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ], unique=True)
+        collection_domaine.create_index(
+            [
+                (TachesConstantes.LIBELLE_UUID_TACHE, 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            unique=True,
+            name='uuid-mglibelle'
+        )
 
-        collection_domaine.create_index([
-            (TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP, -1)
-        ])
+        collection_domaine.create_index(
+            [
+                (TachesConstantes.LIBELLE_RAPPEL_TIMESTAMP, -1)
+            ],
+            name='timestamp'
+        )
 
-        collection_domaine.create_index([
-            (TachesConstantes.LIBELLE_DOMAINE, 1),
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
+        collection_domaine.create_index(
+            [
+                (TachesConstantes.LIBELLE_DOMAINE, 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='domaine-mglibelle'
+        )
 
     def demarrer(self):
         super().demarrer()

@@ -631,15 +631,24 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         # Index noeud, _mg-libelle
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        ])
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
-        ])
-        collection_domaine.create_index([
-            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
-        ])
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
+            ],
+            name='mglibelle'
+        )
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+            ],
+            name='datecreation'
+        )
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
+            ],
+            name='dernieremodification'
+        )
 
     def get_queue_configuration(self):
         """
