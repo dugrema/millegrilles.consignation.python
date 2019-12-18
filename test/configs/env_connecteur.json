@@ -1,11 +1,8 @@
 {
-  "MG_IDMG": "3CJRQAdBPGzDgqC75mTBDXeL7MFU",
-  "MG_MQ_HOST": "mg-dev4",
-
   "MG_MQ_PORT": 5673,
-  "MG_MQ_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.fullchain",
+  "MG_MQ_CA_CERTS": "/home/mathieu/mgdev/certs/pki.racine.cert",
   "MG_MQ_KEYFILE": "/home/mathieu/mgdev/certs/pki.connecteur.key",
-  "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.connecteur.cert",
+  "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.connecteur.fullchain",
   "MG_MQ_SSL": "on",
   "MG_MQ_AUTH_CERT": "on",
   "MG_PKI_SECRETS": "/home/mathieu/mgdev/certs"

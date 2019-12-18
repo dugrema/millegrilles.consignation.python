@@ -1,18 +1,13 @@
 {
-  "MG_MQ_HOST": "mg-dev4",
-  "MG_MONGO_HOST": "mg-dev4",
-  "MG_MONGO_PASSWORD": "5bef309db80745924f6bd6a42c84ebab",
-
   "MG_MQ_PORT": 5673,
-  "MG_MQ_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.fullchain",
+  "MG_MQ_CA_CERTS": "/home/mathieu/mgdev/certs/pki.racine.cert",
   "MG_MQ_KEYFILE": "/home/mathieu/mgdev/certs/pki.transaction.key",
-  "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.transaction.cert",
+  "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.transaction.fullchain",
   "MG_MQ_SSL": "on",
   "MG_MQ_AUTH_CERT": "on",
-  "MG_MONGO_SSL": "on",
-  "MG_MONGO_SSL_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.fullchain",
   "MG_MONGO_USERNAME": "transaction",
-  "MG_CONFIG_JSON": "/home/mathieu/mgdev/certs/passwd.transaction.json",
+  "MG_MONGO_SSL": "on",
+  "MG_MONGO_SSL_CA_CERTS": "/home/mathieu/mgdev/certs/pki.racine.cert",
   "MG_MONGO_SSL_CERTFILE": "/home/mathieu/mgdev/certs/pki.transaction.key_cert",
   "MG_PKI_SECRETS": "/home/mathieu/mgdev/certs"
 }
