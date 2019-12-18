@@ -26,6 +26,7 @@ class ConstantesPki:
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
+    LIBELLE_IDMG = 'idmg'
     LIBELLE_FINGERPRINT_ISSUER = 'fingerprint_issuer'
     LIBELLE_DOCID_ISSUER = '_id_issuer'
     LIBELLE_CHAINE_COMPLETE = 'chaine_complete'
@@ -375,6 +376,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
             document_certificat = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
             document_certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = transaction['certificat_pem']
             document_certificat[ConstantesPki.LIBELLE_FINGERPRINT] = enveloppe_certificat.fingerprint_ascii
+            document_certificat[ConstantesPki.LIBELLE_IDMG] = enveloppe_certificat.idmg
 
             collection.insert_one(document_certificat)
 

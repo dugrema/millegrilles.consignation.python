@@ -34,6 +34,7 @@ class ConstantesSecurityPki:
     LIBELLE_FINGERPRINT = 'fingerprint'
     LIBELLE_CHAINE_PEM = 'chaine_pem'
     LIBELLE_CA_APPROUVE = 'ca_approuve'
+    LIBELLE_IDMG = 'idmg'
 
     EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
     EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
@@ -579,12 +580,10 @@ class VerificateurCertificats(UtilCertificats):
         file_ca_racine = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
         if not os.path.isfile(file_ca_racine):
             collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-            idmg_hex = base58.b58decode(idmg)
-            idmg_hex = binascii.hexlify(idmg_hex).decode('utf-8')
 
             filtre = {
                 '$or': [
-                    {ConstantesSecurityPki.LIBELLE_FINGERPRINT: idmg_hex},
+                    {ConstantesSecurityPki.LIBELLE_IDMG: idmg},
                     {
                         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
                         'sujet.commonName': idmg,
@@ -595,10 +594,10 @@ class VerificateurCertificats(UtilCertificats):
             certs = collection.find(filtre)
 
             for cert in certs:
-                if cert['fingerprint'] == idmg_hex:
-                    # C'est le certificat racine, on verifie son fingerprint avant de le sauvegarder sur disque
+                if cert[ConstantesSecurityPki.LIBELLE_IDMG] == idmg:
+                    # C'est le certificat racine, on re-verifie son fingerprint avant de le sauvegarder sur disque
                     enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                    if enveloppe_ca.is_rootCA and enveloppe_ca.fingerprint_ascii == idmg_hex:
+                    if enveloppe_ca.is_rootCA and enveloppe_ca.idmg == idmg:
                         # Certificat racine est valide
                         with open(file_ca_racine, 'w') as fichier:
                             fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
@@ -644,7 +643,7 @@ class VerificateurCertificats(UtilCertificats):
                 self.charger_certificats_CA_millegrille(idmg)  # Aucun effet si le cert racine est deja charge
 
                 # Verifier la chaine de ce certificat
-                if enveloppe.is_CA:
+                if enveloppe.is_CA and not enveloppe.is_rootCA:
                     # Ajouter dans le fichier temp des untrusted CAs pour openssl
                     # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
                     # sont pas chargees en ordre. On le conserve quand meme.
