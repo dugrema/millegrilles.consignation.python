@@ -1,8 +1,8 @@
 {
-  "MG_IDMG": "2N3wgu2VDZRxS2GJgWTn4SDHJezo",
+  "MG_IDMG": "3CJRQAdBPGzDgqC75mTBDXeL7MFU",
   "MG_MQ_HOST": "mg-dev4",
   "MG_MONGO_HOST": "mg-dev4",
-  "MG_MONGO_PASSWORD": "8a3191d227d17195f9a8871a1b1ac222",
+  "MG_MONGO_PASSWORD": "4121c9bafc3d4f993665c3e5d51806d8",
 
   "MG_MQ_PORT": 5673,
   "MG_MQ_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.fullchain",

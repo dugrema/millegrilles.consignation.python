@@ -54,10 +54,14 @@ class ConnexionWrapper:
         if self.__heartbeat is None:
             self.__heartbeat = self.configuration.mq_heartbeat
 
+        virtual_host = self.configuration.mq_virtual_host
+        if virtual_host is None or virtual_host == '/':
+            virtual_host = self.configuration.idmg
+
         connection_parameters = {
             'host': self.configuration.mq_host,
             'port': self.configuration.mq_port,
-            'virtual_host': self.configuration.idmg,
+            'virtual_host': virtual_host,
             'heartbeat': self.__heartbeat,
             'blocked_connection_timeout': self.configuration.mq_heartbeat / 3
         }
