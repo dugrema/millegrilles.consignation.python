@@ -162,7 +162,16 @@ class EnveloppeCleCert:
 
     @property
     def fingerprint_base58(self) -> str:
-        return base58.b58encode(self.cert.fingerprint(hashes.SHA1())).decode('utf-8')
+        return self.idmg
+
+    @property
+    def idmg(self) -> str:
+        """
+        Retourne le idmg du certificat.
+        Calcule avec SHA-512/224 retourne en base58
+        """
+        idmg = base58.b58encode(self.cert.fingerprint(hashes.SHA512_224())).decode('utf-8')
+        return idmg
 
     @property
     def not_valid_before(self) -> datetime.datetime:

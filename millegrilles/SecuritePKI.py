@@ -99,7 +99,19 @@ class EnveloppeCertificat:
 
     @property
     def fingerprint_base58(self):
-        return base58.b58encode(self._fingerprint).decode('utf-8')
+        """
+        Retourne le idmg
+        """
+        return self.idmg
+
+    @property
+    def idmg(self) -> str:
+        """
+        Retourne le idmg du certificat.
+        Calcule avec SHA-512/224 retourne en base58
+        """
+        idmg = base58.b58encode(self._certificat.fingerprint(hashes.SHA512_224())).decode('utf-8')
+        return idmg
 
     @property
     def certificat(self):
