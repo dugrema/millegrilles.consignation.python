@@ -644,7 +644,7 @@ class VerificateurCertificats(UtilCertificats):
                 self.charger_certificats_CA_millegrille(idmg)  # Aucun effet si le cert racine est deja charge
 
                 # Verifier la chaine de ce certificat
-                if enveloppe.is_CA and not enveloppe.is_rootCA:
+                if enveloppe.is_CA:
                     # Ajouter dans le fichier temp des untrusted CAs pour openssl
                     # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
                     # sont pas chargees en ordre. On le conserve quand meme.
