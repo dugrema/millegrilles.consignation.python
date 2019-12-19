@@ -6,7 +6,9 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeIn
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInconnu
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers, GenerateurCertificatTiers
+from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, \
+    ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
+from millegrilles.util.JSONEncoders import DocElemFilter
 from millegrilles.domaines.Pki import ConstantesPki
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 
@@ -18,8 +20,6 @@ from base64 import b64encode, b64decode
 
 import logging
 import datetime
-import os
-import re
 import json
 import socket
 
@@ -350,8 +350,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         """
         Verifie si la requete de cle est valide, puis transmet une reponse en clair.
         Le fichier est maintenant declasse, non protege.
-        :param evenement:
-        :param properties:
+        :param fuuid:
         :return:
         """
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
@@ -1256,9 +1255,17 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
     """
 
     def initiale(self):
+        domaine = ConstantesAnnuaire.REQUETE_FICHE_PRIVEE
+        self.set_requete(domaine, {})
+
+        self.set_etape_suivante(ProcessusGenererCertificatPourTiers.signer_demande.__name__)
+
+    def signer_demande(self):
         """
         Extrait le CSR et genere un nouveau certificat de connecteur.
         """
+        fiche_privee = self.parametres['reponse'][0]
+
         transaction = self.transaction
         idmg_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
         csr = transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CSR]
@@ -1267,17 +1274,21 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
 
         # Sauvegarder certificat pour tiers et transmettre vers tiers
         self._transmettre_a_pki(clecert)
-        self._transmettre_a_annuaire(transaction, clecert)
+        self._transmettre_a_annuaire(transaction, clecert, fiche_privee)
 
         self.set_etape_suivante()
 
-    def _transmettre_a_annuaire(self, transaction, clecert: EnveloppeCleCert):
+    def _transmettre_a_annuaire(self, transaction, clecert: EnveloppeCleCert, fiche_privee: dict):
+
+        fiche_privee_filtree = DocElemFilter.retirer_champs_doc_transaction(fiche_privee)
+
         idmg_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
         nouvelle_transaction_annuaire = {
             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
             ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: clecert.not_valid_after.timestamp(),
             ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: clecert.cert_bytes.decode('utf-8'),
             ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
+            ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee_filtree,
         }
         self._controleur.generateur_transactions.soumettre_transaction(
             nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS,
