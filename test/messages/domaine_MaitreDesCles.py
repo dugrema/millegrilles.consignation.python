@@ -21,6 +21,7 @@ from base64 import b64encode
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
 
+
 class MessagesSample(BaseCallback):
 
     def __init__(self):
@@ -212,7 +213,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_demande_inscription_tierce(self):
         transaction = {
-            'idmg': 'jFMV6jSR9e1oNKJi3CqwL1QGywr'
+            'idmg': '33KRMhqcWCKvMHyY5xymMCUEbT53Kg1NqUb9AU6'
         }
         domaine = ConstantesMaitreDesCles.TRANSACTION_GENERER_DEMANDE_INSCRIPTION
 

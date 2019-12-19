@@ -57,7 +57,7 @@ class MessagesSample(BaseCallback):
                 'courriel': 'mathieu.dugre@mdugre.info'
             },
             'descriptif': 'Moi',
-            'prive_mq': ['amqps://mg-dev3.maple.maceroc.com:5673/prive']
+            'prive_mq': ['amqps://mg-dev4.maple.maceroc.com:5673/prive']
         }
 
         domaine = 'millegrilles.domaines.Annuaire.maj.fichePrivee'

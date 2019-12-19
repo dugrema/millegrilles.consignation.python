@@ -159,6 +159,9 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
         with open(self.configuration.pki_cafile, 'r') as fichier:
             ca_pem = fichier.read()
+            split_certs = PemHelpers.split_certificats(ca_pem)
+            if len(split_certs) > 1:
+                raise Exception("Le fichier de certificat CA (%s) est mauvais, il contient plusieurs certificats" % self.configuration.pki_cafile)
         fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
         self.initialiser_document(ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE, fiche_privee)
 

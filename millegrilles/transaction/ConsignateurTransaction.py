@@ -124,7 +124,7 @@ class ConsignateurTransactionCallback(BaseCallback):
                 idmg_destination = entete.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION)
 
                 properties_mq = {}
-                if idmg_destination is not None:
+                if idmg_destination is not None and idmg_destination != self.configuration.idmg:
                     # La transaction est pour un tiers, relayer la transaction vers le tiers
                     # La reponse doit provenir de la MilleGrille destination
                     self._logger.debug("Relai de la transaction %s vers %s" % (uuid_transaction, idmg_destination))
