@@ -594,13 +594,19 @@ class VerificateurCertificats(UtilCertificats):
             certs = collection.find(filtre)
 
             for cert in certs:
-                if cert[ConstantesSecurityPki.LIBELLE_IDMG] == idmg:
+                if cert[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesSecurityPki.LIBVAL_CERTIFICAT_RACINE and \
+                        cert[ConstantesSecurityPki.LIBELLE_IDMG] == idmg:
                     # C'est le certificat racine, on re-verifie son fingerprint avant de le sauvegarder sur disque
                     enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
                     if enveloppe_ca.is_rootCA and enveloppe_ca.idmg == idmg:
                         # Certificat racine est valide
                         with open(file_ca_racine, 'w') as fichier:
                             fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+
+                        untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
+                        with open(untrusted_cas_filename, 'w+'):
+                            pass   # Juste touch, initialiser le fichier
+
                     else:
                         raise CertificatInvalide("Le certificat racine de %s a ete altere (idmg != fingerprint)" % idmg)
                 else:
@@ -612,9 +618,8 @@ class VerificateurCertificats(UtilCertificats):
             # Certificat racine pour la MilleGrille est deja charge
             pass
 
-    def charger_certificat(self, fichier=None, fingerprint=None):
+    def charger_certificat(self, fichier=None, fingerprint=None, enveloppe=None):
         # Tenter de charger a partir d'une copie locale
-        enveloppe = None
         if fingerprint is not None:
             # Verifier si le certificat est deja charge
             enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
@@ -627,7 +632,7 @@ class VerificateurCertificats(UtilCertificats):
                         certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
                     )
 
-        elif os.path.isfile(fichier):
+        elif fichier is not None and os.path.isfile(fichier):
             certificat = self._charger_pem(fichier)
 
             if certificat is not None:
@@ -643,21 +648,33 @@ class VerificateurCertificats(UtilCertificats):
                 self.charger_certificats_CA_millegrille(idmg)  # Aucun effet si le cert racine est deja charge
 
                 # Verifier la chaine de ce certificat
-                if enveloppe.is_CA and not enveloppe.is_rootCA:
-                    # Ajouter dans le fichier temp des untrusted CAs pour openssl
-                    # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
-                    # sont pas chargees en ordre. On le conserve quand meme.
-                    if enveloppe.fingerprint_ascii not in self._liste_CAs_connus:
-                        self._logger.debug("Conserver cert CA dans untrusted: %s" % enveloppe.fingerprint_ascii)
-                        self._ajouter_untrusted_ca(enveloppe)
+                if enveloppe.is_rootCA:
+                    self._ajouter_racine(enveloppe)
+                else:
+                    if enveloppe.is_CA and not enveloppe.is_rootCA:
+                        # Ajouter dans le fichier temp des untrusted CAs pour openssl
+                        # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
+                        # sont pas chargees en ordre. On le conserve quand meme.
+                        if enveloppe.fingerprint_ascii not in self._liste_CAs_connus:
+                            self._logger.debug("Conserver cert CA dans untrusted: %s" % enveloppe.fingerprint_ascii)
+                            self._ajouter_untrusted_ca(enveloppe)
 
-                self.verifier_chaine(enveloppe)
+                        self.verifier_chaine(enveloppe)
+
                 self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
 
         else:
             raise CertificatInconnu("Certificat ne peut pas etre charge", fingerprint=fingerprint)
 
         return enveloppe
+
+    def _ajouter_racine(self, enveloppe: EnveloppeCertificat):
+
+        idmg = enveloppe.idmg
+
+        trusted_ca_filename = os.path.join(self.__workdir, idmg + '.cert.pem')
+        with open(trusted_ca_filename, 'w') as writer:
+            writer.write(enveloppe.certificat_pem)
 
     def _ajouter_untrusted_ca(self, enveloppe: EnveloppeCertificat):
 

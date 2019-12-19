@@ -5,6 +5,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDoc
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete, CertificatInconnu
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
+from millegrilles.util.X509Certificate import PemHelpers
 
 import logging
 import datetime
@@ -187,25 +188,32 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def initialiser_mgca(self):
         """ Initialise les root CA et noeud middleware (ou local) """
-        ca_file = self.configuration.mq_cafile
 
-        with open(ca_file) as f:
+        verificateur = self._contexte.verificateur_certificats
+
+        with open(self.configuration.pki_cafile, 'r') as f:
             contenu = f.read()
-            cles = contenu.split(ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS)[1:]
-            self._logger.debug("Certificats ROOT configures: %s" % cles)
+            pems = PemHelpers.split_certificats(contenu)
+            self._logger.debug("Certificats ROOT configures: %s" % pems)
 
-        for cle in cles:
-            certificat_pem = '%s%s' % (ConstantesSecurityPki.DELIM_DEBUT_CERTIFICATS, cle)
-            enveloppe = EnveloppeCertificat(certificat_pem=bytes(certificat_pem, 'utf-8'))
+        for cert in pems:
+            enveloppe = EnveloppeCertificat(certificat_pem=cert.encode('utf-8'))
             self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
             self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
+            verificateur.charger_certificat(enveloppe=enveloppe)
 
         mq_certfile = self.configuration.mq_certfile
-        with open(mq_certfile) as f:
+        with open(mq_certfile, 'r') as f:
             contenu_pem = f.read()
-            enveloppe = EnveloppeCertificat(certificat_pem=bytes(contenu_pem, 'utf-8'))
+        pems = PemHelpers.split_certificats(contenu_pem)
+        pems.reverse()  # Commencer par les certs intermediaires
+        for cert_pem in pems:
+            enveloppe = EnveloppeCertificat(certificat_pem=cert_pem.encode('utf-8'))
+            verificateur.charger_certificat(enveloppe=enveloppe)
             self._logger.debug("Certificats noeud local: %s" % contenu)
-            self._pki_document_helper.inserer_certificat(enveloppe, trusted=False)
+
+            # Verifier la chaine immediatement, permet d'ajouter le cert avec Trusted=True
+            self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
 
         # Demarrer validation des certificats
         # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
@@ -261,15 +269,15 @@ class PKIDocumentHelper:
         document_cert[ConstantesPki.LIBELLE_TRANSACTION_FAITE] = False
 
         if enveloppe.is_CA:
-            if enveloppe.subject_organizational_unit_name == 'MilleGrille':
-                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
-            else:
-                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE
+            document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
 
             if trusted and enveloppe.is_rootCA:
+                document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
                 document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
                 # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
                 document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
+            else:
+                document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
 
         filtre = {
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint

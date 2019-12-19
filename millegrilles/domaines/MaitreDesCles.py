@@ -166,16 +166,22 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def charger_ca_chaine(self):
         self.__dict_ca = dict()
 
-        self._logger.warning("CA FILE: %s" % self.configuration.pki_cafile)
-        ca_chain_file = self.configuration.pki_cafile
-        with open(ca_chain_file, 'r') as fichier:
+        self._logger.info("CA FILE: %s" % self.configuration.pki_cafile)
+        ca_file = self.configuration.pki_cafile
+        with open(ca_file, 'rb') as fichier:
+            cert = fichier.read()
+            x509_cert = x509.load_pem_x509_certificate(cert, backend=default_backend())
+            skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
+            self.__dict_ca[skid] = x509_cert
+
+        self._logger.info("Cert maitre des cles: %s" % self.configuration.pki_certfile)
+        with open(self.configuration.pki_certfile, 'r') as fichier:
             chaine = fichier.read()
-            certs = chaine.split('-----END CERTIFICATE-----')
-            for cert in certs[0:-1]:
-                cert = '%s-----END CERTIFICATE-----\n' % cert
-                self._logger.warning("Loading CA cert :\n%s" % cert)
-                cert = cert.encode('utf-8')
-                x509_cert = x509.load_pem_x509_certificate(cert, backend=default_backend())
+            chaine = PemHelpers.split_certificats(chaine)
+
+            # Prendre tous les certificats apres le premier (c'est celui du maitre des cles)
+            for cert in chaine[1:]:
+                x509_cert = x509.load_pem_x509_certificate(cert.encode('utf-8'), backend=default_backend())
                 skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
                 self.__dict_ca[skid] = x509_cert
 

@@ -524,7 +524,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             cert_autorite = self._dict_ca.get(akid_autorite)
 
             if cert_autorite is None:
-                raise Exception("Erreur, autorite introuvable")
+                raise Exception("Erreur, autorite %s introuvable" % akid_autorite)
 
             chaine.append(cert_autorite)
             akid_autorite_suivante = EnveloppeCleCert.get_authority_identifier(cert_autorite)
