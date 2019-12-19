@@ -268,16 +268,15 @@ class PKIDocumentHelper:
         document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
         document_cert[ConstantesPki.LIBELLE_TRANSACTION_FAITE] = False
 
-        if enveloppe.is_CA:
+        if enveloppe.is_rootCA:
+            document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
+            document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
+            # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
+            document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
+        elif enveloppe.is_CA:
             document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+            document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
 
-            if trusted and enveloppe.is_rootCA:
-                document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
-                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
-                # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
-                document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
-            else:
-                document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
 
         filtre = {
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint

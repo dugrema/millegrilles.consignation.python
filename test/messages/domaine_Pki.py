@@ -12,7 +12,8 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser(init_document=False)
+contexte.initialiser()
+
 
 class MessagesSample(BaseCallback):
 

@@ -195,7 +195,7 @@ class EnveloppeCertificat:
 
     @property
     def is_rootCA(self):
-        return self.is_CA and self.certificat.issuer == self.certificat.subject
+        return self.is_CA and self.authority_key_identifier == self.subject_key_identifier
 
     @property
     def is_CA(self):
@@ -672,8 +672,13 @@ class VerificateurCertificats(UtilCertificats):
         idmg = enveloppe.idmg
 
         trusted_ca_filename = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
-        with open(trusted_ca_filename, 'w') as writer:
-            writer.write(enveloppe.certificat_pem)
+        try:
+            with open(trusted_ca_filename, 'w') as writer:
+                writer.write(enveloppe.certificat_pem)
+
+            os.chmod(trusted_ca_filename, 0o444)
+        except PermissionError:
+            self._logger.info("Tentative de sauvegarder plusieurs fois le cert racine %s" % idmg)
 
     def _ajouter_untrusted_ca(self, enveloppe: EnveloppeCertificat):
 
@@ -682,6 +687,8 @@ class VerificateurCertificats(UtilCertificats):
         untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
         with open(untrusted_cas_filename, 'w+') as untrusted_cas_writer:
             untrusted_cas_writer.write(enveloppe.certificat_pem)
+
+        os.chmod(untrusted_cas_filename, 0o644)
 
     def verifier_chaine(self, enveloppe: EnveloppeCertificat):
         """
