@@ -215,10 +215,13 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def emettre_certificat(self, certificat_pem: str, fingerprint_ascii: str):
+    def emettre_certificat(self, certificat_pem: str, fingerprint_ascii: str, correlation_csr: str = None):
         message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
         message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = fingerprint_ascii
         message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = certificat_pem
+
+        if correlation_csr is not None:
+            message_evenement[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
 
         routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, fingerprint_ascii)
         self._contexte.message_dao.transmettre_message(

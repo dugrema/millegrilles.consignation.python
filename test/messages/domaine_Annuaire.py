@@ -78,10 +78,18 @@ class MessagesSample(BaseCallback):
         domaine = 'transaction.nouvelle'
         self.generateur.relayer_transaction(transaction)
 
+    def lire_transaction_inscription_inscription_recue(self):
+        with open('/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/messages/inscription_reponse.json', 'r') as fichier:
+            transaction = json.load(fichier)
+
+        domaine = 'transaction.nouvelle'
+        self.generateur.relayer_transaction(transaction)
+
     def executer(self):
         # enveloppe = sample.transmettre_maj_fiche_privee()
         # sample.requete_fiche_privee()
-        sample.lire_transaction_demande_inscription()
+        # sample.lire_transaction_demande_inscription()
+        sample.lire_transaction_inscription_inscription_recue()
 
 
 # --- MAIN ---

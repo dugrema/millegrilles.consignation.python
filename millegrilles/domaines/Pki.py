@@ -251,7 +251,7 @@ class PKIDocumentHelper:
         # self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
         self._mg_processus_demarreur = mg_processus_demarreur
 
-    def inserer_certificat(self, enveloppe, trusted=False):
+    def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None):
         document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
         fingerprint = enveloppe.fingerprint_ascii
 
@@ -267,6 +267,9 @@ class PKIDocumentHelper:
         document_cert[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
         document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
         document_cert[ConstantesPki.LIBELLE_TRANSACTION_FAITE] = False
+
+        if correlation_csr is not None:
+            document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
 
         if enveloppe.is_rootCA:
             document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
@@ -612,8 +615,9 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
     def recevoir_certificat(self, message_dict):
         enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
+        correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
         # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
-        self.__pki_document_helper.inserer_certificat(enveloppe)
+        self.__pki_document_helper.inserer_certificat(enveloppe, correlation_csr=correlation_csr)
 
     def transmettre_certificat(self, properties, message_dict):
         pass

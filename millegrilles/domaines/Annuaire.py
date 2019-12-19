@@ -3,6 +3,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessage
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.X509Certificate import PemHelpers
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 from pymongo.collection import ReturnDocument
 
@@ -352,6 +353,8 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         idmg_sollicite = inscription[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
         idmg_originateur = inscription[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
 
+        set_ops = {}
+
         if idmg_sollicite == self.configuration.idmg:
             self._logger.debug("Inscription de la MilleGrille %s pour se connecter localement" % idmg_originateur)
             champ_inscription = ConstantesAnnuaire.LIBELLE_DOC_INSCRIPTIONS_TIERS_VERS_LOCAL
@@ -360,6 +363,17 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             self._logger.debug("Sauvegarder inscription vers %s" % idmg_sollicite)
             champ_inscription = ConstantesAnnuaire.LIBELLE_DOC_INSCRIPTIONS_LOCAL_VERS_TIERS
             idmg_distant = idmg_sollicite
+
+            # Extraire fiche privee
+            fiche_privee = inscription[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE]
+            set_ops[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE] = fiche_privee
+
+            certificat_connecteur = inscription[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT]
+            enveloppe_certificat = EnveloppeCertificat(certificat_pem=certificat_connecteur)
+
+            correlation_csr = inscription[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION]
+            # Generer une transaction de certificat pour PKI
+            self.generateur_transactions.emettre_certificat(certificat_connecteur, enveloppe_certificat.fingerprint_ascii, correlation_csr)
 
         # On conserver la demande au complet pour la retransmettre a la MilleGrille tierce
         inscription_copy = inscription.copy()
@@ -393,6 +407,8 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             },
             '$setOnInsert': on_insert,
         }
+        if len(set_ops.keys()) > 0:
+            ops['$set'] = set_ops
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_TIERS,

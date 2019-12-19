@@ -231,6 +231,7 @@ class ConstantesSecurityPki:
     LIBELLE_CHAINE_PEM = 'chaine_pem'
     LIBELLE_CA_APPROUVE = 'ca_approuve'
     LIBELLE_IDMG = 'idmg'
+    LIBELLE_CORRELATION_CSR = 'csr_correlation'
 
     EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
     EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
