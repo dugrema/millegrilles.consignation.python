@@ -1,6 +1,7 @@
 import uuid
 import datetime
 import re
+import logging
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
@@ -15,6 +16,7 @@ class GenerateurTransaction:
     def __init__(self, contexte, encodeur_json=DateFormatEncoder):
         self.encodeur_json = encodeur_json
         self._contexte = contexte
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                            idmg_destination: str = None):
@@ -65,6 +67,7 @@ class GenerateurTransaction:
 
         # Preparer la structure du message reconnue par MilleGrilles
         enveloppe = self.preparer_enveloppe(message_dict, domaine, version=version, idmg_destination=idmg_destination)
+        # self.__logger.debug("Enveloppe message complet:\n%s" % str(enveloppe))
 
         # Extraire le UUID pour le retourner a l'invoqueur de la methode. Utilise pour retracer une soumission.
         uuid_transaction = enveloppe.get(

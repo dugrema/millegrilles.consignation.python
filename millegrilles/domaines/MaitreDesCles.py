@@ -1267,22 +1267,22 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
         fiche_privee = self.parametres['reponse'][0]
 
         transaction = self.transaction
-        idmg_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
+        fiche_privee_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE]
+        idmg_tiers = fiche_privee_tiers[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
         csr = transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CSR]
 
         clecert = self.controleur.gestionnaire.generer_certificat_connecteur(idmg_tiers, csr)
 
         # Sauvegarder certificat pour tiers et transmettre vers tiers
         self._transmettre_a_pki(clecert)
-        self._transmettre_a_annuaire(transaction, clecert, fiche_privee)
+        self._transmettre_a_annuaire(transaction, idmg_tiers, clecert, fiche_privee)
 
         self.set_etape_suivante()
 
-    def _transmettre_a_annuaire(self, transaction, clecert: EnveloppeCleCert, fiche_privee: dict):
+    def _transmettre_a_annuaire(self, transaction, idmg_tiers, clecert: EnveloppeCleCert, fiche_privee: dict):
 
         fiche_privee_filtree = DocElemFilter.retirer_champs_doc_transaction(fiche_privee)
 
-        idmg_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE]
         nouvelle_transaction_annuaire = {
             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
             ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: clecert.not_valid_after.timestamp(),
