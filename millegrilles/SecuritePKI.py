@@ -583,7 +583,10 @@ class VerificateurCertificats(UtilCertificats):
 
             filtre = {
                 '$or': [
-                    {ConstantesSecurityPki.LIBELLE_IDMG: idmg},
+                    {
+                        Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_RACINE,
+                        ConstantesSecurityPki.LIBELLE_IDMG: idmg
+                    },
                     {
                         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
                         'sujet.commonName': idmg,
