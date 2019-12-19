@@ -1283,12 +1283,16 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
 
         fiche_privee_filtree = DocElemFilter.retirer_champs_doc_transaction(fiche_privee)
 
+        with open(self.controleur.configuration.pki_certfile, 'r') as fichier:
+            cert_fullchain = PemHelpers.split_certificats(fichier.read())
+
         nouvelle_transaction_annuaire = {
             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
-            ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: clecert.not_valid_after.timestamp(),
+            ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: int(clecert.not_valid_after.timestamp()),
             ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: clecert.cert_bytes.decode('utf-8'),
             ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
             ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee_filtree,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FULLCHAIN: cert_fullchain,
         }
         self._controleur.generateur_transactions.soumettre_transaction(
             nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS,
