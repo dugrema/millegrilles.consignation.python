@@ -156,7 +156,7 @@ class DemarreurNoeud(Daemon):
         # Charger la configuration et les DAOs
         self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
-        self._contexte.initialiser(init_document=False, connecter=doit_connecter)
+        self._contexte.initialiser(connecter=doit_connecter)
         self._contexte.message_dao.register_channel_listener(self)
 
         self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
@@ -180,8 +180,6 @@ class DemarreurNoeud(Daemon):
 
         try:
             self.contexte.message_dao.deconnecter()
-            if self.contexte.document_dao is not None:
-                self.contexte.document_dao.deconnecter()
         except Exception as edao:
             self._logger.info("Erreur deconnexion DAOs: %s" % str(edao))
 
