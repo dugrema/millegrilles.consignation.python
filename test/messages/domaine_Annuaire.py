@@ -5,16 +5,13 @@ import datetime, time
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles import Constantes
-from millegrilles.domaines.Principale import ConstantesPrincipale
-from threading import Thread, Event
+from threading import Event
 
 import json
-import uuid
 
 
 contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser(init_document=False)
+contexte.initialiser()
 
 
 class MessagesSample(BaseCallback):

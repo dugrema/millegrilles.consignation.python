@@ -225,7 +225,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self._logger.info("Nouveau certificat MaitreDesCles genere:\n%s" % (clecert.cert_bytes.decode('utf-8')))
 
-        self.__clecert_maitredescles = clecert
+        # Enchainer pour charger le certificat normalement
+        self.charger_certificat_courant()
 
     def charger_certificat_courant(self):
         fichier_cert = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert)
