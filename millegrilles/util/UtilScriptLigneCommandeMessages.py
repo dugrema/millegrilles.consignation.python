@@ -10,7 +10,7 @@ import threading
 from threading import Event
 
 from millegrilles import Constantes
-from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 
 
@@ -19,7 +19,7 @@ class ModeleConfiguration:
     def __init__(self):
         self._logger = logging.getLogger('%s' % self.__class__.__name__)
         self._logger.setLevel(logging.INFO)
-        self._contexte = ContexteRessourcesDocumentsMilleGrilles()
+        self._contexte = ContexteRessourcesMilleGrilles()
         self.parser = None  # Parser de ligne de commande
         self.args = None  # Arguments de la ligne de commande
 
@@ -34,7 +34,6 @@ class ModeleConfiguration:
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
         self._contexte.initialiser(
-            init_document=init_document,
             init_message=init_message,
             connecter=connecter
         )
@@ -87,15 +86,9 @@ class ModeleConfiguration:
         if self._contexte.message_dao is not None:
             self._contexte.message_dao.connecter()
 
-        if self._contexte.document_dao is not None:
-            self._contexte.document_dao.connecter()
-
     def deconnecter(self):
         if self._contexte.message_dao is not None:
             self._contexte.message_dao.deconnecter()
-
-        if self._contexte.document_dao is not None:
-            self._contexte.document_dao.deconnecter()
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """
@@ -156,7 +149,7 @@ class ModeleConfiguration:
                 sys.exit(2)
 
     @property
-    def contexte(self) -> ContexteRessourcesDocumentsMilleGrilles:
+    def contexte(self) -> ContexteRessourcesMilleGrilles:
         return self._contexte
 
     @property

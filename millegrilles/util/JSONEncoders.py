@@ -2,13 +2,14 @@ import json
 import datetime
 from bson.objectid import ObjectId
 
+from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 
-class MongoJSONEncoder(json.JSONEncoder):
+
+class MongoJSONEncoder(DateFormatEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
             return obj.timestamp()
         elif isinstance(obj, ObjectId):
             return str(obj)
-
-        # Let the base class default method raise the TypeError
-        return json.JSONEncoder.default(self, obj)
+        else:
+            return super().default(obj)

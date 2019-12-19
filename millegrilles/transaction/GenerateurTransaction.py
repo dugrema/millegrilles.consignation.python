@@ -3,7 +3,7 @@ import datetime
 import re
 
 from millegrilles import Constantes
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
+from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 
 
 class GenerateurTransaction:
@@ -11,7 +11,7 @@ class GenerateurTransaction:
     Generateur de transactions, requetes et reponses vers RabbitMQ.
     """
 
-    def __init__(self, contexte, encodeur_json=MongoJSONEncoder):
+    def __init__(self, contexte, encodeur_json=DateFormatEncoder):
         self.encodeur_json = encodeur_json
         self._contexte = contexte
 
@@ -151,7 +151,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def transmettre_commande(self, commande_dict, routing_key, channel=None, encoding=MongoJSONEncoder,
+    def transmettre_commande(self, commande_dict, routing_key, channel=None, encoding=DateFormatEncoder,
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None):
 
         enveloppe = self.preparer_enveloppe(commande_dict, idmg_destination=idmg_destination)
