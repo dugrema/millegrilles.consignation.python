@@ -3,6 +3,7 @@ import datetime
 import re
 
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 
 
@@ -210,6 +211,20 @@ class GenerateurTransaction:
         )
 
         return uuid_transaction
+
+    def emettre_certificat(self, certificat_pem: str, fingerprint_ascii: str):
+        message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
+        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = fingerprint_ascii
+        message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = certificat_pem
+
+        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, fingerprint_ascii)
+        self._contexte.message_dao.transmettre_message(
+            message_evenement, routing,
+        )
+        self._contexte.message_dao.transmettre_message_noeuds(
+            message_evenement, routing
+        )
+
 
 class TransactionOperations:
 

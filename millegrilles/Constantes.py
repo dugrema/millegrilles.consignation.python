@@ -219,3 +219,32 @@ SECURITE_ACCES_REFUSE = '0.refuse'
 SECURITE_ACCES_PERMIS = '1.permis'
 
 CLE_CERT_CA = 'pki.millegrille'
+
+
+class ConstantesSecurityPki:
+
+    DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
+    COLLECTION_NOM = 'millegrilles.domaines.Pki/documents'
+
+    LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
+    LIBELLE_FINGERPRINT = 'fingerprint'
+    LIBELLE_CHAINE_PEM = 'chaine_pem'
+    LIBELLE_CA_APPROUVE = 'ca_approuve'
+    LIBELLE_IDMG = 'idmg'
+
+    EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
+    EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
+
+    LIBVAL_CERTIFICAT_RACINE = 'certificat.root'
+    LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
+
+    REGLE_LIMITE_CHAINE = 4  # Longeur maximale de la chaine de certificats
+
+    SYMETRIC_PADDING = 128
+
+    # Document utilise pour publier un certificat
+    DOCUMENT_EVENEMENT_CERTIFICAT = {
+        EVENEMENT_MESSAGE_EVENEMENT: EVENEMENT_CERTIFICAT,
+        LIBELLE_FINGERPRINT: None,
+        LIBELLE_CERTIFICAT_PEM: None
+    }

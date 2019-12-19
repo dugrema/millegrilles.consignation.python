@@ -21,37 +21,9 @@ from cryptography import x509
 from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, JSONHelper
 from millegrilles.dao.DocumentDAO import MongoJSONEncoder
-
-
-class ConstantesSecurityPki:
-
-    DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
-    COLLECTION_NOM = 'millegrilles.domaines.Pki/documents'
-
-    LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
-    LIBELLE_FINGERPRINT = 'fingerprint'
-    LIBELLE_CHAINE_PEM = 'chaine_pem'
-    LIBELLE_CA_APPROUVE = 'ca_approuve'
-    LIBELLE_IDMG = 'idmg'
-
-    EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
-    EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
-
-    LIBVAL_CERTIFICAT_RACINE = 'certificat.root'
-    LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
-
-    REGLE_LIMITE_CHAINE = 4  # Longeur maximale de la chaine de certificats
-
-    SYMETRIC_PADDING = 128
-
-    # Document utilise pour publier un certificat
-    DOCUMENT_EVENEMENT_CERTIFICAT = {
-        Constantes.EVENEMENT_MESSAGE_EVENEMENT: EVENEMENT_CERTIFICAT,
-        LIBELLE_FINGERPRINT: None,
-        LIBELLE_CERTIFICAT_PEM: None
-    }
 
 
 class EnveloppeCertificat:
@@ -492,9 +464,20 @@ class VerificateurTransaction(UtilCertificats):
         # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
         # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.cert.pem) au besoin.
         # Retourne le idmg de la MilleGrille concernee.
-        enveloppe_certificat = self._identifier_certificat(dict_message)
+        try:
+            enveloppe_certificat = self._identifier_certificat(dict_message)
+        except CertificatInconnu as ci:
+            # Le certificat est inconnu. Verifier si le message contient une fiche (privee ou publique)
+            fiche = dict_message.get('fiche_privee')
+            certs_signataires = dict_message.get('certificat_fullchain_signataire')
+            if fiche is not None:
+                self._logger.info("Message avec une fichier privee, on charge les certificats")
+                self._charger_fiche(fiche, certs_signataires)
+                enveloppe_certificat = self._identifier_certificat(dict_message)
+            else:
+                raise ci  # On re-souleve l'erreur
+
         self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
-        # self._verifier_cn(dict_message, enveloppe=enveloppe_certificat)
 
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
 
@@ -547,6 +530,19 @@ class VerificateurTransaction(UtilCertificats):
 
         enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint)
         return enveloppe_certificat
+
+    def _charger_fiche(self, fiche, certs_signataires: list = None):
+        """
+        Charge et emet les certificats valides d'une fiche de MilleGrille
+        """
+        verificateur_certificats = self._contexte.verificateur_certificats
+        enveloppes_certificats = verificateur_certificats.charger_fiche(fiche, certs_signataires)
+
+        # Les certificats de la fiche ont ete charges et sont valides. On les emet sur le reseau.
+        for cert in enveloppes_certificats:
+            self.contexte.generateur_transactions.emettre_certificat(cert.certificat_pem, cert.fingerprint_ascii)
+
+        return enveloppes_certificats
 
 
 class VerificateurCertificats(UtilCertificats):
@@ -675,7 +671,7 @@ class VerificateurCertificats(UtilCertificats):
 
         idmg = enveloppe.idmg
 
-        trusted_ca_filename = os.path.join(self.__workdir, idmg + '.cert.pem')
+        trusted_ca_filename = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
         with open(trusted_ca_filename, 'w') as writer:
             writer.write(enveloppe.certificat_pem)
 
@@ -736,6 +732,56 @@ class VerificateurCertificats(UtilCertificats):
         enveloppe.set_est_verifie(True)
 
         return resultat == 0, output_txt
+
+    def charger_fiche(self, fiche, certs_signataires: list = None):
+        """
+        Charge et valide des certificats provenant d'une fiche de MilleGrille tierce
+        """
+        certificats = list()  # Accumuler tous les certificats pour les re-emettre dans la MilleGrille
+        idmg_entete = fiche[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        # Charger et valider le certificat racine
+        certificat_racine = fiche['certificat_racine']
+        enveloppe_racine = EnveloppeCertificat(certificat_pem=certificat_racine)
+        if enveloppe_racine.idmg != idmg_entete:
+            raise CertificatInvalide("Racine %s invalide, fiche contient idmg=%s" % (enveloppe_racine.idmg, idmg_entete))
+
+        self._ajouter_racine(enveloppe_racine)
+        certificats.append(enveloppe_racine)
+
+        # Charger et valider les certificats intermediaires
+        certificats_intermediaires = fiche['certificats_intermediaires']
+        for cert in certificats_intermediaires:
+            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=cert)
+            if enveloppe_intermediaire.subject_organization_name == idmg_entete:
+                self._ajouter_untrusted_ca(enveloppe_intermediaire)
+                certificats.append(enveloppe_intermediaire)
+            else:
+                self._logger.warning("Certificat intermediaire invalide, idmg=%s plutot que %s" % (enveloppe_intermediaire.idmg, idmg_entete))
+
+        # Charger et valider les autres certificats (leaf)
+        certificats_additionnels = fiche.get('certificats_additionnels')
+        certificat_correspondance = fiche.get('certificat')
+
+        cert_a_valider = list()
+        if certificats_additionnels is not None:
+            cert_a_valider.extend(certificats_additionnels)
+        if certificat_correspondance is not None:
+            cert_a_valider.append(certificat_correspondance)
+        if certs_signataires is not None:
+            cert_a_valider.extend(certs_signataires)
+
+        for cert in cert_a_valider:
+            enveloppe_leaf = EnveloppeCertificat(certificat_pem=cert)
+            if enveloppe_leaf.subject_organization_name == idmg_entete and not enveloppe_leaf.is_CA:
+                self.verifier_chaine(enveloppe_leaf)
+                certificats.append(enveloppe_leaf)
+            else:
+                self._logger.warning("Certificat leaf invalide, CA=%s, idmg=%s (source: %s)" % (
+                    enveloppe_leaf.is_CA, enveloppe_leaf.idmg, idmg_entete))
+
+        # Retourne les certificats qui sont valides
+        return certificats
 
     def close(self):
         # Supprimer tous les certificats mis sur le disque
