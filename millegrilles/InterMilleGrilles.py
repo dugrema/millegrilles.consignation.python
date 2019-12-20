@@ -305,18 +305,18 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
 
         return relai
 
-    def ouvrir_route_millegrille(self, commande):
+    def ouvrir_route_millegrille(self, fiche: dict):
         """
         Tente de trouver une route vers une MilleGrille distante
         Utilise les relais deja connectes si applicable, sinon tente d'ouvrir une connexion vers de nouveaux relais
+        :param fiche: Fiche le la MilleGrille
         """
-        idmg = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        idmg = fiche[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
         route_existante = self.__route_tiers.get(idmg)
         if route_existante is None:
             # Creer une nouvelle connexion. La classe va s'occuper d'etablir une connexion si c'est possible.
-            connexion = ConnexionRelaiMilleGrilles(self, idmg)
-            self.__route_tiers[idmg] = connexion
-            connexion.demarrer()
+            route = RouteMilleGrilleTiers(self, idmg)
+            self.__route_tiers[idmg] = route
         else:
             self.__logger.warning("Demande de connexion a %s mais une thread de connexion est deja en cours")
             route_existante.poke()
@@ -771,39 +771,81 @@ class ListenerDistant:
         self.on_channel_close = None
 
 
+class CommandesSurRelai:
+    """
+    Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir
+    """
+
+    # Une annonce est placee sur l'echange prive avec le routing key definit ci-bas
+    ANNONCE_CONNEXION = 'annonce.connexion'  # Evenement de connexion sur echange prive
+    ANNONCE_DECONNEXION = 'annonce.deconnexion'  # Evenement de deconnexion sur echange prive
+    ANNONCE_RECHERCHE_CERTIFICAT = 'annonce.requete.certificat'  # Requete d'un certificat par fingerprint
+    ANNONCE_PRESENCE = 'annonce.presence'  # Annonce la presence d'une millegrille (regulierement)
+
+    # Le type de commande est place dans le header 'connecteur.commande' du message
+
+    # -- Commandes sans inscription --
+    COMMANDE_DEMANDE_INSCRIPTION = 'commande.inscription'  # Transmet une demande d'inscription a une MilleGrille tierce
+
+    # Transmet une demande de confirmation de presence a un connecteur de MilleGrille tierce qui repond par pong
+    COMMANDE_PING = 'commande.ping'
+
+    # -- Commandes avec inscription --
+    # Une commande est dirigee vers une MilleGrille tierce specifique sur un echange direct (e.g. echange par defaut)
+    COMMANDE_CONNEXION = 'commande.connexion'  # Demande de connexion vers une millegrille tierce presente sur relai
+    COMMANDE_DECONNEXION = 'commande.deconnexion'  # Deconnexion d'une millegrille tierce presente sur relai
+    COMMANDE_PRESENCE = 'commande.presence'  # Utilise pour indiquer presence/activite a un tiers (regulierement)
+    COMMANDE_DEMANDE_FICHE = 'commande.demandeFiche'  # Demande la fiche privee d'une MilleGrille tierce
+
+    # Commandes de relai de messages
+    # Le contenu doit etre contre-signee par le certificat de connecteur pour etre admises
+    COMMANDE_MESSAGE_RELAI = 'commande.message.relai'  # Relai message de la MilleGrille d'origine
+
+
 class RouteMilleGrilleTiers:
     """
     Lien entre la MilleGrille locale (Q locale) et une MilleGrilles distante (tiers, Q sur relai)
     """
 
-    def __init__(self, connecteur: ConnecteurInterMilleGrilles, idmg: str):
+    ROUTE_CONNECTEE = 'connectee'
+    ROUTE_DECONNECTEE = 'deconnectee'
+    ROUTE_CUL_DE_SAC = 'cul_de_sac'
+
+    def __init__(self, connecteur: ConnecteurInterMilleGrilles, __fiche_privee_tiers: dict):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.connecteur = connecteur
-        self.__idmg = idmg
+        self.__fiche_privee_tiers = __fiche_privee_tiers
+
+        self.__idmg = __fiche_privee_tiers[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
 
         self.__traitement_local_vers_tiers = TraitementMessageLocalVersTiers(
             self, connecteur.contexte.message_dao, connecteur.contexte.configuration)
 
         self.__traitement_tiers_vers_local = None
 
+        self.__etat_route = RouteMilleGrilleTiers.ROUTE_DECONNECTEE
+
         # Ouvrir un nouveau canal en amont local
         # Necessaire en partie parce que la verification de Q exclusive ferme le canal si la
         # Q existe deja (e.g. ouverte par MG tierce)
-        self.__nom_q_locale = 'inter.' + idmg  # IDMG distant sur MQ local
+        self.__nom_q_locale = 'inter.' + self.__idmg  # IDMG distant sur MQ local
         self.__channel_amont_local = None
         self.__ctag_amont_local = None
 
-        # Information de connexion
-        self.__fiche_privee_tiers = None
-        self.__configuration_connexion = None
+    def entretien(self):
+        """
+        Invoque regulierement par une thread pour executer l'entretien (connecter, reconnecter, etc.)
+        :return:
+        """
+        self.__logger.warning("Executer entretien route idmg: %s" % self.__idmg)
 
-        # Connexions distantes en amont et aval
-        self.__nom_q_distante = 'inter.' + self.connecteur.contexte.idmg  # IDMG local sur MQ distant
-        self.__channel_amont_distant = None
-        self.__ctag_amont_distant = None
-
-    def poke(self):
-        self.__logger.warning("On vient de se faire poker (idmg: %s)" % self.__idmg)
+    def ping_millegrille_sur_relai(self, relai: ConnexionRelaiMilleGrilles):
+        """
+        Transmettre un ping pour une MilleGrille sur un relai.
+        Si on recoit un pong affirmatif (requete de connexion acceptee), cette route devient etablie.
+        :param relai:
+        :return:
+        """
 
     def transmettre_message_prive_vers_distant(self, dict_message, routing_key=None, reply_q=None, correlation_id=None):
         properties = pika.BasicProperties(delivery_mode=1)
