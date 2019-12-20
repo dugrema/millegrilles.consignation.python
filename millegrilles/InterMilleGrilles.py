@@ -641,7 +641,7 @@ class ConnexionRelaiMilleGrilles:
 
     def emettre_presence(self):
         message = {
-            'idmg': self.idmg,
+            'idmg': self.connecteur.contexte.idmg,
             'message': 'allo! avec un beigne',
         }
         self.__transmetteur_message_vers_distant.emettre_message_prive(message, CommandesSurRelai.ANNONCE_CONNEXION)
@@ -740,6 +740,8 @@ class ConnexionRelaiMilleGrilles:
         self.__logger.info("Ouverture channel aval distant avec relai %s" % self.idmg)
         self.__transmetteur_message_vers_distant = TransmetteurMessageMilleGrilles(
             self.connecteur.contexte, channel, self.__connexion_mq_aval_distante)
+
+        self.emettre_presence()
 
     def on_channel_aval_distant_close(self, channel=None, code=None, reason=None):
         if not self.__stop_event.is_set():
@@ -993,7 +995,7 @@ class TraitementMessageTiersVersLocal:
             self.traiter_message(ch, method, properties, body)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
-            self.__logger.warning("Certificat inconnu, on fait la demande %s" % fingerprint)
+            self.__logger.debug("Certificat inconnu (%s) provenant du relai" % fingerprint)
             pass  # A FAIRE
         except Exception as e:
             self.__logger.exception("Erreur dans TraitementMessageTiersVersLocal, exception: %s" % str(e))
@@ -1042,15 +1044,36 @@ class TraitementMessageTiersVersLocal:
             self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
 
         if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
+
+            if routing_key.startswith('annonce.'):
+                # Verifier si c'est une annonce ou une commande (gerer directement avec le connecteur)
+                if routing_key == CommandesSurRelai.ANNONCE_CONNEXION:
+                    self.__logger.debug("Connexion de " % dict_message.get('idmg'))
+                elif routing_key == CommandesSurRelai.ANNONCE_DECONNEXION:
+                    self.__logger.debug("Deconnexion de " % dict_message.get('idmg'))
+                elif routing_key == CommandesSurRelai.ANNONCE_PRESENCE:
+                    self.__logger.debug("Annonce presence de " % dict_message.get('idmg'))
+                elif routing_key == CommandesSurRelai.ANNONCE_RECHERCHE_CERTIFICAT:
+                    self.__logger.debug("Recherche certificat %s" % dict_message.get('fingerprint'))
+                else:
+                    self.__logger.warning("Annonce de type inconnu: %s\n%s" % (routing_key, str(dict_message)))
+
             # Verifier si le message a deja ete transfere
-            if properties.headers is None or properties.headers.get(CommandesSurRelai.HEADER_TRANSFERT_INTER_COMPLETE) != 'true':
+            elif properties.headers is None or properties.headers.get(CommandesSurRelai.HEADER_TRANSFERT_INTER_COMPLETE) != 'true':
                 self.__logger.debug("Message en amont sur exchange prive distant, on le passe a la millegrille locale")
                 self.__connexion.transmettre_message_vers_local(
                     dict_message, routing_key, reply_to=properties.reply_to, correlation_id=properties.correlation_id)
+
             else:
                 self.__logger.debug("Message inter deja transmis, on l'ignore (pour eviter boucles")
+
         elif exchange == '':  # Echange direct
-            self.__logger.debug("Message sur exchange distant")
-            self.__connexion.transmettre_message_exchdefault_vers_local(dict_message, method, properties)
+
+            if commande == CommandesSurRelai.COMMANDE_MESSAGE_RELAI:
+                self.__logger.debug("Message provenant exchange distant a relayer localement:\n%s" % str(dict_message))
+                self.__connexion.transmettre_message_exchdefault_vers_local(dict_message, method, properties)
+            else:
+                self.__logger.warning("Commande inconnue recue: %s\n%s" % (commande, str(dict_message)))
+
         else:
             raise Exception("Message non traitable")
