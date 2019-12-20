@@ -301,7 +301,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             # Creer une nouvelle instance de relai avec cette MilleGrille
             configuration_relai = ConfigurationRelai(fiche_millegrille, self.interca_dir)
             relai = ConnexionRelaiMilleGrilles(self, configuration_relai)
-            relai.demarrer()
+            relai.connecter_mq_distant()
 
         return relai
 
@@ -571,7 +571,7 @@ class ConnexionRelaiMilleGrilles:
         self.__idmg = configuration.idmg
 
         # self.__idmg = idmg  # IDMG de la connexion (millegrille distante)
-        self.__thread = Thread(name="Relai-" + self.__idmg, target=self.executer, daemon=True)
+        # self.__thread = Thread(name="Relai-" + self.__idmg, target=self.executer, daemon=True)
 
         # Connexions MQ au relai dans les 2 directions
         self.__connexion_mq_amont_distante = None
@@ -589,30 +589,30 @@ class ConnexionRelaiMilleGrilles:
         self.__fiche_privee_relai = None
         self.__nom_q_distante = 'inter.' + self.connecteur.contexte.idmg  # Q pour MilleGrille locale
 
-    def demarrer(self):
-        self.__logger.info("Demarrage thread connexion a relai " + self.__idmg)
-        self.__thread.start()
+    # def demarrer(self):
+    #     self.__logger.info("Demarrage thread connexion a relai " + self.__idmg)
+    #     self.__thread.start()
 
-    def executer(self):
-        self.__logger.info("Execution thread connexion a relai " + self.__idmg)
-
-        try:
-            # self.charger_configuration_tiers()
-
-            self.__logger.info("Connexion amont locale %s prete, demarrage connexions distantes" % self.__idmg)
-
-            self.connecter_mq_distant()  # Methode blocking (barrier)
-            self.__connexion_event.wait(10)  # Attendre que la Q en amont distante soit prete
-            if not self.__connexion_event.is_set():
-                raise Exception('Erreur connexion relai %s, q en amont distante pas prete' % self.__idmg)
-
-            while not self.__stop_event.is_set():
-                self.__stop_event.wait(10)
-
-        finally:
-            self._fermeture()
-
-        self.__logger.info("Fin execution thread connexion a " + self.__idmg)
+    # def executer(self):
+    #     self.__logger.info("Execution thread connexion a relai " + self.__idmg)
+    #
+    #     try:
+    #         # self.charger_configuration_tiers()
+    #
+    #         self.__logger.info("Connexion amont locale %s prete, demarrage connexions distantes" % self.__idmg)
+    #
+    #         self.connecter_mq_distant()  # Methode blocking (barrier)
+    #         self.__connexion_event.wait(10)  # Attendre que la Q en amont distante soit prete
+    #         if not self.__connexion_event.is_set():
+    #             raise Exception('Erreur connexion relai %s, q en amont distante pas prete' % self.__idmg)
+    #
+    #         while not self.__stop_event.is_set():
+    #             self.__stop_event.wait(10)
+    #
+    #     finally:
+    #         self._fermeture()
+    #
+    #     self.__logger.info("Fin execution thread connexion a " + self.__idmg)
 
     def arreter(self):
         self.__stop_event.set()
@@ -663,6 +663,10 @@ class ConnexionRelaiMilleGrilles:
         listener_distant.on_channel_open = self.on_channel_amont_distant_open
         listener_distant.on_channel_close = self.on_channel_amont_distant_close
         self.__connexion_mq_amont_distante.register_channel_listener(listener_distant)
+
+        self.__connexion_event.wait(10)  # Attendre que la Q en amont distante soit prete
+        if not self.__connexion_event.is_set():
+            raise Exception('Erreur connexion relai %s, q en amont distante pas prete' % self.__idmg)
 
     def on_channel_amont_distant_open(self, channel):
         self.__logger.info("MQ Channel distant ouvert pour %s" % self.idmg)
