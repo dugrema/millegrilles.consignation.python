@@ -6,6 +6,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrapper, JSONHelper, CertificatInconnu
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenerateurCertificat
+from millegrilles.Constantes import ConstantesSecurityPki
 
 from threading import Event, Thread, Lock, Barrier
 from pika.channel import Channel
@@ -87,6 +88,11 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
 
         self.__logger.info("Attente Q et routes prets")
 
+        # Initialiser les repertoires
+        os.makedirs(ConstantesInterMilleGrilles.REPERTOIRE_FICHES, mode=0o755, exist_ok=True)
+        os.makedirs(ConstantesInterMilleGrilles.REPERTOIRE_CERTS, mode=0o755, exist_ok=True)
+        os.makedirs(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, mode=0o700, exist_ok=True)
+
         self.__attendre_q_prete.wait(10)
 
         if not self.__attendre_q_prete.is_set():
@@ -94,6 +100,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             self.contexte.message_dao.enter_error_state()
         else:
             self.__logger.info("Q et routes prets")
+            self.verifier_correlation_csr()
 
     def executer(self):
 
@@ -104,6 +111,26 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         finally:
             self.__logger.info("Fin execution InterMilleGrilles")
             self.__fermeture()
+
+    def verifier_correlation_csr(self):
+        """
+        Verifier si des tokens de correlation sont arrives.
+        """
+        cles_new = [f for f in os.listdir(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS) if f.startswith('new.')]
+
+        if len(cles_new) > 0:
+            self.__logger.debug("Demander certificats pour correlation: %s" % str(cles_new))
+            liste_correlation = [c.split('.')[1] for c in cles_new]
+
+            # Faire une requete vers PKI pour demander les certificats associes a ces correlation, si disponibles
+            requete = {
+                ConstantesSecurityPki.LIBELLE_CORRELATION_CSR: liste_correlation
+            }
+
+            self.__logger.debug("Reply Q: %s" % self.__q_locale)
+            self.contexte.generateur_transactions.transmettre_requete(
+                requete, ConstantesSecurityPki.REQUETE_CORRELATION_CSR, ConstantesSecurityPki.LIBELLE_CORRELATION_CSR,
+                self.__q_locale)
 
     def exit_gracefully(self, signum=None, frame=None):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
@@ -147,10 +174,9 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             callback=self.creer_bindings_local,
         )
 
-        self.__attendre_q_prete.set()
-
     def creer_bindings_local(self, queue):
         self.__q_locale = queue.method.queue
+        self.__attendre_q_prete.set()
 
         routing_keys_prive = [
             ConstantesInterMilleGrilles.COMMANDE_CONNECTER,
@@ -288,6 +314,40 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         correlation_id = properties.correlation_id
         self.contexte.generateur_transactions.transmettre_reponse(reponse, reply_q, correlation_id)
 
+    def associer_certificats(self, dict_message: dict):
+        """
+        Associer des cles privees en attente avec leur certificat signe.
+        """
+        certificats = dict_message[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR]
+
+        for cert in certificats:
+            correlation = cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR]
+            certificat = cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+            enveloppe = EnveloppeCleCert()
+            enveloppe.cert_from_pem_bytes(certificat.encode('utf-8'))
+
+            # Trouver la cle associee a ce certificat
+            fichier_cle = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, 'new.' + correlation + '.key.pem')
+            with open(fichier_cle, 'rb') as fichier:
+                cle_cryptee = fichier.read()
+            enveloppe.key_from_pem_bytes(cle_cryptee, self.__mot_de_passe_cle.encode('utf-8'))
+
+            # Valider le certificat et la cle
+            if enveloppe.cle_correspondent():
+                sujet = enveloppe.formatter_subject()
+                self.__logger.info("On a recu le certificat correspondant a la cle %s, cert pour %s" % (correlation, str(sujet)))
+                idmg = sujet['organizationName']
+
+                # Conserver certificat
+                fichier_cert_associe = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_CERTS, idmg + '.cert.pem')
+                with open(fichier_cert_associe, 'wb') as writer:
+                    writer.write(enveloppe.cert_bytes)
+
+                # Renommer cle au nom du idmg
+                fichier_cle_associe = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, idmg + '.key.pem')
+                os.rename(fichier_cle, fichier_cle_associe)
+            else:
+                self.__logger.warning("On a un certificat avec correlation %s mais il ne correspond pas a la cle" % correlation)
 
 class TraitementMessageQueueLocale(TraitementMessageCallback):
 
@@ -313,6 +373,12 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
             if routing_key == 'requete.' + ConstantesInterMilleGrilles.REQUETE_GENERER_CSR:
                 self.__connecteur.generer_csr(properties)
 
+        elif exchange == '':
+            correlation_id = properties.correlation_id
+            if correlation_id == ConstantesSecurityPki.LIBELLE_CORRELATION_CSR:
+                self.__connecteur.associer_certificats(dict_message)
+            else:
+                self.__logger.debug("Recu reponse sur Q locale, correlation %s:\n%s" % (correlation_id, str(body.decode('utf-8'))))
 
 class ConfigurationRelai:
     """

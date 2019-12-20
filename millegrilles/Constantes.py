@@ -238,6 +238,9 @@ class ConstantesSecurityPki:
 
     LIBVAL_CERTIFICAT_RACINE = 'certificat.root'
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
+    LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
+
+    REQUETE_CORRELATION_CSR = 'pki.correlation_csr'
 
     REGLE_LIMITE_CHAINE = 4  # Longeur maximale de la chaine de certificats
 

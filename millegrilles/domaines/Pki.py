@@ -139,6 +139,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 'routing': [
                     '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                     ConstantesPki.REQUETE_LISTE_CA,
+                    'requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR,
                 ],
                 'exchange': self.configuration.exchange_noeuds,
                 'callback': self.__traitement_certificats.callbackAvecAck
@@ -243,6 +244,25 @@ class GestionnairePki(GestionnaireDomaineStandard):
     def get_handler_requetes_noeuds(self):
         return self.__traitement_requetes_noeuds
 
+    def get_certs_correlation_csr(self, correlation_csr: list):
+        """
+        :return: Retourne les certificats associes aux correlation
+        """
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+        curseur = collection_pki.find({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_NOEUD,
+            ConstantesSecurityPki.LIBELLE_CORRELATION_CSR: {'$in': correlation_csr}
+        })
+
+        certs = list()
+        for cert in curseur:
+            cert_reponse = {
+                ConstantesPki.LIBELLE_CERTIFICAT_PEM: cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM],
+                ConstantesSecurityPki.LIBELLE_CORRELATION_CSR: cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR],
+            }
+            certs.append(cert_reponse)
+
+        return certs
 
 class PKIDocumentHelper:
 
@@ -609,6 +629,8 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
             self.transmettre_liste_ca(properties, message_dict)
         elif method.routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
             self.confirmer_certificat(properties, message_dict)
+        elif method.routing_key.startswith('requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR):
+            self.transmettre_certificats_correlation_csr(properties, message_dict)
 
         else:
             raise Exception("Type evenement inconnu: %s" % method.routing_key)
@@ -645,7 +667,6 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
         self.gestionnaire.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id)
 
-
     def transmettre_liste_ca(self, properties, message_dict):
         ca_file = self.configuration.mq_cafile
 
@@ -654,6 +675,17 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
         reponse = {
             ConstantesSecurityPki.LIBELLE_CHAINE_PEM: contenu
+        }
+
+        self.gestionnaire.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
+
+    def transmettre_certificats_correlation_csr(self, properties, message_dict):
+        liste_correlation = message_dict[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR]
+        certs = self.gestionnaire.get_certs_correlation_csr(liste_correlation)
+
+        reponse = {
+            ConstantesSecurityPki.LIBELLE_CORRELATION_CSR: certs
         }
 
         self.gestionnaire.generateur_transactions.transmettre_reponse(
