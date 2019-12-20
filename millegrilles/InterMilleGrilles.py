@@ -107,6 +107,9 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             # Mettre la jour les fiches des certificats
             self.demander_fiches()
 
+            # Ouvrir une connexion vers les relais connus
+            self.ouvrir_relais_connus()
+
     def executer(self):
 
         try:
@@ -155,12 +158,27 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
                 'fiche_privee.usager': 1,
                 'fiche_privee.prive_mq': 1,
                 'fiche_privee.relais': 1,
+                'fiche_privee.' + ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE: 1,
+                'fiche_privee.' + ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: 1,
             }
         }]}
 
         self.contexte.generateur_transactions.transmettre_requete(
             requete, ConstantesAnnuaire.DOMAINE_NOM, ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
             self.__q_locale)
+
+    def ouvrir_relais_connus(self):
+        """
+        Ouvre les relais connus (fiches locales)
+        """
+        nom_fiches = [f for f in os.listdir(ConstantesInterMilleGrilles.REPERTOIRE_FICHES) if f.endswith('.json')]
+        for nom_fiche in nom_fiches:
+            with open(os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_FICHES, nom_fiche), 'r') as fichier:
+                fiche = json.load(fichier)
+            try:
+                self.connecter_relai(fiche)
+            except Exception:
+                self.__logger.exception("Erreur demarrage thread pour connecter un relai a %s" % fiche.get('idmg'))
 
     def exit_gracefully(self, signum=None, frame=None):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
@@ -327,7 +345,8 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
 
         correlation_cle = str(uuid.uuid4())
 
-        clecert.password = self.__mot_de_passe_cle.encode('utf-8')
+        # Note: openssl ne supporte pas les mots de passe sur cle - wrap_socket key_password ne se rend pas.
+        # clecert.password = self.__mot_de_passe_cle.encode('utf-8')
 
         private_file = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, 'new.' + correlation_cle + '.key.pem')
         with open(private_file, 'wb') as fichier:
@@ -360,7 +379,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             fichier_cle = os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, 'new.' + correlation + '.key.pem')
             with open(fichier_cle, 'rb') as fichier:
                 cle_cryptee = fichier.read()
-            enveloppe.key_from_pem_bytes(cle_cryptee, self.__mot_de_passe_cle.encode('utf-8'))
+            enveloppe.key_from_pem_bytes(cle_cryptee)
 
             # Valider le certificat et la cle
             if enveloppe.cle_correspondent():
@@ -427,6 +446,7 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
                 self.__connecteur.conserver_fiches(dict_message)
             else:
                 self.__logger.debug("Recu reponse sur Q locale, correlation %s:\n%s" % (correlation_id, str(body.decode('utf-8'))))
+
 
 class ConfigurationRelai:
     """
@@ -627,12 +647,14 @@ class ConnexionRelaiMilleGrilles:
         self.__connexion_mq_amont_distante = ConnexionWrapper(self.__configuration_relai, self.__stop_event)
 
         # Ouvrir les connexions, donner 20 secondes max avant d'abandonner
+        self.__logger.info("Connexion a MQ relai %s" % self.__idmg)
         barrier = Barrier(3)
         self.__connexion_mq_aval_distante.connecter(barrier)
         self.__connexion_mq_amont_distante.connecter(barrier)
         barrier.wait(20)
         if barrier.broken:
             raise Exception("Erreur connexion a MQ distant")
+        self.__logger.info("Connecte a MQ relai %s" % self.__idmg)
 
         self.__traitement_tiers_vers_local = TraitementMessageTiersVersLocal(self)
 
