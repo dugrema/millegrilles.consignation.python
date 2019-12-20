@@ -6,6 +6,7 @@ import logging
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
+from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
 
 
 class GenerateurTransaction:
@@ -16,38 +17,41 @@ class GenerateurTransaction:
     def __init__(self, contexte, encodeur_json=DateFormatEncoder):
         self.encodeur_json = encodeur_json
         self._contexte = contexte
+        self.__formatteur_message = FormatteurMessageMilleGrilles(self._contexte.idmg, self._contexte.signateur_transactions)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                            idmg_destination: str = None):
 
-        # Identifier usager du systeme, nom de domaine
-        signateur_transactions = self._contexte.signateur_transactions
+        return self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination)
 
-        # common_name = signateur_transactions.enveloppe_certificat_courant.subject_common_name
-        # identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
-
-        # Ajouter identificateur unique et temps de la transaction
-        uuid_transaction = uuid.uuid1()
-
-        meta = dict()
-        meta[Constantes.CONFIG_IDMG] = self._contexte.idmg
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = version
-        if domaine is not None:
-            meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
-        if idmg_destination is not None:
-            meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION] = idmg_destination
-
-        enveloppe = message_dict.copy()
-        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
-
-        # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = signateur_transactions.hacher_contenu(enveloppe)
-        message_signe = signateur_transactions.signer(enveloppe)
-
-        return message_signe
+        # # Identifier usager du systeme, nom de domaine
+        # signateur_transactions = self._contexte.signateur_transactions
+        #
+        # # common_name = signateur_transactions.enveloppe_certificat_courant.subject_common_name
+        # # identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
+        #
+        # # Ajouter identificateur unique et temps de la transaction
+        # uuid_transaction = uuid.uuid1()
+        #
+        # meta = dict()
+        # meta[Constantes.CONFIG_IDMG] = self._contexte.idmg
+        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
+        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
+        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = version
+        # if domaine is not None:
+        #     meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
+        # if idmg_destination is not None:
+        #     meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION] = idmg_destination
+        #
+        # enveloppe = message_dict.copy()
+        # enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
+        #
+        # # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
+        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = signateur_transactions.hacher_contenu(enveloppe)
+        # message_signe = signateur_transactions.signer(enveloppe)
+        #
+        # return message_signe
 
     def soumettre_transaction(self, message_dict, domaine=None,
                               reply_to=None, correlation_id=None,

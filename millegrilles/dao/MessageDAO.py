@@ -9,6 +9,7 @@ import ssl
 from threading import Lock, RLock, Event, Thread, Barrier
 
 from millegrilles import Constantes
+from millegrilles.Constantes import CommandesSurRelai
 from millegrilles.util.JSONEncoders import MongoJSONEncoder
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from pika.credentials import PlainCredentials, ExternalCredentials
@@ -636,9 +637,11 @@ class PikaDAO:
         if correlation_id is not None:
             properties.correlation_id = correlation_id
         properties.headers = {
-            'inter': 'true',
-            'origine': idmg_origine,
+            CommandesSurRelai.HEADER_TRANSFERT_INTER_COMPLETE: 'true',
+            CommandesSurRelai.HEADER_IDMG_ORIGINE: idmg_origine,
         }
+        if headers is not None:
+            properties.headers.update(headers)
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:

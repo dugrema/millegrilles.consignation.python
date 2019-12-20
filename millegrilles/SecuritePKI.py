@@ -390,6 +390,26 @@ class SignateurTransaction(UtilCertificats):
 
         return dict_message_effectif
 
+    def contresigner(self, message: dict, idmg: str):
+        """
+        Ajoute une signature au message sans modifier l'entete. Utilise pour re-signer un message avec un
+        certificat de MilleGrilles tierce
+        :param message:
+        :return:
+        """
+        contresignatures = message.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURES)
+        if contresignatures is None:
+            contresignatures = dict()
+            message[Constantes.TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURES] = contresignatures
+
+        contresignature = dict()
+        contresignatures[idmg] = contresignature
+
+        signature = self._produire_signature(message)
+        contresignature[Constantes.TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURE] = signature
+        contresignature[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT] = \
+            self._enveloppe.fingerprint_ascii
+
     def _produire_signature(self, dict_message):
         message_bytes = self.preparer_transaction_bytes(dict_message)
         self._logger.debug("Message en format json: %s" % message_bytes)

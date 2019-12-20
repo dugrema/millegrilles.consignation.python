@@ -123,6 +123,8 @@ TRANSACTION_MESSAGE_LIBELLE_EVENEMENT = '_evenements'  # Precedemment evenements
 TRANSACTION_MESSAGE_LIBELLE_ORIGINE = '_origine'
 TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE = 'estampille'
 TRANSACTION_MESSAGE_LIBELLE_SIGNATURE = '_signature'
+TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURES = '_contresignatures'
+TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURE = 'signature'
 TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION = 'en-tete'  # Precedemment info-transaction
 TRANSACTION_MESSAGE_LIBELLE_EN_TETE = 'en-tete'
 # TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE = 'charge-utile'  # Deprecated
@@ -252,3 +254,38 @@ class ConstantesSecurityPki:
         LIBELLE_FINGERPRINT: None,
         LIBELLE_CERTIFICAT_PEM: None
     }
+
+
+class CommandesSurRelai:
+    """
+    Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir
+    """
+
+    HEADER_COMMANDE = 'connecteur_commande'
+    HEADER_TRANSFERT_INTER_COMPLETE = 'transfert_inter_complete'
+    HEADER_IDMG_ORIGINE = 'idmg_origine'
+
+    # Une annonce est placee sur l'echange prive avec le routing key definit ci-bas
+    ANNONCE_CONNEXION = 'annonce.connexion'  # Evenement de connexion sur echange prive
+    ANNONCE_DECONNEXION = 'annonce.deconnexion'  # Evenement de deconnexion sur echange prive
+    ANNONCE_RECHERCHE_CERTIFICAT = 'annonce.requete.certificat'  # Requete d'un certificat par fingerprint
+    ANNONCE_PRESENCE = 'annonce.presence'  # Annonce la presence d'une millegrille (regulierement)
+
+    # Le type de commande est place dans le header 'connecteur_commande' du message
+
+    # -- Commandes sans inscription --
+    COMMANDE_DEMANDE_INSCRIPTION = 'commande.inscription'  # Transmet une demande d'inscription a une MilleGrille tierce
+
+    # Transmet une demande de confirmation de presence a un connecteur de MilleGrille tierce qui repond par pong
+    COMMANDE_PING = 'commande.ping'
+
+    # -- Commandes avec inscription --
+    # Une commande est dirigee vers une MilleGrille tierce specifique sur un echange direct (e.g. echange par defaut)
+    COMMANDE_CONNEXION = 'commande.connexion'  # Demande de connexion vers une millegrille tierce presente sur relai
+    COMMANDE_DECONNEXION = 'commande.deconnexion'  # Deconnexion d'une millegrille tierce presente sur relai
+    COMMANDE_PRESENCE = 'commande.presence'  # Utilise pour indiquer presence/activite a un tiers (regulierement)
+    COMMANDE_DEMANDE_FICHE = 'commande.demandeFiche'  # Demande la fiche privee d'une MilleGrille tierce
+
+    # Commandes de relai de messages
+    # Le contenu doit etre contre-signee par le certificat de connecteur pour etre admises
+    COMMANDE_MESSAGE_RELAI = 'commande.message.relai'  # Relai message de la MilleGrille d'origine

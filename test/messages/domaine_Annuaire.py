@@ -87,9 +87,9 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.transmettre_maj_fiche_privee()
-        # sample.requete_fiche_privee()
+        sample.requete_fiche_privee()
         # sample.lire_transaction_demande_inscription()
-        sample.lire_transaction_inscription_inscription_recue()
+        # sample.lire_transaction_inscription_inscription_recue()
 
 
 # --- MAIN ---

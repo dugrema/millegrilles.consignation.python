@@ -6,10 +6,10 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrapper, JSONHelper, CertificatInconnu
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenerateurCertificat
-from millegrilles.Constantes import ConstantesSecurityPki
+from millegrilles.Constantes import ConstantesSecurityPki, CommandesSurRelai
 
 from threading import Event, Thread, Lock, Barrier
-from pika.channel import Channel
+from pika import BasicProperties
 
 import logging
 import datetime
@@ -583,6 +583,9 @@ class ConnexionRelaiMilleGrilles:
         self.__temps_inactivite_secs = datetime.timedelta(seconds=300)
         self.__derniere_activite = datetime.datetime.utcnow()
 
+        self.__intervalle_emission_presence = datetime.timedelta(seconds=90)
+        self.__dernier_emission_presence = datetime.datetime.utcnow()
+
         self.__connexion_event = Event()
         self.__stop_event = Event()
 
@@ -613,6 +616,16 @@ class ConnexionRelaiMilleGrilles:
     #         self._fermeture()
     #
     #     self.__logger.info("Fin execution thread connexion a " + self.__idmg)
+
+    def emettre_presence(self):
+        channel_aval_distant = self.__connexion_mq_aval_distante.channel
+        self.connecteur.contexte.generateur_transactions.eme
+
+    def entretenir(self):
+        """
+        Effectuer entretien avec le relai
+        """
+        pass
 
     def arreter(self):
         self.__stop_event.set()
@@ -769,37 +782,6 @@ class ListenerDistant:
     def __init__(self):
         self.on_channel_open = None
         self.on_channel_close = None
-
-
-class CommandesSurRelai:
-    """
-    Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir
-    """
-
-    # Une annonce est placee sur l'echange prive avec le routing key definit ci-bas
-    ANNONCE_CONNEXION = 'annonce.connexion'  # Evenement de connexion sur echange prive
-    ANNONCE_DECONNEXION = 'annonce.deconnexion'  # Evenement de deconnexion sur echange prive
-    ANNONCE_RECHERCHE_CERTIFICAT = 'annonce.requete.certificat'  # Requete d'un certificat par fingerprint
-    ANNONCE_PRESENCE = 'annonce.presence'  # Annonce la presence d'une millegrille (regulierement)
-
-    # Le type de commande est place dans le header 'connecteur.commande' du message
-
-    # -- Commandes sans inscription --
-    COMMANDE_DEMANDE_INSCRIPTION = 'commande.inscription'  # Transmet une demande d'inscription a une MilleGrille tierce
-
-    # Transmet une demande de confirmation de presence a un connecteur de MilleGrille tierce qui repond par pong
-    COMMANDE_PING = 'commande.ping'
-
-    # -- Commandes avec inscription --
-    # Une commande est dirigee vers une MilleGrille tierce specifique sur un echange direct (e.g. echange par defaut)
-    COMMANDE_CONNEXION = 'commande.connexion'  # Demande de connexion vers une millegrille tierce presente sur relai
-    COMMANDE_DECONNEXION = 'commande.deconnexion'  # Deconnexion d'une millegrille tierce presente sur relai
-    COMMANDE_PRESENCE = 'commande.presence'  # Utilise pour indiquer presence/activite a un tiers (regulierement)
-    COMMANDE_DEMANDE_FICHE = 'commande.demandeFiche'  # Demande la fiche privee d'une MilleGrille tierce
-
-    # Commandes de relai de messages
-    # Le contenu doit etre contre-signee par le certificat de connecteur pour etre admises
-    COMMANDE_MESSAGE_RELAI = 'commande.message.relai'  # Relai message de la MilleGrille d'origine
 
 
 class RouteMilleGrilleTiers:
@@ -1006,11 +988,12 @@ class TraitementMessageTiersVersLocal:
     def json_helper(self):
         return self.__json_helper
 
-    def traiter_message(self, ch, method, properties, body):
+    def traiter_message(self, ch, method, properties: BasicProperties, body):
         """
         S'occupe de la reception d'un message en amont a transferer vers la millegrille designee.
         """
         routing_key = method.routing_key
+        commande = properties.headers.get(CommandesSurRelai.HEADER_COMMANDE)
         exchange = method.exchange
         dict_message = json.loads(body)
 
@@ -1019,7 +1002,7 @@ class TraitementMessageTiersVersLocal:
 
         if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
             # Verifier si le message a deja ete transfere
-            if properties.headers is None or properties.headers.get('inter') != 'true':
+            if properties.headers is None or properties.headers.get(CommandesSurRelai.HEADER_TRANSFERT_INTER_COMPLETE) != 'true':
                 self.__logger.debug("Message en amont sur exchange prive distant, on le passe a la millegrille locale")
                 self.__connexion.transmettre_message_vers_local(
                     dict_message, routing_key, reply_to=properties.reply_to, correlation_id=properties.correlation_id)
