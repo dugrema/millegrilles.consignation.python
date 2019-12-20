@@ -128,7 +128,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
                     try:
                         relai.entretenir()
                     except Exception:
-                        self.__logger.exception("Erreur entretien relai " % relai.idmg)
+                        self.__logger.exception("Erreur entretien relai %s" % relai.idmg)
 
                 self._stop_event.wait(15)
 
@@ -195,6 +195,19 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
                 self.connecter_relai(fiche)
             except Exception:
                 self.__logger.exception("Erreur demarrage thread pour connecter un relai a %s" % fiche.get('idmg'))
+
+            # Creer une route pour la MilleGrille du relai
+            self.creer_route(fiche)
+
+    def creer_route(self, fiche):
+        idmg = fiche[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        route = self.__route_tiers.get(idmg)
+        if route is None:
+            self.__logger.info("Preparer route vers %s" % idmg)
+            route = RouteMilleGrilleTiers(self, fiche)
+            self.__route_tiers[idmg] = route
+
+        route.entretenir()
 
     def exit_gracefully(self, signum=None, frame=None):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
@@ -433,6 +446,20 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             # On demarre une connexion via le relai immediatement
             # self.connecter_relai(fiche_privee)
 
+    def annonce_pour_route(self, annonce: dict, relai):
+        """
+        Annonce recue sur un relai pour une route.
+        :param annonce:
+        :param relai:
+        :return:
+        """
+        idmg = annonce['idmg']
+        route = self.__route_tiers.get(idmg)
+        if route is not None:
+            route.traiter_annonce(annonce, relai)
+        else:
+            self.__logger.debug("On ignore annonce de MilleGrille %s, aucune route configuree" % idmg)
+
 
 class TraitementMessageQueueLocale(TraitementMessageCallback):
 
@@ -657,10 +684,18 @@ class ConnexionRelaiMilleGrilles:
         """
         Effectuer entretien avec le relai
         """
-        self.__logger.debug("Entretient relai %s" % self.idmg)
+        self.__logger.debug("Entretien relai %s" % self.idmg)
         self.__connexion_mq_aval_distante.executer_maintenance()
         self.__connexion_mq_amont_distante.executer_maintenance()
         self.emettre_presence()  # Utilise un intervalle de transmission interne
+
+    def annonce_pour_route(self, annonce: dict):
+        """
+        Passe une annonce au connecteur pour identifier la route destinataire
+        :param annonce:
+        :return:
+        """
+        self.connecteur.annonce_pour_route(annonce, self)
 
     def arreter(self):
         self.__stop_event.set()
@@ -864,31 +899,60 @@ class RouteMilleGrilleTiers:
         self.__traitement_local_vers_tiers = TraitementMessageLocalVersTiers(
             self, connecteur.contexte.message_dao, connecteur.contexte.configuration)
 
-        self.__traitement_tiers_vers_local = None
-
         self.__etat_route = RouteMilleGrilleTiers.ROUTE_DECONNECTEE
+
+        # Relai sur laquele la route est etablie
+        self.__relai = None
 
         # Ouvrir un nouveau canal en amont local
         # Necessaire en partie parce que la verification de Q exclusive ferme le canal si la
         # Q existe deja (e.g. ouverte par MG tierce)
         self.__nom_q_locale = 'inter.' + self.__idmg  # IDMG distant sur MQ local
-        self.__channel_amont_local = None
-        self.__ctag_amont_local = None
+        self.__channel = None
+        self.__ctag = None
 
-    def entretien(self):
+    def entretenir(self):
         """
         Invoque regulierement par une thread pour executer l'entretien (connecter, reconnecter, etc.)
         :return:
         """
-        self.__logger.warning("Executer entretien route idmg: %s" % self.__idmg)
+        self.__logger.debug("Executer entretien route idmg: %s" % self.__idmg)
 
-    def ping_millegrille_sur_relai(self, relai: ConnexionRelaiMilleGrilles):
+    def connecter_millegrille_sur_relai(self, relai: ConnexionRelaiMilleGrilles):
         """
         Transmettre un ping pour une MilleGrille sur un relai.
         Si on recoit un pong affirmatif (requete de connexion acceptee), cette route devient etablie.
         :param relai:
         :return:
         """
+        self.__logger.info("Route pour %s connectee sur relai %s" % (self.__idmg, relai.idmg))
+        self.__relai = relai
+        self.__channel = self.connecteur.channel  # Channel connexion en amont
+
+        # Creer une Q pour la millegrille distante sur local
+        self.__channel.queue_declare(
+            queue=self.__nom_q_locale,
+            durable=False,
+            exclusive=True,
+            callback=self.creer_bindings_local,
+        )
+
+    def creer_bindings_local(self, queue):
+        channel = self.connecteur.channel
+
+        callback_message = self.traitement_local_vers_tiers.callbackAvecAck
+
+        self.__ctag = channel.basic_consume(
+            callback_message,
+            queue=self.__nom_q_locale,
+            no_ack=False
+        )
+
+    def traiter_annonce(self, annonce: dict, relai: ConnexionRelaiMilleGrilles):
+
+        if annonce['type'] in [CommandesSurRelai.ANNONCE_PRESENCE, CommandesSurRelai.ANNONCE_CONNEXION]:
+            if self.__etat_route == RouteMilleGrilleTiers.ROUTE_DECONNECTEE:
+                self.connecter_millegrille_sur_relai(relai)
 
     def transmettre_message_prive_vers_distant(self, dict_message, routing_key=None, reply_q=None, correlation_id=None):
         properties = pika.BasicProperties(delivery_mode=1)
@@ -957,6 +1021,10 @@ class RouteMilleGrilleTiers:
 
         # Utiliser pubdog pour la connexion publishing par defaut
         self.__connexion_mq_aval_distante.publish_watch()
+
+    @property
+    def traitement_local_vers_tiers(self):
+        return self.__traitement_local_vers_tiers
 
 
 class TraitementMessageLocalVersTiers(TraitementMessageCallback):
@@ -1067,12 +1135,20 @@ class TraitementMessageTiersVersLocal:
 
             if routing_key.startswith('annonce.'):
                 # Verifier si c'est une annonce ou une commande (gerer directement avec le connecteur)
+                annonce = {
+                    'idmg': dict_message['idmg'],
+                    'type': routing_key,
+                    'contenu': dict_message,
+                }
                 if routing_key == CommandesSurRelai.ANNONCE_CONNEXION:
                     self.__logger.debug("Connexion de %s" % dict_message.get('idmg'))
+                    self.__connexion.annonce_pour_route(annonce)
                 elif routing_key == CommandesSurRelai.ANNONCE_DECONNEXION:
                     self.__logger.debug("Deconnexion de %s" % dict_message.get('idmg'))
+                    self.__connexion.annonce_pour_route(annonce)
                 elif routing_key == CommandesSurRelai.ANNONCE_PRESENCE:
                     self.__logger.debug("Annonce presence de %s" % dict_message.get('idmg'))
+                    self.__connexion.annonce_pour_route(annonce)
                 elif routing_key == CommandesSurRelai.ANNONCE_RECHERCHE_CERTIFICAT:
                     self.__logger.debug("Recherche certificat %s" % dict_message.get('fingerprint'))
                 else:
