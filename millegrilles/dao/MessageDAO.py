@@ -10,6 +10,7 @@ from threading import Lock, RLock, Event, Thread, Barrier
 
 from millegrilles import Constantes
 from millegrilles.util.JSONEncoders import MongoJSONEncoder
+from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from pika.credentials import PlainCredentials, ExternalCredentials
 from pika.exceptions import AMQPConnectionError
 
@@ -653,7 +654,7 @@ class PikaDAO:
 
         self._in_error = False
 
-    def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=json.JSONEncoder):
+    def transmettre_reponse(self, message_dict, replying_to, correlation_id, delivery_mode_v=1, encoding=DateFormatEncoder):
 
         if self.__connexionmq_publisher is None or self.__connexionmq_publisher.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
@@ -1036,6 +1037,10 @@ class JSONHelper:
         self.reader = codecs.getreader("utf-8")
 
     def dict_vers_json(self, enveloppe_dict: dict, encoding=json.JSONEncoder) -> str:
+        if enveloppe_dict.get('_id') is not None:
+            # On converti le MongoDB _id
+            enveloppe_dict = enveloppe_dict.copy()
+            enveloppe_dict['_id'] = str(enveloppe_dict['_id'])
         message_utf8 = json.dumps(enveloppe_dict, sort_keys=True, ensure_ascii=False, cls=encoding)
         return message_utf8
 

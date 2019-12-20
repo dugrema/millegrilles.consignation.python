@@ -100,7 +100,12 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             self.contexte.message_dao.enter_error_state()
         else:
             self.__logger.info("Q et routes prets")
+
+            # Verifier si des certificats sont arrives
             self.verifier_correlation_csr()
+
+            # Mettre la jour les fiches des certificats
+            self.demander_fiches()
 
     def executer(self):
 
@@ -131,6 +136,31 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             self.contexte.generateur_transactions.transmettre_requete(
                 requete, ConstantesSecurityPki.REQUETE_CORRELATION_CSR, ConstantesSecurityPki.LIBELLE_CORRELATION_CSR,
                 self.__q_locale)
+
+    def demander_fiches(self):
+        """
+        Demander une version mise a jour des fiches pour les MilleGrilles avec un certificat valide.
+        """
+        fichiers_certificats = [f for f in os.listdir(ConstantesInterMilleGrilles.REPERTOIRE_CERTS) if f.endswith('.cert.pem')]
+
+        millegrilles = [m.split('.')[0] for m in fichiers_certificats]
+        requete = {'requetes': [{
+            'filtre': {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: {'$in': millegrilles}
+            },
+            'projection': {
+                'fiche_privee.idmg': 1,
+                'fiche_privee.descriptif': 1,
+                'fiche_privee.usager': 1,
+                'fiche_privee.prive_mq': 1,
+                'fiche_privee.relais': 1,
+            }
+        }]}
+
+        self.contexte.generateur_transactions.transmettre_requete(
+            requete, ConstantesAnnuaire.DOMAINE_NOM, ConstantesAnnuaire.LIBVAL_FICHE_TIERS,
+            self.__q_locale)
 
     def exit_gracefully(self, signum=None, frame=None):
         self.__logger.warning("Arret de ConnecteurInterMilleGrilles")
@@ -349,6 +379,22 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             else:
                 self.__logger.warning("On a un certificat avec correlation %s mais il ne correspond pas a la cle" % correlation)
 
+    def conserver_fiches(self, dict_message: dict):
+        """
+        Conserve les fiches recues en reponse.
+        """
+        millegrilles = dict_message['resultats'][0]
+        for millegrille in millegrilles:
+            fiche_privee = millegrille.get(ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE)
+            idmg = fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+            with open(os.path.join(ConstantesInterMilleGrilles.REPERTOIRE_FICHES, idmg + '.json'), 'w') as writer:
+                json.dump(fiche_privee, writer)
+
+            # On demarre une connexion via le relai immediatement
+            # self.connecter_relai(fiche_privee)
+
+
 class TraitementMessageQueueLocale(TraitementMessageCallback):
 
     def __init__(self, connecteur: ConnecteurInterMilleGrilles, message_dao, configuration):
@@ -377,6 +423,8 @@ class TraitementMessageQueueLocale(TraitementMessageCallback):
             correlation_id = properties.correlation_id
             if correlation_id == ConstantesSecurityPki.LIBELLE_CORRELATION_CSR:
                 self.__connecteur.associer_certificats(dict_message)
+            elif correlation_id == ConstantesAnnuaire.LIBVAL_FICHE_TIERS:
+                self.__connecteur.conserver_fiches(dict_message)
             else:
                 self.__logger.debug("Recu reponse sur Q locale, correlation %s:\n%s" % (correlation_id, str(body.decode('utf-8'))))
 

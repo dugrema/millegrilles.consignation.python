@@ -9,7 +9,10 @@ class DateFormatEncoder(json.JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
-            return obj.timestamp()
+            return int(obj.timestamp())
 
         # Let the base class default method raise the TypeError
-        return json.JSONEncoder.default(self, obj)
+        try:
+            return json.JSONEncoder.default(self, obj)
+        except TypeError:
+            return str(obj)

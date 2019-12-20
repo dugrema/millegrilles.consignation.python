@@ -621,15 +621,17 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
         # Pas de verification du contenu - le certificat est sa propre validation via CAs
         # self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
-        if method.routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_EMIS):
+        routing_key = method.routing_key
+
+        if routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_EMIS):
             self.recevoir_certificat(message_dict)
-        elif method.routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
+        elif routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
             self.transmettre_certificat(properties, message_dict)
-        elif method.routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
+        elif routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
             self.transmettre_liste_ca(properties, message_dict)
-        elif method.routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
+        elif routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
             self.confirmer_certificat(properties, message_dict)
-        elif method.routing_key.startswith('requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR):
+        elif routing_key == 'requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR:
             self.transmettre_certificats_correlation_csr(properties, message_dict)
 
         else:
