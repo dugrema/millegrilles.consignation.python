@@ -266,6 +266,7 @@ class CommandesSurRelai:
     HEADER_IDMG_ORIGINE = 'idmg_origine'
 
     # Une annonce est placee sur l'echange prive avec le routing key definit ci-bas
+    BINDING_ANNONCES = 'annonce.#'
     ANNONCE_CONNEXION = 'annonce.connexion'  # Evenement de connexion sur echange prive
     ANNONCE_DECONNEXION = 'annonce.deconnexion'  # Evenement de deconnexion sur echange prive
     ANNONCE_RECHERCHE_CERTIFICAT = 'annonce.requete.certificat'  # Requete d'un certificat par fingerprint
@@ -274,6 +275,7 @@ class CommandesSurRelai:
     # Le type de commande est place dans le header 'connecteur_commande' du message
 
     # -- Commandes sans inscription --
+    BINDING_COMMANDES = 'commande.#'
     COMMANDE_DEMANDE_INSCRIPTION = 'commande.inscription'  # Transmet une demande d'inscription a une MilleGrille tierce
 
     # Transmet une demande de confirmation de presence a un connecteur de MilleGrille tierce qui repond par pong

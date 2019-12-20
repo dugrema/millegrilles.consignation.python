@@ -779,6 +779,20 @@ class ConnexionRelaiMilleGrilles:
             callback=None
         )
 
+        self.__channel_amont_distant.queue_bind(
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+            queue=self.__nom_q_distante,
+            routing_key=CommandesSurRelai.BINDING_ANNONCES,
+            callback=None
+        )
+
+        self.__channel_amont_distant.queue_bind(
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+            queue=self.__nom_q_distante,
+            routing_key=CommandesSurRelai.BINDING_COMMANDES,
+            callback=None
+        )
+
         self.__ctag_amont_distant = self.__channel_amont_distant.basic_consume(
             self.__traitement_tiers_vers_local.callbackAvecAck,
             queue=self.__nom_q_distante,
@@ -1028,7 +1042,10 @@ class TraitementMessageTiersVersLocal:
         S'occupe de la reception d'un message en amont a transferer vers la millegrille designee.
         """
         routing_key = method.routing_key
-        commande = properties.headers.get(CommandesSurRelai.HEADER_COMMANDE)
+        if properties.headers is not None:
+            commande = properties.headers.get(CommandesSurRelai.HEADER_COMMANDE)
+        else:
+            commande = None
         exchange = method.exchange
         dict_message = json.loads(body)
 
@@ -1040,11 +1057,11 @@ class TraitementMessageTiersVersLocal:
             if routing_key.startswith('annonce.'):
                 # Verifier si c'est une annonce ou une commande (gerer directement avec le connecteur)
                 if routing_key == CommandesSurRelai.ANNONCE_CONNEXION:
-                    self.__logger.debug("Connexion de " % dict_message.get('idmg'))
+                    self.__logger.debug("Connexion de %s" % dict_message.get('idmg'))
                 elif routing_key == CommandesSurRelai.ANNONCE_DECONNEXION:
-                    self.__logger.debug("Deconnexion de " % dict_message.get('idmg'))
+                    self.__logger.debug("Deconnexion de %s" % dict_message.get('idmg'))
                 elif routing_key == CommandesSurRelai.ANNONCE_PRESENCE:
-                    self.__logger.debug("Annonce presence de " % dict_message.get('idmg'))
+                    self.__logger.debug("Annonce presence de %s" % dict_message.get('idmg'))
                 elif routing_key == CommandesSurRelai.ANNONCE_RECHERCHE_CERTIFICAT:
                     self.__logger.debug("Recherche certificat %s" % dict_message.get('fingerprint'))
                 else:
