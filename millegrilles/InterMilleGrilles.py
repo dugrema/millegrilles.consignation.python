@@ -125,7 +125,10 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             while not self._stop_event.is_set():
 
                 for relai in self.__relais.values():
-                    relai.entretenir()
+                    try:
+                        relai.entretenir()
+                    except Exception:
+                        self.__logger.exception("Erreur entretien relai " % relai.idmg)
 
                 self._stop_event.wait(15)
 
@@ -318,6 +321,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
             configuration_relai = ConfigurationRelai(fiche_millegrille, self.interca_dir)
             relai = ConnexionRelaiMilleGrilles(self, configuration_relai)
             relai.connecter_mq_distant()
+            self.__relais[idmg] = relai
 
         return relai
 
@@ -603,7 +607,7 @@ class ConnexionRelaiMilleGrilles:
         self.__derniere_activite = datetime.datetime.utcnow()
 
         self.__intervalle_emission_presence = datetime.timedelta(seconds=90)
-        self.__dernier_emission_presence = datetime.datetime.utcnow()
+        self.__derniere_emission_presence = None
 
         self.__connexion_event = Event()
         self.__stop_event = Event()
@@ -641,14 +645,22 @@ class ConnexionRelaiMilleGrilles:
             'idmg': self.connecteur.contexte.idmg,
             'message': 'allo! avec un beigne',
         }
-        self.__transmetteur_message_vers_distant.emettre_message_prive(message, CommandesSurRelai.ANNONCE_CONNEXION)
+        maintenant = datetime.datetime.utcnow()
+        if self.__derniere_emission_presence is None:
+            self.__transmetteur_message_vers_distant.emettre_message_prive(message, CommandesSurRelai.ANNONCE_CONNEXION)
+            self.__derniere_emission_presence = maintenant
+        elif self.__derniere_emission_presence < maintenant - self.__intervalle_emission_presence:
+            self.__transmetteur_message_vers_distant.emettre_message_prive(message, CommandesSurRelai.ANNONCE_PRESENCE)
+            self.__derniere_emission_presence = maintenant
 
     def entretenir(self):
         """
         Effectuer entretien avec le relai
         """
+        self.__logger.debug("Entretient relai %s" % self.idmg)
         self.__connexion_mq_aval_distante.executer_maintenance()
         self.__connexion_mq_amont_distante.executer_maintenance()
+        self.emettre_presence()  # Utilise un intervalle de transmission interne
 
     def arreter(self):
         self.__stop_event.set()
@@ -1049,10 +1061,9 @@ class TraitementMessageTiersVersLocal:
         exchange = method.exchange
         dict_message = json.loads(body)
 
-        self.__logger.debug("%s: Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (
-            self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
-
         if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
+            self.__logger.debug("%s: Annonce inter-millegrilles recue sur echange %s: %s, contenu %s" % (
+                self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
 
             if routing_key.startswith('annonce.'):
                 # Verifier si c'est une annonce ou une commande (gerer directement avec le connecteur)
@@ -1077,6 +1088,9 @@ class TraitementMessageTiersVersLocal:
                 self.__logger.debug("Message inter deja transmis, on l'ignore (pour eviter boucles")
 
         elif exchange == '':  # Echange direct
+
+            self.__logger.debug("%s: Commande inter-millegrilles recue sur echange %s: %s, contenu %s" % (
+                self.__connexion.idmg, exchange, routing_key, body.decode('utf-8')))
 
             if commande == CommandesSurRelai.COMMANDE_MESSAGE_RELAI:
                 self.__logger.debug("Message provenant exchange distant a relayer localement:\n%s" % str(dict_message))
