@@ -640,8 +640,11 @@ class ConnexionRelaiMilleGrilles:
     #     self.__logger.info("Fin execution thread connexion a " + self.__idmg)
 
     def emettre_presence(self):
-        channel_aval_distant = self.__connexion_mq_aval_distante.channel
-        self.connecteur.contexte.generateur_transactions.eme
+        message = {
+            'idmg': self.idmg,
+            'message': 'allo! avec un beigne',
+        }
+        self.__transmetteur_message_vers_distant.emettre_message_prive(message, CommandesSurRelai.ANNONCE_CONNEXION)
 
     def entretenir(self):
         """
@@ -699,6 +702,12 @@ class ConnexionRelaiMilleGrilles:
         listener_distant.on_channel_close = self.on_channel_amont_distant_close
         self.__connexion_mq_amont_distante.register_channel_listener(listener_distant)
 
+        # Creer channel pour transmettre messages vers relais (aval)
+        listener_channel_publish = ListenerDistant()
+        listener_channel_publish.on_channel_open = self.on_channel_aval_distant_open
+        listener_channel_publish.on_channel_close = self.on_channel_aval_distant_close
+        self.__connexion_mq_aval_distante.register_channel_listener(listener_channel_publish)
+
         self.__connexion_event.wait(10)  # Attendre que la Q en amont distante soit prete
         if not self.__connexion_event.is_set():
             raise Exception('Erreur connexion relai %s, q en amont distante pas prete' % self.__idmg)
@@ -726,6 +735,16 @@ class ConnexionRelaiMilleGrilles:
     def transmettre_message_vers_local(self, dict_message, routing_key, reply_to=None, correlation_id=None):
         self.__connecteur.contexte.message_dao.recevoir_message_intermillegrilles(
             dict_message, routing_key, idmg_origine=self.__idmg, reply_to=reply_to, correlation_id=correlation_id)
+
+    def on_channel_aval_distant_open(self, channel):
+        self.__logger.info("Ouverture channel aval distant avec relai %s" % self.idmg)
+        self.__transmetteur_message_vers_distant = TransmetteurMessageMilleGrilles(
+            self.connecteur.contexte, channel, self.__connexion_mq_aval_distante)
+
+    def on_channel_aval_distant_close(self, channel=None, code=None, reason=None):
+        if not self.__stop_event.is_set():
+            self.__logger.info("Fermeture channel aval distant relai %s" % self.idmg)
+        self.__transmetteur_message_vers_distant = None
 
     def transmettre_message_exchdefault_vers_local(self, dict_message, method, properties):
         """
