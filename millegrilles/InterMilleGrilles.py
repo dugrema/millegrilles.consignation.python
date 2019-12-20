@@ -7,6 +7,7 @@ from millegrilles.dao.MessageDAO import TraitementMessageCallback, ConnexionWrap
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenerateurCertificat
 from millegrilles.Constantes import ConstantesSecurityPki, CommandesSurRelai
+from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 
 from threading import Event, Thread, Lock, Barrier
 from pika import BasicProperties
@@ -68,6 +69,7 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         self.__callback_q_locale = None
         self.__ctag_local = None
         self.__q_locale = None
+        self.__transmetteur_message_vers_local = None       # Transmetteur de message, lie a la connexion local
 
         # Repertoire temporaire pour conserver les fichiers de certificats
         self.interca_dir = tempfile.mkdtemp(prefix='interca_')
@@ -92,6 +94,11 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         os.makedirs(ConstantesInterMilleGrilles.REPERTOIRE_FICHES, mode=0o755, exist_ok=True)
         os.makedirs(ConstantesInterMilleGrilles.REPERTOIRE_CERTS, mode=0o755, exist_ok=True)
         os.makedirs(ConstantesInterMilleGrilles.REPERTOIRE_SECRETS, mode=0o700, exist_ok=True)
+
+        listener_channel_publish = ListenerDistant()
+        listener_channel_publish.on_channel_open = self.on_channel_aval_open
+        listener_channel_publish.on_channel_close = self.on_channel_aval_close
+        self.contexte.message_dao.connexion_publisher.register_channel_listener(listener_channel_publish)
 
         self.__attendre_q_prete.wait(10)
 
@@ -201,10 +208,23 @@ class ConnecteurInterMilleGrilles(ModeleConfiguration):
         channel.add_on_return_callback(self._on_return)
         self.creer_q_commandes_locales()
 
+        self.__transmetteur_message_vers_local = TransmetteurMessageMilleGrilles(
+            self.contexte, self.contexte.message_dao.channel_publisher, self.contexte.message_dao.connexion_publisher)
+
     def on_channel_close(self, channel=None, code=None, reason=None):
         self._logger.warning("MQ Channel local ferme - enlever toutes les connexions")
         self.enlever_toutes_connexions()
         super().on_channel_close(channel, code, reason)
+
+    def on_channel_aval_open(self, channel):
+        self.__logger.info("Ouverture channel local en aval %s" % str(channel))
+        self.__transmetteur_message_vers_local = TransmetteurMessageMilleGrilles(
+            self.contexte, channel, self.contexte.message_dao.connexion_publisher)
+
+    def on_channel_aval_close(self):
+        if not self._stop_event.is_set():
+            self.__logger.error("Fermeture channel en aval local")
+        self.__transmetteur_message_vers_local = None
 
     def _on_return(self, channel, method, properties, body):
         self.__logger.warning("Return value: %s\n%s" % (str(method), str(body)))
@@ -578,6 +598,8 @@ class ConnexionRelaiMilleGrilles:
         self.__connexion_mq_aval_distante = None
         self.__ctag_amont_distant = None
         self.__traitement_tiers_vers_local = None
+
+        self.__transmetteur_message_vers_distant = None     # Transmetteur de message, lie a la connexion distante
 
         # Temps d'inactivite apres lequel on ferme la connexion
         self.__temps_inactivite_secs = datetime.timedelta(seconds=300)

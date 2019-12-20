@@ -339,7 +339,7 @@ class TransactionConfiguration:
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """
 
-    def __init__(self, configuration=None, message_dao=None, additionals: list = None):
+    def __init__(self, configuration: TransactionConfiguration = None, message_dao=None, additionals: list = None):
         """
         Init classe. Fournir les ressources deja initialisee ou utiliser methode initialiser().
 

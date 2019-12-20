@@ -11,7 +11,7 @@ from threading import Lock, RLock, Event, Thread, Barrier
 from millegrilles import Constantes
 from millegrilles.Constantes import CommandesSurRelai
 from millegrilles.util.JSONEncoders import MongoJSONEncoder
-from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
+from millegrilles.util.JSONMessageEncoders import DateFormatEncoder, JSONHelper
 from pika.credentials import PlainCredentials, ExternalCredentials
 from pika.exceptions import AMQPConnectionError
 
@@ -48,6 +48,7 @@ class ConnexionWrapper:
 
         self.__lock_init = None
 
+        self.__lock_publish = Lock()
         self.__last_publish = None
 
     def preparer_connexion(self):
@@ -322,6 +323,22 @@ class ConnexionWrapper:
     @property
     def channel(self):
         return self.__channel
+
+    @property
+    def publish_lock(self) -> Lock:
+        """
+        Retourne un lock sur la publication
+        :return:
+        """
+        return self.__lock_publish
+
+    @property
+    def publish_event(self) -> Event:
+        """
+        Retourne l'evenement utilise pour attendre une confirmation de publication d'un message
+        :return:
+        """
+        return self.__publish_confirm_event
 
     @property
     def is_closed(self):
@@ -1025,32 +1042,16 @@ class PikaDAO:
         return self.__connexionmq_publisher.channel
 
     @property
+    def connexion_publisher(self):
+        return self.__connexionmq_publisher
+
+    @property
     def queue_reponse(self):
         return self._queue_reponse
 
     @property
     def in_error(self):
         return self._in_error
-
-
-# Classe avec utilitaires pour JSON
-class JSONHelper:
-
-    def __init__(self):
-        self.reader = codecs.getreader("utf-8")
-
-    def dict_vers_json(self, enveloppe_dict: dict, encoding=json.JSONEncoder) -> str:
-        if enveloppe_dict.get('_id') is not None:
-            # On converti le MongoDB _id
-            enveloppe_dict = enveloppe_dict.copy()
-            enveloppe_dict['_id'] = str(enveloppe_dict['_id'])
-        message_utf8 = json.dumps(enveloppe_dict, sort_keys=True, ensure_ascii=False, cls=encoding)
-        return message_utf8
-
-    def bin_utf8_json_vers_dict(self, json_utf8):
-        message_json = json_utf8.decode("utf-8")
-        dict = json.loads(message_json)
-        return dict
 
 
 class TraitementMessageCallback:
