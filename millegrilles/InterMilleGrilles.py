@@ -948,6 +948,8 @@ class RouteMilleGrilleTiers:
             no_ack=False
         )
 
+        self.__etat_route = RouteMilleGrilleTiers.ROUTE_CONNECTEE
+
     def traiter_annonce(self, annonce: dict, relai: ConnexionRelaiMilleGrilles):
 
         if annonce['type'] in [CommandesSurRelai.ANNONCE_PRESENCE, CommandesSurRelai.ANNONCE_CONNEXION]:
