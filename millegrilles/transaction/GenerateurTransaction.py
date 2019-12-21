@@ -12,6 +12,8 @@ from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGri
 class GenerateurTransaction:
     """
     Generateur de transactions, requetes et reponses vers RabbitMQ.
+
+    DEPRECATED - Deplacer comportement vers millegrilles.transaction.TransmetteurMessages.
     """
 
     def __init__(self, contexte, encodeur_json=DateFormatEncoder):
