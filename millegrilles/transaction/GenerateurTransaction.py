@@ -23,7 +23,8 @@ class GenerateurTransaction:
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                            idmg_destination: str = None):
 
-        return self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination)
+        message, uuid_transaction = self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination)
+        return message
 
         # # Identifier usager du systeme, nom de domaine
         # signateur_transactions = self._contexte.signateur_transactions

@@ -869,6 +869,10 @@ class ConnexionRelaiMilleGrilles:
     def connecteur(self):
         return self.__connecteur
 
+    @property
+    def transmetteur_message_vers_distant(self):
+        return self.__transmetteur_message_vers_distant
+
 
 class ListenerDistant:
     """
@@ -956,33 +960,21 @@ class RouteMilleGrilleTiers:
             if self.__etat_route == RouteMilleGrilleTiers.ROUTE_DECONNECTEE:
                 self.connecter_millegrille_sur_relai(relai)
 
-    def transmettre_message_prive_vers_distant(self, dict_message, routing_key=None, reply_q=None, correlation_id=None):
-        properties = pika.BasicProperties(delivery_mode=1)
+    def relayer_message(self, message: dict, method, properties, correlation):
 
-        properties.reply_to = 'inter.' + self.connecteur.contexte.idmg  # Q de reponse inter pour local
+        reply_to = properties.reply_to
+        correlation_id = properties.correlation_id
 
-        if reply_q is not None:
+        if reply_to is not None:
             self.__logger.debug("On modifie le message de requete pour permettre une reponse inter-millegrilles")
-            properties.correlation_id = reply_q + '/' + correlation_id
+            correlation_id_ajuste = reply_to + '/' + correlation_id
         else:
-            properties.correlation_id = correlation_id
+            correlation_id_ajuste = correlation_id
 
-        properties.headers = {
-            'inter': 'true',
-            'origine': self.connecteur.contexte.idmg,
-        }
+        reply_to_ajuste = 'inter.' + self.connecteur.contexte.idmg  # Q de reponse inter pour local
 
-        message_utf8 = self.connecteur.json_helper.dict_vers_json(dict_message, encoding=json.JSONEncoder)
-        channel_publisher = self.__connexion_mq_aval_distante.channel
-        channel_publisher.basic_publish(
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,  # Exchange prive pour message inter
-            routing_key=routing_key,
-            body=message_utf8,
-            properties=properties,
-            mandatory=True)
-
-        # Utiliser pubdog pour la connexion publishing par defaut
-        self.__connexion_mq_aval_distante.publish_watch()
+        self.__relai.transmetteur_message_vers_distant.relayer_direct(
+            message, 'inter.' + self.__idmg, reply_to=reply_to_ajuste, correlation_id=correlation_id_ajuste)
 
     def transmettre_message_exchdefault_vers_distant(self, dict_message, reply_q=None, correlation_id=None):
         properties = pika.BasicProperties(delivery_mode=1)
@@ -1028,6 +1020,10 @@ class RouteMilleGrilleTiers:
     def traitement_local_vers_tiers(self):
         return self.__traitement_local_vers_tiers
 
+    @property
+    def idmg(self):
+        return self.__idmg
+
 
 class TraitementMessageLocalVersTiers(TraitementMessageCallback):
 
@@ -1050,25 +1046,13 @@ class TraitementMessageLocalVersTiers(TraitementMessageCallback):
         if exchange == Constantes.DEFAUT_MQ_EXCHANGE_PRIVE:
             if properties.headers is None or properties.headers.get('inter') != 'true':
                 self.__logger.debug("Message en amont sur exchange prive local, on le passe a la millegrille distante")
-                self.transferer_message_echange_prive(dict_message, method, properties)
             else:
                 self.__logger.debug("Message inter deja transmis, on l'ignore (pour eviter boucles")
         elif exchange == '':  # Echange direct
             self.__logger.debug("Message sur exchange direct local")
-            self.transferer_message_direct(dict_message, method, properties)
+            self.__route.relayer_message(dict_message, method, properties, body)
         else:
             raise Exception("Message non traitable")
-
-    def transferer_message_direct(self, dict_message, method, properties):
-        self.__connexion.transmettre_message_exchdefault_vers_distant(dict_message, properties.reply_to,
-                                                                      properties.correlation_id)
-
-    def transferer_message_echange_prive(self, dict_message, method, properties):
-        self.__logger.debug("Message echange prive local. Method: %s, properties: %s" % (str(method), str(properties)))
-        if properties.headers is None or properties.headers.get('inter') != 'true':
-            self.__connexion.transmettre_message_prive_vers_distant(dict_message, method.routing_key, properties.reply_to, properties.correlation_id)
-        else:
-            self.__logger.debug("Message inter deja transmis, on l'ignore (pour eviter boucles")
 
 
 class TraitementMessageTiersVersLocal:

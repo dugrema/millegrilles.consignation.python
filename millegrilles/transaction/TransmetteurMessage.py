@@ -97,15 +97,13 @@ class TransmetteurMessageMilleGrilles:
     def emettre_message_prive(self, message: dict, routing_key: str,
                               version: int = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
 
-        message_signe = self.__formatteur_message.signer_message(message, routing_key, version=version)
-
-        uuid_transaction = message_signe[
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-
+        message_signe, uuid_transaction = self.__formatteur_message.signer_message(
+            message, routing_key, version=version)
         self._publish_prive(message_signe, routing_key)
-
         return uuid_transaction, message_signe
+
+    def relayer_direct(self, message: dict, queue_name: str, reply_to=None, correlation_id=None):
+        self._publish_direct(message, queue_name, reply_to=reply_to, correlation_id=correlation_id)
 
     def _publish_direct(self, message, queue_name,
                 delivery_mode_v=1, encoding=DateFormatEncoder, reply_to=None, correlation_id=None):

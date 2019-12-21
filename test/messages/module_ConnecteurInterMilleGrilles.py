@@ -69,7 +69,7 @@ class MessagesSample(BaseCallback):
         }
 
         domaine = 'donne.moi.des.fichiers'
-        enveloppe_val = self.generateur.transmettre_requete(requete, domaine, idmg=idmg, correlation_id='moimoi')
+        enveloppe_val = self.generateur.transmettre_requete(requete, domaine, idmg_destination=idmg, correlation_id='moimoi')
 
         print("Envoi maj fiche privee: %s" % enveloppe_val)
         return enveloppe_val

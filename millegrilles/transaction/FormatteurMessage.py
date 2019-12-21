@@ -26,7 +26,7 @@ class FormatteurMessageMilleGrilles:
                        message: dict,
                        domaine: str = None,
                        version: int = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                       idmg_destination: str = None) -> dict:
+                       idmg_destination: str = None) -> (dict, str):
         """
         Formatte un message en ajoutant l'entete et en le signant.
 
@@ -57,7 +57,7 @@ class FormatteurMessageMilleGrilles:
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_contenu(enveloppe)
         message_signe = self.__signateur_transactions.signer(enveloppe)
 
-        return message_signe
+        return message_signe, uuid_transaction
 
     def contresigner_message(self, message: dict):
         """
