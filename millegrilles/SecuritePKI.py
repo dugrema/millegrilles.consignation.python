@@ -12,7 +12,6 @@ import secrets
 import base58
 import shutil
 
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -23,7 +22,7 @@ from cryptography.x509.name import NameOID
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, JSONHelper
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
+from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 
 
 class EnveloppeCertificat:
@@ -280,7 +279,7 @@ class UtilCertificats:
             ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
             sort_keys=True,
             separators=(',', ':'),
-            cls=MongoJSONEncoder
+            cls=DateFormatEncoder
         )
         message_bytes = bytes(message_json, 'utf-8')
 
@@ -848,7 +847,7 @@ class EncryptionHelper:
         encryptor = cipher.encryptor()
 
         padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
-        dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, MongoJSONEncoder).encode('utf-8')
+        dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, DateFormatEncoder).encode('utf-8')
 
         # Inserer IV dans les premiers 16 bytes - pas vraiment le choix, c'est l'algo:
         # https://stackoverflow.com/questions/26928012/wrong-16-bytes-in-decryption-using-aes
