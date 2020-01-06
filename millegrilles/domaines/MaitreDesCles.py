@@ -2,6 +2,7 @@
 # Responsable de la gestion et de l'acces aux cles secretes pour les niveaux 3.Protege et 4.Secure.
 
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInconnu
@@ -22,81 +23,6 @@ import logging
 import datetime
 import json
 import socket
-
-
-class ConstantesMaitreDesCles:
-
-    DOMAINE_NOM = 'millegrilles.domaines.MaitreDesCles'
-    COLLECTION_NOM = DOMAINE_NOM
-
-    COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
-    QUEUE_NOM = DOMAINE_NOM
-
-    LIBVAL_CONFIGURATION = 'configuration'
-
-    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.nouvelleCle.grosFichier' % DOMAINE_NOM
-    TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.nouvelleCle.document' % DOMAINE_NOM
-    TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
-
-    TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
-    TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
-    TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
-    TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR = '%s.genererCertificatNavigateur' % DOMAINE_NOM
-    TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
-    TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
-    TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
-
-    REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
-    REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
-    REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
-
-    TRANSACTION_CHAMP_CLESECRETE = 'cle'
-    TRANSACTION_CHAMP_CLES = 'cles'
-    TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
-    TRANSACTION_CHAMP_DOMAINE = 'domaine'
-    TRANSACTION_CHAMP_DOMAINES = 'domaines'
-    TRANSACTION_CHAMP_IDDOC = 'id-doc'
-    TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS = 'identificateurs_document'
-    TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
-    TRANSACTION_CHAMP_ROLE_CERTIFICAT = 'role'
-    TRANSACTION_CHAMP_CSR = 'csr'
-    TRANSACTION_CHAMP_CSR_CORRELATION = 'csr_correlation'
-    TRANSACTION_CHAMP_TYPEDEMANDE = 'type_demande'
-    TRANSACTION_CHAMP_FULLCHAIN = 'certificat_fullchain_signataire'
-
-    TYPE_DEMANDE_INSCRIPTION = 'inscription'
-
-    TRANSACTION_VERSION_COURANTE = 5
-
-    DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
-    DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
-
-    DOCUMENT_SECURITE = 'securite'
-
-    DOCUMENT_DEFAUT = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: TRANSACTION_VERSION_COURANTE
-    }
-
-    # Document utilise pour conserver un ensemble de cles lie a un document
-    DOCUMENT_CLES_GROSFICHIERS = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
-
-        # Template a remplir
-        'fuuid': None,    # Identificateur unique de version de fichier
-        'cles': dict(),   # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
-    }
-
-    DOCUMENT_TRANSACTION_CONSERVER_CLES = {
-        TRANSACTION_CHAMP_SUJET_CLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,  # Mettre le sujet approprie
-        'cles': dict(),  # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
-    }
-
-    DOCUMENT_TRANSACTION_GROSFICHIERRESUME = {
-        'fuuid': None,  # Identificateur unique de version de fichier
-    }
 
 
 class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
