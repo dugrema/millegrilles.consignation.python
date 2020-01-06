@@ -496,13 +496,13 @@ class ConstantesMaitreDesCles:
     DOCUMENT_SECURITE = 'securite'
 
     DOCUMENT_DEFAUT = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: TRANSACTION_VERSION_COURANTE
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        TRANSACTION_MESSAGE_LIBELLE_VERSION: TRANSACTION_VERSION_COURANTE
     }
 
     # Document utilise pour conserver un ensemble de cles lie a un document
     DOCUMENT_CLES_GROSFICHIERS = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+        DOCUMENT_INFODOC_LIBELLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
 
         # Template a remplir
         'fuuid': None,    # Identificateur unique de version de fichier
