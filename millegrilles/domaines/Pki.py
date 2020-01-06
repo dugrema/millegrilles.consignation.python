@@ -1,6 +1,7 @@
 # Domaine Public Key Infrastructure (PKI)
 
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesPki
 from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet, TraitementRequetesNoeuds
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete, CertificatInconnu
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
@@ -9,67 +10,6 @@ from millegrilles.util.X509Certificate import PemHelpers
 
 import logging
 import datetime
-
-
-class ConstantesPki:
-
-    DOMAINE_NOM = 'millegrilles.domaines.Pki'
-    COLLECTION_TRANSACTIONS_NOM = 'millegrilles.domaines.Pki'
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_PROCESSUS_NOM = 'millegrilles.domaines.Pki/processus'
-    QUEUE_NOM = DOMAINE_NOM
-    QUEUE_NOM_CERTIFICATS = '%s.certificats' % QUEUE_NOM
-
-    TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat' % DOMAINE_NOM
-    TRANSACTION_WEB_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat.web' % DOMAINE_NOM
-    TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
-    TRANSACTION_CONFIRMER_CERTIFICAT = '%s.confirmerCertificat' % DOMAINE_NOM
-
-    LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
-    LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
-    LIBELLE_IDMG = 'idmg'
-    LIBELLE_FINGERPRINT_ISSUER = 'fingerprint_issuer'
-    LIBELLE_DOCID_ISSUER = '_id_issuer'
-    LIBELLE_CHAINE_COMPLETE = 'chaine_complete'
-    LIBELLE_SUBJECT = 'sujet'
-    LIBELLE_ISSUER = 'issuer'
-    LIBELLE_NOT_VALID_BEFORE = 'not_valid_before'
-    LIBELLE_NOT_VALID_AFTER = 'not_valid_after'
-    LIBELLE_SUBJECT_KEY = 'subject_key'
-    LIBELLE_AUTHORITY_KEY = 'authority_key'
-    LIBELLE_TRANSACTION_FAITE = 'transaction_faite'
-    LIBELLE_CHAINES = 'chaines'
-    LIBELLE_MGLIBELLE = 'mg-libelle'
-    LIBELLE_CLE_CRYPTEE = 'cle_cryptee'
-
-    LIBVAL_CONFIGURATION = 'configuration'
-    LIBVAL_CERTIFICAT_ROOT = 'certificat.root'
-    LIBVAL_CERTIFICAT_INTERMEDIAIRE = 'certificat.intermediaire'
-    LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
-    LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
-    LIBVAL_PKI_WEB = 'pki.web'
-
-    REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
-    REQUETE_CERTIFICAT_DEMANDE = 'pki.requete.certificat'
-    REQUETE_LISTE_CA = 'pki.requete.ca'
-    TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
-
-    # Indique que c'est un evenement avec un certificat (reference)
-    EVENEMENT_CERTIFICAT = ConstantesSecurityPki.EVENEMENT_CERTIFICAT
-    # Indique que c'est une requete pour trouver un certificat par fingerprint
-    EVENEMENT_REQUETE = ConstantesSecurityPki.EVENEMENT_REQUETE
-
-    # Document par defaut pour la configuration de l'interface principale
-    DOCUMENT_DEFAUT = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
-    }
-
-    DOCUMENT_CERTIFICAT_NOEUD = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CERTIFICAT_NOEUD,
-        LIBELLE_CERTIFICAT_PEM: '',
-        LIBELLE_FINGERPRINT: '',
-        LIBELLE_CHAINE_COMPLETE: False
-    }
 
 
 class GestionnairePki(GestionnaireDomaineStandard):
