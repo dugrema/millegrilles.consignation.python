@@ -102,6 +102,19 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         if resultat.matched_count < 1:
             raise ErreurMAJProcessus("Erreur MAJ processus %s, document inexistant" % self.__class__.__name__)
 
+    def maj_profil_millegrille(self, fiche):
+        operation = {
+            '$set': fiche
+        }
+        documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        resultat = documents.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE},
+            operation
+        )
+
+        if resultat.matched_count < 1:
+            raise ErreurMAJProcessus("Erreur MAJ processus %s, document inexistant" % self.__class__.__name__)
+
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
 
@@ -310,13 +323,31 @@ class ProcessusAjouterToken(ProcessusPrincipale):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusMajProfilUsager(ProcessusPrincipale):
+class ProcessusMajFiches(ProcessusPrincipale):
+
+    def _generer_transactions_fiches(self, transaction_fiche):
+        """
+        Genere 2 transactions pour Annaire - fiche privee et fiche publique
+        :param transaction_fiche:
+        :return:
+        """
+        self.generateur_transactions.soumettre_transaction(
+            transaction_fiche, Constantes.ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPRIVEE
+        )
+
+        self.generateur_transactions.soumettre_transaction(
+            transaction_fiche, Constantes.ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPUBLIQUE
+        )
+
+
+class ProcessusMajProfilUsager(ProcessusMajFiches):
 
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
 
         # Recuperer toutes les valeurs de la transaction et inserer dans le document
         fiche = ConstantesPrincipale.DOCUMENT_PROFIL_USAGER.copy()
+        del fiche[Constantes.DOCUMENT_INFODOC_LIBELLE]
 
         for cle, valeur in transaction.items():
             if not cle.startswith('_') and cle not in [Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]:
@@ -326,26 +357,33 @@ class ProcessusMajProfilUsager(ProcessusPrincipale):
         self.controleur.gestionnaire.maj_profil_usager(fiche)
 
         # Creer transactions pour mettre a jour les fiches privees et publiques de l'annuaire.
-        self._generer_transactions_fiches(fiche)
-
-        self.set_etape_suivante()  # Termine
-
-    def _generer_transactions_fiches(self, fiche):
-        """
-        Genere 2 transactions pour Annaire - fiche privee et fiche publique
-        :param fiche:
-        :return:
-        """
-
         # Copier le contenu directement
         transaction_fiche = {
             Constantes.ConstantesAnnuaire.LIBELLE_DOC_USAGER: fiche
         }
+        self._generer_transactions_fiches(transaction_fiche)
 
-        self.generateur_transactions.soumettre_transaction(
-            transaction_fiche, Constantes.ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPRIVEE
-        )
+        self.set_etape_suivante()  # Termine
 
-        self.generateur_transactions.soumettre_transaction(
-            transaction_fiche, Constantes.ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPUBLIQUE
-        )
+
+class ProcessusMajProfilMilleGrille(ProcessusMajFiches):
+
+    def initiale(self):
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
+
+        fiche = {
+            ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE: transaction[ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE],
+            ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: transaction[ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE],
+            ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: transaction[ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE],
+        }
+
+        # Verifier si on a plusieurs languages - si oui, les noms de MilleGrilles sont ramenes au niveau de base
+
+        # Mettre a jour le profile usager sous Principale
+        self.controleur.gestionnaire.maj_profil_millegrille(fiche)
+
+        # Creer transactions pour mettre a jour les fiches privees et publiques de l'annuaire.
+        # Copier le contenu directement
+        self._generer_transactions_fiches(fiche)
+
+        self.set_etape_suivante()  # Termine

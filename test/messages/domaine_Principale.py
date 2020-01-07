@@ -50,9 +50,9 @@ class MessagesSample(BaseCallback):
 
     def transmettre_maj_profil_usager(self):
         fiche = {
-            'nom': 'DugreA',
-            'prenom': 'Mathieu',
-            'courriel': 'mathieu.dugre@mdugre.info'
+            ConstantesPrincipale.LIBELLE_NOM: 'DugreA',
+            ConstantesPrincipale.LIBELLE_PRENOM: 'Mathieu',
+            ConstantesPrincipale.LIBELLE_COURRIEL: 'mathieu.dugre@mdugre.info',
         }
 
         domaine = ConstantesPrincipale.TRANSACTION_ACTION_MAJ_PROFILUSAGER
@@ -60,7 +60,22 @@ class MessagesSample(BaseCallback):
             fiche, domaine, reply_to=self.queue_name, correlation_id='abcd'
         )
 
-        print("Envoi maj profile usager: %s" % enveloppe_val)
+        print("Envoi maj profil usager: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def transmettre_maj_profil_millegrille(self):
+        fiche = {
+            ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE: 'Un Test',
+            ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: 'fr',
+            ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: False,
+        }
+
+        domaine = ConstantesPrincipale.TRANSACTION_ACTION_MAJ_PROFILMILLEGRILLE
+        enveloppe_val = self.generateur.soumettre_transaction(
+            fiche, domaine, reply_to=self.queue_name, correlation_id='abcd'
+        )
+
+        print("Envoi maj profil usager: %s" % enveloppe_val)
         return enveloppe_val
 
     def requete_profil_usager(self):
@@ -101,10 +116,8 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # enveloppe = sample.transmettre_maj_fiche_privee()
-        sample.transmettre_maj_profil_usager()
-        # sample.lire_transaction_demande_inscription()
-        # sample.lire_transaction_inscription_inscription_recue()
+        # sample.transmettre_maj_profil_usager()
+        sample.transmettre_maj_profil_millegrille()
 
 
 # --- MAIN ---
