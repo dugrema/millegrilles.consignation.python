@@ -2,23 +2,47 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesAnnuaire
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.X509Certificate import PemHelpers
 from millegrilles.SecuritePKI import EnveloppeCertificat
 
 from pymongo.collection import ReturnDocument
 
 import datetime
-import uuid
-import logging
 
 
 class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
 
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+    def _preparerFiche(self, fiche):
+        # Filtrer les champs MongoDB et MilleGrilles qui ne sont pas natifs a la fiche
+        champs_enlever = [
+            '_id',
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION,
+            Constantes.DOCUMENT_INFODOC_LIBELLE
+        ]
+        for champ in champs_enlever:
+            del fiche[champ]
+
+
+class TraitementRequetesPubliquesAnnuaire(TraitementRequetesAnnuaire):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PRIVEE:
+        if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PUBLIQUE:
+            fiche_publique = self.gestionnaire.get_fiche_publique()
+            self.transmettre_reponse(message_dict, fiche_publique, properties.reply_to, properties.correlation_id)
+        else:
+            raise Exception("Requete publique non supportee " + routing_key)
+
+
+class TraitementRequetesProtegeesAnnuaire(TraitementRequetesAnnuaire):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PUBLIQUE:
+            fiche_publique = self.gestionnaire.get_fiche_publique()
+            self.transmettre_reponse(message_dict, fiche_publique, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PRIVEE:
             fiche_privee = self.gestionnaire.get_fiche_privee()
 
             # Filtrer les champs MongoDB et MilleGrilles qui ne sont pas natifs a la fiche
@@ -33,28 +57,20 @@ class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
 
             self.transmettre_reponse(message_dict, fiche_privee, properties.reply_to, properties.correlation_id)
         else:
-            super().traiter_message(ch, method, properties, body)
-
+            super().traiter_requete(ch, method, properties, body, message_dict)
 
 
 class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
-        self._traitement_requetes = TraitementRequetesAnnuaire(self)
+        self._traitement_requetes = {
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesAnnuaire(self),
+            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesAnnuaire(self),
+        }
 
     def configurer(self):
         super().configurer()
-
-        # collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
-        #
-        # collection_domaine.create_index(
-        #     [
-        #         (AnnuaireConstantes.LIBELLE_DOMAINE, 1),
-        #         (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-        #     ],
-        #     name='domaine-mglibelle'
-        # )
 
     def demarrer(self):
         super().demarrer()
@@ -99,7 +115,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return ConstantesAnnuaire.DOMAINE_NOM
 
-    def get_handler_requetes_noeuds(self):
+    def get_handler_requetes(self) -> dict:
         return self._traitement_requetes
 
     def traiter_cedule(self, message):
@@ -216,6 +232,15 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
         fiche_privee = collection_domaine.find_one(filtre)
         return fiche_privee
+
+    def get_fiche_publique(self):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_PUBLIQUE
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
+        fiche_publique = collection_domaine.find_one(filtre)
+        return fiche_publique
 
     def ajouter_demande_inscription(self, demande_inscription):
         # Determiner si la demande est pour une millegrille tierce si c'est une demande locale vers un tiers

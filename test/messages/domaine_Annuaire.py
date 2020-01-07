@@ -2,6 +2,7 @@
 
 import datetime, time
 
+from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
@@ -71,6 +72,15 @@ class MessagesSample(BaseCallback):
     def requete_fiche_privee(self):
         self.generateur.transmettre_requete({}, 'millegrilles.domaines.Annuaire.fichePrivee', reply_to=self.queue_name, correlation_id='abcd')
 
+    def requete_fiche_public(self):
+        self.generateur.transmettre_requete(
+            {},
+            'millegrilles.domaines.Annuaire.fichePublique',
+            reply_to=self.queue_name,
+            correlation_id='abcd',
+            securite=Constantes.SECURITE_PUBLIC
+        )
+
     def lire_transaction_demande_inscription(self):
         with open('/home/mathieu/PycharmProjects/MilleGrilles.consignation.python/test/messages/demande_connexion.json', 'r') as fichier:
             transaction = json.load(fichier)
@@ -87,7 +97,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # enveloppe = sample.transmettre_maj_fiche_privee()
-        sample.requete_fiche_privee()
+        # sample.requete_fiche_privee()
+        sample.requete_fiche_public()
         # sample.lire_transaction_demande_inscription()
         # sample.lire_transaction_inscription_inscription_recue()
 

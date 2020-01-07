@@ -1195,21 +1195,19 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
         try:
             self.gestionnaire.verificateur_transaction.verifier(message_dict)
-
-            # routing_key = method.routing_key
-            # exchange = method.exchange
-            # evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-
-            resultats = list()
-            for requete in message_dict['requetes']:
-                resultat = self.executer_requete(requete)
-                resultats.append(resultat)
-
-            # Genere message reponse
-            self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+            self.traiter_requete(ch, method, properties, body, message_dict)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
             self.message_dao.transmettre_demande_certificat(fingerprint)
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
 
     def executer_requete(self, requete):
         collection = self.gestionnaire.get_collection()

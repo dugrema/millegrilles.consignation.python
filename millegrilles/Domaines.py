@@ -683,18 +683,29 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 'exchange': self.configuration.exchange_middleware,
                 'ttl': 600000,
                 'callback': self._traitement_evenements.callbackAvecAck
-            },
-            {
-                'nom': '%s.%s' % (self.get_nom_queue(), 'requete.noeuds'),
+            }
+        ]
+
+        # Ajouter les handles de requete par niveau de securite
+        for securite, handler_requete in self.get_handler_requetes().items():
+            if securite == Constantes.SECURITE_SECURE:
+                exchange = self.configuration.exchange_middleware
+            elif securite == Constantes.SECURITE_PROTEGE:
+                exchange = self.configuration.exchange_noeuds
+            elif securite == Constantes.SECURITE_PRIVE:
+                exchange = self.configuration.exchange_prive
+            else:
+                exchange = self.configuration.exchange_public
+
+            queues_config.append({
+                'nom': '%s.%s' % (self.get_nom_queue(), 'requete.noeuds.' + securite),
                 'routing': [
                     'requete.%s.#' % self.get_nom_domaine(),
-                    'pki.ca',
                 ],
-                'exchange': self.configuration.exchange_noeuds,
+                'exchange': exchange,
                 'ttl': 20000,
-                'callback': self.get_handler_requetes_noeuds().callbackAvecAck
-            },
-        ]
+                'callback': handler_requete.callbackAvecAck
+            })
 
         return queues_config
 
@@ -708,6 +719,11 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
     def get_handler_requetes_noeuds(self):
         return self.__traitement_noeud
+
+    def get_handler_requetes(self) -> dict:
+        return {
+            Constantes.SECURITE_PROTEGE: self.get_handler_requetes_noeuds()
+        }
 
     def get_handler_cedule(self):
         return self.__handler_cedule

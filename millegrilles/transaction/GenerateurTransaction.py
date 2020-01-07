@@ -102,7 +102,7 @@ class GenerateurTransaction:
             reply_to=reply_to, correlation_id=correlation_id)
 
     def transmettre_requete(self, message_dict, domaine, correlation_id, reply_to=None, domaine_direct=False,
-                            idmg_destination: str = None):
+                            idmg_destination: str = None, securite=Constantes.SECURITE_PROTEGE):
         """
         Transmet une requete au backend de MilleGrilles. La requete va etre vu par un des workers du domaine. La
         reponse va etre transmise vers la "message_dao.queue_reponse", et le correlation_id permet de savoir a
@@ -113,6 +113,7 @@ class GenerateurTransaction:
         :param reply_to:
         :param domaine_direct:
         :param idmg_destination: MilleGrille destination pour la reponse
+        :param securite: Niveau de securite, par defaut 3.protege.
         :return:
         """
 
@@ -130,9 +131,18 @@ class GenerateurTransaction:
         else:
             routing_key = 'requete.%s' % domaine
 
+        if securite == Constantes.SECURITE_SECURE:
+            exchange = self._contexte.configuration.exchange_secure
+        elif securite == Constantes.SECURITE_PROTEGE:
+            exchange = self._contexte.configuration.exchange_protege
+        elif securite == Constantes.SECURITE_PRIVE:
+            exchange = self._contexte.configuration.exchange_prive
+        else:
+            exchange = self._contexte.configuration.exchange_public
+
         if idmg_destination is None:
-            self._contexte.message_dao.transmettre_message_noeuds(
-                enveloppe, routing_key, encoding=self.encodeur_json,
+            self._contexte.message_dao.transmettre_message_exchange(
+                enveloppe, routing_key, exchange, encoding=self.encodeur_json,
                 reply_to=reply_to, correlation_id=correlation_id)
         else:
             self._contexte.message_dao.transmettre_message_intermillegrilles(

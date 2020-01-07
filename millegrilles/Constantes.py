@@ -686,6 +686,7 @@ class ConstantesAnnuaire:
     TRANSACTION_SIGNATURE_INSCRIPTION_TIERS = '%s.signatureInscriptionTiers' % DOMAINE_NOM
 
     REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
+    REQUETE_FICHE_PUBLIQUE = 'millegrilles.domaines.Annuaire.fichePublique'
 
     TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
