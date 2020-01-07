@@ -1,4 +1,5 @@
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesAnnuaire
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
@@ -10,103 +11,6 @@ from pymongo.collection import ReturnDocument
 import datetime
 import uuid
 import logging
-
-
-class ConstantesAnnuaire:
-
-    DOMAINE_NOM = 'millegrilles.domaines.Annuaire'
-    QUEUE_SUFFIXE = DOMAINE_NOM
-    COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
-
-    LIBVAL_INDEX_MILLEGRILLES = 'index.millegrilles'
-    LIBVAL_FICHE_PRIVEE = 'fiche.privee'      # Fiche privee de la millegrille locale
-    LIBVAL_FICHE_PUBLIQUE = 'fiche.publique'  # Fiche publique de la millegrille locale signee par le maitredescles
-    LIBVAL_FICHE_TIERS = 'fiche.tiers'        # Fiche d'une MilleGrille tierce
-
-    LIBELLE_DOC_LISTE = 'liste'
-    LIBELLE_DOC_SECURITE = '_securite'
-    LIBELLE_DOC_LIENS_PUBLICS_HTTPS = 'public_https'
-    LIBELLE_DOC_LIENS_PRIVES_MQ = 'prive_mq'
-    LIBELLE_DOC_LIENS_PRIVES_HTTPS = 'prive_https'
-    LIBELLE_DOC_LIENS_RELAIS = 'relais'
-    LIBELLE_DOC_USAGER = 'usager'
-    LIBELLE_DOC_DESCRIPTIF = 'descriptif'
-    LIBELLE_DOC_CERTIFICAT_RACINE = 'certificat_racine'
-    LIBELLE_DOC_CERTIFICAT = 'certificat'
-    LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES = 'certificats_intermediaires'
-    LIBELLE_DOC_CERTIFICAT_ADDITIONNELS = 'certificats_additionnels'
-    LIBELLE_DOC_EXPIRATION_INSCRIPTION = 'expiration_inscription'
-    LIBELLE_DOC_RENOUVELLEMENT_INSCRIPTION = 'renouvellement_inscription'
-    LIBELLE_DOC_ABONNEMENTS = 'abonnements'
-    LIBELLE_DOC_NOMBRE_FICHES = 'nombre_fiches'
-    LIBELLE_DOC_TYPE_FICHE = 'type'
-    LIBELLE_DOC_FICHE_PRIVEE = 'fiche_privee'
-    LIBELLE_DOC_FICHE_PUBLIQUE = 'fiche_publique'
-    LIBELLE_DOC_DATE_DEMANDE = 'date'
-    LIBELLE_DOC_DEMANDES_TRANSMISES = 'demandes_transmises'
-    LIBELLE_DOC_DEMANDES_RECUES = 'demandes_recues'
-    LIBELLE_DOC_DEMANDES_CSR = 'csr'
-    LIBELLE_DOC_DEMANDES_CORRELATION = 'csr_correlation'
-    LIBELLE_DOC_DEMANDES_ORIGINALE = 'demande_originale'
-    LIBELLE_DOC_IDMG_SOLLICITE = 'idmg_sollicite'
-    LIBELLE_DOC_EXPIRATION = 'expiration_inscription'
-    LIBELLE_DOC_INSCRIPTIONS_TIERS_VERS_LOCAL = 'inscriptions_tiers'
-    LIBELLE_DOC_INSCRIPTIONS_LOCAL_VERS_TIERS = 'inscriptions_local'
-
-    TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
-    TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
-    TRANSACTION_MAJ_FICHETIERCE = '%s.maj.ficheTierce' % DOMAINE_NOM
-    TRANSACTION_DEMANDER_INSCRIPTION = '%s.demanderInscription' % DOMAINE_NOM
-    TRANSACTION_INSCRIRE_TIERS = '%s.inscrireTiers' % DOMAINE_NOM
-    TRANSACTION_SIGNATURE_INSCRIPTION_TIERS = '%s.signatureInscriptionTiers' % DOMAINE_NOM
-
-    REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
-
-    TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
-        LIBELLE_DOC_LISTE: dict(),  # Dict de ENTREE_INDEX, key=IDMG
-    }
-
-    TEMPLATE_DOCUMENT_ENTREE_INDEX = {
-        LIBELLE_DOC_DESCRIPTIF: None,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
-        LIBELLE_DOC_SECURITE: Constantes.SECURITE_PROTEGE
-    }
-
-    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PRIVEE,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
-        LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
-        LIBELLE_DOC_LIENS_RELAIS: list(),
-        LIBELLE_DOC_USAGER: dict(),
-        LIBELLE_DOC_DESCRIPTIF: None,
-        LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
-        LIBELLE_DOC_CERTIFICAT: None,  # Certificat du maitredescles
-        LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
-        LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
-    }
-
-    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PUBLIQUE = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PUBLIQUE,
-    }
-
-    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_TIERS,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
-        LIBELLE_DOC_LIENS_PUBLICS_HTTPS: list(),
-        LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
-        LIBELLE_DOC_LIENS_RELAIS: list(),
-        LIBELLE_DOC_USAGER: dict(),
-        LIBELLE_DOC_DESCRIPTIF: None,
-        LIBELLE_DOC_CERTIFICAT_RACINE: None,     # str
-        LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
-        LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
-        LIBELLE_DOC_SECURITE: Constantes.SECURITE_PROTEGE,
-        LIBELLE_DOC_EXPIRATION_INSCRIPTION: None,  # Date d'expiration du certificat
-        LIBELLE_DOC_ABONNEMENTS: dict(),  # Dict d'abonnements pour cette MilleGrille
-    }
 
 
 class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
@@ -155,16 +59,21 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
 
-        # Initialiser fiche privee au besoin
+        # Initialiser fiches privees et publiques au besoin
         fiche_privee = ConstantesAnnuaire.TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE.copy()
         fiche_privee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
+        fiche_publique = ConstantesAnnuaire.TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PUBLIQUE.copy()
+        fiche_publique[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
         with open(self.configuration.pki_cafile, 'r') as fichier:
             ca_pem = fichier.read()
             split_certs = PemHelpers.split_certificats(ca_pem)
             if len(split_certs) > 1:
                 raise Exception("Le fichier de certificat CA (%s) est mauvais, il contient plusieurs certificats" % self.configuration.pki_cafile)
         fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
+        fiche_publique[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
+
         self.initialiser_document(ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE, fiche_privee)
+        self.initialiser_document(ConstantesAnnuaire.LIBVAL_FICHE_PUBLIQUE, fiche_publique)
 
         # Initialiser index au besoin
         self.initialiser_document(ConstantesAnnuaire.LIBVAL_INDEX_MILLEGRILLES, ConstantesAnnuaire.TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES.copy())

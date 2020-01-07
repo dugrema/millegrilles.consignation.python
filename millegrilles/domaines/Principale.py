@@ -1,103 +1,12 @@
 # Domaine de l'interface principale de l'usager. Ne peut pas etre deleguee.
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesPrincipale
 from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
 
 import logging
 import datetime
-
-
-class ConstantesPrincipale:
-    """ Constantes pour le domaine de l'interface principale """
-
-    DOMAINE_NOM = 'millegrilles.domaines.Principale'
-    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
-    QUEUE_NOM = 'millegrilles.domaines.Principale'
-
-    LIBVAL_CONFIGURATION = 'configuration'
-    LIBVAL_PROFIL_USAGER = 'profil.usager'
-    LIBVAL_ALERTES = 'alertes'
-    LIBVAL_DOMAINES = 'domaines'
-    LIBVAL_CLES = 'cles'
-
-    TRANSACTION_ACTION_FERMERALERTE = '%s.fermerAlerte' % DOMAINE_NOM
-    TRANSACTION_ACTION_CREERALERTE = '%s.creerAlerte' % DOMAINE_NOM
-    TRANSACTION_ACTION_CREEREMPREINTE = '%s.creerEmpreinte' % DOMAINE_NOM
-    TRANSACTION_ACTION_AJOUTER_TOKEN = '%s.ajouterToken' % DOMAINE_NOM
-
-    DOCUMENT_ALERTES = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
-        'alertes': [
-            {'message': "Interface principale initialisee", 'ts': int(datetime.datetime.utcnow().timestamp()*1000)}
-        ]
-    }
-
-    DOCUMENT_CLES = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CLES,
-        'cles': [],
-        'challenge_authentification': None,
-        'empreinte_absente': True,
-    }
-
-    DOCUMENT_DOMAINES = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_DOMAINES,
-        LIBVAL_DOMAINES: {
-            'SenseursPassifs': {
-                'rang': 5,
-                'description': 'SenseursPassifs'
-            },
-            'GrosFichiers': {
-                'rang': 3,
-                'description': 'GrosFichiers'
-            },
-            'Principale': {
-                'rang': 1,
-                'description': 'Principale'
-            },
-            'Plume': {
-                'rang': 1,
-                'description': 'Plume'
-            },
-            'Pki': {
-                'rang': 1,
-                'description': 'Pki'
-            },
-            'Parametres': {
-                'rang': 1,
-                'description': 'Parametres'
-            },
-            'Annuaire': {
-                'rang': 1,
-                'description': 'Annuaire'
-            }
-        },
-        "menu": [
-            'Principale',
-            'Annuaire',
-            'GrosFichiers',
-            'Plume',
-            'SenseursPassifs',
-            'Pki',
-            'Parametres',
-        ]
-    }
-
-    # Document par defaut pour la configuration de l'interface principale
-    DOCUMENT_DEFAUT = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
-    }
-
-    DOCUMENT_PROFIL_USAGER = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_PROFIL_USAGER,
-        'courriel': None,
-        'courriel_alertes': [],
-        'prenom': None,
-        'nom': None,
-        'uuid_usager': None,
-    }
 
 
 class GestionnairePrincipale(GestionnaireDomaineStandard):
@@ -123,6 +32,10 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_USAGER, ConstantesPrincipale.DOCUMENT_PROFIL_USAGER)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_DOMAINES, ConstantesPrincipale.DOCUMENT_DOMAINES)
         self.initialiser_document(ConstantesPrincipale.LIBVAL_CLES, ConstantesPrincipale.DOCUMENT_CLES)
+
+        profil_millegrille = ConstantesPrincipale.DOCUMENT_PROFIL_MILLEGRILLE
+        profil_millegrille[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
+        self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.DOCUMENT_PROFIL_MILLEGRILLE)
 
     def traiter_cedule(self, evenement):
         pass

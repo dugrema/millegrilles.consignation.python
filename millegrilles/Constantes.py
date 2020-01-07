@@ -224,6 +224,103 @@ SECURITE_ACCES_PERMIS = '1.permis'
 CLE_CERT_CA = 'pki.millegrille'
 
 
+class ConstantesPrincipale:
+    """ Constantes pour le domaine de l'interface principale """
+
+    DOMAINE_NOM = 'millegrilles.domaines.Principale'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = 'millegrilles.domaines.Principale'
+
+    LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_PROFIL_USAGER = 'profil.usager'
+    LIBVAL_PROFIL_MILLEGRILLE = 'profil.millegrille'
+    LIBVAL_ALERTES = 'alertes'
+    LIBVAL_DOMAINES = 'domaines'
+    LIBVAL_CLES = 'cles'
+
+    TRANSACTION_ACTION_FERMERALERTE = '%s.fermerAlerte' % DOMAINE_NOM
+    TRANSACTION_ACTION_CREERALERTE = '%s.creerAlerte' % DOMAINE_NOM
+    TRANSACTION_ACTION_CREEREMPREINTE = '%s.creerEmpreinte' % DOMAINE_NOM
+    TRANSACTION_ACTION_AJOUTER_TOKEN = '%s.ajouterToken' % DOMAINE_NOM
+
+    DOCUMENT_ALERTES = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
+        'alertes': [
+            {'message': "Interface principale initialisee", 'ts': int(datetime.datetime.utcnow().timestamp()*1000)}
+        ]
+    }
+
+    DOCUMENT_CLES = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CLES,
+        'cles': [],
+        'challenge_authentification': None,
+        'empreinte_absente': True,
+    }
+
+    DOCUMENT_DOMAINES = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_DOMAINES,
+        LIBVAL_DOMAINES: {
+            'SenseursPassifs': {
+                'rang': 5,
+                'description': 'SenseursPassifs'
+            },
+            'GrosFichiers': {
+                'rang': 3,
+                'description': 'GrosFichiers'
+            },
+            'Principale': {
+                'rang': 1,
+                'description': 'Principale'
+            },
+            'Plume': {
+                'rang': 1,
+                'description': 'Plume'
+            },
+            'Pki': {
+                'rang': 1,
+                'description': 'Pki'
+            },
+            'Parametres': {
+                'rang': 1,
+                'description': 'Parametres'
+            },
+            'Annuaire': {
+                'rang': 1,
+                'description': 'Annuaire'
+            }
+        },
+        "menu": [
+            'Principale',
+            'Annuaire',
+            'GrosFichiers',
+            'Plume',
+            'SenseursPassifs',
+            'Pki',
+            'Parametres',
+        ]
+    }
+
+    # Document par defaut pour la configuration de l'interface principale
+    DOCUMENT_DEFAUT = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+    }
+
+    DOCUMENT_PROFIL_USAGER = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_PROFIL_USAGER,
+        'courriel': None,
+        'courriel_alertes': [],
+        'prenom': None,
+        'nom': None,
+    }
+
+    DOCUMENT_PROFIL_MILLEGRILLE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_PROFIL_MILLEGRILLE,
+        'descriptif': 'Sans nom',
+    }
+
+
 class ConstantesSecurityPki:
 
     DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
@@ -516,6 +613,107 @@ class ConstantesMaitreDesCles:
 
     DOCUMENT_TRANSACTION_GROSFICHIERRESUME = {
         'fuuid': None,  # Identificateur unique de version de fichier
+    }
+
+
+class ConstantesAnnuaire:
+
+    DOMAINE_NOM = 'millegrilles.domaines.Annuaire'
+    QUEUE_SUFFIXE = DOMAINE_NOM
+    COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+
+    LIBVAL_INDEX_MILLEGRILLES = 'index.millegrilles'
+    LIBVAL_FICHE_PRIVEE = 'fiche.privee'      # Fiche privee de la millegrille locale
+    LIBVAL_FICHE_PUBLIQUE = 'fiche.publique'  # Fiche publique de la millegrille locale signee par le maitredescles
+    LIBVAL_FICHE_TIERS = 'fiche.tiers'        # Fiche d'une MilleGrille tierce
+
+    LIBELLE_DOC_LISTE = 'liste'
+    LIBELLE_DOC_SECURITE = '_securite'
+    LIBELLE_DOC_LIENS_PUBLICS_HTTPS = 'public_https'
+    LIBELLE_DOC_LIENS_PRIVES_MQ = 'prive_mq'
+    LIBELLE_DOC_LIENS_PRIVES_HTTPS = 'prive_https'
+    LIBELLE_DOC_LIENS_RELAIS = 'relais'
+    LIBELLE_DOC_USAGER = 'usager'
+    LIBELLE_DOC_DESCRIPTIF = 'descriptif'
+    LIBELLE_DOC_CERTIFICAT_RACINE = 'certificat_racine'
+    LIBELLE_DOC_CERTIFICAT = 'certificat'
+    LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES = 'certificats_intermediaires'
+    LIBELLE_DOC_CERTIFICAT_ADDITIONNELS = 'certificats_additionnels'
+    LIBELLE_DOC_EXPIRATION_INSCRIPTION = 'expiration_inscription'
+    LIBELLE_DOC_RENOUVELLEMENT_INSCRIPTION = 'renouvellement_inscription'
+    LIBELLE_DOC_ABONNEMENTS = 'abonnements'
+    LIBELLE_DOC_NOMBRE_FICHES = 'nombre_fiches'
+    LIBELLE_DOC_TYPE_FICHE = 'type'
+    LIBELLE_DOC_FICHE_PRIVEE = 'fiche_privee'
+    LIBELLE_DOC_FICHE_PUBLIQUE = 'fiche_publique'
+    LIBELLE_DOC_DATE_DEMANDE = 'date'
+    LIBELLE_DOC_DEMANDES_TRANSMISES = 'demandes_transmises'
+    LIBELLE_DOC_DEMANDES_RECUES = 'demandes_recues'
+    LIBELLE_DOC_DEMANDES_CSR = 'csr'
+    LIBELLE_DOC_DEMANDES_CORRELATION = 'csr_correlation'
+    LIBELLE_DOC_DEMANDES_ORIGINALE = 'demande_originale'
+    LIBELLE_DOC_IDMG_SOLLICITE = 'idmg_sollicite'
+    LIBELLE_DOC_EXPIRATION = 'expiration_inscription'
+    LIBELLE_DOC_INSCRIPTIONS_TIERS_VERS_LOCAL = 'inscriptions_tiers'
+    LIBELLE_DOC_INSCRIPTIONS_LOCAL_VERS_TIERS = 'inscriptions_local'
+
+    TRANSACTION_MAJ_FICHEPRIVEE = '%s.maj.fichePrivee' % DOMAINE_NOM
+    TRANSACTION_MAJ_FICHEPUBLIQUE = '%s.maj.fichePublique' % DOMAINE_NOM
+    TRANSACTION_MAJ_FICHETIERCE = '%s.maj.ficheTierce' % DOMAINE_NOM
+    TRANSACTION_DEMANDER_INSCRIPTION = '%s.demanderInscription' % DOMAINE_NOM
+    TRANSACTION_INSCRIRE_TIERS = '%s.inscrireTiers' % DOMAINE_NOM
+    TRANSACTION_SIGNATURE_INSCRIPTION_TIERS = '%s.signatureInscriptionTiers' % DOMAINE_NOM
+
+    REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
+
+    TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,
+        LIBELLE_DOC_LISTE: dict(),  # Dict de ENTREE_INDEX, key=IDMG
+    }
+
+    TEMPLATE_DOCUMENT_ENTREE_INDEX = {
+        LIBELLE_DOC_DESCRIPTIF: None,
+        TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_SECURITE: SECURITE_PROTEGE
+    }
+
+    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PRIVEE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PRIVEE,
+        TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
+        LIBELLE_DOC_LIENS_RELAIS: list(),
+        LIBELLE_DOC_USAGER: dict(),
+        LIBELLE_DOC_DESCRIPTIF: None,
+        LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
+        LIBELLE_DOC_CERTIFICAT: None,  # Certificat du maitredescles
+        LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
+        LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
+    }
+
+    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_PUBLIQUE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_PUBLIQUE,
+        TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_USAGER: dict(),
+        LIBELLE_DOC_DESCRIPTIF: None,
+        LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
+    }
+
+    TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHE_TIERS,
+        TRANSACTION_MESSAGE_LIBELLE_IDMG: None,
+        LIBELLE_DOC_LIENS_PUBLICS_HTTPS: list(),
+        LIBELLE_DOC_LIENS_PRIVES_MQ: list(),
+        LIBELLE_DOC_LIENS_RELAIS: list(),
+        LIBELLE_DOC_USAGER: dict(),
+        LIBELLE_DOC_DESCRIPTIF: None,
+        LIBELLE_DOC_CERTIFICAT_RACINE: None,     # str
+        LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
+        LIBELLE_DOC_CERTIFICAT_ADDITIONNELS: None,  # Liste de certificats maitredescles additionnels
+        LIBELLE_DOC_SECURITE: SECURITE_PROTEGE,
+        LIBELLE_DOC_EXPIRATION_INSCRIPTION: None,  # Date d'expiration du certificat
+        LIBELLE_DOC_ABONNEMENTS: dict(),  # Dict d'abonnements pour cette MilleGrille
     }
 
 
