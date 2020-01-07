@@ -79,11 +79,28 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Principale:ProcessusCreerEmpreinte"
         elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_AJOUTER_TOKEN:
             processus = "millegrilles_domaines_Principale:ProcessusAjouterToken"
+        elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_MAJ_PROFILUSAGER:
+            processus = "millegrilles_domaines_Principale:ProcessusMajProfilUsager"
+        elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_MAJ_PROFILMILLEGRILLE:
+            processus = "millegrilles_domaines_Principale:ProcessusMajProfilMilleGrille"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
+
+    def maj_profil_usager(self, fiche):
+        operation = {
+            '$set': fiche
+        }
+        documents = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        resultat = documents.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER},
+            operation
+        )
+
+        if resultat.matched_count < 1:
+            raise ErreurMAJProcessus("Erreur MAJ processus %s, document inexistant" % self.__class__.__name__)
 
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
@@ -173,7 +190,16 @@ class TraitementMessageRequete(TraitementMessageDomaine):
         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
-class ProcessusFermerAlerte(MGProcessusTransaction):
+class ProcessusPrincipale(MGProcessusTransaction):
+
+    def get_collection_transaction_nom(self):
+        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusFermerAlerte(ProcessusPrincipale):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -195,14 +221,8 @@ class ProcessusFermerAlerte(MGProcessusTransaction):
 
         self.set_etape_suivante()  # Marque transaction comme traitee
 
-    def get_collection_transaction_nom(self):
-        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
 
-    def get_collection_processus_nom(self):
-        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusCreerAlerte(MGProcessusTransaction):
+class ProcessusCreerAlerte(ProcessusPrincipale):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -228,14 +248,8 @@ class ProcessusCreerAlerte(MGProcessusTransaction):
 
         self.set_etape_suivante()  # Marque transaction comme traitee
 
-    def get_collection_transaction_nom(self):
-        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
 
-    def get_collection_processus_nom(self):
-        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusCreerEmpreinte(MGProcessusTransaction):
+class ProcessusCreerEmpreinte(ProcessusPrincipale):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -273,17 +287,8 @@ class ProcessusCreerEmpreinte(MGProcessusTransaction):
 
         self.set_etape_suivante()  # Termine
 
-    def get_collection_transaction_nom(self):
-        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
 
-    def get_collection_processus_nom(self):
-        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusAjouterToken(MGProcessusTransaction):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
+class ProcessusAjouterToken(ProcessusPrincipale):
 
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
@@ -304,8 +309,43 @@ class ProcessusAjouterToken(MGProcessusTransaction):
 
         self.set_etape_suivante()  # Termine
 
-    def get_collection_transaction_nom(self):
-        return ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM
 
-    def get_collection_processus_nom(self):
-        return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
+class ProcessusMajProfilUsager(ProcessusPrincipale):
+
+    def initiale(self):
+        transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
+
+        # Recuperer toutes les valeurs de la transaction et inserer dans le document
+        fiche = ConstantesPrincipale.DOCUMENT_PROFIL_USAGER.copy()
+
+        for cle, valeur in transaction.items():
+            if not cle.startswith('_') and cle not in [Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]:
+                fiche[cle] = valeur
+
+        # Mettre a jour le profile usager sous Principale
+        self.controleur.gestionnaire.maj_profil_usager(fiche)
+
+        # Creer transactions pour mettre a jour les fiches privees et publiques de l'annuaire.
+        self._generer_transactions_fiches(fiche)
+
+        self.set_etape_suivante()  # Termine
+
+    def _generer_transactions_fiches(self, fiche):
+        """
+        Genere 2 transactions pour Annaire - fiche privee et fiche publique
+        :param fiche:
+        :return:
+        """
+
+        # Copier le contenu directement
+        transaction_fiche = {
+            Constantes.ConstantesAnnuaire.LIBELLE_DOC_USAGER: fiche
+        }
+
+        self.generateur_transactions.soumettre_transaction(
+            transaction_fiche, Constantes.ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPRIVEE
+        )
+
+        self.generateur_transactions.soumettre_transaction(
+            transaction_fiche, Constantes.ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPUBLIQUE
+        )

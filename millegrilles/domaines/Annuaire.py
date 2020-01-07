@@ -121,12 +121,18 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         return processus
 
     def maj_fiche_privee(self, fiche):
+        return self.__maj_fiche(fiche, ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE)
+
+    def maj_fiche_publique(self, fiche):
+        return self.__maj_fiche(fiche, ConstantesAnnuaire.LIBVAL_FICHE_PUBLIQUE)
+
+    def __maj_fiche(self, fiche, type_fiche):
         self.valider_signature_fiche(fiche)
 
         # Extraire toutes les valeurs de la transaction qui ne commencent pas par un '_'
         set_ops = dict()
         for key, value in fiche.items():
-            if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
+            if not key.startswith('_') and key not in [Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]:
                 set_ops[key] = value
 
         # Ajouter certificat local
@@ -142,7 +148,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         }
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE
+            Constantes.DOCUMENT_INFODOC_LIBELLE: type_fiche
         }
 
         collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
@@ -180,7 +186,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
                 ConstantesAnnuaire.LIBELLE_DOC_LISTE,
                 fiche_exportee[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG],
                 ConstantesAnnuaire.LIBELLE_DOC_TYPE_FICHE
-            ): ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE,
+            ): type_fiche,
         }
         collection_domaine.update_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesAnnuaire.LIBVAL_INDEX_MILLEGRILLES},
@@ -381,6 +387,28 @@ class ProcessusMajFichePublique(ProcessusAnnuaire):
 
     def initiale(self):
         transaction = self.transaction
+        self.set_etape_suivante()  # Termine
+
+        fiche_exportee = self.controleur.gestionnaire.maj_fiche_publique(transaction)
+
+        if fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT) is None:
+            # Le certificat du maitre des cles n'a pas ete ajoute. On fait une requete.
+            domaine = 'millegrilles.domaines.MaitreDesCles.certMaitreDesCles'
+            requete = {
+                '_evenements': 'certMaitreDesCles'
+            }
+
+            self.set_requete(domaine, requete)
+            self.set_etape_suivante(ProcessusMajFichePublique.maj_maitredescles.__name__)
+
+        else:
+            self.set_etape_suivante()  # Termine
+
+    def maj_maitredescles(self):
+        reponse = self.parametres['reponse'][0]
+
+        self.controleur.gestionnaire.maj_fiche_publique(reponse)
+
         self.set_etape_suivante()  # Termine
 
 
