@@ -116,8 +116,8 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # sample.transmettre_maj_profil_usager()
-        sample.transmettre_maj_profil_millegrille()
+        sample.transmettre_maj_profil_usager()
+        # sample.transmettre_maj_profil_millegrille()
 
 
 # --- MAIN ---

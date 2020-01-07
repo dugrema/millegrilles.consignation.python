@@ -1,6 +1,6 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesAnnuaire
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.X509Certificate import PemHelpers
@@ -77,6 +77,12 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
         # Initialiser index au besoin
         self.initialiser_document(ConstantesAnnuaire.LIBVAL_INDEX_MILLEGRILLES, ConstantesAnnuaire.TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES.copy())
+
+        self.demarrer_watcher_collection(
+            ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM,
+            ConstantesAnnuaire.QUEUE_ROUTING_CHANGEMENTS,
+            AnnuaireExchangeRouter(self._contexte)
+        )
 
     def get_nom_queue(self):
         return ConstantesAnnuaire.QUEUE_SUFFIXE
@@ -332,6 +338,27 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
 
         collection_domaine = self.document_dao.get_collection(ConstantesAnnuaire.COLLECTION_DOCUMENTS_NOM)
         collection_domaine.update_one(filtre, ops, upsert=True)
+
+
+class AnnuaireExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle in [ConstantesAnnuaire.LIBVAL_FICHE_PUBLIQUE]:
+            exchanges.add(self._exchange_public)
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+        elif mg_libelle in [ConstantesAnnuaire.LIBVAL_FICHE_PRIVEE]:
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+        else:
+            exchanges.add(self._exchange_protege)
+
+        return list(exchanges)
 
 
 class ProcessusAnnuaire(MGProcessusTransaction):

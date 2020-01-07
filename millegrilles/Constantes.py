@@ -641,6 +641,7 @@ class ConstantesAnnuaire:
     COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_ROUTING_CHANGEMENTS = 'document.millegrilles_domaines_Annuaire'
 
     LIBVAL_INDEX_MILLEGRILLES = 'index.millegrilles'
     LIBVAL_FICHE_PRIVEE = 'fiche.privee'      # Fiche privee de la millegrille locale
@@ -704,6 +705,8 @@ class ConstantesAnnuaire:
         LIBELLE_DOC_LIENS_RELAIS: list(),
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
+        ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: 'fr',
+        ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: False,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
         LIBELLE_DOC_CERTIFICAT: None,  # Certificat du maitredescles
         LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
@@ -716,6 +719,8 @@ class ConstantesAnnuaire:
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
+        ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: 'fr',
+        ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: False,
     }
 
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {

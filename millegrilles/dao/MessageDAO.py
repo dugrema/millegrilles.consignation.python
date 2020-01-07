@@ -591,7 +591,21 @@ class PikaDAO:
     '''
 
     def transmettre_message_noeuds(self, message_dict, routing_key, delivery_mode_v=1,
-                                   encoding=json.JSONEncoder, reply_to=None, correlation_id=None):
+                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None):
+
+        self.transmettre_message_exchange(message_dict, routing_key, self.configuration.exchange_noeuds,
+                                          delivery_mode_v, encoding, reply_to, correlation_id)
+
+
+    ''' 
+    Methode generique pour transmettre un evenement JSON avec l'echange millegrilles
+
+    :param routing_key: Routing key utilise pour distribuer le message.
+    :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
+    '''
+
+    def transmettre_message_exchange(self, message_dict, routing_key, exchange: str, delivery_mode_v=1,
+                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None):
 
         if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
@@ -605,7 +619,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
             self.__channel_publisher.basic_publish(
-                exchange=self.configuration.exchange_noeuds,
+                exchange=exchange,
                 routing_key=routing_key,
                 body=message_utf8,
                 properties=properties,

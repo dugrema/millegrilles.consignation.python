@@ -196,7 +196,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def emettre_message(self, message_dict, routing_key):
+    def emettre_message(self, message_dict, routing_key, exchanges: list = None):
 
         enveloppe = self.preparer_enveloppe(message_dict)
 
@@ -204,9 +204,16 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_message_noeuds(
-            message_dict=enveloppe, routing_key=routing_key
-        )
+        if exchanges is None:
+            self._contexte.message_dao.transmettre_message_noeuds(
+                message_dict=enveloppe, routing_key=routing_key
+            )
+        else:
+            # On transmet le message sur chaque exchange (identique, meme signature)
+            for exchange in exchanges:
+                self._contexte.message_dao.transmettre_message_exchange(
+                    message_dict=enveloppe, routing_key=routing_key, exchange=exchange
+                )
 
         return uuid_transaction
 

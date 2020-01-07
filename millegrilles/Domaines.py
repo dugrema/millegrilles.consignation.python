@@ -400,16 +400,17 @@ class GestionnaireDomaine:
 
         return ctag
 
-    def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str):
+    def demarrer_watcher_collection(self, nom_collection_mongo: str, routing_key: str, exchange_router=None):
         """
         Enregistre un watcher et demarre une thread qui lit le pipeline dans MongoDB. Les documents sont
         lus au complet et envoye avec la routing_key specifiee.
         :param nom_collection_mongo: Nom de la collection dans MongoDB pour cette MilleGrille
         :param routing_key: Nom du topic a enregistrer,
                e.g. noeuds.source.millegrilles_domaines_SenseursPassifs.affichage.__nom_noeud__.__no_senseur__
+        :param exchange_router: Routeur pour determiner sur quels exchanges le document sera place.
         :return:
         """
-        watcher = WatcherCollectionMongoThread(self._contexte, self._stop_event, nom_collection_mongo, routing_key)
+        watcher = WatcherCollectionMongoThread(self._contexte, self._stop_event, nom_collection_mongo, routing_key, exchange_router)
         self._watchers.append(watcher)
         watcher.start()
 
@@ -775,6 +776,26 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
+class ExchangeRouter:
+    """
+    Classe qui permet de determiner sur quel echange le document doit etre soumis
+    """
+
+    def __init__(self, contexte: ContexteRessourcesMilleGrilles):
+        self.__contexte = contexte
+
+        self._exchange_public = self.__contexte.configuration.exchange_public
+        self._exchange_prive = self.__contexte.configuration.exchange_prive
+        self._exchange_protege = self.__contexte.configuration.exchange_noeuds
+        self._exchange_secure = self.__contexte.configuration.exchange_middleware
+
+    def determiner_exchanges(self, document: dict) -> list:
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        return [self._exchange_protege]
+
+
 class WatcherCollectionMongoThread:
     """
     Ecoute les changements sur une collection MongoDB et transmet les documents complets sur RabbitMQ.
@@ -785,13 +806,15 @@ class WatcherCollectionMongoThread:
             contexte: ContexteRessourcesMilleGrilles,
             stop_event: Event,
             nom_collection_mongo: str,
-            routing_key: str
+            routing_key: str,
+            exchange_router: ExchangeRouter,
     ):
         """
         :param contexte:
         :param stop_event: Stop event utilise par le gestionnaire.
         :param nom_collection_mongo:
         :param routing_key:
+        :param exchange_routing: Permet de determiner quels documents vont sur les echanges proteges, prives et publics.
         """
         self.__logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
@@ -799,6 +822,10 @@ class WatcherCollectionMongoThread:
         self.__stop_event = stop_event
         self.__nom_collection_mongo = nom_collection_mongo
         self.__routing_key = routing_key
+
+        self.__exchange_router = exchange_router
+        if self.__exchange_router is None:
+            self.__exchange_router = ExchangeRouter(contexte)
 
         self.__collection_mongo = None
         self.__thread = None
@@ -826,17 +853,7 @@ class WatcherCollectionMongoThread:
                     operation_type = change_event['operationType']
                     if operation_type in ['insert', 'update', 'replace']:
                         full_document = change_event['fullDocument']
-                        self.__logger.debug("Watcher document recu: %s" % str(full_document))
-
-                        # Ajuster la routing key pour ajouter information si necessaire.
-                        routing_key = self.__routing_key
-                        mg_libelle = full_document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-                        if mg_libelle is not None:
-                            routing_key = '%s.%s' % (routing_key, mg_libelle)
-
-                        # Transmettre document sur MQ
-                        self.__contexte.message_dao.transmettre_message_noeuds(
-                            full_document, routing_key, encoding=MongoJSONEncoder)
+                        self._emettre_document(full_document)
                     elif operation_type == 'invalidate':
                         # Curseur ferme
                         self.__logger.warning("Curseur watch a ete invalide, on le ferme.\n%s" % str(change_event))
@@ -873,6 +890,19 @@ class WatcherCollectionMongoThread:
         except OperationFailure as opf:
             self.__logger.warning("Erreur activation watch, on fonctionne par timer: %s" % str(opf))
             self.__curseur_changements = None
+
+    def _emettre_document(self, document):
+        self.__logger.debug("Watcher document recu: %s" % str(document))
+
+        # Ajuster la routing key pour ajouter information si necessaire.
+        routing_key = self.__routing_key
+        exchanges = self.__exchange_router.determiner_exchanges(document)
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle is not None:
+            routing_key = '%s.%s' % (routing_key, mg_libelle)
+
+        # Transmettre document sur MQ
+        self.__contexte.generateur_transactions.emettre_message(document, routing_key, exchanges)
 
 
 class TraiteurRequeteDomaineNoeud:
