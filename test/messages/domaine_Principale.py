@@ -50,9 +50,10 @@ class MessagesSample(BaseCallback):
 
     def transmettre_maj_profil_usager(self):
         fiche = {
-            ConstantesPrincipale.LIBELLE_NOM: 'DugreA',
+            ConstantesPrincipale.LIBELLE_NOM: 'DugreAB',
             ConstantesPrincipale.LIBELLE_PRENOM: 'Mathieu',
-            ConstantesPrincipale.LIBELLE_COURRIEL: 'mathieu.dugre@mdugre.info',
+            ConstantesPrincipale.LIBELLE_COURRIEL: 'jajar.jjaargh@mdugre.info',
+            ConstantesPrincipale.LIBELLE_TWITTER: '@moi!',
         }
 
         domaine = ConstantesPrincipale.TRANSACTION_ACTION_MAJ_PROFILUSAGER
@@ -65,7 +66,7 @@ class MessagesSample(BaseCallback):
 
     def transmettre_maj_profil_millegrille(self):
         fiche = {
-            ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE: 'Un Test',
+            ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE: 'Deux Tests',
             ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: 'fr',
             ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: False,
         }

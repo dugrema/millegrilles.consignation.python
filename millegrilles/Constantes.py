@@ -456,6 +456,8 @@ class ConstantesParametres:
     TRANSACTION_MAJ_CERTIFICAT_PUBLIC = '%s.public.majCertificat' % DOMAINE_NOM
     TRANSACTION_PRIVATISER_NOEUD = '%s.public.privatiser' % DOMAINE_NOM
     TRANSACTION_FERMER_MILLEGRILLE = '%s.fermerMilleGrilles' % DOMAINE_NOM
+    TRANSACTION_MAJ_NOEUD_PUBLIC = '%s.majNoeudPublic' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_NOEUD_PUBLIC = '%s.supprimerNoeudPublic' % DOMAINE_NOM
 
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
@@ -477,6 +479,7 @@ class ConstantesParametres:
     LIBVAL_CERTS_WEB = 'certs.web'
     LIBVAL_CERTS_SSL = 'certs.ssl'
     LIBVAL_ID_MILLEGRILLE = 'millegrille.id'
+    LIBVAL_CONFIGURATION_NOEUDPUBLIC = 'configuration.noeudPublic'
 
     # Configuration Publique
     LIBVAL_CONFIGURATION_PUBLIQUE = 'publique.configuration'
@@ -505,6 +508,8 @@ class ConstantesParametres:
     DOCUMENT_PUBLIQUE_ACTIVITE_DESCRIPTION = 'description'
 
     DOCUMENT_PUBLIQUE_ACTIVITE_TAILLEMAX = 50
+
+    DOCUMENT_PUBLIQUE_MENU = 'menu'
 
     DOCUMENT_DEFAUT = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION

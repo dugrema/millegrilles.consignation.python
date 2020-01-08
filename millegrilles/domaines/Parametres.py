@@ -111,6 +111,10 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Parametres:ProcessusPrivatiserNoeud"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_FERMER_MILLEGRILLE:
             processus = "millegrilles_domaines_Parametres:FermerMilleGrilles"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_MAJ_NOEUD_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusConfigurerNoeudPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_SUPPRIMER_NOEUD_PUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusSupprimerNoeudPublic"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -119,6 +123,30 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def traiter_cedule(self, evenement):
         pass
+
+    def maj_configuration_noeud_public(self, url, transaction):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url,
+        }
+        set_on_insert = {Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()}
+        set_on_insert.update(filtre)
+
+        operations = {
+            '$set': {
+                ConstantesParametres.DOCUMENT_PUBLIQUE_MENU: transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_MENU]
+            },
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+
+        if resultat.upserted_id is None and resultat.modified_count != 1:
+            raise Exception("Erreur creation/mise a jour configuration noeud public " + url)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
@@ -563,3 +591,29 @@ class ProcessusRenouvellerCertificatPublic(ProcessusParametres):
 
 class ProcessusMajCertificatPublic(ProcessusParametres):
     pass
+
+
+class ProcessusConfigurerNoeudPublic(ProcessusParametres):
+    """
+    Sert a creer ou modifier un noeud public par URL.
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        url = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+        self.controleur.gestionnaire.maj_configuration_noeud_public(url, transaction)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusSupprimerNoeudPublic(ProcessusParametres):
+    """
+    Sert a creer ou modifier un noeud public par URL.
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        url = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+        self.controleur.gestionnaire.maj_supprimer_noeud_public(url, transaction)
+
+        self.set_etape_suivante()  # Termine

@@ -1,31 +1,52 @@
-# Script de test pour transmettre message de transaction
+import datetime, time
 
-import datetime
-import uuid
-
+from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesParametres
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles import Constantes
-from millegrilles.domaines.Parametres import ConstantesParametres
-from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles
-from millegrilles.util.BaseSendMessage import BaseEnvoyerMessageEcouter
+from threading import Event
+
+import json
+
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser()
 
 
-class MessagesSample(BaseEnvoyerMessageEcouter):
+class MessagesSample(BaseCallback):
 
     def __init__(self):
-        super().__init__()
+        super().__init__(contexte)
+        self.contexte.message_dao.register_channel_listener(self)
+        self.generateur = GenerateurTransaction(self.contexte)
 
-        self.uuid = '16b85142-d406-11e9-af0b-00155d011f00'
-        # self.uuid = 'bb58dc23-bf28-49b6-b3f6-a534794d6de4'
+        self.queue_name = None
+
+        self.channel = None
+        self.event_recu = Event()
+
+    def on_channel_open(self, channel):
+        # Enregistrer la reply-to queue
+        self.channel = channel
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+
+    def queue_open_local(self, queue):
+        self.queue_name = queue.method.queue
+        print("Queue: %s" % str(self.queue_name))
+
+        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.executer()
+
+    def run_ioloop(self):
+        self.contexte.message_dao.run_ioloop()
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
 
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(body)
+        message = json.loads(str(body, 'utf-8'))
+        print(json.dumps(message, indent=4))
 
     def maj_email_smtp_avecpassword(self):
         email_smtp_transaction = {
@@ -87,16 +108,35 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def maj_noeud_public(self):
+        transaction = {
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: 'https://localhost',
+            ConstantesParametres.DOCUMENT_PUBLIQUE_MENU: [
+                'fichiers',
+                'messages'
+            ]
+        }
+
+        domaine = ConstantesParametres.TRANSACTION_MAJ_NOEUD_PUBLIC
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, domaine, reply_to=self.queue_name, correlation_id='abcd'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def executer(self):
+        # uuid = self.maj_email_smtp_avecpassword()
+        # enveloppe = self.transmettre_cles(uuid)
+        self.maj_noeud_public()
+
+
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.maj_email_smtp_sanspassword()
-uuid = sample.maj_email_smtp_avecpassword()
-enveloppe = sample.transmettre_cles(uuid)
-
-
-sample.recu.wait(10)
 
 # FIN TEST
+sample.event_recu.wait(5)
 sample.deconnecter()
+
