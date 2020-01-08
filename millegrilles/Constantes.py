@@ -462,6 +462,8 @@ class ConstantesParametres:
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
 
+    REQUETE_NOEUD_PUBLIC = DOMAINE_NOM + '.noeudPublic'
+
     # Courriel
     DOCUMENT_CHAMP_COURRIEL_ORIGINE = 'origine'
     DOCUMENT_CHAMP_COURRIEL_DESTINATIONS = 'destinations'

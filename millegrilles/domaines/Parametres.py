@@ -1,12 +1,23 @@
 # Domaine de gestion et d'administration de MilleGrilles
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds, TraitementMessageDomaineRequete
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import  MGProcessusTransaction
 
 import logging
 import datetime
+
+
+class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesParametres.REQUETE_NOEUD_PUBLIC:
+            noeud_publique = self.gestionnaire.get_noeud_publique(message_dict)
+            self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+        else:
+            raise Exception("Requete publique non supportee " + routing_key)
 
 
 class GestionnaireParametres(GestionnaireDomaineStandard):
@@ -17,7 +28,10 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         # Queue message handlers
         self.__handler_transaction = TraitementTransactionPersistee(self)
         self.__handler_cedule = TraitementMessageCedule(self)
-        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
+        self.__handler_requetes_noeuds = {
+            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesParametres(self),
+            Constantes.SECURITE_PROTEGE: TraitementMessageDomaineRequete(self)
+        }
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
@@ -39,7 +53,6 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
         self.demarrer_watcher_collection(
             ConstantesParametres.COLLECTION_DOCUMENTS_NOM, ConstantesParametres.QUEUE_ROUTING_CHANGEMENTS)
-
 
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {
@@ -81,7 +94,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
     def get_handler_cedule(self):
         return self.__handler_cedule
 
-    def get_handler_requetes_noeuds(self):
+    def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
 
     def identifier_processus(self, domaine_transaction):
@@ -147,6 +160,18 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
         if resultat.upserted_id is None and resultat.modified_count != 1:
             raise Exception("Erreur creation/mise a jour configuration noeud public " + url)
+
+    def get_noeud_publique(self, requete):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: requete[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB],
+        }
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        noeud_public = collection_domaine.find_one(filtre)
+
+        return noeud_public
+
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
