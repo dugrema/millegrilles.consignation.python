@@ -1,7 +1,7 @@
 # Domaine de gestion et d'administration de MilleGrilles
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import  MGProcessusTransaction
 
@@ -19,6 +19,23 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
+
+class ParametresExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle in [ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC]:
+            exchanges.add(self._exchange_public)
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+        else:
+            exchanges.add(self._exchange_protege)
+
+        return list(exchanges)
 
 class GestionnaireParametres(GestionnaireDomaineStandard):
 
@@ -52,7 +69,10 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesParametres.LIBVAL_ID_MILLEGRILLE, document_config_id)
 
         self.demarrer_watcher_collection(
-            ConstantesParametres.COLLECTION_DOCUMENTS_NOM, ConstantesParametres.QUEUE_ROUTING_CHANGEMENTS)
+            ConstantesParametres.COLLECTION_DOCUMENTS_NOM,
+            ConstantesParametres.QUEUE_ROUTING_CHANGEMENTS,
+            ParametresExchangeRouter(self._contexte)
+        )
 
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {
@@ -171,7 +191,6 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         noeud_public = collection_domaine.find_one(filtre)
 
         return noeud_public
-
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):

@@ -138,8 +138,8 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # uuid = self.maj_email_smtp_avecpassword()
         # enveloppe = self.transmettre_cles(uuid)
-        # self.maj_noeud_public()
-        self.requete_noeud_public()
+        self.maj_noeud_public()
+        # self.requete_noeud_public()
 
 
 # --- MAIN ---
