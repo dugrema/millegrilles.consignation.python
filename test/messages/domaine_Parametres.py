@@ -112,8 +112,10 @@ class MessagesSample(BaseCallback):
         transaction = {
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: 'https://localhost',
             ConstantesParametres.DOCUMENT_PUBLIQUE_MENU: [
+                'messages',
                 'fichiers',
-                'messages'
+                'podcasts',
+                'albums',
             ]
         }
 
@@ -127,7 +129,7 @@ class MessagesSample(BaseCallback):
 
     def supprimer_noeud_public(self):
         transaction = {
-            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: 'https://localhost3',
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: 'https://localhost',
         }
 
         domaine = ConstantesParametres.TRANSACTION_SUPPRIMER_NOEUD_PUBLIC
@@ -153,8 +155,8 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # uuid = self.maj_email_smtp_avecpassword()
         # enveloppe = self.transmettre_cles(uuid)
-        # self.maj_noeud_public()
-        self.supprimer_noeud_public()
+        self.maj_noeud_public()
+        # self.supprimer_noeud_public()
         # self.requete_noeud_public()
 
 
