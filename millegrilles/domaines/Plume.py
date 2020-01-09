@@ -14,7 +14,7 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
-            noeud_publique = self.gestionnaire.get_annonces_recentes(message_dict)
+            noeud_publique = self.gestionnaire.get_annonces_recentes()
             self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
@@ -353,6 +353,13 @@ class GestionnairePlume(GestionnaireDomaineStandard):
                 }
             }
             collection_domaine.update_one(filtre, ops_push)
+
+    def get_annonces_recentes(self):
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        annonces_recentes = collection_domaine.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_ANNONCES_RECENTES
+        })
+        return annonces_recentes
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):

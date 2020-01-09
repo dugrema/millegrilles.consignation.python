@@ -177,10 +177,20 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_annonces_recentes(self):
+        self.generateur.transmettre_requete(
+            {},
+            ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES,
+            reply_to=self.queue_name,
+            correlation_id='abcd',
+            securite=Constantes.SECURITE_PUBLIC
+        )
+
     def executer(self):
         # self.creerAnnonce()
         # self.supprimerAnnonce()
-        self.remplacerAnnonce()
+        # self.remplacerAnnonce()
+        self.requete_annonces_recentes()
 
 
 # --- MAIN ---
