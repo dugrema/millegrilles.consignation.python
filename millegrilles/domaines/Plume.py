@@ -1,7 +1,7 @@
 # Domaine Plume - ecriture de documents
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPlume
-from millegrilles.Domaines import GestionnaireDomaineStandard
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
 
@@ -9,11 +9,56 @@ import logging
 import datetime
 
 
+class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
+            noeud_publique = self.gestionnaire.get_annonces_recentes(message_dict)
+            self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+        else:
+            raise Exception("Requete publique non supportee " + routing_key)
+
+
+class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
+            noeud_publique = self.gestionnaire.get_annonces_recentes(message_dict)
+            self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+
+
+class ParametresExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle in [ConstantesPlume.LIBVAL_ANNONCES_RECENTES]:
+            exchanges.add(self._exchange_public)
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+        else:
+            exchanges.add(self._exchange_protege)
+
+        return list(exchanges)
+
+
 class GestionnairePlume(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
         super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
+
+        self.__handler_requetes_noeuds = {
+            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesParametres(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesParametres(self)
+        }
 
     def configurer(self):
         super().configurer()
@@ -62,6 +107,12 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
         self.initialiser_document(ConstantesPlume.LIBVAL_ANNONCES_RECENTES, ConstantesPlume.DOCUMENT_ANNONCES_RECENTES)
+
+        self.demarrer_watcher_collection(
+            ConstantesPlume.COLLECTION_DOCUMENTS_NOM,
+            ConstantesPlume.QUEUE_ROUTING_CHANGEMENTS,
+            ParametresExchangeRouter(self._contexte)
+        )
 
     def ajouter_nouveau_document(self, transaction):
         document_plume = ConstantesPlume.DOCUMENT_PLUME.copy()
@@ -211,6 +262,9 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
     def traiter_cedule(self, evenement):
         pass
+
+    def get_handler_requetes(self) -> dict:
+        return self.__handler_requetes_noeuds
 
     def creer_annonce(self, annonce):
         date_creation = datetime.datetime.utcnow()

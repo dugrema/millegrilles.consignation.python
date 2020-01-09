@@ -757,6 +757,7 @@ class ConstantesPlume:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
+    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_Plume.documents'
 
     TRANSACTION_NOUVEAU_DOCUMENT = '%s.nouveauDocument' % DOMAINE_NOM
     TRANSACTION_MODIFIER_DOCUMENT = '%s.modifierDocument' % DOMAINE_NOM
@@ -782,7 +783,7 @@ class ConstantesPlume:
     LIBELLE_DOC_ANNONCES = 'annonces'
 
     DEFAUT_ATTENTE_PUBLICATION_SECS = 120   # Delai de publication par defaut
-    DEFAUT_NOMBRE_ANNONCES_RECENTES = 5   # Nombre max d'annonces dans annonces.recentes
+    DEFAUT_NOMBRE_ANNONCES_RECENTES = 200   # Nombre max d'annonces dans annonces.recentes
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PLUME = 'plume'
