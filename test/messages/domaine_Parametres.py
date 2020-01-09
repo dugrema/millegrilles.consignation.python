@@ -125,8 +125,23 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def supprimer_noeud_public(self):
+        transaction = {
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: 'https://localhost3',
+        }
+
+        domaine = ConstantesParametres.TRANSACTION_SUPPRIMER_NOEUD_PUBLIC
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, domaine, reply_to=self.queue_name, correlation_id='abcd'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
     def requete_noeud_public(self):
-        requete = {'url_web': 'https://localhost'}
+        requete = {
+            'url_web': 'https://localhost'
+        }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete, ConstantesParametres.REQUETE_NOEUD_PUBLIC, 'abcd-1234', self.queue_name,
             securite=Constantes.SECURITE_PUBLIC)
@@ -138,7 +153,8 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # uuid = self.maj_email_smtp_avecpassword()
         # enveloppe = self.transmettre_cles(uuid)
-        self.maj_noeud_public()
+        # self.maj_noeud_public()
+        self.supprimer_noeud_public()
         # self.requete_noeud_public()
 
 

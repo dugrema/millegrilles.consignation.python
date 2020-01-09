@@ -20,6 +20,17 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
             raise Exception("Requete publique non supportee " + routing_key)
 
 
+class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesParametres.REQUETE_NOEUD_PUBLIC:
+            noeud_publique = self.gestionnaire.get_noeud_publique(message_dict)
+            self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+
+
 class ParametresExchangeRouter(ExchangeRouter):
 
     def determiner_exchanges(self, document):
@@ -37,6 +48,7 @@ class ParametresExchangeRouter(ExchangeRouter):
 
         return list(exchanges)
 
+
 class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -47,7 +59,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         self.__handler_cedule = TraitementMessageCedule(self)
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesParametres(self),
-            Constantes.SECURITE_PROTEGE: TraitementMessageDomaineRequete(self)
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesParametres(self)
         }
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
@@ -184,13 +196,27 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
     def get_noeud_publique(self, requete):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
-            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: requete[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB],
+        }
+        url = requete.get(ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB)
+        if url is not None:
+            filtre[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB] = url
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        curseur = collection_domaine.find(filtre, sort=[(ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB, 1)])
+        noeuds_publics = list()
+        for noeud in curseur:
+            noeuds_publics.append(noeud)
+
+        return noeuds_publics
+
+    def maj_supprimer_noeud_public(self, url):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url,
         }
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
-        noeud_public = collection_domaine.find_one(filtre)
-
-        return noeud_public
+        collection_domaine.delete_one(filtre)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
@@ -658,6 +684,6 @@ class ProcessusSupprimerNoeudPublic(ProcessusParametres):
     def initiale(self):
         transaction = self.transaction
         url = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
-        self.controleur.gestionnaire.maj_supprimer_noeud_public(url, transaction)
+        self.controleur.gestionnaire.maj_supprimer_noeud_public(url)
 
         self.set_etape_suivante()  # Termine
