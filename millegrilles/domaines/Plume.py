@@ -61,6 +61,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
+        self.initialiser_document(ConstantesPlume.LIBVAL_ANNONCES_RECENTES, ConstantesPlume.DOCUMENT_ANNONCES_RECENTES)
 
     def ajouter_nouveau_document(self, transaction):
         document_plume = ConstantesPlume.DOCUMENT_PLUME.copy()
@@ -234,18 +235,70 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             doc_annonce[ConstantesPlume.LIBELLE_DOC_SUJET] = sujet
 
         # Verifier si l'annonce en remplace une autre
+        liste_remplacement = None
         remplacement = annonce.get(ConstantesPlume.LIBELLE_DOC_REMPLACE)
         if remplacement is not None:
             doc_annonce[ConstantesPlume.LIBELLE_DOC_REMPLACE] = remplacement
-
-            # Supprimer l'annonce qui est remplacee
-            self.supprimer_annonce(remplacement)
+            liste_remplacement = [remplacement]
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         collection_domaine.insert_one(doc_annonce)
 
+        # Mettre a jour le document avec toutes les annonces
+        self.maj_annonces_recentes([doc_annonce], liste_remplacement)
+
     def supprimer_annonce(self, uuid_annonce):
-        pass
+        self.maj_annonces_recentes(supprimer_annonces=[uuid_annonce])
+
+    def maj_annonces_recentes(self, nouvelles_annonces: list = None, supprimer_annonces: list = None):
+        """
+        Met a jour le document d'annonces recentes.
+
+        :param nouvelles_annonces: Liste de dictionnaires d'annonces a ajouter
+        :param supprimer_annonces: Liste de uuid d'annonces a supprimer
+        :return:
+        """
+        # Ajouter les valeurs en ordre croissant de timestamp.
+        # Garder les "nombre_resultats_limite" plus recents (~1 semaine)
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_ANNONCES_RECENTES
+        }
+
+        # Les deux operations sont separees pour eviter l'erreur :
+        # "pymongo.errors.WriteError: Updating the path 'annonces' would create a conflict at 'annonces'"
+
+        if supprimer_annonces is not None:
+            self._logger.debug("Supprimer annonces %s" % str(supprimer_annonces))
+            ops_pull = {
+                '$pull': {
+                    ConstantesPlume.LIBELLE_DOC_ANNONCES: {
+                        ConstantesPlume.LIBELLE_DOC_PLUME_UUID: {'$in': supprimer_annonces}
+                    }
+                }
+            }
+            collection_domaine.update_one(filtre, ops_pull)
+
+        if nouvelles_annonces is not None:
+            # Filtrer les champs indesirables dans chaque annonce
+            annonces_filtrees = list()
+            for annonce in nouvelles_annonces:
+                annonce_filtree = {}
+                for cle, valeur in annonce.items():
+                    if cle in ConstantesPlume.FILTRE_DOC_ANNONCES_RECENTES:
+                        annonce_filtree[cle] = valeur
+                annonces_filtrees.append(annonce_filtree)
+
+            ops_push = {
+                '$push': {
+                    ConstantesPlume.LIBELLE_DOC_ANNONCES: {
+                        '$each': annonces_filtrees,
+                        '$sort': {Constantes.DOCUMENT_INFODOC_DATE_CREATION: -1},
+                        '$slice': ConstantesPlume.DEFAUT_NOMBRE_ANNONCES_RECENTES,
+                    }
+                }
+            }
+            collection_domaine.update_one(filtre, ops_push)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
@@ -470,5 +523,6 @@ class ProcessusTransactionSupprimerAnnonce(ProcessusPlume):
 
     def initiale(self):
         transaction = self.charger_transaction()
-        self.controleur.gestionnaire.supprimer_annonce(transaction)
+        uuid_annonce = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+        self.controleur.gestionnaire.supprimer_annonce(uuid_annonce)
         self.set_etape_suivante()  # Termine

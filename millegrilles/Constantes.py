@@ -779,12 +779,15 @@ class ConstantesPlume:
     LIBELLE_DOC_DATE_PUBLICATION = 'datePublication'
     LIBELLE_DOC_REMPLACE = 'remplace'
     LIBELLE_DOC_DATE_ATTENTE_PUBLICATION = 'dateAttentePublication'
+    LIBELLE_DOC_ANNONCES = 'annonces'
 
-    DEFAUT_ATTENTE_PUBLICATION_SECS = 120  # Delai de publication par defaut
+    DEFAUT_ATTENTE_PUBLICATION_SECS = 120   # Delai de publication par defaut
+    DEFAUT_NOMBRE_ANNONCES_RECENTES = 5   # Nombre max d'annonces dans annonces.recentes
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PLUME = 'plume'
     LIBVAL_ANNONCE = 'annonce'
+    LIBVAL_ANNONCES_RECENTES = 'annonces.recentes'
     LIBVAL_CATALOGUE = 'catalogue'
     LIBVAL_CATEGORIE = 'categorie'
 
@@ -817,6 +820,20 @@ class ConstantesPlume:
         LIBELLE_DOC_REMPLACE: None,                     # uuid de l'annonce remplacee (opt)
         LIBELLE_DOC_DATE_ATTENTE_PUBLICATION: None,     # Date de prise d'effet de l'annonce
     }
+
+    DOCUMENT_ANNONCES_RECENTES = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_ANNONCES_RECENTES,
+        LIBELLE_DOC_ANNONCES: list(),   # Liste triee par date, plus recente annonce en premier
+    }
+
+    FILTRE_DOC_ANNONCES_RECENTES = [
+        DOCUMENT_INFODOC_DATE_CREATION,
+        DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
+        LIBELLE_DOC_PLUME_UUID,
+        LIBELLE_DOC_DATE_ATTENTE_PUBLICATION,
+        LIBELLE_DOC_TEXTE,
+        LIBELLE_DOC_SUJET
+    ]
 
 
 class CommandesSurRelai:

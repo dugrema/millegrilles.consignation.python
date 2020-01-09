@@ -154,8 +154,33 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def supprimerAnnonce(self):
+        document = {
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: '6b55ce50-32fc-11ea-adb2-00155d011f09'
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            document, ConstantesPlume.TRANSACTION_SUPPRIMER_ANNONCE, reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def remplacerAnnonce(self):
+        document = ConstantesPlume.DOCUMENT_ANNONCE.copy()
+        document[ConstantesPlume.LIBELLE_DOC_TEXTE] = 'Un remplacement dans Plumeau'
+        document[ConstantesPlume.LIBELLE_DOC_SUJET] = 'Tu es remplace'
+        document[ConstantesPlume.LIBELLE_DOC_REMPLACE] = '974c9442-32fe-11ea-adb2-00155d011f09'
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            document, ConstantesPlume.TRANSACTION_CREER_ANNONCE, reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
-        self.creerAnnonce()
+        # self.creerAnnonce()
+        # self.supprimerAnnonce()
+        self.remplacerAnnonce()
 
 
 # --- MAIN ---
