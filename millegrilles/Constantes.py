@@ -748,6 +748,77 @@ class ConstantesAnnuaire:
     }
 
 
+class ConstantesPlume:
+
+    DOMAINE_NOM = 'millegrilles.domaines.Plume'
+    COLLECTION_NOM = DOMAINE_NOM
+
+    COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
+    QUEUE_NOM = DOMAINE_NOM
+
+    TRANSACTION_NOUVEAU_DOCUMENT = '%s.nouveauDocument' % DOMAINE_NOM
+    TRANSACTION_MODIFIER_DOCUMENT = '%s.modifierDocument' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_DOCUMENT = '%s.supprimerDocument' % DOMAINE_NOM
+    TRANSACTION_PUBLIER_DOCUMENT = '%s.publierDocument' % DOMAINE_NOM
+    TRANSACTION_DEPUBLIER_DOCUMENT = '%s.depublierDocument' % DOMAINE_NOM
+    TRANSACTION_CREER_ANNONCE = '%s.creerAnnonce' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_ANNONCE = '%s.supprimerAnnonce' % DOMAINE_NOM
+
+    REQUETE_CHARGER_ANNONCES_RECENTES = DOMAINE_NOM + '.chargerAnnoncesRecentes'
+
+    LIBELLE_DOC_PLUME_UUID = 'uuid'
+    LIBELLE_DOC_SECURITE = 'securite'
+    LIBELLE_DOC_TITRE = 'titre'
+    LIBELLE_DOC_CATEGORIES = 'categories'
+    LIBELLE_DOC_TEXTE = 'texte'
+    LIBELLE_DOC_SUJET = 'sujet'
+    LIBELLE_DOC_QUILL_DELTA = 'quilldelta'
+    LIBELLE_DOC_LISTE = 'documents'
+    LIBELLE_DOC_DATE_PUBLICATION = 'datePublication'
+    LIBELLE_DOC_REMPLACE = 'remplace'
+    LIBELLE_DOC_DATE_ATTENTE_PUBLICATION = 'dateAttentePublication'
+
+    DEFAUT_ATTENTE_PUBLICATION_SECS = 120  # Delai de publication par defaut
+
+    LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_PLUME = 'plume'
+    LIBVAL_ANNONCE = 'annonce'
+    LIBVAL_CATALOGUE = 'catalogue'
+    LIBVAL_CATEGORIE = 'categorie'
+
+    DOCUMENT_DEFAUT = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
+    }
+
+    DOCUMENT_PLUME = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_PLUME,
+        LIBELLE_DOC_PLUME_UUID: None,  # Identificateur unique du document plume
+        LIBELLE_DOC_SECURITE: SECURITE_PRIVE,  # Niveau de securite
+        LIBELLE_DOC_TITRE: None,               # Titre
+        LIBELLE_DOC_CATEGORIES: None,          # Categorie du fichier
+        LIBELLE_DOC_QUILL_DELTA: None,         # Contenu, delta Quill
+        LIBELLE_DOC_TEXTE: None,               # Texte sans formattage
+    }
+
+    DOCUMENT_CATALOGUE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CATALOGUE,
+        LIBELLE_DOC_SECURITE: SECURITE_PUBLIC,     # Niveau de securite du catalogue
+        LIBELLE_DOC_CATEGORIES: {},                # Dict des categories de Plume. Valeur est 'True' (bidon)
+        LIBELLE_DOC_LISTE: {},                     # Dict des documents du catalogue. Cle est uuid,
+                                                # valeur est: {titre, uuid, _mg-derniere-modification, categories).
+    }
+
+    DOCUMENT_ANNONCE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_ANNONCE,
+        LIBELLE_DOC_SUJET: None,                        # Sujet du message (opt)
+        LIBELLE_DOC_TEXTE: None,                        # Texte sans formattage
+        LIBELLE_DOC_REMPLACE: None,                     # uuid de l'annonce remplacee (opt)
+        LIBELLE_DOC_DATE_ATTENTE_PUBLICATION: None,     # Date de prise d'effet de l'annonce
+    }
+
+
 class CommandesSurRelai:
     """
     Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir

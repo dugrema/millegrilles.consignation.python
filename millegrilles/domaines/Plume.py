@@ -1,64 +1,12 @@
 # Domaine Plume - ecriture de documents
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesPlume
 from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 import logging
 import datetime
-
-
-class ConstantesPlume:
-
-    DOMAINE_NOM = 'millegrilles.domaines.Plume'
-    COLLECTION_NOM = DOMAINE_NOM
-
-    COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
-    QUEUE_NOM = DOMAINE_NOM
-
-    TRANSACTION_NOUVEAU_DOCUMENT = '%s.nouveauDocument' % DOMAINE_NOM
-    TRANSACTION_MODIFIER_DOCUMENT = '%s.modifierDocument' % DOMAINE_NOM
-    TRANSACTION_SUPPRIMER_DOCUMENT = '%s.supprimerDocument' % DOMAINE_NOM
-    TRANSACTION_PUBLIER_DOCUMENT = '%s.publierDocument' % DOMAINE_NOM
-    TRANSACTION_DEPUBLIER_DOCUMENT = '%s.depublierDocument' % DOMAINE_NOM
-
-    DOCUMENT_PLUME_UUID = 'uuid'
-    DOCUMENT_SECURITE = 'securite'
-    DOCUMENT_TITRE = 'titre'
-    DOCUMENT_CATEGORIES = 'categories'
-    DOCUMENT_TEXTE = 'texte'
-    DOCUMENT_QUILL_DELTA = 'quilldelta'
-    DOCUMENT_LISTE = 'documents'
-    DOCUMENT_DATE_PUBLICATION = 'datePublication'
-
-    LIBVAL_CONFIGURATION = 'configuration'
-    LIBVAL_PLUME = 'plume'
-    LIBVAL_CATALOGUE = 'catalogue'
-    LIBVAL_CATEGORIE = 'categorie'
-
-    DOCUMENT_DEFAUT = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
-    }
-
-    DOCUMENT_PLUME = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_PLUME,
-        DOCUMENT_PLUME_UUID: None,  # Identificateur unique du document plume
-        DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,       # Niveau de securite
-        DOCUMENT_TITRE: None,                               # Titre
-        DOCUMENT_CATEGORIES: None,                          # Categorie du fichier
-        DOCUMENT_QUILL_DELTA: None,                         # Contenu, delta Quill
-        DOCUMENT_TEXTE: None,                               # Texte sans formattage
-    }
-
-    DOCUMENT_CATALOGUE = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CATALOGUE,
-        DOCUMENT_SECURITE: Constantes.SECURITE_PUBLIC,      # Niveau de securite du catalogue
-        DOCUMENT_CATEGORIES: {},                            # Dict des categories de Plume. Valeur est 'True' (bidon)
-        DOCUMENT_LISTE: {},                                 # Dict des documents du catalogue. Cle est uuid,
-                                                            # valeur est: {titre, uuid, _mg-derniere-modification, categories).
-    }
 
 
 class GestionnairePlume(GestionnaireDomaineStandard):
@@ -74,7 +22,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         # Index noeud, _mg-libelle
         collection_domaine.create_index(
             [
-                (ConstantesPlume.DOCUMENT_CATEGORIES, 1)
+                (ConstantesPlume.LIBELLE_DOC_CATEGORIES, 1)
             ],
             name='categories'
         )
@@ -86,13 +34,13 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         )
         collection_domaine.create_index(
             [
-                (ConstantesPlume.DOCUMENT_PLUME_UUID, 1)
+                (ConstantesPlume.LIBELLE_DOC_PLUME_UUID, 1)
             ],
             name='uuid'
         )
         collection_domaine.create_index(
             [
-                (ConstantesPlume.DOCUMENT_TITRE, 1)
+                (ConstantesPlume.LIBELLE_DOC_TITRE, 1)
             ],
             name='titre'
         )
@@ -117,9 +65,9 @@ class GestionnairePlume(GestionnaireDomaineStandard):
     def ajouter_nouveau_document(self, transaction):
         document_plume = ConstantesPlume.DOCUMENT_PLUME.copy()
 
-        document_plume[ConstantesPlume.DOCUMENT_PLUME_UUID] = \
+        document_plume[ConstantesPlume.LIBELLE_DOC_PLUME_UUID] = \
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        document_plume[ConstantesPlume.DOCUMENT_SECURITE] = transaction[ConstantesPlume.DOCUMENT_SECURITE]
+        document_plume[ConstantesPlume.LIBELLE_DOC_SECURITE] = transaction[ConstantesPlume.LIBELLE_DOC_SECURITE]
         document_plume[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = datetime.datetime.utcnow()
         document_plume[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = datetime.datetime.utcnow()
 
@@ -140,7 +88,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         }
 
         filtre = {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: transaction[ConstantesPlume.DOCUMENT_PLUME_UUID]
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
         }
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
@@ -150,19 +98,19 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
     def supprimer_document(self, transaction):
         filtre = {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: transaction[ConstantesPlume.DOCUMENT_PLUME_UUID]
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
         }
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         resultat = collection_domaine.delete_one(filtre)
 
     def __map_transaction_vers_document(self, transaction, document_plume):
-        document_plume[ConstantesPlume.DOCUMENT_TITRE] = transaction[ConstantesPlume.DOCUMENT_TITRE]
-        document_plume[ConstantesPlume.DOCUMENT_TEXTE] = transaction[ConstantesPlume.DOCUMENT_TEXTE]
-        document_plume[ConstantesPlume.DOCUMENT_QUILL_DELTA] = transaction.get(ConstantesPlume.DOCUMENT_QUILL_DELTA)
-        categories_string = transaction[ConstantesPlume.DOCUMENT_CATEGORIES]
+        document_plume[ConstantesPlume.LIBELLE_DOC_TITRE] = transaction[ConstantesPlume.LIBELLE_DOC_TITRE]
+        document_plume[ConstantesPlume.LIBELLE_DOC_TEXTE] = transaction[ConstantesPlume.LIBELLE_DOC_TEXTE]
+        document_plume[ConstantesPlume.LIBELLE_DOC_QUILL_DELTA] = transaction.get(ConstantesPlume.LIBELLE_DOC_QUILL_DELTA)
+        categories_string = transaction[ConstantesPlume.LIBELLE_DOC_CATEGORIES]
         if categories_string is not None:
             categories = categories_string.split(' ')
-            document_plume[ConstantesPlume.DOCUMENT_CATEGORIES] = categories
+            document_plume[ConstantesPlume.LIBELLE_DOC_CATEGORIES] = categories
 
     def get_document(self, uuid_document):
         filtre = {
@@ -181,16 +129,16 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             raise ValueError("Document uuid: %s non trouve" % uuid_document)
 
         info_catalogue = {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: document[ConstantesPlume.DOCUMENT_PLUME_UUID],
-            ConstantesPlume.DOCUMENT_TITRE: document[ConstantesPlume.DOCUMENT_TITRE],
-            ConstantesPlume.DOCUMENT_CATEGORIES: document[ConstantesPlume.DOCUMENT_CATEGORIES],
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: document[ConstantesPlume.LIBELLE_DOC_PLUME_UUID],
+            ConstantesPlume.LIBELLE_DOC_TITRE: document[ConstantesPlume.LIBELLE_DOC_TITRE],
+            ConstantesPlume.LIBELLE_DOC_CATEGORIES: document[ConstantesPlume.LIBELLE_DOC_CATEGORIES],
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: document[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
         }
         set_ops = {
-            '%s.%s' % (ConstantesPlume.DOCUMENT_LISTE, uuid_document): info_catalogue
+            '%s.%s' % (ConstantesPlume.LIBELLE_DOC_LISTE, uuid_document): info_catalogue
         }
         for categorie in document['categories']:
-            set_ops['%s.%s' % (ConstantesPlume.DOCUMENT_CATEGORIES, categorie)] = True
+            set_ops['%s.%s' % (ConstantesPlume.LIBELLE_DOC_CATEGORIES, categorie)] = True
 
         operations = {
             '$set': set_ops,
@@ -199,7 +147,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
         filtre_catalogue = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_CATALOGUE,
-            ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PUBLIC,
+            ConstantesPlume.LIBELLE_DOC_SECURITE: Constantes.SECURITE_PUBLIC,
         }
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
@@ -207,7 +155,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
         # Marquer document comme publie
         operations_publie = {
-            '$currentDate': {ConstantesPlume.DOCUMENT_DATE_PUBLICATION: True}
+            '$currentDate': {ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION: True}
         }
         filtre_document = {
             'uuid': uuid_document,
@@ -219,7 +167,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         filtre_catalogue = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_CATALOGUE,
-            ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PUBLIC,
+            ConstantesPlume.LIBELLE_DOC_SECURITE: Constantes.SECURITE_PUBLIC,
         }
         document = collection_domaine.find_one(filtre_catalogue)
         return document
@@ -251,12 +199,52 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Plume:ProcessusTransactionPublierDocumentPlume"
         elif domaine_transaction == ConstantesPlume.TRANSACTION_DEPUBLIER_DOCUMENT:
             processus = "millegrilles_domaines_Plume:ProcessusTransactionDepublierDocumentPlume"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_CREER_ANNONCE:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionCreerAnnonce"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_SUPPRIMER_ANNONCE:
+            processus = "millegrilles_domaines_Plume:ProcessusTransactionSupprimerAnnonce"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
 
     def traiter_cedule(self, evenement):
+        pass
+
+    def creer_annonce(self, annonce):
+        date_creation = datetime.datetime.utcnow()
+
+        # Calculer le delai de publication par defaut
+        delta_publication = datetime.timedelta(seconds=ConstantesPlume.DEFAUT_ATTENTE_PUBLICATION_SECS)
+        date_publication = date_creation + delta_publication
+
+        doc_annonce = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_ANNONCE,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: annonce[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_creation,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_creation,
+            ConstantesPlume.LIBELLE_DOC_DATE_ATTENTE_PUBLICATION: date_publication,
+            ConstantesPlume.LIBELLE_DOC_TEXTE: annonce[ConstantesPlume.LIBELLE_DOC_TEXTE],
+        }
+
+        # Le sujet est optionnel
+        sujet = annonce.get(ConstantesPlume.LIBELLE_DOC_SUJET)
+        if sujet is not None:
+            doc_annonce[ConstantesPlume.LIBELLE_DOC_SUJET] = sujet
+
+        # Verifier si l'annonce en remplace une autre
+        remplacement = annonce.get(ConstantesPlume.LIBELLE_DOC_REMPLACE)
+        if remplacement is not None:
+            doc_annonce[ConstantesPlume.LIBELLE_DOC_REMPLACE] = remplacement
+
+            # Supprimer l'annonce qui est remplacee
+            self.supprimer_annonce(remplacement)
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine.insert_one(doc_annonce)
+
+    def supprimer_annonce(self, uuid_annonce):
         pass
 
 
@@ -375,7 +363,7 @@ class ProcessusTransactionAjouterDocumentPlume(ProcessusPlume):
         self.set_etape_suivante()  # Termine
 
         return {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: document_plume[ConstantesPlume.DOCUMENT_PLUME_UUID],
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: document_plume[ConstantesPlume.LIBELLE_DOC_PLUME_UUID],
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: document_plume[Constantes.DOCUMENT_INFODOC_DATE_CREATION],
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: document_plume[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION],
         }
@@ -459,12 +447,28 @@ class ProcessusTransactionDepublierDocumentPlume(ProcessusPlume):
     Processus de publication d'une version de document Plume
     """
 
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
     def initiale(self):
         """ Mettre a jour le document """
         transaction = self.charger_transaction()
 
         self.set_etape_suivante()  # Termine
 
+
+class ProcessusTransactionCreerAnnonce(ProcessusPlume):
+    """
+    Generer et publie une nouvelle annonce.
+    L'annonce a un delai de prise d'effet pour permettre de la supprimer avant d'etre affichee.
+    """
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        self.controleur.gestionnaire.creer_annonce(transaction)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionSupprimerAnnonce(ProcessusPlume):
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        self.controleur.gestionnaire.supprimer_annonce(transaction)
+        self.set_etape_suivante()  # Termine

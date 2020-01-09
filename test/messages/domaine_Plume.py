@@ -1,43 +1,66 @@
 # Script de test pour transmettre message de transaction
+import datetime, time
 
-import datetime
-import uuid
-
+from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesPlume
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles import Constantes
-from millegrilles.domaines.Plume import ConstantesPlume
-from millegrilles.util.BaseSendMessage import BaseEnvoyerMessageEcouter
+from threading import Event
+
+import json
+
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser()
 
 
-class MessagesSample(BaseEnvoyerMessageEcouter):
+class MessagesSample(BaseCallback):
 
     def __init__(self):
-        super().__init__()
+        super().__init__(contexte)
+        self.contexte.message_dao.register_channel_listener(self)
+        self.generateur = GenerateurTransaction(self.contexte)
 
-        self.uuid = '16b85142-d406-11e9-af0b-00155d011f00'
-        # self.uuid = 'bb58dc23-bf28-49b6-b3f6-a534794d6de4'
+        self.queue_name = None
+
+        self.channel = None
+        self.event_recu = Event()
+
+    def on_channel_open(self, channel):
+        # Enregistrer la reply-to queue
+        self.channel = channel
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+
+    def queue_open_local(self, queue):
+        self.queue_name = queue.method.queue
+        print("Queue: %s" % str(self.queue_name))
+
+        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.executer()
+
+    def run_ioloop(self):
+        self.contexte.message_dao.run_ioloop()
 
     def deconnecter(self):
         self.contexte.message_dao.deconnecter()
 
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(body)
+        message = json.loads(str(body, 'utf-8'))
+        print(json.dumps(message, indent=4))
 
     def requete_liste(self):
         requete_document = {
             'filtre': {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME,
-                ConstantesPlume.DOCUMENT_CATEGORIES: {'$in': ['cat1']},
+                ConstantesPlume.LIBELLE_DOC_CATEGORIES: {'$in': ['cat1']},
             },
             'sort': [(Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)],
             'projection': {
-                ConstantesPlume.DOCUMENT_PLUME_UUID: 1,
-                ConstantesPlume.DOCUMENT_CATEGORIES: 1,
-                ConstantesPlume.DOCUMENT_TITRE: 1,
-                ConstantesPlume.DOCUMENT_SECURITE: 1,
+                ConstantesPlume.LIBELLE_DOC_PLUME_UUID: 1,
+                ConstantesPlume.LIBELLE_DOC_CATEGORIES: 1,
+                ConstantesPlume.LIBELLE_DOC_TITRE: 1,
+                ConstantesPlume.LIBELLE_DOC_SECURITE: 1,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: 1,
             }
@@ -53,7 +76,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         requete_document = {
             'filtre': {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_PLUME,
-                ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
+                ConstantesPlume.LIBELLE_DOC_PLUME_UUID: self.uuid,
             }
         }
         requetes = {'requetes': [requete_document]}
@@ -66,11 +89,11 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def nouveau_document(self):
 
         document = {
-            ConstantesPlume.DOCUMENT_TITRE: 'Document Unit Test',
-            ConstantesPlume.DOCUMENT_CATEGORIES: 'cat1 cat2 Cat3',
-            ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
-            ConstantesPlume.DOCUMENT_QUILL_DELTA: {"ops": [{"insert": "Un document de test.\n"}]},
-            ConstantesPlume.DOCUMENT_TEXTE: "Un document de test.\n",
+            ConstantesPlume.LIBELLE_DOC_TITRE: 'Document Unit Test',
+            ConstantesPlume.LIBELLE_DOC_CATEGORIES: 'cat1 cat2 Cat3',
+            ConstantesPlume.LIBELLE_DOC_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesPlume.LIBELLE_DOC_QUILL_DELTA: {"ops": [{"insert": "Un document de test.\n"}]},
+            ConstantesPlume.LIBELLE_DOC_TEXTE: "Un document de test.\n",
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -82,12 +105,12 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def modifier_document(self):
 
         document = {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
-            ConstantesPlume.DOCUMENT_TITRE: 'Document Unit Test modifie 1',
-            ConstantesPlume.DOCUMENT_CATEGORIES: 'cat1 cat4 Cat3',
-            ConstantesPlume.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
-            ConstantesPlume.DOCUMENT_QUILL_DELTA: {"ops": [{"insert": "Un document de test modifie 1.\n"}]},
-            ConstantesPlume.DOCUMENT_TEXTE: "Un document de test modifie 1.\n",
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: self.uuid,
+            ConstantesPlume.LIBELLE_DOC_TITRE: 'Document Unit Test modifie 1',
+            ConstantesPlume.LIBELLE_DOC_CATEGORIES: 'cat1 cat4 Cat3',
+            ConstantesPlume.LIBELLE_DOC_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesPlume.LIBELLE_DOC_QUILL_DELTA: {"ops": [{"insert": "Un document de test modifie 1.\n"}]},
+            ConstantesPlume.LIBELLE_DOC_TEXTE: "Un document de test modifie 1.\n",
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -99,7 +122,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def supprimer_document(self):
 
         document = {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: self.uuid,
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -111,7 +134,7 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
     def publier_document(self):
 
         document = {
-            ConstantesPlume.DOCUMENT_PLUME_UUID: self.uuid,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: self.uuid,
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -120,19 +143,27 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def creerAnnonce(self):
+        document = ConstantesPlume.DOCUMENT_ANNONCE.copy()
+        document[ConstantesPlume.LIBELLE_DOC_TEXTE] = 'Une nouvelle annonce sous Plume'
+        document[ConstantesPlume.LIBELLE_DOC_SUJET] = 'Mon sujet'
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            document, ConstantesPlume.TRANSACTION_CREER_ANNONCE, reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def executer(self):
+        self.creerAnnonce()
+
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.requete_document()
-# enveloppe = sample.requete_liste()
-# enveloppe = sample.nouveau_document()
-# enveloppe = sample.modifier_document()
-# enveloppe = sample.supprimer_document()
-enveloppe = sample.publier_document()
-
-sample.recu.wait(10)
 
 # FIN TEST
+sample.event_recu.wait(5)
 sample.deconnecter()
+
