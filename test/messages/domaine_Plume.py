@@ -146,7 +146,7 @@ class MessagesSample(BaseCallback):
     def creerAnnonce(self):
         document = ConstantesPlume.DOCUMENT_ANNONCE.copy()
         document[ConstantesPlume.LIBELLE_DOC_TEXTE] = 'Une nouvelle annonce sous Plume'
-        document[ConstantesPlume.LIBELLE_DOC_SUJET] = 'Mon sujet'
+        document[ConstantesPlume.LIBELLE_DOC_SUJET] = 'Mouaip, reussi!'
 
         enveloppe_val = self.generateur.soumettre_transaction(
             document, ConstantesPlume.TRANSACTION_CREER_ANNONCE, reply_to=self.queue_name, correlation_id='efgh')
@@ -187,10 +187,10 @@ class MessagesSample(BaseCallback):
         )
 
     def executer(self):
-        # self.creerAnnonce()
+        self.creerAnnonce()
         # self.supprimerAnnonce()
         # self.remplacerAnnonce()
-        self.requete_annonces_recentes()
+        # self.requete_annonces_recentes()
 
 
 # --- MAIN ---

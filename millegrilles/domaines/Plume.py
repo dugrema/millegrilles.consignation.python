@@ -25,7 +25,7 @@ class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
-            noeud_publique = self.gestionnaire.get_annonces_recentes(message_dict)
+            noeud_publique = self.gestionnaire.get_annonces_recentes()
             self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
