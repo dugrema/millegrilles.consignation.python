@@ -5,6 +5,7 @@ from millegrilles import Constantes
 from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
+import os
 import logging
 import uuid
 import datetime
@@ -41,6 +42,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
 
     DOCUMENT_FICHIER_NOMFICHIER = 'nom'
+    DOCUMENT_FICHIER_EXTENSION_ORIGINAL = 'extension'
     DOCUMENT_FICHIER_UUID_DOC = 'uuid'                    # UUID du document de fichier (metadata)
     DOCUMENT_UUID_GENERIQUE = 'documentuuid'            # Represente un UUID de n'import quel type de document
     DOCUMENT_FICHIER_FUUID = 'fuuid'                    # UUID (v1) du fichier
@@ -365,6 +367,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def traiter_cedule(self, evenement):
         pass
 
+    def get_fichier_par_fuuid(self, fuuid):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid): {
+                '$exists': True,
+            }
+        }
+        self._logger.info("Fichier par fuuid: %s" % filtre)
+
+        fichier = collection_domaine.find_one(filtre)
+
+        return fichier
+
     def maj_fichier(self, transaction):
         """
         Genere ou met a jour un document de fichier avec l'information recue dans une transaction metadata.
@@ -391,12 +407,16 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_generique
             })
 
-        nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
-
         set_on_insert = ConstantesGrosFichiers.DOCUMENT_FICHIER.copy()
+        nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] =\
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
+
+        # Extraire l'extension originale
+        extension_fichier = os.path.splitext(nom_fichier)[1].lower().replace('.', '')
+        if extension_fichier != '':
+            set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = extension_fichier
 
         # set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
 
@@ -1599,16 +1619,21 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
         self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
 
-        return {'fuuid': fuuid}
+        return {
+            'fuuid': fuuid,
+        }
 
     def decrypter_fichier(self):
-        transaction_id = self.parametres['decrypterFichier_cleSecrete'].get('_id-transaction')
-        collection_transaction_nom = self.controleur.gestionnaire.get_collection_transaction_nom()
-        collection_transaction = self.controleur.document_dao.get_collection(collection_transaction_nom)
-        transaction_cle_secrete = collection_transaction.find_one({'_id': ObjectId(transaction_id)})
+        # transaction_id = self.parametres['decrypterFichier_cleSecrete'].get('_id-transaction')
+        # collection_transaction_nom = self.controleur.gestionnaire.get_collection_transaction_nom()
+        # collection_transaction = self.controleur.document_dao.get_collection(collection_transaction_nom)
+        # transaction_cle_secrete = collection_transaction.find_one({'_id': ObjectId(transaction_id)})
+        information_cle_secrete = self.parametres['decrypterFichier_cleSecrete']
 
-        cle_secrete = transaction_cle_secrete['cle_secrete_decryptee']
-        iv = transaction_cle_secrete['iv']
+        cle_secrete = information_cle_secrete['cle_secrete_decryptee']
+        iv = information_cle_secrete['iv']
+
+        information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
 
         self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
 
@@ -1621,6 +1646,9 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
             'fuuid': fuuid,
             'cleSecreteDecryptee': cle_secrete,
             'iv': iv,
+            'nomfichier': information_fichier['nom'],
+            'mimetype': information_fichier['mimetype'],
+            'extension': information_fichier.get('extension'),
         }
 
         self.controleur.generateur_transactions.transmettre_commande(
