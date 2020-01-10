@@ -10,7 +10,6 @@ import logging
 import uuid
 import datetime
 import json
-from bson.objectid import ObjectId
 
 
 class ConstantesGrosFichiers:
@@ -418,8 +417,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if extension_fichier != '':
             set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = extension_fichier
 
-        # set_on_insert[ConstantesGrosFichiers.DOCUMENT_SECURITE] = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-
         operation_currentdate = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
         }
@@ -475,8 +472,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
 
-        self._logger.error("maj_fichier: filtre = %s" % filtre)
-        self._logger.error("maj_fichier: operations = %s" % operations)
+        self._logger.info("maj_fichier: filtre = %s" % filtre)
+        self._logger.info("maj_fichier: operations = %s" % operations)
         try:
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
         except DuplicateKeyError as dke:
@@ -1113,6 +1110,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def initiale(self):
         """ Sauvegarder une nouvelle version d'un fichier """
@@ -1120,28 +1118,25 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         # Vierifier si le document de fichier existe deja
         self._logger.debug("Fichier existe, on ajoute une version")
-        self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.ajouter_version_fichier.__name__)
 
         fuuid = transaction['fuuid']
         document_uuid = transaction.get('documentuuid')  # Represente la collection, si present
 
-        return {'fuuid': fuuid, 'securite': transaction['securite'], 'collection_uuid': document_uuid, 'type_operation': 'Nouveau fichier'}
-
-    def ajouter_version_fichier(self):
-        # Ajouter version au fichier
         transaction = self.charger_transaction()
         resultat = self._controleur.gestionnaire.maj_fichier(transaction)
+        resultat.update({
+            'fuuid': fuuid,
+            'securite': transaction['securite'],
+            'collection_uuid': document_uuid,
+            'type_operation': 'Nouveau fichier',
+            'mimetype': transaction['mimetype'],
+        })
 
-        self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.attendre_transaction_transfertcomplete.__name__)
-
-        return resultat
-
-    def attendre_transaction_transfertcomplete(self):
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.confirmer_hash_update_collections.__name__,
-            self._get_tokens_attente())
+            self._get_tokens_attente(resultat))
+
+        return resultat
 
     def confirmer_hash_update_collections(self):
         # if self.parametres.get('attente_token') is not None:
@@ -1157,28 +1152,77 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         uuid_fichier = self.parametres['uuid_fichier']
         self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
-        collection_uuid = self.parametres.get('collection_uuid')
-        if collection_uuid is None:
-            self.set_etape_suivante()  # Processus termine
+        # Verifier si le fichier est une image protegee - il faut generer un thumbnail
+        self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
+        if self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image':
+            self.__logger.info("Mimetype est une image")
+            self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
         else:
-            self.set_etape_suivante(
-                ProcessusTransactionNouvelleVersionMetadata.ajouter_a_collection.__name__)
+            self._traitement_collection()
 
-    def ajouter_a_collection(self):
-        fichier_uuid = self.parametres.get('uuid_fichier')
+    def attente_cle_decryptage(self):
+        fuuid = self.parametres['fuuid']
+        # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
+        transaction_maitredescles = {
+            'fuuid': fuuid
+        }
+        domaine = 'millegrilles.domaines.MaitreDesCles.declasserCleGrosFichier'
+        self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
+
+        token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.demander_thumbnail_protege.__name__,
+                                [token_attente])
+
+    def demander_thumbnail_protege(self):
+
+        information_cle_secrete = self.parametres['decrypterFichier_cleSecrete']
+
+        cle_secrete = information_cle_secrete['cle_secrete_decryptee']
+        iv = information_cle_secrete['iv']
+
+        information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
+
+        self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
+
+        fuuid = self.parametres['fuuid']
+        token_attente = 'decrypterFichier_nouveauFichier:%s' % fuuid
+
+        # Transmettre commande a grosfichiers
+
+        commande = {
+            'fuuid': fuuid,
+            'cleSecreteDecryptee': cle_secrete,
+            'iv': iv,
+            'nomfichier': information_fichier['nom'],
+            'mimetype': information_fichier['mimetype'],
+            'extension': information_fichier.get('extension'),
+        }
+
+        self.controleur.generateur_transactions.transmettre_commande(
+            commande, 'commande.grosfichiers.decrypterFichier')
+
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.sauvegarde_thumbnail_protege.__name__, [token_attente])
+
+    def sauvegarde_thumbnail_protege(self):
+        self._traitement_collection()
+
+    def _traitement_collection(self):
         collection_uuid = self.parametres.get('collection_uuid')
+        if collection_uuid is not None:
+            fichier_uuid = self.parametres.get('uuid_fichier')
+            collection_uuid = self.parametres.get('collection_uuid')
 
-        self._controleur._gestionnaire_domaine.ajouter_documents_collection(collection_uuid, [fichier_uuid])
+            self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, [fichier_uuid])
 
         self.set_etape_suivante()  # Processus termine
 
-    def _get_tokens_attente(self):
-        fuuid = self.parametres.get('fuuid')
+    def _get_tokens_attente(self, resultat):
+        fuuid = resultat['fuuid']
         tokens = [
             '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
         ]
 
-        if self.parametres['securite'] in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+        if resultat['securite'] in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
             tokens.append('%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid))
 
         return tokens

@@ -894,7 +894,7 @@ class MGProcessus:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
 
             # Verifier si on peut eviter d'attenre des tockens
-            # self.verifier_attendre_token()
+            self.verifier_attendre_token()
 
             # Ajouter tokens pour synchronisation inter-transaction.
             tokens = {}
