@@ -8,9 +8,6 @@ ENV SRC_FOLDER=/opt/millegrilles/build/src
 COPY scripts/ $BUILD_FOLDER/scripts
 COPY ./ $SRC_FOLDER/MilleGrilles.consignation.python/
 
-# Copier les fichiers templates et ressources html statiques
-COPY html/ $BUNDLE_FOLDER/html
-
 RUN $BUILD_FOLDER/scripts/setup.sh
 
 USER mg_python
