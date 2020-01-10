@@ -837,6 +837,170 @@ class ConstantesPlume:
     ]
 
 
+class ConstantesGrosFichiers:
+    """ Constantes pour le domaine de GrosFichiers """
+
+    DOMAINE_NOM = 'millegrilles.domaines.GrosFichiers'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = 'millegrilles.domaines.GrosFichiers'
+    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_GrosFichiers'
+
+    TRANSACTION_TYPE_METADATA = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata'
+    TRANSACTION_TYPE_TRANSFERTCOMPLETE = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.transfertComplete'
+
+    TRANSACTION_CHAMP_ETIQUETTE = 'etiquette'
+
+    LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_FICHIER = 'fichier'
+    LIBVAL_COLLECTION = 'collection'
+    LIBVAL_COLLECTION_FIGEE = 'collection.figee'
+    LIBVAL_FAVORIS = 'favoris'
+    LIBVAL_RAPPORT = 'rapport'
+    LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
+
+    DOCUMENT_SECURITE = 'securite'
+    DOCUMENT_COMMENTAIRES = 'commentaires'
+
+    DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
+
+    DOCUMENT_FICHIER_NOMFICHIER = 'nom'
+    DOCUMENT_FICHIER_EXTENSION_ORIGINAL = 'extension'
+    DOCUMENT_FICHIER_UUID_DOC = 'uuid'                    # UUID du document de fichier (metadata)
+    DOCUMENT_UUID_GENERIQUE = 'documentuuid'            # Represente un UUID de n'import quel type de document
+    DOCUMENT_FICHIER_FUUID = 'fuuid'                    # UUID (v1) du fichier
+    DOCUMENT_FICHIER_DATEVCOURANTE = 'date_v_courante'  # Date de la version courante
+    DOCUMENT_FICHIER_UUIDVCOURANTE = 'fuuid_v_courante'  # FUUID de la version courante
+    DOCUMENT_FICHIER_VERSIONS = 'versions'
+    DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
+    DOCUMENT_FICHIER_TAILLE = 'taille'
+    DOCUMENT_FICHIER_SHA256 = 'sha256'
+    DOCUMENT_FICHIER_SUPPRIME = 'supprime'
+    DOCUMENT_FICHIER_ETIQUETTES = 'etiquettes'
+
+    DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
+    DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
+    DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE = 'uuid_source_figee'
+    DOCUMENT_COLLECTIONS_FIGEES = 'figees'
+    DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
+
+    DOCUMENT_FAVORIS_LISTE = 'favoris'
+
+    DOCUMENT_VERSION_NOMFICHIER = 'nom'
+    DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
+    DOCUMENT_VERSION_DATE_VERSION = 'date_version'
+    DOCUMENT_VERSION_DATE_SUPPRESSION = 'date_suppression'
+
+    DOCUMENT_DEFAULT_MIMETYPE = 'application/binary'
+
+    DOCUMENT_TORRENT_HASHSTRING = 'torrent_hashstring'
+
+    TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
+    TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
+    TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM
+    TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM
+    TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
+    TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
+    TRANSACTION_CHANGER_ETIQUETTES_FICHIER = '%s.changerEtiquettesFichier' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerFichier' % DOMAINE_NOM
+    TRANSACTION_RECUPERER_FICHIER = '%s.recupererFichier' % DOMAINE_NOM
+    TRANSACTION_DECRYPTER_FICHIER = '%s.decrypterFichier' % DOMAINE_NOM
+    TRANSACTION_CLESECRETE_FICHIER = '%s.cleSecreteFichier' % DOMAINE_NOM
+    TRANSACTION_NOUVEAU_FICHIER_DECRYPTE = '%s.nouveauFichierDecrypte' % DOMAINE_NOM
+
+    TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
+    TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
+    TRANSACTION_COMMENTER_COLLECTION = '%s.commenterCollection' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_COLLECTION = '%s.supprimerCollection' % DOMAINE_NOM
+    TRANSACTION_RECUPERER_COLLECTION = '%s.recupererCollection' % DOMAINE_NOM
+    TRANSACTION_FIGER_COLLECTION = '%s.figerCollection' % DOMAINE_NOM
+    TRANSACTION_CHANGER_ETIQUETTES_COLLECTION = '%s.changerEtiquettesCollection' % DOMAINE_NOM
+    TRANSACTION_CREERTORRENT_COLLECTION = '%s.creerTorrentCollection' % DOMAINE_NOM
+    TRANSACTION_AJOUTER_FICHIERS_COLLECTION = '%s.ajouterFichiersCollection' % DOMAINE_NOM
+    TRANSACTION_RETIRER_FICHIERS_COLLECTION = '%s.retirerFichiersCollection' % DOMAINE_NOM
+
+    TRANSACTION_AJOUTER_FAVORI = '%s.ajouterFavori' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_FAVORI = '%s.supprimerFavori' % DOMAINE_NOM
+
+    TRANSACTION_TORRENT_NOUVEAU = '%s.nouveauTorrent' % DOMAINE_NOM
+    TRANSACTION_TORRENT_SEEDING = '%s.seedingTorrent' % DOMAINE_NOM
+
+    COMMANDE_DECRYPTER_FICHIER = 'commande.grosfichiers.decrypterFichier'
+    COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
+
+    # Document par defaut pour la configuration de l'interface GrosFichiers
+    DOCUMENT_DEFAUT = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+    }
+
+    DOCUMENT_FICHIER = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_FICHIER,
+        DOCUMENT_FICHIER_UUID_DOC: None,  # Identificateur unique du fichier (UUID trans initiale)
+        # DOCUMENT_SECURITE: Constantes.SECURITE_SECURE,      # Niveau de securite
+        DOCUMENT_COMMENTAIRES: None,                        # Commentaires
+        DOCUMENT_FICHIER_NOMFICHIER: None,                  # Nom du fichier (libelle affiche a l'usager)
+        DOCUMENT_FICHIER_ETIQUETTES: list(),                # Liste de libelles du fichier
+        DOCUMENT_FICHIER_SUPPRIME: False,                   # True si le fichier est supprime
+    }
+
+    SOUSDOCUMENT_VERSION_FICHIER = {
+        DOCUMENT_FICHIER_FUUID: None,
+        DOCUMENT_FICHIER_NOMFICHIER: None,
+        DOCUMENT_FICHIER_MIMETYPE: DOCUMENT_DEFAULT_MIMETYPE,
+        DOCUMENT_VERSION_DATE_FICHIER: None,
+        DOCUMENT_VERSION_DATE_VERSION: None,
+        DOCUMENT_FICHIER_TAILLE: None,
+        DOCUMENT_FICHIER_SHA256: None,
+        DOCUMENT_COMMENTAIRES: None,
+    }
+
+    DOCUMENT_COLLECTION = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_COLLECTION,
+        DOCUMENT_FICHIER_UUID_DOC: None,        # Identificateur unique du fichier (UUID trans initiale)
+        DOCUMENT_COLLECTION_LISTEDOCS: dict(),  # Dictionnaire de fichiers, key=uuid, value=DOCUMENT_COLLECTION_FICHIER
+        DOCUMENT_FICHIER_ETIQUETTES: list(),    # Etiquettes de la collection
+        DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
+        DOCUMENT_COMMENTAIRES: None,
+        DOCUMENT_SECURITE: SECURITE_PRIVE,
+    }
+
+    DOCUMENT_COLLECTION_FICHIER = {
+        DOCUMENT_FICHIER_UUID_DOC: None,    # uuid du fichier
+        DOCUMENT_FICHIER_FUUID: None,       # fuuid de la version du fichier
+        DOCUMENT_FICHIER_NOMFICHIER: None,  # Nom du fichier
+        DOCUMENT_VERSION_DATE_FICHIER: None,
+        DOCUMENT_FICHIER_TAILLE: None,
+        DOCUMENT_COMMENTAIRES: None,
+    }
+
+    DOCUMENT_FAVORIS = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_FAVORIS,
+        DOCUMENT_FAVORIS_LISTE: list(),     # Liste DOCUMENT_FAVORIS_INFO
+    }
+
+    DOCUMENT_FAVORIS_INFO = {
+        DOCUMENT_INFODOC_LIBELLE: None,      # Type document
+        'nom': None,                                    # Nom affiche a l'ecran
+        'uuid': None,                                   # Lien vers document, doit etre unique dans la liste de favoris
+    }
+
+    # Prototype de document liste de recherche
+    # Represente une liste maintenue et triee par un champ particulier (date) de resultats
+    # pour acces rapide.
+    # Peut etre utilise pour garder une liste des N derniers fichiers changes, fichiers
+    # avec libelles '2019 et 'photos', etc.
+    DOCUMENT_RAPPORT_RECHERCHE = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_RAPPORT,
+        'description': None,                    # Description (nom) de la liste de recherche
+        DOCUMENT_SECURITE: None,                # Niveau de securite de cette liste
+        'filtre_libelles': dict(),              # Libelles utilises pour filtrer la liste des changements
+        DOCUMENT_COLLECTION_FICHIERS: list(),   # Dictionnaire de fichiers, valeur=DOCUMENT_COLLECTION_FICHIER
+        'tri': [{DOCUMENT_VERSION_DATE_FICHIER: -1}],   # Tri de la liste, utilise pour tronquer
+        'compte_max': 100,                      # Nombre maximal d'entree dans la liste
+    }
+
+
 class CommandesSurRelai:
     """
     Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir
