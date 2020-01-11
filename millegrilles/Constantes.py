@@ -878,6 +878,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_SHA256 = 'sha256'
     DOCUMENT_FICHIER_SUPPRIME = 'supprime'
     DOCUMENT_FICHIER_ETIQUETTES = 'etiquettes'
+    DOCUMENT_FICHIER_THUMBNAIL = 'thumbnail'
 
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
@@ -908,6 +909,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_DECRYPTER_FICHIER = '%s.decrypterFichier' % DOMAINE_NOM
     TRANSACTION_CLESECRETE_FICHIER = '%s.cleSecreteFichier' % DOMAINE_NOM
     TRANSACTION_NOUVEAU_FICHIER_DECRYPTE = '%s.nouveauFichierDecrypte' % DOMAINE_NOM
+    TRANSACTION_ASSOCIER_THUMBNAIL = '%s.associerThumbnail' % DOMAINE_NOM
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM

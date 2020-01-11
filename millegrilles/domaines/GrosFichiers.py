@@ -82,6 +82,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecreteFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_THUMBNAIL:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierThumbnail"
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
@@ -900,6 +902,30 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update(filtre, ops)
 
+    def associer_thumbnail(self, fuuid, thumbnail):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid): {
+                '$exists': True,
+            }
+        }
+
+        ops = {
+            '$set': {
+                '%s.%s.%s' % (
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                    fuuid,
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
+                ): thumbnail
+            }
+        }
+
+        self._logger.debug("Ajout thumbnail pour fuuid: %s" % filtre)
+        update_info = collection_domaine.update_one(filtre, ops)
+        if update_info.matched_count < 1:
+            raise Exception("Erreur ajout thumbnail pour fuuid " + fuuid)
+
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -1025,7 +1051,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
 
         fuuid = self.parametres['fuuid']
-        token_attente = 'decrypterFichier_nouveauFichier:%s' % fuuid
+        token_attente = 'associer_thumbnail:%s' % fuuid
 
         # Transmettre commande a grosfichiers
 
@@ -1585,3 +1611,22 @@ class ProcessusTransactionNouveauFichierDecrypte(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
         return {'fuuid_crypte': fuuid_decrypte, 'fuuid_decrypte': fuuid_decrypte}
+
+
+class ProcessusTransactionAssocierThumbnail(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        fuuid = transaction['fuuid']
+        thumbnail = transaction['thumbnail']
+
+        self.controleur.gestionnaire.associer_thumbnail(fuuid, thumbnail)
+
+        token_resumer = 'associer_thumbnail:%s' % fuuid
+        self.resumer_processus([token_resumer])
+
+        self.set_etape_suivante()
