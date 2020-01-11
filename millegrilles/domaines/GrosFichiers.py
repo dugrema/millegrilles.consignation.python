@@ -858,6 +858,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256_fichier
         }
 
+        if transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL] = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL]
+
+        if transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
+
         label_versions_fuuid_decrypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_decrypte)
         ops = {
             '$set': {

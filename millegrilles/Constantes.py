@@ -879,6 +879,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_SUPPRIME = 'supprime'
     DOCUMENT_FICHIER_ETIQUETTES = 'etiquettes'
     DOCUMENT_FICHIER_THUMBNAIL = 'thumbnail'
+    DOCUMENT_FICHIER_FUUID_PREVIEW = 'fuuid_preview'
+    DOCUMENT_FICHIER_MIMETYPE_PREVIEW = 'mimetype_preview'
 
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
