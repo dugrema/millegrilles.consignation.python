@@ -1498,7 +1498,8 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
             'fuuid': fuuid
         }
         domaine = 'millegrilles.domaines.MaitreDesCles.declasserCleGrosFichier'
-        self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
+        # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
+        self.ajouter_transaction_a_soumettre(domaine, transaction_maitredescles)
 
         token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
         self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
@@ -1511,7 +1512,7 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         # transaction_id = self.parametres['decrypterFichier_cleSecrete'].get('_id-transaction')
         # collection_transaction_nom = self.controleur.gestionnaire.get_collection_transaction_nom()
         # collection_transaction = self.controleur.document_dao.get_collection(collection_transaction_nom)
-        # transaction_cle_secrete = collection_transaction.find_one({'_id': ObjectId(transaction_id)})
+        # information_cle_secrete = collection_transaction.find_one({'_id': ObjectId(transaction_id)})
         information_cle_secrete = self.parametres['decrypterFichier_cleSecrete']
 
         cle_secrete = information_cle_secrete['cle_secrete_decryptee']
@@ -1534,9 +1535,7 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
             'mimetype': information_fichier['mimetype'],
             'extension': information_fichier.get('extension'),
         }
-
-        self.controleur.generateur_transactions.transmettre_commande(
-            commande, 'commande.grosfichiers.decrypterFichier')
+        self.ajouter_commande_a_transmettre('commande.grosfichiers.decrypterFichier', commande)
 
         self.set_etape_suivante('finale', [token_attente])
 

@@ -368,6 +368,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         document_processus = self.charger_document_processus(
             id_document_processus, self._gestionnaire_domaine.get_collection_processus_nom())
 
+        self.__logger.warning("Transmettre evenement continuer pour %s, %s" % (id_document_processus, document_processus.get('processus')))
         self._contexte.message_dao.transmettre_evenement_mgpprocessus(
             self._gestionnaire_domaine.get_nom_domaine(),
             id_document_processus,
@@ -808,6 +809,7 @@ class MGProcessus:
         self._ajouter_token_resumer = None
         self._requete = None
         self._tokens_connectes = None
+        self._messages_a_transmettre = list()
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -913,6 +915,16 @@ class MGProcessus:
             self._controleur.sauvegarder_etape_processus(
                 self.get_collection_processus_nom(), id_document_processus, document_etape, self._etape_suivante)
 
+            # Transmettre les transactions et les commandes
+            if self._messages_a_transmettre is not None:
+                for message in self._messages_a_transmettre:
+                    if message['type'] == 'commande':
+                        self.controleur.generateur_transactions.transmettre_commande(
+                            message['contenu'], message['domaine'])
+                    elif message['type'] == 'transaction':
+                        self.controleur.generateur_transactions.soumettre_transaction(
+                            message['contenu'], message['domaine'])
+
             # Transmettre la requete inter-domaine, au besoin
             if self._requete is not None:
                 self.generateur_transactions.transmettre_requete(
@@ -923,7 +935,7 @@ class MGProcessus:
                 )
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
-            if self._requete is not None:
+            if self._requete:
                 pass  # Arrete traitement pour attendre reponse
             elif self._ajouter_token_resumer is not None:
                 self._controleur.transmettre_message_resumer(
@@ -1097,6 +1109,20 @@ class MGProcessus:
             self._ajouter_token_attente = None
 
         return len(tokens_restants) == 0, dict_tokens
+
+    def ajouter_commande_a_transmettre(self, domaine, commande):
+        self._messages_a_transmettre.append({
+            'type': 'commande',
+            'domaine': domaine,
+            'contenu': commande,
+        })
+
+    def ajouter_transaction_a_soumettre(self, domaine, transaction):
+        self._messages_a_transmettre.append({
+            'type': 'transaction',
+            'domaine': domaine,
+            'contenu': transaction,
+        })
 
     @property
     def document_dao(self):
