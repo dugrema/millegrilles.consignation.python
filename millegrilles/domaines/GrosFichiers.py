@@ -254,11 +254,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_fichier
 
-        # Extraire l'extension originale
-        extension_fichier = os.path.splitext(nom_fichier)[1].lower().replace('.', '')
-        if extension_fichier != '':
-            set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = extension_fichier
-
         operation_currentdate = {
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
         }
@@ -291,6 +286,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         for key in transaction.keys():
             if key in masque_transaction:
                 info_version[key] = transaction[key]
+
+        # Extraire l'extension originale
+        extension_fichier = os.path.splitext(nom_fichier)[1].lower().replace('.', '')
+        if extension_fichier != '':
+            info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = extension_fichier
+            set_on_insert[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = extension_fichier
+
         set_operations['%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid)] = info_version
 
         if plus_recente_version:
@@ -614,6 +616,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
     def __filtrer_entree_collection(self, entree):
+        """
+        Effectue une project d'un document de fichier pour l'insertion/maj dans une collection.`
+        :param entree:
+        :return:
+        """
         fichier_uuid = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         type_document = entree[Constantes.DOCUMENT_INFODOC_LIBELLE]
 
@@ -1436,7 +1443,7 @@ class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         collectionuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         documentsuuid = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
-        self._controleur._gestionnaire_domaine.ajouter_documents_collection(collectionuuid, documentsuuid)
+        self._controleur.gestionnaire.ajouter_documents_collection(collectionuuid, documentsuuid)
         self.set_etape_suivante()
 
 
