@@ -955,6 +955,31 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if update_info.matched_count < 1:
             raise Exception("Erreur ajout thumbnail pour fuuid " + fuuid)
 
+    def changer_niveau_securite(self, uuid_collection, niveau_securite):
+        """
+        Change le niveau de securite de la collection.
+        N'inclus pas le traitement des fichiers
+        :param uuid:
+        :param niveau_securite:
+        :return:
+        """
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+
+        ops = {
+            '$set': {
+                ConstantesGrosFichiers.DOCUMENT_SECURITE: niveau_securite
+            }
+        }
+
+        self._logger.debug("Changement securite pour collection uuid: %s" % uuid_collection)
+        update_info = collection_domaine.update_one(filtre, ops)
+        if update_info.matched_count < 1:
+            raise Exception("Erreur changement securite pour collection " + uuid_collection)
+
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -1532,7 +1557,7 @@ class ProcessusTransactionTorrentSeeding(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         uuid_collection_figee = transaction['uuid-collection']
         hashstring = transaction['hashstring-torrent']
-        self._controleur._gestionnaire_domaine.associer_hashstring_torrent(uuid_collection_figee, hashstring)
+        self.controleur.gestionnaire.associer_hashstring_torrent(uuid_collection_figee, hashstring)
         self.set_etape_suivante()
 
         return {'uuid_collection_figee': uuid_collection_figee, 'hashstring': hashstring}
@@ -1688,6 +1713,8 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
         elif niveau_securite_courant_num > niveau_securite_destination:
             # Diminuer le niveau de securite
             self.set_etape_suivante()
+            self.__preparer_decryptage(uuid_collection)
+            self.set_etape_suivante(ChangerNiveauSecuriteCollection.changer_niveau_securite.__name__)
         elif niveau_securite_courant_num < niveau_securite_destination:
             # Augmenter le niveau de securite
             # Aucun impact sur le contenu
@@ -1719,6 +1746,10 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
         for fichier in collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
             if fichier.get(ConstantesGrosFichiers.DOCUMENT_SECURITE) in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
                 fichiers_cryptes.append(fichier)
+                securite_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+                if securite_fichier in [Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE]:
+                    transaction_decryptage = {
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+                    }
+                    self.ajouter_transaction_a_soumettre(ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER, transaction_decryptage)
 
-        # Transmettre une transaction pour chaque fichier
-        # Retourner un token de sync pour attendre le decryptage
