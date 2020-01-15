@@ -21,7 +21,7 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
-        self.collection_uuid = "f4c6db04-37af-11ea-acfe-00155d011f09"
+        self.collection_uuid = "737423c8-37c2-11ea-acfe-00155d011f09"
 
         self.channel = None
         self.event_recu = Event()

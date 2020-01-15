@@ -637,20 +637,43 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fichier_uuid = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         type_document = entree[Constantes.DOCUMENT_INFODOC_LIBELLE]
 
+        filtre_fichier = [
+            ConstantesGrosFichiers.DOCUMENT_SECURITE,
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
+        ]
+
+        filtre_version = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL,
+        ]
+
         entree_filtree = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: type_document,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: fichier_uuid,
-            ConstantesGrosFichiers.DOCUMENT_SECURITE: entree.get(ConstantesGrosFichiers.DOCUMENT_SECURITE),
-            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: entree.get(ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES),
         }
+
+        # Copier valeurs de base
+        for cle in filtre_fichier:
+            valeur = entree.get(cle)
+            if valeur is not None:
+                entree_filtree[cle] = valeur
 
         if type_document == ConstantesGrosFichiers.LIBVAL_FICHIER:
             fuuid = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE]
+            entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID] = fuuid
             version_courante = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS].get(fuuid)
 
-            entree_filtree.update(version_courante)
-            entree_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = entree.get(
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
+            # Copier valeurs specifiques a la version
+            for cle in filtre_version:
+                valeur = version_courante.get(cle)
+                if valeur is not None:
+                    entree_filtree[cle] = valeur
 
         return entree_filtree
 
@@ -875,7 +898,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER],
             ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: date_now,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid_decrypte,
-            ConstantesGrosFichiers.DOCUMENT_SECURITE: niveau_securite,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE: taille,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256_fichier
@@ -893,7 +916,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         label_versions_fuuid_decrypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_decrypte)
         ops = {
             '$set': {
-                ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+                ConstantesGrosFichiers.DOCUMENT_SECURITE: niveau_securite,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE: fuuid_decrypte,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE: date_now,
                 # Taille maj
@@ -983,6 +1006,31 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if update_info.matched_count < 1:
             raise Exception("Erreur changement securite pour collection " + uuid_collection)
 
+    def changer_securite_fichiers(self, liste_uuid: list, securite_destination: str):
+        """
+        Change le niveau de securite d'une liste de fichiers.
+        N'effectue pas la logique de cryptage/decryptage
+        :param liste_uuid: Liste de uuid de fichier
+        :param securite_destination: Niveau de securite destination pour les fichiers
+        :return:
+        """
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operations = dict()
+        set_operations[ConstantesGrosFichiers.DOCUMENT_SECURITE] = securite_destination
+
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': liste_uuid},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+        }
+
+        resultat = collection_domaine.update(filtre, {
+            '$set': set_operations,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        })
+        # if resultat.matched_count < len(liste_uuid):
+        #     raise Exception("Nombre de fichiers modifies ne correspond pas, changes < demandes (%d < %d)" %
+        #                     (resultat.matched_count, len(liste_uuid)))
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -1205,7 +1253,7 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersActivite)
         uuid_doc = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         nouveau_nom = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
 
-        self._controleur._gestionnaire_domaine.renommer_deplacer_fichier(uuid_doc, nouveau_nom)
+        self._controleur.gestionnaire.renommer_deplacer_fichier(uuid_doc, nouveau_nom)
 
         # Le resultat a deja ancien_repertoire_uuid. On ajoute le nouveau pour permettre de traiter les deux.
         resultat = {
@@ -1721,7 +1769,7 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
         elif niveau_securite_courant_num > niveau_securite_destination:
             # Diminuer le niveau de securite
             self.set_etape_suivante()
-            self.__preparer_decryptage(uuid_collection, niveau_securite_destination)
+            self.__diminuer_securite_fichiers(uuid_collection, niveau_securite_destination)
             self.set_etape_suivante(ChangerNiveauSecuriteCollection.changer_niveau_securite.__name__)
         elif niveau_securite_courant_num < niveau_securite_destination:
             # Augmenter le niveau de securite
@@ -1747,13 +1795,13 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
 
         self.set_etape_suivante()
 
-    def __preparer_decryptage(self, uuid_collection, securite_destination):
+    def __diminuer_securite_fichiers(self, uuid_collection, securite_destination):
         collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
 
-        fichiers_cryptes = []
+        fichier_diminuer_direct = []
         for fichier in collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
             if fichier.get(ConstantesGrosFichiers.DOCUMENT_SECURITE) in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
-                fichiers_cryptes.append(fichier)
+                # Le fichier est crypte, on transmet une transaction de decryptage
                 securite_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_SECURITE]
                 if securite_fichier in [Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE]:
                     transaction_decryptage = {
@@ -1761,20 +1809,11 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
                         ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
                     }
                     self.ajouter_transaction_a_soumettre(ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER, transaction_decryptage)
+            else:
+                # Le fichier n'est pas crypte, on transmet une transaction de mise a jour
+                fichier_diminuer_direct.append(fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC])
 
-    def __changer_niveau_securite_fichiers(self, uuid_collection, securite_destination):
-        collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
-
-        fichiers_cryptes = []
-        for fichier in collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
-            if fichier.get(ConstantesGrosFichiers.DOCUMENT_SECURITE) in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
-                fichiers_cryptes.append(fichier)
-                securite_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-                if securite_fichier in [Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE]:
-                    transaction_decryptage = {
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
-                        ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
-                    }
-                    self.ajouter_transaction_a_soumettre(ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER, transaction_decryptage)
-
-
+        if len(fichier_diminuer_direct) > 0:
+            self.controleur.gestionnaire.changer_securite_fichiers(fichier_diminuer_direct, securite_destination)
+            for uuid_fichier in fichier_diminuer_direct:
+                self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
