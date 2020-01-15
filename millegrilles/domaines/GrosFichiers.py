@@ -856,6 +856,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fuuid_decrypte = transaction.get('fuuid_decrypte')
         taille = transaction.get('taille')
         sha256_fichier = transaction.get('sha256Hash')
+        niveau_securite = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
+        if niveau_securite is None:
+            niveau_securite = Constantes.SECURITE_PRIVE
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
@@ -872,7 +875,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER],
             ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION: date_now,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid_decrypte,
-            ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: niveau_securite,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE: taille,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256_fichier
@@ -955,7 +958,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         if update_info.matched_count < 1:
             raise Exception("Erreur ajout thumbnail pour fuuid " + fuuid)
 
-    def changer_niveau_securite(self, uuid_collection, niveau_securite):
+    def changer_niveau_securite_collection(self, uuid_collection, niveau_securite):
         """
         Change le niveau de securite de la collection.
         N'inclus pas le traitement des fichiers
@@ -1572,6 +1575,9 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.charger_transaction()
         fuuid = transaction['fuuid']
+        securite_destination = transaction.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
+        if securite_destination is None:
+            securite_destination = Constantes.SECURITE_PRIVE
 
         # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
         transaction_maitredescles = {
@@ -1586,6 +1592,7 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
 
         return {
             'fuuid': fuuid,
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
         }
 
     def decrypter_fichier(self):
@@ -1614,6 +1621,7 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
             'nomfichier': information_fichier['nom'],
             'mimetype': information_fichier['mimetype'],
             'extension': information_fichier.get('extension'),
+            'securite': self.parametres[ConstantesGrosFichiers.DOCUMENT_SECURITE],
         }
         self.ajouter_commande_a_transmettre('commande.grosfichiers.decrypterFichier', commande)
 
@@ -1713,12 +1721,12 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
         elif niveau_securite_courant_num > niveau_securite_destination:
             # Diminuer le niveau de securite
             self.set_etape_suivante()
-            self.__preparer_decryptage(uuid_collection)
+            self.__preparer_decryptage(uuid_collection, niveau_securite_destination)
             self.set_etape_suivante(ChangerNiveauSecuriteCollection.changer_niveau_securite.__name__)
         elif niveau_securite_courant_num < niveau_securite_destination:
             # Augmenter le niveau de securite
             # Aucun impact sur le contenu
-            self.controleur.gestionnaire.changer_niveau_securite(uuid_collection, niveau_securite_destination)
+            self.controleur.gestionnaire.changer_niveau_securite_collection(uuid_collection, niveau_securite_destination)
             self.set_etape_suivante()
 
         return {
@@ -1735,11 +1743,11 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
         uuid_collection = self.parametres['uuid_collection']
         niveau_securite_destination = self.parametres['niveau_securite_destination']
 
-        self.controleur.gestionnaire.changer_niveau_securite(uuid_collection, niveau_securite_destination)
+        self.controleur.gestionnaire.changer_niveau_securite_collection(uuid_collection, niveau_securite_destination)
 
         self.set_etape_suivante()
 
-    def __preparer_decryptage(self, uuid_collection):
+    def __preparer_decryptage(self, uuid_collection, securite_destination):
         collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
 
         fichiers_cryptes = []
@@ -1749,7 +1757,24 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
                 securite_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_SECURITE]
                 if securite_fichier in [Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE]:
                     transaction_decryptage = {
-                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
+                        ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
                     }
                     self.ajouter_transaction_a_soumettre(ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER, transaction_decryptage)
+
+    def __changer_niveau_securite_fichiers(self, uuid_collection, securite_destination):
+        collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
+
+        fichiers_cryptes = []
+        for fichier in collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
+            if fichier.get(ConstantesGrosFichiers.DOCUMENT_SECURITE) in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+                fichiers_cryptes.append(fichier)
+                securite_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+                if securite_fichier in [Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE]:
+                    transaction_decryptage = {
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
+                        ConstantesGrosFichiers.DOCUMENT_SECURITE: securite_destination,
+                    }
+                    self.ajouter_transaction_a_soumettre(ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER, transaction_decryptage)
+
 

@@ -21,7 +21,7 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
-        self.collection_uuid = "8ff120ea-37aa-11ea-acfe-00155d011f09"
+        self.collection_uuid = "f4c6db04-37af-11ea-acfe-00155d011f09"
 
         self.channel = None
         self.event_recu = Event()
@@ -60,8 +60,21 @@ class MessagesSample(BaseCallback):
         print("Changement securite: %s" % enveloppe_val)
         return enveloppe_val
 
+    def set_securite_collection_public(self):
+        transaction = {
+            "uuid": self.collection_uuid,
+            "niveau_securite_destination": "1.public",
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION,
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Changement securite: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
-        sample.set_securite_collection_prive()
+        # sample.set_securite_collection_prive()
+        sample.set_securite_collection_public()
 
         pass
 
