@@ -105,6 +105,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ChangerNiveauSecuriteCollection"
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FAVORI:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFavori"
@@ -221,6 +223,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fichier = collection_domaine.find_one(filtre)
 
         return fichier
+
+    def get_collection_par_uuid(self, uuid_collection):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+
+        collection = collection_domaine.find_one(filtre)
+
+        return collection
 
     def maj_fichier(self, transaction):
         """
@@ -1261,7 +1274,7 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
 
         uuid_collection = str(uuid.uuid1())
 
-        self._controleur._gestionnaire_domaine.creer_collection(uuid_collection, documents)
+        self._controleur.gestionnaire.creer_collection(uuid_collection, documents)
 
         self.set_etape_suivante()  # Termine
 
@@ -1646,3 +1659,66 @@ class ProcessusTransactionAssocierThumbnail(ProcessusGrosFichiers):
         self.resumer_processus([token_resumer])
 
         self.set_etape_suivante()
+
+
+class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
+    """
+    Change le niveau de securite d'une collection (e.g. 4.secure vers 1.public)
+    Le comportement est different si on passe d'un niveau crypte a decrypte ou non.
+    """
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        niveau_securite_destination = transaction["niveau_securite_destination"]
+
+        collection_fichiers = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
+
+        # Determiner le sens du changement (moins->plus secure ou plus->moins secure)
+        niveau_securite_courant = collection_fichiers[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+
+        niveau_securite_courant_num = niveau_securite_courant.split('.')[0]
+        niveau_securite_destination_num = niveau_securite_destination.split('.')[0]
+
+        if niveau_securite_courant_num == niveau_securite_destination:
+            self.__logger.warning("Aucun changement au niveau de securite")
+        elif niveau_securite_courant_num > niveau_securite_destination:
+            # Diminuer le niveau de securite
+            self.set_etape_suivante()
+        elif niveau_securite_courant_num < niveau_securite_destination:
+            # Augmenter le niveau de securite
+            # Aucun impact sur le contenu
+            self.controleur.gestionnaire.changer_niveau_securite(uuid_collection, niveau_securite_destination)
+            self.set_etape_suivante()
+
+        return {
+            'uuid_collection': uuid_collection,
+            'niveau_securite_courant_num': niveau_securite_courant_num,
+            'niveau_securite_destination': niveau_securite_destination,
+            'niveau_securite_destination_num': niveau_securite_destination_num,
+        }
+
+    def changer_niveau_securite(self):
+        """
+        Changer le niveau de securite puis terminer le processus
+        """
+        uuid_collection = self.parametres['uuid_collection']
+        niveau_securite_destination = self.parametres['niveau_securite_destination']
+
+        self.controleur.gestionnaire.changer_niveau_securite(uuid_collection, niveau_securite_destination)
+
+        self.set_etape_suivante()
+
+    def __preparer_decryptage(self, uuid_collection):
+        collection = self.controleur.gestionnaire.get_collection_par_uuid(uuid_collection)
+
+        fichiers_cryptes = []
+        for fichier in collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
+            if fichier.get(ConstantesGrosFichiers.DOCUMENT_SECURITE) in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+                fichiers_cryptes.append(fichier)
+
+        # Transmettre une transaction pour chaque fichier
+        # Retourner un token de sync pour attendre le decryptage

@@ -923,6 +923,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_CREERTORRENT_COLLECTION = '%s.creerTorrentCollection' % DOMAINE_NOM
     TRANSACTION_AJOUTER_FICHIERS_COLLECTION = '%s.ajouterFichiersCollection' % DOMAINE_NOM
     TRANSACTION_RETIRER_FICHIERS_COLLECTION = '%s.retirerFichiersCollection' % DOMAINE_NOM
+    TRANSACTION_CHANGER_SECURITE_COLLECTION = '%s.changerSecuriteCollection' % DOMAINE_NOM
 
     TRANSACTION_AJOUTER_FAVORI = '%s.ajouterFavori' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_FAVORI = '%s.supprimerFavori' % DOMAINE_NOM
@@ -966,7 +967,7 @@ class ConstantesGrosFichiers:
         DOCUMENT_FICHIER_ETIQUETTES: list(),    # Etiquettes de la collection
         DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
         DOCUMENT_COMMENTAIRES: None,
-        DOCUMENT_SECURITE: SECURITE_PRIVE,
+        DOCUMENT_SECURITE: SECURITE_PROTEGE,
     }
 
     DOCUMENT_COLLECTION_FICHIER = {
