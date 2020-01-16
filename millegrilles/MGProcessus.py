@@ -1124,6 +1124,36 @@ class MGProcessus:
             'contenu': transaction,
         })
 
+    def get_transaction_token_connecte(self, token):
+        """
+        Retourne la transaction qui s'est connectee via un token resumer
+        :param token:
+        :return:
+        """
+        self._logger.debug("Charger transaction par token %s" % token)
+        tokens = self._document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES)
+        if tokens is not None:
+            id_processus_connecte = tokens.get(token)
+            if id_processus_connecte is not None:
+                self._logger.debug("Chargement de la transaction connectee via processus %s: %s" % (
+                    token, str(id_processus_connecte)))
+                nom_collection_processus = self.get_collection_processus_nom()
+                collection_processus = self.controleur.document_dao.get_collection(nom_collection_processus)
+                processus_connecte = collection_processus.find_one({'_id': id_processus_connecte})
+
+                # Obtenir l'_id de la transaction
+                id_transaction_connectee = processus_connecte[
+                    Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES][Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+                id_transaction_connectee = ObjectId(id_transaction_connectee)
+
+                nom_collection_transaction = self.get_collection_transaction_nom()
+                collection_transactions = self.controleur.document_dao.get_collection(nom_collection_transaction)
+                transaction_connectee = collection_transactions.find_one({'_id': id_transaction_connectee})
+
+                return transaction_connectee
+
+        return None
+
     @property
     def document_dao(self):
         return self._controleur.document_dao

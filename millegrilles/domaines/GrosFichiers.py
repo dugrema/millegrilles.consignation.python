@@ -933,6 +933,52 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'info_fichier_decrypte': info_fichier_decrypte,
         }
 
+    def enregistrer_image_info(self, uuid_fichier, image_info):
+
+        fuuid_fichier = image_info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+
+        info_image_maj = dict()
+        if image_info.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
+            libelle_thumbnail = '%s.%s.%s' % (
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                fuuid_fichier,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
+            )
+            info_image_maj[libelle_thumbnail] = image_info[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL]
+
+        if image_info.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
+            libelle_fuuid_preview = '%s.%s.%s' % (
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                fuuid_fichier,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW
+            )
+            info_image_maj[libelle_fuuid_preview] = image_info[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
+
+            libelle_mimetype_preview = '%s.%s.%s' % (
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                fuuid_fichier,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW
+            )
+            info_image_maj[libelle_mimetype_preview] = image_info[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
+
+        ops = {
+            '$set': info_image_maj,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(filtre, ops)
+
     def maj_fichier_dans_collection(self, uuid_fichier):
         """
         Mettre a jour l'element _documents_ de toutes les collections avec le fichier.
@@ -1104,20 +1150,23 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         })
 
         self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.confirmer_hash_update_collections.__name__,
+            ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
             self._get_tokens_attente(resultat))
 
         return resultat
 
-    def confirmer_hash_update_collections(self):
-        # if self.parametres.get('attente_token') is not None:
-        #     # Il manque des tokens, on boucle.
-        #     self._logger.debug('attendre_transaction_transfertcomplete(): Il reste des tokens actifs, on boucle')
-        #     self.set_etape_suivante(
-        #         ProcessusTransactionNouvelleVersionMetadata.confirmer_hash.__name__)
-        #     return
+    def confirmer_reception_update_collections(self):
+        # Verifie si la transaction correspond a un document d'image
+        est_image = self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image'
 
-        # Verifie que le hash des deux transactions (metadata, transfer complete) est le meme.
+        if est_image:
+            fuuid = self.parametres['fuuid']
+            tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
+
+            transaction_image = self.get_transaction_token_connecte(tokens_attente[0])
+            self.__logger.debug("Enregistrement preview et thumbnail image : %s" % str(transaction_image))
+            self.controleur.gestionnaire.enregistrer_image_info(
+                self.parametres['uuid_fichier'], transaction_image)
 
         # Met a jour les collections existantes avec ce fichier
         uuid_fichier = self.parametres['uuid_fichier']
@@ -1126,7 +1175,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         # Verifier si le fichier est une image protegee - il faut generer un thumbnail
         self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
         chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
-        if chiffre and self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image':
+        if chiffre and est_image:
             self.__logger.info("Mimetype est une image")
             self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
         else:
@@ -1212,6 +1261,11 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers
         """
         transaction = self.charger_transaction()
         fuuid = transaction.get('fuuid')
+
+        # Verifier si on a recu un thumbnail et preview d'image
+        # if transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None or \
+        #         transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
+        #     self.controleur.gestionnaire.enregistrer_image_info(transaction)
 
         self.set_etape_suivante(ProcessusTransactionNouvelleVersionTransfertComplete.declencher_resumer.__name__)
         return {'fuuid': fuuid}
