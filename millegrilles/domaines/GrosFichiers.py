@@ -1125,7 +1125,8 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         # Verifier si le fichier est une image protegee - il faut generer un thumbnail
         self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
-        if self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image':
+        chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
+        if chiffre and self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image':
             self.__logger.info("Mimetype est une image")
             self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
         else:
