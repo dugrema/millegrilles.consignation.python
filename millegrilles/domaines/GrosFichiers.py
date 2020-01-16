@@ -1070,7 +1070,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
 
-        resultat = collection_domaine.update(filtre, {
+        resultat = collection_domaine.update_many(filtre, {
             '$set': set_operations,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         })
