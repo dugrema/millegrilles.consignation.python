@@ -1159,7 +1159,8 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         # Verifie si la transaction correspond a un document d'image
         est_image = self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image'
 
-        if est_image:
+        chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
+        if not chiffre and est_image:
             fuuid = self.parametres['fuuid']
             tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
 
@@ -1174,7 +1175,6 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         # Verifier si le fichier est une image protegee - il faut generer un thumbnail
         self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
-        chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
         if chiffre and est_image:
             self.__logger.info("Mimetype est une image")
             self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
