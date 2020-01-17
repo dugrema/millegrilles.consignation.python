@@ -1177,33 +1177,44 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
         if chiffre and est_image:
             self.__logger.info("Mimetype est une image")
+
+            # Transmettre requete pour certificat de consignation.grosfichiers
+            self.set_requete('pki.role.fichiers', {})
+
             self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
         else:
             self._traitement_collection()
 
     def attente_cle_decryptage(self):
         fuuid = self.parametres['fuuid']
+
+        fingerprint_fichiers = self.parametres['reponse'][0]['fingerprint']
+
         # Transmettre transaction au maitre des cles pour recuperer cle secrete decryptee
         transaction_maitredescles = {
-            'fuuid': fuuid
+            'fuuid': fuuid,
+            'fingerprint': fingerprint_fichiers,
         }
-        domaine = 'millegrilles.domaines.MaitreDesCles.declasserCleGrosFichier'
-        self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
+        domaine = 'millegrilles.domaines.MaitreDesCles.decryptageGrosFichier'
 
-        token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.demander_thumbnail_protege.__name__,
-                                [token_attente])
+        # Effectuer requete pour re-chiffrer la cle du document pour le consignateur de transactions
+        self.set_requete(domaine, transaction_maitredescles)
+
+        # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
+
+        # token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.demander_thumbnail_protege.__name__)
 
     def demander_thumbnail_protege(self):
 
-        information_cle_secrete = self.parametres['decrypterFichier_cleSecrete']
+        information_cle_secrete = self.parametres['reponse'][1]
 
-        cle_secrete = information_cle_secrete['cle_secrete_decryptee']
+        cle_secrete_chiffree = information_cle_secrete['cle']
         iv = information_cle_secrete['iv']
 
         information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
 
-        self.__logger.info("Info tran decryptee: cle %s, iv %s" % (cle_secrete, iv))
+        self.__logger.debug("Info tran chiffree: cle %s, iv %s" % (cle_secrete_chiffree, iv))
 
         fuuid = self.parametres['fuuid']
         token_attente = 'associer_thumbnail:%s' % fuuid
@@ -1212,7 +1223,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         commande = {
             'fuuid': fuuid,
-            'cleSecreteDecryptee': cle_secrete,
+            'cleSecreteChiffree': cle_secrete_chiffree,
             'iv': iv,
             'nomfichier': information_fichier['nom'],
             'mimetype': information_fichier['mimetype'],

@@ -415,7 +415,8 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        certificat_demandeur = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        enveloppe_certificat = certificat_demandeur
 
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
@@ -427,8 +428,10 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
                 enveloppe_certificat = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
 
                 # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-                roles = enveloppe_certificat.get_roles
-                if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in roles:
+                if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in enveloppe_certificat.get_roles:
+                    pass
+                elif ConstantesGenerateurCertificat.ROLE_DOMAINES in certificat_demandeur.get_roles:
+                    # Le middleware a le droit de demander une cle pour un autre composant
                     pass
                 else:
                     self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)

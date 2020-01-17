@@ -435,7 +435,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             elif evenement_type == Constantes.EVENEMENT_VERIFIER_RESUMER:
                 self.verifier_resumer(evenement_dict)
 
-            elif evenement_type == Constantes.EVENEMENT_REPONSE:
+            elif evenement_type == Constantes.EVENEMENT_REPONSE or correlation_id is not None:
                 self.ajouter_reponse(evenement_dict, correlation_id)
 
             else:

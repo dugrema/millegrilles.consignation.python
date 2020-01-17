@@ -288,6 +288,14 @@ class TransactionConfiguration:
         return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_MIDDLEWARE]
 
     @property
+    def exchange_secure(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_MIDDLEWARE]
+
+    @property
+    def exchange_protege(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_NOEUDS]
+
+    @property
     def exchange_prive(self):
         return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_PRIVE]
 
