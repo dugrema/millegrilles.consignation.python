@@ -169,18 +169,18 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
     def traiter_cedule(self, evenement):
         pass
 
-    def maj_configuration_noeud_public(self, url, transaction):
+    def maj_configuration_noeud_public(self, url, transaction_filtree):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url,
         }
         set_on_insert = {Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()}
-        set_on_insert.update(filtre)
+        set_on_insert.update({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC
+        })
 
         operations = {
-            '$set': {
-                ConstantesParametres.DOCUMENT_PUBLIQUE_MENU: transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_MENU]
-            },
+            '$set': transaction_filtree,
             '$setOnInsert': set_on_insert,
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
@@ -669,7 +669,7 @@ class ProcessusConfigurerNoeudPublic(ProcessusParametres):
     """
 
     def initiale(self):
-        transaction = self.transaction
+        transaction = self.transaction_filtree
         url = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
         self.controleur.gestionnaire.maj_configuration_noeud_public(url, transaction)
 

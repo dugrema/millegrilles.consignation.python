@@ -1261,6 +1261,22 @@ class MGProcessusTransaction(MGProcessus):
 
         return self._transaction
 
+    @property
+    def transaction_filtree(self):
+        """
+        Enleve les champs de metadonnees et l'entete
+        :return:
+        """
+
+        transaction = self.transaction
+
+        transaction_filtree = dict()
+        for key, value in transaction.items():
+            if not key.startswith('_') and key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE:
+                transaction_filtree[key] = value
+
+        return transaction_filtree
+
 
 class MGProcessusDocInitial(MGProcessusTransaction):
 
