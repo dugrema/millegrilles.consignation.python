@@ -239,6 +239,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return collection
 
+    def get_collection_figee_par_uuid(self, uuid_collection_figee):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection_figee,
+        }
+
+        collection = collection_domaine.find_one(filtre)
+
+        return collection
+
     def maj_fichier(self, transaction):
         """
         Genere ou met a jour un document de fichier avec l'information recue dans une transaction metadata.
@@ -1898,6 +1909,7 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.transaction
         url_noeud_public = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+        uuid_collection_figee = transaction[ConstantesParametres.TRANSACTION_CHAMP_UUID]
 
         self.set_requete(ConstantesParametres.REQUETE_NOEUD_PUBLIC, {
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
@@ -1907,6 +1919,7 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
 
         return {
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
+            ConstantesParametres.TRANSACTION_CHAMP_UUID: uuid_collection_figee,
         }
 
     def determiner_type_deploiement(self):
@@ -1931,10 +1944,82 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
 
     def deploiement_s3(self):
         """
+        Demander le fingerprint du certificat de consignationfichiers
+        :return:
+        """
+        self.set_requete('pki.role.fichiers', {})
+
+        self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3_demander_cle_rechiffree.__name__)
+
+    def deploiement_s3_demander_cle_rechiffree(self):
+        """
+        Demander la cle pour le mot de passe Amazon
+        :return:
+        """
+
+        fingerprint_fichiers = self.parametres['reponse'][1]['fingerprint']
+
+        transaction_maitredescles = {
+            'fingerprint': fingerprint_fichiers,
+            "identificateurs_document": {
+                "champ": "awsSecretAccessKey",
+                "url_web": self.parametres[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB],
+            }
+        }
+        domaine = 'millegrilles.domaines.MaitreDesCles.decryptageDocument'
+
+        # Effectuer requete pour re-chiffrer la cle du document pour le consignateur de transactions
+        self.set_requete(domaine, transaction_maitredescles)
+
+        self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3_commande.__name__)
+
+    def deploiement_s3_commande(self):
+        """
         Lancer le processus de deploiement avec Amazon S3
         :return:
         """
+        info_noeud_public = self.parametres['reponse'][0][0]
+
+        # Extraire liste de fichiers a publier de la collection
+        collection_figee_uuid = self.parametres[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+        collection_figee = self.controleur.gestionnaire.get_collection_figee_par_uuid(collection_figee_uuid)
+        liste_documents = collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
+        info_documents_a_publier = []
+        for document_a_publier in liste_documents.values():
+            if document_a_publier[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesGrosFichiers.LIBVAL_FICHIER:
+                info_doc = {
+                    'fuuid': document_a_publier['fuuid'],
+                    'extension': document_a_publier['extension'],
+                    'mimetype': document_a_publier['mimetype'],
+                    'nom': document_a_publier['nom'],
+                }
+                info_documents_a_publier.append(info_doc)
+
+        # Creer commande de deploiement pour consignationfichiers
+        commande_deploiement = {
+            "credentials": {
+                "accessKeyId": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_ACCESS_KEY],
+                "secretAccessKeyChiffre": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE],
+                "secretAccessKey": "AQYWx9UcqGvs2YevyStRHkCUGsDVrJwZG8ibGSNn",
+                "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_CRED_REGION],
+                "cle": self.parametres['reponse'][2]['cle'],
+                "iv": self.parametres['reponse'][2]['iv'],
+            },
+            "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_REGION],
+            "bucket": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_NAME],
+            "dirfichier": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_DIR],
+            "fuuidFichiers": info_documents_a_publier,
+            "uuid_source_figee": collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE],
+            "uuid_collection_figee": collection_figee_uuid,
+        }
+
+        # self.ajouter_commande_a_transmettre('commande.grosfichiers.publierCollection', commande_deploiement)
+
         self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
+
+        return {
+            "commande": commande_deploiement
+        }
 
     def publier_metadonnees_collection(self):
         self.set_etape_suivante()  # Termine

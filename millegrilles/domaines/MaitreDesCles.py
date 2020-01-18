@@ -485,43 +485,54 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        certificat_demandeur = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        enveloppe_certificat = certificat_demandeur
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
-        reponse_requetes = list()
-        for requete in evenement['requetes']:
-            reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
-            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
-            self._logger.debug(
-                "Verification signature requete cle document. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+        fingerprint_demande = evenement.get('fingerprint')
+        if fingerprint_demande is not None:
+            self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
+            try:
+                enveloppe_certificat = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
 
-            ## AJOUTER FILTRE SUR DOMAINE PERMIS PAR LE CERTIFICAT ##
+                # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
+                if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in enveloppe_certificat.get_roles:
+                    pass
+                elif ConstantesGenerateurCertificat.ROLE_DOMAINES in certificat_demandeur.get_roles:
+                    # Le middleware a le droit de demander une cle pour un autre composant
+                    pass
+                else:
+                    self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
+                    enveloppe_certificat = None
+            except CertificatInconnu:
+                enveloppe_certificat = None
 
-            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: requete['filtre']
-            }
-            document = collection_documents.find_one(filtre)
-            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
-            if document is not None:
-                self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
-                if acces_permis:
-                    cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
-                    cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(
-                        cle_secrete, enveloppe_certificat.certificat)
-                    reponse = {
-                        'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                        'iv': document['iv'],
-                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
-                    }
+        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+        acces_permis = enveloppe_certificat is not None
+        self._logger.debug(
+            "Verification signature requete cle document. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
 
-            # Ajouter la reponse a la liste
-            reponse_requetes.append(reponse)
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+        }
+        document = collection_documents.find_one(filtre)
+        # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+        if document is not None:
+            self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
+            if acces_permis:
+                cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
+                cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(
+                    cle_secrete, enveloppe_certificat.certificat)
+                reponse = {
+                    'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                    'iv': document['iv'],
+                    Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                }
 
-        dict_resultats = {'resultats': reponse_requetes}
         self._gestionnaire.generateur_transactions.transmettre_reponse(
-            dict_resultats, properties.reply_to, properties.correlation_id
+            reponse, properties.reply_to, properties.correlation_id
         )
 
 
