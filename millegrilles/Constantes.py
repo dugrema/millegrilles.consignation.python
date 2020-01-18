@@ -458,6 +458,7 @@ class ConstantesParametres:
     TRANSACTION_FERMER_MILLEGRILLE = '%s.fermerMilleGrilles' % DOMAINE_NOM
     TRANSACTION_MAJ_NOEUD_PUBLIC = '%s.majNoeudPublic' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_NOEUD_PUBLIC = '%s.supprimerNoeudPublic' % DOMAINE_NOM
+    TRANSACTION_RECEPTION_CLES_MAJNOEUDPUBLIC = '%s.majNoeudPublic.clesRecues' % DOMAINE_NOM
 
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
@@ -474,6 +475,16 @@ class ConstantesParametres:
     DOCUMENT_CHAMP_IDMG = 'idmg'
     DOCUMENT_CHAMP_URL_BASE = 'adresse_url_base'
     DOCUMENT_CHAMP_ACTIF = 'actif'
+
+    DOCUMENT_CHAMP_AWS_ACCESS_KEY = 'awsAccessKeyId'
+    DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE = 'awsSecretAccessKeyChiffre'
+    DOCUMENT_CHAMP_AWS_CRED_REGION = 'awsCredentialRegion'
+    DOCUMENT_CHAMP_AWS_BUCKET_NAME= 'awsBucketName'
+    DOCUMENT_CHAMP_AWS_BUCKET_REGION = 'awsBucketRegion'
+    DOCUMENT_CHAMP_AWS_BUCKET_URL = 'awsBucketUrl'
+    DOCUMENT_CHAMP_AWS_BUCKET_DIR = 'awsBucketDir'
+
+    TOKEN_ATTENTE_CLE = 'confirmer_reception_cle'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_EMAIL_SMTP = 'email.stmp'

@@ -160,6 +160,8 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Parametres:ProcessusConfigurerNoeudPublic"
         elif domaine_transaction == ConstantesParametres.TRANSACTION_SUPPRIMER_NOEUD_PUBLIC:
             processus = "millegrilles_domaines_Parametres:ProcessusSupprimerNoeudPublic"
+        elif domaine_transaction == ConstantesParametres.TRANSACTION_RECEPTION_CLES_MAJNOEUDPUBLIC:
+            processus = "millegrilles_domaines_Parametres:ProcessusRecevoirCles"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -671,8 +673,33 @@ class ProcessusConfigurerNoeudPublic(ProcessusParametres):
     def initiale(self):
         transaction = self.transaction_filtree
         url = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+
+        if transaction.get(ConstantesParametres.DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE) is not None:
+            uuid_transaction = self.transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            token_attente = '%s:%s' % (ConstantesParametres.TOKEN_ATTENTE_CLE, uuid_transaction)
+            # On doit attendre la reception de la cle avant de sauvegarder
+            self.set_etape_suivante(ProcessusConfigurerNoeudPublic.confirmation_cle.__name__, [token_attente])
+        else:
+            self.controleur.gestionnaire.maj_configuration_noeud_public(url, transaction)
+            self.set_etape_suivante()  # Termine
+
+    def confirmation_cle(self):
+        transaction = self.transaction_filtree
+        url = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
         self.controleur.gestionnaire.maj_configuration_noeud_public(url, transaction)
 
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusRecevoirCles(ProcessusParametres):
+    """
+    Sert a creer ou modifier un noeud public par URL.
+    """
+
+    def initiale(self):
+        uuid_transaction = self.transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        token_attente = '%s:%s' % (ConstantesParametres.TOKEN_ATTENTE_CLE, uuid_transaction)
+        self.resumer_processus([token_attente])
         self.set_etape_suivante()  # Termine
 
 
