@@ -22,6 +22,7 @@ class MessagesSample(BaseCallback):
         self.generateur = GenerateurTransaction(self.contexte)
 
         self.collection_uuid = "1383dca0-37dc-11ea-acfe-00155d011f09"
+        self.collection_figee = "fcc64a32-396d-11ea-be1a-00155d011f09"
 
         self.channel = None
         self.event_recu = Event()
@@ -72,9 +73,22 @@ class MessagesSample(BaseCallback):
         print("Changement securite: %s" % enveloppe_val)
         return enveloppe_val
 
+    def publier_collection(self):
+        transaction = {
+            "uuid": self.collection_figee,
+            "url_web": "https://localhost"
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION,
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Publier collection figee: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # sample.set_securite_collection_prive()
-        sample.set_securite_collection_public()
+        # sample.set_securite_collection_public()
+        sample.publier_collection()
 
         pass
 

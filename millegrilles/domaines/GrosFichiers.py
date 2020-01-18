@@ -2,7 +2,7 @@
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesGrosFichiers
+from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
 from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
@@ -118,6 +118,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentNouveau"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_SEEDING:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentSeeding"
+
+        # Distribution
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusPublierCollection"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -1507,9 +1511,10 @@ class ProcessusTransactionChangerEtiquettesCollection(ProcessusGrosFichiersActiv
 
 
 class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
+    """
+    Fige une collection et genere le torrent.
+    Pour les collections privees et publiques, le processus de distribution/publication est enclenche.
+    """
 
     def initiale(self):
         """
@@ -1883,3 +1888,53 @@ class ChangerNiveauSecuriteCollection(ProcessusGrosFichiers):
             self.controleur.gestionnaire.changer_securite_fichiers(fichier_diminuer_direct, securite_destination)
             for uuid_fichier in fichier_diminuer_direct:
                 self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+
+
+class ProcessusPublierCollection(ProcessusGrosFichiers):
+    """
+    Publie une collection sur un noeud public (Vitrine)
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        url_noeud_public = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+
+        self.set_requete(ConstantesParametres.REQUETE_NOEUD_PUBLIC, {
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
+        })
+
+        self.set_etape_suivante(ProcessusPublierCollection.determiner_type_deploiement.__name__)
+
+        return {
+            ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
+        }
+
+    def determiner_type_deploiement(self):
+
+        info_noeud_public = self.parametres['reponse'][0][0]
+        mode_deploiement = info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_MODE_DEPLOIEMENT]
+
+        if mode_deploiement == 'torrent':
+            self.set_etape_suivante(ProcessusPublierCollection.deploiement_torrent.__name__)
+        elif mode_deploiement == 's3':
+            self.set_etape_suivante(ProcessusPublierCollection.deploiement_s3.__name__)
+        else:
+            raise Exception("Mode de deploiement inconnu pour noeud public " + self.parametres[
+                ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB])
+
+    def deploiement_torrent(self):
+        """
+        Lancer le processus de deploiement avec Torrents
+        :return:
+        """
+        self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
+
+    def deploiement_s3(self):
+        """
+        Lancer le processus de deploiement avec Amazon S3
+        :return:
+        """
+        self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
+
+    def publier_metadonnees_collection(self):
+        self.set_etape_suivante()  # Termine

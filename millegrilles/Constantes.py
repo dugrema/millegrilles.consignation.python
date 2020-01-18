@@ -476,6 +476,8 @@ class ConstantesParametres:
     DOCUMENT_CHAMP_URL_BASE = 'adresse_url_base'
     DOCUMENT_CHAMP_ACTIF = 'actif'
 
+    DOCUMENT_CHAMP_MODE_DEPLOIEMENT = 'mode_deploiement'
+
     DOCUMENT_CHAMP_AWS_ACCESS_KEY = 'awsAccessKeyId'
     DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE = 'awsSecretAccessKeyChiffre'
     DOCUMENT_CHAMP_AWS_CRED_REGION = 'awsCredentialRegion'
@@ -941,6 +943,8 @@ class ConstantesGrosFichiers:
 
     TRANSACTION_TORRENT_NOUVEAU = '%s.nouveauTorrent' % DOMAINE_NOM
     TRANSACTION_TORRENT_SEEDING = '%s.seedingTorrent' % DOMAINE_NOM
+
+    TRANSACTION_PUBLIER_COLLECTION = '%s.publierCollection' % DOMAINE_NOM
 
     COMMANDE_DECRYPTER_FICHIER = 'commande.grosfichiers.decrypterFichier'
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
