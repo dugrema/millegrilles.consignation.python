@@ -22,7 +22,7 @@ class MessagesSample(BaseCallback):
         self.generateur = GenerateurTransaction(self.contexte)
 
         self.collection_uuid = "1383dca0-37dc-11ea-acfe-00155d011f09"
-        self.collection_figee = "c98ff732-3a51-11ea-be1a-00155d011f09"
+        self.collection_figee = "4df31516-3aea-11ea-be1a-00155d011f09"
 
         self.channel = None
         self.event_recu = Event()

@@ -1587,10 +1587,39 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         commande['trackers'] = self.__url_trackers()
 
         self._logger.debug("Commande creation torrent:\n%s" % str(commande))
+        self.ajouter_commande_a_transmettre('commande.torrent.creerNouveau', commande)
 
-        self.generateur_transactions.transmettre_commande(commande, 'commande.torrent.creerNouveau')
+        securite_collection = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
+        if securite_collection == Constantes.SECURITE_PUBLIC:
+            # Une fois le torrent cree, on va publier la collection figee
+            self.set_etape_suivante(ProcessusTransactionFigerCollection.publier_collection_figee.__name__)
+        else:
+            self.set_etape_suivante()  # Termine
 
-        self.set_etape_suivante()
+    def publier_collection_figee(self):
+
+        requete = {"requetes": [{"filtre": {
+            '_mg-libelle': ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
+        }}]}
+        self.set_requete('millegrilles.domaines.Parametres', requete)
+
+        self.set_etape_suivante(ProcessusTransactionFigerCollection.public_collection_sur_noeuds.__name__)
+
+    def public_collection_sur_noeuds(self):
+
+        liste_noeuds = self.parametres['reponse'][1][0]
+        uuid_collection_figee = self.parametres['uuid_collection_figee']
+
+        domaine_publier = ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION
+        for noeud in liste_noeuds:
+            url_web = noeud['url_web']
+            transaction = {
+                "uuid": uuid_collection_figee,
+                "url_web": url_web,
+            }
+            self.controleur.generateur_transactions.soumettre_transaction(transaction, domaine_publier)
+
+        self.set_etape_suivante()  # Termine
 
     def __url_trackers(self):
         # Creer le URL pour le tracker torrent
