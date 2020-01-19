@@ -2000,7 +2000,6 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
             "credentials": {
                 "accessKeyId": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_ACCESS_KEY],
                 "secretAccessKeyChiffre": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_SECRET_KEY_CHIFFRE],
-                "secretAccessKey": "AQYWx9UcqGvs2YevyStRHkCUGsDVrJwZG8ibGSNn",
                 "region": info_noeud_public[ConstantesParametres.DOCUMENT_CHAMP_AWS_CRED_REGION],
                 "cle": self.parametres['reponse'][2]['cle'],
                 "iv": self.parametres['reponse'][2]['iv'],
@@ -2013,7 +2012,7 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
             "uuid_collection_figee": collection_figee_uuid,
         }
 
-        # self.ajouter_commande_a_transmettre('commande.grosfichiers.publierCollection', commande_deploiement)
+        self.ajouter_commande_a_transmettre('commande.grosfichiers.publierCollection', commande_deploiement)
 
         self.set_etape_suivante(ProcessusPublierCollection.publier_metadonnees_collection.__name__)
 
