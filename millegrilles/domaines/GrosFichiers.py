@@ -2059,4 +2059,19 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
         }
 
     def publier_metadonnees_collection(self):
+
+        collection_figee_uuid = self.parametres[ConstantesParametres.TRANSACTION_CHAMP_UUID]
+        collection_figee = self.controleur.gestionnaire.get_collection_figee_par_uuid(collection_figee_uuid)
+
+        collection_filtree = dict()
+        for key, value in collection_figee.items():
+            if not key.startswith('_'):
+                collection_filtree[key] = value
+
+        url_web = self.parametres[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
+        url_web = url_web.replace('.', '_')
+        domaine = 'commande.%s.publierCollection' % url_web
+
+        self.controleur.transmetteur.emettre_message_public(collection_filtree, domaine)
+
         self.set_etape_suivante()  # Termine

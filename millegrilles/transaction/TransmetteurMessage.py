@@ -102,6 +102,22 @@ class TransmetteurMessageMilleGrilles:
         self._publish_prive(message_signe, routing_key)
         return uuid_transaction, message_signe
 
+    def emettre_message_public(self, message: dict, routing_key: str,
+                               version: int = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
+        """
+        Emet un message sur l'echange public.
+
+        :param message:
+        :param routing_key:
+        :param version:
+        :return:
+        """
+
+        message_signe, uuid_transaction = self.__formatteur_message.signer_message(
+            message, routing_key, version=version)
+        self._publish_public(message_signe, routing_key)
+        return uuid_transaction, message_signe
+
     def relayer_direct(self, message: dict, queue_name: str, reply_to=None, correlation_id=None):
         self._publish_direct(message, queue_name, reply_to=reply_to, correlation_id=correlation_id)
 

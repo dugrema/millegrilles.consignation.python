@@ -8,6 +8,7 @@ import json
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
 from millegrilles.transaction import GenerateurTransaction
+from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from threading import Thread, Event, Barrier
 
 
@@ -17,6 +18,9 @@ class MGPProcesseur:
         self.__contexte = contexte
         self.__gestionnaire_domaine = gestionnaire_domaine
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self.__transmetteur = TransmetteurMessageMilleGrilles(contexte)
+        self.contexte.message_dao.register_channel_listener(self.__transmetteur)
 
     def charger_transaction_par_id(self, id_transaction, nom_collection):
         return self.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
@@ -81,6 +85,10 @@ class MGPProcesseur:
     @property
     def generateur_transactions(self) -> GenerateurTransaction:
         return self.__contexte.generateur_transactions
+
+    @property
+    def transmetteur(self) -> TransmetteurMessageMilleGrilles:
+        return self.__transmetteur
 
     @property
     def verificateur_transaction(self):
