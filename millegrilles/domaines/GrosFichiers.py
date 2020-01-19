@@ -660,12 +660,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
         ]
 
         filtre_version = [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
         ]
 
         entree_filtree = {
@@ -1994,6 +1994,15 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
                     'nom': document_a_publier['nom'],
                 }
                 info_documents_a_publier.append(info_doc)
+
+                if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
+                    # On ajoute aussi l'upload du preview
+                    info_preview = {
+                        'fuuid': document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW],
+                        'mimetype': document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW],
+                        'extension': 'jpg',
+                    }
+                    info_documents_a_publier.append(info_preview)
 
         # Creer commande de deploiement pour consignationfichiers
         commande_deploiement = {
