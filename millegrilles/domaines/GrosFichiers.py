@@ -1172,10 +1172,12 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
     def confirmer_reception_update_collections(self):
         # Verifie si la transaction correspond a un document d'image
-        est_image = self.parametres['mimetype'] is not None and self.parametres['mimetype'].split('/')[0] == 'image'
+        mimetype = self.parametres['mimetype'].split('/')[0]
+        est_image = mimetype == 'image'
+        est_video = mimetype == 'video'
 
         chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
-        if not chiffre and est_image:
+        if not chiffre and (est_image or est_video):
             fuuid = self.parametres['fuuid']
             tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
 
@@ -1190,8 +1192,8 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         # Verifier si le fichier est une image protegee - il faut generer un thumbnail
         self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
-        if chiffre and est_image:
-            self.__logger.info("Mimetype est une image")
+        if chiffre and (est_image or est_video):
+            self.__logger.info("Mimetype est une image/video")
 
             # Transmettre requete pour certificat de consignation.grosfichiers
             self.set_requete('pki.role.fichiers', {})
