@@ -1018,7 +1018,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update(filtre, ops)
 
-    def associer_thumbnail(self, fuuid, thumbnail):
+    def associer_thumbnail(self, fuuid, thumbnail, metadata = None):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
@@ -1027,14 +1027,24 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             }
         }
 
-        ops = {
-            '$set': {
-                '%s.%s.%s' % (
+        set_opts = {
+            '%s.%s.%s' % (
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                fuuid,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
+            ): thumbnail
+        }
+        if metadata is not None:
+            if metadata.get('data_video') is not None:
+                libelle_data_video = '%s.%s.%s' % (
                     ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
                     fuuid,
-                    ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
-                ): thumbnail
-            }
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_DATA_VIDEO
+                )
+                set_opts[libelle_data_video] = metadata['data_video']
+
+        ops = {
+            '$set': set_opts
         }
 
         self._logger.debug("Ajout thumbnail pour fuuid: %s" % filtre)
@@ -1846,8 +1856,9 @@ class ProcessusTransactionAssocierThumbnail(ProcessusGrosFichiers):
 
         fuuid = transaction['fuuid']
         thumbnail = transaction['thumbnail']
+        metadata = transaction.get('metadata')
 
-        self.controleur.gestionnaire.associer_thumbnail(fuuid, thumbnail)
+        self.controleur.gestionnaire.associer_thumbnail(fuuid, thumbnail, metadata)
 
         token_resumer = 'associer_thumbnail:%s' % fuuid
         self.resumer_processus([token_resumer])
