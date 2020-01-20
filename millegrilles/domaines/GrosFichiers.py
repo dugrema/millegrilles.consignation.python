@@ -33,6 +33,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Ajout document favoris
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_FAVORIS, ConstantesGrosFichiers.DOCUMENT_FAVORIS)
 
+        # Ajout documents vitrine
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_VITRINE_FICHIERS, ConstantesGrosFichiers.DOCUMENT_VITRINE_FICHIERS)
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS, ConstantesGrosFichiers.DOCUMENT_VITRINE_ALBUMS)
+
         # Creation liste de recherche speciale pour l'activite des fichiers
         liste_recherche = ConstantesGrosFichiers.DOCUMENT_RAPPORT_RECHERCHE.copy()
         liste_recherche[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
@@ -249,6 +253,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection = collection_domaine.find_one(filtre)
 
         return collection
+
+    def get_document_vitrine_fichiers(self):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_FICHIERS,
+        }
+        return collection_domaine.find_one(filtre)
+
+    def get_document_vitrine_albums(self):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS,
+        }
+        return collection_domaine.find_one(filtre)
 
     def maj_fichier(self, transaction):
         """
@@ -669,6 +687,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE_480P,
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION,
         ]
 
         entree_filtree = {
@@ -1117,6 +1136,185 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # if resultat.matched_count < len(liste_uuid):
         #     raise Exception("Nombre de fichiers modifies ne correspond pas, changes < demandes (%d < %d)" %
         #                     (resultat.matched_count, len(liste_uuid)))
+
+    def maj_documents_vitrine(self, collection_figee_uuid):
+        collection_figee = self.get_collection_figee_par_uuid(collection_figee_uuid)
+        self.__maj_vitrine_fichiers(collection_figee)
+        self.__maj_vitrine_albums(collection_figee)
+
+    def __maj_vitrine_fichiers(self, collection_figee):
+        etiquettes = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES)
+        uuid_collection = collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE]
+
+        champs_filtre_collections = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
+        ]
+
+        champs_filtre_fichiers = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P,
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION,
+        ]
+
+        champs_filtre_multilingue = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMENTAIRES,
+        ]
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        ops = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': set_on_insert,
+        }
+
+        if not ConstantesGrosFichiers.LIBELLE_PUBLICATION_CACHERFICHIERS in etiquettes:
+
+            collection_figee_filtree = dict()
+            # On met a jour la liste des fichiers
+            ops = {
+                '$set': {
+                    'collections.%s' % uuid_collection: collection_figee_filtree
+                }
+            }
+            for key, value in collection_figee.items():
+                if key in champs_filtre_collections:
+                    collection_figee_filtree[key] = value
+                else:
+                    for multikey in champs_filtre_multilingue:
+                        if multikey.startswith(key):
+                            collection_figee_filtree[key] = value
+
+            if ConstantesGrosFichiers.LIBELLE_PUBLICATION_TOP in etiquettes:
+                # Cette collection fournit des fichiers a mettre dans le haut de la page fichiers
+                # liste_fichiers_top = list()
+                for fichier_uuid, fichier in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
+                    fichier_filtre = dict()
+                    for key, value in fichier.items():
+                        if key in champs_filtre_fichiers:
+                            fichier_filtre[key] = value
+                        else:
+                            for multikey in champs_filtre_multilingue:
+                                if multikey.startswith(key):
+                                    fichier_filtre[key] = value
+                    # liste_fichiers_top.append(fichier_filtre)
+                    ops['$set']['top.%s'%fichier_uuid] = fichier_filtre
+
+        else:
+            # S'assurer que la collection n'est pas publiee dans fichiers
+            pass
+
+        self._logger.info("Operation update vitrine.fichiers: %s" % str(ops))
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_FICHIERS}, ops)
+
+    def __maj_vitrine_albums(self, collection_figee):
+        etiquettes = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES)
+        uuid_collection = collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE]
+
+        # Determiner si on a au moins une image/video
+        contient_medias = any(f[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] is not None for f in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values())
+        if not contient_medias:
+            return
+
+        champs_filtre_collections = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
+        ]
+
+        champs_filtre_fichiers = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_DATEVCOURANTE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P,
+            ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_VERSION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL,
+        ]
+
+        champs_filtre_multilingue = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMENTAIRES,
+        ]
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_FICHIERS,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        ops = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': set_on_insert,
+        }
+
+        collection_figee_filtree = dict()
+        # On met a jour la liste des fichiers
+        ops = {
+            '$set': {
+                'collections.%s' % uuid_collection: collection_figee_filtree
+            }
+        }
+        for key, value in collection_figee.items():
+            if key in champs_filtre_collections:
+                collection_figee_filtree[key] = value
+            else:
+                for multikey in champs_filtre_multilingue:
+                    if multikey.startswith(key):
+                        collection_figee_filtree[key] = value
+
+        # Capture un thumbnail/preview pour la collection (au hasard)
+        for fichier in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values():
+            if fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
+                collection_figee_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] = fichier[
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
+                collection_figee_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = fichier[
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
+                collection_figee_filtree[ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL] = fichier[
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL]
+                break
+
+        if ConstantesGrosFichiers.LIBELLE_PUBLICATION_TOP in etiquettes:
+            # Cette collection fournit des fichiers a mettre dans le carousel de l'album
+            for fichier_uuid, fichier in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].items():
+                if fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] is not None:
+                    fichier_filtre = dict()
+                    for key, value in fichier.items():
+                        if key in champs_filtre_fichiers:
+                            fichier_filtre[key] = value
+                        else:
+                            for multikey in champs_filtre_multilingue:
+                                if multikey.startswith(key):
+                                    fichier_filtre[key] = value
+                    # liste_fichiers_top.append(fichier_filtre)
+                    ops['$set']['top.%s'%fichier_uuid] = fichier_filtre
+
+        else:
+            # S'assurer que la collection n'est pas publiee dans fichiers
+            pass
+
+        self._logger.info("Operation update vitrine.albums: %s" % str(ops))
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS}, ops)
+
 
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
@@ -1968,6 +2166,10 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
         url_noeud_public = transaction[ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB]
         uuid_collection_figee = transaction[ConstantesParametres.TRANSACTION_CHAMP_UUID]
 
+        # Inserer dans les documents de vitrine
+        # Ceci va automatiquement les publier (via watchers MongoDB)
+        self.controleur.gestionnaire.maj_documents_vitrine(uuid_collection_figee)
+
         self.set_requete(ConstantesParametres.REQUETE_NOEUD_PUBLIC, {
             ConstantesParametres.DOCUMENT_PUBLIQUE_URL_WEB: url_noeud_public,
         })
@@ -2121,4 +2323,14 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
 
         self.controleur.transmetteur.emettre_message_public(collection_filtree, domaine)
 
-        self.set_etape_suivante()  # Termine
+        # Publier les documents de sections avec fichiers (fichiers, albums, podcasts, etc.)
+        # Note : ajouter un selecteur pour charger uniquement les sections actives (menu du noeud)
+        document_fichiers = self.controleur.gestionnaire.get_document_vitrine_fichiers()
+        domaine_fichiers = 'commande.%s.publierFichiers' % url_web
+        self.controleur.transmetteur.emettre_message_public(document_fichiers, domaine_fichiers)
+
+        document_albums = self.controleur.gestionnaire.get_document_vitrine_albums()
+        domaine_albums = 'commande.%s.publierAlbums' % url_web
+        self.controleur.transmetteur.emettre_message_public(document_albums, domaine_albums)
+
+        self.set_etape_suivante()

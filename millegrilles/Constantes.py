@@ -873,12 +873,20 @@ class ConstantesGrosFichiers:
     LIBVAL_RAPPORT = 'rapport'
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
 
+    LIBVAL_VITRINE_FICHIERS = 'vitrine.fichiers'
+    LIBVAL_VITRINE_ALBUMS = 'vitrine.albums'
+
+    LIBELLE_PUBLICATION_CACHERFICHIERS = 'cacherfichiers'
+    LIBELLE_PUBLICATION_TOP = 'top'
+    LIBELLE_PUBLICATION_CAROUSEL = 'carousel'
+
     DOCUMENT_SECURITE = 'securite'
     DOCUMENT_COMMENTAIRES = 'commentaires'
 
     DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
 
     DOCUMENT_FICHIER_NOMFICHIER = 'nom'
+    DOCUMENT_FICHIER_COMMENTAIRES = 'commentaires'
     DOCUMENT_FICHIER_EXTENSION_ORIGINAL = 'extension'
     DOCUMENT_FICHIER_UUID_DOC = 'uuid'                    # UUID du document de fichier (metadata)
     DOCUMENT_UUID_GENERIQUE = 'documentuuid'            # Represente un UUID de n'import quel type de document
@@ -909,6 +917,9 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
+
+    DOCUMENT_VITRINE_TOP = 'top'
+    DOCUMENT_VITRINE_COLLECTIONS = 'collections'
 
     DOCUMENT_VERSION_NOMFICHIER = 'nom'
     DOCUMENT_VERSION_DATE_FICHIER = 'date_fichier'
@@ -1010,6 +1021,18 @@ class ConstantesGrosFichiers:
         DOCUMENT_INFODOC_LIBELLE: None,      # Type document
         'nom': None,                                    # Nom affiche a l'ecran
         'uuid': None,                                   # Lien vers document, doit etre unique dans la liste de favoris
+    }
+
+    DOCUMENT_VITRINE_FICHIERS = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_VITRINE_FICHIERS,
+        DOCUMENT_VITRINE_TOP: dict(),
+        DOCUMENT_VITRINE_COLLECTIONS: dict(),
+    }
+
+    DOCUMENT_VITRINE_ALBUMS = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_VITRINE_ALBUMS,
+        DOCUMENT_VITRINE_TOP: dict(),
+        DOCUMENT_VITRINE_COLLECTIONS: dict(),
     }
 
     # Prototype de document liste de recherche
