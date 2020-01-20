@@ -666,6 +666,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE_480P,
         ]
 
         entree_filtree = {
@@ -927,6 +930,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
             info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = transaction[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
+
+        if transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P) is not None:
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P]
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P]
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE_480P] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE_480P]
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256_480P] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256_480P]
+            info_fichier_decrypte[ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA_VIDEO] = transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA][ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA_VIDEO]
 
         label_versions_fuuid_decrypte = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_decrypte)
         ops = {
@@ -2029,20 +2044,39 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
         info_documents_a_publier = []
         for document_a_publier in liste_documents.values():
             if document_a_publier[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesGrosFichiers.LIBVAL_FICHIER:
+
                 info_doc = {
-                    'fuuid': document_a_publier['fuuid'],
-                    'extension': document_a_publier['extension'],
-                    'mimetype': document_a_publier['mimetype'],
                     'nom': document_a_publier['nom'],
                 }
+
+                # Gerer l'exception des videos, on publie uniquement le clip mp4 en 480p
+                if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P) is not None:
+                    # On publie uniquement le video a 480p
+                    info_doc.update({
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: 'mp4',
+                    })
+                else:
+                    # C'est un fichier standard
+                    info_doc.update({
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: document_a_publier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
+                    })
                 info_documents_a_publier.append(info_doc)
 
                 if document_a_publier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
                     # On ajoute aussi l'upload du preview
                     info_preview = {
-                        'fuuid': document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW],
-                        'mimetype': document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW],
-                        'extension': 'jpg',
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_a_publier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: 'jpg',
                     }
                     info_documents_a_publier.append(info_preview)
 
