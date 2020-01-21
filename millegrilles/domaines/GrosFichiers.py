@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -11,6 +11,42 @@ import logging
 import uuid
 import datetime
 import json
+
+
+class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
+            fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
+            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
+            fichiers_vitrine = self.gestionnaire.get_document_vitrine_albums()
+            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_COLLECTION_FIGEE:
+            uuid_collection = message_dict.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+            fichiers_vitrine = self.gestionnaire.get_collection_figee_recente_par_collection(uuid_collection)
+            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        else:
+            raise Exception("Requete publique non supportee " + routing_key)
+
+
+class TraitementRequetesProtegeesGrosFichiers(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
+            fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
+            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
+            fichiers_vitrine = self.gestionnaire.get_document_vitrine_albums()
+            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_COLLECTION_FIGEE:
+            uuid_collection = message_dict.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+            fichiers_vitrine = self.gestionnaire.get_collection_figee_recente_par_collection(uuid_collection)
+            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
 
 
 class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
@@ -21,6 +57,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._traitement_noeud = None
         self._traitement_cedule = None
         self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
+
+        self.__handler_requetes_noeuds = {
+            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesGrosFichiers(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesGrosFichiers(self)
+        }
 
     def configurer(self):
         super().configurer()
@@ -45,6 +86,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
+
+    def get_handler_requetes(self) -> dict:
+        return self.__handler_requetes_noeuds
 
     def get_queue_configuration(self):
         queue_config = super().get_queue_configuration()
@@ -254,6 +298,19 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return collection
 
+    def get_collection_figee_recente_par_collection(self, uuid_collection):
+        collection = self.get_collection_par_uuid(uuid_collection)
+
+        # Determiner la plus recente collection figee
+        liste_figees = collection.get(ConstantesGrosFichiers.DOCUMENT_COLLECTIONS_FIGEES)
+        if liste_figees is not None:
+            info_collection_figee = liste_figees[0]
+            uuid_collection_figee = info_collection_figee[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+            collection_figee = self.get_collection_figee_par_uuid(uuid_collection_figee)
+            return collection_figee
+
+        return None
+
     def get_document_vitrine_fichiers(self):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
@@ -267,6 +324,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS,
         }
         return collection_domaine.find_one(filtre)
+
+    def get_documents_vitrine(self):
+        documents = list()
+        documents.append(self.get_document_vitrine_albums())
+        documents.append(self.get_document_vitrine_fichiers())
+        return documents
 
     def maj_fichier(self, transaction):
         """
@@ -1266,11 +1329,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         collection_figee_filtree = dict()
         # On met a jour la liste des fichiers
-        ops = {
+        ops.update({
             '$set': {
                 'collections.%s' % uuid_collection: collection_figee_filtree
             }
-        }
+        })
         for key, value in collection_figee.items():
             if key in champs_filtre_collections:
                 collection_figee_filtree[key] = value

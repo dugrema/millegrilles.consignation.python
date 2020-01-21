@@ -181,6 +181,21 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC
         })
 
+        # Ajustement pour la consignation selon Torrent ou Amazon S3
+        if transaction_filtree[ConstantesParametres.DOCUMENT_CHAMP_MODE_DEPLOIEMENT] == 'torrent':
+            transaction_filtree['consignation'] = {
+                'flat': False,
+                'base_url': '/consignation/',
+            }
+        elif transaction_filtree[ConstantesParametres.DOCUMENT_CHAMP_MODE_DEPLOIEMENT] == 's3':
+            transaction_filtree['consignation'] = {
+                'flat': True,
+                'base_url': '%s/%s/' % (
+                    transaction_filtree[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_URL],
+                    transaction_filtree[ConstantesParametres.DOCUMENT_CHAMP_AWS_BUCKET_DIR]
+                )
+            }
+
         operations = {
             '$set': transaction_filtree,
             '$setOnInsert': set_on_insert,
