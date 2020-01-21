@@ -248,7 +248,6 @@ class ConstantesPrincipale:
     LIBELLE_NOM_MILLEGRILLE = 'nomMilleGrille'
     LIBELLE_NOM_MILLEGRILLE_PAR_LANGUE = 'nomMilleGrilleParLangue'
     LIBELLE_LANGUE_PRINCIPALE = 'langue'
-    LIBELLE_LANGUE_MULTILINGUE = 'multilingue'
     LIBELLE_LANGUES_ADDITIONNELLES = 'languesAdditionnelles'
 
     TRANSACTION_ACTION_FERMERALERTE = '%s.fermerAlerte' % DOMAINE_NOM
@@ -332,10 +331,8 @@ class ConstantesPrincipale:
     DOCUMENT_PROFIL_MILLEGRILLE = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_PROFIL_MILLEGRILLE,
         LIBELLE_NOM_MILLEGRILLE: 'Sans nom',
-        LIBELLE_NOM_MILLEGRILLE_PAR_LANGUE: None,
         LIBELLE_LANGUE_PRINCIPALE: None,
-        LIBELLE_LANGUE_MULTILINGUE: False,
-        LIBELLE_LANGUES_ADDITIONNELLES: None,
+        LIBELLE_LANGUES_ADDITIONNELLES: list(),
     }
 
 
@@ -727,7 +724,6 @@ class ConstantesAnnuaire:
         LIBELLE_DOC_USAGER: dict(),
         LIBELLE_DOC_DESCRIPTIF: None,
         ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: 'fr',
-        ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: False,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
         LIBELLE_DOC_CERTIFICAT: None,  # Certificat du maitredescles
         LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES: None,  # Liste certificats du maitredescles + intermediaires
@@ -741,7 +737,6 @@ class ConstantesAnnuaire:
         LIBELLE_DOC_DESCRIPTIF: None,
         LIBELLE_DOC_CERTIFICAT_RACINE: None,  # str
         ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: 'fr',
-        ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: False,
     }
 
     TEMPLATE_DOCUMENT_FICHE_MILLEGRILLE_TIERCE = {

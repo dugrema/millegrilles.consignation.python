@@ -372,12 +372,19 @@ class ProcessusMajProfilMilleGrille(ProcessusMajFiches):
         transaction = self.charger_transaction(ConstantesPrincipale.COLLECTION_TRANSACTIONS_NOM)
 
         fiche = {
-            ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE: transaction[ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE],
             ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE: transaction[ConstantesPrincipale.LIBELLE_LANGUE_PRINCIPALE],
-            ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE: transaction[ConstantesPrincipale.LIBELLE_LANGUE_MULTILINGUE],
+            ConstantesPrincipale.LIBELLE_LANGUES_ADDITIONNELLES: transaction[ConstantesPrincipale.LIBELLE_LANGUES_ADDITIONNELLES],
         }
 
         # Verifier si on a plusieurs languages - si oui, les noms de MilleGrilles sont ramenes au niveau de base
+        champs_multilingues = [
+            ConstantesPrincipale.LIBELLE_NOM_MILLEGRILLE
+        ]
+
+        for champ in champs_multilingues:
+            for key, value in transaction.items():
+                if key.startswith(champ):
+                    fiche[key] = value
 
         # Mettre a jour le profile usager sous Principale
         self.controleur.gestionnaire.maj_profil_millegrille(fiche)
