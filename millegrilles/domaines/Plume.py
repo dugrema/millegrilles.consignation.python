@@ -31,7 +31,7 @@ class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
             super().traiter_requete(ch, method, properties, body, message_dict)
 
 
-class ParametresExchangeRouter(ExchangeRouter):
+class PlumeExchangeRouter(ExchangeRouter):
 
     def determiner_exchanges(self, document):
         """
@@ -112,7 +112,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         self.demarrer_watcher_collection(
             ConstantesPlume.COLLECTION_DOCUMENTS_NOM,
             ConstantesPlume.QUEUE_ROUTING_CHANGEMENTS,
-            ParametresExchangeRouter(self._contexte)
+            PlumeExchangeRouter(self._contexte)
         )
 
     def ajouter_nouveau_document(self, transaction):
