@@ -107,6 +107,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPlume.LIBVAL_CONFIGURATION, ConstantesPlume.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
         self.initialiser_document(ConstantesPlume.LIBVAL_ANNONCES_RECENTES, ConstantesPlume.DOCUMENT_ANNONCES_RECENTES)
+        self.initialiser_document(ConstantesPlume.LIBVAL_VITRINE_ACCUEIL, ConstantesPlume.DOCUMENT_VITRINE_ACCUEIL)
 
         self.demarrer_watcher_collection(
             ConstantesPlume.COLLECTION_DOCUMENTS_NOM,
@@ -255,6 +256,8 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Plume:ProcessusTransactionCreerAnnonce"
         elif domaine_transaction == ConstantesPlume.TRANSACTION_SUPPRIMER_ANNONCE:
             processus = "millegrilles_domaines_Plume:ProcessusTransactionSupprimerAnnonce"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_MAJ_ACCUEIL_VITRINE:
+            processus = "millegrilles_domaines_Plume:ProcessuMajAccueilVitrine"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -360,6 +363,19 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_ANNONCES_RECENTES
         })
         return annonces_recentes
+
+    def maj_accueil_vitrine(self, info_accueil):
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_VITRINE_ACCUEIL
+        }
+
+        ops = {
+            '$set': info_accueil
+        }
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        collection_domaine.update_one(filtre, ops)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
@@ -586,4 +602,56 @@ class ProcessusTransactionSupprimerAnnonce(ProcessusPlume):
         transaction = self.charger_transaction()
         uuid_annonce = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
         self.controleur.gestionnaire.supprimer_annonce(uuid_annonce)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessuMajAccueilVitrine(ProcessusPlume):
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        champs_multilingues = [
+            ConstantesPlume.LIBELLE_DOC_VITRINE_BIENVENUE
+        ]
+
+        info_accueil = dict()
+
+        for key, value in transaction.items():
+            for champ in champs_multilingues:
+                if key.startswith(champ):
+                    info_accueil[key] = value
+
+        # Preparer la section de donnees du portail accueil
+        colonnes = list()
+        portail = [
+            {
+                'type': 'deck',
+                'cartes': colonnes,
+            }
+        ]
+        info_accueil['portail'] = portail
+
+        # Faire un mapping des donnees par colonne
+        for col in range(1, 4):
+            contenu_colonne = dict()
+            colonnes.append(contenu_colonne)
+
+            champs_multilingues = {
+                '%s%d' % (ConstantesPlume.LIBELLE_DOC_VITRINE_TEXTE_COLONNES, col): 'texte',
+                '%s%d' % (ConstantesPlume.LIBELLE_DOC_VITRINE_TITRE_COLONNES, col): 'titre',
+            }
+
+            for key, value in transaction.items():
+                key_vals = key.split('_')
+                language = None
+                if len(key_vals) > 1:
+                    language = key_vals[-1]
+                for champ, champ_map in champs_multilingues.items():
+                    if key.startswith(champ):
+                        if language is not None:
+                            champ_map = '%s_%s' % (champ_map, language)
+                        contenu_colonne[champ_map] = value
+
+        self.controleur.gestionnaire.maj_accueil_vitrine(info_accueil)
+
         self.set_etape_suivante()  # Termine

@@ -774,6 +774,7 @@ class ConstantesPlume:
     TRANSACTION_DEPUBLIER_DOCUMENT = '%s.depublierDocument' % DOMAINE_NOM
     TRANSACTION_CREER_ANNONCE = '%s.creerAnnonce' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_ANNONCE = '%s.supprimerAnnonce' % DOMAINE_NOM
+    TRANSACTION_MAJ_ACCUEIL_VITRINE = '%s.majAccueilVitrine' % DOMAINE_NOM
 
     REQUETE_CHARGER_ANNONCES_RECENTES = DOMAINE_NOM + '.chargerAnnoncesRecentes'
 
@@ -790,6 +791,10 @@ class ConstantesPlume:
     LIBELLE_DOC_DATE_ATTENTE_PUBLICATION = 'dateAttentePublication'
     LIBELLE_DOC_ANNONCES = 'annonces'
 
+    LIBELLE_DOC_VITRINE_BIENVENUE = 'messageBienvenue'
+    LIBELLE_DOC_VITRINE_TITRE_COLONNES = 'titreCol'
+    LIBELLE_DOC_VITRINE_TEXTE_COLONNES = 'texteCol'
+
     DEFAUT_ATTENTE_PUBLICATION_SECS = 120   # Delai de publication par defaut
     DEFAUT_NOMBRE_ANNONCES_RECENTES = 200   # Nombre max d'annonces dans annonces.recentes
 
@@ -799,6 +804,7 @@ class ConstantesPlume:
     LIBVAL_ANNONCES_RECENTES = 'annonces.recentes'
     LIBVAL_CATALOGUE = 'catalogue'
     LIBVAL_CATEGORIE = 'categorie'
+    LIBVAL_VITRINE_ACCUEIL = 'vitrine.accueil'
 
     DOCUMENT_DEFAUT = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
@@ -833,6 +839,10 @@ class ConstantesPlume:
     DOCUMENT_ANNONCES_RECENTES = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_ANNONCES_RECENTES,
         LIBELLE_DOC_ANNONCES: list(),   # Liste triee par date, plus recente annonce en premier
+    }
+
+    DOCUMENT_VITRINE_ACCUEIL = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_VITRINE_ACCUEIL,
     }
 
     FILTRE_DOC_ANNONCES_RECENTES = [
