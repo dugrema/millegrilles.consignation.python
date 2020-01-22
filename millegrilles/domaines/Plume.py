@@ -625,7 +625,6 @@ class ProcessuMajAccueilVitrine(ProcessusPlume):
 
         # Preparer la section de donnees du portail accueil
         if transaction.get('colonnes') is not None:
-            colonnes = list()
             portail = [
                 {
                     'type': 'deck',
@@ -633,27 +632,6 @@ class ProcessuMajAccueilVitrine(ProcessusPlume):
                 }
             ]
             info_accueil['portail'] = portail
-
-            # # Faire un mapping des donnees par colonne
-            # for col in range(1, 4):
-            #     contenu_colonne = dict()
-            #     colonnes.append(contenu_colonne)
-            #
-            #     champs_multilingues = {
-            #         '%s%d' % (ConstantesPlume.LIBELLE_DOC_VITRINE_TEXTE_COLONNES, col): 'texte',
-            #         '%s%d' % (ConstantesPlume.LIBELLE_DOC_VITRINE_TITRE_COLONNES, col): 'titre',
-            #     }
-            #
-            #     for key, value in transaction.items():
-            #         key_vals = key.split('_')
-            #         language = None
-            #         if len(key_vals) > 1:
-            #             language = key_vals[-1]
-            #         for champ, champ_map in champs_multilingues.items():
-            #             if key.startswith(champ):
-            #                 if language is not None:
-            #                     champ_map = '%s_%s' % (champ_map, language)
-            #                 contenu_colonne[champ_map] = value
 
         accueil_modifie = self.controleur.gestionnaire.maj_accueil_vitrine(info_accueil)
 
