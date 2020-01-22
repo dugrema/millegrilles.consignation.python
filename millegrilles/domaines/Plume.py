@@ -375,7 +375,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         }
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
-        collection_domaine.update_one(filtre, ops)
+        return collection_domaine.find_and_modify(filtre, ops, new=True)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
@@ -652,6 +652,11 @@ class ProcessuMajAccueilVitrine(ProcessusPlume):
                             champ_map = '%s_%s' % (champ_map, language)
                         contenu_colonne[champ_map] = value
 
-        self.controleur.gestionnaire.maj_accueil_vitrine(info_accueil)
+        accueil_modifie = self.controleur.gestionnaire.maj_accueil_vitrine(info_accueil)
+
+        if transaction['operation'] == 'publier':
+            # Publier la mise a jour
+            domaine_publier = 'commande.publierAccueil'
+            self.controleur.transmetteur.emettre_message_public(accueil_modifie, domaine_publier)
 
         self.set_etape_suivante()  # Termine
