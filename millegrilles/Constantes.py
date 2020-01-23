@@ -781,6 +781,8 @@ class ConstantesPlume:
     TRANSACTION_SUPPRIMER_BLOGPOST = '%s.supprimerBlogpostVitrine' % DOMAINE_NOM
 
     REQUETE_CHARGER_ANNONCES_RECENTES = DOMAINE_NOM + '.chargerAnnoncesRecentes'
+    REQUETE_CHARGER_ACCUEIL = DOMAINE_NOM + '.chargerAccueil'
+    REQUETE_CHARGER_BLOGPOSTS_RECENTS = DOMAINE_NOM + '.chargerBlogpostsRecents'
 
     LIBELLE_DOC_PLUME_UUID = 'uuid'
     LIBELLE_DOC_SECURITE = 'securite'

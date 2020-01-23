@@ -16,6 +16,12 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
         if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
             noeud_publique = self.gestionnaire.get_annonces_recentes()
             self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ACCUEIL:
+            document_accueil = self.gestionnaire.get_document_accueil()
+            self.transmettre_reponse(message_dict, document_accueil, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_BLOGPOSTS_RECENTS:
+            document_blogposts = self.gestionnaire.get_blogposts_recents()
+            self.transmettre_reponse(message_dict, document_blogposts, properties.reply_to, properties.correlation_id)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
@@ -515,6 +521,22 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         }
 
         return collection_domaine.find_and_modify(filtre, ops, upsert=True, new=True)
+
+    def get_document_accueil(self):
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        # Retirer date publication blogpost
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_VITRINE_ACCUEIL,
+        }
+        return collection_domaine.find_one(filtre)
+
+    def get_blogposts_recents(self):
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        # Retirer date publication blogpost
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOSTS_RECENTS,
+        }
+        return collection_domaine.find_one(filtre)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
