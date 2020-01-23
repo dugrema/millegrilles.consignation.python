@@ -108,6 +108,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPlume.LIBVAL_CATALOGUE, ConstantesPlume.DOCUMENT_CATALOGUE)
         self.initialiser_document(ConstantesPlume.LIBVAL_ANNONCES_RECENTES, ConstantesPlume.DOCUMENT_ANNONCES_RECENTES)
         self.initialiser_document(ConstantesPlume.LIBVAL_VITRINE_ACCUEIL, ConstantesPlume.DOCUMENT_VITRINE_ACCUEIL)
+        self.initialiser_document(ConstantesPlume.LIBVAL_BLOGPOSTS_RECENTS, ConstantesPlume.DOCUMENT_BLOGPOSTS_RECENTS)
 
         self.demarrer_watcher_collection(
             ConstantesPlume.COLLECTION_DOCUMENTS_NOM,
@@ -258,6 +259,16 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Plume:ProcessusTransactionSupprimerAnnonce"
         elif domaine_transaction == ConstantesPlume.TRANSACTION_MAJ_ACCUEIL_VITRINE:
             processus = "millegrilles_domaines_Plume:ProcessuMajAccueilVitrine"
+
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_MAJ_BLOGPOST:
+            processus = "millegrilles_domaines_Plume:ProcessuMajBlogpostVitrine"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_PUBLIER_BLOGPOST:
+            processus = "millegrilles_domaines_Plume:ProcessuPublierBlogpostVitrine"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_RETIRER_BLOGPOST:
+            processus = "millegrilles_domaines_Plume:ProcessuRetirerBlogpostVitrine"
+        elif domaine_transaction == ConstantesPlume.TRANSACTION_SUPPRIMER_BLOGPOST:
+            processus = "millegrilles_domaines_Plume:ProcessuSupprimerBlogpostVitrine"
+
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -376,6 +387,130 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         return collection_domaine.find_and_modify(filtre, ops, new=True)
+
+    def get_blogpost(self, uuid_blogpost):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOST,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: uuid_blogpost,
+        }
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        return collection_domaine.find_one(filtre)
+
+    def maj_blogpost(self, transaction):
+
+        uuid_blogpost = transaction.get(ConstantesPlume.LIBELLE_DOC_PLUME_UUID)
+        if uuid_blogpost is None:
+            # Utiliser le uuid-transaction
+            uuid_blogpost = transaction[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOST,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: uuid_blogpost,
+        }
+
+        blogpost = {}
+        if transaction.get(ConstantesPlume.LIBELLE_DOC_IMAGE) is not None:
+            blogpost[ConstantesPlume.LIBELLE_DOC_IMAGE] = transaction[ConstantesPlume.LIBELLE_DOC_IMAGE]
+
+        champs = [
+            ConstantesPlume.LIBELLE_DOC_TITRE,
+            ConstantesPlume.LIBELLE_DOC_TEXTE,
+        ]
+
+        # Copier les champs de la transaction
+        for key, value in transaction.items():
+            for champ in champs:
+                if key.startswith(champ):
+                    blogpost[key] = value
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOST,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: uuid_blogpost,
+        }
+
+        ops = {
+            '$set': blogpost,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': set_on_insert,
+        }
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+        return collection_domaine.find_and_modify(filtre, ops, upsert=True, new=True)
+
+    def publier_blogpost(self, uuid_blogpost):
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+
+        # Mettre a jour date publication et charger blogpost
+        filtre_blogpost = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOST,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: uuid_blogpost
+        }
+        ops = {
+            '$currentDate': {ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION: True}
+        }
+        blogpost = collection_domaine.find_and_modify(filtre_blogpost, ops)
+
+        # Mettre a jour document blogposts recents
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOSTS_RECENTS,
+        }
+
+        # Filtrer les champs qui ne doivent pas etre exportes
+        retirer_champs = [
+            Constantes.MONGO_DOC_ID, Constantes.DOCUMENT_INFODOC_LIBELLE
+        ]
+        for champ in retirer_champs:
+            del blogpost[champ]
+
+        uuid_blogpost = blogpost[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+
+        set_ops = {
+            '%s.%s' % (ConstantesPlume.LIBELLE_DOC_BLOGPOSTS, uuid_blogpost): blogpost
+        }
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION: True,
+            },
+        }
+
+        return collection_domaine.find_and_modify(filtre, ops, upsert=True, new=True)
+
+    def retirer_blogpost(self, uuid_blogpost, supprimer=False):
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+
+        # Retirer date publication blogpost
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOST,
+            ConstantesPlume.LIBELLE_DOC_PLUME_UUID: uuid_blogpost
+        }
+        if supprimer:
+            collection_domaine.delete_one(filtre)
+        else:
+            ops = {
+                '$unset': {ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION: True},
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            }
+            collection_domaine.update_one(filtre, ops)
+
+        # Retirer blogpost de recents et autres documents
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOSTS_RECENTS,
+        }
+
+        ops = {
+            '$unset': {'%s.%s' % (ConstantesPlume.LIBELLE_DOC_BLOGPOSTS, uuid_blogpost): True},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        return collection_domaine.find_and_modify(filtre, ops, upsert=True, new=True)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
@@ -641,3 +776,87 @@ class ProcessuMajAccueilVitrine(ProcessusPlume):
             self.controleur.transmetteur.emettre_message_public(accueil_modifie, domaine_publier)
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusPublierBlogposts(ProcessusPlume):
+
+    def publier_blogposts_recents(self, blogposts_recents):
+        domaine_publier = 'commande.publierBlogpostsRecents'
+
+        champs_retirer = [
+            Constantes.MONGO_DOC_ID,
+            Constantes.DOCUMENT_INFODOC_LIBELLE,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
+        ]
+
+        blogposts_filtres = blogposts_recents.copy()
+        for champ in champs_retirer:
+            del blogposts_filtres[champ]
+
+        self.controleur.transmetteur.emettre_message_public(blogposts_filtres, domaine_publier)
+
+
+class ProcessuMajBlogpostVitrine(ProcessusPublierBlogposts):
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        document_maj = self.controleur.gestionnaire.maj_blogpost(transaction)
+
+        operation = transaction.get('operation')
+        if operation == 'publier':
+            uuid_blogpost = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+            pass
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessuPublierBlogpostVitrine(ProcessusPublierBlogposts):
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        uuid_blogpost = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+
+        # Recuperer document
+        blogposts_recents = self.controleur.gestionnaire.publier_blogpost(uuid_blogpost)
+
+        # Publier blogpost
+        self.publier_blogposts_recents(blogposts_recents)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessuRetirerBlogpostVitrine(ProcessusPublierBlogposts):
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        uuid_blogpost = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+
+        # Publier blogpost
+        blogposts_recents = self.controleur.gestionnaire.retirer_blogpost(uuid_blogpost)
+
+        # Transmettre message pour retirer la publication
+        self.publier_blogposts_recents(blogposts_recents)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessuSupprimerBlogpostVitrine(ProcessusPublierBlogposts):
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        uuid_blogpost = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+
+        # Publier blogpost
+        blogposts_recents = self.controleur.gestionnaire.retirer_blogpost(uuid_blogpost, supprimer=True)
+
+        # Transmettre message pour retirer la publication
+        self.publier_blogposts_recents(blogposts_recents)
+
+        self.set_etape_suivante()  # Termine
+
+

@@ -775,6 +775,10 @@ class ConstantesPlume:
     TRANSACTION_CREER_ANNONCE = '%s.creerAnnonce' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_ANNONCE = '%s.supprimerAnnonce' % DOMAINE_NOM
     TRANSACTION_MAJ_ACCUEIL_VITRINE = '%s.majAccueilVitrine' % DOMAINE_NOM
+    TRANSACTION_MAJ_BLOGPOST = '%s.majBlogpostVitrine' % DOMAINE_NOM
+    TRANSACTION_PUBLIER_BLOGPOST = '%s.publierBlogpostVitrine' % DOMAINE_NOM
+    TRANSACTION_RETIRER_BLOGPOST = '%s.retirerBlogpostVitrine' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_BLOGPOST = '%s.supprimerBlogpostVitrine' % DOMAINE_NOM
 
     REQUETE_CHARGER_ANNONCES_RECENTES = DOMAINE_NOM + '.chargerAnnoncesRecentes'
 
@@ -790,6 +794,8 @@ class ConstantesPlume:
     LIBELLE_DOC_REMPLACE = 'remplace'
     LIBELLE_DOC_DATE_ATTENTE_PUBLICATION = 'dateAttentePublication'
     LIBELLE_DOC_ANNONCES = 'annonces'
+    LIBELLE_DOC_IMAGE = 'image'
+    LIBELLE_DOC_BLOGPOSTS = 'blogposts'
 
     LIBELLE_DOC_VITRINE_BIENVENUE = 'messageBienvenue'
     LIBELLE_DOC_VITRINE_TITRE_COLONNES = 'titreCol'
@@ -805,6 +811,8 @@ class ConstantesPlume:
     LIBVAL_CATALOGUE = 'catalogue'
     LIBVAL_CATEGORIE = 'categorie'
     LIBVAL_VITRINE_ACCUEIL = 'vitrine.accueil'
+    LIBVAL_BLOGPOST = 'blogpost'
+    LIBVAL_BLOGPOSTS_RECENTS = 'blogposts.recents'
 
     DOCUMENT_DEFAUT = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
@@ -843,6 +851,11 @@ class ConstantesPlume:
 
     DOCUMENT_VITRINE_ACCUEIL = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_VITRINE_ACCUEIL,
+    }
+
+    DOCUMENT_BLOGPOSTS_RECENTS = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_BLOGPOSTS_RECENTS,
+        LIBELLE_DOC_BLOGPOSTS: dict(),
     }
 
     FILTRE_DOC_ANNONCES_RECENTES = [
