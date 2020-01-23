@@ -806,11 +806,19 @@ class ProcessuMajBlogpostVitrine(ProcessusPublierBlogposts):
         document_maj = self.controleur.gestionnaire.maj_blogpost(transaction)
 
         operation = transaction.get('operation')
+        info_retour = {}
         if operation == 'publier':
-            uuid_blogpost = transaction[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
-            pass
+            uuid_blogpost = document_maj[ConstantesPlume.LIBELLE_DOC_PLUME_UUID]
+            # Recuperer document
+            blogposts_recents = self.controleur.gestionnaire.publier_blogpost(uuid_blogpost)
+            info_retour[ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION] = blogposts_recents[ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION]
+
+            # Publier blogpost
+            self.publier_blogposts_recents(blogposts_recents)
 
         self.set_etape_suivante()  # Termine
+
+        return info_retour
 
 
 class ProcessuPublierBlogpostVitrine(ProcessusPublierBlogposts):
