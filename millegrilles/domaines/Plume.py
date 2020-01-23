@@ -445,9 +445,12 @@ class GestionnairePlume(GestionnaireDomaineStandard):
             ConstantesPlume.LIBELLE_DOC_PLUME_UUID: uuid_blogpost
         }
         ops = {
-            '$currentDate': {ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION: True}
+            '$currentDate': {
+                ConstantesPlume.LIBELLE_DOC_DATE_PUBLICATION: True,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            }
         }
-        blogpost = collection_domaine.find_and_modify(filtre_blogpost, ops)
+        blogpost = collection_domaine.find_and_modify(filtre_blogpost, ops, new=True)
 
         # Mettre a jour document blogposts recents
         filtre = {
