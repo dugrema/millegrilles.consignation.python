@@ -1210,11 +1210,36 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
         self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
 
     def executer_requete(self, requete):
+        """
+        Requetes generiques par composants avec acces protege.
+
+        Exemple:
+        {
+          'filtre': {
+            '_mg-libelle': 'blogpost',
+          },
+          'projection': {
+            "uuid": 1, "_mg-derniere-modification": 1,
+            "titre": 1, "titre_fr": 1, "titre_en": 1
+          },
+          'hint': [
+            {'_mg-libelle': 1},
+            {'_mg-derniere-modification': -1}
+          ],
+          'limit': 10,
+          'skip': 120,
+        }
+
+        :param requete:
+        :return:
+        """
         collection = self.gestionnaire.get_collection()
         filtre = requete.get('filtre')
         projection = requete.get('projection')
         sort_params = requete.get('sort')
         hint = requete.get('hint')
+        limit = requete.get('limit')
+        skip = requete.get('skip')
 
         if projection is None:
             curseur = collection.find(filtre)
@@ -1225,7 +1250,19 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
             curseur.sort(sort_params)
 
         if hint is not None:
-            curseur.hint(hint)
+            # Reformatter les hints avec tuple
+            hints_formatte = []
+            for hint_elem in hint:
+                for key, value in hint_elem.items():
+                    hints_formatte.append((key, value))
+
+            curseur.hint(hints_formatte)
+
+        if skip is not None:
+            curseur.skip(skip)
+
+        if limit is not None:
+            curseur.limit(limit)
 
         resultats = list()
         for resultat in curseur:

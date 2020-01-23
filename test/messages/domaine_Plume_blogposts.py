@@ -53,7 +53,7 @@ class MessagesSample(BaseCallback):
             "titre_fr": "Titre blogpost",
             "texte": "Text blogpost",
             "texte_fr": "Texte du blogpost",
-            'uuid': self.uuid_blogpost,
+            # 'uuid': self.uuid_blogpost,
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, ConstantesPlume.TRANSACTION_MAJ_BLOGPOST,
@@ -96,10 +96,10 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # sample.maj_blogpost()
+        sample.maj_blogpost()
         # sample.publier_blogpost()
         # sample.retirer_blogpost()
-        sample.supprimer_blogpost()
+        # sample.supprimer_blogpost()
 
 
 # --- MAIN ---
