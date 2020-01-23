@@ -79,6 +79,13 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         )
         collection_domaine.create_index(
             [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+                (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
+            ],
+            name='mglibelle_derniermodif'
+        )
+        collection_domaine.create_index(
+            [
                 (ConstantesPlume.LIBELLE_DOC_PLUME_UUID, 1)
             ],
             name='uuid'
@@ -88,18 +95,6 @@ class GestionnairePlume(GestionnaireDomaineStandard):
                 (ConstantesPlume.LIBELLE_DOC_TITRE, 1)
             ],
             name='titre'
-        )
-        collection_domaine.create_index(
-            [
-                (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
-            ],
-            name='creation'
-        )
-        collection_domaine.create_index(
-            [
-                (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1)
-            ],
-            name='dernieremodification'
         )
 
     def demarrer(self):
@@ -483,6 +478,12 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         return collection_domaine.find_and_modify(filtre, ops, upsert=True, new=True)
 
     def retirer_blogpost(self, uuid_blogpost, supprimer=False):
+        """
+        Retire un blogpost deja publie.
+        :param uuid_blogpost:
+        :param supprimer: Si True, supprime aussi le document du blogpost.
+        :return:
+        """
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
 
