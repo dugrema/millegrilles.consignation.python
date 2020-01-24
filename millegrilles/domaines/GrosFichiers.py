@@ -1351,7 +1351,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 collection_figee_filtree[key] = value
             else:
                 for multikey in champs_filtre_multilingue:
-                    if multikey.startswith(key):
+                    if key.startswith(multikey):
                         collection_figee_filtree[key] = value
 
         # Capture un thumbnail/preview pour la collection (au hasard)
@@ -1375,7 +1375,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                             fichier_filtre[key] = value
                         else:
                             for multikey in champs_filtre_multilingue:
-                                if multikey.startswith(key):
+                                if key.startswith(multikey):
                                     fichier_filtre[key] = value
                     # liste_fichiers_top.append(fichier_filtre)
                     ops['$set']['top.%s'%fichier_uuid] = fichier_filtre
