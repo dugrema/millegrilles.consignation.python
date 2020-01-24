@@ -233,6 +233,16 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             name='versions-fuuid'
         )
 
+        # Index pour trouver une version de fichier par FUUID
+        collection_domaine.create_index(
+            [
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES, 1),
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER, 1),
+            ],
+            name='recherche'
+        )
+
         # Index pour la recherche temps reel
         collection_domaine.create_index(
             [
