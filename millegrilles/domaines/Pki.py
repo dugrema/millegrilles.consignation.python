@@ -326,9 +326,6 @@ class PKIDocumentHelper:
 
 class ProcessusAjouterCertificat(MGProcessusTransaction):
 
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         fingerprint = transaction['fingerprint']
@@ -346,7 +343,12 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
             document_certificat = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
             document_certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = transaction['certificat_pem']
             document_certificat[ConstantesPki.LIBELLE_FINGERPRINT] = enveloppe_certificat.fingerprint_ascii
-            document_certificat[ConstantesPki.LIBELLE_IDMG] = enveloppe_certificat.idmg
+
+            if enveloppe_certificat.is_rootCA:
+                idmg_certificat = enveloppe_certificat.idmg
+            else:
+                idmg_certificat = enveloppe_certificat.subject_organization_name
+            document_certificat[ConstantesPki.LIBELLE_IDMG] = idmg_certificat
 
             collection.insert_one(document_certificat)
 
@@ -598,9 +600,6 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
             enveloppe_cert = self.configuration.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
             if enveloppe_cert is not None:
                 reponse['valide'] = True
-
-                # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
-
             else:
                 reponse['valide'] = False
         else:
@@ -665,6 +664,10 @@ class TraitementRequetePki(TraitementRequetesNoeuds):
             # Charge un certificat connu
             enveloppe_cert = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
             if enveloppe_cert is not None:
+
+                if not enveloppe_cert.est_verifie:
+                    self.gestionnaire.verificateur_certificats.verifier_chaine(enveloppe_cert)
+
                 reponse['valide'] = enveloppe_cert.est_verifie
 
                 # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
