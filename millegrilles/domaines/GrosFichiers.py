@@ -728,12 +728,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         filtre_fichier = [
             ConstantesGrosFichiers.DOCUMENT_SECURITE,
-            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
+        ]
+
+        filtre_multilingue = [
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
         ]
 
         filtre_version = [
@@ -756,6 +759,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             valeur = entree.get(cle)
             if valeur is not None:
                 entree_filtree[cle] = valeur
+
+        # Appliquer filtre multilingue
+        for key, value in entree.items():
+            for champ in filtre_multilingue:
+                if key.startswith(champ):
+                    entree_filtree[key] = value
 
         if type_document == ConstantesGrosFichiers.LIBVAL_FICHIER:
             fuuid = entree[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE]
@@ -1249,7 +1258,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     collection_figee_filtree[key] = value
                 else:
                     for multikey in champs_filtre_multilingue:
-                        if multikey.startswith(key):
+                        if key.startswith(multikey):
                             collection_figee_filtree[key] = value
 
             if ConstantesGrosFichiers.LIBELLE_PUBLICATION_TOP in etiquettes:
@@ -1262,7 +1271,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                             fichier_filtre[key] = value
                         else:
                             for multikey in champs_filtre_multilingue:
-                                if multikey.startswith(key):
+                                if key.startswith(multikey):
                                     fichier_filtre[key] = value
                     # liste_fichiers_top.append(fichier_filtre)
                     ops['$set']['top.%s'%fichier_uuid] = fichier_filtre
