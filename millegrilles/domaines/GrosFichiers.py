@@ -439,11 +439,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier}
 
-    def renommer_deplacer_fichier(self, uuid_doc, nouveau_nom):
+    def renommer_deplacer_fichier(self, uuid_doc, changements):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-        set_operations = dict()
-        set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nouveau_nom
+        set_operations = changements
 
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc,
@@ -456,12 +455,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         })
         self._logger.debug('renommer_deplacer_fichier resultat: %s' % str(resultat))
 
-    def maj_commentaire_fichier(self, uuid_fichier, commentaire):
+    def maj_commentaire_fichier(self, uuid_fichier, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-        set_operation = {
-            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
-        }
+        set_operation = changements
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
@@ -555,13 +552,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.insert_one(collection)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
-    def renommer_collection(self, uuid_collection: str, nouveau_nom_collection: str):
+    def renommer_collection(self, uuid_collection: str, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         ops = {
-            '$set': {
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: nouveau_nom_collection
-            },
+            '$set': changements,
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             }
@@ -576,13 +571,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
-    def commenter_collection(self, uuid_collection: str, commentaire: str):
+    def commenter_collection(self, uuid_collection: str, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         ops = {
-            '$set': {
-                ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES: commentaire
-            },
+            '$set': changements,
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             }
@@ -1620,9 +1613,18 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersActivite)
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_doc = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        nouveau_nom = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER)
 
-        self._controleur.gestionnaire.renommer_deplacer_fichier(uuid_doc, nouveau_nom)
+        champs_multilingues = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER
+        ]
+
+        changements = dict()
+        for key, value in transaction.items():
+            for champ in champs_multilingues:
+                if key.startswith(champ):
+                    changements[key] = value
+
+        self._controleur.gestionnaire.renommer_deplacer_fichier(uuid_doc, changements)
 
         # Le resultat a deja ancien_repertoire_uuid. On ajoute le nouveau pour permettre de traiter les deux.
         resultat = {
@@ -1645,8 +1647,18 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
-        self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, commentaire)
+
+        champs_multilingues = [
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES
+        ]
+
+        changements = dict()
+        for key, value in transaction.items():
+            for champ in champs_multilingues:
+                if key.startswith(champ):
+                    changements[key] = value
+
+        self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, changements)
 
         # Met a jour les collections existantes avec ce fichier
         self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
@@ -1733,10 +1745,19 @@ class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersActivite):
 
     def initiale(self):
         transaction = self.charger_transaction()
-        nouveau_nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur._gestionnaire_domaine.renommer_collection(uuid_collection, nouveau_nom_collection)
+        champs_multilingues = [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER
+        ]
+
+        changements = dict()
+        for key, value in transaction.items():
+            for champ in champs_multilingues:
+                if key.startswith(champ):
+                    changements[key] = value
+
+        self._controleur._gestionnaire_domaine.renommer_collection(uuid_collection, changements)
 
         self.set_etape_suivante()  # Termine
 
@@ -1751,9 +1772,18 @@ class ProcessusTransactionCommenterCollection(ProcessusGrosFichiersActivite):
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        commentaire = transaction[ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES]
 
-        self._controleur._gestionnaire_domaine.commenter_collection(uuid_collection, commentaire)
+        champs_multilingues = [
+            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES
+        ]
+
+        changements = dict()
+        for key, value in transaction.items():
+            for champ in champs_multilingues:
+                if key.startswith(champ):
+                    changements[key] = value
+
+        self._controleur._gestionnaire_domaine.commenter_collection(uuid_collection, changements)
 
         self.set_etape_suivante()  # Termine
 
