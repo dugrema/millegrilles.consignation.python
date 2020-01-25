@@ -36,10 +36,10 @@ class ConstantesGenerateurCertificat:
     ROLE_COUPDOEIL = 'coupdoeil'
     ROLE_COUPDOEIL_NAVIGATEUR = 'coupdoeil.navigateur'
     ROLE_FICHIERS = 'fichiers'
-    ROLE_VITRINE = 'vitrine'
+    ROLE_VITRINE = 'vitrine_api'
     ROLE_PUBLICATEUR = 'publicateur'
     ROLE_MONGOEXPRESS = 'mongoxp'
-    ROLE_NGINX = 'nginx'
+    ROLE_NGINX = 'vitrine_web'
     ROLE_CONNECTEUR = 'connecteur'
     ROLE_CONNECTEUR_TIERS = 'tiers'
 
