@@ -148,6 +148,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             fichier.write(clecert.password)
         with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert), 'wb') as fichier:
             fichier.write(clecert.cert_bytes)
+        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_autorite_cert), 'w') as fichier:
+            fichier.write(clecert.chaine[1])
 
         self._logger.info("Nouveau certificat MaitreDesCles genere:\n%s" % (clecert.cert_bytes.decode('utf-8')))
 

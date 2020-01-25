@@ -1075,7 +1075,7 @@ class TraitementMessageCallback:
 
     def __init__(self, message_dao, configuration):
         self.__json_helper = JSONHelper()
-        self.__message_dao = message_dao
+        self._message_dao = message_dao
         self.__configuration = configuration
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -1120,7 +1120,7 @@ class TraitementMessageCallback:
 
     @property
     def message_dao(self):
-        return self.__message_dao
+        return self._message_dao
 
     @property
     def configuration(self):

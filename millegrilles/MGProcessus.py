@@ -20,7 +20,7 @@ class MGPProcesseur:
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
         self.__transmetteur = TransmetteurMessageMilleGrilles(contexte)
-        self.contexte.message_dao.register_channel_listener(self.__transmetteur)
+        contexte.message_dao.register_channel_listener(self.__transmetteur)
 
     def charger_transaction_par_id(self, id_transaction, nom_collection):
         return self.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
