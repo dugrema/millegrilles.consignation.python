@@ -8,6 +8,7 @@ from millegrilles.SecuritePKI import EnveloppeCertificat
 from pymongo.collection import ReturnDocument
 
 import datetime
+import logging
 
 
 class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
@@ -69,6 +70,8 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesAnnuaire(self),
         }
 
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
     def configurer(self):
         super().configurer()
 
@@ -84,7 +87,8 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
             ca_pem = fichier.read()
             split_certs = PemHelpers.split_certificats(ca_pem)
             if len(split_certs) > 1:
-                raise Exception("Le fichier de certificat CA (%s) est mauvais, il contient plusieurs certificats" % self.configuration.pki_cafile)
+                self.__logger.warning("Plusieurs certificats CA trouves: %s" % ca_pem)
+                self.__logger.error("Le fichier de certificat CA (%s) est mauvais, il contient plusieurs certificats" % self.configuration.pki_cafile)
         fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
         fiche_publique[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE] = ca_pem
 
