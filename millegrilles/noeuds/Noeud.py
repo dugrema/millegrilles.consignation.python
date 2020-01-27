@@ -14,7 +14,7 @@ from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
-from millegrilles.transaction import GenerateurTransaction
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 from millegrilles.util.Daemon import Daemon
