@@ -5,14 +5,17 @@ import traceback
 import argparse
 import logging
 import time
+import socket
 
 from threading import Event, Thread
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
-from millegrilles.domaines.SenseursPassifs import ProducteurTransactionSenseursPassifs
 from millegrilles import Constantes
+from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
+from millegrilles.transaction import GenerateurTransaction
+
 
 from millegrilles.util.Daemon import Daemon
 
