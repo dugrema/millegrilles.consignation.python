@@ -1,54 +1,15 @@
 # Module avec les classes de donnees, processus et gestionnaire de sous domaine millegrilles.domaines.SenseursPassifs
 import datetime
-import socket
 import logging
 
 from millegrilles import Constantes
+from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-from millegrilles.transaction.GenerateurTransaction import TransactionOperations, GenerateurTransaction
+from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
-
-
-# Constantes pour SenseursPassifs
-class SenseursPassifsConstantes:
-
-    DOMAINE_NOM = 'millegrilles.domaines.SenseursPassifs'
-    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
-    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
-    QUEUE_NOM = DOMAINE_NOM
-    QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
-    QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
-    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
-
-    LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
-    LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
-    LIBELLE_DOCUMENT_GROUPE = 'groupe.senseurs'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE = 'senseur.rapport.gq'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_QUOTIDIEN = 'senseur.rapport.gh'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE = 'senseur.rapport.annee'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE = 'senseur.rapport.semaine'
-    LIBVAL_CONFIGURATION = 'configuration'
-
-    TRANSACTION_NOEUD = 'noeud'
-    TRANSACTION_ID_SENSEUR = 'uuid_senseur'
-    TRANSACTION_DATE_LECTURE = 'timestamp'
-    TRANSACTION_LOCATION = 'location'
-    TRANSACTION_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
-    TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR = '%s.changementAttributSenseur' % DOMAINE_NOM
-    TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR = '%s.suppressionSenseur' % DOMAINE_NOM
-    SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
-
-    EVENEMENT_MAJ_HORAIRE = '%s.MAJHoraire' % DOMAINE_NOM
-    EVENEMENT_MAJ_QUOTIDIENNE = '%s.MAJQuotidienne' % DOMAINE_NOM
-
-    DOCUMENT_DEFAUT_CONFIGURATION = {
-        Constantes.DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
-        Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION: Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6
-    }
 
 
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
@@ -982,41 +943,6 @@ class ProcessusMajFenetreHoraireRapport(MGProcessus):
         producteur.ajouter_derniereheure_fenetre_horaire()
 
         self.set_etape_suivante()  # Termine
-
-
-class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
-    """ Producteur de transactions pour les SenseursPassifs. """
-
-    def __init__(self, contexte, noeud=socket.getfqdn()):
-        super().__init__(contexte)
-        self._noeud = noeud
-        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
-
-    def transmettre_lecture_senseur(self, dict_lecture, version=4):
-        # Preparer le dictionnaire a transmettre pour la lecture
-        message = dict_lecture.copy()
-
-        # Verifier valeurs qui doivent etre presentes
-        if message.get(SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR) is None:
-            raise ValueError("L'identificateur du senseur (%s) doit etre fourni." %
-                             SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR)
-        if message.get(SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE) is None:
-            raise ValueError("Le temps de la lecture (%s) doit etre fourni." %
-                             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE)
-
-        # Ajouter le noeud s'il n'a pas ete fourni
-        if message.get(SenseursPassifsConstantes.TRANSACTION_NOEUD) is None:
-            message[SenseursPassifsConstantes.TRANSACTION_NOEUD] = self._noeud
-
-        self._logger.debug("Message a transmettre: %s" % str(message))
-
-        uuid_transaction = self.soumettre_transaction(
-            message,
-            SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            version=version
-        )
-
-        return uuid_transaction
 
 
 class RegenerateurSenseursPassifs(RegenerateurDeDocuments):

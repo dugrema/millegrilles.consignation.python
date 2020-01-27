@@ -1075,6 +1075,45 @@ class ConstantesGrosFichiers:
     }
 
 
+# Constantes pour SenseursPassifs
+class SenseursPassifsConstantes:
+
+    DOMAINE_NOM = 'millegrilles.domaines.SenseursPassifs'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = DOMAINE_NOM
+    QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
+    QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
+    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
+
+    LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
+    LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
+    LIBELLE_DOCUMENT_GROUPE = 'groupe.senseurs'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE = 'senseur.rapport.gq'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_QUOTIDIEN = 'senseur.rapport.gh'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE = 'senseur.rapport.annee'
+    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE = 'senseur.rapport.semaine'
+    LIBVAL_CONFIGURATION = 'configuration'
+
+    TRANSACTION_NOEUD = 'noeud'
+    TRANSACTION_ID_SENSEUR = 'uuid_senseur'
+    TRANSACTION_DATE_LECTURE = 'timestamp'
+    TRANSACTION_LOCATION = 'location'
+    TRANSACTION_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
+    TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR = '%s.changementAttributSenseur' % DOMAINE_NOM
+    TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR = '%s.suppressionSenseur' % DOMAINE_NOM
+    SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
+
+    EVENEMENT_MAJ_HORAIRE = '%s.MAJHoraire' % DOMAINE_NOM
+    EVENEMENT_MAJ_QUOTIDIENNE = '%s.MAJQuotidienne' % DOMAINE_NOM
+
+    DOCUMENT_DEFAUT_CONFIGURATION = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        TRANSACTION_MESSAGE_LIBELLE_VERSION: TRANSACTION_MESSAGE_LIBELLE_VERSION_6
+    }
+
+
 class CommandesSurRelai:
     """
     Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir

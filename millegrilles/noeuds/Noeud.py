@@ -319,6 +319,40 @@ class DummySenseurs:
                 self._stop_event.wait(self._intervalle_lectures)
 
 
+class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
+    """ Producteur de transactions pour les SenseursPassifs. """
+
+    def __init__(self, contexte, noeud=socket.getfqdn()):
+        super().__init__(contexte)
+        self._noeud = noeud
+        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
+
+    def transmettre_lecture_senseur(self, dict_lecture, version=4):
+        # Preparer le dictionnaire a transmettre pour la lecture
+        message = dict_lecture.copy()
+
+        # Verifier valeurs qui doivent etre presentes
+        if message.get(SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR) is None:
+            raise ValueError("L'identificateur du senseur (%s) doit etre fourni." %
+                             SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR)
+        if message.get(SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE) is None:
+            raise ValueError("Le temps de la lecture (%s) doit etre fourni." %
+                             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE)
+
+        # Ajouter le noeud s'il n'a pas ete fourni
+        if message.get(SenseursPassifsConstantes.TRANSACTION_NOEUD) is None:
+            message[SenseursPassifsConstantes.TRANSACTION_NOEUD] = self._noeud
+
+        self._logger.debug("Message a transmettre: %s" % str(message))
+
+        uuid_transaction = self.soumettre_transaction(
+            message,
+            SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
+            version=version
+        )
+
+        return uuid_transaction
+
 # **** MAIN ****
 def main():
     try:
