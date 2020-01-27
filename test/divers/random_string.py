@@ -7,4 +7,11 @@ print(str(test))
 
 test = binascii.hexlify(test)
 
-print(test.decode('utf8'))
+test_string = test.decode('utf8')
+
+print(test_string)
+
+test_back = binascii.unhexlify(test_string.encode('utf8'))
+
+print(test_back)
+
