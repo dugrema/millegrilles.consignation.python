@@ -1301,7 +1301,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         uuid_collection = collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE]
 
         # Determiner si on a au moins une image/video
-        contient_medias = any(f[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] is not None for f in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values())
+        contient_medias = any(f.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None for f in collection_figee[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS].values())
         if not contient_medias:
             return
 
