@@ -6,11 +6,7 @@ import time
 import pytz
 from threading import Thread, Event
 
-# from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
-# from bson import ObjectId
-
-from millegrilles import Constantes
-from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
+from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.dao.MessageDAO import BaseCallback
 
 
