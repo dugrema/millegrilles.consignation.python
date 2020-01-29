@@ -827,6 +827,8 @@ class ProcessusMAJSenseurPassif(MGProcessusTransaction):
         producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
 
+        # Mettre a jour le dashboard de vitrine
+        producteur_document.maj_document_vitrine_dashboard(id_document_senseur)
         self.set_etape_suivante()  # Termine
 
     def get_collection_transaction_nom(self):
