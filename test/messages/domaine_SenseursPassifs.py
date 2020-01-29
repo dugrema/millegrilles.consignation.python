@@ -1,20 +1,76 @@
 # Script de test pour transmettre message de transaction
 
-import datetime, time
+
+# Script de test pour transmettre message de transaction
+
+import datetime
+import time
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.Principale import ConstantesPrincipale
+from threading import Thread, Event
 
-from millegrilles.util.BaseSendMessage import BaseEnvoyerMessageEcouter
+
+contexte = ContexteRessourcesMilleGrilles()
+contexte.initialiser()
 
 
-class MessagesSample(BaseEnvoyerMessageEcouter):
+class MessagesSample(BaseCallback):
 
     def __init__(self):
-        super().__init__()
+        super().__init__(contexte)
+        self.contexte.message_dao.register_channel_listener(self)
+        self.generateur = GenerateurTransaction(self.contexte)
+
+        self.fichier_fuuid = "39c1e1b0-b6ee-11e9-b0cd-d30e8fab842j"
+
+        self.channel = None
+        self.event_recu = Event()
+
+    def on_channel_open(self, channel):
+        # Enregistrer la reply-to queue
+        self.channel = channel
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
+
+    def queue_open_local(self, queue):
+        self.queue_name = queue.method.queue
+        print("Queue: %s" % str(self.queue_name))
+
+        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.executer()
+
+    def run_ioloop(self):
+        self.contexte.message_dao.run_ioloop()
+
+    def deconnecter(self):
+        self.contexte.message_dao.deconnecter()
+
+    def traiter_message(self, ch, method, properties, body):
+        print("Message recu, correlationId: %s" % properties.correlation_id)
+        print(body)
+
+    def transaction_nouvelle_version_metadata(self):
+        transaction = {
+            "fuuid": self.fichier_fuuid,
+            "securite": "2.prive",
+            "nom": "ExplorationGrosFichiers10.txt",
+            "taille": 5478,
+            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
+            "mimetype": "test/plain",
+            "reception": {
+                "methode": "coupdoeil",
+                "noeud": "public1.maple.mdugre.info"
+            },
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata',
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Envoi metadata: %s" % enveloppe_val)
+        return enveloppe_val
 
     def transmettre_lecture(self):
         temps_lecture = datetime.datetime.now()
@@ -75,10 +131,10 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         message_dict['senseurs'] = senseurs
 
         enveloppe_val = self.generateur.soumettre_transaction(
-            message_dict, 'millegrilles.domaines.SenseursPassifs.lecture', reply_to=self.queue_name, correlation_id='efgh')
+            message_dict, 'millegrilles.domaines.SenseursPassifs.lecture',
+            reply_to=self.queue_name, correlation_id='efgh')
 
         print("Sent: %s" % enveloppe_val)
-        return enveloppe_val
 
     def changer_nom(self):
         temps_lecture = datetime.datetime.now()
@@ -132,21 +188,15 @@ class MessagesSample(BaseEnvoyerMessageEcouter):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
-    def load_lectures(self, nb_messages):
-        for n in range(0, nb_messages):
-            self.transmettre_lecture()
+    def executer(self):
+        enveloppe = sample.transmettre_lecture()
+
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-# enveloppe = sample.transmettre_lecture()
-# enveloppe = sample.changer_nom()
-# enveloppe = sample.supprimer_senseur()
-
-sample.load_lectures(5)
-
-sample.recu.wait(1)
 
 # FIN TEST
+sample.event_recu.wait(10)
 sample.deconnecter()

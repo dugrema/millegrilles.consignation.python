@@ -4,12 +4,53 @@ import logging
 
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
-from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard
-from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments
+from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
+
+
+class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
+            reponse = self.gestionnaire.get_vitrine_dashboard()
+        else:
+            raise Exception("Requete publique non supportee " + routing_key)
+
+        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
+class TraitementRequetesProtegeesSenseursPassifs(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        if routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
+            reponse = self.gestionnaire.get_vitrine_dashboard()
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+
+
+class SenseursPassifsExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle in [SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD, SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR]:
+            exchanges.add(self._exchange_public)
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+        else:
+            exchanges.add(self._exchange_protege)
+
+        return list(exchanges)
 
 
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
@@ -22,6 +63,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         self._traitement_backlog_lectures = None
 
         self._logger = logging.getLogger("%s.GestionnaireSenseursPassifs" % __name__)
+
+        self.__handler_requetes_noeuds = {
+            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesSenseursPassifs(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesSenseursPassifs(self)
+        }
 
     def configurer(self):
         super().configurer()
@@ -87,7 +133,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             SenseursPassifsConstantes.DOCUMENT_DEFAUT_CONFIGURATION
         )
         self.demarrer_watcher_collection(
-            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS)
+            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS,
+            SenseursPassifsExchangeRouter(self._contexte))
+
+    def get_handler_requetes(self) -> dict:
+        return self.__handler_requetes_noeuds
 
     def get_nom_queue(self):
         return SenseursPassifsConstantes.QUEUE_NOM

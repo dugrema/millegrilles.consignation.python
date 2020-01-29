@@ -1095,6 +1095,7 @@ class SenseursPassifsConstantes:
     LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE = 'senseur.rapport.annee'
     LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE = 'senseur.rapport.semaine'
     LIBVAL_CONFIGURATION = 'configuration'
+    LIBVAL_VITRINE_DASHBOARD = 'vitrine.dashboard'
 
     TRANSACTION_NOEUD = 'noeud'
     TRANSACTION_ID_SENSEUR = 'uuid_senseur'
@@ -1104,6 +1105,8 @@ class SenseursPassifsConstantes:
     TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR = '%s.changementAttributSenseur' % DOMAINE_NOM
     TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR = '%s.suppressionSenseur' % DOMAINE_NOM
     SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
+
+    REQUETE_VITRINE_DASHBOARD = '%s.dashboard' % DOMAINE_NOM
 
     EVENEMENT_MAJ_HORAIRE = '%s.MAJHoraire' % DOMAINE_NOM
     EVENEMENT_MAJ_QUOTIDIENNE = '%s.MAJQuotidienne' % DOMAINE_NOM

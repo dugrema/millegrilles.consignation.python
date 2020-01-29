@@ -11,7 +11,7 @@ from threading import Thread, Event
 
 
 contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser(init_document=False)
+contexte.initialiser()
 
 
 class MessagesSample(BaseCallback):
