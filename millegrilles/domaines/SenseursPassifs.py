@@ -132,6 +132,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             SenseursPassifsConstantes.LIBVAL_CONFIGURATION,
             SenseursPassifsConstantes.DOCUMENT_DEFAUT_CONFIGURATION
         )
+        self.initialiser_document(
+            SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD,
+            SenseursPassifsConstantes.DOCUMENT_DEFAUT_VITRINE_DASHBOARD
+        )
+
         self.demarrer_watcher_collection(
             SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS,
             SenseursPassifsExchangeRouter(self._contexte))
@@ -238,6 +243,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         """ Permet de regenerer les documents de rapports sur cedule lors du demarrage du domaine """
         self.demarrer_processus('millegrilles_domaines_SenseursPassifs:ProcessusRegenererFenetresRapport', {})
 
+    def maj_vitrine_dashboard(self, document_senseur):
+        """
+        Met a jour le dashboard de vitrine avec l'information d'un senseur passif
+        :param document_senseur:
+        :return:
+        """
+        pass
 
 class TraitementMessageLecture(TraitementMessageDomaine):
 
@@ -367,6 +379,43 @@ class ProducteurDocumentNoeud:
         }
 
         collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
+
+    '''
+    Mise a jour du document du dashboard de vitrine
+
+    :param id_document_senseur: _id du document du senseur.
+    '''
+
+    def maj_document_vitrine_dashboard(self, id_document_senseur):
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
+
+        noeud = document_senseur['noeud']
+        uuid_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+
+        champs_a_inclure = [
+            'uuid_senseur', 'affichage', 'bat_mv', 'bat_reserve', 'location'
+        ]
+
+        valeurs = dict()
+        for key, value in document_senseur.items():
+            if key in champs_a_inclure:
+                valeurs[key] = value
+
+        donnees_senseur = {
+            'noeuds.%s.%s' % (noeud, uuid_senseur): valeurs
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD,
+        }
+
+        update = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$set': donnees_senseur
+        }
+
+        collection_senseurs.update_one(filter=filtre, update=update)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
@@ -720,15 +769,21 @@ class ProducteurDocumentSenseurPassif:
         )
 
 
-# Processus pour enregistrer une transaction d'un senseur passif
 class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
+    """
+    Processus pour enregistrer une transaction d'un senseur passif
+    """
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
         self._logger = logging.getLogger('%s.ProcessusTransactionSenseursPassifsLecture' % __name__)
 
-    ''' Enregistrer l'information de la transaction dans le document du senseur '''
     def initiale(self):
+        """
+        Enregistrer l'information de la transaction dans le document du senseur
+        :return:
+        """
+
         doc_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         self._logger.debug("Document processus: %s" % self._document_processus)
         self._logger.debug("Document transaction: %s" % doc_transaction)
@@ -738,26 +793,18 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
 
         parametres = None
         if document_senseur and document_senseur.get("_id") is not None:
-            # Preparer la prochaine etape - mettre a jour le noeud
-            parametres = {"id_document_senseur": document_senseur.get("_id")}
+            # Mettre a jour le noeud
+            id_document_senseur = document_senseur["_id"]
 
-            self.set_etape_suivante(ProcessusTransactionSenseursPassifsLecture.maj_noeud.__name__)
-        else:
-            # Le document de senseur n'a pas ete modifie, probablement parce que les donnees n'etaient pas
-            # les plus recentes. Il n'y a plus rien d'autre a faire.
-            self.set_etape_suivante()   # Etape finale par defaut
+            producteur_document_noeud = ProducteurDocumentNoeud(self._controleur.document_dao)
+            producteur_document_noeud.maj_document_noeud_senseurpassif(id_document_senseur)
+
+            # Mettre a jour le dashboard de vitrine
+            producteur_document_noeud.maj_document_vitrine_dashboard(id_document_senseur)
+
+        self.set_etape_suivante()   # Etape finale par defaut
 
         return parametres
-
-    ''' Mettre a jour l'information du noeud pour ce senseur '''
-    def maj_noeud(self):
-
-        id_document_senseur = self._document_processus['parametres']['id_document_senseur']
-
-        producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
-        producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
-
-        self.set_etape_suivante()  # Etape finale
 
     def get_collection_transaction_nom(self):
         return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
@@ -773,7 +820,9 @@ class ProcessusMAJSenseurPassif(MGProcessusTransaction):
         super().__init__(controleur, evenement)
 
     def modifier_noeud(self):
-        """ Appliquer les modifications au noeud """
+        """
+        Appliquer les modifications au noeud
+        """
         id_document_senseur = self._document_processus['parametres']['id_document_senseur']
         producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
         producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)

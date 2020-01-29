@@ -88,7 +88,7 @@ class MessagesSample(BaseCallback):
             #     "type": "th",
             # },
             {
-                "pression": 99.8,
+                "pression": 99.1,
                 "temperature": 38,
                 "type": "tp",
             },
@@ -189,7 +189,7 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def executer(self):
-        enveloppe = sample.transmettre_lecture()
+        sample.transmettre_lecture()
 
 
 # --- MAIN ---
