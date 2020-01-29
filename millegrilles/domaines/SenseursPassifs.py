@@ -253,6 +253,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         })
         return document_dashboard
 
+
 class TraitementMessageLecture(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):
