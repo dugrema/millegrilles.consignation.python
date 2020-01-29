@@ -88,7 +88,7 @@ class MessagesSample(BaseCallback):
             #     "type": "th",
             # },
             {
-                "pression": 99.1,
+                "pression": 99.7,
                 "temperature": 38,
                 "type": "tp",
             },
@@ -103,7 +103,7 @@ class MessagesSample(BaseCallback):
                 "adresse": '3854ab799711030c'
             },
             {
-                "temperature": -22.9,
+                "temperature": -24.9,
                 "type": "onewire/temperature",
                 "adresse": '4854ab799711030c'
             },

@@ -243,13 +243,15 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         """ Permet de regenerer les documents de rapports sur cedule lors du demarrage du domaine """
         self.demarrer_processus('millegrilles_domaines_SenseursPassifs:ProcessusRegenererFenetresRapport', {})
 
-    def maj_vitrine_dashboard(self, document_senseur):
+    def get_vitrine_dashboard(self):
         """
-        Met a jour le dashboard de vitrine avec l'information d'un senseur passif
-        :param document_senseur:
-        :return:
+        :return: Le document dashboard de vitrine
         """
-        pass
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        document_dashboard = collection.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD
+        })
+        return document_dashboard
 
 class TraitementMessageLecture(TraitementMessageDomaine):
 
