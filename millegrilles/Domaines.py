@@ -14,6 +14,7 @@ import json
 
 from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure
+from bson import ObjectId
 
 from threading import Thread, Event, Lock
 
@@ -563,6 +564,10 @@ class GestionnaireDomaine:
 
     def get_collection(self):
         return self.document_dao.get_collection(self.get_nom_collection())
+
+    def get_transaction(self, id_transaction):
+        collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
+        return collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_transaction)})
 
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")

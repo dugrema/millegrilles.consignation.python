@@ -376,7 +376,8 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         document_processus = self.charger_document_processus(
             id_document_processus, self._gestionnaire_domaine.get_collection_processus_nom())
 
-        self.__logger.warning("Transmettre evenement continuer pour %s, %s" % (id_document_processus, document_processus.get('processus')))
+        self.__logger.debug("Transmettre evenement continuer pour %s, %s" % (
+            id_document_processus, document_processus.get('processus')))
         self._contexte.message_dao.transmettre_evenement_mgpprocessus(
             self._gestionnaire_domaine.get_nom_domaine(),
             id_document_processus,
@@ -903,8 +904,9 @@ class MGProcessus:
             if resultat is not None:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES] = resultat
 
-            # Verifier si on peut eviter d'attenre des tockens
-            self.verifier_attendre_token()
+            # Verifier si on peut eviter d'attenre des tokens
+            # Note: Cause problemes, c'est mieux d'attendre la verification async transmettre_message_verifier_resumer()
+            # self.verifier_attendre_token()
 
             # Ajouter tokens pour synchronisation inter-transaction.
             tokens = {}
@@ -949,8 +951,10 @@ class MGProcessus:
                 self._controleur.transmettre_message_resumer(
                     id_document_processus, self._ajouter_token_resumer)
             elif not self._processus_complete and self._ajouter_token_attente is None:
+                self._logger.debug("Continuer %s" % self.parametres['_id-transaction'])
                 self.transmettre_message_etape_suivante(resultat)
             elif self._ajouter_token_attente is not None:
+                self._logger.debug("Verifier si continuer/resumer %s" % self.parametres['_id-transaction'])
                 self.transmettre_message_verifier_resumer()
 
             # Verifier s'il faut avertir d'autres processus que le traitement de l'etape est complete
@@ -1142,6 +1146,7 @@ class MGProcessus:
         tokens = self._document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES)
         if tokens is not None:
             id_processus_connecte = tokens.get(token)
+            self._logger.debug("id processus connecte %s" % id_processus_connecte)
             if id_processus_connecte is not None:
                 self._logger.debug("Chargement de la transaction connectee via processus %s: %s" % (
                     token, str(id_processus_connecte)))
@@ -1149,9 +1154,12 @@ class MGProcessus:
                 collection_processus = self.controleur.document_dao.get_collection(nom_collection_processus)
                 processus_connecte = collection_processus.find_one({'_id': id_processus_connecte})
 
+                self._logger.debug("Chargement processus connecte: %s" % str(processus_connecte))
+
                 # Obtenir l'_id de la transaction
                 id_transaction_connectee = processus_connecte[
                     Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES][Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+                self._logger.debug("ID Transaction connectee: %d" % id_transaction_connectee)
                 id_transaction_connectee = ObjectId(id_transaction_connectee)
 
                 nom_collection_transaction = self.get_collection_transaction_nom()

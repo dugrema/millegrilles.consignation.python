@@ -435,8 +435,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
         }
 
-        self._logger.info("maj_fichier: filtre = %s" % filtre)
-        self._logger.info("maj_fichier: operations = %s" % operations)
+        self._logger.debug("maj_fichier: filtre = %s" % filtre)
+        self._logger.debug("maj_fichier: operations = %s" % operations)
         try:
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
         except DuplicateKeyError as dke:
@@ -1470,6 +1470,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
     def confirmer_reception_update_collections(self):
         # Verifie si la transaction correspond a un document d'image
+        self.__logger.debug("Debut confirmer_reception_update_collections")
         mimetype = self.parametres['mimetype'].split('/')[0]
         est_image = mimetype == 'image'
         est_video = mimetype == 'video'
@@ -1479,17 +1480,29 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             fuuid = self.parametres['fuuid']
             tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
 
-            transaction_image = self.get_transaction_token_connecte(tokens_attente[0])
-            self.__logger.debug("Enregistrement preview et thumbnail image : %s" % str(transaction_image))
-            self.controleur.gestionnaire.enregistrer_image_info(
-                self.parametres['uuid_fichier'], transaction_image)
+            self.__logger.debug("Token attente image preview: %s" % str(tokens_attente))
+
+            transaction_image = None
+            try:
+                id_transaction_image = self.parametres['millegrilles']['domaines']['GrosFichiers'][
+                    'nouvelleVersion']['transfertComplete']['_id-transaction']
+                transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
+            except Exception as e:
+                self.__logger.exception("Erreur chargement preview/thumbnail")
+
+            if transaction_image is not None:
+                self.__logger.debug("Enregistrement preview et thumbnail image : %s" % str(transaction_image))
+                self.controleur.gestionnaire.enregistrer_image_info(
+                    self.parametres['uuid_fichier'], transaction_image)
+            else:
+                self.__logger.warning("Image ajoutee sans thumbnail/preview (non transmis)")
 
         # Met a jour les collections existantes avec ce fichier
         uuid_fichier = self.parametres['uuid_fichier']
         self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
         # Verifier si le fichier est une image protegee - il faut generer un thumbnail
-        self.__logger.info("Mimetype fichier %s" % self.parametres['mimetype'])
+        self.__logger.debug("Mimetype fichier %s" % self.parametres['mimetype'])
         if chiffre and (est_image or est_video):
             self.__logger.info("Mimetype est une image/video")
 
@@ -1499,6 +1512,8 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
         else:
             self._traitement_collection()
+
+        self.__logger.debug("Fin confirmer_reception_update_collections")
 
     def attente_cle_decryptage(self):
         fuuid = self.parametres['fuuid']
