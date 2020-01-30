@@ -132,6 +132,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_THUMBNAIL:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierThumbnail"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
@@ -447,7 +449,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self._logger.debug("maj_fichier resultat %s" % str(resultat))
 
-        return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier}
+        return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier, 'info_version': info_version}
 
     def renommer_deplacer_fichier(self, uuid_doc, changements):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1057,6 +1059,28 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'info_fichier_decrypte': info_fichier_decrypte,
         }
 
+    def associer_video_transcode(self, transaction):
+        prefixe_version = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, transaction['fuuid'])
+        set_ops = {
+            '%s.%s' % (prefixe_version, ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P): transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P],
+            '%s.%s' % (prefixe_version, ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P): transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P],
+            '%s.%s' % (prefixe_version, ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA_VIDEO): transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA_VIDEO],
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            prefixe_version: {'$exists': True},
+        }
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_fichier = collection_domaine.find_one_and_update(filtre, ops)
+        return document_fichier
+
     def enregistrer_image_info(self, uuid_fichier, image_info):
 
         fuuid_fichier = image_info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
@@ -1088,20 +1112,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             info_image_maj[libelle_mimetype_preview] = image_info[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
 
-        ops = {
-            '$set': info_image_maj,
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+        if len(info_image_maj.keys()) > 0:
+            ops = {
+                '$set': info_image_maj,
+                '$currentDate': {
+                    Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+                }
             }
-        }
 
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
-        }
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+            }
 
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        collection_domaine.update_one(filtre, ops)
+            collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+            collection_domaine.update_one(filtre, ops)
 
     def maj_fichier_dans_collection(self, uuid_fichier):
         """
@@ -1472,15 +1497,25 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         # Verifie si la transaction correspond a un document d'image
         self.__logger.debug("Debut confirmer_reception_update_collections")
         mimetype = self.parametres['mimetype'].split('/')[0]
+        fuuid = self.parametres['fuuid']
         est_image = mimetype == 'image'
         est_video = mimetype == 'video'
 
         chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
         if not chiffre and (est_image or est_video):
-            fuuid = self.parametres['fuuid']
             tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
 
             self.__logger.debug("Token attente image preview: %s" % str(tokens_attente))
+
+            if est_video:
+                # Transmettre une commande de transcodage apres cette etape
+                transaction_transcoder = {
+                    'fuuid': fuuid,
+                    'mimetype': mimetype,
+                    'extension': self.parametres['info_version']['extension'],
+                    'securite': self.parametres['securite'],
+                }
+                self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
 
             transaction_image = None
             try:
@@ -2461,3 +2496,16 @@ class ProcessusPublierCollection(ProcessusGrosFichiers):
         self.controleur.transmetteur.emettre_message_public(document_albums, domaine_albums)
 
         self.set_etape_suivante()
+
+
+class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
+    """
+    Associe un video a un fichier une fois le transcodage termine
+    """
+
+    def initiale(self):
+        transaction = self.transaction
+        document_fichier = self.controleur.gestionnaire.associer_video_transcode(transaction)
+        uuid_fichier = document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+        self.set_etape_suivante()  # Termine

@@ -951,7 +951,7 @@ class MGProcessus:
                 self._controleur.transmettre_message_resumer(
                     id_document_processus, self._ajouter_token_resumer)
             elif not self._processus_complete and self._ajouter_token_attente is None:
-                self._logger.debug("Continuer %s" % self.parametres['_id-transaction'])
+                # self._logger.debug("Continuer %s" % self.parametres['_id-transaction'])
                 self.transmettre_message_etape_suivante(resultat)
             elif self._ajouter_token_attente is not None:
                 self._logger.debug("Verifier si continuer/resumer %s" % self.parametres['_id-transaction'])
