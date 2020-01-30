@@ -662,23 +662,27 @@ class TraitementRequetePki(TraitementRequetesNoeuds):
             fingerprint = message_dict['fingerprint']
             self.__logger.debug("Requete verification certificat par fingerprint: %s" % fingerprint)
             # Charge un certificat connu
-            enveloppe_cert = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
-            if enveloppe_cert is not None:
+            try:
+                enveloppe_cert = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+                if enveloppe_cert is not None:
 
-                if not enveloppe_cert.est_verifie:
-                    self.gestionnaire.verificateur_certificats.verifier_chaine(enveloppe_cert)
+                    if not enveloppe_cert.est_verifie:
+                        self.gestionnaire.verificateur_certificats.verifier_chaine(enveloppe_cert)
 
-                reponse['valide'] = enveloppe_cert.est_verifie
+                    reponse['valide'] = enveloppe_cert.est_verifie
 
-                # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
-                cle_publique = enveloppe_cert.public_key
-                reponse['certificat'] = enveloppe_cert.certificat_pem
-                reponse['roles'] = enveloppe_cert.get_roles
+                    # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
+                    cle_publique = enveloppe_cert.public_key
+                    reponse['certificat'] = enveloppe_cert.certificat_pem
+                    reponse['roles'] = enveloppe_cert.get_roles
 
-            else:
+                else:
+                    reponse['valide'] = False
+            except CertificatInconnu:
                 reponse['valide'] = False
         else:
             reponse['valide'] = False
+
 
         self.gestionnaire.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id)
