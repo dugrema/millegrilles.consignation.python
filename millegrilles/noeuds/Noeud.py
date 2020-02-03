@@ -117,6 +117,9 @@ class DemarreurNoeud(Daemon):
             self.stop()
         elif daemon_command == 'restart':
             self.restart()
+        elif daemon_command == 'nofork':
+            # Executer sans fork
+            self.run()
 
     def start(self):
         Daemon.start(self)
