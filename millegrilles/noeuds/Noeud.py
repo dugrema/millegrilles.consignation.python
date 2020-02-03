@@ -330,7 +330,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
     def __init__(self, contexte, noeud=socket.getfqdn()):
         super().__init__(contexte)
-        self._noeud = noeud
+        self._noeud = noeud.replace('.', '-')
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
     def transmettre_lecture_senseur(self, dict_lecture, version=4):
