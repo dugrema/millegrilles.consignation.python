@@ -64,8 +64,8 @@ class DemarreurNoeud(Daemon):
 
     def parse(self):
         self._parser.add_argument(
-            'command', type=str, nargs=1, choices=['start', 'stop', 'restart'],
-            help="Commande a executer: start, stop, restart"
+            'command', type=str, nargs=1, choices=['start', 'stop', 'restart', 'nofork'],
+            help="Commande a executer: start, stop, restart, nofork"
         )
         self._parser.add_argument(
             '--apcupsd', type=int, nargs=1, required=False,
