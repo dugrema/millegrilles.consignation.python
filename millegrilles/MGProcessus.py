@@ -1174,6 +1174,9 @@ class MGProcessus:
         return None
 
     def sauvegarder_consignationfichiers(self, fp, nom_fichier, mimetype: str = 'application/data', etiquettes: list = None, securite: str = Constantes.SECURITE_PRIVE):
+        if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+            raise Exception("Support de fichiers cryptes non implemente")
+
         # Preparer le fichier
         BUF_SIZE = 65535
         sha256 = hashlib.sha256()
@@ -1203,11 +1206,16 @@ class MGProcessus:
             'mimetype': mimetype,
         }
 
-        requests.put(
+        response = requests.put(
             path_upload, fp, headers=headers,
             verify=self.controleur.configuration.pki_cafile,
             cert=(self.controleur.configuration.pki_certfile, self.controleur.configuration.pki_keyfile)
         )
+
+        # Comparer hash server et celui calcule localement
+        sha256_digest_serveur = response.json()['sha256Hash']
+        if sha256_digest != sha256_digest_serveur:
+            raise Exception("Erreur upload fichier, SHA256 different")
 
         transaction_nouveau = {
             'fuuid': str(fuuid),
