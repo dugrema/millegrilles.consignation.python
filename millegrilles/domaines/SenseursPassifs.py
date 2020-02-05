@@ -1,6 +1,8 @@
 # Module avec les classes de donnees, processus et gestionnaire de sous domaine millegrilles.domaines.SenseursPassifs
 import datetime
 import logging
+import tempfile
+import os
 
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
@@ -10,6 +12,7 @@ from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
+from openpyxl import Workbook
 
 
 class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete):
@@ -223,6 +226,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreHoraireRapport"
         elif domaine_transaction == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreQuotidienneRapport"
+        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_GENERER_RAPPORT:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusGenererRapport"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -1047,6 +1052,173 @@ class ProcessusMajFenetreHoraireRapport(MGProcessus):
         producteur.ajouter_derniereheure_fenetre_horaire()
 
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusGenererRapport(MGProcessusTransaction):
+    """
+    Processus de creation d'un rapport (Excel) a partir de donnees de senseurs
+    """
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        # Definir parametres du rapport
+        transaction = self.transaction
+
+        requete_aggregation = self._extraire_requete(transaction)
+        hint = {'_evenements._estampille': -1}
+
+        # Executer la requete sur la collection de noms
+        collection = self.controleur.document_dao.get_collection(self.get_collection_transaction_nom())
+        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+
+        # Extraire les donnees
+        rangees, colonnes = self.extraire_donnees(curseur_resultat)
+
+        # Generer Workbook
+        fichier_temporaire = self.generer_workbook(rangees, colonnes)
+        self.__logger.info("Fichier Excel temporaire %s" % fichier_temporaire)
+        try:
+            with open(fichier_temporaire) as fichier:
+                # Sauvegarder le fichier dans consignationfichiers
+                pass
+        finally:
+            # os.remove(fichier_temporaire)
+            pass
+
+        self.set_etape_suivante()  # Termine
+
+        return {
+            'fichier_excel': fichier_temporaire
+        }
+
+    def _extraire_requete(self, transaction):
+        regroupement_periode = {
+            'year': {'$year': '$_evenements._estampille'},
+            'month': {'$month': '$_evenements._estampille'},
+            'day': {'$dayOfMonth': '$_evenements._estampille'},
+            'hour': {'$hour': '$_evenements._estampille'},
+        }
+
+        regroupement_elem_numeriques = [
+            'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
+        ]
+
+        accumulateurs = ['max', 'min', 'avg']
+
+        regroupement = {
+            '_id': {
+                'uuid_senseur': '$uuid_senseur',
+                'appareil_type': '$senseurs.type',
+                'appareil_adresse': '$senseurs.adresse',
+                'timestamp': {
+                    '$dateFromParts': regroupement_periode
+                },
+            },
+        }
+
+        # Combiner les types de lectures (temp, hum) avec operation (avg, min, max)
+        for elem_regroupement in regroupement_elem_numeriques:
+            for accumulateur in accumulateurs:
+                key = '%s_%s' % (elem_regroupement, accumulateur)
+                regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
+
+        temps_fin_rapport = datetime.datetime.utcnow()
+        periode_rapport = datetime.timedelta(days=365)
+        temps_debut_rapport = temps_fin_rapport - periode_rapport
+
+        filtre = {
+            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
+            # 'uuid_senseur': {'$in': ['731bf65cf35811e9b135b827eb9064af']},
+            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
+                '$gte': temps_debut_rapport.timestamp(),
+                '$lt': temps_fin_rapport.timestamp(),
+            },
+        }
+
+        operation = [
+            {'$match': filtre},
+            {'$unwind': '$senseurs'},
+            {'$group': regroupement},
+        ]
+
+        return operation
+
+    def extraire_donnees(self, curseur):
+        colonnes = set()
+        rangees = dict()
+        for resultat in curseur:
+            id_result = resultat['_id']
+            if id_result.get('appareil_adresse') is not None:
+                colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_adresse']
+            else:
+                colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_type']
+
+            timestamp = id_result['timestamp']
+            rangee = rangees.get(timestamp)
+            if rangee is None:
+                rangee = dict()
+                rangees[timestamp] = rangee
+
+            for donnee in resultat.keys():
+                if donnee != '_id' and resultat.get(donnee) is not None:
+                    colonne_donnee = colonne + '/' + donnee
+                    colonnes.add(colonne_donnee)
+                    rangee[colonne_donnee] = resultat[donnee]
+
+        colonnes = sorted(colonnes)
+        print("Colonnes: " + str(colonnes))
+
+        for timestamp in sorted(rangees.keys()):
+            ligne = "Timestamp %s : " % (timestamp)
+            rangee = rangees[timestamp]
+            for colonne in colonnes:
+                if rangee.get(colonne) is not None:
+                    ligne = ligne + ', ' + colonne + "=" + str(rangee[colonne])
+            print("Timestamp %s : %s" % (timestamp, ligne))
+
+        return rangees, colonnes
+
+    def generer_workbook(self, rangees, colonnes):
+        wb = Workbook()
+        feuille = wb.active
+        feuille.title = "Rapport"
+
+        no_colonne = 1
+        colonnes = sorted(colonnes)
+        for colonne in colonnes:
+            no_colonne = no_colonne + 1
+            feuille.cell(column=no_colonne, row=1, value=colonne)
+
+        ligne = 1
+        for timestamp in sorted(rangees.keys()):
+            no_colonne = 1
+            ligne = ligne + 1
+            feuille.cell(column=1, row=ligne, value=timestamp)
+
+            rangee = rangees[timestamp]
+            for colonne in colonnes:
+                no_colonne = no_colonne + 1
+                valeur = rangee.get(colonne)
+                if valeur is not None:
+                    feuille.cell(column=no_colonne, row=ligne, value=valeur)
+                    if 'temperature' in colonne or 'pression' in colonne:
+                        feuille.cell(column=no_colonne, row=ligne).number_format = '0.0'
+                    else:
+                        feuille.cell(column=no_colonne, row=ligne).number_format = '0'
+
+        # Creer un fichier temporaire
+        fichier_excel = tempfile.mkstemp()[1]
+
+        try:
+            wb.save(fichier_excel)
+        except Exception as e:
+            self.__logger.exception("Erreur sauvegarde workbook Excel")
+            os.remove(fichier_excel)
+            raise e
+
+        return fichier_excel
 
 
 class RegenerateurSenseursPassifs(RegenerateurDeDocuments):

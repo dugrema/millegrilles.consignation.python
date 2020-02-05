@@ -72,6 +72,7 @@ class RequeteMongo(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.executer()
 
     def run_ioloop(self):
         self.contexte.message_dao.run_ioloop()
@@ -198,15 +199,26 @@ class RequeteMongo(BaseCallback):
 
         wb.save(dest_filename)
 
+    def requete_rapport(self):
+        transaction = {
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, SenseursPassifsConstantes.TRANSACTION_DOMAINE_GENERER_RAPPORT, reply_to=self.queue_name,
+            correlation_id='efgh')
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
-        self.generer_excel()
+        self.requete_rapport()
 
 
 # --- MAIN ---
 sample = RequeteMongo()
 
 # TEST
-sample.executer()
+# sample.executer()
 
 # FIN TEST
 sample.event_recu.wait(2)

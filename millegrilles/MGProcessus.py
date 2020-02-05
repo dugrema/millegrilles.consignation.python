@@ -1199,6 +1199,10 @@ class MGProcessus:
         return self._document_processus['parametres']
 
     @property
+    def get_collection_documents(self):
+        return self._controleur.get_collection_documents
+
+    @property
     def get_collection_transaction_nom(self):
         return self._controleur.get_collection_transaction_nom
 

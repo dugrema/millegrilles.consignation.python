@@ -1107,6 +1107,7 @@ class SenseursPassifsConstantes:
     TRANSACTION_DOMAINE_LECTURE = '%s.lecture' % DOMAINE_NOM
     TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR = '%s.changementAttributSenseur' % DOMAINE_NOM
     TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR = '%s.suppressionSenseur' % DOMAINE_NOM
+    TRANSACTION_DOMAINE_GENERER_RAPPORT = '%s.genererRapport' % DOMAINE_NOM
     SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
 
     REQUETE_VITRINE_DASHBOARD = '%s.dashboard' % DOMAINE_NOM
