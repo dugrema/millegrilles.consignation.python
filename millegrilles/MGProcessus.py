@@ -1210,7 +1210,7 @@ class MGProcessus:
         )
 
         transaction_nouveau = {
-            'fuuid': fuuid,
+            'fuuid': str(fuuid),
             'securite': securite,
             'nom': nom_fichier,
             'taille': taille_fichier,

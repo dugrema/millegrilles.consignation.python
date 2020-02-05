@@ -227,7 +227,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         elif domaine_transaction == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreQuotidienneRapport"
         elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_GENERER_RAPPORT:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusGenererRapport"
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusGenererRapportSenseurs"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -1054,7 +1054,7 @@ class ProcessusMajFenetreHoraireRapport(MGProcessus):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusGenererRapport(MGProcessusTransaction):
+class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
     """
     Processus de creation d'un rapport (Excel) a partir de donnees de senseurs
     """
@@ -1079,10 +1079,17 @@ class ProcessusGenererRapport(MGProcessusTransaction):
         # Generer Workbook
         fichier_temporaire = self.generer_workbook(rangees, colonnes)
         self.__logger.info("Fichier Excel temporaire %s" % fichier_temporaire)
+        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M")
+        etiquettes = ['rapport', 'senseurspassifs']
         try:
             with open(fichier_temporaire, 'rb') as fichier:
                 # Sauvegarder le fichier dans consignationfichiers
-                self.sauvegarder_consignationfichiers(fichier, 'rapport.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                fuuid = self.sauvegarder_consignationfichiers(
+                    fichier,
+                    'Rapport_SenseursPassifs_%s.xlsx' % timestamp,
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    etiquettes=etiquettes,
+                )
         finally:
             # os.remove(fichier_temporaire)
             pass
@@ -1090,7 +1097,7 @@ class ProcessusGenererRapport(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
         return {
-            'fichier_excel': fichier_temporaire
+            'fuuid': fuuid,
         }
 
     def _extraire_requete(self, transaction):
