@@ -1175,7 +1175,6 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
                     rangee[colonne_donnee] = resultat[donnee]
 
         colonnes = sorted(colonnes)
-        print("Colonnes: " + str(colonnes))
 
         for timestamp in sorted(rangees.keys()):
             ligne = "Timestamp %s : " % (timestamp)
@@ -1183,7 +1182,6 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
             for colonne in colonnes:
                 if rangee.get(colonne) is not None:
                     ligne = ligne + ', ' + colonne + "=" + str(rangee[colonne])
-            print("Timestamp %s : %s" % (timestamp, ligne))
 
         return rangees, colonnes
 
@@ -1192,13 +1190,63 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
         feuille = wb.active
         feuille.title = "Rapport"
 
-        no_colonne = 1
         colonnes = sorted(colonnes)
+        senseurs = dict()
         for colonne in colonnes:
-            no_colonne = no_colonne + 1
-            feuille.cell(column=no_colonne, row=1, value=colonne)
+            senseur, appareil, mesure = colonne.split('/')
+            groupe_appareils = senseurs.get(senseur)
+            if groupe_appareils is None:
+                groupe_appareils = dict()
+                senseurs[senseur] = groupe_appareils
+            groupe_mesures = groupe_appareils.get(appareil)
+            if groupe_mesures is None:
+                groupe_mesures = list()
+                groupe_appareils[appareil] = groupe_mesures
+            groupe_mesures.append(mesure)
 
-        ligne = 1
+        # Remplacer les ID de senseurs et appareils par leur nom
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: {'$in': list(senseurs.keys())}
+        }
+        try:
+            collection = self.get_collection_documents()
+            curseur_senseurs = collection.find(filtre)
+            for senseur_db in curseur_senseurs:
+                id_senseur = senseur_db[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+                colonnes_senseur = senseurs[id_senseur]
+                location_senseur = senseur_db.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
+                if location_senseur is not None:
+                    # Remplacer le nom du senseur dans la colonne
+                    senseurs[location_senseur] = colonnes_senseur
+                    del senseurs[id_senseur]
+                    for appareil in colonnes_senseur.keys():
+                        mesures = colonnes_senseur[appareil]
+                        affichage_appareils = senseur_db.get('affichage')
+                        if affichage_appareils is not None:
+                            appareil_db = affichage_appareils.get(appareil)
+                            if appareil_db is not None:
+                                location_appareil = appareil_db.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
+                                if location_appareil is not None:
+                                    colonnes_senseur[location_appareil] = mesures
+                                    del colonnes_senseur[appareil]
+        except Exception:
+            # Erreur de formattage de l'entete, n'empeche pas de produire le rapport
+            self.__logger.exception("Erreur mapping nom senseurs pour rapport, le rapport va quand meme etre produit")
+
+        # Generer les 3 niveaux d'entete
+        no_colonne = 2
+        for senseur in sorted(senseurs.keys()):
+            appareils = senseurs[senseur]
+            feuille.cell(column=no_colonne, row=1, value=senseur)
+            for appareil in sorted(appareils.keys()):
+                feuille.cell(column=no_colonne, row=2, value=appareil)
+                mesures = appareils[appareil]
+                for mesure in mesures:
+                    feuille.cell(column=no_colonne, row=3, value=mesure)
+                    no_colonne = no_colonne + 1
+
+        ligne = 3
         for timestamp in sorted(rangees.keys()):
             no_colonne = 1
             ligne = ligne + 1
