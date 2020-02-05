@@ -449,6 +449,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self._logger.debug("maj_fichier resultat %s" % str(resultat))
 
+        # Mettre a jour les etiquettes du fichier au besoin
+        etiquettes = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES)
+        if etiquettes is not None:
+            self.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
+
         return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier, 'info_version': info_version}
 
     def renommer_deplacer_fichier(self, uuid_doc, changements):
