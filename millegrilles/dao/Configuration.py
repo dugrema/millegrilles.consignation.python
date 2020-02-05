@@ -89,6 +89,11 @@ class TransactionConfiguration:
             Constantes.CONFIG_EMAIL_FROM: None
         }
 
+        self._serveurs = {
+            Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_HOST: Constantes.DEFAUT_CONSIGNATIONFICHIERS_HOST,
+            Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT: Constantes.DEFAUT_CONSIGNATIONFICHIERS_PORT,
+        }
+
     def loadEnvironment(self, additionals: list = None):
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
@@ -110,6 +115,7 @@ class TransactionConfiguration:
             self._domaines_config,
             self._email_config,
             self._pki_config,
+            self._serveurs,
         ]
 
         for config_dict in configurations:
@@ -343,6 +349,13 @@ class TransactionConfiguration:
     def email_from(self):
         return self._email_config[Constantes.CONFIG_EMAIL_FROM]
 
+    @property
+    def serveur_consignationfichiers_host(self):
+        return self._serveurs[Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_HOST]
+
+    @property
+    def serveur_consignationfichiers_port(self):
+        return self._serveurs[Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT]
 
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """

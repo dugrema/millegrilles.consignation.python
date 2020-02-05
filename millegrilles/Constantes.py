@@ -53,6 +53,9 @@ DEFAUT_KEYCERTFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key_
 DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert'
 DEFAUT_CA_CERTS = '/opt/millegrilles/etc/millegrilles.RootCA.pem'
 
+DEFAUT_CONSIGNATIONFICHIERS_HOST = 'consignationfichiers'
+DEFAUT_CONSIGNATIONFICHIERS_PORT = '443'
+
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
 CONFIG_MONGO_PORT = 'mongo_port'
@@ -78,6 +81,10 @@ CONFIG_EMAIL_USER = 'email_user'
 CONFIG_EMAIL_PASSWORD = 'email_password'
 CONFIG_EMAIL_TO = 'email_to'
 CONFIG_EMAIL_FROM = 'email_from'
+
+# Serveurs et liens externes
+CONFIG_SERVEUR_CONSIGNATIONFICHIERS_HOST = 'consignationfichiers_host'
+CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT = 'consignationfichiers_port'
 
 # Valeurs par defaut
 DEFAUT_MQ_USER = 'transaction'

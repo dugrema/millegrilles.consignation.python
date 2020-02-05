@@ -1194,7 +1194,9 @@ class MGProcessus:
         fp.seek(0)
 
         fuuid = uuid.uuid1()
-        adresse_serveur = 'mg-dev3:3003'
+        consignationfichiers_host = self.controleur.configuration.serveur_consignationfichiers_host
+        consignationfichiers_port = self.controleur.configuration.serveur_consignationfichiers_port
+        adresse_serveur = '%s:%s' % (consignationfichiers_host, consignationfichiers_port)
         crypte = 'false'
         if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
             crypte = 'true'

@@ -211,7 +211,7 @@ class RequeteMongo(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        self.requete_rapport()
+        self.generer_excel()
 
 
 # --- MAIN ---
