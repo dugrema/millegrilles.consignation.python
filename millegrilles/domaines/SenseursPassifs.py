@@ -1080,9 +1080,9 @@ class ProcessusGenererRapport(MGProcessusTransaction):
         fichier_temporaire = self.generer_workbook(rangees, colonnes)
         self.__logger.info("Fichier Excel temporaire %s" % fichier_temporaire)
         try:
-            with open(fichier_temporaire) as fichier:
+            with open(fichier_temporaire, 'rb') as fichier:
                 # Sauvegarder le fichier dans consignationfichiers
-                pass
+                self.sauvegarder_consignationfichiers(fichier, 'rapport.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         finally:
             # os.remove(fichier_temporaire)
             pass

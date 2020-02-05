@@ -1,9 +1,12 @@
 # Module de processus pour MilleGrilles
 import logging
 import datetime
+import requests
+import hashlib
 
 from bson.objectid import ObjectId
 import json
+import uuid
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
@@ -1169,6 +1172,59 @@ class MGProcessus:
                 return transaction_connectee
 
         return None
+
+    def sauvegarder_consignationfichiers(self, fp, nom_fichier, mimetype: str = 'application/data', etiquettes: list = None, securite: str = Constantes.SECURITE_PRIVE):
+        # Preparer le fichier
+        BUF_SIZE = 65535
+        sha256 = hashlib.sha256()
+
+        taille_fichier = 0
+        while True:
+            data = fp.read(BUF_SIZE)
+            taille_fichier = taille_fichier + len(data)
+            if not data:
+                break
+            sha256.update(data)
+        sha256_digest = sha256.hexdigest()
+
+        # Reset fp a 0 pour upload
+        fp.seek(0)
+
+        fuuid = uuid.uuid1()
+        adresse_serveur = 'mg-dev3:3003'
+        crypte = 'false'
+        if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+            crypte = 'true'
+        path_upload = 'https://%s/grosfichiers/local/nouveauFichier/%s' % (adresse_serveur, fuuid)
+        headers = {
+            'encrypte': crypte,
+            'fileuuid': str(fuuid),
+            'nomfichier': nom_fichier,
+            'mimetype': mimetype,
+        }
+
+        requests.put(
+            path_upload, fp, headers=headers,
+            verify=self.controleur.configuration.pki_cafile,
+            cert=(self.controleur.configuration.pki_certfile, self.controleur.configuration.pki_keyfile)
+        )
+
+        transaction_nouveau = {
+            'fuuid': fuuid,
+            'securite': securite,
+            'nom': nom_fichier,
+            'taille': taille_fichier,
+            'mimetype': mimetype,
+            'sha256': sha256_digest,
+        }
+
+        if etiquettes is not None:
+            transaction_nouveau['etiquettes'] = etiquettes
+
+        self.ajouter_transaction_a_soumettre(
+            Constantes.ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA, transaction_nouveau)
+
+        return fuuid
 
     @property
     def document_dao(self):
