@@ -1137,6 +1137,10 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
                 key = '%s_%s' % (elem_regroupement, accumulateur)
                 regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
 
+        temps_fin_rapport = datetime.datetime.utcnow()
+        periode_rapport = datetime.timedelta(days=90)
+        temps_debut_rapport = temps_fin_rapport - periode_rapport
+
         periode_transaction = transaction.get('periode')
         try:
             if periode_transaction is not None:
@@ -1144,9 +1148,6 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
                 temps_fin_rapport = datetime.datetime.fromtimestamp(periode_transaction['fin'])
         except Exception:
             self.__logger.exception("Erreur parametres intervalle du rapport, on prend 90 derniers jours")
-            temps_fin_rapport = datetime.datetime.utcnow()
-            periode_rapport = datetime.timedelta(days=90)
-            temps_debut_rapport = temps_fin_rapport - periode_rapport
 
         filtre = {
             'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
