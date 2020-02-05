@@ -1107,12 +1107,18 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
             'day': {'$dayOfMonth': '$_evenements._estampille'},
             'hour': {'$hour': '$_evenements._estampille'},
         }
+        if transaction.get('groupe_temp') == 'day':
+            del regroupement_periode['hour']
 
         regroupement_elem_numeriques = [
             'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
         ]
+        if transaction.get('mesures'):
+            regroupement_elem_numeriques = transaction['mesures']
 
         accumulateurs = ['max', 'min', 'avg']
+        if transaction.get('accumulateurs'):
+            accumulateurs = transaction['accumulateurs']
 
         regroupement = {
             '_id': {
@@ -1131,9 +1137,16 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
                 key = '%s_%s' % (elem_regroupement, accumulateur)
                 regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
 
-        temps_fin_rapport = datetime.datetime.utcnow()
-        periode_rapport = datetime.timedelta(days=365)
-        temps_debut_rapport = temps_fin_rapport - periode_rapport
+        periode_transaction = transaction.get('periode')
+        try:
+            if periode_transaction is not None:
+                temps_debut_rapport = datetime.datetime.fromtimestamp(periode_transaction['debut'])
+                temps_fin_rapport = datetime.datetime.fromtimestamp(periode_transaction['fin'])
+        except Exception:
+            self.__logger.exception("Erreur parametres intervalle du rapport, on prend 90 derniers jours")
+            temps_fin_rapport = datetime.datetime.utcnow()
+            periode_rapport = datetime.timedelta(days=90)
+            temps_debut_rapport = temps_fin_rapport - periode_rapport
 
         filtre = {
             'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
@@ -1143,6 +1156,9 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
                 '$lt': temps_fin_rapport.timestamp(),
             },
         }
+
+        if transaction.get('senseurs'):
+            filtre[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR] = {'$in': transaction['senseurs']}
 
         operation = [
             {'$match': filtre},

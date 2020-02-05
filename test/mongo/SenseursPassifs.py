@@ -251,7 +251,15 @@ class RequeteMongo(BaseCallback):
         wb.save(dest_filename)
 
     def requete_rapport(self):
+        fin_rapport = datetime.datetime.utcnow()
+        debut_rapport = fin_rapport - datetime.timedelta(days=60)
+
         transaction = {
+            'mesures': ['temperature', 'humidite'],
+            'accumulateurs': ['avg', 'max'],
+            'senseurs': ['514951f2f43211e99259b827eb53ee51'],
+            'groupe_temp': 'hour',
+            'periode': {'debut': debut_rapport.timestamp(), 'fin': fin_rapport.timestamp()}
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
