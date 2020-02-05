@@ -12,6 +12,10 @@ from millegrilles.util.JSONEncoders import MongoJSONEncoder
 
 import json
 
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+
+
 contexte = ContexteRessourcesDocumentsMilleGrilles()
 contexte.initialiser()
 
@@ -68,7 +72,6 @@ class RequeteMongo(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        self.executer()
 
     def run_ioloop(self):
         self.contexte.message_dao.run_ioloop()
@@ -160,14 +163,46 @@ class RequeteMongo(BaseCallback):
                     ligne = ligne + ', ' + colonne + "=" + str(rangee[colonne])
             print("Timestamp %s : %s" % (timestamp, ligne))
 
+        return rangees, colonnes
+
+    def generer_excel(self):
+        rangees, colonnes = self.projeter_rapport()
+
+        wb = Workbook()
+        dest_filename = '/home/mathieu/tmp/empty_book.xlsx'
+        ws1 = wb.active
+        ws1.title = "Pour le fun"
+
+        no_colonne = 0
+        colonnes = sorted(colonnes)
+        for colonne in colonnes:
+            no_colonne = no_colonne + 1
+            ws1.cell(column=no_colonne, row=1, value=colonne)
+
+        ligne = 1
+        for timestamp in sorted(rangees.keys()):
+            no_colonne = 1
+            ligne = ligne + 1
+            ws1.cell(column=1, row=ligne, value=timestamp)
+
+            rangee = rangees[timestamp]
+            for colonne in colonnes:
+                no_colonne = no_colonne + 1
+                valeur = rangee.get(colonne)
+                if valeur is not None:
+                    ws1.cell(column=no_colonne, row=ligne, value=valeur)
+
+        wb.save(dest_filename)
+
     def executer(self):
-        self.projeter_rapport()
+        self.generer_excel()
 
 
 # --- MAIN ---
 sample = RequeteMongo()
 
 # TEST
+sample.executer()
 
 # FIN TEST
 sample.event_recu.wait(2)

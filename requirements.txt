@@ -12,3 +12,4 @@ pymongo>=3.7.1,<4.0
 
 cssutils>=1.0,<2.0
 diff-match-patch>=20181111.0,<20181112.0
+openpyxl
