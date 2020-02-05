@@ -8,13 +8,15 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from threading import Event
 
+from millegrilles.util.JSONEncoders import MongoJSONEncoder
+
 import json
 
 contexte = ContexteRessourcesDocumentsMilleGrilles()
 contexte.initialiser()
 
 
-class MessagesSample(BaseCallback):
+class RequeteMongo(BaseCallback):
 
     def __init__(self):
         super().__init__(contexte)
@@ -27,6 +29,32 @@ class MessagesSample(BaseCallback):
         self.event_recu = Event()
         self.collection_transactions = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
+        self.temps_debut_rapport = datetime.datetime(year=2020, month=1, day=1)
+        self.temps_fin_rapport = datetime.datetime(year=2020, month=2, day=1)
+
+        self.filtre = {
+            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
+            # 'uuid_senseur': {'$in': ['731bf65cf35811e9b135b827eb9064af']},
+            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
+                '$gte': self.temps_debut_rapport.timestamp(),
+                '$lt': self.temps_fin_rapport.timestamp(),
+            },
+        }
+
+        self.regroupement_periode = {
+            'year': {'$year': '$_evenements._estampille'},
+            'month': {'$month': '$_evenements._estampille'},
+            'day': {'$dayOfMonth': '$_evenements._estampille'},
+            'hour': {'$hour': '$_evenements._estampille'},
+        }
+
+        self._regroupement_elem_numeriques = [
+            'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
+        ]
+
+        self._accumulateurs = ['max', 'min', 'avg']
+
+        self.hint = {'_evenements._estampille': -1}
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -51,17 +79,65 @@ class MessagesSample(BaseCallback):
         message = json.loads(str(body, 'utf-8'))
         print(json.dumps(message, indent=4))
 
+    def requete_filtre_1(self):
+        curseur_resultat = self.collection_transactions.find(self.filtre).limit(10)
+        resultats = list()
+        for resultat in curseur_resultat:
+            resultats.append({
+                'uuid_senseur': resultat['uuid_senseur'],
+                'timestamp': resultat['timestamp'],
+                'senseurs': resultat['senseurs'],
+            })
+
+        print(json.dumps(resultats, indent=2))
+
+    def requete_aggr_1(self):
+        regroupement = {
+            '_id': {
+                'uuid_senseur': '$uuid_senseur',
+                'appareil_type': '$senseurs.type',
+                'appareil_adresse': '$senseurs.adresse',
+                'timestamp': {
+                    '$dateFromParts': self.regroupement_periode
+                },
+            },
+        }
+
+        for elem_regroupement in self._regroupement_elem_numeriques:
+            for accumulateur in self._accumulateurs:
+                key = '%s_%s' % (elem_regroupement, accumulateur)
+                regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
+
+        operation = [
+            {'$match': self.filtre},
+            {'$unwind': '$senseurs'},
+            {'$group': regroupement},
+        ]
+
+        curseur_resultat = self.collection_transactions.aggregate(operation, hint=self.hint)
+
+        resultats = list()
+        for resultat in curseur_resultat:
+            # resultats.append({
+            #     'uuid_senseur': resultat['uuid_senseur'],
+            #     'timestamp': resultat['timestamp'],
+            #     'senseurs': resultat['senseurs'],
+            # })
+            resultats.append(resultat)
+
+        print(json.dumps(resultats, cls=MongoJSONEncoder, indent=2))
+
+
     def executer(self):
-        dashboard = self.collection_transactions.find_one({})
-        print(dashboard)
+        self.requete_aggr_1()
 
 
 # --- MAIN ---
-sample = MessagesSample()
+sample = RequeteMongo()
 
 # TEST
 
 # FIN TEST
-sample.event_recu.wait(5)
+sample.event_recu.wait(2)
 sample.deconnecter()
 
