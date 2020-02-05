@@ -54,7 +54,7 @@ class RequeteMongo(BaseCallback):
 
         self._regroupement_elem_numeriques = [
             # 'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
-            'temperature'
+            'temperature', 'humidite',
         ]
 
         # self._accumulateurs = ['max', 'min', 'avg']
@@ -173,7 +173,7 @@ class RequeteMongo(BaseCallback):
         ws1 = wb.active
         ws1.title = "Pour le fun"
 
-        no_colonne = 0
+        no_colonne = 1
         colonnes = sorted(colonnes)
         for colonne in colonnes:
             no_colonne = no_colonne + 1
@@ -191,6 +191,10 @@ class RequeteMongo(BaseCallback):
                 valeur = rangee.get(colonne)
                 if valeur is not None:
                     ws1.cell(column=no_colonne, row=ligne, value=valeur)
+                    if 'temperature' in colonne or 'pression' in colonne:
+                        ws1.cell(column=no_colonne, row=ligne).number_format = '0.0'
+                    else:
+                        ws1.cell(column=no_colonne, row=ligne).number_format = '0'
 
         wb.save(dest_filename)
 
