@@ -49,10 +49,12 @@ class RequeteMongo(BaseCallback):
         }
 
         self._regroupement_elem_numeriques = [
-            'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
+            # 'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
+            'temperature'
         ]
 
-        self._accumulateurs = ['max', 'min', 'avg']
+        # self._accumulateurs = ['max', 'min', 'avg']
+        self._accumulateurs = ['avg']
 
         self.hint = {'_evenements._estampille': -1}
 
@@ -118,18 +120,48 @@ class RequeteMongo(BaseCallback):
 
         resultats = list()
         for resultat in curseur_resultat:
-            # resultats.append({
-            #     'uuid_senseur': resultat['uuid_senseur'],
-            #     'timestamp': resultat['timestamp'],
-            #     'senseurs': resultat['senseurs'],
-            # })
             resultats.append(resultat)
 
         print(json.dumps(resultats, cls=MongoJSONEncoder, indent=2))
+        return resultats
 
+    def projeter_rapport(self):
+        resultats = self.requete_aggr_1()
+
+        colonnes = set()
+        rangees = dict()
+        for resultat in resultats:
+            id_result = resultat['_id']
+            if id_result.get('appareil_adresse') is not None:
+                colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_adresse']
+            else:
+                colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_type']
+
+            timestamp = id_result['timestamp']
+            rangee = rangees.get(timestamp)
+            if rangee is None:
+                rangee = dict()
+                rangees[timestamp] = rangee
+
+            for donnee in resultat.keys():
+                if donnee != '_id' and resultat.get(donnee) is not None:
+                    colonne_donnee = colonne + '/' + donnee
+                    colonnes.add(colonne_donnee)
+                    rangee[colonne_donnee] = resultat[donnee]
+
+        colonnes = sorted(colonnes)
+        print("Colonnes: " + str(colonnes))
+
+        for timestamp in sorted(rangees.keys()):
+            ligne = "Timestamp %s : " % (timestamp)
+            rangee = rangees[timestamp]
+            for colonne in colonnes:
+                if rangee.get(colonne) is not None:
+                    ligne = ligne + ', ' + colonne + "=" + str(rangee[colonne])
+            print("Timestamp %s : %s" % (timestamp, ligne))
 
     def executer(self):
-        self.requete_aggr_1()
+        self.projeter_rapport()
 
 
 # --- MAIN ---
