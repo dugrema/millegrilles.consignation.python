@@ -27,6 +27,9 @@ class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
         if routing_key == 'requete.' + ConstantesParametres.REQUETE_NOEUD_PUBLIC:
             noeud_publique = self.gestionnaire.get_noeud_publique(message_dict)
             self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesParametres.REQUETE_ERREURS:
+            liste_erreurs = self.gestionnaire.get_erreurs(message_dict)
+            self.transmettre_reponse(message_dict, liste_erreurs, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -239,6 +242,17 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             noeuds_publics.append(noeud)
 
         return noeuds_publics
+
+    def get_erreurs(self, requete):
+        collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)
+        erreurs = collection_erreurs.find().sort([
+            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)
+        ]).limit(50)
+
+        # Extraire erreurs du curseur
+        erreurs = [erreur for erreur in erreurs]
+
+        return erreurs
 
     def maj_supprimer_noeud_public(self, url):
         filtre = {

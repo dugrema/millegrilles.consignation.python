@@ -469,6 +469,7 @@ class ConstantesParametres:
     TRANSACTION_CHAMP_UUID = 'uuid'
 
     REQUETE_NOEUD_PUBLIC = DOMAINE_NOM + '.noeudPublic'
+    REQUETE_ERREURS = DOMAINE_NOM + '.erreurs'
 
     # Courriel
     DOCUMENT_CHAMP_COURRIEL_ORIGINE = 'origine'
