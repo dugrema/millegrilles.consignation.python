@@ -755,8 +755,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             "_mg-derniere-modification": {"$lte": date_complet}
         }
         filtre_incomplet = {
-            "etape-suivante": {"$exists": False},
-            "_mg-derniere-modification": {"$lte": date_incomplet}
+            "etape-suivante": {"$exists": True},
+            "_mg-creation": {"$lte": date_incomplet}
         }
 
         collection_processus.delete_many(filtre_complet)
