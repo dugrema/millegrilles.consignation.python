@@ -285,8 +285,22 @@ class TraitementMessageCedule(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-        routing_key = method.routing_key
+        indicateurs = message_dict['indicateurs']
+
+        # Faire la liste des cedules a declencher
+        if 'heure' in indicateurs:
+            self.nettoyer_erreurs()
+
+    def nettoyer_erreurs(self):
+        collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)
+
+        date_supprimer = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+
+        filtre_incomplet = {
+            "_mg-creation": {"$lte": date_supprimer}
+        }
+
+        collection_erreurs.delete_many(filtre_incomplet)
 
 
 class TraitementTransactionPersistee(TraitementMessageDomaine):
