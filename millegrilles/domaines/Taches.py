@@ -164,12 +164,14 @@ class GestionnaireTaches(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return TachesConstantes.DOMAINE_NOM
 
-    def traiter_cedule(self, message):
-        timestamp_message = message['timestamp']['UTC']
+    def traiter_cedule(self, evenement):
+        super().traiter_cedule(evenement)
+
+        timestamp_message = evenement['timestamp']['UTC']
         if timestamp_message[4] % 6 == 0:
             self._logger.debug("Traiter actions dues")
             # Declencher la verification des actions sur taches
-            self.verifier_taches_actionsdues(message)
+            self.verifier_taches_actionsdues(evenement)
 
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == TachesConstantes.TRANSACTION_ACTION_TACHE_COMPLETEE:

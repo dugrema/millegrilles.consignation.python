@@ -169,7 +169,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         return processus
 
     def traiter_cedule(self, evenement):
-        pass
+        super().traiter_cedule(evenement)
 
     def maj_configuration_noeud_public(self, url, transaction_filtree):
         filtre = {

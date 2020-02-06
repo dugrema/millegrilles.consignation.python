@@ -99,6 +99,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         return configuration
 
     def traiter_cedule(self, evenement):
+        super().traiter_cedule(evenement)
 
         indicateurs = evenement['indicateurs']
         self._logger.debug("Cedule webPoll: %s" % str(indicateurs))

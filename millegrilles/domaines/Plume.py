@@ -276,7 +276,7 @@ class GestionnairePlume(GestionnaireDomaineStandard):
         return processus
 
     def traiter_cedule(self, evenement):
-        pass
+        super().traiter_cedule(evenement)
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds

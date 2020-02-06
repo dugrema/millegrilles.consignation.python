@@ -350,7 +350,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
     def traiter_cedule(self, evenement):
-        pass
+        super().traiter_cedule(evenement)
 
     @property
     def version_domaine(self):

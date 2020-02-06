@@ -38,7 +38,7 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.DOCUMENT_PROFIL_MILLEGRILLE)
 
     def traiter_cedule(self, evenement):
-        pass
+        super().traiter_cedule(evenement)
 
     def traiter_transaction(self, ch, method, properties, body):
         self._traitement_message.callbackAvecAck(ch, method, properties, body)

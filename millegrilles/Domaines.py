@@ -11,6 +11,7 @@ from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 
 import logging
 import json
+import datetime
 
 from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure
@@ -50,7 +51,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         # MQ est pret, on charge les domaines
         self.__wait_mq_ready.set()
 
-    def on_channel_close(self, arg1, arg2, arg3):
+    def on_channel_close(self, channel=None, code=None, reason=None):
         self.__wait_mq_ready.clear()
         self.__channel = None
         self._logger.info("MQ Channel ferme")
@@ -735,8 +736,31 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
     def traiter_cedule(self, evenement):
         """ Appele par __handler_cedule lors de la reception d'un message sur la Q .ceduleur du domaine """
-        raise NotImplementedError()
 
+        indicateurs = evenement['indicateurs']
+        self._logger.debug("Cedule webPoll: %s" % str(indicateurs))
+
+        # Faire la liste des cedules a declencher
+        if 'heure' in indicateurs:
+            self.nettoyer_processus()
+
+    def nettoyer_processus(self):
+        collection_processus = self.document_dao.get_collection(self.get_collection_processus_nom())
+
+        date_complet = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        date_incomplet = datetime.datetime.utcnow() - datetime.timedelta(days=14)
+
+        filtre_complet = {
+            "etape-suivante": {"$exists": False},
+            "_mg-derniere-modification": {"$lte": date_complet}
+        }
+        filtre_incomplet = {
+            "etape-suivante": {"$exists": False},
+            "_mg-derniere-modification": {"$lte": date_incomplet}
+        }
+
+        collection_processus.delete_many(filtre_complet)
+        collection_processus.delete_many(filtre_incomplet)
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
 

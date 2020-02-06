@@ -161,6 +161,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     ''' Traite les evenements sur cedule. '''
     def traiter_cedule(self, evenement):
+        super().traiter_cedule(evenement)
+
         indicateurs = evenement['indicateurs']
 
         try:

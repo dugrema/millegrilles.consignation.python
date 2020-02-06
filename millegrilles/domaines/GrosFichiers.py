@@ -272,7 +272,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return ConstantesGrosFichiers.DOMAINE_NOM
 
     def traiter_cedule(self, evenement):
-        pass
+        super().traiter_cedule(evenement)
 
     def get_fichier_par_fuuid(self, fuuid):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
