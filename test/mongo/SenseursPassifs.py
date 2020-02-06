@@ -258,7 +258,7 @@ class RequeteMongo(BaseCallback):
             'mesures': ['temperature', 'humidite'],
             'accumulateurs': ['avg', 'max'],
             'senseurs': ['514951f2f43211e99259b827eb53ee51'],
-            'groupe_temp': 'hour',
+            'groupe_temps': 'hour',
             'periode': {'debut': debut_rapport.timestamp(), 'fin': fin_rapport.timestamp()}
         }
 

@@ -1107,7 +1107,7 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
             'day': {'$dayOfMonth': '$_evenements._estampille'},
             'hour': {'$hour': '$_evenements._estampille'},
         }
-        if transaction.get('groupe_temp') == 'day':
+        if transaction.get('groupe_temps') == 'days':
             del regroupement_periode['hour']
 
         regroupement_elem_numeriques = [
