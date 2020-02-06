@@ -8,6 +8,8 @@ from millegrilles.MGProcessus import MGProcessusTransaction
 import logging
 import datetime
 
+from bson import ObjectId
+
 
 class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
 
@@ -30,6 +32,9 @@ class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
         elif routing_key == 'requete.' + ConstantesParametres.REQUETE_ERREURS:
             liste_erreurs = self.gestionnaire.get_erreurs(message_dict)
             self.transmettre_reponse(message_dict, liste_erreurs, properties.reply_to, properties.correlation_id)
+        elif routing_key == 'requete.' + ConstantesParametres.REQUETE_SUPPRIMER_ERREUR:
+            self.gestionnaire.supprimer_erreurs(message_dict)
+            self.transmettre_reponse(message_dict, {}, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -253,6 +258,12 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         erreurs = [erreur for erreur in erreurs]
 
         return erreurs
+
+    def supprimer_erreurs(self, requete):
+        """ Supprimer une erreur """
+        id_erreur = requete['id_erreur']
+        collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)
+        collection_erreurs.delete_one({'_id': ObjectId(id_erreur)})
 
     def maj_supprimer_noeud_public(self, url):
         filtre = {
