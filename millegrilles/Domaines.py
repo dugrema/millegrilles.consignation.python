@@ -280,7 +280,7 @@ class GestionnaireDomaine:
         channel = self.channel_mq
         queues_config = self.get_queue_configuration()
 
-        self.nb_routes_a_config = len([r for r in [q['routing'] for q in queues_config]])
+        self.nb_routes_a_config = len([r for r in [q.get('routing') for q in queues_config]])
         self.wait_Q_ready.clear()  # Reset flag au besoin
         # channel = self.message_dao.channel
         for queue_config in queues_config:
@@ -288,22 +288,31 @@ class GestionnaireDomaine:
             def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config, in_consume=consume):
                 if in_consume:
                     gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
-                for routing in in_queue_config['routing']:
-                    channel.queue_bind(
-                        exchange=in_queue_config['exchange'],
-                        queue=in_queue_config['nom'],
-                        routing_key=routing,
-                        callback=self.__compter_route
-                    )
+
+                routing_list = in_queue_config.get('routing')
+                if routing_list is not None:
+                    for routing in routing_list:
+                        channel.queue_bind(
+                            exchange=in_queue_config['exchange'],
+                            queue=in_queue_config['nom'],
+                            routing_key=routing,
+                            callback=self.__compter_route
+                        )
 
             args = {}
+            if queue_config.get('arguments'):
+                args.update(queue_config.get('arguments'))
             if queue_config.get('ttl'):
                 args['x-message-ttl'] = queue_config['ttl']
+
+            durable = False
+            if queue_config.get('durable'):
+                durable = True
 
             self._logger.info("Declarer Q %s" % queue_config['nom'])
             channel.queue_declare(
                 queue=queue_config['nom'],
-                durable=False,
+                durable=durable,
                 callback=callback_init_transaction,
                 arguments=args,
             )
@@ -761,6 +770,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         collection_processus.delete_many(filtre_complet)
         collection_processus.delete_many(filtre_incomplet)
+
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
 

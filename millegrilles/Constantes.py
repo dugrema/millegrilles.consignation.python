@@ -444,6 +444,7 @@ class ConstantesParametres:
     COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
+    COLLECTION_ERREURS = '%s/erreurs' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_Parametres.documents'
 

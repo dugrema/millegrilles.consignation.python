@@ -2,8 +2,8 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesParametres
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-from millegrilles.MGProcessus import  MGProcessusTransaction
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 import logging
 import datetime
@@ -85,6 +85,20 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             ConstantesParametres.QUEUE_ROUTING_CHANGEMENTS,
             ParametresExchangeRouter(self._contexte)
         )
+
+    def get_queue_configuration(self):
+        queue_config = super().get_queue_configuration()
+        queue_config.append(
+            {
+                'nom': self._contexte.configuration.queue_erreurs_processus,
+                'exchange': self.configuration.exchange_secure,
+                'routing': ['processus.erreur'],
+                'durable': True,
+                'callback': HandlerErreurs(self.document_dao, self.message_dao, self.configuration).callbackAvecAck,
+                'arguments': {'x-queue-mode': 'lazy'},
+            },
+        )
+        return queue_config
 
     def modifier_document_email_smtp(self, transaction):
         document_email_smtp = {
@@ -234,6 +248,34 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         collection_domaine.delete_one(filtre)
+
+
+class HandlerErreurs(TraitementMessageCallback):
+
+    def __init__(self, document_dao, message_dao, configuration):
+        super().__init__(message_dao, configuration)
+        self.document_dao = document_dao
+
+    def traiter_message(self, ch, method, properties, body):
+        """
+        Recoit une erreur identifiee dans le middleware (generalement via processus)
+        :param ch:
+        :param method:
+        :param properties:
+        :param body:
+        :return:
+        """
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)
+        date_courante = datetime.datetime.utcnow()
+        routing_key = method.routing_key
+        document_erreur = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+            'routing_key': routing_key,
+            'erreur': message_dict,
+        }
+        collection_erreurs.insert_one(document_erreur)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
