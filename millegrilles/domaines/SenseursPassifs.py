@@ -47,7 +47,7 @@ class TraitementCommandeSenseursPassifs(TraitementMessageDomaineCommande):
         if routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE:
             resultat = CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
         elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL:
-            pass
+            resultat = CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
 
         return resultat
 
@@ -1280,7 +1280,59 @@ class CommandeGenererRapportAnnuel:
     """
     Genere un rapport annuel (par jour) pour un senseur et tous ses appareils
     """
-    pass
+    def __init__(self, gestionnaire, commande):
+        self.__gestionnaire = gestionnaire
+        self.__commande = commande
+        self.__helper = GenerateurRapportSenseursHelper()
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def generer(self):
+        uuid_senseur = self.__commande['senseurs'][0]
+
+        # Ajouter days pour regroupement
+        commande_days = self.__commande.copy()
+        commande_days['groupe_temps'] = 'days'
+
+        requete_aggregation = self.__helper.extraire_requete(commande_days)
+        hint = {'_evenements._estampille': -1}
+
+        # Executer la requete sur la collection de noms
+        collection = self.__gestionnaire.document_dao.get_collection(self.__gestionnaire.get_collection_transaction_nom())
+        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+
+        # Extraire les donnees
+        rangees, colonnes = self.__helper.extraire_donnees(curseur_resultat)
+        self.__logger.debug("Rapport:\n%s\n%s" % (colonnes, rangees))
+
+        appareils = self.__helper.formatter_mongo(rangees)
+        self.sauvegarder(uuid_senseur, appareils)
+
+        return None
+
+    def sauvegarder(self, uuid_senseur, appareils):
+        collection = self.__gestionnaire.document_dao.get_collection(
+            self.__gestionnaire.get_nom_collection())
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+        }
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+        }
+
+        operations = {
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$set': {'appareils': appareils}
+        }
+
+        self.__logger.info("Requete update rapport semaine:\n%s" % operations)
+
+        collection.update_one(filtre, operations, upsert=True)
 
 
 class ProcessusGenererRapportSenseurs(MGProcessusTransaction):

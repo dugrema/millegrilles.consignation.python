@@ -200,8 +200,20 @@ class MessagesSample(BaseCallback):
         print("Envoi commande: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def commande_generer_rapport_annuel(self):
+        commande = {
+            'senseurs': ['731bf65cf35811e9b135b827eb9064af'],
+        }
+        enveloppe_requete = self.generateur.transmettre_commande(
+            commande, 'commande.millegrilles.domaines.SenseursPassifs.rapportAnnuel',
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            reply_to=self.queue_name, correlation_id='abcd-1234')
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
-        sample.commande_generer_rapport_hebdomadaire()
+        sample.commande_generer_rapport_annuel()
 
 
 # --- MAIN ---
