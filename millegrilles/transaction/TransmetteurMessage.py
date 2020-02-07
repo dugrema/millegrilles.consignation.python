@@ -78,7 +78,7 @@ class TransmetteurMessageMilleGrilles:
         self.__channel = None
 
     def __on_return(self, channel, method, properties, body):
-        self.__logger.warning("Return callback %s (channel: %s, properties: %s):\n%s" % (
+        self.__logger.debug("Return callback %s (channel: %s, properties: %s):\n%s" % (
             str(method), str(channel), str(properties), str(body)))
         self.__publish_confirm_event.set()
 
