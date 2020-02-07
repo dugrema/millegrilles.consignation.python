@@ -1196,9 +1196,10 @@ class GenerateurRapportSenseursHelper:
 
         # Grouper les lectures par appareil, faire la liste en ordre de timestamp (deja triee)
         appareils = dict()
-        for date_donnee, rangee in rangees.items():
-            # Change rangee est une date avec tous les appareils et mesures
+        for date_donnee in sorted(rangees.keys()):
+            rangee = rangees[date_donnee]
 
+            # rangee est une date avec tous les appareils et mesures
             for nom_lect, valeur in rangee.items():
                 # Extraire la mesure avec la valeur
                 uuid_senseur, nom_app, mesure = nom_lect.split('/')
