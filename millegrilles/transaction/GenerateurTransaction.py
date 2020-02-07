@@ -183,7 +183,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
         self._contexte.message_dao.transmettre_commande(
-            enveloppe, routing_key,channel=channel, encoding=encoding, exchange=exchange,
+            enveloppe, routing_key, channel=channel, encoding=encoding, exchange=exchange,
             reply_to=reply_to, correlation_id=correlation_id
         )
 

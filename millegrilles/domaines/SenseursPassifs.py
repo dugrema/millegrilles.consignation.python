@@ -48,6 +48,8 @@ class TraitementCommandeSenseursPassifs(TraitementMessageDomaineCommande):
             resultat = CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
         elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL:
             resultat = CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
+        elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_DECLENCHER_RAPPORTS:
+            resultat = CommandeDeclencherRapports(self.gestionnaire, message_dict).declencher()
 
         return resultat
 
@@ -211,23 +213,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     def traiter_cedule_heure(self, evenement):
 
-        # Declencher l'aggregation horaire des lectures
-        domaine = '%s.MAJHoraire' % SenseursPassifsConstantes.DOMAINE_NOM
-        dict_message = {
-            Constantes.EVENEMENT_MESSAGE_EVENEMENT: SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE,
-            'timestamp': datetime.datetime.utcnow().isoformat()
-        }
-        self.transmettre_declencheur_domaine(domaine, dict_message)
+        # Declencher l'aggregation horaire des lectures de senseurs (derniere semaine)
+        self.declencher_rapports('semaine')
 
     def traiter_cedule_quotidienne(self, evenement):
 
-        # Declencher l'aggregation quotidienne des lectures
-        domaine = '%s.MAJQuotidienne' % SenseursPassifsConstantes.DOMAINE_NOM
-        dict_message = {
-            Constantes.EVENEMENT_MESSAGE_EVENEMENT: SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE,
-            'timestamp': datetime.datetime.utcnow().isoformat()
-        }
-        self.transmettre_declencheur_domaine(domaine, dict_message)
+        # Declencher l'aggregation quotidienne des lectures de senseur (derniere annee)
+        self.declencher_rapports('annee')
 
     '''
      Transmet un message via l'echange MilleGrilles pour un domaine specifique
@@ -280,6 +272,14 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD
         })
         return document_dashboard
+
+    def declencher_rapports(self, type_rapport):
+        commande = {
+            'type_rapport': type_rapport
+        }
+        self.generateur_transactions.transmettre_commande(
+            commande, 'commande.millegrilles.domaines.SenseursPassifs.declencherRapports',
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE)
 
 
 class TraitementMessageLecture(TraitementMessageDomaine):
@@ -1271,7 +1271,7 @@ class CommandeGenererRapportHebdomadaire:
             '$set': {'appareils': appareils}
         }
 
-        self.__logger.info("Requete update rapport semaine:\n%s" % operations)
+        self.__logger.debug("Requete update rapport semaine:\n%s" % operations)
 
         collection.update_one(filtre, operations, upsert=True)
 
@@ -1330,9 +1330,48 @@ class CommandeGenererRapportAnnuel:
             '$set': {'appareils': appareils}
         }
 
-        self.__logger.info("Requete update rapport semaine:\n%s" % operations)
+        self.__logger.debug("Requete update rapport semaine:\n%s" % operations)
 
         collection.update_one(filtre, operations, upsert=True)
+
+
+class CommandeDeclencherRapports:
+    """ Commande qui declenche la generation des rapports """
+
+    def __init__(self, gestionnaire, commande):
+        self.__gestionnaire = gestionnaire
+        self.__commande = commande
+        self.__helper = GenerateurRapportSenseursHelper()
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def declencher(self):
+        type_rapport = self.__commande['type_rapport']
+        if type_rapport == 'semaine':
+            domaine = 'commande.%s' % SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE
+        elif type_rapport == 'annee':
+            domaine = 'commande.%s' % SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL
+        else:
+            raise Exception("Type de rapport inconnu : " + type_rapport)
+
+        # Faire la liste de tous les senseurs individuels
+        collection = self.__gestionnaire.document_dao.get_collection(
+            self.__gestionnaire.get_nom_collection())
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR
+        }
+        projection = {
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: True,
+        }
+
+        resultats = collection.find(filtre, projection)
+        generateur_transactions = self.__gestionnaire.generateur_transactions
+        for senseur in resultats:
+            commande = {
+                'senseurs': [senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]]
+            }
+            generateur_transactions.transmettre_commande(
+                commande, domaine, exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE)
 
 
 class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
