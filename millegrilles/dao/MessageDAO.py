@@ -716,13 +716,17 @@ class PikaDAO:
         self.transmettre_message(
             document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
-    def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder, exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS):
+    def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder,
+                             exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, reply_to=None, correlation_id=None):
         """
         Sert a transmettre une commande vers un noeud
         :param document_commande:
         :param routing_key:
         :param channel:
         :param encoding:
+        :param exchange:
+        :param reply_to:
+        :param correlation_id:
         :return:
         """
         if channel is None:
@@ -732,6 +736,10 @@ class PikaDAO:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
 
         properties = pika.BasicProperties(delivery_mode=1)
+        if reply_to is not None:
+            properties.reply_to = reply_to
+        if correlation_id is not None:
+            properties.correlation_id = correlation_id
 
         message_utf8 = self.json_helper.dict_vers_json(document_commande, encoding)
         with self.lock_transmettre_message:
@@ -1186,6 +1194,35 @@ class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
         except Exception as e:
             self.gestionnaire.marquer_transaction_en_erreur(message_dict)
             raise e
+
+
+class TraitementMessageDomaineCommande(TraitementMessageDomaine):
+    """
+    Traite une commande du domaine
+    """
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        try:
+            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            reponse = self.traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.message_dao.transmettre_demande_certificat(fingerprint)
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        raise NotImplementedError()
+
+    def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None):
+        if correlation_id is None:
+            correlation_id = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
 class TraitementMessageDomaineRequete(TraitementMessageDomaine):

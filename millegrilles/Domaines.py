@@ -722,6 +722,26 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 'callback': handler_requete.callbackAvecAck
             })
 
+        for securite, handler_requete in self.get_handler_commandes().items():
+            if securite == Constantes.SECURITE_SECURE:
+                exchange = self.configuration.exchange_middleware
+            elif securite == Constantes.SECURITE_PROTEGE:
+                exchange = self.configuration.exchange_noeuds
+            elif securite == Constantes.SECURITE_PRIVE:
+                exchange = self.configuration.exchange_prive
+            else:
+                exchange = self.configuration.exchange_public
+
+            queues_config.append({
+                'nom': '%s.%s' % (self.get_nom_queue(), 'commande.' + securite),
+                'routing': [
+                    'commande.%s.#' % self.get_nom_domaine(),
+                ],
+                'exchange': exchange,
+                'ttl': 20000,
+                'callback': handler_requete.callbackAvecAck
+            })
+
         return queues_config
 
     def map_transaction_vers_document(self, transaction: dict, document: dict):
@@ -739,6 +759,9 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         return {
             Constantes.SECURITE_PROTEGE: self.get_handler_requetes_noeuds()
         }
+
+    def get_handler_commandes(self) -> dict:
+        return dict()  # Aucun par defaut
 
     def get_handler_cedule(self):
         return self.__handler_cedule

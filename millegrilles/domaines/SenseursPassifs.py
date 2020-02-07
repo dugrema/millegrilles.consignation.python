@@ -9,7 +9,7 @@ from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineCommande
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
 from openpyxl import Workbook
@@ -36,6 +36,20 @@ class TraitementRequetesProtegeesSenseursPassifs(TraitementMessageDomaineRequete
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+
+
+class TraitementCommandeSenseursPassifs(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+
+        resultat = None
+        if routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE:
+            resultat = CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
+        elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL:
+            pass
+
+        return resultat
 
 
 class SenseursPassifsExchangeRouter(ExchangeRouter):
@@ -70,6 +84,10 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesSenseursPassifs(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesSenseursPassifs(self)
+        }
+
+        self.__handler_commandes_noeuds = {
+            Constantes.SECURITE_SECURE: TraitementCommandeSenseursPassifs(self)
         }
 
     def configurer(self):
@@ -146,6 +164,9 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
+
+    def get_handler_commandes(self) -> dict:
+        return self.__handler_commandes_noeuds
 
     def get_nom_queue(self):
         return SenseursPassifsConstantes.QUEUE_NOM
@@ -1056,53 +1077,15 @@ class ProcessusMajFenetreHoraireRapport(MGProcessus):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
+class GenerateurRapportSenseursHelper:
     """
-    Processus de creation d'un rapport (Excel) a partir de donnees de senseurs
+    Classe qui genere des statistiques sur les senseurs.
     """
-    def __init__(self, controleur, evenement, transaction_mapper=None):
-        super().__init__(controleur, evenement, transaction_mapper)
+
+    def __init__(self):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def initiale(self):
-        # Definir parametres du rapport
-        transaction = self.transaction
-
-        requete_aggregation = self._extraire_requete(transaction)
-        hint = {'_evenements._estampille': -1}
-
-        # Executer la requete sur la collection de noms
-        collection = self.controleur.document_dao.get_collection(self.get_collection_transaction_nom())
-        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
-
-        # Extraire les donnees
-        rangees, colonnes = self.extraire_donnees(curseur_resultat)
-
-        # Generer Workbook
-        fichier_temporaire = self.generer_workbook(rangees, colonnes)
-        self.__logger.info("Fichier Excel temporaire %s" % fichier_temporaire)
-        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M")
-        etiquettes = ['rapport', 'senseurspassifs']
-        try:
-            with open(fichier_temporaire, 'rb') as fichier:
-                # Sauvegarder le fichier dans consignationfichiers
-                fuuid = self.sauvegarder_consignationfichiers(
-                    fichier,
-                    'Rapport_SenseursPassifs_%s.xlsx' % timestamp,
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    etiquettes=etiquettes,
-                )
-        finally:
-            # os.remove(fichier_temporaire)
-            pass
-
-        self.set_etape_suivante()  # Termine
-
-        return {
-            'fuuid': fuuid,
-        }
-
-    def _extraire_requete(self, transaction):
+    def extraire_requete(self, transaction):
         regroupement_periode = {
             'year': {'$year': '$_evenements._estampille'},
             'month': {'$month': '$_evenements._estampille'},
@@ -1203,6 +1186,149 @@ class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
                     ligne = ligne + ', ' + colonne + "=" + str(rangee[colonne])
 
         return rangees, colonnes
+
+    def formatter_mongo(self, rangees):
+        """
+        Prend le format ou chaque rangee est une date et extrait les senseurs avec leurs lectures
+        :param rangees:
+        :return:
+        """
+
+        # Grouper les lectures par appareil, faire la liste en ordre de timestamp (deja triee)
+        appareils = dict()
+        for date_donnee, rangee in rangees.items():
+            # Change rangee est une date avec tous les appareils et mesures
+
+            for nom_lect, valeur in rangee.items():
+                # Extraire la mesure avec la valeur
+                uuid_senseur, nom_app, mesure = nom_lect.split('/')
+                lectures = appareils.get(nom_app)
+                if lectures is None:
+                    # Fabriquer une nouvelle liste de lectures en ordre chronologique pour cet appareil
+                    lectures = list()
+                    appareils[nom_app] = lectures
+                    lectures.append({'timestamp': date_donnee})
+
+                # Toujours ajouter a la derniere valeur dans la liste, jusqu'a changement de date
+                derniere_lecture = lectures[-1]
+                if derniere_lecture['timestamp'] != date_donnee:
+                    # On a une nouvelle rangee (nouvelle date)
+                    derniere_lecture = {'timestamp': date_donnee}
+                    lectures.append(derniere_lecture)
+
+                derniere_lecture[mesure] = valeur
+
+        self.__logger.debug("Resultat reorganisation:\n%s" % appareils)
+        return appareils
+
+
+class CommandeGenererRapportHebdomadaire:
+    """
+    Genere un rapport hebdomadaire (par heure) pour un senseur et tous ses appareils
+    """
+    def __init__(self, gestionnaire, commande):
+        self.__gestionnaire = gestionnaire
+        self.__commande = commande
+        self.__helper = GenerateurRapportSenseursHelper()
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def generer(self):
+        uuid_senseur = self.__commande['senseurs'][0]
+        requete_aggregation = self.__helper.extraire_requete(self.__commande)
+        hint = {'_evenements._estampille': -1}
+
+        # Executer la requete sur la collection de noms
+        collection = self.__gestionnaire.document_dao.get_collection(self.__gestionnaire.get_collection_transaction_nom())
+        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+
+        # Extraire les donnees
+        rangees, colonnes = self.__helper.extraire_donnees(curseur_resultat)
+        self.__logger.debug("Rapport:\n%s\n%s" % (colonnes, rangees))
+
+        appareils = self.__helper.formatter_mongo(rangees)
+        self.sauvegarder(uuid_senseur, appareils)
+
+        return None
+
+    def sauvegarder(self, uuid_senseur, appareils):
+        collection = self.__gestionnaire.document_dao.get_collection(
+            self.__gestionnaire.get_nom_collection())
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+        }
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+        }
+
+        operations = {
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$set': {'appareils': appareils}
+        }
+
+        self.__logger.info("Requete update rapport semaine:\n%s" % operations)
+
+        collection.update_one(filtre, operations, upsert=True)
+
+
+class CommandeGenererRapportAnnuel:
+    """
+    Genere un rapport annuel (par jour) pour un senseur et tous ses appareils
+    """
+    pass
+
+
+class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
+    """
+    Processus de creation d'un rapport (Excel) a partir de donnees de senseurs
+    """
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.helper = GenerateurRapportSenseursHelper()
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        # Definir parametres du rapport
+        transaction = self.transaction
+
+        requete_aggregation = self.helper.extraire_requete(transaction)
+        hint = {'_evenements._estampille': -1}
+
+        # Executer la requete sur la collection de noms
+        collection = self.controleur.document_dao.get_collection(self.get_collection_transaction_nom())
+        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+
+        # Extraire les donnees
+        rangees, colonnes = self.helper.extraire_donnees(curseur_resultat)
+
+        # Generer Workbook
+        fichier_temporaire = self.generer_workbook(rangees, colonnes)
+        self.__logger.info("Fichier Excel temporaire %s" % fichier_temporaire)
+        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M")
+        etiquettes = ['rapport', 'senseurspassifs']
+        try:
+            with open(fichier_temporaire, 'rb') as fichier:
+                # Sauvegarder le fichier dans consignationfichiers
+                fuuid = self.sauvegarder_consignationfichiers(
+                    fichier,
+                    'Rapport_SenseursPassifs_%s.xlsx' % timestamp,
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    etiquettes=etiquettes,
+                )
+        finally:
+            # os.remove(fichier_temporaire)
+            pass
+
+        self.set_etape_suivante()  # Termine
+
+        return {
+            'fuuid': fuuid,
+        }
 
     def generer_workbook(self, rangees, colonnes):
         wb = Workbook()

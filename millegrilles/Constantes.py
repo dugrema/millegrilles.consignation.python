@@ -1122,6 +1122,9 @@ class SenseursPassifsConstantes:
 
     REQUETE_VITRINE_DASHBOARD = '%s.dashboard' % DOMAINE_NOM
 
+    COMMANDE_RAPPORT_HEBDOMADAIRE = '%s.rapportHebdomadaire' % DOMAINE_NOM
+    COMMANDE_RAPPORT_ANNUEL = '%s.rapportAnnuel' % DOMAINE_NOM
+
     EVENEMENT_MAJ_HORAIRE = '%s.MAJHoraire' % DOMAINE_NOM
     EVENEMENT_MAJ_QUOTIDIENNE = '%s.MAJQuotidienne' % DOMAINE_NOM
 

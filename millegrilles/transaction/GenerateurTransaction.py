@@ -173,7 +173,8 @@ class GenerateurTransaction:
         return uuid_transaction
 
     def transmettre_commande(self, commande_dict, routing_key, channel=None, encoding=DateFormatEncoder,
-                             exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None):
+                             exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None,
+                             reply_to=None, correlation_id=None):
 
         enveloppe = self.preparer_enveloppe(commande_dict, idmg_destination=idmg_destination)
 
@@ -181,8 +182,10 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        self._contexte.message_dao.transmettre_commande(enveloppe, routing_key,
-                                                        channel=channel, encoding=encoding, exchange=exchange)
+        self._contexte.message_dao.transmettre_commande(
+            enveloppe, routing_key,channel=channel, encoding=encoding, exchange=exchange,
+            reply_to=reply_to, correlation_id=correlation_id
+        )
 
         return uuid_transaction
 
