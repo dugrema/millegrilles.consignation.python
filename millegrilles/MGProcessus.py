@@ -1416,7 +1416,7 @@ class MGProcessusUpdateDoc(MGProcessusTransaction):
 class MGPProcessusDemarreur:
 
     def __init__(self, contexte, nom_domaine: str, collection_transaction_nom: str, collection_processus_nom: str,
-                 traitement_processus: MGPProcesseurTraitementEvenements):
+                 traitement_processus: MGPProcesseurTraitementEvenements, gestionnaire=None):
         self._contexte = contexte
         self._json_helper = JSONHelper()
 
@@ -1424,6 +1424,7 @@ class MGPProcessusDemarreur:
         self._collection_transaction_nom = collection_transaction_nom
         self._collection_processus_nom = collection_processus_nom
         self._traitement_processus = traitement_processus
+        self.__gestionnaire = gestionnaire
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -1447,8 +1448,12 @@ class MGPProcessusDemarreur:
             id_doc_processus = self._traitement_processus.sauvegarder_initialisation_processus(
                 collection_processus, moteur, processus_a_declencher, dictionnaire_evenement)
 
+            channel = None
+            if self.__gestionnaire is not None:
+                channel = self.__gestionnaire.channel_mq
+
             self._contexte.message_dao.transmettre_evenement_mgpprocessus(
-                self._nom_domaine, id_doc_processus, nom_processus=processus_a_declencher
+                self._nom_domaine, id_doc_processus, nom_processus=processus_a_declencher, channel=channel
             )
 
         except Exception as erreur:
