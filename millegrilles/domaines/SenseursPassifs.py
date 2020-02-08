@@ -8,7 +8,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter
-from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
+from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineCommande
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
@@ -45,9 +45,9 @@ class TraitementCommandeSenseursPassifs(TraitementMessageDomaineCommande):
 
         resultat = None
         if routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE:
-            resultat = CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
+            CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
         elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL:
-            resultat = CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
+            CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
         elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_DECLENCHER_RAPPORTS:
             resultat = CommandeDeclencherRapports(self.gestionnaire, message_dict).declencher()
 
@@ -261,7 +261,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
     def regenerer_rapports_sur_cedule(self):
         """ Permet de regenerer les documents de rapports sur cedule lors du demarrage du domaine """
-        self.demarrer_processus('millegrilles_domaines_SenseursPassifs:ProcessusRegenererFenetresRapport', {})
+        self.declencher_rapports('semaine')
+        self.declencher_rapports('annee')
 
     def get_vitrine_dashboard(self):
         """
@@ -374,6 +375,7 @@ class ProducteurDocumentNoeud:
 
     def __init__(self, document_dao):
         self._document_dao = document_dao
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     '''
     Mise a jour du document de noeud par une transaction senseur passif
@@ -393,9 +395,10 @@ class ProducteurDocumentNoeud:
         valeurs = document_senseur.copy()
         operations_filtre = TransactionOperations()
         valeurs = operations_filtre.enlever_champsmeta(valeurs, champs_a_exclure)
+        senseur_label = 'dict_senseurs.%s' % str(no_senseur)
 
         donnees_senseur = {
-            'dict_senseurs.%s' % str(no_senseur): valeurs
+            senseur_label: valeurs
         }
 
         filtre = {
@@ -410,6 +413,22 @@ class ProducteurDocumentNoeud:
         }
 
         collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
+
+        # S'assurer de nettoyer le senseur s'il etait dans un autre noeud
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_NOEUD,
+            'noeud': {'$ne': noeud},
+            senseur_label: {'$exists': True}
+        }
+        update = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$unset': {
+                senseur_label: 1,
+            }
+        }
+        collection_senseurs.update_many(filtre, update)
+        self.__logger.debug("Requete update noeuds :\n%s\n%s" % (filtre, update))
+
 
     '''
     Mise a jour du document du dashboard de vitrine
@@ -433,8 +452,9 @@ class ProducteurDocumentNoeud:
             if key in champs_a_inclure:
                 valeurs[key] = value
 
+        libelle_senseur = 'noeuds.%s.%s' % (noeud, uuid_senseur)
         donnees_senseur = {
-            'noeuds.%s.%s' % (noeud, uuid_senseur): valeurs
+            libelle_senseur: valeurs
         }
 
         filtre = {
@@ -446,7 +466,20 @@ class ProducteurDocumentNoeud:
             '$set': donnees_senseur
         }
 
-        collection_senseurs.update_one(filter=filtre, update=update)
+        nouveau_document = collection_senseurs.find_one_and_update(filter=filtre, update=update, new=True)
+
+        # S'assurer que le senseur n'a pas change de noeud
+        operation_unset = dict()
+        for noeud_doc, valeurs in nouveau_document['noeuds'].items():
+            if valeurs.get(uuid_senseur) is not None and noeud_doc != noeud:
+                operation_unset['noeuds.%s.%s' % (noeud_doc, uuid_senseur)] = True
+
+        if len(operation_unset.keys()) > 0:
+            update = {
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+                '$unset': operation_unset
+            }
+            collection_senseurs.update_one(filter=filtre, update=update)
 
 
 # Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
@@ -509,7 +542,6 @@ class ProducteurDocumentSenseurPassif:
         # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
         selection = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
-            SenseursPassifsConstantes.TRANSACTION_NOEUD: noeud,
             SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: id_appareil,
             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$lt': date_lecture}
         }
@@ -939,12 +971,14 @@ class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
         """ Mettre a jour le document de senseur """
 
         document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collection_documents = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
 
         liste_cles = dict()
         for senseur in document_transaction['senseurs']:
             senseur_cle = 'dict_senseurs.%s' % senseur
             liste_cles[senseur_cle] = 1
 
+        # Supprimer du noeud
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_NOEUD,
             "noeud": document_transaction['noeud'],
@@ -955,13 +989,29 @@ class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
         }
 
         self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
-        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document = collection_transactions.find_one_and_update(filtre, valeurs)
+        document = collection_documents.find_one_and_update(filtre, valeurs)
 
         if document is None:
             message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
             self._logger.error(message_erreur)
             raise AssertionError(message_erreur)
+
+        liste_cles = dict()
+        for senseur in document_transaction['senseurs']:
+            senseur_cle = 'noeuds.%s.%s' % (document_transaction['noeud'], senseur)
+            liste_cles[senseur_cle] = 1
+
+        # Supprimer du dashboard vitrine
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD,
+        }
+        valeurs = {
+            '$unset': liste_cles,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        self._logger.debug("Application supression sur dashboard vitrine: %s = %s" % (str(filtre), str(valeurs)))
+        document = collection_documents.find_one_and_update(filtre, valeurs)
 
         self.set_etape_suivante()  # Termine
 
@@ -999,82 +1049,6 @@ class ProcessusMajManuelle(ProcessusMAJSenseurPassif):
 
         # Retourner l'id du document pour mettre a jour le noeud
         return {'id_document_senseur': document['_id']}
-
-
-class ProcessusGenererRapport(ProcessusMAJSenseurPassif):
-    """ Processus de calcul d'un rapport pour les senseurs """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Mettre a jour le document de senseur """
-
-        document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-
-        uuid_senseur = document_transaction.get(SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR)
-
-        # Granularite: quoditien, horaire
-        granularite = document_transaction.get('granularite')
-
-        # Si True, le rapport est sauvegarde sous forme de transaction.
-        date_debut = document_transaction.get('date_debut')
-        date_fin = document_transaction.get('date_fin')
-
-        self.set_etape_suivante()
-
-
-class ProcessusRegenererFenetresRapport(MGProcessus):
-    """ Processus de calcul des fenetres d'aggregation horaire pour les senseurs. Ajoute la derniere heure. """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Regenerer les rapports de fenetre mobile horaire """
-
-        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
-        producteur.generer_fenetre_horaire()
-
-        self.set_etape_suivante(ProcessusRegenererFenetresRapport.rapport_annuel.__name__)  # Termine
-
-    def rapport_annuel(self):
-        """ Regenerer les rapports de fenetre mobile quotidienne """
-
-        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
-        producteur.generer_fenetre_quotidienne()
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusMajFenetreQuotidienneRapport(MGProcessus):
-    """ Processus de calcul des fenetres d'aggregation quotidienne pour les senseurs. Ajoute le dernier jour. """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Mettre a jour les documents de senseurs """
-
-        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
-        producteur.ajouter_dernierjour_fenetre_quotidienne()
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusMajFenetreHoraireRapport(MGProcessus):
-    """ Processus de calcul des fenetres d'aggregation horaire pour les senseurs. Ajoute la derniere heure. """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Mettre a jour les documents de senseurs """
-
-        producteur = ProducteurDocumentSenseurPassif(self.document_dao)
-        producteur.ajouter_derniereheure_fenetre_horaire()
-
-        self.set_etape_suivante()  # Termine
 
 
 class GenerateurRapportSenseursHelper:

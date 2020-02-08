@@ -126,7 +126,7 @@ class MessagesSample(BaseCallback):
 
         message_dict = dict()
         message_dict['uuid_senseur'] = '514951f2f43211e99259b827eb53ee51'
-        message_dict['noeud'] = 'domaine_SenseursPassifs'
+        message_dict['noeud'] = 'domaine_SenseursPassifs2'
         message_dict['timestamp'] = int(temps_lecture.timestamp())
         message_dict['senseurs'] = senseurs
 
@@ -230,7 +230,7 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='abcd-1234')
 
     def executer(self):
-        sample.commande_declencher_rapports()
+        sample.transmettre_lecture()
 
 
 # --- MAIN ---
