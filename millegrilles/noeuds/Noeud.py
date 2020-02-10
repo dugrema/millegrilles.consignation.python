@@ -328,7 +328,7 @@ class DummySenseurs:
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
     """ Producteur de transactions pour les SenseursPassifs. """
 
-    def __init__(self, contexte, noeud=socket.getfqdn()):
+    def __init__(self, contexte, noeud=socket.gethostname()):
         super().__init__(contexte)
         self._noeud = noeud.replace('.', '-')
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
