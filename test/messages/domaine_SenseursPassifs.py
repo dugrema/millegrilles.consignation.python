@@ -5,6 +5,7 @@
 
 import datetime
 import time
+import json
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -50,7 +51,11 @@ class MessagesSample(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(body)
+        print(json.dumps(json.loads(body.decode('utf-8')), indent=4))
+        print("Channel : " + str(ch))
+        print("Method : " + str(method))
+        print("Properties : " + str(properties))
+        print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
     def transaction_nouvelle_version_metadata(self):
         transaction = {
