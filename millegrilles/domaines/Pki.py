@@ -12,6 +12,24 @@ import logging
 import datetime
 
 
+class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        domaine_routing_key = method.routing_key.replace('requete.', '')
+
+        reponse = None
+        if domaine_routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
+            reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
+        elif domaine_routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
+            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
 class GestionnairePki(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -20,13 +38,15 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         self._pki_document_helper = None
         self.__traitement_certificats = None
-        self.__traitement_requetes_noeuds = None
+
+        self.__handler_requetes_noeuds = {
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self)
+        }
 
     def configurer(self):
         super().configurer()
         self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
         self.__traitement_certificats = TraitementRequeteCertificat(self, self._pki_document_helper)
-        self.__traitement_requetes_noeuds = TraitementRequetePki(self, self._pki_document_helper)
 
         self.initialiser_mgca()  # S'assurer que les certs locaux sont prets avant les premieres transactions
 
@@ -182,8 +202,8 @@ class GestionnairePki(GestionnaireDomaineStandard):
     def creer_regenerateur_documents(self):
         return RegenerateurDeDocumentsSansEffet(self)
 
-    def get_handler_requetes_noeuds(self):
-        return self.__traitement_requetes_noeuds
+    def get_handler_requetes(self):
+        return self.__handler_requetes_noeuds
 
     def get_certs_correlation_csr(self, correlation_csr: list):
         """
@@ -204,6 +224,72 @@ class GestionnairePki(GestionnaireDomaineStandard):
             certs.append(cert_reponse)
 
         return certs
+
+    def get_certificat(self, fingerprint):
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
+            ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+        }
+        certificat = collection_pki.find_one(filtre)
+
+        certificat_filtre = dict()
+        for key, value in certificat.items():
+            if not key.startswith('_'):
+                certificat_filtre[key] = value
+
+        return certificat_filtre
+
+    def recevoir_certificat(self, message_dict):
+        enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
+        correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
+        # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
+        self._pki_document_helper.inserer_certificat(enveloppe, correlation_csr=correlation_csr)
+
+    def confirmer_certificat(self, properties, message_dict):
+        """
+        Confirme la validute d'un certificat.
+        """
+        reponse = dict()
+        if message_dict.get('fingerprint'):
+            fingerprint = message_dict['fingerprint']
+            self._logger.debug("Requete verification certificat par fingerprint: %s" % fingerprint)
+            # Charge un certificat connu
+            enveloppe_cert = self.configuration.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+            if enveloppe_cert is not None:
+                reponse['valide'] = True
+            else:
+                reponse['valide'] = False
+        else:
+            reponse['valide'] = False
+
+        self.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
+
+    def transmettre_liste_ca(self, properties, message_dict):
+        ca_file = self.configuration.mq_cafile
+
+        with open(ca_file, 'r') as f:
+            contenu = f.read()
+
+        reponse = {
+            ConstantesSecurityPki.LIBELLE_CHAINE_PEM: contenu
+        }
+
+        self.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
+
+    def transmettre_certificats_correlation_csr(self, properties, message_dict):
+        liste_correlation = message_dict[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR]
+        certs = self.get_certs_correlation_csr(liste_correlation)
+
+        reponse = {
+            ConstantesSecurityPki.LIBELLE_CORRELATION_CSR: certs
+        }
+
+        self.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id)
+
 
 class PKIDocumentHelper:
 
@@ -568,8 +654,6 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
         if routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_EMIS):
             self.recevoir_certificat(message_dict)
-        elif routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
-            self.transmettre_certificat(properties, message_dict)
         elif routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
             self.transmettre_liste_ca(properties, message_dict)
         elif routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
@@ -585,9 +669,6 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
         correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
         # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
         self.__pki_document_helper.inserer_certificat(enveloppe, correlation_csr=correlation_csr)
-
-    def transmettre_certificat(self, properties, message_dict):
-        pass
 
     def confirmer_certificat(self, properties, message_dict):
         """
@@ -629,61 +710,6 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
         reponse = {
             ConstantesSecurityPki.LIBELLE_CORRELATION_CSR: certs
         }
-
-        self.gestionnaire.generateur_transactions.transmettre_reponse(
-            reponse, properties.reply_to, properties.correlation_id)
-
-
-class TraitementRequetePki(TraitementRequetesNoeuds):
-
-    def __init__(self, gestionnaire_domaine, pki_document_helper):
-        super().__init__(gestionnaire_domaine)
-        self.__pki_document_helper = pki_document_helper
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        # Pas de verification du contenu - le certificat est sa propre validation via CAs
-        # self.gestionnaire.verificateur_transaction.verifier(message_dict)
-
-        domaine_routing_key = method.routing_key.replace('requete.', '')
-
-        if domaine_routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
-            self.confirmer_certificat(properties, message_dict)
-
-        else:
-            super().traiter_message(ch, method, properties, body)
-
-    def confirmer_certificat(self, properties, message_dict):
-        """
-        Confirme la validute d'un certificat.
-        """
-        reponse = dict()
-        if message_dict.get('fingerprint'):
-            fingerprint = message_dict['fingerprint']
-            self.__logger.debug("Requete verification certificat par fingerprint: %s" % fingerprint)
-            # Charge un certificat connu
-            try:
-                enveloppe_cert = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
-                if enveloppe_cert is not None:
-
-                    if not enveloppe_cert.est_verifie:
-                        self.gestionnaire.verificateur_certificats.verifier_chaine(enveloppe_cert)
-
-                    reponse['valide'] = enveloppe_cert.est_verifie
-
-                    # Retourner quelques elements utiles pour des composants javascript, comme la cle publique
-                    cle_publique = enveloppe_cert.public_key
-                    reponse['certificat'] = enveloppe_cert.certificat_pem
-                    reponse['roles'] = enveloppe_cert.get_roles
-
-                else:
-                    reponse['valide'] = False
-            except CertificatInconnu:
-                reponse['valide'] = False
-        else:
-            reponse['valide'] = False
-
 
         self.gestionnaire.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id)

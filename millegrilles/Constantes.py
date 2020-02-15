@@ -414,7 +414,7 @@ class ConstantesPki:
     LIBVAL_PKI_WEB = 'pki.web'
 
     REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
-    REQUETE_CERTIFICAT_DEMANDE = 'pki.requete.certificat'
+    REQUETE_CERTIFICAT_DEMANDE = '%s.certificat' % DOMAINE_NOM
     REQUETE_LISTE_CA = 'pki.requete.ca'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
