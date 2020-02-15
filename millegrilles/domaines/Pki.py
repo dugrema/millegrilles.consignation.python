@@ -2,8 +2,8 @@
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
-from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet, TraitementRequetesNoeuds
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete, CertificatInconnu
+from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 from millegrilles.util.X509Certificate import PemHelpers
@@ -274,6 +274,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             enveloppe_cert = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
             if enveloppe_cert is not None:
                 reponse['valide'] = True
+                reponse['roles'] = enveloppe_cert.get_roles
             else:
                 reponse['valide'] = False
         else:
