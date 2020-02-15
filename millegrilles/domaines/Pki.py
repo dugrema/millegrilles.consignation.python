@@ -255,7 +255,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             fingerprint = message_dict['fingerprint']
             self._logger.debug("Requete verification certificat par fingerprint: %s" % fingerprint)
             # Charge un certificat connu
-            enveloppe_cert = self.configuration.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+            enveloppe_cert = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
             if enveloppe_cert is not None:
                 reponse['valide'] = True
             else:
