@@ -11,6 +11,7 @@ import tempfile
 import secrets
 import base58
 import shutil
+import math
 
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
@@ -263,27 +264,47 @@ class UtilCertificats:
         :return: Transaction nettoyee en bytes.
         """
 
-        transaction_temp = transaction_dict.copy()
-        regex_ignorer = re.compile('^_.+')
-        keys = list()
-        keys.extend(transaction_temp.keys())
-        for cle in keys:
-            m = regex_ignorer.match(cle)
-            if m:
-                del transaction_temp[cle]
-                self._logger.debug("Enlever cle: %s" % cle)
+        transaction_temp = dict()
+        for key, value in transaction_dict.items():
+            if not key.startswith('_'):
+                transaction_temp[key] = value
 
         self._logger.debug("Message nettoye: %s" % str(transaction_temp))
+
+        # Premiere passe, converti les dates. Les nombre floats sont incorrects.
         message_json = json.dumps(
             transaction_temp,
             ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
-            sort_keys=True,
-            separators=(',', ':'),
             cls=DateFormatEncoder
         )
+
+        # HACK - Fix pour le decodage des float qui ne doivent pas finir par .0 (e.g. 100.0 doit etre 100)
+        message_json = json.loads(message_json, parse_float=self._parse_float)
+        message_json = json.dumps(
+            message_json,
+            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+            sort_keys=True,
+            separators=(',', ':')
+        )
+
         message_bytes = bytes(message_json, 'utf-8')
 
+        # print(message_bytes)
+
         return message_bytes
+
+    def _parse_float(self, f: str):
+        """
+        Permet de transformer les nombre floats qui finissent par .0 en entier. Requis pour interoperabilite avec
+        la verification (hachage, signature) en JavaScript qui fait cette conversion implicitement.
+        :param f:
+        :return:
+        """
+        val_float = float(f)
+        val_int = int(val_float)
+        if val_int == val_float:
+            return val_int
+        return val_float
 
     def _charger_certificat(self):
         certfile_path = self.configuration.mq_certfile
