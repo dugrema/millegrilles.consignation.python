@@ -261,9 +261,14 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def supprimer_erreurs(self, requete):
         """ Supprimer une erreur """
-        id_erreur = requete['id_erreur']
+        id_erreur = requete.get('id_erreur')
+        supprimer_tout = requete.get('supprimer_tout')
+
         collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)
-        collection_erreurs.delete_one({'_id': ObjectId(id_erreur)})
+        if supprimer_tout is None:
+            collection_erreurs.delete_many({})
+        elif id_erreur is not None:
+            collection_erreurs.delete_one({'_id': ObjectId(id_erreur)})
 
     def maj_supprimer_noeud_public(self, url):
         filtre = {

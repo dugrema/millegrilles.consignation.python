@@ -19,9 +19,9 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         domaine_routing_key = method.routing_key.replace('requete.', '')
 
         reponse = None
-        if domaine_routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
+        if domaine_routing_key == ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT:
             reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
-        elif domaine_routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
+        elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_DEMANDE:
             reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
