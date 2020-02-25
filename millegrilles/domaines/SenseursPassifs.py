@@ -523,7 +523,10 @@ class ProducteurDocumentSenseurPassif:
                 if senseur.get('type') == 'batterie':
                     copie_transaction['bat_mv'] = senseur['millivolt']
                     copie_transaction['bat_reserve'] = senseur['reserve']
-                else:
+                elif senseur.get('type') == 'antenne':
+                    del senseur['type']
+                    copie_transaction['antenne'] = senseur
+                elif senseur.get('type') is not None:
                     if senseur.get('type') == 'onewire/temperature':
                         # 1W: copier avec l'adresse unique du senseur comme cle d'affichage
                         cle = 'affichage.1W%s' % senseur['adresse']
@@ -1135,7 +1138,7 @@ class GenerateurRapportSenseursHelper:
             id_result = resultat['_id']
             if id_result.get('appareil_adresse') is not None:
                 colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_adresse']
-            else:
+            elif id_result.get('appareil_type') is not None:
                 colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_type']
 
             timestamp = id_result['timestamp']
