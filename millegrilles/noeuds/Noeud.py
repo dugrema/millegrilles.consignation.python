@@ -6,6 +6,7 @@ import argparse
 import logging
 import time
 import socket
+import sys
 
 from threading import Event, Thread
 
@@ -37,8 +38,7 @@ class DemarreurNoeud(Daemon):
         logging.getLogger('millegrilles.noeuds').setLevel(logging.INFO)
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self._logger.info("\n-----------\n\n-----------")
-        self._logger.info("Demarrage de %s en cours\n-----------" % self.__class__.__name__)
+        self._logger.info("Service %s" % self.__class__.__name__)
 
         self._parser = argparse.ArgumentParser(description="Demarrer un noeud MilleGrilles")
         self._args = None
@@ -370,6 +370,7 @@ def main():
         traceback.print_exc()
         print("!!! ******************************")
         demarreur.print_help()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
