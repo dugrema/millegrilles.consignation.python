@@ -20,7 +20,7 @@ def get_version():
 
 
 setup(
-    name='MilleGrilles.consignation.python',
+    name='millegrilles.consignation.python',
     version='%s' % get_version(),
     packages=[
         'millegrilles',
