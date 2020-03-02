@@ -86,7 +86,7 @@ class ConsignateurTransaction(ModeleConfiguration):
 
     def deconnecter(self):
         self.__stop_event.set()
-        self.contexte.document_dao.deconnecter()
+        # self.contexte.document_dao.deconnecter()
         self.contexte.message_dao.deconnecter()
         self.__logger.info("Deconnexion completee")
 

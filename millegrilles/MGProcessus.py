@@ -157,7 +157,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         self._consume_actif = True
         self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'processus')
 
-        self._thread_traitement = Thread(target=self.__run, name="MGPProcess")
+        self._thread_traitement = Thread(target=self.__run, name="MGPProcess", daemon=True)
         self.__connectionmq_publisher = ConnexionWrapper(self.configuration, self.__stop_event, heartbeat=15)
         self.__wait_event = Event()
 

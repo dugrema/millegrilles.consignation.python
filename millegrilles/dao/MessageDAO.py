@@ -411,6 +411,8 @@ class PikaDAO:
         if barrier.broken:
             self._logger.error("Initialisation connexions a echoue")
             self.enter_error_state()
+            self.__stop_event.set()
+            self.__maintenance_event.set()
             raise Exception("Initialisation connexion echoue")
         else:
             # Informer toutes les threads en attente que la connexion est prete

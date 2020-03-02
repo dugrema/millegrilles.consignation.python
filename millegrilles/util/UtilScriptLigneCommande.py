@@ -108,6 +108,8 @@ class ModeleConfiguration:
 
     def main(self):
 
+        code_retour = 0
+
         try:
             # Preparer logging
             logging.basicConfig(format=Constantes.LOGGING_FORMAT, level=logging.WARNING)
@@ -130,13 +132,15 @@ class ModeleConfiguration:
             self._logger.info("Fin execution " + self.__class__.__name__)
 
         except Exception as e:
-            print("MAIN: Erreur fatale, voir log. Erreur %s" % str(e))
+            # print("MAIN: Erreur fatale, voir log. Erreur %s" % str(e))
             self._logger.exception("MAIN: Erreur")
-            self.print_help()
+            code_retour = 1
+
         finally:
             self.exit_gracefully()
 
         self._logger.info("Main terminee, exit.")
+        time.sleep(0.2)
 
         if threading.active_count() > 1:
             ok_threads = ['MainThread', 'pymongo_kill_cursors_thread']
@@ -145,15 +149,13 @@ class ModeleConfiguration:
                     self._logger.error("Thread ouverte apres demande de fermeture: %s" % thread.name)
 
             time.sleep(5)
-            thread_encore_ouverte = False
             for thread in threading.enumerate():
                 if thread.name not in ok_threads:
-                    self._logger.error("Thread encore ouverte apres demande de fermeture: %s" % thread.name)
-                    thread_encore_ouverte = True
+                    if not thread.isDaemon():
+                        self._logger.warning("Non-daemon thread encore ouverte apres demande de fermeture: %s" % thread.name)
 
-            if thread_encore_ouverte:
-                self._logger.error("Threads encore ouvertes, on force la sortie")
-                sys.exit(2)
+
+        sys.exit(code_retour)
 
     @property
     def contexte(self) -> ContexteRessourcesDocumentsMilleGrilles:
