@@ -44,7 +44,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.contexte.message_dao.configurer_rabbitmq()  # Possede un timer pour attendre le channel dao
 
         self.__init_config_event.wait(30)
-        self.handler_entretien = EntretienCollectionsDomaines(self.contexte)
+        self.handler_entretien = EntretienCollectionsDomaines(self, self.contexte)
         self.handler_entretien.entretien_initial()
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
         self.evenements_handler = EvenementTransactionCallback(self.contexte)
@@ -301,8 +301,9 @@ class EvenementTransactionCallback(BaseCallback):
 
 class EntretienCollectionsDomaines(BaseCallback):
 
-    def __init__(self, contexte):
+    def __init__(self, consignateur: ConsignateurTransaction, contexte):
         super().__init__(contexte)
+        self.__consignateur = consignateur
 
         self.__thread_entretien = None
         self.__channel = None
@@ -328,10 +329,14 @@ class EntretienCollectionsDomaines(BaseCallback):
 
     def _run_entretien_initial(self):
         self.__logger.info("Entretien initial transactions")
-        self._setup_transaction()
-        self._setup_index_domaines()
-        self.__thread_entretien = None  # Cleanup thread termine
-        self.__logger.info("FIN Entretien initial transactions")
+        try:
+            self._setup_transaction()
+            self._setup_index_domaines()
+            self.__thread_entretien = None  # Cleanup thread termine
+            self.__logger.info("FIN Entretien initial transactions")
+        except Exception:
+            self.__logger.exception("Erreur entretien initial, on ferme le consignateur de transaction")
+            self.__consignateur.deconnecter()
 
     def _setup_transaction(self):
         # Creer index: _mg-libelle
