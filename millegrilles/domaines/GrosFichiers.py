@@ -1934,7 +1934,7 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
 
         # Faire une requete pour les parametres de trackers
         requete = {"requetes": [{"filtre": {
-            '_mg-libelle': 'publique.configuration'
+            '_mg-libelle': ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC,
         }}]}
         self.set_requete('millegrilles.domaines.Parametres', requete)
 
@@ -1978,7 +1978,7 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         # Creer le URL pour le tracker torrent
         commande['trackers'] = self.__url_trackers()
 
-        self._logger.debug("Commande creation torrent:\n%s" % str(commande))
+        self._logger.info("Commande creation torrent:\n%s" % str(commande))
         self.ajouter_commande_a_transmettre('commande.torrent.creerNouveau', commande)
 
         securite_collection = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
@@ -2015,15 +2015,15 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
 
     def __url_trackers(self):
         # Creer le URL pour le tracker torrent
-        reponse_parametres = self.parametres['reponse'][0][0][0]
-        url_public = reponse_parametres['url_web']
-        port_public = reponse_parametres['port_https']
-        if port_public != 443:
-            url_tracker = 'https://%s:%d/announce' % (url_public, port_public)
-        else:
-            url_tracker = 'https://%s/announce' % url_public
+        reponse_parametres = self.parametres['reponse'][0][0]
 
-        return [url_tracker]
+        trackers = list()
+        for noeud_public in reponse_parametres:
+            url_public = noeud_public['url_web']
+            url_tracker = '%s/announce' % url_public
+            trackers.append(url_tracker)
+
+        return trackers
 
 
 class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
