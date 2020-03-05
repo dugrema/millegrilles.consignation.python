@@ -2018,6 +2018,10 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         reponse_parametres = self.parametres['reponse'][0][0]
 
         trackers = list()
+
+        # Tracker hard-coded, a corriger
+        trackers.append('http://tracker-ipv4.millegrilles.com:6969/announce')
+
         for noeud_public in reponse_parametres:
             url_public = noeud_public['url_web']
             url_tracker = '%s/announce' % url_public
