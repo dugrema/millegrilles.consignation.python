@@ -265,7 +265,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         supprimer_tout = requete.get('supprimer_tout')
 
         collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)
-        if supprimer_tout is None:
+        if supprimer_tout is not None and supprimer_tout:
             collection_erreurs.delete_many({})
         elif id_erreur is not None:
             collection_erreurs.delete_one({'_id': ObjectId(id_erreur)})
