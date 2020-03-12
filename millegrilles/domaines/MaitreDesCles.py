@@ -789,6 +789,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
     def initiale(self):
         transaction = self.transaction
         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+        altdomains = transaction.get(ConstantesPki.CHAMP_ALT_DOMAINS)
         node = transaction['node']
 
         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
@@ -805,6 +806,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
             return {
                 'autorise': False,
                 'role': role,
+                'altdomains': altdomains,
                 'description': 'demandeur non autorise a renouveller ce certificat',
                 'roles_demandeur': roles_cert
             }
@@ -812,6 +814,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         return {
             'autorise': True,
             'role': role,
+            'altdomains': altdomains,
             'roles_demandeur': roles_cert,
             'node': node,
         }

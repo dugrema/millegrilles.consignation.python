@@ -13,7 +13,6 @@ from threading import Event, Thread
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
 
-
 class MessagesSample(BaseCallback):
 
     def __init__(self):
@@ -81,8 +80,25 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def renouveller_certs_docker(self):
+        requete_cert = {
+            'altdomains': {
+                "mq": 'mq.maple.maceroc.com,mg-dev3.maple.maceroc.com'
+            },
+            'roles': ['mq'],
+        }
+        enveloppe_requete = self.generateur.soumettre_transaction(
+            requete_cert,
+            ConstantesPki.TRANSACTION_RENOUVELLER_CERT_DOCKER,
+            'abcd-1234',
+            self.queue_name,
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
-        self.requete_cert_fingerprint()
+        self.renouveller_certs_docker()
 
 
 # --- MAIN ---

@@ -97,6 +97,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
+        self.initialiser_document(ConstantesPki.LIBVAL_CONFIG_CERTDOCKER, ConstantesPki.DOCUMENT_CONFIG_CERTDOCKER)
 
     def get_queue_configuration(self):
         configuration = super().get_queue_configuration()
@@ -211,6 +212,8 @@ class GestionnairePki(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Pki:ProcessusAjouterCertificatWeb"
         elif domaine_transaction == ConstantesPki.TRANSACTION_CLES_RECUES:
             processus = "millegrilles_domaines_Pki:ProcessusClesRecues"
+        elif domaine_transaction == ConstantesPki.TRANSACTION_RENOUVELLER_CERT_DOCKER:
+            processus = "millegrilles_domaines_Pki:ProcessusRenouvellerCertificats"
         else:
             processus = super().identifier_processus(domaine_transaction)
         return processus
@@ -306,6 +309,18 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id)
+
+    def sauvegarder_configuration_altdomaines(self, transaction):
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CONFIG_CERTDOCKER,
+        }
+        set_ops = dict()
+        for module, altdomain in transaction[ConstantesPki.CHAMP_ALT_DOMAINS].items():
+            set_ops['%s.%s' % (ConstantesPki.CHAMP_ALT_DOMAINS, module)] = altdomain
+
+        collection_pki.update_one(filtre, {'$set': set_ops})
 
 
 class PKIDocumentHelper:
@@ -754,3 +769,37 @@ class ProcessusClesRecues(MGProcessusTransaction):
 
         self.set_etape_suivante()  # Termine
         return {ConstantesPki.LIBELLE_MGLIBELLE: mg_libelle}
+
+
+class ProcessusRenouvellerCertificats(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        pass  # Rien a faire pour cette transaction
+
+    def initiale(self):
+        """
+        Sauvegarde les URL de domaines. Emet une commande au monitor pour demander la creation et le deploiement
+        de nouveaux certificats pour les modules concernes.
+        """
+        transaction = self.charger_transaction()
+        alt_domains = transaction[ConstantesPki.CHAMP_ALT_DOMAINS]
+        roles = transaction[ConstantesPki.CHAMP_ROLES]
+
+        # Sauvegarder les nouveaux alt domains pour les modules
+        self._controleur.gestionnaire.sauvegarder_configuration_altdomaines(transaction)
+
+        # Transmettre commande au monitor
+
+        self.set_etape_suivante(ProcessusRenouvellerCertificats.monitor_complete.__name__)
+
+        commande_monitor = {
+            ConstantesPki.CHAMP_ALT_DOMAINS: alt_domains,
+            ConstantesPki.CHAMP_ROLES: roles,
+        }
+        self.ajouter_commande_a_transmettre('commande.monitor.maj.certificatsParRole', commande_monitor)
+
+    def monitor_complete(self):
+        self.set_etape_suivante()  # Termine

@@ -388,6 +388,7 @@ class ConstantesPki:
     TRANSACTION_WEB_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat.web' % DOMAINE_NOM
     TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
     TRANSACTION_CONFIRMER_CERTIFICAT = '%s.confirmerCertificat' % DOMAINE_NOM
+    TRANSACTION_RENOUVELLER_CERT_DOCKER = '%s.renouvellerCertDocker' % DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
     LIBELLE_FINGERPRINT = ConstantesSecurityPki.LIBELLE_FINGERPRINT
@@ -412,6 +413,10 @@ class ConstantesPki:
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
     LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
     LIBVAL_PKI_WEB = 'pki.web'
+    LIBVAL_CONFIG_CERTDOCKER = 'configuration.certdocker'
+
+    CHAMP_ALT_DOMAINS = 'altdomains'
+    CHAMP_ROLES = 'roles'
 
     REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
     REQUETE_CERTIFICAT_DEMANDE = '%s.certificat' % DOMAINE_NOM
@@ -425,7 +430,8 @@ class ConstantesPki:
 
     # Document par defaut pour la configuration de l'interface principale
     DOCUMENT_DEFAUT = {
-        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        LIBELLE_FINGERPRINT: LIBVAL_CONFIGURATION,
     }
 
     DOCUMENT_CERTIFICAT_NOEUD = {
@@ -435,6 +441,11 @@ class ConstantesPki:
         LIBELLE_CHAINE_COMPLETE: False
     }
 
+    DOCUMENT_CONFIG_CERTDOCKER = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIG_CERTDOCKER,
+        LIBELLE_FINGERPRINT: LIBVAL_CONFIG_CERTDOCKER,
+        CHAMP_ALT_DOMAINS: dict(),
+    }
 
 class ConstantesParametres:
 
