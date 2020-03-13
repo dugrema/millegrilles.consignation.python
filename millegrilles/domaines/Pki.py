@@ -776,9 +776,6 @@ class ProcessusRenouvellerCertificats(MGProcessusTransaction):
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        pass  # Rien a faire pour cette transaction
-
     def initiale(self):
         """
         Sauvegarde les URL de domaines. Emet une commande au monitor pour demander la creation et le deploiement
