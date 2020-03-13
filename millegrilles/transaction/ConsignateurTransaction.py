@@ -44,17 +44,13 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.contexte.message_dao.configurer_rabbitmq()  # Possede un timer pour attendre le channel dao
 
         self.__init_config_event.wait(30)
-        self.handler_entretien = EntretienCollectionsDomaines(self, self.contexte)
-        self.handler_entretien.entretien_initial()
         self.message_handler = ConsignateurTransactionCallback(self.contexte)
         self.evenements_handler = EvenementTransactionCallback(self.contexte)
+        self.handler_entretien = EntretienCollectionsDomaines(self, self.contexte)
+        self.handler_entretien.entretien_initial()
 
-        queue_name = self.contexte.configuration.queue_nouvelles_transactions
-        self.__channel.basic_consume(self.message_handler.callbackAvecAck, queue=queue_name, no_ack=False)
-
-        evenements_queue_name = self.contexte.configuration.queue_evenements_transactions
-        self.__channel.basic_consume(self.evenements_handler.callbackAvecAck, queue=evenements_queue_name, no_ack=False)
-
+        self.contexte.message_dao.register_channel_listener(self.message_handler)
+        self.contexte.message_dao.register_channel_listener(self.evenements_handler)
         self.contexte.message_dao.register_channel_listener(self.handler_entretien)
 
         self.__logger.info("Configuration et connection completee")
@@ -75,7 +71,7 @@ class ConsignateurTransaction(ModeleConfiguration):
             self.__stop_event.set()
 
     def is_channel_open(self):
-        return self.__channel is not None
+        return self.__channel is not None and not self.__channel.is_closed
 
     def executer(self):
         while not self.__stop_event.is_set():
@@ -88,6 +84,7 @@ class ConsignateurTransaction(ModeleConfiguration):
     def entretien(self):
         if not self.is_channel_open or not self.handler_entretien.is_channel_open:
             self.__logger.error("Un canal du consignateur de transactions est ferme")
+            self.__channel = None
             self.contexte.message_dao.enter_error_state()
 
     def deconnecter(self):
@@ -103,6 +100,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         super().__init__(contexte)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.__compteur = 0
+        self.__channel = None
 
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def traiter_message(self, ch, method, properties, body):
@@ -234,11 +232,26 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         return nom_collection
 
+    def on_channel_open(self, channel):
+        self.__channel = channel
+
+        queue_name = self.contexte.configuration.queue_nouvelles_transactions
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def is_channel_open(self):
+        return self.__channel is not None and not self.__channel.is_closed
+
 
 class EvenementTransactionCallback(BaseCallback):
 
     def __init__(self, contexte):
         super().__init__(contexte)
+        self.__channel = None
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     # Methode pour recevoir le callback pour les nouvelles transactions.
@@ -291,7 +304,11 @@ class EvenementTransactionCallback(BaseCallback):
         resultat = collection_transactions.update_one(selection, operation)
 
         if resultat.modified_count != 1:
-            raise Exception("Erreur ajout evenement transaction, updated: %d, ObjectId: %s, collection: %s, evenement: %s" % (resultat.modified_count, str(id_transaction), nom_collection, evenement))
+            raise Exception(
+                "Erreur ajout evenement transaction, updated: %d, ObjectId: %s, collection: %s, evenement: %s" % (
+                    resultat.modified_count, str(id_transaction), nom_collection, evenement
+                )
+            )
 
     @staticmethod
     def identifier_collection_domaine(domaine):
@@ -303,6 +320,20 @@ class EvenementTransactionCallback(BaseCallback):
             nom_collection = '.'.join(domaine_split[0:3])
 
         return nom_collection
+
+    def on_channel_open(self, channel):
+        self.__channel = channel
+
+        evenements_queue_name = self.contexte.configuration.queue_evenements_transactions
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(self.callbackAvecAck, queue=evenements_queue_name, no_ack=False)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def is_channel_open(self):
+        return self.__channel is not None and not self.__channel.is_closed
 
 
 class EntretienCollectionsDomaines(BaseCallback):

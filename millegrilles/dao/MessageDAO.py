@@ -238,6 +238,7 @@ class ConnexionWrapper:
         channel.confirm_delivery(self.__confirm_delivery)
         channel.add_on_flow_callback(self.__on_flow)
         channel.add_on_return_callback(self.__on_return)
+
         self._in_error = False
 
         self.__stop_event.clear()
