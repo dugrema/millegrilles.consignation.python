@@ -406,7 +406,7 @@ class PikaDAO:
         for connexion in self.__connexionsmq:
             connexion.connecter(barrier)
 
-        # Attendre que les connexions soient pretes ou 10 secondes
+        # Attendre que les connexions soient pretes
         barrier.wait(20)
         if barrier.broken:
             self._logger.error("Initialisation connexions a echoue")
@@ -997,6 +997,10 @@ class PikaDAO:
         self._logger.warning("MQ Enter error state")
         self._in_error = True
 
+        if self.__stop_event.is_set():
+            # La connexion est en mode de fermeture
+            raise Exception("Fermeture en cours")
+
         for connexion in self.__connexionsmq:
             connexion.enter_error_state()
 
@@ -1034,6 +1038,12 @@ class PikaDAO:
             self.__maintenance_event.wait(self._intervalle_maintenance)
 
         self._logger.info("MQ-Maint closing")
+
+        # S'assurer que le DAO et autre processus lies vont etre fermes
+        try:
+            self.deconnecter()
+        except Exception:
+            self._logger.exception("Erreur fermeture MQ-Maint")
 
     def attendre_channel(self, timeout):
         self._attendre_channel.wait(timeout)

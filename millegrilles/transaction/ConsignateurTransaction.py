@@ -68,6 +68,12 @@ class ConsignateurTransaction(ModeleConfiguration):
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
 
+        try:
+            self.contexte.message_dao.enter_error_state()
+        except Exception:
+            self.__logger.exception("Erreur activation erreur state, on ferme")
+            self.__stop_event.set()
+
     def is_channel_open(self):
         return self.__channel is not None
 

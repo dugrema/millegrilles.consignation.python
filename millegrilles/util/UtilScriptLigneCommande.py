@@ -52,7 +52,12 @@ class ModeleConfiguration:
         self.__channel = None
         self._logger.warning("MQ Channel ferme")
         if not self.__fermeture_event.is_set():
-            self.contexte.message_dao.enter_error_state()
+            try:
+                self.contexte.message_dao.enter_error_state()
+            except Exception:
+                # Erreur d'activation du error state, la connexion ne peut pas etre reactivee
+                self._logger.exception("Erreur fermeture channel")
+                self.__fermeture_event.set()  # S'assurer que la fermeture est en cours
 
     def __on_return(self, channel, method, properties, body):
         pass
@@ -91,11 +96,17 @@ class ModeleConfiguration:
             self._contexte.document_dao.connecter()
 
     def deconnecter(self):
-        if self._contexte.message_dao is not None:
-            self._contexte.message_dao.deconnecter()
+        try:
+            if self._contexte.message_dao is not None:
+                self._contexte.message_dao.deconnecter()
+        except Exception:
+            self._logger.warning("Erreur fermeture message_dao")
 
-        if self._contexte.document_dao is not None:
-            self._contexte.document_dao.deconnecter()
+        try:
+            if self._contexte.document_dao is not None:
+                self._contexte.document_dao.deconnecter()
+        except Exception:
+            self._logger.warning("Erreur fermeture document_dao")
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """
@@ -139,7 +150,13 @@ class ModeleConfiguration:
         finally:
             self.exit_gracefully()
 
-        self._logger.info("Main terminee, exit.")
+        self._logger.info("Main terminee, finalisation et sortie.")
+        try:
+            self.__finalisation()
+        finally:
+            sys.exit(code_retour)
+
+    def __finalisation(self):
         time.sleep(0.2)
 
         if threading.active_count() > 1:
@@ -153,9 +170,6 @@ class ModeleConfiguration:
                 if thread.name not in ok_threads:
                     if not thread.isDaemon():
                         self._logger.warning("Non-daemon thread encore ouverte apres demande de fermeture: %s" % thread.name)
-
-
-        sys.exit(code_retour)
 
     @property
     def contexte(self) -> ContexteRessourcesDocumentsMilleGrilles:
