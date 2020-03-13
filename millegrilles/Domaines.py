@@ -2,12 +2,10 @@
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
     TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule
-from millegrilles.dao.DocumentDAO import MongoJSONEncoder
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
-from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 
 import logging
 import json
@@ -31,15 +29,12 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
         self._gestionnaires = []
         self._stop_event = Event()
-        self.__mq_ioloop = None
         self.__channel = None  # Ouvrir un channel pour savoir quand MQ est pret
         self.__wait_mq_ready = Event()
 
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
         super().initialiser(init_document, init_message, connecter)
-        self.__mq_ioloop = Thread(name="MQ-ioloop", target=self.contexte.message_dao.run_ioloop, daemon=True)
-        self.__mq_ioloop.start()
         self.contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):
@@ -54,6 +49,16 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     def on_channel_close(self, channel=None, code=None, reason=None):
         self.__wait_mq_ready.clear()
         self.__channel = None
+
+        if not self._stop_event.is_set():
+            try:
+                self.contexte.message_dao.enter_error_state()
+            except Exception:
+                self._logger.exception(
+                    "Erreur d'activation mode erreur pour connexion MQ, contoleur gestionnaire va se fermer"
+                )
+                self.arreter()
+
         self._logger.info("MQ Channel ferme")
 
     def configurer_parser(self):
@@ -149,11 +154,23 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             self._logger.fatal("Aucun gestionnaire de domaine n'a ete charge. Execution interrompue.")
 
         # Surveiller les gestionnaires - si un gestionnaire termine son execution, on doit tout fermer
-        while not self._stop_event.is_set():
-            # self.contexte.message_dao.start_consuming()  # Blocking
-            # self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
+        try:
+            while not self._stop_event.is_set():
+                # self.contexte.message_dao.start_consuming()  # Blocking
+                # self._logger.debug("Erreur consuming, attendre 5 secondes pour ressayer")
 
-            self._stop_event.wait(60)   # Boucler pour maintenance  A FAIRE
+                # Verifier que tous les domaines sont actifs et fonctionnels
+                for gestionnaire in self._gestionnaires:
+                    gestionnaire.executer_entretien()
+                    if not gestionnaire.is_ok:
+                        self._logger.error("Gestionnaire domaine %s est en erreur/termine, on arrete le controleur" % gestionnaire.__name__)
+                        self.arreter()
+
+                self._stop_event.wait(15)   # Boucler pour maintenance
+        except Exception:
+            self._logger.exception("Erreur execution controleur de gestionnaires, arret force")
+        finally:
+            self.arreter()
 
         self._logger.info("Fin de la boucle executer() dans MAIN")
 
@@ -193,9 +210,7 @@ class GestionnaireDomaine:
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
         self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
-        self._thread = None
         self._watchers = list()
-        self.connexion_mq = None
         self.channel_mq = None
         self._arret_en_cours = False
         self._stop_event = Event()
@@ -582,6 +597,7 @@ class GestionnaireDomaine:
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
+        self._stop_event.set()
         for watcher in self._watchers:
             try:
                 watcher.stop()
@@ -622,6 +638,16 @@ class GestionnaireDomaine:
     @property
     def version_domaine(self):
         return Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6
+
+    def executer_entretien(self):
+        pass
+
+    @property
+    def is_ok(self):
+        """
+        :return: False si le gestionnaire ne fonctionne pas bien et requiert un redemarrage complet
+        """
+        return not self._stop_event.is_set() and self.wait_Q_ready.is_set()
 
 
 class GestionnaireDomaineStandard(GestionnaireDomaine):
@@ -892,7 +918,7 @@ class WatcherCollectionMongoThread:
         :param stop_event: Stop event utilise par le gestionnaire.
         :param nom_collection_mongo:
         :param routing_key:
-        :param exchange_routing: Permet de determiner quels documents vont sur les echanges proteges, prives et publics.
+        :param exchange_router: Permet de determiner quels documents vont sur les echanges proteges, prives et publics.
         """
         self.__logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
