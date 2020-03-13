@@ -531,7 +531,7 @@ class GestionnaireDomaine:
             domaine_transaction = '%s.%s' % (self.get_nom_domaine(), Constantes.TRANSACTION_ROUTING_DOCINITIAL)
             self.generateur_transactions.soumettre_transaction(nouveau_doc, domaine_transaction)
         else:
-            self._logger.info("Document de %s pour %s: %s" % (
+            self._logger.debug("Document de %s pour %s: %s" % (
                 mg_libelle, str(document_configuration), self.__class__.__name__
             ))
 
