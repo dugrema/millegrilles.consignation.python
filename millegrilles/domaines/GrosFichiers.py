@@ -2095,9 +2095,6 @@ class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersActivite):
         transaction_copie['fuuid'] = transaction['uuid']
         transaction_copie['mimetype'] = 'application/x-bittorrent'
 
-        # Hack - testing
-        transaction_copie['taille'] = 1234
-
         # Conserver l'information du fichier torrent (comme nouveau fichier)
         resultat = self._controleur.gestionnaire.maj_fichier(transaction_copie)
 
