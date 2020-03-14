@@ -820,6 +820,7 @@ class MGProcessus:
         self._ajouter_token_attente = None
         self._ajouter_token_resumer = None
         self._requete = None
+        self._commande_blocking = None
         self._tokens_connectes = None
         self._messages_a_transmettre = list()
 
@@ -933,7 +934,12 @@ class MGProcessus:
                 for message in self._messages_a_transmettre:
                     if message['type'] == 'commande':
                         self.controleur.generateur_transactions.transmettre_commande(
-                            message['contenu'], message['domaine'])
+                            message['contenu'], message['domaine'],
+                            correlation_id=str(self.document_processus['_id']),
+                            reply_to='%s.processus' % self.controleur.gestionnaire.get_nom_queue()
+                        )
+                        if message.get('blocking') and self._requete is None:
+                            self._commande_blocking = message['domaine']
                     elif message['type'] == 'transaction':
                         self.controleur.generateur_transactions.soumettre_transaction(
                             message['contenu'], message['domaine'])
@@ -948,7 +954,7 @@ class MGProcessus:
                 )
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.
-            if self._requete:
+            if self._requete is not None or self._commande_blocking is not None:
                 pass  # Arrete traitement pour attendre reponse
             elif self._ajouter_token_resumer is not None:
                 self._controleur.transmettre_message_resumer(
@@ -1125,12 +1131,15 @@ class MGProcessus:
 
         return len(tokens_restants) == 0, dict_tokens
 
-    def ajouter_commande_a_transmettre(self, domaine, commande):
-        self._messages_a_transmettre.append({
+    def ajouter_commande_a_transmettre(self, domaine, commande, blocking=False):
+        commande = {
             'type': 'commande',
             'domaine': domaine,
             'contenu': commande,
-        })
+        }
+        if blocking:
+            commande['blocking'] = True
+        self._messages_a_transmettre.append(commande)
 
     def ajouter_transaction_a_soumettre(self, domaine, transaction):
         self._messages_a_transmettre.append({

@@ -1990,12 +1990,17 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         self._logger.info("Commande creation torrent:\n%s" % str(commande))
         self.ajouter_commande_a_transmettre('commande.torrent.creerNouveau', commande)
 
+        token_attente_torrent = 'collection_figee_torrent:%s' % parametres['uuid_collection_figee']
+
         securite_collection = collection_figee.get(ConstantesGrosFichiers.DOCUMENT_SECURITE)
         if securite_collection == Constantes.SECURITE_PUBLIC:
             # Une fois le torrent cree, on va publier la collection figee
-            self.set_etape_suivante(ProcessusTransactionFigerCollection.publier_collection_figee.__name__)
+            self.set_etape_suivante(
+                ProcessusTransactionFigerCollection.publier_collection_figee.__name__,
+                token_attente=[token_attente_torrent]
+            )
         else:
-            self.set_etape_suivante()  # Termine
+            self.set_etape_suivante(token_attente=[token_attente_torrent])  # Termine
 
     def publier_collection_figee(self):
 
@@ -2097,11 +2102,14 @@ class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersActivite):
     def initiale(self):
         transaction = self.charger_transaction()
 
+        uuid_collection_figee = transaction['uuid']
+        fuuid_torrent = transaction['uuid-torrent']
+
         # Appliquer quelques changements pour pouvoir reutiliser maj_fichier
         transaction_copie = transaction.copy()
         transaction_copie['nom'] = '%s.torrent' % transaction_copie['nom']
         transaction_copie[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES] = ['torrent']
-        transaction_copie['fuuid'] = transaction['uuid']
+        transaction_copie['fuuid'] = fuuid_torrent
         transaction_copie['mimetype'] = 'application/x-bittorrent'
 
         # Verifier si l'entree fichier de torrent pour la collection existe deja
@@ -2116,6 +2124,11 @@ class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersActivite):
         resultat = self._controleur.gestionnaire.maj_fichier(transaction_copie)
 
         self.set_etape_suivante()
+
+        # Preparer le token pour resumer le processus principal de creation de torrent
+        # On utilise le fuuid du torrent, c'est la meme valeur que le uuid de la collection privee
+        token_resumer_creertorrent = 'collection_figee_torrent:%s' % uuid_collection_figee
+        self.resumer_processus([token_resumer_creertorrent])
 
         return resultat
 
