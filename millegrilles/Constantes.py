@@ -955,6 +955,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
     DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE = 'uuid_source_figee'
     DOCUMENT_COLLECTIONS_FIGEES = 'figees'
+    DOCUMENT_COLLECTION_UUID = 'uuid-collection'
+    DOCUMENT_TORRENT_COLLECTION_UUID = 'uuid_collection_torrent'
     DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'

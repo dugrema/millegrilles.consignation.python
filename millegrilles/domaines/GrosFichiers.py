@@ -288,6 +288,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return fichier
 
+    def get_torrent_par_collection(self, uuid_collection):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID: uuid_collection,
+        }
+        self._logger.debug("Fichier torrent par collection: %s" % filtre)
+
+        fichier = collection_domaine.find_one(filtre)
+
+        return fichier
+
     def get_collection_par_uuid(self, uuid_collection):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
@@ -426,6 +438,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
             set_operations[ConstantesGrosFichiers.DOCUMENT_SECURITE] = \
                 transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+
+            torrent_collection = transaction.get(ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID)
+            if torrent_collection is not None:
+                set_operations[ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID] = torrent_collection
 
         operations = {
             '$set': set_operations,
@@ -948,13 +964,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger.debug("Supprimer favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
 
         return resultat
-
-    def creer_torrent(self, uuid_collection_figee):
-        """
-        Genere un repertoire de seeding et un
-        :param uuid_collection_figee:
-        :return:
-        """
 
     def associer_hashstring_torrent(self, collection_figee: str, hashstring: str):
         self._logger.debug("associer_seeding_torrent %s, hashstring %s" % (collection_figee, hashstring))
@@ -2094,6 +2103,14 @@ class ProcessusTransactionTorrentNouveau(ProcessusGrosFichiersActivite):
         transaction_copie[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES] = ['torrent']
         transaction_copie['fuuid'] = transaction['uuid']
         transaction_copie['mimetype'] = 'application/x-bittorrent'
+
+        # Verifier si l'entree fichier de torrent pour la collection existe deja
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID]
+        transaction_copie[ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID] = uuid_collection
+        fichier_torrent = self._controleur.gestionnaire.get_torrent_par_collection(uuid_collection)
+        if fichier_torrent is not None:
+            transaction_copie[ConstantesGrosFichiers.DOCUMENT_UUID_GENERIQUE] = fichier_torrent[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
         # Conserver l'information du fichier torrent (comme nouveau fichier)
         resultat = self._controleur.gestionnaire.maj_fichier(transaction_copie)
