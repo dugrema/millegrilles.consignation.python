@@ -4,6 +4,8 @@ import json
 import lzma
 import logging
 from threading import Thread, Event
+from os import listdir, path
+from pymongo.errors import DuplicateKeyError
 
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -27,10 +29,11 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
-        self.fichier_fuuid = "39c1e1b0-b6ee-11e9-b0cd-d30e8fab842j"
-
         self.channel = None
         self.event_recu = Event()
+
+        self.idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
+
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -54,10 +57,11 @@ class MessagesSample(BaseCallback):
         self.__logger.debug(str(body))
 
     def executer(self):
-        # self.backup_domaine_senseurpassifs()
-        self.restore_horaire_domaine_senseurspassifs()
-
-        self.event_recu.set()  # Termine
+        try:
+            # self.backup_domaine_senseurpassifs()
+            self.restore_horaire_domaine_senseurspassifs()
+        finally:
+            self.event_recu.set()  # Termine
 
     def backup_transactions_senseurspassifs_testinit(self):
         coltrans = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
@@ -74,13 +78,12 @@ class MessagesSample(BaseCallback):
 
     def backup_domaine_senseurpassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-        idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
         # heure = datetime.datetime(year=2020, month=1, day=6, hour=19)
         heure_courante = datetime.datetime.utcnow()
         heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.backup_domaine(nom_collection_mongo, idmg, heure)
+        self.backup_domaine(nom_collection_mongo, self.idmg, heure)
 
     def backup_domaine(self, nom_collection_mongo, idmg, heure):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
@@ -109,7 +112,7 @@ class MessagesSample(BaseCallback):
         ]
         hint = {
             '_evenements.transaction_complete': 1,
-            '_evenements.bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva.transaction_traitee': 1
+            '_evenements.%s.transaction_traitee' % idmg: 1
         }
         coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
 
@@ -151,12 +154,17 @@ class MessagesSample(BaseCallback):
 
     def restore_horaire_domaine_senseurspassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-        idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
-        path_fichier = '/tmp/mgbackup/senseurspassifs_2020010619.json.xz'
+        # path_fichier = '/tmp/mgbackup/senseurspassifs_2020010619.json.xz'
+        path_folder = '/tmp/mgbackup'
 
-        self.restore_horaire_domaine(nom_collection_mongo, idmg, path_fichier)
+        for fichier in listdir(path_folder):
+            path_complet = path.join(path_folder, fichier)
+            if path.isfile(path_complet) and fichier.startswith('senseurspassifs') and fichier.endswith('.json.xz'):
+                self.restore_horaire_domaine(nom_collection_mongo, self.idmg, path_complet)
 
     def restore_horaire_domaine(self, nom_collection_mongo: str, idmg: str, path_fichier: str):
+        coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
+
         with lzma.open(path_fichier, 'rt') as fichier:
             for line in fichier:
                 transaction = json.loads(line)
@@ -173,6 +181,12 @@ class MessagesSample(BaseCallback):
                         evenements[idmg] = dates_corrigees
 
                 self.__logger.debug("Transaction : %s" % str(transaction))
+                try:
+                    coltrans.insert(transaction)
+                except DuplicateKeyError:
+                    self.__logger.warning("Transaction existe deja : %s" % transaction['en-tete']['uuid-transaction'])
+
+
 
 # -------
 logging.basicConfig()

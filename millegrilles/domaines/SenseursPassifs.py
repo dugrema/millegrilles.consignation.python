@@ -127,6 +127,15 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         collection_transactions.create_index(
             [
+                ('%s.%s' %
+                 (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID),
+                 1),
+            ],
+            name='uuid-transaction-unique',
+            unique=True,
+        )
+        collection_transactions.create_index(
+            [
                 ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
                 ('%s.%s' %
                  (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
