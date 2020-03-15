@@ -12,7 +12,7 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
-from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder
+from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_backup
 
 
 contexte = ContexteRessourcesDocumentsMilleGrilles()
@@ -122,7 +122,7 @@ class MessagesSample(BaseCallback):
         # for transanter in coltrans.find(filtre_verif_transactions_anterieures, projection=projection):
         #     self.__logger.debug("Vieille transaction : %s" % str(transanter))
 
-        for transanter in coltrans.aggregate(operation, hint=hint):
+        for transanter in coltrans.aggregate(operation):
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
             heure_anterieure = transanter['_id']['timestamp']
             self.backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure)
@@ -167,18 +167,18 @@ class MessagesSample(BaseCallback):
 
         with lzma.open(path_fichier, 'rt') as fichier:
             for line in fichier:
-                transaction = json.loads(line)
+                transaction = json.loads(line, object_hook=decoder_backup)
 
                 # Restaurer les dates dans l'element _evenements
-                evenements = transaction['_evenements']
-                evenements['_estampille'] = datetime.datetime.fromtimestamp(evenements['_estampille'] / 1000)
-
-                for idmg, events_par_mg in evenements.items():
-                    if not idmg.startswith('_') and isinstance(events_par_mg, dict):
-                        dates_corrigees = dict()
-                        for event_name, ts_int in events_par_mg.items():
-                            dates_corrigees[event_name] = datetime.datetime.fromtimestamp(ts_int / 1000)
-                        evenements[idmg] = dates_corrigees
+                # evenements = transaction['_evenements']
+                # evenements['_estampille'] = datetime.datetime.fromtimestamp(evenements['_estampille'] / 1000)
+                #
+                # for idmg, events_par_mg in evenements.items():
+                #     if not idmg.startswith('_') and isinstance(events_par_mg, dict):
+                #         dates_corrigees = dict()
+                #         for event_name, ts_int in events_par_mg.items():
+                #             dates_corrigees[event_name] = datetime.datetime.fromtimestamp(ts_int / 1000)
+                #         evenements[idmg] = dates_corrigees
 
                 self.__logger.debug("Transaction : %s" % str(transaction))
                 try:

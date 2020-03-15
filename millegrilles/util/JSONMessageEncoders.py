@@ -28,13 +28,20 @@ class BackupFormatEncoder(json.JSONEncoder):
 
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
-            return int(obj.timestamp() * 1000)
+            return {'__class__': 'datetime', 'value': obj.timestamp()}
 
         # Let the base class default method raise the TypeError
         try:
             return json.JSONEncoder.default(self, obj)
         except TypeError:
             return str(obj)
+
+
+def decoder_backup(o):
+    if o.get('__class__') == 'datetime':
+        return datetime.datetime.fromtimestamp(o['value'])
+    return o
+
 
 class JSONHelper:
 
