@@ -21,6 +21,21 @@ class DateFormatEncoder(json.JSONEncoder):
             return str(obj)
 
 
+class BackupFormatEncoder(json.JSONEncoder):
+    """
+    Permet de convertir les dates en format epoch * 1000 (millisecondes)
+    """
+
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return int(obj.timestamp() * 1000)
+
+        # Let the base class default method raise the TypeError
+        try:
+            return json.JSONEncoder.default(self, obj)
+        except TypeError:
+            return str(obj)
+
 class JSONHelper:
 
     def __init__(self):

@@ -10,7 +10,7 @@ from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
-from millegrilles.util.JSONMessageEncoders import JSONHelper, DateFormatEncoder
+from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder
 
 
 contexte = ContexteRessourcesDocumentsMilleGrilles()
@@ -23,8 +23,6 @@ class MessagesSample(BaseCallback):
         super().__init__(contexte)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__logger.setLevel(logging.DEBUG)
-
-        self.__json_helper = JSONHelper()
 
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
@@ -56,20 +54,53 @@ class MessagesSample(BaseCallback):
         self.__logger.debug(str(body))
 
     def executer(self):
-        self.backup_transactions_senseurspassifs()
+        # self.backup_transactions_senseurspassifs()
+        self.backup_horaire_domaine_senseurpassifs()
 
-    def backup_transactions_senseurspassifs(self):
+    def backup_transactions_senseurspassifs_testinit(self):
         coltrans = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         filtre = {}
         curseur = coltrans.find(filtre)
 
         with lzma.open('/tmp/senseurspassifs.json.xz', 'wt') as fichier:
             for transaction in curseur:
-                json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+                json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
                 # Une transaction par ligne
                 fichier.write('\n')
                 # json_transaction = self.__json_helper.dict_vers_json(transaction)
                 # self.__logger.debug("Transaction %s" % json_transaction)
+
+    def backup_horaire_domaine_senseurpassifs(self):
+        nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+        idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
+        heure = datetime.datetime(year=2020, month=1, day=6, hour=19)
+        self.backup_horaire_domaine(nom_collection_mongo, idmg, heure)
+
+    def backup_horaire_domaine(self, nom_collection_mongo, idmg, heure):
+        delta = datetime.timedelta(hours=1)
+        heure_fin = heure + delta
+        self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
+
+        coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
+        filtre = {
+            '_evenements.transaction_complete': True,
+            '_evenements.%s.transaction_traitee' % idmg: {
+                '$gte': heure,
+                '$lt': heure_fin
+            }
+        }
+        sort = [
+            ('_evenements.%s.transaction_traitee' % idmg, 1)
+        ]
+
+        curseur = coltrans.find(filtre, sort=sort)
+        with lzma.open('/tmp/senseurspassifs.json.xz', 'wt') as fichier:
+            for transaction in curseur:
+                json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
+
+                # Une transaction par ligne
+                fichier.write('\n')
+
 
 # -------
 logging.basicConfig()
