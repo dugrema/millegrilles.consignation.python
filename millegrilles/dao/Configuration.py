@@ -357,6 +357,7 @@ class TransactionConfiguration:
     def serveur_consignationfichiers_port(self):
         return self._serveurs[Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT]
 
+
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """
 
