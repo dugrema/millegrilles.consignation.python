@@ -21,6 +21,9 @@
     },{
       "module": "millegrilles.domaines.Annuaire",
       "classe": "GestionnaireAnnuaire"
+    },{
+      "module": "millegrilles.domaines.Backup",
+      "classe": "GestionnaireBackup"
     }
   ]
 }

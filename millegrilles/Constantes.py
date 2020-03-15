@@ -1153,6 +1153,18 @@ class SenseursPassifsConstantes:
     }
 
 
+# Constantes pour le domaine Backup
+class ConstantesBackup:
+
+    DOMAINE_NOM = 'millegrilles.domaines.Backup'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = DOMAINE_NOM
+    QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
+    QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
+
+
 class CommandesSurRelai:
     """
     Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir
