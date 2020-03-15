@@ -1,6 +1,7 @@
 import datetime
 import time
 import json
+import lzma
 import logging
 from threading import Thread, Event
 
@@ -62,7 +63,7 @@ class MessagesSample(BaseCallback):
         filtre = {}
         curseur = coltrans.find(filtre)
 
-        with open('/tmp/senseurspassifs.json', 'w') as fichier:
+        with lzma.open('/tmp/senseurspassifs.json.xz', 'wt') as fichier:
             for transaction in curseur:
                 json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
                 # Une transaction par ligne
