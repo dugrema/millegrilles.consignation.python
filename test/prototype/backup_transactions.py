@@ -11,7 +11,7 @@ from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMi
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
-from millegrilles.Constantes import SenseursPassifsConstantes
+from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesGrosFichiers
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_backup
 
 
@@ -58,8 +58,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         try:
-            # self.backup_domaine_senseurpassifs()
-            self.restore_horaire_domaine_senseurspassifs()
+            self.backup_domaine_senseurpassifs()
+            # self.restore_horaire_domaine_senseurspassifs()
         finally:
             self.event_recu.set()  # Termine
 
@@ -169,23 +169,11 @@ class MessagesSample(BaseCallback):
             for line in fichier:
                 transaction = json.loads(line, object_hook=decoder_backup)
 
-                # Restaurer les dates dans l'element _evenements
-                # evenements = transaction['_evenements']
-                # evenements['_estampille'] = datetime.datetime.fromtimestamp(evenements['_estampille'] / 1000)
-                #
-                # for idmg, events_par_mg in evenements.items():
-                #     if not idmg.startswith('_') and isinstance(events_par_mg, dict):
-                #         dates_corrigees = dict()
-                #         for event_name, ts_int in events_par_mg.items():
-                #             dates_corrigees[event_name] = datetime.datetime.fromtimestamp(ts_int / 1000)
-                #         evenements[idmg] = dates_corrigees
-
                 self.__logger.debug("Transaction : %s" % str(transaction))
                 try:
                     coltrans.insert(transaction)
                 except DuplicateKeyError:
                     self.__logger.warning("Transaction existe deja : %s" % transaction['en-tete']['uuid-transaction'])
-
 
 
 # -------
