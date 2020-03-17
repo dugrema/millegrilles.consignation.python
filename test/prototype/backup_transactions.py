@@ -5,6 +5,8 @@ import lzma
 import logging
 import requests
 import ssl
+import hashlib
+import binascii
 from threading import Thread, Event
 from os import listdir, path
 from pymongo.errors import DuplicateKeyError
@@ -136,6 +138,8 @@ class MessagesSample(BaseCallback):
             path_fichier_backup = dependances_backup['path_fichier_backup']
             nom_fichier_backup = path.basename(path_fichier_backup)
 
+            self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4))
+
             # Transferer vers consignation_fichier
             data = {
                 'timestamp_backup': int(heure_anterieure.timestamp()),
@@ -153,7 +157,12 @@ class MessagesSample(BaseCallback):
                     verify=self.configuration.mq_cafile,
                     cert=(self.configuration.mq_certfile, self.configuration.mq_keyfile)
                 )
-            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(json.loads(r.text))))
+            reponse_json = json.loads(r.text)
+            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
+
+            # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
+            if reponse_json['fichiersDomaines'][nom_fichier_backup] != dependances_backup['sha512_fichier_backup']:
+                raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
 
     def backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime):
         heure_str = heure.strftime("%Y%m%d%H")
@@ -195,6 +204,13 @@ class MessagesSample(BaseCallback):
 
                 # Une transaction par ligne
                 fichier.write('\n')
+
+        # Calculer SHA-512 du fichier de backup
+        sha512 = hashlib.sha512()
+        with open(path_fichier_backup, 'rb') as fichier:
+            sha512.update(fichier.read())
+        sha512_digest = sha512.hexdigest()
+        dependances_backup['sha512_fichier_backup'] = sha512_digest
 
         return dependances_backup
 
