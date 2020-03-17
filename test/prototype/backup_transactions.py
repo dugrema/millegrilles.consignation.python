@@ -18,6 +18,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesGrosFichiers
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_backup
 
+from millegrilles.Domaines import HandlerBackupDomaine
 
 contexte = ContexteRessourcesDocumentsMilleGrilles()
 contexte.initialiser()
@@ -32,6 +33,8 @@ class MessagesSample(BaseCallback):
 
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
+
+        self.handler_backup = HandlerBackupDomaine(self.contexte)
 
         self.channel = None
         self.event_recu = Event()
@@ -86,7 +89,7 @@ class MessagesSample(BaseCallback):
         # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
+        self.handler_backup.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
 
     def backup_domaine_grosfichiers(self):
         nom_collection_mongo = ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
@@ -95,123 +98,7 @@ class MessagesSample(BaseCallback):
         # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
-
-    def backup_domaine(self, nom_collection_mongo, idmg, heure, prefixe_fichier):
-        # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
-        filtre_verif_transactions_anterieures = {
-            '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % idmg: {'$lt': heure}
-        }
-        regroupement_periode = {
-            'year': {'$year': '$_evenements.%s.transaction_traitee' % idmg},
-            'month': {'$month': '$_evenements.%s.transaction_traitee' % idmg},
-            'day': {'$dayOfMonth': '$_evenements.%s.transaction_traitee' % idmg},
-            'hour': {'$hour': '$_evenements.%s.transaction_traitee' % idmg},
-        }
-        regroupement = {
-            '_id': {
-                'timestamp': {
-                    '$dateFromParts': regroupement_periode
-                },
-            },
-        }
-        sort = {'_id': 1}
-        operation = [
-            {'$match': filtre_verif_transactions_anterieures},
-            {'$group': regroupement},
-            {'$sort': sort},
-        ]
-        hint = {
-            '_evenements.transaction_complete': 1,
-            '_evenements.%s.transaction_traitee' % idmg: 1,
-        }
-        coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
-
-        for transanter in coltrans.aggregate(operation):
-            self.__logger.debug("Vieille transaction : %s" % str(transanter))
-            heure_anterieure = transanter['_id']['timestamp']
-
-            # Creer le fichier de backup
-            dependances_backup = self.backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure, prefixe_fichier)
-            path_fichier_backup = dependances_backup['path_fichier_backup']
-            nom_fichier_backup = path.basename(path_fichier_backup)
-
-            self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4))
-
-            # Transferer vers consignation_fichier
-            data = {
-                'timestamp_backup': int(heure_anterieure.timestamp()),
-                'fuuid_grosfichiers': json.dumps(dependances_backup['fuuid_grosfichiers'])
-            }
-
-            with open(path_fichier_backup, 'rb') as fichier:
-                files = {
-                    'fichiers_backup': (nom_fichier_backup, fichier, 'application/x-xz')
-                }
-                r = requests.put(
-                    'https://mg-dev3:3003/backup/domaine/%s' % nom_fichier_backup,
-                    data=data,
-                    files=files,
-                    verify=self.configuration.mq_cafile,
-                    cert=(self.configuration.mq_certfile, self.configuration.mq_keyfile)
-                )
-            reponse_json = json.loads(r.text)
-            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
-
-            # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
-            if reponse_json['fichiersDomaines'][nom_fichier_backup] != dependances_backup['sha512_fichier_backup']:
-                raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
-
-    def backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str):
-        heure_str = heure.strftime("%Y%m%d%H")
-        heure_fin = heure + datetime.timedelta(hours=1)
-        self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
-
-        coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
-        filtre = {
-            '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % idmg: {
-                '$gte': heure,
-                '$lt': heure_fin
-            }
-        }
-        sort = [
-            ('_evenements.%s.transaction_traitee' % idmg, 1)
-        ]
-
-        curseur = coltrans.find(filtre, sort=sort)
-
-        path_fichier_backup = '/tmp/mgbackup/%s_%s.json.xz' % (prefixe_fichier, heure_str)
-
-        dependances_backup = {
-            'path_fichier_backup': path_fichier_backup,
-
-            # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
-            # verifier toutes les transactions de ce backup
-            'certificats_racine': list(),
-            'certificats_intermediaires': list(),
-            'certificats': list(),
-
-            # Conserver la liste des grosfichiers requis pour ce backup
-            'fuuid_grosfichiers': list(),
-        }
-
-        with lzma.open(path_fichier_backup, 'wt') as fichier:
-            for transaction in curseur:
-                json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
-
-                # Une transaction par ligne
-                fichier.write('\n')
-
-        # Calculer SHA-512 du fichier de backup
-        sha512 = hashlib.sha512()
-        with open(path_fichier_backup, 'rb') as fichier:
-            sha512.update(fichier.read())
-        sha512_digest = sha512.hexdigest()
-        dependances_backup['sha512_fichier_backup'] = sha512_digest
-
-        return dependances_backup
+        self.handler_backup.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
 
     def restore_horaire_domaine_senseurspassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
@@ -239,6 +126,7 @@ class MessagesSample(BaseCallback):
 
 # -------
 logging.basicConfig()
+logging.getLogger('millegrilles.Domaines.HandlerBackupDomaine').setLevel(logging.DEBUG)
 sample = MessagesSample()
 
 # TEST
