@@ -61,7 +61,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         try:
-            self.backup_domaine_senseurpassifs()
+            self.backup_domaine_grosfichiers()
             # self.restore_horaire_domaine_senseurspassifs()
         finally:
             self.event_recu.set()  # Termine
@@ -81,24 +81,23 @@ class MessagesSample(BaseCallback):
 
     def backup_domaine_senseurpassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-        # heure = datetime.datetime(year=2020, month=1, day=6, hour=19)
         heure_courante = datetime.datetime.utcnow()
-        # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = datetime.datetime(year=2020, month=1, day=6, hour=21, tzinfo=datetime.timezone.utc)
+        # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.backup_domaine(nom_collection_mongo, self.idmg, heure)
+        self.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
 
     def backup_domaine_grosfichiers(self):
-        nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-        # heure = datetime.datetime(year=2020, month=1, day=6, hour=19)
+        nom_collection_mongo = ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
         heure_courante = datetime.datetime.utcnow()
-        heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
+        heure = datetime.datetime(year=2020, month=3, day=15, hour=20, tzinfo=datetime.timezone.utc)
+        # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.backup_domaine(nom_collection_mongo, self.idmg, heure)
+        self.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
 
-    def backup_domaine(self, nom_collection_mongo, idmg, heure):
+    def backup_domaine(self, nom_collection_mongo, idmg, heure, prefixe_fichier):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
@@ -134,7 +133,7 @@ class MessagesSample(BaseCallback):
             heure_anterieure = transanter['_id']['timestamp']
 
             # Creer le fichier de backup
-            dependances_backup = self.backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure)
+            dependances_backup = self.backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure, prefixe_fichier)
             path_fichier_backup = dependances_backup['path_fichier_backup']
             nom_fichier_backup = path.basename(path_fichier_backup)
 
@@ -164,7 +163,7 @@ class MessagesSample(BaseCallback):
             if reponse_json['fichiersDomaines'][nom_fichier_backup] != dependances_backup['sha512_fichier_backup']:
                 raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
 
-    def backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime):
+    def backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str):
         heure_str = heure.strftime("%Y%m%d%H")
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
@@ -183,7 +182,7 @@ class MessagesSample(BaseCallback):
 
         curseur = coltrans.find(filtre, sort=sort)
 
-        path_fichier_backup = '/tmp/mgbackup/senseurspassifs_%s.json.xz' % heure_str
+        path_fichier_backup = '/tmp/mgbackup/%s_%s.json.xz' % (prefixe_fichier, heure_str)
 
         dependances_backup = {
             'path_fichier_backup': path_fichier_backup,
