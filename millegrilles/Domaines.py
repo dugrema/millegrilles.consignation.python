@@ -1163,6 +1163,9 @@ class TransactionTypeInconnuError(Exception):
 
 
 class HandlerBackupDomaine:
+    """
+    Gestionnaire de backup des transactions d'un domaine.
+    """
 
     def __init__(self, contexte):
         self.__contexte = contexte
@@ -1213,7 +1216,7 @@ class HandlerBackupDomaine:
             # Transferer vers consignation_fichier
             data = {
                 'timestamp_backup': int(heure_anterieure.timestamp()),
-                'fuuid_grosfichiers': json.dumps(dependances_backup['fuuid_grosfichiers'])
+                'fuuid_grosfichiers': json.dumps(list(dependances_backup['fuuid_grosfichiers']))
             }
 
             with open(path_fichier_backup, 'rb') as fichier:
@@ -1257,19 +1260,31 @@ class HandlerBackupDomaine:
 
         dependances_backup = {
             'path_fichier_backup': path_fichier_backup,
+            'sha512_fichier_backup': None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
             # verifier toutes les transactions de ce backup
-            'certificats_racine': list(),
-            'certificats_intermediaires': list(),
-            'certificats': list(),
+            'certificats_racine': set(),
+            'certificats_intermediaires': set(),
+            'certificats': set(),
 
             # Conserver la liste des grosfichiers requis pour ce backup
-            'fuuid_grosfichiers': list(),
+            'fuuid_grosfichiers': set(),
         }
+
+        cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
 
         with lzma.open(path_fichier_backup, 'wt') as fichier:
             for transaction in curseur:
+
+                # Extraire metadonnees de la transaction
+                info_transaction = self.traiter_transaction(transaction)
+                for cle in cles_set:
+                    try:
+                        dependances_backup[cle].update(info_transaction[cle])
+                    except KeyError:
+                        pass
+
                 json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
 
                 # Une transaction par ligne
@@ -1282,4 +1297,45 @@ class HandlerBackupDomaine:
         sha512_digest = sha512.hexdigest()
         dependances_backup['sha512_fichier_backup'] = sha512_digest
 
+        # Changer les set() par des list() pour extraire en JSON
+        for cle in cles_set:
+            dependances_backup[cle] = list(dependances_backup[cle])
+
         return dependances_backup
+
+    def traiter_transaction(self, transaction):
+        """
+        Verifie la signature de la transaction et extrait les certificats requis pour le backup.
+
+        :param transaction:
+        :return:
+        """
+        enveloppe_initial = self.__contexte.verificateur_transaction.verifier(transaction)
+        enveloppe = enveloppe_initial
+
+        liste_cas = list()
+        depth = 0
+        while not enveloppe.is_rootCA and depth < 10:
+            autorite = enveloppe.authority_key_identifier
+            self.__logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
+            enveloppes = self.__contexte.verificateur_certificats.get_par_akid(autorite)
+            if len(enveloppes) > 1:
+                raise ValueError("Bug - on ne supporte pas plusieurs cert par AKID - TO DO")
+            enveloppe = enveloppes[0]
+            liste_cas.append(enveloppe.fingerprint_ascii)
+            self.__logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
+
+            depth = depth + 1
+
+        if depth == 10:
+            raise ValueError("Limite de profondeur de chain de certificat atteint")
+
+        # S'assurer que le certificat racine correspond a la transaction
+        if enveloppe.fingerprint_base58 != transaction['en-tete']['idmg']:
+            raise ValueError("Transaction IDMG ne correspond pas au certificat racine " + enveloppe.fingerprint_base58)
+
+        return {
+            'certificats': [enveloppe_initial.fingerprint_ascii],
+            'certificats_intermediaires': liste_cas[:-1],
+            'certificats_racine': [liste_cas[-1]],
+        }

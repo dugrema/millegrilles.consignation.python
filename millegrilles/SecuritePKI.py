@@ -607,6 +607,9 @@ class VerificateurCertificats(UtilCertificats):
     def __del__(self):
         self.close()
 
+    def get_par_akid(self, akid):
+        return [cert for cert in self._liste_CAs_connus if cert.subject_key_identifier == akid]
+
     def charger_certificats_CA_millegrille(self, idmg: str):
         """
         Charge le certificat CA d'une MilleGrille tierce s'il est connu avec les certificats intermediaires.
@@ -639,6 +642,7 @@ class VerificateurCertificats(UtilCertificats):
                     enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
                     if enveloppe_ca.is_rootCA and enveloppe_ca.idmg == idmg:
                         # Certificat racine est valide
+                        self._liste_CAs_connus.append(enveloppe_ca)
                         with open(file_ca_racine, 'w') as fichier:
                             fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
 
@@ -652,6 +656,7 @@ class VerificateurCertificats(UtilCertificats):
                     # Certificat intermediaire, on l'ajoute au untrusted (pas besoin de verifier ici, c'est untrusted)
                     enveloppe_ca = EnveloppeCertificat(
                         certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
+                    self._liste_CAs_connus.append(enveloppe_ca)
                     self._ajouter_untrusted_ca(enveloppe_ca)
         else:
             # Certificat racine pour la MilleGrille est deja charge
