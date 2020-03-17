@@ -3,6 +3,8 @@ import time
 import json
 import lzma
 import logging
+import requests
+import ssl
 from threading import Thread, Event
 from os import listdir, path
 from pymongo.errors import DuplicateKeyError
@@ -33,7 +35,6 @@ class MessagesSample(BaseCallback):
         self.event_recu = Event()
 
         self.idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
-
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -80,6 +81,16 @@ class MessagesSample(BaseCallback):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
         # heure = datetime.datetime(year=2020, month=1, day=6, hour=19)
         heure_courante = datetime.datetime.utcnow()
+        # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
+        heure = datetime.datetime(year=2020, month=1, day=6, hour=21, tzinfo=datetime.timezone.utc)
+        heure = heure - datetime.timedelta(hours=1)
+        self.__logger.debug("Faire backup horaire de %s" % str(heure))
+        self.backup_domaine(nom_collection_mongo, self.idmg, heure)
+
+    def backup_domaine_grosfichiers(self):
+        nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+        # heure = datetime.datetime(year=2020, month=1, day=6, hour=19)
+        heure_courante = datetime.datetime.utcnow()
         heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
@@ -112,20 +123,37 @@ class MessagesSample(BaseCallback):
         ]
         hint = {
             '_evenements.transaction_complete': 1,
-            '_evenements.%s.transaction_traitee' % idmg: 1
+            '_evenements.%s.transaction_traitee' % idmg: 1,
         }
         coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
-
-        # projection = [
-        #     '_evenements.%s.transaction_traitee' % idmg
-        # ]
-        # for transanter in coltrans.find(filtre_verif_transactions_anterieures, projection=projection):
-        #     self.__logger.debug("Vieille transaction : %s" % str(transanter))
 
         for transanter in coltrans.aggregate(operation):
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
             heure_anterieure = transanter['_id']['timestamp']
-            self.backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure)
+
+            # Creer le fichier de backup
+            dependances_backup = self.backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure)
+            path_fichier_backup = dependances_backup['path_fichier_backup']
+            nom_fichier_backup = path.basename(path_fichier_backup)
+
+            # Transferer vers consignation_fichier
+            data = {
+                'timestamp_backup': int(heure_anterieure.timestamp()),
+                'fuuid_grosfichiers': json.dumps(dependances_backup['fuuid_grosfichiers'])
+            }
+
+            with open(path_fichier_backup, 'rb') as fichier:
+                files = {
+                    'fichiers_backup': (nom_fichier_backup, fichier, 'application/x-xz')
+                }
+                r = requests.put(
+                    'https://mg-dev3:3003/backup/domaine/%s' % nom_fichier_backup,
+                    data=data,
+                    files=files,
+                    verify=self.configuration.mq_cafile,
+                    cert=(self.configuration.mq_certfile, self.configuration.mq_keyfile)
+                )
+            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(json.loads(r.text))))
 
     def backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime):
         heure_str = heure.strftime("%Y%m%d%H")
@@ -145,12 +173,30 @@ class MessagesSample(BaseCallback):
         ]
 
         curseur = coltrans.find(filtre, sort=sort)
-        with lzma.open('/tmp/mgbackup/senseurspassifs_%s.json.xz' % heure_str, 'wt') as fichier:
+
+        path_fichier_backup = '/tmp/mgbackup/senseurspassifs_%s.json.xz' % heure_str
+
+        dependances_backup = {
+            'path_fichier_backup': path_fichier_backup,
+
+            # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
+            # verifier toutes les transactions de ce backup
+            'certificats_racine': list(),
+            'certificats_intermediaires': list(),
+            'certificats': list(),
+
+            # Conserver la liste des grosfichiers requis pour ce backup
+            'fuuid_grosfichiers': list(),
+        }
+
+        with lzma.open(path_fichier_backup, 'wt') as fichier:
             for transaction in curseur:
                 json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
 
                 # Une transaction par ligne
                 fichier.write('\n')
+
+        return dependances_backup
 
     def restore_horaire_domaine_senseurspassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
