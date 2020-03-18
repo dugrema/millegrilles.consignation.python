@@ -1227,6 +1227,10 @@ class HandlerBackupDomaine:
                 # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
                 if reponse_json['fichiersDomaines'][nom_fichier_transactions] != catalogue_backup['sha512_transactions']:
                     raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
+
+                # Transmettre la transaction au domaine de backup
+                # L'enveloppe est deja prete, on fait juste l'emettre
+                self.__contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
             else:
                 raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
 
