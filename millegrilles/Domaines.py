@@ -21,7 +21,7 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder
-
+from millegrilles.SecuritePKI import HachageInvalide
 
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     """
@@ -1283,18 +1283,21 @@ class HandlerBackupDomaine:
         with lzma.open(path_fichier_backup, 'wt') as fichier:
             for transaction in curseur:
 
-                # Extraire metadonnees de la transaction
-                info_transaction = self.traiter_transaction(transaction)
-                for cle in cles_set:
-                    try:
-                        dependances_backup[cle].update(info_transaction[cle])
-                    except KeyError:
-                        pass
+                try:
+                    # Extraire metadonnees de la transaction
+                    info_transaction = self.traiter_transaction(transaction)
+                    for cle in cles_set:
+                        try:
+                            dependances_backup[cle].update(info_transaction[cle])
+                        except KeyError:
+                            pass
 
-                json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
+                    json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
 
-                # Une transaction par ligne
-                fichier.write('\n')
+                    # Une transaction par ligne
+                    fichier.write('\n')
+                except HachageInvalide:
+                    self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup" % transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID])
 
         # Calculer SHA-512 du fichier de backup
         sha512 = hashlib.sha512()
