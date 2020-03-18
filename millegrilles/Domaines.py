@@ -1182,7 +1182,8 @@ class HandlerBackupDomaine:
             heure_anterieure = transanter['_id']['timestamp']
 
             # Creer le fichier de backup
-            dependances_backup = self._backup_horaire_domaine(nom_collection_mongo, idmg, heure_anterieure, prefixe_fichier)
+            dependances_backup = self._backup_horaire_domaine(
+                nom_collection_mongo, idmg, heure_anterieure, prefixe_fichier, Constantes.SECURITE_PRIVE)
             catalogue_backup = dependances_backup['catalogue']
 
             path_fichier_transactions = dependances_backup['path_fichier_backup']
@@ -1267,7 +1268,7 @@ class HandlerBackupDomaine:
 
         return coltrans.aggregate(operation)
 
-    def _backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str) -> dict:
+    def _backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str, niveau_securite: str) -> dict:
         heure_str = heure.strftime("%Y%m%d%H")
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
@@ -1290,10 +1291,11 @@ class HandlerBackupDomaine:
         backup_workdir = self.__contexte.configuration.backup_workdir
         Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
-        backup_nomfichier = '%s_%s.transactions.json.xz' % (prefixe_fichier, heure_str)
+        backup_nomfichier = '%s_transactions_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
         path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
         catalogue_backup = {
+            ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
             'sha512_transactions': None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
@@ -1351,7 +1353,7 @@ class HandlerBackupDomaine:
         info_backup['catalogue'] = catalogue_backup
 
         # Sauvegarder catlogue sur disque pour transferer
-        catalogue_nomfichier = '%s_%s.catalogue.json.xz' % (prefixe_fichier, heure_str)
+        catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
         path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
         info_backup['path_catalogue'] = path_catalogue
 

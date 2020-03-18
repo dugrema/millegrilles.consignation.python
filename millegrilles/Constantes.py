@@ -1173,6 +1173,7 @@ class ConstantesBackup:
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
 
+    LIBELLE_SECURITE = 'securite'
 
 class CommandesSurRelai:
     """
