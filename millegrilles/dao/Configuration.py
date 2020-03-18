@@ -386,7 +386,6 @@ class ContexteRessourcesMilleGrilles:
         self._email_dao = None
         self._signateur_transactions = None
         self._generateur_transactions = None
-        self._transmetteur_messages = None
 
     def initialiser(self, init_message=True, connecter=True):
         """

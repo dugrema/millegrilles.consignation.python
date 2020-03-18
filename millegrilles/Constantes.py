@@ -1170,6 +1170,8 @@ class ConstantesBackup:
     QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
 
+    TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
 
 
 class CommandesSurRelai:

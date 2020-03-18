@@ -54,8 +54,8 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
     def __init__(self, contexte):
         super().__init__(contexte)
 
-    def traiter_transaction(self, transaction):
-        info_transaction = super().traiter_transaction(transaction)
+    def _traiter_transaction(self, transaction):
+        info_transaction = super()._traiter_transaction(transaction)
 
         # Extraire les fuuids
         transactions_visees = {
