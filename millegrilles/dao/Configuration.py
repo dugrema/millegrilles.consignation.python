@@ -94,6 +94,10 @@ class TransactionConfiguration:
             Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT: Constantes.DEFAUT_CONSIGNATIONFICHIERS_PORT,
         }
 
+        self._backup = {
+            Constantes.CONFIG_BACKUP_WORKDIR: Constantes.DEFAUT_BACKUP_WORKDIR,
+        }
+
     def loadEnvironment(self, additionals: list = None):
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
@@ -116,6 +120,7 @@ class TransactionConfiguration:
             self._email_config,
             self._pki_config,
             self._serveurs,
+            self._backup,
         ]
 
         for config_dict in configurations:
@@ -356,6 +361,10 @@ class TransactionConfiguration:
     @property
     def serveur_consignationfichiers_port(self):
         return self._serveurs[Constantes.CONFIG_SERVEUR_CONSIGNATIONFICHIERS_PORT]
+
+    @property
+    def backup_workdir(self):
+        return self._backup[Constantes.CONFIG_BACKUP_WORKDIR]
 
 
 class ContexteRessourcesMilleGrilles:

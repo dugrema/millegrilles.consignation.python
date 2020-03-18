@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, HandlerBackupDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -47,6 +47,41 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementMessageDomaineRequete):
             self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+
+
+class HandlerBackupGrosFichiers(HandlerBackupDomaine):
+
+    def __init__(self, contexte):
+        super().__init__(contexte)
+
+    def traiter_transaction(self, transaction):
+        info_transaction = super().traiter_transaction(transaction)
+
+        # Extraire les fuuids
+        transactions_visees = {
+            ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA: {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
+            },
+            ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE: {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_DECRYPTE,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
+            },
+        }
+
+        domaine_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        fuuid_dict = dict()
+        if domaine_transaction in transactions_visees.keys():
+            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+            champs = transactions_visees[domaine_transaction]
+            for champ in champs:
+                try:
+                    fuuid_dict[transaction[champ]] = {'securite': securite}
+                except KeyError:
+                    pass
+
+            info_transaction['fuuid_grosfichiers'] = fuuid_dict
+
+        return info_transaction
 
 
 class GestionnaireGrosFichiers(GestionnaireDomaineStandard):

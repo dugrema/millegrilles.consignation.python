@@ -31,6 +31,8 @@ CONFIG_QUEUE_ERREURS_PROCESSUS = 'mq_queue_erreurs_processus'
 CONFIG_QUEUE_GENERATEUR_DOCUMENTS = 'mq_queue_generateur_documents'
 CONFIG_QUEUE_NOTIFICATIONS = 'mq_queue_notifications'
 
+CONFIG_BACKUP_WORKDIR = 'backup_workdir'
+
 # DEFAUT_MQ_EXCHANGE_EVENEMENTS = 'millegrilles.evenements'
 DEFAUT_MQ_EXCHANGE_MIDDLEWARE = 'millegrilles.middleware'
 DEFAUT_MQ_EXCHANGE_NOEUDS = 'millegrilles.noeuds'
@@ -55,6 +57,8 @@ DEFAUT_CA_CERTS = '/opt/millegrilles/etc/millegrilles.RootCA.pem'
 
 DEFAUT_CONSIGNATIONFICHIERS_HOST = 'consignationfichiers'
 DEFAUT_CONSIGNATIONFICHIERS_PORT = '443'
+
+DEFAUT_BACKUP_WORKDIR = '/tmp/mgbackup'
 
 # Configuration Mongo
 CONFIG_MONGO_HOST = 'mongo_host'
@@ -951,6 +955,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_TAILLE_480P = "tailleVideo480p"
     DOCUMENT_FICHIER_SHA256_480P = "sha256Video480p"
 
+    DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
+
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
     DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE = 'uuid_source_figee'
@@ -1163,6 +1169,7 @@ class ConstantesBackup:
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
+
 
 
 class CommandesSurRelai:

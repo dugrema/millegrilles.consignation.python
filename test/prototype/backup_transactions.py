@@ -19,6 +19,7 @@ from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesGrosFic
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_backup
 
 from millegrilles.Domaines import HandlerBackupDomaine
+from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
 
 contexte = ContexteRessourcesDocumentsMilleGrilles()
 contexte.initialiser()
@@ -35,6 +36,7 @@ class MessagesSample(BaseCallback):
         self.generateur = GenerateurTransaction(self.contexte)
 
         self.handler_backup = HandlerBackupDomaine(self.contexte)
+        self.handler_grosfichiers = HandlerBackupGrosFichiers(self.contexte)
 
         self.channel = None
         self.event_recu = Event()
@@ -94,11 +96,11 @@ class MessagesSample(BaseCallback):
     def backup_domaine_grosfichiers(self):
         nom_collection_mongo = ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
         heure_courante = datetime.datetime.utcnow()
-        heure = datetime.datetime(year=2020, month=3, day=15, hour=20, tzinfo=datetime.timezone.utc)
+        heure = datetime.datetime(year=2020, month=3, day=15, hour=22, tzinfo=datetime.timezone.utc)
         # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.handler_backup.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
+        self.handler_grosfichiers.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
 
     def restore_horaire_domaine_senseurspassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM

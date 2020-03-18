@@ -11,6 +11,7 @@ from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure
 from bson import ObjectId
 from threading import Thread, Event, Lock
+from pathlib import Path
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
@@ -1216,7 +1217,7 @@ class HandlerBackupDomaine:
             # Transferer vers consignation_fichier
             data = {
                 'timestamp_backup': int(heure_anterieure.timestamp()),
-                'fuuid_grosfichiers': json.dumps(list(dependances_backup['fuuid_grosfichiers']))
+                'fuuid_grosfichiers': json.dumps(dependances_backup['fuuid_grosfichiers'])
             }
 
             with open(path_fichier_backup, 'rb') as fichier:
@@ -1256,7 +1257,12 @@ class HandlerBackupDomaine:
 
         curseur = coltrans.find(filtre, sort=sort)
 
-        path_fichier_backup = '/tmp/mgbackup/%s_%s.json.xz' % (prefixe_fichier, heure_str)
+        # Creer repertoire backup et determiner path fichier
+        backup_workdir = self.__contexte.configuration.backup_workdir
+        Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
+
+        backup_nomfichier = '%s_%s.json.xz' % (prefixe_fichier, heure_str)
+        path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
         dependances_backup = {
             'path_fichier_backup': path_fichier_backup,
@@ -1269,7 +1275,7 @@ class HandlerBackupDomaine:
             'certificats': set(),
 
             # Conserver la liste des grosfichiers requis pour ce backup
-            'fuuid_grosfichiers': set(),
+            'fuuid_grosfichiers': dict(),
         }
 
         cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
@@ -1299,7 +1305,8 @@ class HandlerBackupDomaine:
 
         # Changer les set() par des list() pour extraire en JSON
         for cle in cles_set:
-            dependances_backup[cle] = list(dependances_backup[cle])
+            if isinstance(dependances_backup[cle], set):
+                dependances_backup[cle] = list(dependances_backup[cle])
 
         return dependances_backup
 
