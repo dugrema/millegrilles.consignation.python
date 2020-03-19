@@ -243,8 +243,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             self._logger.info("On insere le document %s pour domaine GrosFichiers" % mg_libelle)
 
             super().initialiser_document(doc_defaut[Constantes.DOCUMENT_INFODOC_LIBELLE], doc_defaut)
-        else:
-            self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
+        # else:
+        #    self._logger.info("Document de %s pour GrosFichiers: %s" % (mg_libelle, str(document_configuration)))
 
     def creer_index(self):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)

@@ -39,6 +39,18 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
     def configurer(self):
         super().configurer()
 
+        collection_documents = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        # Index noeud, _mg-libelle
+        collection_documents.create_index(
+            [
+                (ConstantesBackup.LIBELLE_DIRTY_FLAG, 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+                (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, 1),
+            ],
+            name='dirty-backups'
+        )
+
+
     def demarrer(self):
         super().demarrer()
         # self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)

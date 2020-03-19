@@ -347,7 +347,8 @@ class EntretienCollectionsDomaines(BaseCallback):
         self.__throttle_event = Event()
 
         self.__liste_domaines = [
-            'millegrilles.domaines.Annuaires',
+            'millegrilles.domaines.Annuaire',
+            'millegrilles.domaines.Backup',
             'millegrilles.domaines.GrosFichiers',
             'millegrilles.domaines.MaitreDesCles',
             'millegrilles.domaines.Parametres',
@@ -410,7 +411,8 @@ class EntretienCollectionsDomaines(BaseCallback):
                     [
                         ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID), 1)
                     ],
-                    name='uuid_transaction'
+                    name='uuid_transaction',
+                    unique=True,
                 )
 
                 # _evenements.estampille
