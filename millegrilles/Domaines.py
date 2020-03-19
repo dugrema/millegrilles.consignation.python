@@ -21,7 +21,7 @@ from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitem
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
-from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder
+from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide
 
 
@@ -1454,3 +1454,101 @@ class HandlerBackupDomaine:
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
         }
         self.__contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+
+    def restaurer_domaines_horaires(self, nom_collection_mongo):
+
+        url_consignationfichiers = 'https://%s:%s' % (
+            self.__contexte.configuration.serveur_consignationfichiers_host,
+            self.__contexte.configuration.serveur_consignationfichiers_port,
+        )
+
+        backup_workdir = self.__contexte.configuration.backup_workdir
+        Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
+
+        data = {
+            'domaine': nom_collection_mongo
+        }
+
+        with requests.get(
+                '%s/backup/liste/backups_horaire' % url_consignationfichiers,
+                data=data,
+                verify=self.__contexte.configuration.mq_cafile,
+                cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile)
+        ) as r:
+
+            if r.status_code == 200:
+                reponse_json = json.loads(r.text)
+            else:
+                raise Exception("Erreur chargement liste backups horaire")
+
+        self.__logger.debug("Reponse liste backups horaire:\n" + json.dumps(reponse_json, indent=4))
+
+        for heure, backups in reponse_json['backupsHoraire'].items():
+            self.__logger.debug("Telechargement fichiers backup %s" % heure)
+            path_fichier_transaction = backups['transactions']
+            nom_fichier_transaction = path.basename(path_fichier_transaction)
+
+            with requests.get(
+                    '%s/backup/transactions/%s' % (url_consignationfichiers, path_fichier_transaction),
+                    verify=self.__contexte.configuration.mq_cafile,
+                    cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile),
+            ) as r:
+
+                r.raise_for_status()
+
+                # Sauvegarder le fichier
+                with open(path.join(backup_workdir, nom_fichier_transaction), 'wb') as fichier:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        fichier.write(chunk)
+
+            path_fichier_catalogue = backups['catalogue']
+            nom_fichier_catalogue = path.basename(path_fichier_catalogue)
+
+            # Verifier l'integrite du fichier de transactions
+            with lzma.open(path.join(backup_workdir, nom_fichier_catalogue), 'rt') as fichier:
+                catalogue = json.load(fichier, object_hook=decoder_backup)
+
+            self.__logger.debug("Verifier signature catalogue %s\n%s" % (nom_fichier_catalogue, catalogue))
+            self.__contexte.verificateur_transaction.verifier(catalogue)
+
+            with requests.get(
+                    '%s/backup/catalogues/%s' % (url_consignationfichiers, path_fichier_catalogue),
+                    verify=self.__contexte.configuration.mq_cafile,
+                    cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile),
+            ) as r:
+
+                r.raise_for_status()
+
+                # Sauvegarder le fichier
+                with open(path.join(backup_workdir, nom_fichier_catalogue), 'wb') as fichier:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        fichier.write(chunk)
+
+                    fichier.flush()
+
+            # Catalogue ok, on verifie fichier de transactions
+            self.__logger.debug("Verifier SHA512 sur le fichier de transactions %s" % nom_fichier_transaction)
+            transactions_sha512 = catalogue['transactions_sha512']
+            sha512 = hashlib.sha512()
+            with open(path.join(backup_workdir, nom_fichier_transaction), 'rb') as fichier:
+                sha512.update(fichier.read())
+            sha512_digest_calcule = sha512.hexdigest()
+
+            if transactions_sha512 != sha512_digest_calcule:
+                raise Exception(
+                    "Le fichier de transactions %s est incorrect, SHA512 ne correspond pas a celui du catalogue" %
+                    nom_fichier_transaction
+                )
+
+        # Une fois tous les fichiers telecharges et verifies, on peut commencer le
+        # chargement dans la collection des transactions du domaine
+
+        for heure, backups in reponse_json['backupsHoraire'].items():
+            path_fichier_transaction = backups['transactions']
+            nom_fichier_transaction = path.basename(path_fichier_transaction)
+
+            with lzma.open(path.join(backup_workdir, nom_fichier_transaction), 'rt') as fichier:
+                for transaction in fichier:
+                    self.__logger.debug("Chargement transaction restauree vers collection:\n%s" % str(transaction))
+                    # Emettre chaque transaction vers le consignateur de transaction
+                    self.__contexte.generateur_transactions.restaurer_transaction(transaction)
