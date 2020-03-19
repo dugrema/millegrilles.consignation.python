@@ -192,13 +192,20 @@ class MessagesSample(BaseCallback):
                     nom_fichier_transaction
                 )
 
-        nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-        path_fichier = '/tmp/mgbackup/senseurspassifs_2020010619.json.xz'
+        # Une fois tous les fichiers telecharges et verifies, on peut commencer le
+        # chargement dans la collection des transactions du domaine
 
-        # for fichier in listdir(path_folder):
-        #     path_complet = path.join(path_folder, fichier)
-        #     if path.isfile(path_complet) and fichier.startswith('senseurspassifs') and fichier.endswith('.json.xz'):
-        #         self.restore_horaire_domaine(nom_collection_mongo, self.idmg, path_complet)
+        for heure, backups in reponse_json['backupsHoraire'].items():
+            path_fichier_transaction = backups['transactions']
+            nom_fichier_transaction = path.basename(path_fichier_transaction)
+
+            with lzma.open(path.join(path_folder, nom_fichier_transaction), 'rt') as fichier:
+                for transaction in fichier:
+                    #transaction = fichier.read()
+                    self.__logger.debug("Chargement transaction restauree vers collection:\n%s" % str(transaction))
+
+            # Emettre chaque transaction vers le consignateur de transaction
+            # Mettre un indicateur special pour indiquer que c'est une restauration
 
     def restore_horaire_domaine(self, nom_collection_mongo: str, idmg: str, path_fichier: str):
         coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
