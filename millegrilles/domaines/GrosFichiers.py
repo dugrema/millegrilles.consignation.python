@@ -58,28 +58,34 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
         info_transaction = super()._traiter_transaction(transaction)
 
         # Extraire les fuuids
-        transactions_visees = {
-            ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA: {
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
-            },
-            ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE: {
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_DECRYPTE,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
-            },
-        }
-
         domaine_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         fuuid_dict = dict()
-        if domaine_transaction in transactions_visees.keys():
-            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            champs = transactions_visees[domaine_transaction]
-            for champ in champs:
-                try:
-                    fuuid_dict[transaction[champ]] = {'securite': securite}
-                except KeyError:
-                    pass
+        info_transaction['fuuid_grosfichiers'] = fuuid_dict
 
-            info_transaction['fuuid_grosfichiers'] = fuuid_dict
+        if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
+            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256]
+
+            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
+                'securite': securite,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256
+            }
+
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
+            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+            sha256 = transaction['sha256Hash']
+
+            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_DECRYPTE]] = {
+                'securite': securite,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256
+            }
+
+            try:
+                fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = {
+                    'securite': securite,
+                }
+            except KeyError:
+                pass
 
         return info_transaction
 

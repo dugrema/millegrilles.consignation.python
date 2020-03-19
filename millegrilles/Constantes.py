@@ -1173,7 +1173,23 @@ class ConstantesBackup:
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
 
+    LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
+    LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
+
     LIBELLE_SECURITE = 'securite'
+    LIBELLE_HEURE = 'heure'
+    LIBELLE_JOUR = 'jour'
+    LIBELLE_DOMAINE = 'domaine'
+    LIBELLE_CERTS_RACINE = 'certificats_racine'
+    LIBELLE_CERTS_INTERMEDIAIRES = 'certificats_intermediaires'
+    LIBELLE_CERTS = 'certificats'
+    LIBELLE_FUUID_GROSFICHIERS = 'fuuid_grosfichiers'
+    LIBELLE_INFO_HORAIRE = 'info_horaire'
+    LIBELLE_TRANSACTIONS_SHA512 = 'transactions_sha512'
+    LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
+    LIBELLE_CATALOGUES = 'catalogues'
+    LIBELLE_DIRTY_FLAG = 'dirty_flag'
+
 
 class CommandesSurRelai:
     """

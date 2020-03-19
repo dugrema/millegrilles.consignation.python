@@ -21,7 +21,7 @@ from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitem
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
-from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder
+from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder
 from millegrilles.SecuritePKI import HachageInvalide
 
 
@@ -1192,7 +1192,7 @@ class HandlerBackupDomaine:
             path_fichier_catalogue = dependances_backup['path_catalogue']
             nom_fichier_catalogue = path.basename(path_fichier_catalogue)
 
-            self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4))
+            self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4, cls=BackupFormatEncoder))
 
             # Transferer vers consignation_fichier
             data = {
@@ -1226,7 +1226,7 @@ class HandlerBackupDomaine:
                 self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
 
                 # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
-                if reponse_json['fichiersDomaines'][nom_fichier_transactions] != catalogue_backup['sha512_transactions']:
+                if reponse_json['fichiersDomaines'][nom_fichier_transactions] != catalogue_backup['transactions_sha512']:
                     raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
 
                 # Transmettre la transaction au domaine de backup
@@ -1295,17 +1295,20 @@ class HandlerBackupDomaine:
         path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
         catalogue_backup = {
+            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
             ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
-            'sha512_transactions': None,
+            ConstantesBackup.LIBELLE_HEURE: heure,
+
+            ConstantesBackup.LIBELLE_TRANSACTIONS_SHA512: None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
             # verifier toutes les transactions de ce backup
-            'certificats_racine': set(),
-            'certificats_intermediaires': set(),
-            'certificats': set(),
+            ConstantesBackup.LIBELLE_CERTS_RACINE: set(),
+            ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES: set(),
+            ConstantesBackup.LIBELLE_CERTS: set(),
 
             # Conserver la liste des grosfichiers requis pour ce backup
-            'fuuid_grosfichiers': dict(),
+            ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS: dict(),
         }
 
         info_backup = {
@@ -1335,12 +1338,13 @@ class HandlerBackupDomaine:
                                         transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                                             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID])
 
-        # Calculer SHA-512 du fichier de backup
+        # Calculer SHA-512 du fichier de backup des transactions
         sha512 = hashlib.sha512()
         with open(path_fichier_backup, 'rb') as fichier:
             sha512.update(fichier.read())
         sha512_digest = sha512.hexdigest()
-        catalogue_backup['sha512_transactions'] = sha512_digest
+        catalogue_backup['transactions_sha512'] = sha512_digest
+        catalogue_backup['transactions_nomfichier'] = backup_nomfichier
 
         # Changer les set() par des list() pour extraire en JSON
         for cle in cles_set:
@@ -1348,6 +1352,10 @@ class HandlerBackupDomaine:
                 catalogue_backup[cle] = list(catalogue_backup[cle])
 
         # Generer l'entete et la signature pour le catalogue
+        catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+
+        # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
+        catalogue_backup = json.loads(catalogue_json)
         catalogue_backup = self.__contexte.generateur_transactions.preparer_enveloppe(
             catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE)
         info_backup['catalogue'] = catalogue_backup
@@ -1358,7 +1366,8 @@ class HandlerBackupDomaine:
         info_backup['path_catalogue'] = path_catalogue
 
         with lzma.open(path_catalogue, 'wt') as fichier:
-            json.dump(catalogue_backup, fichier)
+            # Dump du catalogue en format de transaction avec DateFormatEncoder
+            fichier.write(catalogue_json)
 
         return info_backup
 

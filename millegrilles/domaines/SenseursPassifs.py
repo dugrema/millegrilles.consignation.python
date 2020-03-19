@@ -4,6 +4,8 @@ import logging
 import tempfile
 import os
 
+from pymongo.errors import OperationFailure
+
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete
@@ -1226,7 +1228,7 @@ class CommandeGenererRapportHebdomadaire:
 
         # Executer la requete sur la collection de noms
         collection = self.__gestionnaire.document_dao.get_collection(self.__gestionnaire.get_collection_transaction_nom())
-        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+        curseur_resultat = collection.aggregate(requete_aggregation)  # , hint=hint)
 
         # Extraire les donnees
         rangees, colonnes = self.__helper.extraire_donnees(curseur_resultat)
@@ -1285,7 +1287,11 @@ class CommandeGenererRapportAnnuel:
 
         # Executer la requete sur la collection de noms
         collection = self.__gestionnaire.document_dao.get_collection(self.__gestionnaire.get_collection_transaction_nom())
-        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+        try:
+            curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
+        except OperationFailure:
+            self.__logger.exception("Erreur operation aggregation, tenter de recuperer sans le hint")
+            curseur_resultat = collection.aggregate(requete_aggregation)
 
         # Extraire les donnees
         rangees, colonnes = self.__helper.extraire_donnees(curseur_resultat)
