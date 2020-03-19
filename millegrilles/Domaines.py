@@ -1232,6 +1232,10 @@ class HandlerBackupDomaine:
                 # Transmettre la transaction au domaine de backup
                 # L'enveloppe est deja prete, on fait juste l'emettre
                 self.__contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
+
+                # Marquer les transactions comme inclue dans le backup
+                liste_uuids = dependances_backup['uuid_transactions']
+                self.marquer_transactions_backup_complete(nom_collection_mongo, liste_uuids)
             else:
                 raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
 
@@ -1311,15 +1315,17 @@ class HandlerBackupDomaine:
             ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS: dict(),
         }
 
+        liste_uuid_transactions = list()
         info_backup = {
             'path_fichier_backup': path_fichier_backup,
+            'uuid_transactions': liste_uuid_transactions,
         }
 
         cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
 
         with lzma.open(path_fichier_backup, 'wt') as fichier:
             for transaction in curseur:
-
+                uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 try:
                     # Extraire metadonnees de la transaction
                     info_transaction = self._traiter_transaction(transaction)
@@ -1333,10 +1339,11 @@ class HandlerBackupDomaine:
 
                     # Une transaction par ligne
                     fichier.write('\n')
+
+                    # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
+                    liste_uuid_transactions.append(uuid_transaction)
                 except HachageInvalide:
-                    self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup" %
-                                        transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                                            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID])
+                    self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup" % uuid_transaction)
 
         # Calculer SHA-512 du fichier de backup des transactions
         sha512 = hashlib.sha512()
@@ -1407,3 +1414,20 @@ class HandlerBackupDomaine:
             'certificats_intermediaires': liste_cas[:-1],
             'certificats_racine': [liste_cas[-1]],
         }
+
+    def marquer_transactions_backup_complete(self, nom_collection_mongo: str, uuid_transactions: list):
+        """
+        Marquer une liste de transactions du domaine comme etat inclues dans un backup horaire.
+
+        :param nom_collection_mongo: Nom de la collection des transactions du domaine
+        :param uuid_transactions: Liste des uuid de transactions (en-tete)
+        :return:
+        """
+
+        evenement = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transactions,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection_mongo,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
+        }
+        self.__contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)

@@ -268,12 +268,19 @@ class EvenementTransactionCallback(BaseCallback):
             raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
 
     def ajouter_evenement(self, message_dict):
-        id_transaction = message_dict[Constantes.MONGO_DOC_ID]
+
         nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         evenement = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENT]
-        self.ajouter_evenement_transaction(id_transaction, nom_collection, evenement)
 
-    def ajouter_evenement_transaction(self, id_transaction, nom_collection, evenement):
+        try:
+            id_transaction = message_dict[Constantes.MONGO_DOC_ID]
+            self.set_evenement_traitement_transaction(id_transaction, nom_collection, evenement)
+        except KeyError:
+            # L'evenement n'est pas pour une seule transaction, on recupere la liste des uuids
+            uuid_transactions = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            self.ajouter_evenement_transactions(uuid_transactions, nom_collection, evenement)
+
+    def set_evenement_traitement_transaction(self, id_transaction, nom_collection, evenement):
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
         transaction_complete = False
@@ -307,6 +314,40 @@ class EvenementTransactionCallback(BaseCallback):
             raise Exception(
                 "Erreur ajout evenement transaction, updated: %d, ObjectId: %s, collection: %s, evenement: %s" % (
                     resultat.modified_count, str(id_transaction), nom_collection, evenement
+                )
+            )
+
+    def ajouter_evenement_transactions(self, uuid_transaction: list, nom_collection: str, evenement: str):
+        """
+        Permet d'ajouter un evenement a une liste de transactions par UUID.
+
+        :param uuid_transaction:
+        :param nom_collection:
+        :param evenement:
+        :return:
+        """
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
+
+        libelle_evenement = '%s.%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            self.contexte.configuration.idmg,
+            evenement
+        )
+        selection = {
+            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID):
+                {'$in': uuid_transaction}
+        }
+        operation = {
+            '$set': {
+                libelle_evenement: datetime.datetime.now(tz=datetime.timezone.utc),
+            }
+        }
+        resultat = collection_transactions.update_many(selection, operation)
+
+        if resultat['modified_count'] != len(uuid_transaction):
+            raise Exception(
+                "Erreur ajout evenement a des transactions, updated: %d, collection: %s, evenement: %s, uuids: %s" % (
+                    resultat.modified_count, nom_collection, evenement, str(uuid_transaction)
                 )
             )
 
