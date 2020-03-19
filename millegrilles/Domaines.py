@@ -1351,7 +1351,7 @@ class HandlerBackupDomaine:
                     # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
                     liste_uuid_transactions.append(uuid_transaction)
                 except HachageInvalide:
-                    self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup" % uuid_transaction)
+                    self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup de %s" % (uuid_transaction, nom_collection_mongo))
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA-512 du fichier de backup des transactions

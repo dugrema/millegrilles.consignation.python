@@ -67,7 +67,7 @@ class MessagesSample(BaseCallback):
     def executer(self):
         try:
             self.backup_domaine_senseurpassifs()
-            # self.backup_domaine_grosfichiers()
+            self.backup_domaine_grosfichiers()
             # self.restore_horaire_domaine_senseurspassifs()
         finally:
             self.event_recu.set()  # Termine
@@ -88,8 +88,8 @@ class MessagesSample(BaseCallback):
     def backup_domaine_senseurpassifs(self):
         nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
         heure_courante = datetime.datetime.utcnow()
-        heure = datetime.datetime(year=2020, month=2, day=6, hour=21, tzinfo=datetime.timezone.utc)
-        # heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
+        # heure = datetime.datetime(year=2020, month=3, day=6, hour=21, tzinfo=datetime.timezone.utc)
+        heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
         self.handler_backup.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
