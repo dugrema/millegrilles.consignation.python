@@ -1291,7 +1291,16 @@ class HandlerBackupDomaine:
                 '$gte': heure,
                 '$lt': heure_fin
             },
-            '_evenements.%s.backup_horaire' % idmg: {'$exists': False},
+            '$and': [
+                {
+                    '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE): {'$exists': False}
+                }, {
+                    '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': False}
+                }
+            ]
+
         }
         sort = [
             ('_evenements.%s.transaction_traitee' % idmg, 1)

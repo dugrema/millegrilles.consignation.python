@@ -58,5 +58,5 @@ class JSONHelper:
 
     def bin_utf8_json_vers_dict(self, json_utf8):
         message_json = json_utf8.decode("utf-8")
-        dict = json.loads(message_json)
+        dict = json.loads(message_json, object_hook=decoder_backup)
         return dict

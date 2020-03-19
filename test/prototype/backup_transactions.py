@@ -75,6 +75,7 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
+            self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # self.reset_evenements()
@@ -178,6 +179,8 @@ class MessagesSample(BaseCallback):
                     for chunk in r.iter_content(chunk_size=8192):
                         fichier.write(chunk)
 
+                    fichier.flush()
+
             # Catalogue ok, on verifie fichier de transactions
             self.__logger.debug("Verifier SHA512 sur le fichier de transactions %s" % nom_fichier_transaction)
             transactions_sha512 = catalogue['transactions_sha512']
@@ -203,6 +206,7 @@ class MessagesSample(BaseCallback):
                 for transaction in fichier:
                     #transaction = fichier.read()
                     self.__logger.debug("Chargement transaction restauree vers collection:\n%s" % str(transaction))
+                    self.generateur.restaurer_transaction(transaction)
 
             # Emettre chaque transaction vers le consignateur de transaction
             # Mettre un indicateur special pour indiquer que c'est une restauration

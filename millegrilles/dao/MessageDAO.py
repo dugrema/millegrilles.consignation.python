@@ -441,7 +441,7 @@ class PikaDAO:
                 self.__channel_consumer,
                 nom_echange,
                 self.queuename_nouvelles_transactions(),
-                [Constantes.TRANSACTION_ROUTING_NOUVELLE],
+                [Constantes.TRANSACTION_ROUTING_NOUVELLE, Constantes.TRANSACTION_ROUTING_RESTAURER],
                 queue_durable=True,
                 arguments={'x-queue-mode': 'lazy'}
             ))
@@ -571,6 +571,40 @@ class PikaDAO:
             properties.correlation_id = correlation_id
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
+        with self.lock_transmettre_message:
+            channel.basic_publish(
+                exchange=self.configuration.exchange_middleware,
+                routing_key=routing_key,
+                body=message_utf8,
+                properties=properties,
+                mandatory=True)
+            self.__stop_event.wait(0.01)  # Throttle
+
+        if channel is self.__channel_publisher:
+            # Utiliser pubdog pour la connexion publishing par defaut
+            self.__connexionmq_publisher.publish_watch()
+
+        self._in_error = False
+
+    def transmettre_message_direct(self, message_utf8: str, routing_key: str, delivery_mode_v=1, reply_to=None, correlation_id=None, channel=None):
+
+        if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
+            raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
+
+        if channel is None:
+            # Utiliser le channel implicite
+            if self.__channel_publisher is None:
+                # Le channel n'est pas pret, on va l'attendre max 30 secondes (cycle de maintenance)
+                with self.lock_transmettre_message:
+                    pass  # On fait juste attendre que le channel soit pret
+            channel = self.__channel_publisher
+
+        properties = pika.BasicProperties(delivery_mode=delivery_mode_v)
+        if reply_to is not None:
+            properties.reply_to = reply_to
+        if correlation_id is not None:
+            properties.correlation_id = correlation_id
+
         with self.lock_transmettre_message:
             channel.basic_publish(
                 exchange=self.configuration.exchange_middleware,

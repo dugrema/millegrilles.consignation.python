@@ -1,16 +1,16 @@
 # Programme principal pour transferer les nouvelles transactions vers MongoDB
-
-from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
-from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
-
-from millegrilles import Constantes
-from bson.objectid import ObjectId
-from threading import Thread, Event
-
 import logging
 import datetime
 import traceback
 import psutil
+
+from bson.objectid import ObjectId
+from threading import Thread, Event
+from pymongo.errors import DuplicateKeyError
+
+from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
+from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
+from millegrilles import Constantes
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -110,8 +110,15 @@ class ConsignateurTransactionCallback(BaseCallback):
         if routing_key == Constantes.TRANSACTION_ROUTING_NOUVELLE:
             try:
                 self.__compteur = self.__compteur + 1
-                self._logger.info("Nouvelle transaction %d: %s" % (self.__compteur, str(message_dict['en-tete']['domaine'])))
+                self._logger.debug("Nouvelle transaction %d: %s" % (self.__compteur, str(message_dict['en-tete']['domaine'])))
                 self.traiter_nouvelle_transaction(message_dict, exchange, properties)
+            except Exception as e:
+                self._logger.exception("Erreur traitement transaction")
+        elif routing_key == Constantes.TRANSACTION_ROUTING_RESTAURER:
+            try:
+                self._logger.debug(
+                    "Transaction restauree %s" % str(message_dict['en-tete']['domaine']))
+                self.traiter_restauration_transaction(message_dict)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
         else:
@@ -144,6 +151,21 @@ class ConsignateurTransactionCallback(BaseCallback):
                 self.contexte.message_dao.transmettre_evenement_persistance(
                     id_document, uuid_transaction, domaine, properties_mq)
 
+        except Exception as e:
+            uuid_transaction = 'NA'
+            en_tete = message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
+            if en_tete is not None:
+                uuid_transaction = en_tete.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
+            self._logger.exception(
+                'Erreur traitement transaction uuid=%s, transferee a transaction.staging',
+                uuid_transaction
+            )
+            message_traceback = traceback.format_exc()
+            self.traiter_erreur_persistance(message_dict, e, message_traceback)
+
+    def traiter_restauration_transaction(self, message_dict):
+        try:
+            self.sauvegarder_transaction_restauree(message_dict)
         except Exception as e:
             uuid_transaction = 'NA'
             en_tete = message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
@@ -220,6 +242,44 @@ class ConsignateurTransactionCallback(BaseCallback):
         doc_id = resultat.inserted_id
 
         return doc_id, signature_valide
+
+    def sauvegarder_transaction_restauree(self, enveloppe_transaction):
+
+        entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        domaine_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        idmg = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        nom_collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine_transaction)
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
+
+        # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
+        entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        try:
+            enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+            enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
+                enveloppe_certificat.authority_key_identifier
+            signature_valide = True
+        except CertificatInconnu as ci:
+            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+            self._logger.warning(
+                "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
+                    fingerprint, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                )
+            )
+            # Emettre demande pour le certificat manquant
+            self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+            raise ci
+
+        # Ajouter la date de restauration
+        evenements = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT]
+        evenements_idmg = evenements[idmg]
+        evenements_idmg[Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE] = datetime.datetime.utcnow()
+
+        try:
+            collection_transactions.insert_one(enveloppe_transaction)
+        except DuplicateKeyError:
+            # Ok, la transaction existe deja dans la collection - rien a faire
+            pass
 
     @staticmethod
     def identifier_collection_domaine(domaine):
@@ -344,7 +404,7 @@ class EvenementTransactionCallback(BaseCallback):
         }
         resultat = collection_transactions.update_many(selection, operation)
 
-        if resultat['modified_count'] != len(uuid_transaction):
+        if resultat.modified_count != len(uuid_transaction):
             raise Exception(
                 "Erreur ajout evenement a des transactions, updated: %d, collection: %s, evenement: %s, uuids: %s" % (
                     resultat.modified_count, nom_collection, evenement, str(uuid_transaction)
