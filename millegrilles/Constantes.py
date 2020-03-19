@@ -1188,6 +1188,7 @@ class ConstantesBackup:
     LIBELLE_TRANSACTIONS_SHA512 = 'transactions_sha512'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
     LIBELLE_CATALOGUES = 'catalogues'
+    LIBELLE_FICHIERS_TRANSACTIONS = 'fichiers_transactions'
     LIBELLE_DIRTY_FLAG = 'dirty_flag'
 
 

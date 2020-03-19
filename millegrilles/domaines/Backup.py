@@ -98,7 +98,7 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
         sha512_fichier_transaction = transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_SHA512]
 
         set_ops = {
-            '%s.%s' % (ConstantesBackup.LIBELLE_CATALOGUES, sha512_fichier_transaction): nom_fichier_transactions,
+            '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_TRANSACTIONS, sha512_fichier_transaction): nom_fichier_transactions,
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
         }
 
