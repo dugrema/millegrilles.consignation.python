@@ -41,6 +41,12 @@ class MessagesSample(BaseCallback):
         self.channel = None
         self.event_recu = Event()
 
+        # Preparer URL de connexion a consignationfichiers
+        self.url_consignationfichiers = 'https://%s:%s' % (
+            self._contexte.configuration.serveur_consignationfichiers_host,
+            self._contexte.configuration.serveur_consignationfichiers_port,
+        )
+
         self.idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
 
     def on_channel_open(self, channel):
@@ -66,9 +72,12 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         try:
-            self.backup_domaine_senseurpassifs()
-            self.backup_domaine_grosfichiers()
-            # self.restore_horaire_domaine_senseurspassifs()
+            # self.backup_domaine_senseurpassifs()
+            # self.backup_domaine_grosfichiers()
+
+            self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
+
+            # self.reset_evenements()
         finally:
             self.event_recu.set()  # Termine
 
@@ -103,15 +112,93 @@ class MessagesSample(BaseCallback):
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
         self.handler_grosfichiers.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
 
-    def restore_horaire_domaine_senseurspassifs(self):
-        nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-        # path_fichier = '/tmp/mgbackup/senseurspassifs_2020010619.json.xz'
+    def restore_domaine(self, nom_collection_mongo):
+
+        # nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+        # nom_collection_mongo = ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
+
+        data = {
+            'domaine': nom_collection_mongo
+        }
+
         path_folder = '/tmp/mgbackup'
 
-        for fichier in listdir(path_folder):
-            path_complet = path.join(path_folder, fichier)
-            if path.isfile(path_complet) and fichier.startswith('senseurspassifs') and fichier.endswith('.json.xz'):
-                self.restore_horaire_domaine(nom_collection_mongo, self.idmg, path_complet)
+        with requests.get(
+                '%s/backup/liste/backups_horaire' % self.url_consignationfichiers,
+                data=data,
+                verify=self._contexte.configuration.mq_cafile,
+                cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+        ) as r:
+
+            if r.status_code == 200:
+                reponse_json = json.loads(r.text)
+            else:
+                raise Exception("Erreur chargement liste backups horaire")
+
+        self.__logger.debug("Reponse liste backups horaire:\n" + json.dumps(reponse_json, indent=4))
+
+        for heure, backups in reponse_json['backupsHoraire'].items():
+            self.__logger.debug("Telechargement fichiers backup %s" % heure)
+            path_fichier_transaction = backups['transactions']
+            nom_fichier_transaction = path.basename(path_fichier_transaction)
+
+            with requests.get(
+                    '%s/backup/transactions/%s' % (self.url_consignationfichiers, path_fichier_transaction),
+                    verify=self._contexte.configuration.mq_cafile,
+                    cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            ) as r:
+
+                r.raise_for_status()
+
+                # Sauvegarder le fichier
+                with open(path.join(path_folder, nom_fichier_transaction), 'wb') as fichier:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        fichier.write(chunk)
+
+            path_fichier_catalogue = backups['catalogue']
+            nom_fichier_catalogue = path.basename(path_fichier_catalogue)
+
+            # Verifier l'integrite du fichier de transactions
+            with lzma.open(path.join(path_folder, nom_fichier_catalogue), 'rt') as fichier:
+                catalogue = json.load(fichier, object_hook=decoder_backup)
+
+            self.__logger.debug("Verifier signature catalogue %s\n%s" % (nom_fichier_catalogue, catalogue))
+            self._contexte.verificateur_transaction.verifier(catalogue)
+
+            with requests.get(
+                    '%s/backup/catalogues/%s' % (self.url_consignationfichiers, path_fichier_catalogue),
+                    verify=self._contexte.configuration.mq_cafile,
+                    cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
+            ) as r:
+
+                r.raise_for_status()
+
+                # Sauvegarder le fichier
+                with open(path.join(path_folder, nom_fichier_catalogue), 'wb') as fichier:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        fichier.write(chunk)
+
+            # Catalogue ok, on verifie fichier de transactions
+            self.__logger.debug("Verifier SHA512 sur le fichier de transactions %s" % nom_fichier_transaction)
+            transactions_sha512 = catalogue['transactions_sha512']
+            sha512 = hashlib.sha512()
+            with open(path.join(path_folder, nom_fichier_transaction), 'rb') as fichier:
+                sha512.update(fichier.read())
+            sha512_digest_calcule = sha512.hexdigest()
+
+            if transactions_sha512 != sha512_digest_calcule:
+                raise Exception(
+                    "Le fichier de transactions %s est incorrect, SHA512 ne correspond pas a celui du catalogue" %
+                    nom_fichier_transaction
+                )
+
+        nom_collection_mongo = SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+        path_fichier = '/tmp/mgbackup/senseurspassifs_2020010619.json.xz'
+
+        # for fichier in listdir(path_folder):
+        #     path_complet = path.join(path_folder, fichier)
+        #     if path.isfile(path_complet) and fichier.startswith('senseurspassifs') and fichier.endswith('.json.xz'):
+        #         self.restore_horaire_domaine(nom_collection_mongo, self.idmg, path_complet)
 
     def restore_horaire_domaine(self, nom_collection_mongo: str, idmg: str, path_fichier: str):
         coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
@@ -126,6 +213,16 @@ class MessagesSample(BaseCallback):
                 except DuplicateKeyError:
                     self.__logger.warning("Transaction existe deja : %s" % transaction['en-tete']['uuid-transaction'])
 
+    def reset_evenements(self):
+        col_grosfichiers = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
+        col_senseurspassifs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+
+        evenement_libelle = '_evenements.%s.backup_horaire' % self.idmg
+        filtre = {evenement_libelle: {'$exists': True}}
+        ops = {'$unset': {evenement_libelle: True}}
+
+        col_grosfichiers.update_many(filtre, ops)
+        col_senseurspassifs.update_many(filtre, ops)
 
 # -------
 logging.basicConfig()

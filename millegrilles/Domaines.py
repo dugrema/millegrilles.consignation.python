@@ -1374,6 +1374,7 @@ class HandlerBackupDomaine:
             catalogue_backup = json.loads(catalogue_json)
             catalogue_backup = self.__contexte.generateur_transactions.preparer_enveloppe(
                 catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE)
+            catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
             info_backup['catalogue'] = catalogue_backup
 
             # Sauvegarder catlogue sur disque pour transferer
