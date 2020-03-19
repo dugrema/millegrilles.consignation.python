@@ -1184,66 +1184,73 @@ class HandlerBackupDomaine:
             # Creer le fichier de backup
             dependances_backup = self._backup_horaire_domaine(
                 nom_collection_mongo, idmg, heure_anterieure, prefixe_fichier, Constantes.SECURITE_PRIVE)
-            catalogue_backup = dependances_backup['catalogue']
+            if dependances_backup is not None:
+                catalogue_backup = dependances_backup['catalogue']
 
-            path_fichier_transactions = dependances_backup['path_fichier_backup']
-            nom_fichier_transactions = path.basename(path_fichier_transactions)
+                path_fichier_transactions = dependances_backup['path_fichier_backup']
+                nom_fichier_transactions = path.basename(path_fichier_transactions)
 
-            path_fichier_catalogue = dependances_backup['path_catalogue']
-            nom_fichier_catalogue = path.basename(path_fichier_catalogue)
+                path_fichier_catalogue = dependances_backup['path_catalogue']
+                nom_fichier_catalogue = path.basename(path_fichier_catalogue)
 
-            self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4, cls=BackupFormatEncoder))
+                self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4, cls=BackupFormatEncoder))
 
-            # Transferer vers consignation_fichier
-            data = {
-                'timestamp_backup': int(heure_anterieure.timestamp()),
-                'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers'])
-            }
+                # Transferer vers consignation_fichier
+                data = {
+                    'timestamp_backup': int(heure_anterieure.timestamp()),
+                    'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers'])
+                }
 
-            # Preparer URL de connexion a consignationfichiers
-            url_consignationfichiers = 'https://%s:%s' % (
-                self.__contexte.configuration.serveur_consignationfichiers_host,
-                self.__contexte.configuration.serveur_consignationfichiers_port,
-            )
+                # Preparer URL de connexion a consignationfichiers
+                url_consignationfichiers = 'https://%s:%s' % (
+                    self.__contexte.configuration.serveur_consignationfichiers_host,
+                    self.__contexte.configuration.serveur_consignationfichiers_port,
+                )
 
-            with open(path_fichier_transactions, 'rb') as transactions_fichier:
-                with open(path_fichier_catalogue, 'rb') as catalogue_fichier:
-                    files = {
-                        'transactions': (nom_fichier_transactions, transactions_fichier, 'application/x-xz'),
-                        'catalogue': (nom_fichier_catalogue, catalogue_fichier, 'application/x-xz'),
-                    }
+                with open(path_fichier_transactions, 'rb') as transactions_fichier:
+                    with open(path_fichier_catalogue, 'rb') as catalogue_fichier:
+                        files = {
+                            'transactions': (nom_fichier_transactions, transactions_fichier, 'application/x-xz'),
+                            'catalogue': (nom_fichier_catalogue, catalogue_fichier, 'application/x-xz'),
+                        }
 
-                    r = requests.put(
-                        '%s/backup/domaine/%s' % (url_consignationfichiers, nom_fichier_catalogue),
-                        data=data,
-                        files=files,
-                        verify=self.__contexte.configuration.mq_cafile,
-                        cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile)
-                    )
+                        r = requests.put(
+                            '%s/backup/domaine/%s' % (url_consignationfichiers, nom_fichier_catalogue),
+                            data=data,
+                            files=files,
+                            verify=self.__contexte.configuration.mq_cafile,
+                            cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile)
+                        )
 
-            if r.status_code == 200:
-                reponse_json = json.loads(r.text)
-                self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
+                if r.status_code == 200:
+                    reponse_json = json.loads(r.text)
+                    self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
 
-                # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
-                if reponse_json['fichiersDomaines'][nom_fichier_transactions] != catalogue_backup['transactions_sha512']:
-                    raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
+                    # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
+                    if reponse_json['fichiersDomaines'][nom_fichier_transactions] != catalogue_backup['transactions_sha512']:
+                        raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
 
-                # Transmettre la transaction au domaine de backup
-                # L'enveloppe est deja prete, on fait juste l'emettre
-                self.__contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
+                    # Transmettre la transaction au domaine de backup
+                    # L'enveloppe est deja prete, on fait juste l'emettre
+                    self.__contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
 
-                # Marquer les transactions comme inclue dans le backup
-                liste_uuids = dependances_backup['uuid_transactions']
-                self.marquer_transactions_backup_complete(nom_collection_mongo, liste_uuids)
+                    # Marquer les transactions comme inclue dans le backup
+                    liste_uuids = dependances_backup['uuid_transactions']
+                    self.marquer_transactions_backup_complete(nom_collection_mongo, liste_uuids)
+                else:
+                    raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
             else:
-                raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
+                self.__logger.warning(
+                    "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
+                    nom_collection_mongo, str(heure_anterieure))
+                )
 
     def _effectuer_requete_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % idmg: {'$lt': heure}
+            '_evenements.%s.transaction_traitee' % idmg: {'$lt': heure},
+            '_evenements.%s.backup_horaire' % idmg: {'$exists': False},
         }
         regroupement_periode = {
             'year': {'$year': '$_evenements.%s.transaction_traitee' % idmg},
@@ -1283,7 +1290,8 @@ class HandlerBackupDomaine:
             '_evenements.%s.transaction_traitee' % idmg: {
                 '$gte': heure,
                 '$lt': heure_fin
-            }
+            },
+            '_evenements.%s.backup_horaire' % idmg: {'$exists': False},
         }
         sort = [
             ('_evenements.%s.transaction_traitee' % idmg, 1)
@@ -1345,36 +1353,41 @@ class HandlerBackupDomaine:
                 except HachageInvalide:
                     self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup" % uuid_transaction)
 
-        # Calculer SHA-512 du fichier de backup des transactions
-        sha512 = hashlib.sha512()
-        with open(path_fichier_backup, 'rb') as fichier:
-            sha512.update(fichier.read())
-        sha512_digest = sha512.hexdigest()
-        catalogue_backup['transactions_sha512'] = sha512_digest
-        catalogue_backup['transactions_nomfichier'] = backup_nomfichier
+        if len(liste_uuid_transactions) > 0:
+            # Calculer SHA-512 du fichier de backup des transactions
+            sha512 = hashlib.sha512()
+            with open(path_fichier_backup, 'rb') as fichier:
+                sha512.update(fichier.read())
+            sha512_digest = sha512.hexdigest()
+            catalogue_backup['transactions_sha512'] = sha512_digest
+            catalogue_backup['transactions_nomfichier'] = backup_nomfichier
 
-        # Changer les set() par des list() pour extraire en JSON
-        for cle in cles_set:
-            if isinstance(catalogue_backup[cle], set):
-                catalogue_backup[cle] = list(catalogue_backup[cle])
+            # Changer les set() par des list() pour extraire en JSON
+            for cle in cles_set:
+                if isinstance(catalogue_backup[cle], set):
+                    catalogue_backup[cle] = list(catalogue_backup[cle])
 
-        # Generer l'entete et la signature pour le catalogue
-        catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            # Generer l'entete et la signature pour le catalogue
+            catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
 
-        # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
-        catalogue_backup = json.loads(catalogue_json)
-        catalogue_backup = self.__contexte.generateur_transactions.preparer_enveloppe(
-            catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE)
-        info_backup['catalogue'] = catalogue_backup
+            # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
+            catalogue_backup = json.loads(catalogue_json)
+            catalogue_backup = self.__contexte.generateur_transactions.preparer_enveloppe(
+                catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE)
+            info_backup['catalogue'] = catalogue_backup
 
-        # Sauvegarder catlogue sur disque pour transferer
-        catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
-        path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
-        info_backup['path_catalogue'] = path_catalogue
+            # Sauvegarder catlogue sur disque pour transferer
+            catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
+            path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
+            info_backup['path_catalogue'] = path_catalogue
 
-        with lzma.open(path_catalogue, 'wt') as fichier:
-            # Dump du catalogue en format de transaction avec DateFormatEncoder
-            fichier.write(catalogue_json)
+            with lzma.open(path_catalogue, 'wt') as fichier:
+                # Dump du catalogue en format de transaction avec DateFormatEncoder
+                fichier.write(catalogue_json)
+
+        else:
+            self.__logger.info("Backup: aucune transaction, backup annule")
+            info_backup = None
 
         return info_backup
 
