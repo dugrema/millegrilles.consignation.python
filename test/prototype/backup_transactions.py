@@ -75,7 +75,7 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
-            self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+            # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # self.reset_evenements()
@@ -119,97 +119,6 @@ class MessagesSample(BaseCallback):
 
         self.handler_grosfichiers.restaurer_domaines_horaires(nom_collection_mongo)
 
-        # data = {
-        #     'domaine': nom_collection_mongo
-        # }
-        #
-        # with requests.get(
-        #         '%s/backup/liste/backups_horaire' % self.url_consignationfichiers,
-        #         data=data,
-        #         verify=self._contexte.configuration.mq_cafile,
-        #         cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
-        # ) as r:
-        #
-        #     if r.status_code == 200:
-        #         reponse_json = json.loads(r.text)
-        #     else:
-        #         raise Exception("Erreur chargement liste backups horaire")
-        #
-        # self.__logger.debug("Reponse liste backups horaire:\n" + json.dumps(reponse_json, indent=4))
-        #
-        # for heure, backups in reponse_json['backupsHoraire'].items():
-        #     self.__logger.debug("Telechargement fichiers backup %s" % heure)
-        #     path_fichier_transaction = backups['transactions']
-        #     nom_fichier_transaction = path.basename(path_fichier_transaction)
-        #
-        #     with requests.get(
-        #             '%s/backup/transactions/%s' % (self.url_consignationfichiers, path_fichier_transaction),
-        #             verify=self._contexte.configuration.mq_cafile,
-        #             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
-        #     ) as r:
-        #
-        #         r.raise_for_status()
-        #
-        #         # Sauvegarder le fichier
-        #         with open(path.join(path_folder, nom_fichier_transaction), 'wb') as fichier:
-        #             for chunk in r.iter_content(chunk_size=8192):
-        #                 fichier.write(chunk)
-        #
-        #     path_fichier_catalogue = backups['catalogue']
-        #     nom_fichier_catalogue = path.basename(path_fichier_catalogue)
-        #
-        #     # Verifier l'integrite du fichier de transactions
-        #     with lzma.open(path.join(path_folder, nom_fichier_catalogue), 'rt') as fichier:
-        #         catalogue = json.load(fichier, object_hook=decoder_backup)
-        #
-        #     self.__logger.debug("Verifier signature catalogue %s\n%s" % (nom_fichier_catalogue, catalogue))
-        #     self._contexte.verificateur_transaction.verifier(catalogue)
-        #
-        #     with requests.get(
-        #             '%s/backup/catalogues/%s' % (self.url_consignationfichiers, path_fichier_catalogue),
-        #             verify=self._contexte.configuration.mq_cafile,
-        #             cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
-        #     ) as r:
-        #
-        #         r.raise_for_status()
-        #
-        #         # Sauvegarder le fichier
-        #         with open(path.join(path_folder, nom_fichier_catalogue), 'wb') as fichier:
-        #             for chunk in r.iter_content(chunk_size=8192):
-        #                 fichier.write(chunk)
-        #
-        #             fichier.flush()
-        #
-        #     # Catalogue ok, on verifie fichier de transactions
-        #     self.__logger.debug("Verifier SHA512 sur le fichier de transactions %s" % nom_fichier_transaction)
-        #     transactions_sha512 = catalogue['transactions_sha512']
-        #     sha512 = hashlib.sha512()
-        #     with open(path.join(path_folder, nom_fichier_transaction), 'rb') as fichier:
-        #         sha512.update(fichier.read())
-        #     sha512_digest_calcule = sha512.hexdigest()
-        #
-        #     if transactions_sha512 != sha512_digest_calcule:
-        #         raise Exception(
-        #             "Le fichier de transactions %s est incorrect, SHA512 ne correspond pas a celui du catalogue" %
-        #             nom_fichier_transaction
-        #         )
-        #
-        # # Une fois tous les fichiers telecharges et verifies, on peut commencer le
-        # # chargement dans la collection des transactions du domaine
-        #
-        # for heure, backups in reponse_json['backupsHoraire'].items():
-        #     path_fichier_transaction = backups['transactions']
-        #     nom_fichier_transaction = path.basename(path_fichier_transaction)
-        #
-        #     with lzma.open(path.join(path_folder, nom_fichier_transaction), 'rt') as fichier:
-        #         for transaction in fichier:
-        #             #transaction = fichier.read()
-        #             self.__logger.debug("Chargement transaction restauree vers collection:\n%s" % str(transaction))
-        #             self.generateur.restaurer_transaction(transaction)
-        #
-        #     # Emettre chaque transaction vers le consignateur de transaction
-        #     # Mettre un indicateur special pour indiquer que c'est une restauration
-
     def restore_horaire_domaine(self, nom_collection_mongo: str, idmg: str, path_fichier: str):
         coltrans = self.contexte.document_dao.get_collection(nom_collection_mongo)
 
@@ -227,12 +136,12 @@ class MessagesSample(BaseCallback):
         col_grosfichiers = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
         col_senseurspassifs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
-        evenement_libelle = '_evenements.%s.backup_horaire' % self.idmg
-        filtre = {evenement_libelle: {'$exists': True}}
-        ops = {'$unset': {evenement_libelle: True}}
+        evenement_libelle_backup = '_evenements.%s.backup_horaire' % self.idmg
+        evenement_libelle_restauree = '_evenements.%s.transaction_restauree' % self.idmg
+        ops = {'$unset': {evenement_libelle_backup: True, evenement_libelle_restauree: True}}
 
-        col_grosfichiers.update_many(filtre, ops)
-        col_senseurspassifs.update_many(filtre, ops)
+        col_grosfichiers.update_many({}, ops)
+        col_senseurspassifs.update_many({}, ops)
 
 # -------
 logging.basicConfig()

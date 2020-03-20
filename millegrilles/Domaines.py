@@ -1489,7 +1489,7 @@ class HandlerBackupDomaine:
             nom_fichier_transaction = path.basename(path_fichier_transaction)
 
             with requests.get(
-                    '%s/backup/transactions/%s' % (url_consignationfichiers, path_fichier_transaction),
+                    '%s/backup/horaire/transactions/%s' % (url_consignationfichiers, path_fichier_transaction),
                     verify=self.__contexte.configuration.mq_cafile,
                     cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile),
             ) as r:
@@ -1512,7 +1512,7 @@ class HandlerBackupDomaine:
             self.__contexte.verificateur_transaction.verifier(catalogue)
 
             with requests.get(
-                    '%s/backup/catalogues/%s' % (url_consignationfichiers, path_fichier_catalogue),
+                    '%s/backup/horaire/catalogues/%s' % (url_consignationfichiers, path_fichier_catalogue),
                     verify=self.__contexte.configuration.mq_cafile,
                     cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile),
             ) as r:
