@@ -86,7 +86,7 @@ class MessagesSample(BaseCallback):
             # Backup quotidien
             self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-            self.reset_evenements()
+            # self.reset_evenements()
         finally:
             pass
             self.event_recu.set()  # Termine
@@ -225,14 +225,13 @@ class MessagesSample(BaseCallback):
             catalogue = json.loads(catalogue_json)
             catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
                 catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
-            catalogue_json = json.dumps(catalogue_quotidien, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-            self.__logger.debug("Catalogue:\n%s" % catalogue_json)
+            self.__logger.debug("Catalogue:\n%s" % catalogue_quotidien)
 
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
             # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
             # transaction de catalogue quotidien.
             self._contexte.generateur_transactions.transmettre_commande(
-                catalogue, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
+                {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
 # -------
 sample = MessagesSample()
