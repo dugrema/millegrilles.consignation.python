@@ -106,17 +106,23 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
         jour_backup = datetime.datetime(year=heure_backup.year, month=heure_backup.month, day=heure_backup.day)
 
-        nom_fichier_transactions = transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
-        sha512_fichier_transaction = transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_SHA512]
+        champs_fichier = [
+            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER,
+            ConstantesBackup.LIBELLE_TRANSACTIONS_SHA512,
+            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER
+        ]
 
         set_ops = {
-            '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_TRANSACTIONS, sha512_fichier_transaction): nom_fichier_transactions,
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
         }
 
+        for champ in champs_fichier:
+            set_ops['%s.%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_HORAIRE, str(heure_backup.hour), champ)] = \
+                transaction[champ]
+
         # Placer les fuuid de chaque fichier pour faire un update individuel
-        for fuuid, securite in transaction[ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS].items():
-            set_ops['%s.%s' % (ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS, fuuid)] = securite
+        for fuuid, info_fichier in transaction[ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS].items():
+            set_ops['%s.%s' % (ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS, fuuid)] = info_fichier
 
         # Ces valeurs doivent etre agregees commes si elles etaient des sets()
         sets_a_copier = [

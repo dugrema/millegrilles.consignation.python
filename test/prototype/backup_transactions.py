@@ -21,6 +21,10 @@ from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_b
 from millegrilles.Domaines import HandlerBackupDomaine
 from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
 
+logging.basicConfig()
+logging.getLogger('millegrilles.Domaines.HandlerBackupDomaine').setLevel(logging.DEBUG)
+logging.getLogger('millegrilles.Domaines.HandlerBackupGrosFichiers').setLevel(logging.DEBUG)
+
 contexte = ContexteRessourcesDocumentsMilleGrilles()
 contexte.initialiser()
 
@@ -223,8 +227,6 @@ class MessagesSample(BaseCallback):
                 catalogue, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
 # -------
-logging.basicConfig()
-logging.getLogger('millegrilles.Domaines.HandlerBackupDomaine').setLevel(logging.DEBUG)
 sample = MessagesSample()
 
 # TEST

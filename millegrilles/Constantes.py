@@ -1190,6 +1190,7 @@ class ConstantesBackup:
     LIBELLE_CERTS = 'certificats'
     LIBELLE_CERTS_PEM = 'certificats_pem'
     LIBELLE_FUUID_GROSFICHIERS = 'fuuid_grosfichiers'
+    LIBELLE_FICHIERS_HORAIRE = 'fichiers_horaire'
     LIBELLE_INFO_HORAIRE = 'info_horaire'
     LIBELLE_TRANSACTIONS_SHA512 = 'transactions_sha512'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
