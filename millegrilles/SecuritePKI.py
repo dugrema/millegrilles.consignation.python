@@ -256,6 +256,26 @@ class UtilCertificats:
 
         self._enveloppe = EnveloppeCertificat(self.certificat)
 
+    def aligner_chaine_cas(self, enveloppe: EnveloppeCertificat):
+        liste_enveloppes_cas = list()
+        depth = 0
+        while not enveloppe.is_rootCA and depth < 10:
+            autorite = enveloppe.authority_key_identifier
+            self._logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
+            enveloppes = self._contexte.verificateur_certificats.get_par_akid(autorite)
+            if len(enveloppes) > 1:
+                raise ValueError("Bug - on ne supporte pas plusieurs cert par AKID - TO DO")
+            enveloppe = enveloppes[0]
+            liste_enveloppes_cas.append(enveloppe)
+            self._logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
+
+            depth = depth + 1
+
+        if depth == 10:
+            raise ValueError("Limite de profondeur de chain de certificat atteint")
+
+        return liste_enveloppes_cas
+
     def preparer_transaction_bytes(self, transaction_dict):
         """
         Prepare une transaction (dictionnaire) pour la signature ou la verification. Retourne des bytes.

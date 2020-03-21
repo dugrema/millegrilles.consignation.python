@@ -1431,26 +1431,15 @@ class HandlerBackupDomaine:
         enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
         enveloppe = enveloppe_initial
 
-        liste_cas = list()
-        depth = 0
-        while not enveloppe.is_rootCA and depth < 10:
-            autorite = enveloppe.authority_key_identifier
-            self.__logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
-            enveloppes = self._contexte.verificateur_certificats.get_par_akid(autorite)
-            if len(enveloppes) > 1:
-                raise ValueError("Bug - on ne supporte pas plusieurs cert par AKID - TO DO")
-            enveloppe = enveloppes[0]
-            liste_cas.append(enveloppe.fingerprint_ascii)
-            self.__logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
-
-            depth = depth + 1
-
-        if depth == 10:
-            raise ValueError("Limite de profondeur de chain de certificat atteint")
+        liste_enveloppes_cas = self._contexte.verificateur_transaction.aligner_chaine_cas(enveloppe_initial)
 
         # S'assurer que le certificat racine correspond a la transaction
-        if enveloppe.fingerprint_base58 != transaction['en-tete']['idmg']:
+        ca_racine = liste_enveloppes_cas[-1]
+        if ca_racine.fingerprint_base58 != transaction['en-tete']['idmg']:
             raise ValueError("Transaction IDMG ne correspond pas au certificat racine " + enveloppe.fingerprint_base58)
+
+        # Extraire liste de fingerprints
+        liste_cas = [enveloppe.fingerprint_ascii for enveloppe in liste_enveloppes_cas]
 
         return {
             'certificats': [enveloppe_initial.fingerprint_ascii],

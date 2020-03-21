@@ -78,14 +78,14 @@ class MessagesSample(BaseCallback):
     def executer(self):
         try:
             # self.backup_domaine_senseurpassifs()
-            # self.backup_domaine_grosfichiers()
+            self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
             # self.creer_backup_quoditien_protege(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-            self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+            # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             self.reset_evenements()
         finally:
