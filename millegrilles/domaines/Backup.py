@@ -5,6 +5,7 @@ import json
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.dao.MessageDAO import TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
@@ -22,6 +23,23 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
         domaine_routing_key = method.routing_key.replace('requete.', '')
 
 
+class TraitementMessageDomaineCommandeSecure(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+
+        if routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE:
+            self.gestionnaire.declencher_backup_horaire(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN:
+            self.gestionnaire.declencher_backup_quotidien(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL:
+            self.gestionnaire.declencher_backup_mensuel(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL:
+            self.gestionnaire.declencher_backup_annuel(message_dict)
+        else:
+            raise ValueError("Commande inconnue: " + routing_key)
+
+
 class GestionnaireBackup(GestionnaireDomaineStandard):
     """
     Gestionnaire du domaine de backup
@@ -34,6 +52,10 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+        }
+
+        self.__handler_requetes_commandes = {
+            Constantes.SECURITE_SECURE: TraitementMessageDomaineCommandeSecure(self),
         }
 
     def configurer(self):
@@ -50,7 +72,6 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             name='dirty-backups'
         )
 
-
     def demarrer(self):
         super().demarrer()
         # self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
@@ -59,6 +80,9 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         configuration = super().get_queue_configuration()
 
         return configuration
+
+    def get_handler_commandes(self) -> dict:
+        return self.__handler_requetes_commandes
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
@@ -92,6 +116,22 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
+
+    def declencher_backup_horaire(self, declencheur: dict):
+        heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
+        self.__logger.error("Declencher backup horaire pour " + str(heure))
+
+    def declencher_backup_quotidien(self, declencheur: dict):
+        jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
+        self.__logger.error("Declencher backup quotidien pour " + str(jour))
+
+    def declencher_backup_mensuel(self, declencheur: dict):
+        mois = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_MOIS], tz=datetime.timezone.utc)
+        self.__logger.error("Declencher backup mensuel pour " + str(mois))
+
+    def declencher_backup_annuel(self, declencheur: dict):
+        annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
+        self.__logger.error("Declencher backup annuel pour " + str(annee))
 
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):

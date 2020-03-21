@@ -1276,6 +1276,33 @@ class HandlerBackupDomaine:
 
         self.__logger.debug("Veille: %s, mois precedent: %s, annee_precedente: %s" % (str(veille), str(mois_precedent), str(annee_precedente)))
 
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_JOUR: int(veille.timestamp()),
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
+        commande_backup_mensuel = {
+            ConstantesBackup.LIBELLE_MOIS: int(mois_precedent.timestamp()),
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_mensuel,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
+        commande_backup_annuel = {
+            ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_annuel,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
     def _effectuer_requete_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
         filtre_verif_transactions_anterieures = {

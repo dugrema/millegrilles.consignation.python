@@ -1178,6 +1178,13 @@ class ConstantesBackup:
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
 
     COMMANDE_BACKUP_QUOTIDIEN = 'commande.backup.genererBackupQuotidien'
+    COMMANDE_BACKUP_MENSUEL = 'commande.backup.genererBackupMensuel'
+    COMMANDE_BACKUP_ANNUEL = 'commande.backup.genererBackupAnnuel'
+
+    COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande.%s.declencherBackupHoraire' % DOMAINE_NOM
+    COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande.%s.declencherBackupQuotidien' % DOMAINE_NOM
+    COMMANDE_BACKUP_DECLENCHER_MENSUEL = 'commande.%s.declencherBackupMensuel' % DOMAINE_NOM
+    COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande.%s.declencherBackupAnnuel' % DOMAINE_NOM
 
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
@@ -1185,6 +1192,8 @@ class ConstantesBackup:
     LIBELLE_SECURITE = 'securite'
     LIBELLE_HEURE = 'heure'
     LIBELLE_JOUR = 'jour'
+    LIBELLE_MOIS = 'mois'
+    LIBELLE_ANNEE = 'annee'
     LIBELLE_DOMAINE = 'domaine'
     LIBELLE_CERTS_RACINE = 'certificats_racine'
     LIBELLE_CERTS_INTERMEDIAIRES = 'certificats_intermediaires'
