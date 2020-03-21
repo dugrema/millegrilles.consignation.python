@@ -5,6 +5,7 @@ import datetime
 import lzma
 import hashlib
 import requests
+import pytz
 
 from os import path
 from pika.exceptions import ChannelClosed
@@ -1177,9 +1178,16 @@ class HandlerBackupDomaine:
     def backup_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime, prefixe_fichier: str):
 
         curseur = self._effectuer_requete_domaine(nom_collection_mongo, idmg, heure)
+
+        heure_plusvieille = heure
         for transanter in curseur:
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
-            heure_anterieure = transanter['_id']['timestamp']
+            heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
+
+            # Conserver l'heure la plus vieille dans ce backup
+            # Permet de declencher backup quotidiens anterieurs
+            if heure_anterieure < heure_plusvieille:
+                heure_plusvieille = heure_anterieure
 
             # Creer le fichier de backup
             dependances_backup = self._backup_horaire_domaine(
@@ -1255,6 +1263,18 @@ class HandlerBackupDomaine:
                     "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
                         nom_collection_mongo, str(heure_anterieure))
                 )
+
+        # Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
+        # backup quotidien, mensuel et annuel pour les aggregations qui peuvent etre generees
+        veille = heure_plusvieille - datetime.timedelta(days=1)
+        veille = datetime.datetime(year=veille.year, month=veille.month, day=veille.day, tzinfo=datetime.timezone.utc)
+
+        mois_precedent = veille - datetime.timedelta(days=31)
+        mois_precedent = datetime.datetime(year=mois_precedent.year, month=mois_precedent.month, day=1, tzinfo=datetime.timezone.utc)
+
+        annee_precedente = datetime.datetime(year=mois_precedent.year-1, month=1, day=1, tzinfo=datetime.timezone.utc)
+
+        self.__logger.debug("Veille: %s, mois precedent: %s, annee_precedente: %s" % (str(veille), str(mois_precedent), str(annee_precedente)))
 
     def _effectuer_requete_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle

@@ -77,14 +77,14 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         try:
-            # self.backup_domaine_senseurpassifs()
+            self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
-            self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+            # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             # self.reset_evenements()
         finally:
@@ -151,6 +151,12 @@ class MessagesSample(BaseCallback):
 
         col_grosfichiers.update_many({}, ops)
         col_senseurspassifs.update_many({}, ops)
+
+        col_backup = self.contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        col_backup.update_many(
+            {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN},
+            {'$set': {'dirty_flag': True}}
+        )
 
     def creer_backup_quoditien(self, nom_collection_mongo: str):
         coldocs = self.contexte.document_dao.get_collection(nom_collection_mongo)
