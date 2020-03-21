@@ -1278,6 +1278,8 @@ class HandlerBackupDomaine:
 
         commande_backup_quotidien = {
             ConstantesBackup.LIBELLE_JOUR: int(veille.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,
@@ -1287,6 +1289,8 @@ class HandlerBackupDomaine:
 
         commande_backup_mensuel = {
             ConstantesBackup.LIBELLE_MOIS: int(mois_precedent.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_mensuel,
@@ -1296,6 +1300,8 @@ class HandlerBackupDomaine:
 
         commande_backup_annuel = {
             ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_annuel,

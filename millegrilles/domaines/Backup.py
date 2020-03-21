@@ -119,19 +119,27 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
     def declencher_backup_horaire(self, declencheur: dict):
         heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
-        self.__logger.error("Declencher backup horaire pour " + str(heure))
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self.__logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
 
     def declencher_backup_quotidien(self, declencheur: dict):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
-        self.__logger.error("Declencher backup quotidien pour " + str(jour))
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self.__logger.error("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
 
     def declencher_backup_mensuel(self, declencheur: dict):
         mois = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_MOIS], tz=datetime.timezone.utc)
-        self.__logger.error("Declencher backup mensuel pour " + str(mois))
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self.__logger.error("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
-        self.__logger.error("Declencher backup annuel pour " + str(annee))
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self.__logger.error("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
 
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
