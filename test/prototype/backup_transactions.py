@@ -78,14 +78,14 @@ class MessagesSample(BaseCallback):
     def executer(self):
         try:
             # self.backup_domaine_senseurpassifs()
-            self.backup_domaine_grosfichiers()
+            # self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
             # self.creer_backup_quoditien_protege(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-            # self.creer_backup_quoditien_protege(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+            self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             self.reset_evenements()
         finally:
@@ -153,7 +153,7 @@ class MessagesSample(BaseCallback):
         col_grosfichiers.update_many({}, ops)
         col_senseurspassifs.update_many({}, ops)
 
-    def creer_backup_quoditien_protege(self, nom_collection_mongo: str):
+    def creer_backup_quoditien(self, nom_collection_mongo: str):
         coldocs = self.contexte.document_dao.get_collection(nom_collection_mongo)
         collection_pki = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
 
@@ -176,6 +176,11 @@ class MessagesSample(BaseCallback):
             except KeyError:
                 certs_pem = dict()
                 catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
+
+            # Ajouter le certificat du module courant pour etre sur
+            enveloppe_certificat_module_courant = self.contexte.signateur_transactions.enveloppe_certificat_courant
+
+            certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
 
             certs_manquants = set()
             for fingerprint in certs:
@@ -209,16 +214,13 @@ class MessagesSample(BaseCallback):
                 if champ.startswith('_') or champ in [ConstantesBackup.LIBELLE_DIRTY_FLAG]:
                     del catalogue[champ]
 
-            # Generer la signature du catalogue
             # Generer l'entete et la signature pour le catalogue
-            # catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-            # catalogue = json.loads(catalogue_json)
-            #
-            # # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
-            # catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
-            #     catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
-            # catalogue_json = json.dumps(catalogue_quotidien, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-            # self.__logger.debug("Catalogue:\n%s" % catalogue_json)
+            catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            catalogue = json.loads(catalogue_json)
+            catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
+                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
+            catalogue_json = json.dumps(catalogue_quotidien, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            self.__logger.debug("Catalogue:\n%s" % catalogue_json)
 
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
             # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une

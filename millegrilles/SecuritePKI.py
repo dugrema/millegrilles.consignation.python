@@ -368,7 +368,7 @@ class UtilCertificats:
         return self._certificat
 
     @property
-    def enveloppe_certificat_courant(self):
+    def enveloppe_certificat_courant(self) -> EnveloppeCertificat:
         return self._enveloppe
 
     @property

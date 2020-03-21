@@ -1253,7 +1253,7 @@ class HandlerBackupDomaine:
             else:
                 self.__logger.warning(
                     "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
-                    nom_collection_mongo, str(heure_anterieure))
+                        nom_collection_mongo, str(heure_anterieure))
                 )
 
     def _effectuer_requete_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime):
