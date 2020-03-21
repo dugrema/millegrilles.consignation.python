@@ -88,7 +88,6 @@ class GenerateurTransaction:
     def restaurer_transaction(self, transaction: str):
         self._contexte.message_dao.transmettre_message_direct(transaction, Constantes.TRANSACTION_ROUTING_RESTAURER)
 
-
     def relayer_transaction_vers_tiers(self, transaction: dict, reply_to: str = None, correlation_id: str = None):
         """
         Tente d'acheminer une transaction vers une MilleGrille tierce.

@@ -1171,7 +1171,7 @@ class HandlerBackupDomaine:
     """
 
     def __init__(self, contexte):
-        self.__contexte = contexte
+        self._contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def backup_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime, prefixe_fichier: str):
@@ -1203,8 +1203,8 @@ class HandlerBackupDomaine:
 
                 # Preparer URL de connexion a consignationfichiers
                 url_consignationfichiers = 'https://%s:%s' % (
-                    self.__contexte.configuration.serveur_consignationfichiers_host,
-                    self.__contexte.configuration.serveur_consignationfichiers_port,
+                    self._contexte.configuration.serveur_consignationfichiers_host,
+                    self._contexte.configuration.serveur_consignationfichiers_port,
                 )
 
                 with open(path_fichier_transactions, 'rb') as transactions_fichier:
@@ -1218,8 +1218,8 @@ class HandlerBackupDomaine:
                             '%s/backup/domaine/%s' % (url_consignationfichiers, nom_fichier_catalogue),
                             data=data,
                             files=files,
-                            verify=self.__contexte.configuration.mq_cafile,
-                            cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile)
+                            verify=self._contexte.configuration.mq_cafile,
+                            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
                         )
 
                 if r.status_code == 200:
@@ -1232,7 +1232,7 @@ class HandlerBackupDomaine:
 
                     # Transmettre la transaction au domaine de backup
                     # L'enveloppe est deja prete, on fait juste l'emettre
-                    self.__contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
+                    self._contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
 
                     # Marquer les transactions comme inclue dans le backup
                     liste_uuids = dependances_backup['uuid_transactions']
@@ -1275,7 +1275,7 @@ class HandlerBackupDomaine:
         #     '_evenements.transaction_complete': 1,
         #     '_evenements.%s.transaction_traitee' % idmg: 1,
         # }
-        coltrans = self.__contexte.document_dao.get_collection(nom_collection_mongo)
+        coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
 
         return coltrans.aggregate(operation)
 
@@ -1284,7 +1284,7 @@ class HandlerBackupDomaine:
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
 
-        coltrans = self.__contexte.document_dao.get_collection(nom_collection_mongo)
+        coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
         filtre = {
             '_evenements.transaction_complete': True,
             '_evenements.%s.transaction_traitee' % idmg: {
@@ -1309,17 +1309,21 @@ class HandlerBackupDomaine:
         curseur = coltrans.find(filtre, sort=sort)
 
         # Creer repertoire backup et determiner path fichier
-        backup_workdir = self.__contexte.configuration.backup_workdir
+        backup_workdir = self._contexte.configuration.backup_workdir
         Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
         backup_nomfichier = '%s_transactions_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
         path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
+
+        catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
 
         catalogue_backup = {
             ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
             ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
             ConstantesBackup.LIBELLE_HEURE: heure,
 
+            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: catalogue_nomfichier,
+            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: backup_nomfichier,
             ConstantesBackup.LIBELLE_TRANSACTIONS_SHA512: None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
@@ -1381,19 +1385,24 @@ class HandlerBackupDomaine:
 
             # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
             catalogue_backup = json.loads(catalogue_json)
-            catalogue_backup = self.__contexte.generateur_transactions.preparer_enveloppe(
+            catalogue_backup = self._contexte.generateur_transactions.preparer_enveloppe(
                 catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE)
             catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
             info_backup['catalogue'] = catalogue_backup
 
             # Sauvegarder catlogue sur disque pour transferer
-            catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
             path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
             info_backup['path_catalogue'] = path_catalogue
 
             with lzma.open(path_catalogue, 'wt') as fichier:
                 # Dump du catalogue en format de transaction avec DateFormatEncoder
                 fichier.write(catalogue_json)
+
+            sha512 = hashlib.sha512()
+            with open(path_fichier_backup, 'rb') as fichier:
+                sha512.update(fichier.read())
+            sha512_digest = sha512.hexdigest()
+            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA512] = sha512_digest
 
         else:
             self.__logger.info("Backup: aucune transaction, backup annule")
@@ -1408,7 +1417,7 @@ class HandlerBackupDomaine:
         :param transaction:
         :return:
         """
-        enveloppe_initial = self.__contexte.verificateur_transaction.verifier(transaction)
+        enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
         enveloppe = enveloppe_initial
 
         liste_cas = list()
@@ -1416,7 +1425,7 @@ class HandlerBackupDomaine:
         while not enveloppe.is_rootCA and depth < 10:
             autorite = enveloppe.authority_key_identifier
             self.__logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
-            enveloppes = self.__contexte.verificateur_certificats.get_par_akid(autorite)
+            enveloppes = self._contexte.verificateur_certificats.get_par_akid(autorite)
             if len(enveloppes) > 1:
                 raise ValueError("Bug - on ne supporte pas plusieurs cert par AKID - TO DO")
             enveloppe = enveloppes[0]
@@ -1453,16 +1462,16 @@ class HandlerBackupDomaine:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection_mongo,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
         }
-        self.__contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+        self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
 
     def restaurer_domaines_horaires(self, nom_collection_mongo):
 
         url_consignationfichiers = 'https://%s:%s' % (
-            self.__contexte.configuration.serveur_consignationfichiers_host,
-            self.__contexte.configuration.serveur_consignationfichiers_port,
+            self._contexte.configuration.serveur_consignationfichiers_host,
+            self._contexte.configuration.serveur_consignationfichiers_port,
         )
 
-        backup_workdir = self.__contexte.configuration.backup_workdir
+        backup_workdir = self._contexte.configuration.backup_workdir
         Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
         data = {
@@ -1472,8 +1481,8 @@ class HandlerBackupDomaine:
         with requests.get(
                 '%s/backup/liste/backups_horaire' % url_consignationfichiers,
                 data=data,
-                verify=self.__contexte.configuration.mq_cafile,
-                cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile)
+                verify=self._contexte.configuration.mq_cafile,
+                cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
         ) as r:
 
             if r.status_code == 200:
@@ -1490,8 +1499,8 @@ class HandlerBackupDomaine:
 
             with requests.get(
                     '%s/backup/horaire/transactions/%s' % (url_consignationfichiers, path_fichier_transaction),
-                    verify=self.__contexte.configuration.mq_cafile,
-                    cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile),
+                    verify=self._contexte.configuration.mq_cafile,
+                    cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
             ) as r:
 
                 r.raise_for_status()
@@ -1509,12 +1518,12 @@ class HandlerBackupDomaine:
                 catalogue = json.load(fichier, object_hook=decoder_backup)
 
             self.__logger.debug("Verifier signature catalogue %s\n%s" % (nom_fichier_catalogue, catalogue))
-            self.__contexte.verificateur_transaction.verifier(catalogue)
+            self._contexte.verificateur_transaction.verifier(catalogue)
 
             with requests.get(
                     '%s/backup/horaire/catalogues/%s' % (url_consignationfichiers, path_fichier_catalogue),
-                    verify=self.__contexte.configuration.mq_cafile,
-                    cert=(self.__contexte.configuration.mq_certfile, self.__contexte.configuration.mq_keyfile),
+                    verify=self._contexte.configuration.mq_cafile,
+                    cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile),
             ) as r:
 
                 r.raise_for_status()
@@ -1551,4 +1560,4 @@ class HandlerBackupDomaine:
                 for transaction in fichier:
                     self.__logger.debug("Chargement transaction restauree vers collection:\n%s" % str(transaction))
                     # Emettre chaque transaction vers le consignateur de transaction
-                    self.__contexte.generateur_transactions.restaurer_transaction(transaction)
+                    self._contexte.generateur_transactions.restaurer_transaction(transaction)

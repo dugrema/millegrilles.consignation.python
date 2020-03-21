@@ -1176,6 +1176,8 @@ class ConstantesBackup:
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
 
+    COMMANDE_BACKUP_QUOTIDIEN = 'commande.backup.genererBackupQuotidien'
+
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
 
@@ -1191,6 +1193,8 @@ class ConstantesBackup:
     LIBELLE_INFO_HORAIRE = 'info_horaire'
     LIBELLE_TRANSACTIONS_SHA512 = 'transactions_sha512'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
+    LIBELLE_CATALOGUE_SHA512 = 'catalogue_sha512'
+    LIBELLE_CATALOGUE_NOMFICHIER = 'catalogue_nomfichier'
     LIBELLE_CATALOGUES = 'catalogues'
     LIBELLE_FICHIERS_TRANSACTIONS = 'fichiers_transactions'
     LIBELLE_DIRTY_FLAG = 'dirty_flag'

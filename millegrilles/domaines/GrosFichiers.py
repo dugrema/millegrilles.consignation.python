@@ -65,25 +65,46 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
             sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256]
+            nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+            extension = nom_fichier.split('.')[-1].lower()
 
             fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
                 'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256,
+                'extension': extension,
             }
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
             sha256 = transaction['sha256Hash']
 
-            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_DECRYPTE]] = {
+            fuuid_document_dechiffre = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_DECRYPTE]
+
+            # Aller chercher l'information sur l'extension du fichier dechiffre dans la base de donnees
+            collection_documents = self._contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+                '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_document_dechiffre): {'$exists': True}
+            }
+            document_fichier = collection_documents.find_one(filtre)
+            info_version_fichier = document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid_document_dechiffre]
+            extension = info_version_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER].split('.')[-1].lower()
+
+            fuuid_dict[fuuid_document_dechiffre] = {
                 'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: extension,
             }
 
             try:
-                fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = {
+                info_preview = {
                     'securite': securite,
                 }
+                fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = info_preview
+
+                if transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] == 'image/jpeg':
+                    info_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = 'jpg'
+
             except KeyError:
                 pass
 

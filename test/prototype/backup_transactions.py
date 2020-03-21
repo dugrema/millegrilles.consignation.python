@@ -69,21 +69,23 @@ class MessagesSample(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         self.__logger.debug(str(body))
+        self.event_recu.set()  # Termine
 
     def executer(self):
         try:
             # self.backup_domaine_senseurpassifs()
-            # self.backup_domaine_grosfichiers()
+            self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
             # self.creer_backup_quoditien_protege(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-            self.creer_backup_quoditien_protege(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+            # self.creer_backup_quoditien_protege(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             # self.reset_evenements()
         finally:
+            pass
             self.event_recu.set()  # Termine
 
     def backup_transactions_senseurspassifs_testinit(self):
@@ -205,21 +207,20 @@ class MessagesSample(BaseCallback):
 
             # Generer la signature du catalogue
             # Generer l'entete et la signature pour le catalogue
-            catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-            catalogue = json.loads(catalogue_json)
-
-            # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
-            catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
-                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
-            catalogue_json = json.dumps(catalogue_quotidien, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-            self.__logger.debug("Catalogue:\n%s" % catalogue_json)
+            # catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            # catalogue = json.loads(catalogue_json)
+            #
+            # # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
+            # catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
+            #     catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
+            # catalogue_json = json.dumps(catalogue_quotidien, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            # self.__logger.debug("Catalogue:\n%s" % catalogue_json)
 
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
             # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
             # transaction de catalogue quotidien.
-            pass
-
-
+            self._contexte.generateur_transactions.transmettre_commande(
+                catalogue, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
 # -------
 logging.basicConfig()
