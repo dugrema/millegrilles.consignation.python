@@ -1237,6 +1237,17 @@ class HandlerBackupDomaine:
                     # Marquer les transactions comme inclue dans le backup
                     liste_uuids = dependances_backup['uuid_transactions']
                     self.marquer_transactions_backup_complete(nom_collection_mongo, liste_uuids)
+
+                    transaction_sha512_catalogue = {
+                        ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+                        ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][ConstantesBackup.LIBELLE_SECURITE],
+                        ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
+                        ConstantesBackup.LIBELLE_CATALOGUE_SHA512: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA512],
+                    }
+
+                    self._contexte.generateur_transactions.soumettre_transaction(
+                        transaction_sha512_catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA512)
+
                 else:
                     raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
             else:
@@ -1399,7 +1410,7 @@ class HandlerBackupDomaine:
                 fichier.write(catalogue_json)
 
             sha512 = hashlib.sha512()
-            with open(path_fichier_backup, 'rb') as fichier:
+            with open(path_catalogue, 'rb') as fichier:
                 sha512.update(fichier.read())
             sha512_digest = sha512.hexdigest()
             info_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA512] = sha512_digest

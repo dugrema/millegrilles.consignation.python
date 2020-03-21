@@ -1174,6 +1174,7 @@ class ConstantesBackup:
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
 
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_HORAIRE_SHA512 = '%s.catalogueHoraireSHA512' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
 
     COMMANDE_BACKUP_QUOTIDIEN = 'commande.backup.genererBackupQuotidien'

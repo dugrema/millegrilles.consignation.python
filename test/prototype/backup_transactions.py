@@ -87,7 +87,7 @@ class MessagesSample(BaseCallback):
             # self.creer_backup_quoditien_protege(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
             # self.creer_backup_quoditien_protege(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-            # self.reset_evenements()
+            self.reset_evenements()
         finally:
             pass
             self.event_recu.set()  # Termine

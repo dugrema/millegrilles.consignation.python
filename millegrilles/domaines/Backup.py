@@ -84,6 +84,8 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraire"
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA512:
+            processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHA512"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -149,6 +151,58 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
             '$setOnInsert': set_on_insert,
             '$set': set_ops,
             '$addToSet': add_to_sets,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_backup.update_one(filtre, ops, upsert=True)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        self.__logger.info("Transaction catalogue SHA512 : %s" % str(transaction))
+        heure_backup = datetime.datetime.fromtimestamp(
+            transaction[ConstantesBackup.LIBELLE_HEURE],
+            tz=datetime.timezone.utc
+        )
+
+        jour_backup = datetime.datetime(year=heure_backup.year, month=heure_backup.month, day=heure_backup.day)
+
+        champs_fichier = [
+            ConstantesBackup.LIBELLE_CATALOGUE_SHA512,
+        ]
+
+        set_ops = {
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
+        }
+
+        for champ in champs_fichier:
+            set_ops['%s.%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_HORAIRE, str(heure_backup.hour), champ)] = \
+                transaction[champ]
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
+            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
+            ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
+            ConstantesBackup.LIBELLE_JOUR: jour_backup,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)  # On utilise les memes valeurs que le filtre lors de l'insertion
+
+        ops = {
+            '$setOnInsert': set_on_insert,
+            '$set': set_ops,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
