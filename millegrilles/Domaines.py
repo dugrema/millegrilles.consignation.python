@@ -1431,7 +1431,7 @@ class HandlerBackupDomaine:
         enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
         enveloppe = enveloppe_initial
 
-        liste_enveloppes_cas = self._contexte.verificateur_transaction.aligner_chaine_cas(enveloppe_initial)
+        liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_initial)
 
         # S'assurer que le certificat racine correspond a la transaction
         ca_racine = liste_enveloppes_cas[-1]

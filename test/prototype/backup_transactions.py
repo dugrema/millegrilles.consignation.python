@@ -78,14 +78,13 @@ class MessagesSample(BaseCallback):
     def executer(self):
         try:
             # self.backup_domaine_senseurpassifs()
-            self.backup_domaine_grosfichiers()
+            # self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
-            # self.creer_backup_quoditien_protege(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-            # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+            self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             self.reset_evenements()
         finally:
@@ -182,10 +181,17 @@ class MessagesSample(BaseCallback):
 
             certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
 
+            liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
+            for cert_ca in liste_enveloppes_cas:
+                fingerprint_ca = cert_ca.fingerprint_ascii
+                certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+
             certs_manquants = set()
             for fingerprint in certs:
                 if not certs_pem.get(fingerprint):
                     certs_manquants.add(fingerprint)
+
+            self.__logger.debug("Liste de certificats a trouver: %s" % str(certs_manquants))
 
             if len(certs_manquants) > 0:
                 filtre_certs_pki = {
@@ -203,11 +209,11 @@ class MessagesSample(BaseCallback):
                     fingerprint = cert[ConstantesPki.LIBELLE_FINGERPRINT]
                     pem = cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
                     certs_pem[fingerprint] = pem
+                    certs_manquants.remove(fingerprint)
 
                 # Verifier s'il manque des certificats
-                diff_certs_charges = certs_manquants.difference(certs_pem.keys())
-                if len(diff_certs_charges) > 0:
-                    raise Exception("Certificats manquants : %s" % diff_certs_charges)
+                if len(certs_manquants) > 0:
+                    raise Exception("Certificats manquants : %s" % str(certs_manquants))
 
             # Filtrer catalogue pour retirer les champs Mongo
             for champ in catalogue.copy().keys():
