@@ -1737,6 +1737,68 @@ class HandlerBackupDomaine:
         self.transmettre_trigger_mois_precedent(plus_vieux_jour)
 
     def creer_backup_mensuel(self, domaine: str, mois: datetime.datetime):
+        coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_pki = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+
+        # Calculer la fin du jour comme etant le lendemain, on fait un "<" dans la selection
+        annee_fin = mois.year
+        mois_fin = mois.month + 1
+        if mois_fin > 12:
+            annee_fin = annee_fin + 1
+            mois_fin = 1
+        fin_mois = datetime.datetime(year=annee_fin, month=mois_fin, day=1)
+
+        # Faire la liste des catalogues de backups qui sont dus
+        filtre_backups_mensuels_dirty = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
+            ConstantesBackup.LIBELLE_DOMAINE: domaine,
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
+            ConstantesBackup.LIBELLE_MOIS: {'$lt': fin_mois}
+        }
+        curseur_catalogues = coldocs.find(filtre_backups_mensuels_dirty)
+        plus_vieux_mois = mois
+
+        for catalogue in curseur_catalogues:
+
+            # Identifier le plus vieux backup qui est effectue
+            # Utilise pour transmettre trigger backup mensuel
+            mois_backup = pytz.utc.localize(catalogue[ConstantesBackup.LIBELLE_MOIS])
+            if plus_vieux_mois > mois_backup:
+                plus_vieux_mois = mois_backup
+
+            # Ajouter le certificat du module courant pour etre sur de pouvoir valider le catalogue mensuel
+            enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+
+            try:
+                certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
+            except KeyError:
+                certs_pem = dict()
+                catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
+
+            certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
+
+            liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
+            for cert_ca in liste_enveloppes_cas:
+                fingerprint_ca = cert_ca.fingerprint_ascii
+                certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+
+            # Filtrer catalogue pour retirer les champs Mongo
+            for champ in catalogue.copy().keys():
+                if champ.startswith('_') or champ in [ConstantesBackup.LIBELLE_DIRTY_FLAG]:
+                    del catalogue[champ]
+
+            # Generer l'entete et la signature pour le catalogue
+            catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            catalogue = json.loads(catalogue_json)
+            catalogue_mensuel = self._contexte.generateur_transactions.preparer_enveloppe(
+                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_MENSUEL)
+            self.__logger.debug("Catalogue:\n%s" % catalogue_mensuel)
+
+            # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
+            # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
+            # transaction de catalogue quotidien.
+            self._contexte.generateur_transactions.transmettre_commande(
+                {'catalogue': catalogue_mensuel}, ConstantesBackup.COMMANDE_BACKUP_MENSUEL)
 
         self.transmettre_trigger_annee_precedente(mois)
 

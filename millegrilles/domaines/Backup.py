@@ -289,7 +289,7 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
     def initiale(self):
         transaction = self.charger_transaction()
 
-        self.__logger.debug("Transaction catalogue quotidien : %s" % str(transaction))
+        self.__logger.debug("Transaction information archive quotidienne : %s" % str(transaction))
         jour_backup = datetime.datetime.fromtimestamp(
             transaction[ConstantesBackup.LIBELLE_JOUR],
             tz=datetime.timezone.utc
@@ -309,7 +309,109 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
             ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
-            ConstantesBackup.LIBELLE_JOUR: mois_backup,
+            ConstantesBackup.LIBELLE_MOIS: mois_backup,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)  # On utilise les memes valeurs que le filtre lors de l'insertion
+
+        ops = {
+            '$setOnInsert': set_on_insert,
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_backup.update_one(filtre, ops, upsert=True)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusFinaliserCatalogueMensuel(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        self.__finaliser_catalogue_mensuel()
+        self.set_etape_suivante()  # Termine
+
+    def __finaliser_catalogue_mensuel(self):
+        transaction = self.charger_transaction()
+
+        self.__logger.debug("Transaction catalogue mensuel : %s" % str(transaction))
+        mois_backup = datetime.datetime.fromtimestamp(
+            transaction[ConstantesBackup.LIBELLE_MOIS],
+            tz=datetime.timezone.utc
+        )
+
+        champs_copier = [
+            ConstantesBackup.LIBELLE_FICHIERS_QUOTIDIEN,
+        ]
+
+        set_ops = {
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: False,
+        }
+
+        for champ in champs_copier:
+            set_ops[champ] = transaction[champ]
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
+            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
+            ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
+            ConstantesBackup.LIBELLE_MOIS: mois_backup,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)  # On utilise les memes valeurs que le filtre lors de l'insertion
+
+        ops = {
+            '$setOnInsert': set_on_insert,
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_backup.update_one(filtre, ops, upsert=True)
+
+
+class ProcessusInformationArchiveMensuelle(MGProcessusTransaction):
+    """
+    Sauvegarder les informations de l'archive mensuelle dans le catalogue annuel.
+    """
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        self.__logger.debug("Transaction information archive mensuelle : %s" % str(transaction))
+        mois_backup = datetime.datetime.fromtimestamp(
+            transaction[ConstantesBackup.LIBELLE_MOIS],
+            tz=datetime.timezone.utc
+        )
+
+        annee_backup = datetime.datetime(year=mois_backup.year, month=1, day=1)
+
+        set_ops = {
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
+            '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_MENSUEL, str(mois_backup.month)): {
+                ConstantesBackup.LIBELLE_ARCHIVE_SHA512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA512],
+                ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
+            }
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
+            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
+            ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
+            ConstantesBackup.LIBELLE_ANNEE: annee_backup,
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
