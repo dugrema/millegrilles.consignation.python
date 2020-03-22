@@ -877,12 +877,14 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         self._logger.error("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
+        self.__handler_backup.creer_backup_mensuel(self.get_nom_domaine(), mois)
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         self._logger.error("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
+        self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
 
     @property
     def handler_backup(self):
@@ -1329,50 +1331,7 @@ class HandlerBackupDomaine:
                         self._nom_collection_transactions, str(heure_anterieure))
                 )
 
-        # Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
-        # backup quotidien, mensuel et annuel pour les aggregations qui peuvent etre generees
-        veille = heure_plusvieille - datetime.timedelta(days=1)
-        veille = datetime.datetime(year=veille.year, month=veille.month, day=veille.day, tzinfo=datetime.timezone.utc)
-
-        mois_precedent = veille - datetime.timedelta(days=31)
-        mois_precedent = datetime.datetime(year=mois_precedent.year, month=mois_precedent.month, day=1, tzinfo=datetime.timezone.utc)
-
-        annee_precedente = datetime.datetime(year=mois_precedent.year-1, month=1, day=1, tzinfo=datetime.timezone.utc)
-
-        self.__logger.debug("Veille: %s, mois precedent: %s, annee_precedente: %s" % (str(veille), str(mois_precedent), str(annee_precedente)))
-
-        commande_backup_quotidien = {
-            ConstantesBackup.LIBELLE_JOUR: int(veille.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
-        }
-        self._contexte.generateur_transactions.transmettre_commande(
-            commande_backup_quotidien,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace('_DOMAINE_', self._nom_collection_transactions),
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
-        )
-
-        commande_backup_mensuel = {
-            ConstantesBackup.LIBELLE_MOIS: int(mois_precedent.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
-        }
-        self._contexte.generateur_transactions.transmettre_commande(
-            commande_backup_mensuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace('_DOMAIN_', self._nom_collection_transactions),
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
-        )
-
-        commande_backup_annuel = {
-            ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
-        }
-        self._contexte.generateur_transactions.transmettre_commande(
-            commande_backup_annuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace('_DOMAIN_', self._nom_collection_transactions),
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
-        )
+        self.transmettre_trigger_jour_precedent(heure_plusvieille)
 
     def _effectuer_requete_domaine(self, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
@@ -1682,7 +1641,7 @@ class HandlerBackupDomaine:
                     # Emettre chaque transaction vers le consignateur de transaction
                     self._contexte.generateur_transactions.restaurer_transaction(transaction)
 
-    def creer_backup_quoditien(self, domaine: str, jour: datetime):
+    def creer_backup_quoditien(self, domaine: str, jour: datetime.datetime):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
         collection_pki = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
 
@@ -1697,6 +1656,7 @@ class HandlerBackupDomaine:
             ConstantesBackup.LIBELLE_JOUR: {'$lt': fin_jour}
         }
         curseur_catalogues = coldocs.find(filtre_backups_quotidiens_dirty)
+        plus_vieux_jour = jour
 
         for catalogue in curseur_catalogues:
 
@@ -1704,6 +1664,12 @@ class HandlerBackupDomaine:
             certs = catalogue[ConstantesBackup.LIBELLE_CERTS_RACINE].copy()
             certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES])
             certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS])
+
+            # Identifier le plus vieux backup qui est effectue
+            # Utilise pour transmettre trigger backup mensuel
+            jour_backup = catalogue[ConstantesBackup.LIBELLE_JOUR]
+            if plus_vieux_jour > jour_backup:
+                plus_vieux_jour = jour_backup
 
             try:
                 certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
@@ -1767,3 +1733,71 @@ class HandlerBackupDomaine:
             # transaction de catalogue quotidien.
             self._contexte.generateur_transactions.transmettre_commande(
                 {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
+
+        self.transmettre_trigger_mois_precedent(plus_vieux_jour)
+
+    def creer_backup_mensuel(self, domaine: str, mois: datetime.datetime):
+
+        self.transmettre_trigger_annee_precedente(mois)
+
+    def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
+        pass
+
+    def transmettre_trigger_jour_precedent(self, heure_plusvieille):
+        """
+        Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
+        backup quotidien, mensuel et annuel pour les aggregations qui peuvent etre generees
+
+        :param heure_plusvieille:
+        :return:
+        """
+
+        veille = heure_plusvieille - datetime.timedelta(days=1)
+        veille = datetime.datetime(year=veille.year, month=veille.month, day=veille.day, tzinfo=datetime.timezone.utc)
+        self.__logger.debug("Veille: %s" % str(veille))
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_JOUR: int(veille.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace(
+                '_DOMAINE_', self._nom_domaine),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
+    def transmettre_trigger_mois_precedent(self, jour: datetime.datetime):
+        annee = jour.year
+        mois_precedent = jour.month - 1
+        if mois_precedent == 0:
+            annee = annee - 1
+            mois_precedent = 12
+
+        mois_precedent = datetime.datetime(year=annee, month=mois_precedent, day=1, tzinfo=datetime.timezone.utc)
+
+        commande_backup_mensuel = {
+            ConstantesBackup.LIBELLE_MOIS: int(mois_precedent.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_mensuel,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace('_DOMAINE_', self._nom_domaine),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
+    def transmettre_trigger_annee_precedente(self, mois: datetime.datetime):
+        annee_precedente = datetime.datetime(year=mois.year-1, month=1, day=1, tzinfo=datetime.timezone.utc)
+
+        commande_backup_annuel = {
+            ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_annuel,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace('_DOMAINE_', self._nom_domaine),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
