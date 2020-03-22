@@ -52,7 +52,10 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementMessageDomaineRequete):
 class HandlerBackupGrosFichiers(HandlerBackupDomaine):
 
     def __init__(self, contexte):
-        super().__init__(contexte)
+        super().__init__(contexte,
+                         ConstantesGrosFichiers.DOMAINE_NOM,
+                         ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM,
+                         ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
     def _traiter_transaction(self, transaction):
         info_transaction = super()._traiter_transaction(transaction)

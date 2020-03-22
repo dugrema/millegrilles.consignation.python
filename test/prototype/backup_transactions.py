@@ -1,22 +1,16 @@
 import datetime
-import time
 import json
 import lzma
 import logging
-import requests
-import ssl
-import hashlib
-import binascii
-from threading import Thread, Event
-from os import listdir, path
+from threading import Event
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
-from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesGrosFichiers, ConstantesBackup, ConstantesPki
-from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_backup, DateFormatEncoder
+from millegrilles.Constantes import SenseursPassifsConstantes, ConstantesGrosFichiers, ConstantesBackup
+from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, decoder_backup
 
 from millegrilles.Domaines import HandlerBackupDomaine
 from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
@@ -39,7 +33,11 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)
 
-        self.handler_backup = HandlerBackupDomaine(self.contexte)
+        self.handler_backup_senseurspassifs = HandlerBackupDomaine(
+            self.contexte,
+            SenseursPassifsConstantes.DOMAINE_NOM,
+            SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM,
+            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         self.handler_grosfichiers = HandlerBackupGrosFichiers(self.contexte)
 
         self.channel = None
@@ -111,7 +109,7 @@ class MessagesSample(BaseCallback):
         heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.handler_backup.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
+        self.handler_backup_senseurspassifs.backup_domaine(heure, nom_collection_mongo)
 
     def backup_domaine_grosfichiers(self):
         nom_collection_mongo = ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
@@ -120,7 +118,7 @@ class MessagesSample(BaseCallback):
         heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.handler_grosfichiers.backup_domaine(nom_collection_mongo, self.idmg, heure, nom_collection_mongo)
+        self.handler_grosfichiers.backup_domaine(heure, nom_collection_mongo)
 
     def restore_domaine(self, nom_collection_mongo):
 
@@ -158,88 +156,88 @@ class MessagesSample(BaseCallback):
             {'$set': {'dirty_flag': True}}
         )
 
-    def creer_backup_quoditien(self, nom_collection_mongo: str):
-        self.handler_backup.creer_backup_quoditien(nom_collection_mongo)
-
-        # coldocs = self.contexte.document_dao.get_collection(nom_collection_mongo)
-        # collection_pki = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        #
-        # # Faire la liste des catalogues de backups qui sont dus
-        # filtre_backups_quotidiens_dirty = {
-        #     Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
-        #     ConstantesBackup.LIBELLE_DIRTY_FLAG: True
-        # }
-        # curseur_catalogues = coldocs.find(filtre_backups_quotidiens_dirty)
-        #
-        # for catalogue in curseur_catalogues:
-        #
-        #     # S'assurer que le catalogue contient tous les certificats
-        #     certs = catalogue[ConstantesBackup.LIBELLE_CERTS_RACINE].copy()
-        #     certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES])
-        #     certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS])
-        #
-        #     try:
-        #         certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
-        #     except KeyError:
-        #         certs_pem = dict()
-        #         catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
-        #
-        #     # Ajouter le certificat du module courant pour etre sur
-        #     enveloppe_certificat_module_courant = self.contexte.signateur_transactions.enveloppe_certificat_courant
-        #
-        #     certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
-        #
-        #     liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
-        #     for cert_ca in liste_enveloppes_cas:
-        #         fingerprint_ca = cert_ca.fingerprint_ascii
-        #         certs_pem[fingerprint_ca] = cert_ca.certificat_pem
-        #
-        #     certs_manquants = set()
-        #     for fingerprint in certs:
-        #         if not certs_pem.get(fingerprint):
-        #             certs_manquants.add(fingerprint)
-        #
-        #     self.__logger.debug("Liste de certificats a trouver: %s" % str(certs_manquants))
-        #
-        #     if len(certs_manquants) > 0:
-        #         filtre_certs_pki = {
-        #             ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(certs_manquants)},
-        #             ConstantesPki.LIBELLE_CHAINE_COMPLETE: True,
-        #             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-        #                 ConstantesPki.LIBVAL_CERTIFICAT_ROOT,
-        #                 ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE,
-        #                 ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
-        #                 ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
-        #             ]}
-        #         }
-        #         curseur_certificats = collection_pki.find(filtre_certs_pki)
-        #         for cert in curseur_certificats:
-        #             fingerprint = cert[ConstantesPki.LIBELLE_FINGERPRINT]
-        #             pem = cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
-        #             certs_pem[fingerprint] = pem
-        #             certs_manquants.remove(fingerprint)
-        #
-        #         # Verifier s'il manque des certificats
-        #         if len(certs_manquants) > 0:
-        #             raise Exception("Certificats manquants : %s" % str(certs_manquants))
-        #
-        #     # Filtrer catalogue pour retirer les champs Mongo
-        #     for champ in catalogue.copy().keys():
-        #         if champ.startswith('_') or champ in [ConstantesBackup.LIBELLE_DIRTY_FLAG]:
-        #             del catalogue[champ]
-        #
-        #     # Generer l'entete et la signature pour le catalogue
-        #     catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-        #     catalogue = json.loads(catalogue_json)
-        #     catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
-        #         catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
-        #     self.__logger.debug("Catalogue:\n%s" % catalogue_quotidien)
-        #
-        #     # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
-        #     # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
-        #     # transaction de catalogue quotidien.
-        #     self._contexte.generateur_transactions.transmettre_commande(
-        #         {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
+    # def creer_backup_quoditien(self, nom_collection_mongo: str):
+    #     self.handler_backup.creer_backup_quoditien(nom_collection_mongo)
+    #
+    #     coldocs = self.contexte.document_dao.get_collection(nom_collection_mongo)
+    #     collection_pki = self.contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+    #
+    #     # Faire la liste des catalogues de backups qui sont dus
+    #     filtre_backups_quotidiens_dirty = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
+    #         ConstantesBackup.LIBELLE_DIRTY_FLAG: True
+    #     }
+    #     curseur_catalogues = coldocs.find(filtre_backups_quotidiens_dirty)
+    #
+    #     for catalogue in curseur_catalogues:
+    #
+    #         # S'assurer que le catalogue contient tous les certificats
+    #         certs = catalogue[ConstantesBackup.LIBELLE_CERTS_RACINE].copy()
+    #         certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES])
+    #         certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS])
+    #
+    #         try:
+    #             certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
+    #         except KeyError:
+    #             certs_pem = dict()
+    #             catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
+    #
+    #         # Ajouter le certificat du module courant pour etre sur
+    #         enveloppe_certificat_module_courant = self.contexte.signateur_transactions.enveloppe_certificat_courant
+    #
+    #         certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
+    #
+    #         liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
+    #         for cert_ca in liste_enveloppes_cas:
+    #             fingerprint_ca = cert_ca.fingerprint_ascii
+    #             certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+    #
+    #         certs_manquants = set()
+    #         for fingerprint in certs:
+    #             if not certs_pem.get(fingerprint):
+    #                 certs_manquants.add(fingerprint)
+    #
+    #         self.__logger.debug("Liste de certificats a trouver: %s" % str(certs_manquants))
+    #
+    #         if len(certs_manquants) > 0:
+    #             filtre_certs_pki = {
+    #                 ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(certs_manquants)},
+    #                 ConstantesPki.LIBELLE_CHAINE_COMPLETE: True,
+    #                 Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+    #                     ConstantesPki.LIBVAL_CERTIFICAT_ROOT,
+    #                     ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE,
+    #                     ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
+    #                     ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
+    #                 ]}
+    #             }
+    #             curseur_certificats = collection_pki.find(filtre_certs_pki)
+    #             for cert in curseur_certificats:
+    #                 fingerprint = cert[ConstantesPki.LIBELLE_FINGERPRINT]
+    #                 pem = cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+    #                 certs_pem[fingerprint] = pem
+    #                 certs_manquants.remove(fingerprint)
+    #
+    #             # Verifier s'il manque des certificats
+    #             if len(certs_manquants) > 0:
+    #                 raise Exception("Certificats manquants : %s" % str(certs_manquants))
+    #
+    #         # Filtrer catalogue pour retirer les champs Mongo
+    #         for champ in catalogue.copy().keys():
+    #             if champ.startswith('_') or champ in [ConstantesBackup.LIBELLE_DIRTY_FLAG]:
+    #                 del catalogue[champ]
+    #
+    #         # Generer l'entete et la signature pour le catalogue
+    #         catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+    #         catalogue = json.loads(catalogue_json)
+    #         catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
+    #             catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
+    #         self.__logger.debug("Catalogue:\n%s" % catalogue_quotidien)
+    #
+    #         # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
+    #         # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
+    #         # transaction de catalogue quotidien.
+    #         self._contexte.generateur_transactions.transmettre_commande(
+    #             {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
 # -------
 sample = MessagesSample()

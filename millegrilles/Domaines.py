@@ -21,6 +21,7 @@ from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide
@@ -690,7 +691,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         self.__traitement_middleware = None
         self.__traitement_noeud = None
-        self.__handler_backup = HandlerBackupDomaine(contexte)
+        self.__handler_backup = HandlerBackupDomaine(
+            contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(), self.get_collection())
 
         self.__handler_cedule = None
         self.__handler_commandes = None
@@ -861,7 +863,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         self._logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
-        self.handler_backup.backup_domaine(self.get_collection_transaction_nom(), self.configuration.idmg, heure, domaine)
+        self.handler_backup.backup_domaine(heure, domaine)
 
     def declencher_backup_quotidien(self, declencheur: dict):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
@@ -973,7 +975,7 @@ class WatcherCollectionMongoThread:
 
     def __init__(
             self,
-            contexte: ContexteRessourcesMilleGrilles,
+            contexte: ContexteRessourcesDocumentsMilleGrilles,
             stop_event: Event,
             nom_collection_mongo: str,
             routing_key: str,
@@ -1229,13 +1231,16 @@ class HandlerBackupDomaine:
     Gestionnaire de backup des transactions d'un domaine.
     """
 
-    def __init__(self, contexte):
+    def __init__(self, contexte, nom_domaine, nom_collection_transactions, nom_collection_documents):
         self._contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def backup_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime, prefixe_fichier: str):
+        self._nom_domaine = nom_domaine
+        self._nom_collection_transactions = nom_collection_transactions
+        self._nom_collection_documents = nom_collection_documents
 
-        curseur = self._effectuer_requete_domaine(nom_collection_mongo, idmg, heure)
+    def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str):
+        curseur = self._effectuer_requete_domaine(heure)
 
         heure_plusvieille = heure
         for transanter in curseur:
@@ -1249,7 +1254,7 @@ class HandlerBackupDomaine:
 
             # Creer le fichier de backup
             dependances_backup = self._backup_horaire_domaine(
-                nom_collection_mongo, idmg, heure_anterieure, prefixe_fichier, Constantes.SECURITE_PRIVE)
+                self._nom_collection_transactions, self._contexte.idmg, heure_anterieure, prefixe_fichier, Constantes.SECURITE_PRIVE)
             if dependances_backup is not None:
                 catalogue_backup = dependances_backup['catalogue']
 
@@ -1293,8 +1298,10 @@ class HandlerBackupDomaine:
                     self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
 
                     # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
-                    if reponse_json['fichiersDomaines'][nom_fichier_transactions] != catalogue_backup['transactions_sha512']:
-                        raise ValueError("Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
+                    if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
+                            catalogue_backup['transactions_sha512']:
+                        raise ValueError(
+                            "Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
 
                     # Transmettre la transaction au domaine de backup
                     # L'enveloppe est deja prete, on fait juste l'emettre
@@ -1302,10 +1309,10 @@ class HandlerBackupDomaine:
 
                     # Marquer les transactions comme inclue dans le backup
                     liste_uuids = dependances_backup['uuid_transactions']
-                    self.marquer_transactions_backup_complete(nom_collection_mongo, liste_uuids)
+                    self.marquer_transactions_backup_complete(self._nom_collection_transactions, liste_uuids)
 
                     transaction_sha512_catalogue = {
-                        ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+                        ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
                         ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][ConstantesBackup.LIBELLE_SECURITE],
                         ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
                         ConstantesBackup.LIBELLE_CATALOGUE_SHA512: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA512],
@@ -1319,7 +1326,7 @@ class HandlerBackupDomaine:
             else:
                 self.__logger.warning(
                     "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
-                        nom_collection_mongo, str(heure_anterieure))
+                        self._nom_collection_transactions, str(heure_anterieure))
                 )
 
         # Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
@@ -1336,39 +1343,41 @@ class HandlerBackupDomaine:
 
         commande_backup_quotidien = {
             ConstantesBackup.LIBELLE_JOUR: int(veille.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
             ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace('_DOMAINE_', nom_collection_mongo),
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace('_DOMAINE_', self._nom_collection_transactions),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
         commande_backup_mensuel = {
             ConstantesBackup.LIBELLE_MOIS: int(mois_precedent.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
             ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_mensuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace('_DOMAIN_', nom_collection_mongo),
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace('_DOMAIN_', self._nom_collection_transactions),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
         commande_backup_annuel = {
             ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
             ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_annuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace('_DOMAIN_', nom_collection_mongo),
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace('_DOMAIN_', self._nom_collection_transactions),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
-    def _effectuer_requete_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime.datetime):
+    def _effectuer_requete_domaine(self, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
+        idmg = self._contexte.idmg
+
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
             '_evenements.%s.transaction_traitee' % idmg: {'$lt': heure},
@@ -1393,13 +1402,13 @@ class HandlerBackupDomaine:
             {'$group': regroupement},
             {'$sort': sort},
         ]
-        # hint = {
-        #     '_evenements.transaction_complete': 1,
-        #     '_evenements.%s.transaction_traitee' % idmg: 1,
-        # }
-        coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
+        hint = {
+            '_evenements.transaction_complete': 1,
+            '_evenements.%s.transaction_traitee' % idmg: 1,
+        }
+        collection_transactions = self._contexte.document_dao.get_collection(self._nom_collection_transactions)
 
-        return coltrans.aggregate(operation)
+        return collection_transactions.aggregate(operation, hint=hint)
 
     def _backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str, niveau_securite: str) -> dict:
         heure_str = heure.strftime("%Y%m%d%H")
@@ -1677,12 +1686,15 @@ class HandlerBackupDomaine:
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
         collection_pki = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
 
+        # Calculer la fin du jour comme etant le lendemain, on fait un "<" dans la selection
+        fin_jour = jour + datetime.timedelta(days=1)
+
         # Faire la liste des catalogues de backups qui sont dus
         filtre_backups_quotidiens_dirty = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
             ConstantesBackup.LIBELLE_DOMAINE: domaine,
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
-            ConstantesBackup.LIBELLE_JOUR: {'$lt': jour}
+            ConstantesBackup.LIBELLE_JOUR: {'$lt': fin_jour}
         }
         curseur_catalogues = coldocs.find(filtre_backups_quotidiens_dirty)
 
