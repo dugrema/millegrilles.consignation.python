@@ -1383,6 +1383,11 @@ class TraitementMessageCedule(TraitementMessageDomaine):
         self.gestionnaire.traiter_cedule(message)
 
 
+class TraitementCommandesSecures(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        pass
+
 class PikaSetupCallbackHandler:
 
     class RoutingKeyCallback:

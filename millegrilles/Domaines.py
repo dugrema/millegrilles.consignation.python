@@ -15,9 +15,9 @@ from threading import Thread, Event, Lock
 from pathlib import Path
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesBackup
+from millegrilles.Constantes import ConstantesBackup, ConstantesPki
 from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
-    TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule
+    TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -658,6 +658,28 @@ class GestionnaireDomaine:
         return not self._stop_event.is_set() and self.wait_Q_ready.is_set()
 
 
+class TraitementCommandesSecures(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+
+        nom_domaine = self.gestionnaire.get_collection_transaction_nom()
+
+        resultat = None
+
+        if routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace("_DOMAINE_", nom_domaine):
+            self.gestionnaire.declencher_backup_horaire(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace("_DOMAINE_", nom_domaine):
+            self.gestionnaire.declencher_backup_quotidien(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace("_DOMAINE_", nom_domaine):
+            self.gestionnaire.declencher_backup_mensuel(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
+            self.gestionnaire.declencher_backup_annuel(message_dict)
+        else:
+            raise ValueError("Commande inconnue: " + routing_key)
+
+        return resultat
+
 class GestionnaireDomaineStandard(GestionnaireDomaine):
     """
     Implementation des Q standards pour les domaines.
@@ -668,7 +690,10 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         self.__traitement_middleware = None
         self.__traitement_noeud = None
+        self.__handler_backup = HandlerBackupDomaine(contexte)
+
         self.__handler_cedule = None
+        self.__handler_commandes = None
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
@@ -678,6 +703,9 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
         self.__traitement_noeud = TraitementMessageDomaineRequete(self)
         self.__handler_cedule = TraitementMessageCedule(self)
+        self.__handler_commandes = {
+            Constantes.SECURITE_SECURE: TraitementCommandesSecures(self)
+        }
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         # Index noeud, _mg-libelle
@@ -795,7 +823,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         }
 
     def get_handler_commandes(self) -> dict:
-        return dict()  # Aucun par defaut
+        return self.__handler_commandes
 
     def get_handler_cedule(self):
         return self.__handler_cedule
@@ -827,6 +855,36 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         collection_processus.delete_many(filtre_complet)
         collection_processus.delete_many(filtre_incomplet)
+
+    def declencher_backup_horaire(self, declencheur: dict):
+        heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self._logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
+        self.handler_backup.backup_domaine(self.get_collection_transaction_nom(), self.configuration.idmg, heure, domaine)
+
+    def declencher_backup_quotidien(self, declencheur: dict):
+        jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self._logger.error("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
+        self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour)
+
+    def declencher_backup_mensuel(self, declencheur: dict):
+        mois = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_MOIS], tz=datetime.timezone.utc)
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self._logger.error("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
+
+    def declencher_backup_annuel(self, declencheur: dict):
+        annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
+        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        self._logger.error("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
+
+    @property
+    def handler_backup(self):
+        return self.__handler_backup
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaine):
@@ -1283,7 +1341,7 @@ class HandlerBackupDomaine:
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace('_DOMAINE_', nom_collection_mongo),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
@@ -1294,7 +1352,7 @@ class HandlerBackupDomaine:
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_mensuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace('_DOMAIN_', nom_collection_mongo),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
@@ -1305,7 +1363,7 @@ class HandlerBackupDomaine:
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_annuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace('_DOMAIN_', nom_collection_mongo),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
@@ -1614,3 +1672,86 @@ class HandlerBackupDomaine:
                     self.__logger.debug("Chargement transaction restauree vers collection:\n%s" % str(transaction))
                     # Emettre chaque transaction vers le consignateur de transaction
                     self._contexte.generateur_transactions.restaurer_transaction(transaction)
+
+    def creer_backup_quoditien(self, domaine: str, jour: datetime):
+        coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_pki = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+
+        # Faire la liste des catalogues de backups qui sont dus
+        filtre_backups_quotidiens_dirty = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
+            ConstantesBackup.LIBELLE_DOMAINE: domaine,
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
+            ConstantesBackup.LIBELLE_JOUR: {'$lt': jour}
+        }
+        curseur_catalogues = coldocs.find(filtre_backups_quotidiens_dirty)
+
+        for catalogue in curseur_catalogues:
+
+            # S'assurer que le catalogue contient tous les certificats
+            certs = catalogue[ConstantesBackup.LIBELLE_CERTS_RACINE].copy()
+            certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES])
+            certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS])
+
+            try:
+                certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
+            except KeyError:
+                certs_pem = dict()
+                catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
+
+            # Ajouter le certificat du module courant pour etre sur
+            enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+
+            certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
+
+            liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
+            for cert_ca in liste_enveloppes_cas:
+                fingerprint_ca = cert_ca.fingerprint_ascii
+                certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+
+            certs_manquants = set()
+            for fingerprint in certs:
+                if not certs_pem.get(fingerprint):
+                    certs_manquants.add(fingerprint)
+
+            self.__logger.debug("Liste de certificats a trouver: %s" % str(certs_manquants))
+
+            if len(certs_manquants) > 0:
+                filtre_certs_pki = {
+                    ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(certs_manquants)},
+                    ConstantesPki.LIBELLE_CHAINE_COMPLETE: True,
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                        ConstantesPki.LIBVAL_CERTIFICAT_ROOT,
+                        ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE,
+                        ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
+                        ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
+                    ]}
+                }
+                curseur_certificats = collection_pki.find(filtre_certs_pki)
+                for cert in curseur_certificats:
+                    fingerprint = cert[ConstantesPki.LIBELLE_FINGERPRINT]
+                    pem = cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+                    certs_pem[fingerprint] = pem
+                    certs_manquants.remove(fingerprint)
+
+                # Verifier s'il manque des certificats
+                if len(certs_manquants) > 0:
+                    raise Exception("Certificats manquants : %s" % str(certs_manquants))
+
+            # Filtrer catalogue pour retirer les champs Mongo
+            for champ in catalogue.copy().keys():
+                if champ.startswith('_') or champ in [ConstantesBackup.LIBELLE_DIRTY_FLAG]:
+                    del catalogue[champ]
+
+            # Generer l'entete et la signature pour le catalogue
+            catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+            catalogue = json.loads(catalogue_json)
+            catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
+                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
+            self.__logger.debug("Catalogue:\n%s" % catalogue_quotidien)
+
+            # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
+            # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
+            # transaction de catalogue quotidien.
+            self._contexte.generateur_transactions.transmettre_commande(
+                {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)

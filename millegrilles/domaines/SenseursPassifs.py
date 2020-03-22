@@ -9,9 +9,9 @@ from pymongo.errors import OperationFailure
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete
-from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter
+from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter, TraitementCommandesSecures
 from millegrilles.MGProcessus import MGProcessusTransaction
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineCommande
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
 from openpyxl import Workbook
@@ -40,7 +40,7 @@ class TraitementRequetesProtegeesSenseursPassifs(TraitementMessageDomaineRequete
             super().traiter_requete(ch, method, properties, body, message_dict)
 
 
-class TraitementCommandeSenseursPassifs(TraitementMessageDomaineCommande):
+class TraitementCommandeSenseursPassifs(TraitementCommandesSecures):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
@@ -52,6 +52,8 @@ class TraitementCommandeSenseursPassifs(TraitementMessageDomaineCommande):
             CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
         elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_DECLENCHER_RAPPORTS:
             resultat = CommandeDeclencherRapports(self.gestionnaire, message_dict).declencher()
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
         return resultat
 

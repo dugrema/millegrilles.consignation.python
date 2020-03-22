@@ -1181,10 +1181,10 @@ class ConstantesBackup:
     COMMANDE_BACKUP_MENSUEL = 'commande.backup.genererBackupMensuel'
     COMMANDE_BACKUP_ANNUEL = 'commande.backup.genererBackupAnnuel'
 
-    COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande.%s.declencherBackupHoraire' % DOMAINE_NOM
-    COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande.%s.declencherBackupQuotidien' % DOMAINE_NOM
-    COMMANDE_BACKUP_DECLENCHER_MENSUEL = 'commande.%s.declencherBackupMensuel' % DOMAINE_NOM
-    COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande.%s.declencherBackupAnnuel' % DOMAINE_NOM
+    COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande._DOMAINE_.declencherBackupHoraire'
+    COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande._DOMAINE_.declencherBackupQuotidien'
+    COMMANDE_BACKUP_DECLENCHER_MENSUEL = 'commande._DOMAINE_.declencherBackupMensuel'
+    COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande._DOMAINE_.declencherBackupAnnuel'
 
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
