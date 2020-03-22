@@ -75,7 +75,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         try:
-            self.backup_domaine_senseurpassifs()
+            # self.backup_domaine_senseurpassifs()
             self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
@@ -88,6 +88,21 @@ class MessagesSample(BaseCallback):
         finally:
             pass
             self.event_recu.set()  # Termine
+
+    def trigger_backup_horaire(self, domaine):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: domaine,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace(
+                '_DOMAINE_', domaine),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
 
     def backup_transactions_senseurspassifs_testinit(self):
         coltrans = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)

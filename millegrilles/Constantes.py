@@ -1175,7 +1175,12 @@ class ConstantesBackup:
 
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_HORAIRE_SHA512 = '%s.catalogueHoraireSHA512' % DOMAINE_NOM
-    TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidien' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidienFinaliser' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_MENSUEL = '%s.catalogueMensuelFinaliser' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_ANNUEL = '%s.catalogueAnnuelFinaliser' % DOMAINE_NOM
+
+    TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO = '%s.archiveQuotidienneInfo' % DOMAINE_NOM
+    TRANSACTION_ARCHIVE_MENSUELLE_INFO = '%s.archiveMensuelleInfo' % DOMAINE_NOM
 
     COMMANDE_BACKUP_QUOTIDIEN = 'commande.backup.genererBackupQuotidien'
     COMMANDE_BACKUP_MENSUEL = 'commande.backup.genererBackupMensuel'
@@ -1188,6 +1193,8 @@ class ConstantesBackup:
 
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
+    LIBVAL_CATALOGUE_MENSUEL = 'catalogue.mensuel'
+    LIBVAL_CATALOGUE_ANNUEL = 'catalogue.annuel'
 
     LIBELLE_SECURITE = 'securite'
     LIBELLE_HEURE = 'heure'
@@ -1201,6 +1208,8 @@ class ConstantesBackup:
     LIBELLE_CERTS_PEM = 'certificats_pem'
     LIBELLE_FUUID_GROSFICHIERS = 'fuuid_grosfichiers'
     LIBELLE_FICHIERS_HORAIRE = 'fichiers_horaire'
+    LIBELLE_FICHIERS_QUOTIDIEN = 'fichiers_quotidien'
+    LIBELLE_FICHIERS_MENSUEL = 'fichiers_mensuel'
     LIBELLE_INFO_HORAIRE = 'info_horaire'
     LIBELLE_TRANSACTIONS_SHA512 = 'transactions_sha512'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
@@ -1209,6 +1218,9 @@ class ConstantesBackup:
     LIBELLE_CATALOGUES = 'catalogues'
     LIBELLE_FICHIERS_TRANSACTIONS = 'fichiers_transactions'
     LIBELLE_DIRTY_FLAG = 'dirty_flag'
+
+    LIBELLE_ARCHIVE_SHA512 = 'archive_sha512'
+    LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
 
 
 class CommandesSurRelai:

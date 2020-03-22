@@ -1667,7 +1667,7 @@ class HandlerBackupDomaine:
 
             # Identifier le plus vieux backup qui est effectue
             # Utilise pour transmettre trigger backup mensuel
-            jour_backup = catalogue[ConstantesBackup.LIBELLE_JOUR]
+            jour_backup = pytz.utc.localize(catalogue[ConstantesBackup.LIBELLE_JOUR])
             if plus_vieux_jour > jour_backup:
                 plus_vieux_jour = jour_backup
 
