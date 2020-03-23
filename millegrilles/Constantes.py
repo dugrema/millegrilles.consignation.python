@@ -1191,6 +1191,8 @@ class ConstantesBackup:
     COMMANDE_BACKUP_DECLENCHER_MENSUEL = 'commande._DOMAINE_.declencherBackupMensuel'
     COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande._DOMAINE_.declencherBackupAnnuel'
 
+    COMMANDE_BACKUP_PREPARER_RESTAURATION = 'commande.backup.preparerStagingRestauration'
+
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
     LIBVAL_CATALOGUE_MENSUEL = 'catalogue.mensuel'

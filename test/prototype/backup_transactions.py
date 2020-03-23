@@ -78,13 +78,15 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
+            self.prerarerStagingRestauration()
+
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-            self.reset_evenements()
+            # self.reset_evenements()
         finally:
             pass
             self.event_recu.set()  # Termine
@@ -264,6 +266,10 @@ class MessagesSample(BaseCallback):
     #         # transaction de catalogue quotidien.
     #         self._contexte.generateur_transactions.transmettre_commande(
     #             {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
+
+    def prerarerStagingRestauration(self):
+        self._contexte.generateur_transactions.transmettre_commande(
+            {}, ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION)
 
 # -------
 sample = MessagesSample()
