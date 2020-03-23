@@ -76,7 +76,7 @@ class MessagesSample(BaseCallback):
     def executer(self):
         try:
             # self.backup_domaine_senseurpassifs()
-            self.backup_domaine_grosfichiers()
+            # self.backup_domaine_grosfichiers()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
@@ -84,7 +84,7 @@ class MessagesSample(BaseCallback):
             # Backup quotidien
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-            # self.reset_evenements()
+            self.reset_evenements()
         finally:
             pass
             self.event_recu.set()  # Termine
@@ -155,15 +155,26 @@ class MessagesSample(BaseCallback):
                     self.__logger.warning("Transaction existe deja : %s" % transaction['en-tete']['uuid-transaction'])
 
     def reset_evenements(self):
-        col_grosfichiers = self.contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
-        col_senseurspassifs = self.contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        collections = [
+            ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM,
+            SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM,
+            'millegrilles.domaines.Annuaire',
+            'millegrilles.domaines.MaitreDesCles',
+            'millegrilles.domaines.Parametres',
+            'millegrilles.domaines.Pki',
+            'millegrilles.domaines.Plume',
+            'millegrilles.domaines.Principale',
+            'millegrilles.domaines.Taches',
+        ]
 
-        evenement_libelle_backup = '_evenements.%s.backup_horaire' % self.idmg
-        evenement_libelle_restauree = '_evenements.%s.transaction_restauree' % self.idmg
-        ops = {'$unset': {evenement_libelle_backup: True, evenement_libelle_restauree: True}}
+        for coll in collections:
+            collection_domaine = self.contexte.document_dao.get_collection(coll)
 
-        col_grosfichiers.update_many({}, ops)
-        col_senseurspassifs.update_many({}, ops)
+            evenement_libelle_backup = '_evenements.%s.backup_horaire' % self.idmg
+            evenement_libelle_restauree = '_evenements.%s.transaction_restauree' % self.idmg
+            ops = {'$unset': {evenement_libelle_backup: True, evenement_libelle_restauree: True}}
+
+            collection_domaine.update_many({}, ops)
 
         col_backup = self.contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
         col_backup.update_many(

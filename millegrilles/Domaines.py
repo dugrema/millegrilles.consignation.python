@@ -681,6 +681,7 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
         return resultat
 
+
 class GestionnaireDomaineStandard(GestionnaireDomaine):
     """
     Implementation des Q standards pour les domaines.
@@ -839,6 +840,25 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         # Faire la liste des cedules a declencher
         if 'heure' in indicateurs:
             self.nettoyer_processus()
+            self.transmettre_commande_backup_horaire()
+
+    def transmettre_commande_backup_horaire(self):
+        """
+        Transmet une commande pour faire un backup horaire pour ce domaine.
+
+        :return:
+        """
+        commande_backup = {
+            ConstantesBackup.LIBELLE_HEURE: datetime.datetime.utcnow() - datetime.timedelta(hours=1),
+            ConstantesBackup.LIBELLE_DOMAINE: self.get_nom_domaine(),
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace(
+                '_DOMAINE_', self.get_nom_domaine()),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
 
     def nettoyer_processus(self):
         collection_processus = self.document_dao.get_collection(self.get_collection_processus_nom())
@@ -1439,7 +1459,7 @@ class HandlerBackupDomaine:
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 try:
                     # Extraire metadonnees de la transaction
-                    info_transaction = self._traiter_transaction(transaction)
+                    info_transaction = self._traiter_transaction(transaction, heure)
                     for cle in cles_set:
                         try:
                             catalogue_backup[cle].update(info_transaction[cle])
@@ -1500,7 +1520,7 @@ class HandlerBackupDomaine:
 
         return info_backup
 
-    def _traiter_transaction(self, transaction):
+    def _traiter_transaction(self, transaction, heure: datetime.datetime):
         """
         Verifie la signature de la transaction et extrait les certificats requis pour le backup.
 

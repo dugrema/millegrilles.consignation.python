@@ -57,8 +57,10 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
                          ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM,
                          ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-    def _traiter_transaction(self, transaction):
-        info_transaction = super()._traiter_transaction(transaction)
+    def _traiter_transaction(self, transaction, heure: datetime.datetime):
+        info_transaction = super()._traiter_transaction(transaction, heure)
+
+        heure_str = heure.strftime('%H')
 
         # Extraire les fuuids
         domaine_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
@@ -75,6 +77,7 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
                 'securite': securite,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256,
                 'extension': extension,
+                'heure': heure_str,
             }
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
@@ -97,11 +100,13 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
                 'securite': securite,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: extension,
+                'heure': heure_str,
             }
 
             try:
                 info_preview = {
                     'securite': securite,
+                    'heure': heure_str,
                 }
                 fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = info_preview
 
