@@ -133,6 +133,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesGrosFichiers(self)
         }
 
+        self.__handler_backup = HandlerBackupGrosFichiers(self._contexte)
+
     def configurer(self):
         super().configurer()
         self.creer_index()  # Creer index dans MongoDB
@@ -424,6 +426,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         documents.append(self.get_document_vitrine_albums())
         documents.append(self.get_document_vitrine_fichiers())
         return documents
+
+    @property
+    def handler_backup(self):
+        return self.__handler_backup
 
     def maj_fichier(self, transaction):
         """

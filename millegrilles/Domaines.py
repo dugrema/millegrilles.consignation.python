@@ -703,6 +703,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def configurer(self):
         super().configurer()
 
+        self._logger.debug("Type gestionnaire : " + self.__class__.__name__)
+
         self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
         self.__traitement_noeud = TraitementMessageDomaineRequete(self)
         self.__handler_cedule = TraitementMessageCedule(self)
