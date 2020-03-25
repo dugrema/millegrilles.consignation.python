@@ -1312,6 +1312,9 @@ class HandlerBackupDomaine:
             if dependances_backup is not None:
                 catalogue_backup = dependances_backup['catalogue']
 
+                hachage_entete = self.calculer_hash_entetebackup(catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE])
+                uuid_transaction_catalogue = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
                 path_fichier_transactions = dependances_backup['path_fichier_backup']
                 nom_fichier_transactions = path.basename(path_fichier_transactions)
 
@@ -1370,6 +1373,8 @@ class HandlerBackupDomaine:
                         ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][ConstantesBackup.LIBELLE_SECURITE],
                         ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
                         ConstantesBackup.LIBELLE_CATALOGUE_SHA512: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA512],
+                        ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete,
+                        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_catalogue,
                     }
 
                     self._contexte.generateur_transactions.soumettre_transaction(
@@ -1383,8 +1388,7 @@ class HandlerBackupDomaine:
                 chainage_backup_precedent = {
                     Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
                         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-                    ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(
-                        entete_backup_precedent)
+                    ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete
                 }
 
             else:

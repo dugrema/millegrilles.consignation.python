@@ -97,6 +97,8 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraire"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA512:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHA512"
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE:
+            processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHAEntete"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN:
             processus = "millegrilles_domaines_Backup:ProcessusFinaliserCatalogueQuotidien"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO:
@@ -228,6 +230,8 @@ class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):
 
         champs_fichier = [
             ConstantesBackup.LIBELLE_CATALOGUE_SHA512,
+            ConstantesBackup.LIBELLE_HACHAGE_ENTETE,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID,
         ]
 
         set_ops = {

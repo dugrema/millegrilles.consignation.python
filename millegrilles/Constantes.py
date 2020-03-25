@@ -1175,6 +1175,7 @@ class ConstantesBackup:
 
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_HORAIRE_SHA512 = '%s.catalogueHoraireSHA512' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE = '%s.catalogueHoraireSHAEntete' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidienFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_MENSUEL = '%s.catalogueMensuelFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_ANNUEL = '%s.catalogueAnnuelFinaliser' % DOMAINE_NOM
