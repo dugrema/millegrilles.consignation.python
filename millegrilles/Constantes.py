@@ -1193,6 +1193,8 @@ class ConstantesBackup:
 
     COMMANDE_BACKUP_PREPARER_RESTAURATION = 'commande.backup.preparerStagingRestauration'
 
+    REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
+
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
     LIBVAL_CATALOGUE_MENSUEL = 'catalogue.mensuel'
@@ -1220,6 +1222,8 @@ class ConstantesBackup:
     LIBELLE_CATALOGUES = 'catalogues'
     LIBELLE_FICHIERS_TRANSACTIONS = 'fichiers_transactions'
     LIBELLE_DIRTY_FLAG = 'dirty_flag'
+    LIBELLE_BACKUP_PRECEDENT = 'backup_precedent'
+    LIBELLE_HACHAGE_ENTETE = 'hachage_entete'
 
     LIBELLE_ARCHIVE_SHA512 = 'archive_sha512'
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'

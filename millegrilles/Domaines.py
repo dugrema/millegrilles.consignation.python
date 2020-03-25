@@ -13,12 +13,13 @@ from pymongo.errors import OperationFailure
 from bson import ObjectId
 from threading import Thread, Event, Lock
 from pathlib import Path
+from cryptography.hazmat.primitives import hashes
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
 from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
     TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule, TraitementMessageDomaineCommande
-from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration
+from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration, MGProcessus
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
@@ -882,8 +883,27 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
     def declencher_backup_horaire(self, declencheur: dict):
         heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
+        domaine = self.get_nom_domaine()
+        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+
+        self._logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
+        routing = domaine
+        nom_module = 'millegrilles_Domaines'
+        nom_classe = 'BackupHoraire'
+        processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
+
+        parametres = {
+            'heure': heure,
+            'securite': securite,
+        }
+
+        self.demarrer_processus(processus, parametres)
+
+    def executer_backup_horaire(self, declencheur: dict):
+        heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
+        backup_precedent = declencheur.get(ConstantesBackup.LIBELLE_BACKUP_PRECEDENT)
         self._logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
         self.handler_backup.backup_domaine(heure, domaine)
 
@@ -1263,22 +1283,32 @@ class HandlerBackupDomaine:
         self._nom_collection_transactions = nom_collection_transactions
         self._nom_collection_documents = nom_collection_documents
 
-    def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str):
+    def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str, entete_backup_precedent: dict):
         curseur = self._effectuer_requete_domaine(heure)
 
+        # Utilise pour creer une chaine entre backups horaires
+        chainage_backup_precedent = None
+        if entete_backup_precedent:
+            chainage_backup_precedent = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(entete_backup_precedent)
+            }
+
         heure_plusvieille = heure
+
         for transanter in curseur:
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
             heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
 
             # Conserver l'heure la plus vieille dans ce backup
             # Permet de declencher backup quotidiens anterieurs
-            if heure_anterieure < heure_plusvieille:
+            if heure_plusvieille > heure_anterieure:
                 heure_plusvieille = heure_anterieure
 
             # Creer le fichier de backup
             dependances_backup = self._backup_horaire_domaine(
-                self._nom_collection_transactions, self._contexte.idmg, heure_anterieure, prefixe_fichier, Constantes.SECURITE_PRIVE)
+                self._nom_collection_transactions, self._contexte.idmg, heure_anterieure, prefixe_fichier, Constantes.SECURITE_PRIVE, chainage_backup_precedent)
+
             if dependances_backup is not None:
                 catalogue_backup = dependances_backup['catalogue']
 
@@ -1347,6 +1377,16 @@ class HandlerBackupDomaine:
 
                 else:
                     raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
+
+                # Calculer nouvelle entete
+                entete_backup_precedent = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+                chainage_backup_precedent = {
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
+                        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                    ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(
+                        entete_backup_precedent)
+                }
+
             else:
                 self.__logger.warning(
                     "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
@@ -1354,6 +1394,9 @@ class HandlerBackupDomaine:
                 )
 
         self.transmettre_trigger_jour_precedent(heure_plusvieille)
+
+    def __trouver_backup_horaire_precedent(self, heure_anterieure):
+        pass
 
     def _effectuer_requete_domaine(self, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
@@ -1391,7 +1434,7 @@ class HandlerBackupDomaine:
 
         return collection_transactions.aggregate(operation, hint=hint)
 
-    def _backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str, niveau_securite: str) -> dict:
+    def _backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str, niveau_securite: str, chainage_backup_precedent: dict) -> dict:
         heure_str = heure.strftime("%Y%m%d%H")
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
@@ -1446,6 +1489,8 @@ class HandlerBackupDomaine:
 
             # Conserver la liste des grosfichiers requis pour ce backup
             ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS: dict(),
+
+            ConstantesBackup.LIBELLE_BACKUP_PRECEDENT: chainage_backup_precedent,
         }
 
         liste_uuid_transactions = list()
@@ -1885,3 +1930,46 @@ class HandlerBackupDomaine:
             ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace('_DOMAINE_', self._nom_domaine),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
+
+    def calculer_hash_entetebackup(self, entete):
+        """
+        Generer une valeur de hachage a partir de l'entete
+        :param entete:
+        :return:
+        """
+        hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA3_512())
+        return hachage_backup
+
+
+class BackupHoraire(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        self.__logger.error("Processus backup horaire demarre, %s" % str(self.parametres))
+
+        # Charger l'information du backup horaire precedent pour creer une chaine
+        requete = {
+            ConstantesBackup.LIBELLE_DOMAINE: self.controleur.gestionnaire.get_nom_domaine(),
+            ConstantesBackup.LIBELLE_SECURITE: self.parametres[ConstantesBackup.LIBELLE_SECURITE],
+        }
+        self.set_requete(ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE, requete)
+
+        self.set_etape_suivante(BackupHoraire.executer_backup.__name__)
+
+    def executer_backup(self):
+        heure = pytz.utc.localize(self.parametres[ConstantesBackup.LIBELLE_HEURE])
+        gestionnaire = self.controleur.gestionnaire
+        domaine = gestionnaire.get_nom_domaine()
+
+        entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
+
+        self.__logger.error("Reponse requete : %s" % str(entete_dernier_backup))
+
+        gestionnaire.handler_backup.backup_domaine(heure, domaine, entete_dernier_backup)
+
+        self.set_etape_suivante()  # Termine
+
+        return {}

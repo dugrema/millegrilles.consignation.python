@@ -70,7 +70,7 @@ class MessagesSample(BaseCallback):
         self.contexte.message_dao.deconnecter()
 
     def traiter_message(self, ch, method, properties, body):
-        self.__logger.debug(str(body))
+        self.__logger.debug('Reponse recue : %s' % str(body))
         self.event_recu.set()  # Termine
 
     def executer(self):
@@ -78,18 +78,20 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
-            self.prerarerStagingRestauration()
+            # self.prerarerStagingRestauration()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
+            self.trigger_backup_horaire(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
+            self.trigger_backup_horaire(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             # self.reset_evenements()
         finally:
             pass
-            self.event_recu.set()  # Termine
+            # self.event_recu.set()  # Termine
 
     def trigger_backup_horaire(self, domaine):
         timestamp_courant = datetime.datetime.utcnow()
@@ -103,7 +105,9 @@ class MessagesSample(BaseCallback):
             commande_backup_quotidien,
             ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace(
                 '_DOMAINE_', domaine),
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_horaire'
         )
 
     def backup_transactions_senseurspassifs_testinit(self):
@@ -269,7 +273,11 @@ class MessagesSample(BaseCallback):
 
     def prerarerStagingRestauration(self):
         self._contexte.generateur_transactions.transmettre_commande(
-            {}, ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION)
+            {},
+            ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION,
+            reply_to=self.queue_name,
+            correlation_id='backup_transactions'
+        )
 
 # -------
 sample = MessagesSample()

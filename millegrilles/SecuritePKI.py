@@ -340,7 +340,7 @@ class UtilCertificats:
         if not supporte_signature_numerique:
             raise Exception('Le certificat ne supporte pas les signatures numeriques')
 
-    def hacher_contenu(self, dict_message):
+    def hacher_contenu(self, dict_message, hachage=None):
         """
         Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete et les elements commencant par _.
         :param dict_message:
@@ -355,7 +355,10 @@ class UtilCertificats:
 
         message_bytes = self.preparer_transaction_bytes(dict_message_effectif)
 
-        digest = hashes.Hash(self._contenu_hash_function(), backend=default_backend())
+        if hachage is None:
+            hachage = self._contenu_hash_function()
+
+        digest = hashes.Hash(hachage, backend=default_backend())
         digest.update(message_bytes)
         resultat_digest = digest.finalize()
         digest_base64 = str(base64.b64encode(resultat_digest), 'utf-8')
@@ -583,6 +586,10 @@ class VerificateurTransaction(UtilCertificats):
             self.contexte.generateur_transactions.emettre_certificat(cert.certificat_pem, cert.fingerprint_ascii)
 
         return enveloppes_certificats
+
+    def hacher_entete(self, entete):
+        bytes_entete = self.preparer_transaction_bytes(entete)
+
 
 
 class VerificateurCertificats(UtilCertificats):

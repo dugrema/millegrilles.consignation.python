@@ -13,6 +13,16 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         routing_key = method.routing_key
         domaine_routing_key = method.routing_key.replace('requete.', '')
 
+        reponse = None
+        if domaine_routing_key == ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE:
+            reponse = self.gestionnaire.requete_backup_dernier_horaire(message_dict)
+        else:
+            raise ValueError("Requete inconnue " + routing_key)
+
+        if reponse is not None:
+            self.gestionnaire.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=properties.reply_to, correlation_id=properties.correlation_id)
+
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
@@ -79,6 +89,9 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return ConstantesBackup.DOMAINE_NOM
 
+    def get_handler_requetes(self) -> dict:
+        return self.__handler_requetes_noeuds
+
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraire"
@@ -99,6 +112,33 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
+
+    def requete_backup_dernier_horaire(self, requete):
+        """
+        Identifie le plus recent backup horaire pour domaine/securite
+        :param requete:
+        :return:
+        """
+
+        securite = requete[ConstantesBackup.LIBELLE_SECURITE]
+        domaine = requete[ConstantesBackup.LIBELLE_DOMAINE]
+
+        filtre = {
+            ConstantesBackup.LIBELLE_DOMAINE: domaine,
+            ConstantesBackup.LIBELLE_SECURITE: securite,
+        }
+        sort = [
+            (ConstantesBackup.LIBELLE_HEURE, -1),
+        ]
+
+        collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_TRANSACTIONS_NOM)
+        dernier_backup = collection_backup.find_one(filtre, sort=sort)
+
+        info_dernier_backup = None
+        if dernier_backup:
+            info_dernier_backup = dernier_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+
+        return {'dernier_backup': info_dernier_backup}
 
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
