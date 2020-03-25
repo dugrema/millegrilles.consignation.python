@@ -1227,7 +1227,7 @@ class ConstantesBackup:
     LIBELLE_BACKUP_PRECEDENT = 'backup_precedent'
     LIBELLE_HACHAGE_ENTETE = 'hachage_entete'
 
-    LIBELLE_ARCHIVE_SHA512 = 'archive_sha512'
+    LIBELLE_ARCHIVE_SHA3_512 = 'archive_sha3_512'
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
 
 

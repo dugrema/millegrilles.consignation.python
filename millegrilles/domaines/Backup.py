@@ -343,7 +343,7 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
             '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_QUOTIDIEN, str(jour_backup.day)): {
-                ConstantesBackup.LIBELLE_ARCHIVE_SHA512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA512],
+                ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512],
                 ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
             }
         }
@@ -445,7 +445,7 @@ class ProcessusInformationArchiveMensuelle(MGProcessusTransaction):
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
             '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_MENSUEL, str(mois_backup.month)): {
-                ConstantesBackup.LIBELLE_ARCHIVE_SHA512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA512],
+                ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512],
                 ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
             }
         }
