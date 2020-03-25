@@ -1174,7 +1174,7 @@ class ConstantesBackup:
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
 
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
-    TRANSACTION_CATALOGUE_HORAIRE_SHA512 = '%s.catalogueHoraireSHA512' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_HORAIRE_SHA3_512 = '%s.catalogueHoraireSHA3_512' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE = '%s.catalogueHoraireSHAEntete' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidienFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_MENSUEL = '%s.catalogueMensuelFinaliser' % DOMAINE_NOM
@@ -1211,14 +1211,15 @@ class ConstantesBackup:
     LIBELLE_CERTS_INTERMEDIAIRES = 'certificats_intermediaires'
     LIBELLE_CERTS = 'certificats'
     LIBELLE_CERTS_PEM = 'certificats_pem'
+    LIBELLE_CERTS_CHAINE_CATALOGUE = 'certificats_chaine_catalogue'
     LIBELLE_FUUID_GROSFICHIERS = 'fuuid_grosfichiers'
     LIBELLE_FICHIERS_HORAIRE = 'fichiers_horaire'
     LIBELLE_FICHIERS_QUOTIDIEN = 'fichiers_quotidien'
     LIBELLE_FICHIERS_MENSUEL = 'fichiers_mensuel'
     LIBELLE_INFO_HORAIRE = 'info_horaire'
-    LIBELLE_TRANSACTIONS_SHA512 = 'transactions_sha512'
+    LIBELLE_TRANSACTIONS_SHA3_512 = 'transactions_sha3_512'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
-    LIBELLE_CATALOGUE_SHA512 = 'catalogue_sha512'
+    LIBELLE_CATALOGUE_SHA3_512 = 'catalogue_sha3_512'
     LIBELLE_CATALOGUE_NOMFICHIER = 'catalogue_nomfichier'
     LIBELLE_CATALOGUES = 'catalogues'
     LIBELLE_FICHIERS_TRANSACTIONS = 'fichiers_transactions'

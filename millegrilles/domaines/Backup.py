@@ -13,7 +13,6 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         routing_key = method.routing_key
         domaine_routing_key = method.routing_key.replace('requete.', '')
 
-        reponse = None
         if domaine_routing_key == ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE:
             reponse = self.gestionnaire.requete_backup_dernier_horaire(message_dict)
         else:
@@ -95,7 +94,7 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraire"
-        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA512:
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA3_512:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHA512"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHAEntete"
@@ -161,7 +160,7 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
         champs_fichier = [
             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER,
-            ConstantesBackup.LIBELLE_TRANSACTIONS_SHA512,
+            ConstantesBackup.LIBELLE_TRANSACTIONS_SHA3_512,
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER
         ]
 
@@ -229,7 +228,7 @@ class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):
         jour_backup = datetime.datetime(year=heure_backup.year, month=heure_backup.month, day=heure_backup.day)
 
         champs_fichier = [
-            ConstantesBackup.LIBELLE_CATALOGUE_SHA512,
+            ConstantesBackup.LIBELLE_CATALOGUE_SHA3_512,
             ConstantesBackup.LIBELLE_HACHAGE_ENTETE,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID,
         ]
