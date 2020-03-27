@@ -271,7 +271,13 @@ class ConsignateurTransactionCallback(BaseCallback):
             raise ci
 
         # Ajouter la date de restauration
-        evenements = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT]
+        evenements = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT)
+        if not evenements:
+            evenements = {
+                idmg: dict()
+            }
+            enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = evenements
+
         evenements_idmg = evenements[idmg]
         evenements_idmg[Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE] = datetime.datetime.utcnow()
 
