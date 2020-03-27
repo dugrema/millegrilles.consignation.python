@@ -238,6 +238,11 @@ SECURITE_ACCES_PERMIS = '1.permis'
 CLE_CERT_CA = 'pki.millegrille'
 
 
+class ConstantesDomaines:
+
+    COMMANDE_REGENERER = 'regenerer'
+
+
 class ConstantesPrincipale:
     """ Constantes pour le domaine de l'interface principale """
 

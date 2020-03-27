@@ -16,7 +16,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import hashes
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesBackup, ConstantesPki
+from millegrilles.Constantes import ConstantesBackup, ConstantesPki, ConstantesDomaines
 from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
     TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration, MGProcessus
@@ -356,21 +356,21 @@ class GestionnaireDomaine:
                 # Il ne reste plus de routes a configurer, set flag comme pret
                 self.wait_Q_ready.set()
 
-    def stop_consuming(self, queue = None):
+    def stop_consuming(self, queue=None):
         """
         Deconnecte les consommateur queues du domaine pour effectuer du travail offline.
         """
         channel = self.channel_mq
         if queue is None:
-           tags = channel.consumer_tags
-           for tag in tags:
+            tags = channel.consumer_tags
+            for tag in tags:
                 self._logger.debug("Removing ctag %s" % tag)
                 with self.message_dao.lock_transmettre_message:
                     channel.basic_cancel(consumer_tag=tag, nowait=True)
         else:
-           ctag = self._consumer_tags_parQ.get(queue)
-           if ctag is not None:
-               with self.message_dao.lock_transmettre_message:
+            ctag = self._consumer_tags_parQ.get(queue)
+            if ctag is not None:
+                with self.message_dao.lock_transmettre_message:
                     channel.basic_cancel(consumer_tag=ctag, nowait=True)
 
     def resoumettre_transactions(self):
@@ -469,9 +469,22 @@ class GestionnaireDomaine:
 
     def regenerer_documents(self, stop_consuming=True):
         self._logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
-        processeur_regeneration = MGPProcesseurRegeneration(self.__contexte, self)
-        processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
+
+        # Desactiver temporairement toutes les threads de watchers
+        try:
+            for watcher in self._watchers:
+                watcher.stop()
+
+            processeur_regeneration = MGPProcesseurRegeneration(self.__contexte, self)
+            processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
+        finally:
+            # Reactiver les watchers
+            for watcher in self._watchers:
+                watcher.start()
+
         self._logger.info("Fin regeneration des documents de %s" % self.get_nom_domaine())
+
+        return {'complet': True}
 
     def get_collection_transaction_nom(self):
         raise NotImplementedError("N'est pas implemente - doit etre definit dans la sous-classe")
@@ -683,6 +696,21 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
         return resultat
 
 
+class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+
+        commande = method.routing_key.split('.')[-1]
+
+        if commande == ConstantesDomaines.COMMANDE_REGENERER:
+            resultat = self.gestionnaire.regenerer_documents()
+        else:
+            raise ValueError("Commande inconnue: " + routing_key)
+
+        return resultat
+
+
 class GestionnaireDomaineStandard(GestionnaireDomaine):
     """
     Implementation des Q standards pour les domaines.
@@ -691,13 +719,16 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def __init__(self, contexte):
         super().__init__(contexte)
 
-        self.__traitement_middleware = None
-        self.__traitement_noeud = None
+        self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
+        self.__traitement_noeud = TraitementMessageDomaineRequete(self)
         self.__handler_backup = HandlerBackupDomaine(
             contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(), self.get_collection())
 
-        self.__handler_cedule = None
-        self.__handler_commandes = None
+        self.__handler_cedule = TraitementMessageCedule(self)
+        self.__handler_commandes = {
+            Constantes.SECURITE_SECURE: TraitementCommandesSecures(self),
+            Constantes.SECURITE_PROTEGE: TraitementCommandesProtegees(self),
+        }
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
@@ -705,13 +736,6 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         super().configurer()
 
         self._logger.debug("Type gestionnaire : " + self.__class__.__name__)
-
-        self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
-        self.__traitement_noeud = TraitementMessageDomaineRequete(self)
-        self.__handler_cedule = TraitementMessageCedule(self)
-        self.__handler_commandes = {
-            Constantes.SECURITE_SECURE: TraitementCommandesSecures(self)
-        }
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         # Index noeud, _mg-libelle
@@ -1054,7 +1078,10 @@ class WatcherCollectionMongoThread:
         self.__thread.start()
 
     def stop(self):
-        self.__curseur_changements.close()
+        try:
+            self.__curseur_changements.close()
+        except AttributeError:
+            pass
 
     def run(self):
         self.__logger.info("Thread watch: %s" % self.__nom_collection_mongo)

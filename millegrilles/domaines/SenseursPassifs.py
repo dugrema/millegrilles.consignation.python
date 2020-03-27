@@ -92,9 +92,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesSenseursPassifs(self)
         }
 
-        self.__handler_commandes_noeuds = {
-            Constantes.SECURITE_SECURE: TraitementCommandeSenseursPassifs(self)
-        }
+        self.__handler_commandes_noeuds = super().get_handler_commandes()
+        self.__handler_commandes_noeuds[Constantes.SECURITE_SECURE] = TraitementCommandeSenseursPassifs(self)
 
     def configurer(self):
         super().configurer()
