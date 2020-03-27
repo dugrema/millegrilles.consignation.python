@@ -1501,6 +1501,27 @@ class HandlerBackupDomaine:
             ConstantesBackup.LIBELLE_BACKUP_PRECEDENT: chainage_backup_precedent,
         }
 
+        # Ajouter le certificat du module courant pour etre sur
+        enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+
+        # Conserver la chaine de validation du catalogue
+        certificats_validation_catalogue = [
+            enveloppe_certificat_module_courant.fingerprint_ascii
+        ]
+        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
+
+        certs_pem = {
+            enveloppe_certificat_module_courant.fingerprint_ascii: enveloppe_certificat_module_courant.certificat_pem
+        }
+        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
+
+        liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(
+            enveloppe_certificat_module_courant)
+        for cert_ca in liste_enveloppes_cas:
+            fingerprint_ca = cert_ca.fingerprint_ascii
+            certificats_validation_catalogue.append(fingerprint_ca)
+            certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+
         liste_uuid_transactions = list()
         info_backup = {
             'path_fichier_backup': path_fichier_backup,

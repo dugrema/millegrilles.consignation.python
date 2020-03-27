@@ -78,14 +78,14 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
-            # self.prerarerStagingRestauration()
+            self.prerarerStagingRestauration()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
             # Backup quotidien
-            self.trigger_backup_horaire(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
-            self.trigger_backup_horaire(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+            # self.trigger_backup_horaire(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
+            # self.trigger_backup_horaire(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             # self.reset_evenements()
