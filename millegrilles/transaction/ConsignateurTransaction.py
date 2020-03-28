@@ -165,6 +165,9 @@ class ConsignateurTransactionCallback(BaseCallback):
 
     def traiter_restauration_transaction(self, message_dict):
         try:
+            # Retirer le _id - doit etre generer dans MongoDB.
+            del message_dict['_id']
+
             self.sauvegarder_transaction_restauree(message_dict)
         except Exception as e:
             uuid_transaction = 'NA'

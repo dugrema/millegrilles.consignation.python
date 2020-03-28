@@ -1524,16 +1524,16 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
 
         match_query = {
             '_evenements.transaction_complete': True,
-            'en-tete.domaine': 'millegrilles.domaines.SenseursPassifs.lecture',
+            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
             '_evenements.%s.transaction_traitee' % idmg: {'$exists': True},
-            'temps_lecture': {'$exists': True},
+            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$exists': True},
         }
         group_query = {
             '_id': {
-                'noeud': '$noeud',
-                'senseur': '$senseur'
+                SenseursPassifsConstantes.TRANSACTION_NOEUD: '$' + SenseursPassifsConstantes.TRANSACTION_NOEUD,
+                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: '$' + SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR,
             },
-            'temps_lecture': {'$max': '$temps_lecture'}
+            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$max': '$' + SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE}
         }
 
         collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
@@ -1551,7 +1551,10 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         match_query = {
             '_evenements.transaction_complete': True,
             '_evenements.%s.transaction_traitee' % idmg: {'$exists': True},
-            'en-tete.domaine': {'$not': {'$in': ['millegrilles.domaines.SenseursPassifs.lecture']}}
+            'en-tete.domaine': {'$not': {'$in': [
+                'millegrilles.domaines.SenseursPassifs.lecture',
+                'millegrilles.domaines.SenseursPassifs.genererRapport'
+            ]}}
         }
         sort_query = [
             ('_evenements.%s.transaction_traitee' % idmg, 1)
@@ -1567,7 +1570,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
 
         senseur_dict = senseur_lecture['_id']
-        senseur_dict['temps_lecture'] = senseur_lecture['temps_lecture']
+        senseur_dict[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = senseur_lecture[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
         transaction = collection_transaction.find_one(senseur_dict)
 
         return transaction
