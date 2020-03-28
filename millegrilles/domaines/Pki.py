@@ -218,8 +218,8 @@ class GestionnairePki(GestionnaireDomaineStandard):
             processus = super().identifier_processus(domaine_transaction)
         return processus
 
-    def creer_regenerateur_documents(self):
-        return RegenerateurDeDocumentsSansEffet(self)
+    # def creer_regenerateur_documents(self):
+    #     return RegenerateurDeDocumentsSansEffet(self)
 
     def get_handler_requetes(self):
         return self.__handler_requetes_noeuds

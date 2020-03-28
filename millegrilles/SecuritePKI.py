@@ -591,7 +591,6 @@ class VerificateurTransaction(UtilCertificats):
         bytes_entete = self.preparer_transaction_bytes(entete)
 
 
-
 class VerificateurCertificats(UtilCertificats):
     """
     Verifie les certificats en utilisant les certificats CA et openssl.
@@ -985,6 +984,10 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
             self.transmettre_certificat()
         else:
             raise Exception("Routing non gere: %s" % routing_key)
+
+    @property
+    def _message_dao(self):
+        return self.contexte.message_dao
 
 
 class CertificatInvalide(Exception):

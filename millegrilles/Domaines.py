@@ -173,7 +173,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
                 for gestionnaire in self._gestionnaires:
                     gestionnaire.executer_entretien()
                     if not gestionnaire.is_ok:
-                        self._logger.error("Gestionnaire domaine %s est en erreur/termine, on arrete le controleur" % gestionnaire.__name__)
+                        self._logger.error("Gestionnaire domaine %s est en erreur/termine, on arrete le controleur" % gestionnaire.__class__.__name__)
                         self.arreter()
 
                 self._stop_event.wait(15)   # Boucler pour maintenance
@@ -251,7 +251,7 @@ class GestionnaireDomaine:
 
         self._contexte.message_dao.register_channel_listener(self)
         self._logger.info("Attente Q et routes prets")
-        self.wait_Q_ready.wait(5)  # Donner 5 seconde a MQ
+        self.wait_Q_ready.wait(15)  # Donner 15 seconde a MQ
 
         if not self.wait_Q_ready.is_set():
             if self.nb_routes_a_config > 0:

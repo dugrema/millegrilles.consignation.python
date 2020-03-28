@@ -59,14 +59,26 @@ class MessagesSample(BaseCallback):
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
     def commande_regenerer(self):
-        domaine = 'commande.millegrilles.domaines.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER
+        domaines = [
+            'commande.millegrilles.domaines.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.millegrilles.domaines.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.millegrilles.domaines.Taches.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+        ]
+
         commande = {
         }
-        enveloppe_val = self.generateur.transmettre_commande(
-            commande, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
+        for domaine in domaines:
+            enveloppe_val = self.generateur.transmettre_commande(
+                commande, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
+            print("Commande regenerer domaine %s : %s" % (domaine, enveloppe_val))
 
-        print("Commande regenerer: %s" % enveloppe_val)
-        return enveloppe_val
 
     def executer(self):
         sample.commande_regenerer()
