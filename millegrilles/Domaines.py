@@ -1203,8 +1203,14 @@ class GroupeurTransactionsARegenerer:
     Groupe toutes les transactions dans un seul groupe, en ordre de transaction_traitee.
     """
 
-    def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
+    def __init__(self, gestionnaire_domaine: GestionnaireDomaine, transactions_a_ignorer: list = None):
+        """
+
+        :param gestionnaire_domaine:
+        :param transaction_a_ignorer: Liste de transactions a ingorer pour regenerer ce domaine.
+        """
         self.__gestionnaire_domaine = gestionnaire_domaine
+        self.__transactions_a_ignorer = transactions_a_ignorer
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.__complet = False
 
@@ -1240,6 +1246,12 @@ class GroupeurTransactionsARegenerer:
             '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
                           Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
         }
+
+        if self.__transactions_a_ignorer:
+            # Ajouter une liste de transactions a ignorer pour la regeneration
+            # Ces transactions n'ont aucun impact sur l'etat des /documents
+            libelle_domaine = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE)
+            filtre[libelle_domaine] = {'$nin': self.__transactions_a_ignorer}
 
         return filtre, index
 

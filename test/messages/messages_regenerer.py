@@ -59,11 +59,11 @@ class MessagesSample(BaseCallback):
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
     def commande_regenerer(self):
+        domaine = 'commande.millegrilles.domaines.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER
         commande = {
         }
         enveloppe_val = self.generateur.transmettre_commande(
-            commande, 'commande.millegrilles.domaines.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            reply_to=self.queue_name, correlation_id='reply_regenerer')
+            commande, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
 
         print("Commande regenerer: %s" % enveloppe_val)
         return enveloppe_val

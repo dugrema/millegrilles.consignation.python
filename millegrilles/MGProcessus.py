@@ -134,6 +134,13 @@ class MGPProcesseur:
     def _contexte(self):
         return self.__contexte
 
+    @property
+    def is_regeneration(self):
+        """
+        :return: Vrai pour un controleur de regeneration.
+        """
+        return False
+
 
 class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine):
     """
@@ -664,6 +671,10 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         self.__generateur_transactions = StubGenerateurTransactions()
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    @property
+    def is_regeneration(self):
+        return True
 
     @property
     def contexte(self):

@@ -502,7 +502,7 @@ class VerificateurTransaction(UtilCertificats):
                 del dict_message[cle]
                 self._logger.debug("Enlever cle: %s" % cle)
 
-        self._logger.debug("Message nettoye: %s" % str(dict_message))
+        # self._logger.debug("Message nettoye: %s" % str(dict_message))
 
         # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
         # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.cert.pem) au besoin.

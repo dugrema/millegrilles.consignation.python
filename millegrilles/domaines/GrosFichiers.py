@@ -3,7 +3,8 @@ from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, HandlerBackupDomaine
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
+    RegenerateurDeDocuments, GroupeurTransactionsARegenerer
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -345,6 +346,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
+
+    def creer_regenerateur_documents(self):
+        return RegenerateurGrosFichiers(self)
 
     def get_fichier_par_fuuid(self, fuuid):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1506,6 +1510,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS}, ops)
 
 
+class RegenerateurGrosFichiers(RegenerateurDeDocuments):
+
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+
+    def creer_generateur_transactions(self):
+
+        transactions_a_ignorer = [
+            ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER,
+        ]
+
+        return GroupeurTransactionsARegenerer(self._gestionnaire_domaine, transactions_a_ignorer)
+
+
 # ******************* Processus *******************
 class ProcessusGrosFichiers(MGProcessusTransaction):
 
@@ -1577,9 +1595,14 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             'mimetype': transaction['mimetype'],
         })
 
-        self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
-            self._get_tokens_attente(resultat))
+        if not self._controleur.is_regeneration:
+            self.set_etape_suivante(
+                ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
+                self._get_tokens_attente(resultat))
+        else:
+            # Le processus est en mode regeneration
+            self._traitement_collection()
+            self.set_etape_suivante()  # Termine
 
         return resultat
 
@@ -1817,7 +1840,7 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):
                 if key.startswith(champ):
                     changements[key] = value
 
-        self._controleur._gestionnaire_domaine.maj_commentaire_fichier(uuid_fichier, changements)
+        self._controleur.gestionnaire.maj_commentaire_fichier(uuid_fichier, changements)
 
         # Met a jour les collections existantes avec ce fichier
         self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
@@ -1841,7 +1864,7 @@ class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite
         etiquettes = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
         self._logger.error("Etiquettes: %s" % etiquettes)
 
-        self._controleur._gestionnaire_domaine.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
+        self._controleur.gestionnaire.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
 
         self.set_etape_suivante()  # Termine
 
@@ -1856,7 +1879,7 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersActivite):
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        self._controleur._gestionnaire_domaine.supprimer_fichier(uuid_fichier)
+        self._controleur.gestionnaire.supprimer_fichier(uuid_fichier)
 
         self.set_etape_suivante()  # Termine
 
@@ -1871,7 +1894,7 @@ class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersActivite):
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        self._controleur._gestionnaire_domaine.recuperer_fichier(uuid_fichier)
+        self._controleur.gestionnaire.recuperer_fichier(uuid_fichier)
 
         self.set_etape_suivante()  # Termine
 
@@ -1916,7 +1939,7 @@ class ProcessusTransactionRenommerCollection(ProcessusGrosFichiersActivite):
                 if key.startswith(champ):
                     changements[key] = value
 
-        self._controleur._gestionnaire_domaine.renommer_collection(uuid_collection, changements)
+        self._controleur.gestionnaire.renommer_collection(uuid_collection, changements)
 
         self.set_etape_suivante()  # Termine
 
@@ -1942,7 +1965,7 @@ class ProcessusTransactionCommenterCollection(ProcessusGrosFichiersActivite):
                 if key.startswith(champ):
                     changements[key] = value
 
-        self._controleur._gestionnaire_domaine.commenter_collection(uuid_collection, changements)
+        self._controleur.gestionnaire.commenter_collection(uuid_collection, changements)
 
         self.set_etape_suivante()  # Termine
 
@@ -1958,7 +1981,7 @@ class ProcessusTransactionSupprimerCollection(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur._gestionnaire_domaine.supprimer_collection(uuid_collection)
+        self._controleur.gestionnaire.supprimer_collection(uuid_collection)
 
         self.set_etape_suivante()  # Termine
 
@@ -1974,7 +1997,7 @@ class ProcessusTransactionRecupererCollection(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        self._controleur._gestionnaire_domaine.recuperer_collection(uuid_collection)
+        self._controleur.gestionnaire.recuperer_collection(uuid_collection)
 
         self.set_etape_suivante()  # Termine
 
@@ -1991,7 +2014,7 @@ class ProcessusTransactionChangerEtiquettesCollection(ProcessusGrosFichiersActiv
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         libelles = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
 
-        self._controleur._gestionnaire_domaine.maj_etiquettes(uuid_collection, ConstantesGrosFichiers.LIBVAL_COLLECTION, libelles)
+        self._controleur.gestionnaire.maj_etiquettes(uuid_collection, ConstantesGrosFichiers.LIBVAL_COLLECTION, libelles)
 
         self.set_etape_suivante()  # Termine
 
@@ -2012,7 +2035,7 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        info_collection = self._controleur._gestionnaire_domaine.figer_collection(uuid_collection)
+        info_collection = self._controleur.gestionnaire.figer_collection(uuid_collection)
         info_collection['uuid_collection'] = uuid_collection
 
         self.set_etape_suivante(ProcessusTransactionFigerCollection.creer_fichier_torrent.__name__)
@@ -2142,7 +2165,7 @@ class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
         transaction = self.charger_transaction()
         collectionuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
         documentsuuid = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
-        self._controleur._gestionnaire_domaine.retirer_fichiers_collection(collectionuuid, documentsuuid)
+        self._controleur.gestionnaire.retirer_fichiers_collection(collectionuuid, documentsuuid)
         self.set_etape_suivante()
 
 
