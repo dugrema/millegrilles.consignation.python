@@ -10,6 +10,7 @@ import uuid
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from threading import Thread, Event, Barrier
@@ -658,6 +659,35 @@ class StubGenerateurTransactions:
         pass
 
 
+class RegenerationContexteWrapper:
+    """
+    Wrapper pour le contexte durant la regeneration
+    """
+
+    def __init__(self, contexte):
+        self.__contexte = contexte
+
+    @property
+    def message_dao(self):
+        raise NotImplemented("Contexte de regeneration - message dao non disponible")
+
+    @property
+    def document_dao(self):
+        return self.__contexte.document_dao
+
+    @property
+    def verificateur_transaction(self):
+        return self.__contexte.verificateur_transactions
+
+    @property
+    def verificateur_certificats(self):
+        return self.__contexte.verificateur_certificats
+
+    @property
+    def configuration(self):
+        return self.__contexte.configuration
+
+
 class MGPProcesseurRegeneration(MGPProcesseur):
     """
     Processeur utiliser pour regenerer les documents d'un domaine a partir de transactions deja traitees avec succes.
@@ -670,6 +700,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         self.__message_dao = StubMessageDao()  # Stub Message DAO
         self.__generateur_transactions = StubGenerateurTransactions()
 
+        self.__contexte_regeneration = RegenerationContexteWrapper(super().contexte)
+
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     @property
@@ -678,7 +710,10 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
     @property
     def contexte(self):
-        raise Exception("Le contexte n'est pas disponible dans MGPProcesseurRegeneration")
+        """
+        :return: Wrapper sur le contexte, permet d'intercepter ou d'empecher certaines operations
+        """
+        return self.__contexte_regeneration
 
     @property
     def message_dao(self):
