@@ -10,5 +10,7 @@
   "MG_MONGO_SSL_CA_CERTS": "/home/mathieu/mgdev/certs/pki.racine.cert",
   "MG_MONGO_SSL_CERTFILE": "/home/mathieu/mgdev/certs/pki.maitrecles.key_cert",
   "MG_PKI_SECRETS": "/home/mathieu/mgdev/certs",
-  "MG_MAITREDESCLES_DIR": "/home/mathieu/mgdev/maitredescles"
+  "MG_MAITREDESCLES_DIR": "/home/mathieu/mgdev/maitredescles",
+  "MG_CONSIGNATIONFICHIERS_HOST": "mg-dev3",
+  "MG_CONSIGNATIONFICHIERS_PORT": 3003
 }

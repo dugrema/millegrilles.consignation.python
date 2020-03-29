@@ -668,6 +668,18 @@ class VerificateurCertificats(UtilCertificats):
             # Certificat racine pour la MilleGrille est deja charge
             pass
 
+    def charger_certificat_par_akid(self, akid: str):
+        collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
+        document_cert = collection.find_one({'subject_key': akid})
+
+        enveloppe = None
+        if document_cert is not None:
+            enveloppe = EnveloppeCertificat(
+                certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+            )
+
+        return enveloppe
+
     def charger_certificat(self, fichier=None, fingerprint=None, enveloppe=None):
         # Tenter de charger a partir d'une copie locale
         if fingerprint is not None:
@@ -721,9 +733,13 @@ class VerificateurCertificats(UtilCertificats):
     def aligner_chaine_cas(self, enveloppe: EnveloppeCertificat):
         liste_enveloppes_cas = list()
         depth = 0
+
+        autorite = None
+        fingerprint = None
         while not enveloppe.is_rootCA and depth < 10:
             depth = depth + 1
 
+            fingerprint = enveloppe.fingerprint_ascii
             autorite = enveloppe.authority_key_identifier
             self._logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
             enveloppes = self._contexte.verificateur_certificats.get_par_akid(autorite)
@@ -733,14 +749,16 @@ class VerificateurCertificats(UtilCertificats):
                 enveloppe = enveloppes[0]
             except IndexError:
                 # Le certificat n'est pas trouve, tenter de charger la chaine
+                enveloppe = self.charger_certificat_par_akid(autorite)
                 enveloppe = self.charger_certificat(enveloppe=enveloppe)
                 continue  # Recommencer la verification
-
-            liste_enveloppes_cas.append(enveloppe)
-            self._logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
+            finally:
+                liste_enveloppes_cas.append(enveloppe)
+                self._logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
 
         if depth == 10:
-            raise ValueError("Limite de profondeur de chain de certificat atteint")
+            raise ValueError("Limite de profondeur de chain de certificat atteint pour %s, autorite %s " % (
+                fingerprint, autorite))
 
         return liste_enveloppes_cas
 

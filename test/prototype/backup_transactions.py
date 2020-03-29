@@ -49,7 +49,7 @@ class MessagesSample(BaseCallback):
             self._contexte.configuration.serveur_consignationfichiers_port,
         )
 
-        self.idmg = '2UxNEbTyud6xMKhGUyoBjKG3Tg2f9cjULSXXghr'
+        self.idmg = 'CRnbtUbwzUuTg2h88ALe4Phg441Emgp8FibqkJ'
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
