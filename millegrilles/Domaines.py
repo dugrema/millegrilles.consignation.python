@@ -228,6 +228,7 @@ class GestionnaireDomaine:
         self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
         self.wait_Q_ready_lock = Lock()
         self.nb_routes_a_config = 0
+        self.__Q_wait_broken = None  # Mis utc a date si on a un timeout pour l'attente de __wait_mq_ready
 
         self._consumer_tags_parQ = dict()
 
@@ -251,9 +252,10 @@ class GestionnaireDomaine:
 
         self._contexte.message_dao.register_channel_listener(self)
         self._logger.info("Attente Q et routes prets")
-        self.wait_Q_ready.wait(15)  # Donner 15 seconde a MQ
+        self.wait_Q_ready.wait(30)  # Donner 30 seconde a MQ
 
         if not self.wait_Q_ready.is_set():
+            self.__Q_wait_broken = datetime.datetime.utcnow()
             if self.nb_routes_a_config > 0:
                 self._logger.error("Les routes de Q du domaine ne sont pas configures correctement, il reste %d a configurer" % self.nb_routes_a_config)
             else:
@@ -355,6 +357,7 @@ class GestionnaireDomaine:
             if self.nb_routes_a_config <= 0:
                 # Il ne reste plus de routes a configurer, set flag comme pret
                 self.wait_Q_ready.set()
+                self.__Q_wait_broken = None
 
     def stop_consuming(self, queue=None):
         """
@@ -670,7 +673,15 @@ class GestionnaireDomaine:
         """
         :return: False si le gestionnaire ne fonctionne pas bien et requiert un redemarrage complet
         """
-        return not self._stop_event.is_set() and self.wait_Q_ready.is_set()
+        if not self._stop_event.is_set() and not self.wait_Q_ready.is_set():
+            # Verifier si on est en train de charger le domaine ou si quelque chose a empeche le deploiement
+            if not self.__Q_wait_broken:
+                return True
+            else:
+                # On donne 2 minutes pour tenter de recuperer / se reconnecter a MQ
+                return datetime.datetime.utcnow() > self.__Q_wait_broken + datetime.timedelta(minutes=2)
+        else:
+            return not self._stop_event.is_set()
 
 
 class TraitementCommandesSecures(TraitementMessageDomaineCommande):
