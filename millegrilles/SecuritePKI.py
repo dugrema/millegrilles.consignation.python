@@ -722,6 +722,8 @@ class VerificateurCertificats(UtilCertificats):
         liste_enveloppes_cas = list()
         depth = 0
         while not enveloppe.is_rootCA and depth < 10:
+            depth = depth + 1
+
             autorite = enveloppe.authority_key_identifier
             self._logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
             enveloppes = self._contexte.verificateur_certificats.get_par_akid(autorite)
@@ -736,8 +738,6 @@ class VerificateurCertificats(UtilCertificats):
 
             liste_enveloppes_cas.append(enveloppe)
             self._logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
-
-            depth = depth + 1
 
         if depth == 10:
             raise ValueError("Limite de profondeur de chain de certificat atteint")
