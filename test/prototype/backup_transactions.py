@@ -49,7 +49,7 @@ class MessagesSample(BaseCallback):
             self._contexte.configuration.serveur_consignationfichiers_port,
         )
 
-        self.idmg = 'bKKwtXC68HR4TPDzet6zLVq2wPJfc9RiiYLuva'
+        self.idmg = '2UxNEbTyud6xMKhGUyoBjKG3Tg2f9cjULSXXghr'
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -78,7 +78,7 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
-            self.prerarerStagingRestauration()
+            # self.prerarerStagingRestauration()
 
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
@@ -88,7 +88,7 @@ class MessagesSample(BaseCallback):
             # self.trigger_backup_horaire(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-            # self.reset_evenements()
+            self.reset_evenements()
         finally:
             pass
             # self.event_recu.set()  # Termine

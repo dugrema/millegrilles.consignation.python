@@ -646,6 +646,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
     def connectionmq_publisher(self):
         return self.__connectionmq_publisher
 
+
 class StubMessageDao:
 
     def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=None, reply_to=None, correlation_id=None, channel=None):
