@@ -636,7 +636,11 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
         # Transmettre  l'erreur pour completer la transaction
         if processus is not None:
-            processus.marquer_evenement_transaction(Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT)
+            try:
+                processus.marquer_evenement_transaction(Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT)
+            except AttributeError:
+                # Ce n'est pas un processus de transaction
+                pass
 
     @property
     def connectionmq_publisher(self):

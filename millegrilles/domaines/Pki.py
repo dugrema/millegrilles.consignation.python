@@ -330,22 +330,26 @@ class PKIDocumentHelper:
         # self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
         self._mg_processus_demarreur = mg_processus_demarreur
 
-    def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None):
+    def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None, transaction_faite=False):
         document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
+        del document_cert[ConstantesPki.LIBELLE_FINGERPRINT]
         fingerprint = enveloppe.fingerprint_ascii
 
         maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
-        document_cert[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = maintenant
         document_cert[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
 
         document_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = enveloppe.certificat_pem
-        document_cert[ConstantesPki.LIBELLE_FINGERPRINT] = fingerprint
         document_cert[ConstantesPki.LIBELLE_SUBJECT] = enveloppe.formatter_subject()
         document_cert[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = enveloppe.not_valid_before
         document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = enveloppe.not_valid_after
         document_cert[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
         document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
-        document_cert[ConstantesPki.LIBELLE_TRANSACTION_FAITE] = False
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
+            ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+            ConstantesPki.LIBELLE_TRANSACTION_FAITE: transaction_faite,
+        }
 
         if correlation_csr is not None:
             document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
@@ -359,13 +363,12 @@ class PKIDocumentHelper:
             document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
             document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
 
-
         filtre = {
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
         }
 
         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        result = collection.update_one(filtre, {'$setOnInsert': document_cert}, upsert=True)
+        result = collection.update_one(filtre, {'$set': document_cert, '$setOnInsert': set_on_insert}, upsert=True)
         if result.matched_count == 0:
             # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
             # de manier permanente
@@ -457,19 +460,21 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
         if certificat_existant is None:
             # Si on n'a pas le certificat, on le conserve et on lance la verification de chaine
             enveloppe_certificat = EnveloppeCertificat(certificat_pem=bytes(transaction['certificat_pem'], 'utf-8'))
+            helper = PKIDocumentHelper(self.controleur.contexte, None)
+            helper.inserer_certificat(enveloppe_certificat, transaction_faite=True)
 
             # Sauvegarder certificat #
-            document_certificat = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
-            document_certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = transaction['certificat_pem']
-            document_certificat[ConstantesPki.LIBELLE_FINGERPRINT] = enveloppe_certificat.fingerprint_ascii
+            # document_certificat = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
+            # document_certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = transaction['certificat_pem']
+            # document_certificat[ConstantesPki.LIBELLE_FINGERPRINT] = enveloppe_certificat.fingerprint_ascii
+            #
+            # if enveloppe_certificat.is_rootCA:
+            #     idmg_certificat = enveloppe_certificat.idmg
+            # else:
+            #     idmg_certificat = enveloppe_certificat.subject_organization_name
+            # document_certificat[ConstantesPki.LIBELLE_IDMG] = idmg_certificat
 
-            if enveloppe_certificat.is_rootCA:
-                idmg_certificat = enveloppe_certificat.idmg
-            else:
-                idmg_certificat = enveloppe_certificat.subject_organization_name
-            document_certificat[ConstantesPki.LIBELLE_IDMG] = idmg_certificat
-
-            collection.insert_one(document_certificat)
+            # collection.insert_one(document_certificat)
 
             self.set_etape_suivante(ProcessusAjouterCertificat.verifier_chaine.__name__)
 
@@ -512,7 +517,6 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
             helper.marquer_certificats_valides([fingerprint])
 
         # Transmettre commande au publicateur pour inserer le certificat dans le repertoire certs
-
 
         self.set_etape_suivante()  # Termine
 
