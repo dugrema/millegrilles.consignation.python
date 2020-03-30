@@ -921,7 +921,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         domaine = self.get_nom_domaine()
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
 
-        self._logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
+        self._logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
         routing = domaine
         nom_module = 'millegrilles_Domaines'
         nom_classe = 'BackupHoraire'
@@ -939,28 +939,28 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         backup_precedent = declencheur.get(ConstantesBackup.LIBELLE_BACKUP_PRECEDENT)
-        self._logger.error("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
+        self._logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
         self.handler_backup.backup_domaine(heure, domaine)
 
     def declencher_backup_quotidien(self, declencheur: dict):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self._logger.error("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
+        self._logger.info("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
         self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour)
 
     def declencher_backup_mensuel(self, declencheur: dict):
         mois = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_MOIS], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self._logger.error("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
+        self._logger.info("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
         self.__handler_backup.creer_backup_mensuel(self.get_nom_domaine(), mois)
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self._logger.error("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
+        self._logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
         self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
 
     @property
@@ -1365,9 +1365,8 @@ class HandlerBackupDomaine:
                 chainage_backup_precedent
             )
 
-            if dependances_backup is not None:
-                catalogue_backup = dependances_backup['catalogue']
-
+            catalogue_backup = dependances_backup.get('catalogue')
+            if catalogue_backup is not None:
                 hachage_entete = self.calculer_hash_entetebackup(catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE])
                 uuid_transaction_catalogue = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
@@ -1453,6 +1452,15 @@ class HandlerBackupDomaine:
                         self._nom_collection_transactions, str(heure_anterieure))
                 )
 
+            # Traiter les transactions invalides
+            liste_uuids_invalides = dependances_backup.get('liste_uuids_invalides')
+            if liste_uuids_invalides and len(liste_uuids_invalides) > 0:
+                self.__logger.error(
+                    "Marquer %d transactions invalides exclue du backup de %s a %s" % (
+                        len(liste_uuids_invalides), self._nom_collection_transactions, str(heure_anterieure))
+                )
+                self.marquer_transactions_invalides(self._nom_collection_transactions, liste_uuids_invalides)
+
         self.transmettre_trigger_jour_precedent(heure_plusvieille)
 
     def _effectuer_requete_domaine(self, heure: datetime.datetime):
@@ -1462,7 +1470,9 @@ class HandlerBackupDomaine:
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
             '_evenements.%s.transaction_traitee' % idmg: {'$lt': heure},
-            '_evenements.%s.backup_horaire' % idmg: {'$exists': False},
+            '_evenements.%s.%s' % (idmg, Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE): {'$exists': False},
+            '_evenements.%s.%s' % (idmg, Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR): {'$exists': False},
+            '_evenements.%s.%s' % (idmg, Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': False},
         }
         regroupement_periode = {
             'year': {'$year': '$_evenements.%s.transaction_traitee' % idmg},
@@ -1510,6 +1520,9 @@ class HandlerBackupDomaine:
                 }, {
                     '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
                                   Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': False}
+                }, {
+                    '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR): {'$exists': False}
                 }
             ]
 
@@ -1573,9 +1586,11 @@ class HandlerBackupDomaine:
             certs_pem[fingerprint_ca] = cert_ca.certificat_pem
 
         liste_uuid_transactions = list()
+        liste_uuids_invalides = list()
         info_backup = {
             'path_fichier_backup': path_fichier_backup,
             'uuid_transactions': liste_uuid_transactions,
+            'liste_uuids_invalides': liste_uuids_invalides,
         }
 
         cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
@@ -1601,6 +1616,8 @@ class HandlerBackupDomaine:
                     liste_uuid_transactions.append(uuid_transaction)
                 except HachageInvalide:
                     self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup de %s" % (uuid_transaction, nom_collection_mongo))
+                    # Marquer la transaction comme invalide pour backup
+                    liste_uuids_invalides.append(uuid_transaction)
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA3-512 du fichier de backup des transactions
@@ -1642,7 +1659,9 @@ class HandlerBackupDomaine:
 
         else:
             self.__logger.info("Backup: aucune transaction, backup annule")
-            info_backup = None
+            info_backup = {
+                'liste_uuids_invalides': liste_uuids_invalides
+            }
 
         return info_backup
 
@@ -1686,6 +1705,24 @@ class HandlerBackupDomaine:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transactions,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection_mongo,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
+        }
+        self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+
+    def marquer_transactions_invalides(self, nom_collection_mongo: str, uuid_transactions: list):
+        """
+        Effectue une correction sur les transactions considerees invalides pour le backup. Ces transactions
+        deja traitees sont dans un etat irrecuperable qui ne permet pas de les valider.
+
+        :param nom_collection_mongo: Nom de la collection des transactions du domaine
+        :param uuid_transactions: Liste des uuid de transactions (en-tete)
+        :return:
+        """
+
+        evenement = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transactions,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection_mongo,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR,
         }
         self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
 
@@ -2040,7 +2077,7 @@ class BackupHoraire(MGProcessus):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def initiale(self):
-        self.__logger.error("Processus backup horaire demarre, %s" % str(self.parametres))
+        self.__logger.info("Processus backup horaire demarre, %s" % str(self.parametres))
 
         # Charger l'information du backup horaire precedent pour creer une chaine
         requete = {
@@ -2058,7 +2095,7 @@ class BackupHoraire(MGProcessus):
 
         entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
 
-        self.__logger.error("Reponse requete : %s" % str(entete_dernier_backup))
+        self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
 
         gestionnaire.handler_backup.backup_domaine(heure, domaine, entete_dernier_backup)
 
