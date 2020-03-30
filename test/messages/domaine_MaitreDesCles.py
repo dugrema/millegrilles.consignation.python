@@ -9,6 +9,7 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
 from millegrilles.domaines.MaitreDesCles import ConstantesMaitreDesCles
 from millegrilles.domaines.Parametres import ConstantesParametres
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 from threading import Event, Thread
 from cryptography import x509
@@ -119,6 +120,29 @@ class MessagesSample(BaseCallback):
             'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_CLE_RACINE,
             'abcd-1234',
             self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def commande_signer_cle_backup(self):
+        with open ('/home/mathieu/mgdev/certs/pki.connecteur.key', 'rb') as fichier:
+            key_bytes = fichier.read()
+
+        enveloppe = EnveloppeCleCert()
+        enveloppe.key_from_pem_bytes(key_bytes, None)
+        public_bytes = enveloppe.public_bytes
+
+        requete_cle_racine = {
+            'cle_publique': public_bytes.decode('utf-8'),
+            'mot_de_passe': 'allo',
+            'motDePasseChiffre': '',
+        }
+        enveloppe_requete = self.generateur.transmettre_commande(
+            requete_cle_racine,
+            'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
         )
 
         print("Envoi requete: %s" % enveloppe_requete)
@@ -269,7 +293,8 @@ class MessagesSample(BaseCallback):
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
 
-        self.requete_cle_racine()
+        # self.requete_cle_racine()
+        self.commande_signer_cle_backup()
 
 
 # --- MAIN ---

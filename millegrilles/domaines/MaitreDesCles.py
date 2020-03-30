@@ -3,9 +3,9 @@
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite, ConstantesSecurityPki
-from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, TraitementMessageDomaineRequete, TraitementCommandesProtegees
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInconnu
+from millegrilles.dao.MessageDAO import CertificatInconnu, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, \
     ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
@@ -84,6 +84,20 @@ class TraitementRequetesProtegees(TraitementRequetesNoeuds):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
+class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+
+        resultat = None
+        if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP):
+            resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+
+        return resultat
+
+
 class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -112,6 +126,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             Constantes.SECURITE_PRIVE: TraitementRequetesNoeuds(self),
             Constantes.SECURITE_PUBLIC: TraitementRequetesNoeuds(self),
         }
+
+        self.__handler_commandes = super().get_handler_commandes()
+        self.__handler_commandes[Constantes.SECURITE_PROTEGE] = TraitementCommandesMaitreDesClesProtegees(self)
 
     def configurer(self):
         super().configurer()
@@ -551,6 +568,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             reponse, properties.reply_to, properties.correlation_id
         )
 
+    def signer_cle_backup(self, properties, message_dict):
+        self._logger.debug("Signer cle de backup : %s" % str(message_dict))
+        return {"resultat": "ok"}
+
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
 
@@ -566,8 +587,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return ConstantesMaitreDesCles.DOMAINE_NOM
 
-    def get_handler_requetes(self):
+    def get_handler_requetes(self) -> dict:
         return self.__handler_requetes
+
+    def get_handler_commandes(self) -> dict:
+        return self.__handler_commandes
 
     @property
     def get_certificat(self):

@@ -651,6 +651,8 @@ class ConstantesMaitreDesCles:
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
 
+    COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
+
     TRANSACTION_CHAMP_CLESECRETE = 'cle'
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'

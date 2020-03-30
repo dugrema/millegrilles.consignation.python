@@ -145,6 +145,15 @@ class EnveloppeCleCert:
         return self.cert.public_bytes(serialization.Encoding.PEM)
 
     @property
+    def public_bytes(self):
+        if self.cert:
+            return self.cert_bytes
+        elif self.private_key:
+            return self.private_key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+
+        return None
+
+    @property
     def csr_bytes(self):
         return self.csr.public_bytes(serialization.Encoding.PEM)
 
