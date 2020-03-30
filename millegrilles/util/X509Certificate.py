@@ -20,6 +20,7 @@ from millegrilles.SecuritePKI import ConstantesSecurityPki
 class ConstantesGenerateurCertificat:
 
     DUREE_CERT_ROOT = datetime.timedelta(days=3655)
+    DUREE_CERT_BACKUP = datetime.timedelta(days=3655)
     DUREE_CERT_MILLEGRILLE = datetime.timedelta(days=730)
     DUREE_CERT_NOEUD = datetime.timedelta(days=366)
     DUREE_CERT_NAVIGATEUR = datetime.timedelta(weeks=6)
@@ -42,6 +43,7 @@ class ConstantesGenerateurCertificat:
     ROLE_NGINX = 'vitrineweb'
     ROLE_CONNECTEUR = 'connecteur'
     ROLE_CONNECTEUR_TIERS = 'tiers'
+    ROLE_BACKUP = 'backup'
 
     ROLES_ACCES_MONGO = [
         ROLE_MONGO,
@@ -379,8 +381,10 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         builder = builder.not_valid_after(datetime.datetime.today() + duree_cert)
         builder = builder.serial_number(x509.random_serial_number())
 
+        pem_bytes = cle_publique_pem.encode('utf-8')
+
         public_key = serialization.load_pem_public_key(
-            cle_publique_pem.encode('utf8'),
+            pem_bytes,
             backend=default_backend()
         )
 
@@ -1234,6 +1238,27 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
         return builder
 
 
+class GenerateurCertificatBackup(GenerateurCertificateParClePublique):
+
+    def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+        super().__init__(idmg, dict_ca, autorite)
+
+    def preparer_builder(self, cle_publique_pem: str, sujet: str, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_BACKUP) -> x509.CertificateBuilder:
+        return super().preparer_builder(cle_publique_pem, sujet, duree_cert)
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_BACKUP.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class RenouvelleurCertificat:
 
     def __init__(self, idmg, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
@@ -1330,6 +1355,18 @@ class RenouvelleurCertificat:
 
     def signer_navigateur(self, public_key_pem: str, sujet: str):
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__millegrille)
+
+        builder = generateur.preparer_builder(public_key_pem, sujet)
+        certificat = generateur.signer(builder)
+        chaine = generateur.aligner_chaine(certificat)
+
+        clecert = EnveloppeCleCert(cert=certificat)
+        clecert.chaine = chaine
+
+        return clecert
+
+    def signer_backup(self, public_key_pem: str, sujet: str):
+        generateur = GenerateurCertificatBackup(self.__idmg, self.__dict_ca, self.__millegrille)
 
         builder = generateur.preparer_builder(public_key_pem, sujet)
         certificat = generateur.signer(builder)

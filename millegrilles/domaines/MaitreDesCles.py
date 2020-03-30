@@ -570,7 +570,41 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def signer_cle_backup(self, properties, message_dict):
         self._logger.debug("Signer cle de backup : %s" % str(message_dict))
-        return {"resultat": "ok"}
+
+        public_key_str = message_dict['cle_publique']
+        if 'BEGIN PUBLIC KEY' not in public_key_str:
+            public_key_str = PemHelpers.wrap_public_key(public_key_str)
+        sujet = 'Backup'
+
+        # Trouver generateur pour le role
+        renouvelleur = self.renouvelleur_certificat
+        clecert = renouvelleur.signer_backup(public_key_str, sujet)
+
+        # Generer nouvelle transaction pour sauvegarder le certificat
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+
+        # self.generateur_transactions.soumettre_transaction(
+        #     transaction,
+        #     ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        # )
+
+        # Creer une reponse pour coupdoeil
+        info_cert = transaction.copy()
+        del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+
+        return {
+            'certificat_info': info_cert,
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
