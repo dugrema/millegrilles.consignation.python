@@ -243,6 +243,18 @@ class TransactionConfiguration:
         return self._pki_config[Constantes.CONFIG_PKI_WORKDIR]
 
     @property
+    def pki_secretdir(self):
+        return self._pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
+
+    @property
+    def pki_keyautorite(self):
+        return self._pki_config[Constantes.CONFIG_PKI_KEY_AUTORITE]
+
+    @property
+    def pki_capasswords(self):
+        return self._pki_config[Constantes.CONFIG_CA_PASSWORDS]
+
+    @property
     def pki_config(self):
         return self._pki_config
 

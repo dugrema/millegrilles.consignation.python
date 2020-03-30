@@ -108,6 +108,22 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_cle_racine(self):
+        requete_cle_racine = {
+            'fingerprint': '',
+            'mot_de_passe': 'allo',
+            'motDePasseChiffre': '',
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cle_racine,
+            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_CLE_RACINE,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def nouvelle_cle_grosfichiers(self):
 
         cle_secrete = 'Mon mot de passe secret'
@@ -250,8 +266,10 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
         # enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
-        self.transaction_demande_inscription_tierce()
+        # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
+
+        self.requete_cle_racine()
 
 
 # --- MAIN ---

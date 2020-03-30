@@ -116,8 +116,8 @@ DEFAULT_CA_PASSWORDS = 'pki.ca.passwords'
 DEFAUT_PKI_CERT_MILLEGRILLE = 'pki.millegrille.cert'
 DEFAUT_PKI_KEY_MILLEGRILLE = 'pki.millegrille.key'
 DEFAUT_PKI_PASSWORD_MILLEGRILLE = 'pki.millegrille.password.txt'
-DEFAUT_PKI_CERT_AUTORITE = 'pki.autorite.cert.pem'
-DEFAUT_PKI_KEY_AUTORITE = 'pki.autorite.key.pem'
+DEFAUT_PKI_CERT_AUTORITE = 'pki.racine.cert'
+DEFAUT_PKI_KEY_AUTORITE = 'pki.racine.key'
 DEFAUT_PKI_PASSWORD_AUTORITE = 'pki.autorite.password.txt'
 DEFAUT_PKI_CERT_MAITREDESCLES = 'pki.maitredescles.cert.pem'
 DEFAUT_PKI_KEY_MAITREDESCLES = 'pki.maitredescles.key.pem'
@@ -237,6 +237,14 @@ SECURITE_ACCES_REFUSE = '0.refuse'
 SECURITE_ACCES_PERMIS = '1.permis'
 
 CLE_CERT_CA = 'pki.millegrille'
+
+
+class ConstantesSecurite:
+
+    EXCHANGE_SECURE = 'millegrilles.middleware'
+    EXCHANGE_PROTEGE = 'millegrilles.noeuds'
+    EXCHANGE_PRIVE = 'millegrilles.prive'
+    EXCHANGE_PUBLIC = 'millegrilles.public'
 
 
 class ConstantesDomaines:
@@ -381,6 +389,9 @@ class ConstantesSecurityPki:
 
     SYMETRIC_PADDING = 128
 
+    ROLE_CONNECTEUR = 'connecteur'
+    ROLE_MAITREDESCLES = 'maitrecles'
+
     # Document utilise pour publier un certificat
     DOCUMENT_EVENEMENT_CERTIFICAT = {
         EVENEMENT_MESSAGE_EVENEMENT: EVENEMENT_CERTIFICAT,
@@ -459,6 +470,7 @@ class ConstantesPki:
         LIBELLE_FINGERPRINT: LIBVAL_CONFIG_CERTDOCKER,
         CHAMP_ALT_DOMAINS: dict(),
     }
+
 
 class ConstantesParametres:
 
@@ -634,6 +646,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
     TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
 
+    REQUETE_CLE_RACINE = 'requeteCleRacine'
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'

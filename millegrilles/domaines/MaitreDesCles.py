@@ -2,8 +2,8 @@
 # Responsable de la gestion et de l'acces aux cles secretes pour les niveaux 3.Protege et 4.Secure.
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesMaitreDesCles
-from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError
+from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite, ConstantesSecurityPki
+from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, TraitementMessageDomaineRequete
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, CertificatInconnu
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -23,6 +23,65 @@ import logging
 import datetime
 import json
 import socket
+from os import path
+
+
+class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        # Verifier quel processus demarrer. On match la valeur dans la routing key.
+        routing_key = method.routing_key
+        routing_key_sansprefixe = routing_key.replace(
+            'requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM,
+            ''
+        )
+
+        if routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
+            # Transmettre le certificat courant du maitre des cles
+            self.transmettre_certificat(properties)
+        else:
+            # Type de transaction inconnue, on lance une exception
+            raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+
+    def transmettre_certificat(self, properties):
+        """
+        Transmet le certificat courant du MaitreDesCles au demandeur.
+        :param properties:
+        :return:
+        """
+        self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
+        # Genere message reponse
+        message_resultat = {
+            'certificat': self._gestionnaire.get_certificat_pem,
+            'certificats_intermediaires': [self._gestionnaire.get_intermediaires_pem],
+        }
+
+        self._gestionnaire.generateur_transactions.transmettre_reponse(
+            message_resultat, properties.reply_to, properties.correlation_id
+        )
+
+
+class TraitementRequetesProtegees(TraitementRequetesNoeuds):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        domaine_routing_key = method.routing_key.replace('requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM, '')
+
+        reponse = None
+        if domaine_routing_key == ConstantesMaitreDesCles.REQUETE_CLE_RACINE:
+            reponse = self.gestionnaire.transmettre_cle_racine(properties, message_dict)
+        elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
+            self.gestionnaire.transmettre_cle_grosfichier(message_dict, properties)
+        elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
+            self.gestionnaire.transmettre_cle_document(message_dict, properties)
+        else:
+            reponse = super().traiter_requete(ch, method, properties, body, message_dict)
+
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
@@ -47,12 +106,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__renouvelleur_certificat = None
 
         # Queue message handlers
-        self.__handler_requetes_noeuds = None
+        self.__handler_requetes = {
+            Constantes.SECURITE_SECURE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_PRIVE: TraitementRequetesNoeuds(self),
+            Constantes.SECURITE_PUBLIC: TraitementRequetesNoeuds(self),
+        }
 
     def configurer(self):
         super().configurer()
-
-        self.__handler_requetes_noeuds = TraitementRequetesNoeuds(self)
 
         self.charger_ca_chaine()
         self.__clecert_millegrille = self.charger_clecert_millegrille()
@@ -310,100 +372,52 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return clecert
 
-    def get_nom_queue(self):
-        return ConstantesMaitreDesCles.QUEUE_NOM
+    def transmettre_cle_racine(self, properties, message_dict: dict):
+        self._logger.debug("Preparation transmission de la cle Racine, requete : %s" % str(message_dict))
 
-    def get_nom_collection(self):
-        return ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM
+        # Verifier que le demandeur a l'autorisation de se faire transmettre la cle racine
+        en_tete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        fingerprint_demandeur = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+        certificat_demandeur = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demandeur)
+        exchanges_certificat = certificat_demandeur.get_exchanges
+        roles_certificat = certificat_demandeur.get_roles
 
-    def get_collection_transaction_nom(self):
-        return ConstantesMaitreDesCles.COLLECTION_TRANSACTIONS_NOM
+        exchanges_acceptes = [ConstantesSecurite.EXCHANGE_PROTEGE, ConstantesSecurite.EXCHANGE_SECURE]
+        roles_acceptes = [
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL
+        ]
+        if not any(exchange in exchanges_acceptes for exchange in exchanges_certificat):
+            raise Exception("Certificat %s non autorise a recevoir cle racine (exchange)" % fingerprint_demandeur)
+        if not any(exchange in roles_acceptes for exchange in roles_certificat):
+            raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
 
-    def get_collection_processus_nom(self):
-        return ConstantesMaitreDesCles.COLLECTION_PROCESSUS_NOM
+        path_ca_cert = path.join(self.configuration.pki_secretdir, self.configuration.pki_cafile)
+        with open(path_ca_cert, 'r') as fichier:
+            fichier_cert_racine = fichier.read()
 
-    def get_nom_domaine(self):
-        return ConstantesMaitreDesCles.DOMAINE_NOM
+        path_key_racine = path.join(self.configuration.pki_secretdir, self.configuration.pki_keyautorite)
+        with open(path_key_racine, 'rb') as fichier:
+            fichier_key_racine = fichier.read()
 
-    def get_handler_requetes_noeuds(self):
-        return self.__handler_requetes_noeuds
+        path_ca_passwords = path.join(self.configuration.pki_secretdir, self.configuration.pki_capasswords)
+        with open(path_ca_passwords, 'r') as fichier:
+            passwords = json.load(fichier)
 
-    @property
-    def get_certificat(self):
-        return self.__clecert_maitredescles.cert
+        password_racine = passwords['pki.ca.root']
+        clecert = EnveloppeCleCert()
+        clecert.key_from_pem_bytes(fichier_key_racine, password_racine.encode('utf-8'))
 
-    @property
-    def get_certificat_pem(self):
-        return self.__certificat_courant_pem
+        # Mot de passe demande pour le retour
+        mot_de_passe_retour = message_dict['mot_de_passe']
+        clecert.password = mot_de_passe_retour.encode('utf-8')
+        cle_privee_dechiffree = clecert.private_key_bytes
 
-    @property
-    def get_intermediaires_pem(self):
-        return self.__certificat_intermediaires_pem
-
-    @property
-    def get_certificats_backup(self):
-        return self.__certificats_backup
-
-    def get_fingerprint_cert(self, cert=None):
-        if cert is None:
-            cert = self.get_certificat
-        return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
-
-    def traiter_cedule(self, evenement):
-        super().traiter_cedule(evenement)
-
-    @property
-    def version_domaine(self):
-        return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
-
-    @property
-    def renouvelleur_certificat(self) -> RenouvelleurCertificat:
-        return self.__renouvelleur_certificat
-
-
-class TraitementRequetesNoeuds(TraitementMessageDomaine):
-
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire)
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-
-        # Verifier quel processus demarrer. On match la valeur dans la routing key.
-        routing_key = method.routing_key
-        routing_key_sansprefixe = routing_key.replace(
-            'requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM,
-            ''
-        )
-
-        if routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
-            # Transmettre le certificat courant du maitre des cles
-            self.transmettre_certificat(properties)
-        elif routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
-            self.transmettre_cle_grosfichier(message_dict, properties)
-        elif routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
-            self.transmettre_cle_document(message_dict, properties)
-        else:
-            # Type de transaction inconnue, on lance une exception
-            raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
-
-    def transmettre_certificat(self, properties):
-        """
-        Transmet le certificat courant du MaitreDesCles au demandeur.
-        :param properties:
-        :return:
-        """
-        self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
-        # Genere message reponse
-        message_resultat = {
-            'certificat': self._gestionnaire.get_certificat_pem,
-            'certificats_intermediaires': [self._gestionnaire.get_intermediaires_pem],
+        return {
+            'cle_racine': cle_privee_dechiffree.decode('utf-8'),
+            'cert_racine': fichier_cert_racine,
         }
-
-        self._gestionnaire.generateur_transactions.transmettre_reponse(
-            message_resultat, properties.reply_to, properties.correlation_id
-        )
 
     def transmettre_cle_grosfichier(self, evenement, properties):
         """
@@ -417,7 +431,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        certificat_demandeur = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        certificat_demandeur = self.verificateur_transaction.verifier(evenement)
         enveloppe_certificat = certificat_demandeur
 
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
@@ -427,7 +441,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         if fingerprint_demande is not None:
             self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
             try:
-                enveloppe_certificat = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
+                enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
 
                 # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
                 if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in enveloppe_certificat.get_roles:
@@ -462,8 +476,8 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         if document is not None:
             self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
             if acces_permis:
-                cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
-                cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(
+                cle_secrete = self.decrypter_cle(document['cles'])
+                cle_secrete_reencryptee, fingerprint = self.crypter_cle(
                     cle_secrete, enveloppe_certificat.certificat)
                 reponse = {
                     'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
@@ -471,7 +485,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
                 }
 
-        self._gestionnaire.generateur_transactions.transmettre_reponse(
+        self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )
 
@@ -487,7 +501,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        certificat_demandeur = self.gestionnaire.verificateur_transaction.verifier(evenement)
+        certificat_demandeur = self.verificateur_transaction.verifier(evenement)
         enveloppe_certificat = certificat_demandeur
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
@@ -495,7 +509,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         if fingerprint_demande is not None:
             self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
             try:
-                enveloppe_certificat = self.gestionnaire.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
+                enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
 
                 # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
                 if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in enveloppe_certificat.get_roles:
@@ -524,8 +538,8 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         if document is not None:
             self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
             if acces_permis:
-                cle_secrete = self._gestionnaire.decrypter_cle(document['cles'])
-                cle_secrete_reencryptee, fingerprint = self._gestionnaire.crypter_cle(
+                cle_secrete = self.decrypter_cle(document['cles'])
+                cle_secrete_reencryptee, fingerprint = self.crypter_cle(
                     cle_secrete, enveloppe_certificat.certificat)
                 reponse = {
                     'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
@@ -533,9 +547,59 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
                 }
 
-        self._gestionnaire.generateur_transactions.transmettre_reponse(
+        self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )
+
+    def get_nom_queue(self):
+        return ConstantesMaitreDesCles.QUEUE_NOM
+
+    def get_nom_collection(self):
+        return ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM
+
+    def get_collection_transaction_nom(self):
+        return ConstantesMaitreDesCles.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return ConstantesMaitreDesCles.COLLECTION_PROCESSUS_NOM
+
+    def get_nom_domaine(self):
+        return ConstantesMaitreDesCles.DOMAINE_NOM
+
+    def get_handler_requetes(self):
+        return self.__handler_requetes
+
+    @property
+    def get_certificat(self):
+        return self.__clecert_maitredescles.cert
+
+    @property
+    def get_certificat_pem(self):
+        return self.__certificat_courant_pem
+
+    @property
+    def get_intermediaires_pem(self):
+        return self.__certificat_intermediaires_pem
+
+    @property
+    def get_certificats_backup(self):
+        return self.__certificats_backup
+
+    def get_fingerprint_cert(self, cert=None):
+        if cert is None:
+            cert = self.get_certificat
+        return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
+
+    def traiter_cedule(self, evenement):
+        super().traiter_cedule(evenement)
+
+    @property
+    def version_domaine(self):
+        return ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+
+    @property
+    def renouvelleur_certificat(self) -> RenouvelleurCertificat:
+        return self.__renouvelleur_certificat
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):

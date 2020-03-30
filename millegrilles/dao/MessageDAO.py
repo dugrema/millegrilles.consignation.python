@@ -7,13 +7,14 @@ import logging
 import ssl
 
 from threading import Lock, RLock, Event, Thread, Barrier
+from pika.credentials import PlainCredentials, ExternalCredentials
+from pika.exceptions import AMQPConnectionError
+from cryptography.exceptions import InvalidSignature
 
 from millegrilles import Constantes
 from millegrilles.Constantes import CommandesSurRelai
 from millegrilles.util.JSONEncoders import MongoJSONEncoder
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder, JSONHelper
-from pika.credentials import PlainCredentials, ExternalCredentials
-from pika.exceptions import AMQPConnectionError
 
 ''' 
 DAO vers la messagerie
@@ -1284,6 +1285,12 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
             self.message_dao.transmettre_demande_certificat(fingerprint)
+        except InvalidSignature as erreur_signature:
+            self.transmettre_reponse(
+                {'error': True, 'message': 'Signature invalide'},
+                None, properties.reply_to, properties.correlation_id
+            )
+            raise erreur_signature
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         resultats = list()
