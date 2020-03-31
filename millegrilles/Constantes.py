@@ -411,7 +411,6 @@ class ConstantesPki:
     TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat' % DOMAINE_NOM
     TRANSACTION_WEB_NOUVEAU_CERTIFICAT = '%s.nouveauCertificat.web' % DOMAINE_NOM
     TRANSACTION_CLES_RECUES = '%s.clesRecues' % DOMAINE_NOM
-    TRANSACTION_CONFIRMER_CERTIFICAT = '%s.confirmerCertificat' % DOMAINE_NOM
     TRANSACTION_RENOUVELLER_CERT_DOCKER = '%s.renouvellerCertDocker' % DOMAINE_NOM
 
     LIBELLE_CERTIFICAT_PEM = ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM
@@ -446,6 +445,7 @@ class ConstantesPki:
     CHAMP_ALT_DOMAINS = 'altdomains'
     CHAMP_ROLES = 'roles'
 
+    REQUETE_CONFIRMER_CERTIFICAT = 'confirmerCertificat'
     REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
     REQUETE_CERTIFICAT_DEMANDE = 'certificat'
     REQUETE_CERTIFICAT_BACKUP = 'certificatBackup'

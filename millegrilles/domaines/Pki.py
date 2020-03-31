@@ -19,7 +19,7 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
 
         reponse = None
-        if domaine_routing_key == ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT:
+        if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
             reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_DEMANDE:
             reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
@@ -723,7 +723,7 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
             self.recevoir_certificat(message_dict)
         elif routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
             self.transmettre_liste_ca(properties, message_dict)
-        elif routing_key.startswith(ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT):
+        elif routing_key.startswith(ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT):
             self.confirmer_certificat(properties, message_dict)
         elif routing_key == 'requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR:
             self.transmettre_certificats_correlation_csr(properties, message_dict)
@@ -739,7 +739,7 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
     def confirmer_certificat(self, properties, message_dict):
         """
-        Confirme la validute d'un certificat.
+        Confirme la validite d'un certificat.
         """
         reponse = dict()
         if message_dict.get('fingerprint'):
