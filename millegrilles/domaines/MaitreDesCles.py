@@ -1456,12 +1456,7 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
         for doc in curseur:
             self.__logger.debug("Cles manquantes dans " + str(doc))
 
-            if doc[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS:
-                self.creer_transaction_cles_manquantes_grosfichiers(fingerprint_cert_maitredescles, doc, fingerprints)
-            elif doc[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT:
-                self.creer_transaction_cles_manquantes_documents(fingerprint_cert_maitredescles, doc, fingerprints)
-            else:
-                erreurs.append('Document type cle inconnu : ' + doc[Constantes.DOCUMENT_INFODOC_LIBELLE])
+            self.creer_transaction_cles_manquantes(fingerprint_cert_maitredescles, doc, fingerprints)
 
         self.set_etape_suivante()  # Termine
 
@@ -1483,7 +1478,7 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         return collection_documents.find(filtre)
 
-    def creer_transaction_cles_manquantes_grosfichiers(self, fingerprint_cert_maitredescles, document, fingerprints):
+    def creer_transaction_cles_manquantes(self, fingerprint_cert_maitredescles, document, fingerprints):
         # Extraire cle secrete en utilisant le certificat du maitre des cles courant
         cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES][fingerprint_cert_maitredescles]
         cle_dechiffree = self.controleur.gestionnaire.decrypter_contenu(cle_chiffree)
@@ -1494,7 +1489,7 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
             if fingerprint not in cles_connues:
                 identificateur_document = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
-                self.__logger.debug("Ajouter cle %s dans document grosfichiers %s" % (
+                self.__logger.debug("Ajouter cle %s dans document %s" % (
                     fingerprint, identificateur_document))
                 enveloppe_backup = dict_certs[fingerprint]
                 cle_chiffree_backup, fingerprint_backup = self.controleur.gestionnaire.crypter_cle(cle_dechiffree, cert=enveloppe_backup.certificat)
@@ -1502,7 +1497,7 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
                 self.__logger.debug("Cle chiffree pour cert %s : %s" % (fingerprint_backup, cle_chiffree_backup_base64))
 
                 transaction = {
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE: document[Constantes.DOCUMENT_INFODOC_LIBELLE],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES: {
                         fingerprint_backup: cle_chiffree_backup_base64
                     },
@@ -1523,6 +1518,3 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
                     ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES,
                     version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
                 )
-
-    def creer_transaction_cles_manquantes_documents(self, fingerprint_cert_maitredescles, document, fingerprints):
-        dict_certs = self.controleur.gestionnaire.get_certificats_backup()
