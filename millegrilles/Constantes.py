@@ -430,12 +430,16 @@ class ConstantesPki:
     LIBELLE_CHAINES = 'chaines'
     LIBELLE_MGLIBELLE = 'mg-libelle'
     LIBELLE_CLE_CRYPTEE = 'cle_cryptee'
+    LIBELLE_ROLES = 'roles'
+    LIBELLE_EXCHANGES = 'exchanges'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_CERTIFICAT_ROOT = 'certificat.root'
     LIBVAL_CERTIFICAT_INTERMEDIAIRE = 'certificat.intermediaire'
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
     LIBVAL_CERTIFICAT_NOEUD = 'certificat.noeud'
+    LIBVAL_CERTIFICAT_BACKUP = 'certificat.backup'
+    LIBVAL_LISTE_CERTIFICATS_BACKUP = 'liste.certificats.backup'
     LIBVAL_PKI_WEB = 'pki.web'
     LIBVAL_CONFIG_CERTDOCKER = 'configuration.certdocker'
 

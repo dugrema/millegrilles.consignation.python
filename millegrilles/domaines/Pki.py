@@ -6,7 +6,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDoc
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
-from millegrilles.util.X509Certificate import PemHelpers
+from millegrilles.util.X509Certificate import PemHelpers, ConstantesGenerateurCertificat
 
 import logging
 import datetime
@@ -359,9 +359,14 @@ class PKIDocumentHelper:
             document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
             # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
             document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
-        elif enveloppe.is_CA:
-            document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+        else:
             document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
+            if enveloppe.is_CA:
+                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+                # document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
+            elif ConstantesGenerateurCertificat.ROLE_BACKUP in (enveloppe.get_roles):
+                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
+                self.maj_liste_certificats_backup(fingerprint, document_cert)
 
         filtre = {
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
@@ -389,6 +394,20 @@ class PKIDocumentHelper:
         #     ProcessusVerifierChaineCertificatsNonValides.__name__
         # )
         # self._mg_processus_demarreur.demarrer_processus(processus, dict())
+
+    def maj_liste_certificats_backup(self, fingerprint, info_certificat):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
+        }
+        set_ops = {
+            'certificats.%s' % fingerprint: info_certificat[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
+        }
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+        collection.update_one(filtre, {'$set': set_ops, '$setOnInsert': set_on_insert}, upsert=True)
 
     def charger_certificat(self, fingerprint=None, subject=None):
         filtre = dict()

@@ -571,6 +571,24 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def signer_cle_backup(self, properties, message_dict):
         self._logger.debug("Signer cle de backup : %s" % str(message_dict))
 
+        # Verifier que le demandeur a l'autorisation de se faire transmettre la cle racine
+        en_tete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        fingerprint_demandeur = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+        certificat_demandeur = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demandeur)
+        exchanges_certificat = certificat_demandeur.get_exchanges
+        roles_certificat = certificat_demandeur.get_roles
+
+        exchanges_acceptes = [ConstantesSecurite.EXCHANGE_PROTEGE, ConstantesSecurite.EXCHANGE_SECURE]
+        roles_acceptes = [
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL
+        ]
+        if not any(exchange in exchanges_acceptes for exchange in exchanges_certificat):
+            raise Exception("Certificat %s non autorise a recevoir cle racine (exchange)" % fingerprint_demandeur)
+        if not any(exchange in roles_acceptes for exchange in roles_certificat):
+            raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
+
         public_key_str = message_dict['cle_publique']
         if 'BEGIN PUBLIC KEY' not in public_key_str:
             public_key_str = PemHelpers.wrap_public_key(public_key_str)
@@ -589,12 +607,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
             ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
             ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+            ConstantesPki.LIBELLE_ROLES: clecert.get_roles
         }
 
-        # self.generateur_transactions.soumettre_transaction(
-        #     transaction,
-        #     ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-        # )
+        self.generateur_transactions.soumettre_transaction(
+            transaction,
+            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
 
         # Creer une reponse pour coupdoeil
         info_cert = transaction.copy()
