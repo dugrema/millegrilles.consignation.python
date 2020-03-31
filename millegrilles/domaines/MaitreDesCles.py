@@ -662,6 +662,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
         )
 
+        # Ajouter certificat a la liste des certs de backup
+        enveloppe = EnveloppeCertificat(certificat_pem=clecert.cert_bytes)
+        fingerprint_backup = EnveloppeCertificat.calculer_fingerprint_b64(enveloppe.certificat)
+        self.__certificats_backup[fingerprint_backup] = enveloppe
+
+        # Rechiffrer toutes les cles avec ce nouveau certificat de backup
+        processus = "millegrilles_domaines_MaitreDesCles:ProcessusTrouverClesBackupManquantes"
+        fingerprints_backup = {'fingerprints_base64': list(self.__certificats_backup.keys())}
+        self.demarrer_processus(processus, fingerprints_backup)
+
         # Creer une reponse pour coupdoeil
         info_cert = transaction.copy()
         del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
