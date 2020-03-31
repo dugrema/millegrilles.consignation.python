@@ -62,6 +62,10 @@ class EnveloppeCertificat:
     def calculer_fingerprint_ascii(certificat):
         return str(binascii.hexlify(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
 
+    @staticmethod
+    def calculer_fingerprint_b64(certificat):
+        return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
+
     @property
     def fingerprint(self):
         return self._fingerprint

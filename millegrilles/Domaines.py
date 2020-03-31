@@ -691,16 +691,14 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
         nom_domaine = self.gestionnaire.get_collection_transaction_nom()
 
-        resultat = None
-
         if routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace("_DOMAINE_", nom_domaine):
-            self.gestionnaire.declencher_backup_horaire(message_dict)
+            resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace("_DOMAINE_", nom_domaine):
-            self.gestionnaire.declencher_backup_quotidien(message_dict)
+            resultat = self.gestionnaire.declencher_backup_quotidien(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace("_DOMAINE_", nom_domaine):
-            self.gestionnaire.declencher_backup_mensuel(message_dict)
+            resultat = self.gestionnaire.declencher_backup_mensuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
-            self.gestionnaire.declencher_backup_annuel(message_dict)
+            resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         else:
             raise ValueError("Commande inconnue: " + routing_key)
 

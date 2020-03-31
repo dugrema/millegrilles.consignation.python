@@ -658,6 +658,8 @@ class ConstantesMaitreDesCles:
 
     COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
 
+    CORRELATION_CERTIFICATS_BACKUP = 'certificatsBackup'
+
     TRANSACTION_CHAMP_CLESECRETE = 'cle'
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'

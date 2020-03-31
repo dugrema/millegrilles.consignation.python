@@ -1518,6 +1518,7 @@ class MGPProcessusDemarreur:
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
+            self._logger.exception("Erreur demarrage processus")
             self._contexte.message_dao.transmettre_erreur_transaction(id_document=id_document, detail=erreur)
 
 

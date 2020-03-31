@@ -12,6 +12,21 @@ import logging
 import datetime
 
 
+class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
+
+        if domaine_routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
+            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
+        else:
+            raise Exception("Requete publique non supportee " + routing_key)
+
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
 class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
@@ -32,21 +47,6 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
-class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
-
-    def traiter_requete(self, ch, method, properties, body, message_dict):
-        routing_key = method.routing_key
-        domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
-
-        if domaine_routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
-            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
-        else:
-            raise Exception("Requete publique non supportee " + routing_key)
-
-        if reponse is not None:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
-
-
 class GestionnairePki(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -56,9 +56,14 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self._pki_document_helper = None
         self.__traitement_certificats = None
 
+        handler_requetes_protegees = TraitementRequetesProtegees(self)
+        handler_requetes_publiques = TraitementRequetesPubliques(self)
+
         self.__handler_requetes_noeuds = {
-            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
-            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_SECURE: handler_requetes_protegees,
+            Constantes.SECURITE_PROTEGE: handler_requetes_protegees,
+            Constantes.SECURITE_PRIVE: handler_requetes_publiques,
+            Constantes.SECURITE_PUBLIC: handler_requetes_publiques,
         }
 
     def configurer(self):

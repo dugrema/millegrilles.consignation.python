@@ -3,14 +3,16 @@
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite, ConstantesSecurityPki
-from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, TraitementMessageDomaineRequete, TraitementCommandesProtegees
+from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, \
+    TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementCommandesSecures
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import CertificatInconnu, TraitementMessageDomaineCommande
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, \
     ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
 from millegrilles.util.JSONEncoders import DocElemFilter
 from millegrilles.domaines.Pki import ConstantesPki
+from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 
 from cryptography.hazmat.backends import default_backend
@@ -98,6 +100,24 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
         return resultat
 
 
+class TraitementCommandesMaitreDesClesSecures(TraitementCommandesSecures):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        correlation_id = properties.correlation_id
+
+        if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP):
+            resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
+
+        elif correlation_id == ConstantesMaitreDesCles.CORRELATION_CERTIFICATS_BACKUP:
+            resultat = self.gestionnaire.verifier_certificats_backup(message_dict)
+
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+
+        return resultat
+
+
 class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -114,7 +134,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
         self.__certificat_courant_pem = None
         self.__certificat_intermediaires_pem = None
-        self.__certificats_backup = None  # Liste de certificats backup utilises pour conserver les cles secretes.
+        self.__certificats_backup = dict()  # Liste de certificats backup utilises pour conserver les cles secretes.
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
 
         self.__renouvelleur_certificat = None
@@ -129,6 +149,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.__handler_commandes = super().get_handler_commandes()
         self.__handler_commandes[Constantes.SECURITE_PROTEGE] = TraitementCommandesMaitreDesClesProtegees(self)
+        self.__handler_commandes[Constantes.SECURITE_SECURE] = TraitementCommandesMaitreDesClesSecures(self)
 
     def configurer(self):
         super().configurer()
@@ -148,7 +169,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             self._logger.warning("Certificat maitredescles non trouve, on va en generer un nouveau. %s" % str(fnf))
             self.creer_certificat_maitredescles()
 
-        self.charger_certificats_backup()
+        # Faire une demande pour charger les certificats de backup courants
+        self.demander_certificats_backup()
 
         # Index collection domaine
         collection_domaine = self.get_collection()
@@ -267,19 +289,44 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self._logger.info("Certificat courant: %s" % str(cert.subject))
 
-    def charger_certificats_backup(self):
+    def demander_certificats_backup(self):
+        requete = {}
+        domaine = '%s.%s' % (ConstantesPki.DOMAINE_NOM, ConstantesPki.REQUETE_CERTIFICAT_BACKUP)
+        queue = '%s.commande.4.secure' % ConstantesMaitreDesCles.QUEUE_NOM
+        self.generateur_transactions.transmettre_requete(
+            requete,
+            domaine,
+            correlation_id=ConstantesMaitreDesCles.CORRELATION_CERTIFICATS_BACKUP,
+            reply_to=queue,
+            securite=Constantes.SECURITE_SECURE,
+        )
+
+    def verifier_certificats_backup(self, message_dict):
         """
         Charge les certificats de backup presents dans le repertoire des certificats.
         Les cles publiques des backups sont utilisees pour re-encrypter les cles secretes.
         :return:
         """
-        certificats_backup = list()
+        resultats = message_dict['resultats']
+        certificats = resultats['certificats']
 
-        # Aller chercher les certs dans mongo
-        # A FAIRE
+        verificateur_certificats = self.verificateur_certificats
+        for fingerprint_hex, certificat in certificats.items():
 
-        if len(certificats_backup) > 0:
-            self.__certificats_backup = certificats_backup
+            enveloppe = EnveloppeCertificat(certificat_pem=certificat)
+            fingerprint_b64 = EnveloppeCertificat.calculer_fingerprint_b64(enveloppe.certificat)
+
+            # Verifier que c'est un certificat du bon type
+            if ConstantesGenerateurCertificat.ROLE_BACKUP in enveloppe.get_roles:
+                resultat_verification = verificateur_certificats.verifier_chaine(enveloppe)
+                if resultat_verification:
+                    self.__certificats_backup[fingerprint_b64] = enveloppe
+            else:
+                self._logger.warning("Certificat fournit pour backup n'a pas le role 'backup' : fingerprint hex " + fingerprint_hex)
+
+        processus = "millegrilles_domaines_MaitreDesCles:ProcessusVerifierClesBackup"
+        fingerprints_backup = {'fingerprints_base64': list(self.__certificats_backup.keys())}
+        self.demarrer_processus(processus, fingerprints_backup)
 
     def identifier_processus(self, domaine_transaction):
 
@@ -1399,3 +1446,11 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
             transaction,
             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT,
         )
+
+
+class ProcessusVerifierClesBackup(MGProcessus):
+
+    def initiale(self):
+        fingerprints = self.parametres['fingerprints_base64']
+
+        self.set_etape_suivante()  # Termine
