@@ -370,6 +370,38 @@ class UtilCertificats:
 
         return digest_base64
 
+    def chiffage_asymmetrique(self, cle_secrete):
+        public_key = self.certificat.public_key()
+        cle_secrete_backup = public_key.encrypt(
+            cle_secrete,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        fingerprint = self._enveloppe.fingerprint_ascii
+        return cle_secrete_backup, fingerprint
+
+    def dechiffrage_asymmetrique(self, contenu):
+        """
+        Utilise la cle privee en memoire pour dechiffrer le contenu.
+        :param contenu:
+        :return:
+        """
+        contenu_bytes = base64.b64decode(contenu)
+
+        contenu_dechiffre = self._cle.decrypt(
+            contenu_bytes,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
+        return contenu_dechiffre
+
     @property
     def certificat(self):
         return self._certificat

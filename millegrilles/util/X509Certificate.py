@@ -132,6 +132,39 @@ class EnveloppeCleCert:
         with open(private_key, 'rb') as fichier:
             self.key_from_pem_bytes(fichier.read(), password_bytes)
 
+    def chiffage_asymmetrique(self, cle_secrete):
+        public_key = self.cert.public_key()
+        cle_secrete_backup = public_key.encrypt(
+            cle_secrete,
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        fingerprint = self.fingerprint
+        return cle_secrete_backup, fingerprint
+
+    def dechiffrage_asymmetrique(self, contenu):
+        """
+        Utilise la cle privee en memoire pour dechiffrer le contenu.
+        :param contenu:
+        :return:
+        """
+        contenu_bytes = base64.b64decode(contenu)
+
+        contenu_dechiffre = self.private_key.decrypt(
+            contenu_bytes,
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
+        return contenu_dechiffre
+
+
     @property
     def get_roles(self):
         MQ_ROLES_OID = x509.ObjectIdentifier('1.2.3.4.1')

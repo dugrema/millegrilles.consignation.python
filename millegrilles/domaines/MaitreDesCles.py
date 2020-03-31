@@ -151,6 +151,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__handler_commandes[Constantes.SECURITE_PROTEGE] = TraitementCommandesMaitreDesClesProtegees(self)
         self.__handler_commandes[Constantes.SECURITE_SECURE] = TraitementCommandesMaitreDesClesSecures(self)
 
+        self.__encryption_helper = None
+
     def configurer(self):
         super().configurer()
 
@@ -360,17 +362,18 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :param contenu:
         :return:
         """
-        contenu_bytes = b64decode(contenu)
-
-        contenu_decrypte = self.__clecert_maitredescles.private_key.decrypt(
-            contenu_bytes,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-        return contenu_decrypte
+        # contenu_bytes = b64decode(contenu)
+        #
+        # contenu_decrypte = self.__clecert_maitredescles.private_key.decrypt(
+        #     contenu_bytes,
+        #     padding.OAEP(
+        #         mgf=padding.MGF1(algorithm=hashes.SHA256()),
+        #         algorithm=hashes.SHA256(),
+        #         label=None
+        #     )
+        # )
+        # return contenu_decrypte
+        return self.__clecert_maitredescles.dechiffrage_asymmetrique(contenu)
 
     def decrypter_cle(self, dict_cles):
         """
@@ -387,18 +390,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             return None
 
     def crypter_cle(self, cle_secrete, cert=None):
-        if cert is None:
-            cert = self.__clecert_maitredescles.cert
-        cle_secrete_backup = cert.public_key().encrypt(
-            cle_secrete,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-        fingerprint = self.get_fingerprint_cert(cert)
-        return cle_secrete_backup, fingerprint
+        if cert is not None:
+            clecert = EnveloppeCleCert(cert=cert)
+        else:
+            clecert = self.__clecert_maitredescles.cert
+        return clecert.chiffrage_asymmetrique(cle_secrete)
 
     def decrypter_grosfichier(self, fuuid):
         """
@@ -473,13 +469,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         clecert = EnveloppeCleCert()
         clecert.key_from_pem_bytes(fichier_key_racine, password_racine.encode('utf-8'))
 
-        # Mot de passe demande pour le retour
-        mot_de_passe_retour = message_dict['mot_de_passe']
-        clecert.password = mot_de_passe_retour.encode('utf-8')
-        cle_privee_dechiffree = clecert.private_key_bytes
+        # Dechiffrer le mot de passe demande pour le retour de la cle privee chiffree
+        mot_de_passe_chiffre = message_dict['mot_de_passe_chiffre']
+        mot_de_passe_dechiffre = self.decrypter_contenu(mot_de_passe_chiffre)
+        clecert.password = mot_de_passe_dechiffre
+        cle_privee_chiffree = clecert.private_key_bytes
 
         return {
-            'cle_racine': cle_privee_dechiffree.decode('utf-8'),
+            'cle_racine': cle_privee_chiffree.decode('utf-8'),
             'cert_racine': fichier_cert_racine,
         }
 

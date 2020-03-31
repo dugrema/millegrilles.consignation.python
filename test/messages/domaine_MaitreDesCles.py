@@ -33,6 +33,9 @@ class MessagesSample(BaseCallback):
         self.event_recu = Event()
         # self.thread_ioloop = Thread(target=self.run_ioloop)
 
+        self.certificat_maitredescles = None
+        self.cert_maitredescles_recu = Event()
+
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
@@ -53,7 +56,7 @@ class MessagesSample(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        self.executer()
+        self.event_recu.set()
 
     # def run_ioloop(self):
     #     self.contexte.message_dao.run_ioloop()
@@ -64,7 +67,16 @@ class MessagesSample(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
         print(body)
-        self.event_recu.set()
+
+        message_dict = json.loads(body)
+        certificat_pem = message_dict.get('certificat')
+        if certificat_pem is not None:
+            cert = EnveloppeCleCert()
+            cert.cert_from_pem_bytes(certificat_pem.encode('utf-8'))
+            self.certificat_maitredescles = cert
+            self.cert_maitredescles_recu.set()
+        else:
+            self.event_recu.set()
 
     def requete_cert_maitredescles(self):
         requete_cert_maitredescles = {
@@ -110,10 +122,17 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def requete_cle_racine(self):
+        mot_de_passe = 'sjdpo-1824-JWAZ'
+
+        # Attendre le certificat de maitre des cles pour chiffrer la cle
+        self.cert_maitredescles_recu.wait(5)
+
+        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffage_asymmetrique(mot_de_passe.encode('utf-8'))
+
         requete_cle_racine = {
             'fingerprint': '',
-            'mot_de_passe': 'allo',
-            'motDePasseChiffre': '',
+            # 'mot_de_passe': 'sjdpo-1824-JWAZ',
+            'mot_de_passe_chiffre': str(b64encode(mot_de_passe_chiffre), 'utf-8'),
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cle_racine,
@@ -283,7 +302,11 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # enveloppe = self.requete_cert_maitredescles()
+        self.event_recu.wait(5)
+        self.event_recu.clear()
+
+        enveloppe = self.requete_cert_maitredescles()
+
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
@@ -293,14 +316,16 @@ class MessagesSample(BaseCallback):
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
 
-        # self.requete_cle_racine()
-        self.commande_signer_cle_backup()
+        self.requete_cle_racine()
+        # self.commande_signer_cle_backup()
 
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
+sample.executer()
+
 # FIN TEST
 sample.event_recu.wait(10)
 sample.deconnecter()
