@@ -545,7 +545,7 @@ class VerificateurTransaction(UtilCertificats):
         signature_bytes = base64.b64decode(signature)
         # message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
         # message_bytes = bytes(message_json, 'utf-8')
-        message_bytes = self.preparer_transaction_bytes(dict_message);
+        message_bytes = self.preparer_transaction_bytes(dict_message)
         self._logger.debug("Verifier signature, Message: %s" % str(dict_message))
 
         cle_publique = certificat.public_key()

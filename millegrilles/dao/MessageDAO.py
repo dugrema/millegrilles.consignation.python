@@ -1276,6 +1276,10 @@ class TraitementMessageDomaineCommande(TraitementMessageDomaine):
 
 class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
 
@@ -1286,6 +1290,7 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
             fingerprint = ci.fingerprint
             self.message_dao.transmettre_demande_certificat(fingerprint)
         except InvalidSignature as erreur_signature:
+            self.__logger.debug("Erreur signature message: \n%s" % str(message_dict))
             self.transmettre_reponse(
                 {'error': True, 'message': 'Signature invalide'},
                 None, properties.reply_to, properties.correlation_id

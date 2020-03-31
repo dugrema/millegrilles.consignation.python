@@ -283,7 +283,7 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        # enveloppe = self.requete_cert_maitredescles()
+        enveloppe = self.requete_cert_maitredescles()
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
@@ -294,7 +294,7 @@ class MessagesSample(BaseCallback):
         # self.transaction_signature_inscription_tierce()
 
         # self.requete_cle_racine()
-        self.commande_signer_cle_backup()
+        # self.commande_signer_cle_backup()
 
 
 # --- MAIN ---
