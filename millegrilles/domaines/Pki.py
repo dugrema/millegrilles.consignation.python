@@ -16,13 +16,15 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        domaine_routing_key = method.routing_key.replace('requete.', '')
+        domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
 
         reponse = None
         if domaine_routing_key == ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT:
             reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_DEMANDE:
             reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
+        elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
+            reponse = self.gestionnaire.get_certificats_backup()
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -34,7 +36,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        domaine_routing_key = method.routing_key.replace('requete.', '')
+        domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
 
         if domaine_routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
             reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
@@ -258,6 +260,16 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 certificat_filtre[key] = value
 
         return certificat_filtre
+
+    def get_certificats_backup(self):
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+        filtre = {
+            ConstantesPki.LIBELLE_FINGERPRINT: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
+        }
+        liste_certificats = collection_pki.find_one(filtre)
+
+        return liste_certificats
 
     def recevoir_certificat(self, message_dict):
         enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])

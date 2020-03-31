@@ -80,6 +80,19 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_cert_backup(self):
+        requete_cert = {}
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert,
+            '%s.%s' % (ConstantesPki.DOMAINE_NOM, ConstantesPki.REQUETE_CERTIFICAT_BACKUP),
+            'abcd-1234',
+            self.queue_name,
+            securite=Constantes.SECURITE_PROTEGE,
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def renouveller_certs_docker(self):
         requete_cert = {
             'altdomains': {
@@ -98,7 +111,8 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def executer(self):
-        self.renouveller_certs_docker()
+        # self.renouveller_certs_docker()
+        self.requete_cert_backup()
 
 
 # --- MAIN ---

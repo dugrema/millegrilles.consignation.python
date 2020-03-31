@@ -447,7 +447,8 @@ class ConstantesPki:
     CHAMP_ROLES = 'roles'
 
     REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
-    REQUETE_CERTIFICAT_DEMANDE = '%s.certificat' % DOMAINE_NOM
+    REQUETE_CERTIFICAT_DEMANDE = 'certificat'
+    REQUETE_CERTIFICAT_BACKUP = 'certificatBackup'
     REQUETE_LISTE_CA = 'pki.requete.ca'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
