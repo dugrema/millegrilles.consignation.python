@@ -324,7 +324,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             else:
                 self._logger.warning("Certificat fournit pour backup n'a pas le role 'backup' : fingerprint hex " + fingerprint_hex)
 
-        processus = "millegrilles_domaines_MaitreDesCles:ProcessusVerifierClesBackup"
+        processus = "millegrilles_domaines_MaitreDesCles:ProcessusTrouverClesBackupManquantes"
         fingerprints_backup = {'fingerprints_base64': list(self.__certificats_backup.keys())}
         self.demarrer_processus(processus, fingerprints_backup)
 
@@ -745,16 +745,8 @@ class ProcessusReceptionCles(MGProcessusTransaction):
 
         # Re-encrypter la cle secrete avec les cles backup
         if self._controleur.gestionnaire.get_certificats_backup is not None:
-            for backup in self._controleur.gestionnaire.get_certificats_backup:
-                cle_secrete_backup = backup.public_key().encrypt(
-                    cle_secrete,
-                    padding.OAEP(
-                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
-                    )
-                )
-                fingerprint = b64encode(backup.fingerprint(hashes.SHA1())).decode('utf-8')
+            for backup in self._controleur.gestionnaire.get_certificats_backup.values():
+                cle_secrete_backup, fingerprint =self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
                 cles_secretes_encryptees[fingerprint] = b64encode(cle_secrete_backup).decode('utf-8')
 
         return cles_secretes_encryptees
@@ -1448,9 +1440,89 @@ class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
         )
 
 
-class ProcessusVerifierClesBackup(MGProcessus):
+class ProcessusTrouverClesBackupManquantes(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def initiale(self):
         fingerprints = self.parametres['fingerprints_base64']
 
+        curseur = self.curseur_docs_cle_manquante(fingerprints)
+        fingerprint_cert_maitredescles = self.controleur.gestionnaire.get_fingerprint_cert()
+
+        erreurs = list()
+        for doc in curseur:
+            self.__logger.debug("Cles manquantes dans " + str(doc))
+
+            if doc[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS:
+                self.creer_transaction_cles_manquantes_grosfichiers(fingerprint_cert_maitredescles, doc, fingerprints)
+            elif doc[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT:
+                self.creer_transaction_cles_manquantes_documents(fingerprint_cert_maitredescles, doc, fingerprints)
+            else:
+                erreurs.append('Document type cle inconnu : ' + doc[Constantes.DOCUMENT_INFODOC_LIBELLE])
+
         self.set_etape_suivante()  # Termine
+
+        return {'erreurs': erreurs}
+
+    def curseur_docs_cle_manquante(self, fingerprints):
+        liste_operateurs = list()
+        for fingerprint_base64 in fingerprints:
+            liste_operateurs.append({'cles.%s' % fingerprint_base64: {'$exists': False}})
+        # Extraire la liste de cles qui n'ont pas tous ces certificats
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
+            ]},
+            '$or': liste_operateurs
+        }
+
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        return collection_documents.find(filtre)
+
+    def creer_transaction_cles_manquantes_grosfichiers(self, fingerprint_cert_maitredescles, document, fingerprints):
+        # Extraire cle secrete en utilisant le certificat du maitre des cles courant
+        cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES][fingerprint_cert_maitredescles]
+        cle_dechiffree = self.controleur.gestionnaire.decrypter_contenu(cle_chiffree)
+
+        dict_certs = self.controleur.gestionnaire.get_certificats_backup
+        cles_connues = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].keys()
+        for fingerprint in fingerprints:
+            if fingerprint not in cles_connues:
+                identificateur_document = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+
+                self.__logger.debug("Ajouter cle %s dans document grosfichiers %s" % (
+                    fingerprint, identificateur_document))
+                enveloppe_backup = dict_certs[fingerprint]
+                cle_chiffree_backup, fingerprint_backup = self.controleur.gestionnaire.crypter_cle(cle_dechiffree, cert=enveloppe_backup.certificat)
+                cle_chiffree_backup_base64 = str(b64encode(cle_chiffree_backup), 'utf-8')
+                self.__logger.debug("Cle chiffree pour cert %s : %s" % (fingerprint_backup, cle_chiffree_backup_base64))
+
+                transaction = {
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES: {
+                        fingerprint_backup: cle_chiffree_backup_base64
+                    },
+
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateur_document,
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                }
+                sujet = document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE)
+                if sujet:
+                    transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
+
+                # Soumettre la transaction immediatement
+                # Permet de fonctionner incrementalement si le nombre de cles est tres grand
+                self.generateur_transactions.soumettre_transaction(
+                    transaction,
+                    ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES,
+                    version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
+                )
+
+    def creer_transaction_cles_manquantes_documents(self, fingerprint_cert_maitredescles, document, fingerprints):
+        dict_certs = self.controleur.gestionnaire.get_certificats_backup()

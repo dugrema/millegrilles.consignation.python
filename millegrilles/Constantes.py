@@ -662,6 +662,7 @@ class ConstantesMaitreDesCles:
 
     TRANSACTION_CHAMP_CLESECRETE = 'cle'
     TRANSACTION_CHAMP_CLES = 'cles'
+    TRANSACTION_CHAMP_IV = 'iv'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
     TRANSACTION_CHAMP_DOMAINES = 'domaines'
