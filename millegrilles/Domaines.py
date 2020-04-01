@@ -711,8 +711,13 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
         routing_key = method.routing_key
 
         commande = method.routing_key.split('.')[-1]
+        nom_domaine = self.gestionnaire.get_collection_transaction_nom()
 
-        if commande == ConstantesDomaines.COMMANDE_REGENERER:
+        if routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL:
+            resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace("_DOMAINE_", nom_domaine):
+            resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
+        elif commande == ConstantesDomaines.COMMANDE_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
         else:
             raise ValueError("Commande inconnue: " + routing_key)
@@ -837,6 +842,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 'nom': '%s.%s' % (self.get_nom_queue(), 'commande.' + securite),
                 'routing': [
                     'commande.%s.#' % self.get_nom_domaine(),
+                    'commande.global.#',
                 ],
                 'exchange': exchange,
                 'ttl': 20000,

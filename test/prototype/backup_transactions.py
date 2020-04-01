@@ -88,7 +88,10 @@ class MessagesSample(BaseCallback):
             # self.trigger_backup_horaire(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-            self.reset_evenements()
+            # Declenchement global
+            self.trigger_backup_global()
+
+            # self.reset_evenements()
         finally:
             pass
             # self.event_recu.set()  # Termine
@@ -106,6 +109,21 @@ class MessagesSample(BaseCallback):
             ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace(
                 '_DOMAINE_', domaine),
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_horaire'
+        )
+
+    def trigger_backup_global(self):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
             reply_to=self.queue_name,
             correlation_id='trigger_backup_horaire'
         )
