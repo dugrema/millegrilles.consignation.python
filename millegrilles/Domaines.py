@@ -719,6 +719,8 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.reset_backup(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
+        elif routing_key == ConstantesDomaines.COMMANDE_GLOBAL_REGENERER:
+            resultat = self.gestionnaire.regenerer_documents()
         elif commande == ConstantesDomaines.COMMANDE_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
         else:

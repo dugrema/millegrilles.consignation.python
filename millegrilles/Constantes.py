@@ -252,6 +252,7 @@ class ConstantesSecurite:
 class ConstantesDomaines:
 
     COMMANDE_REGENERER = 'regenerer'
+    COMMANDE_GLOBAL_REGENERER = 'commande.global.regenerer'
 
 
 class ConstantesPrincipale:
