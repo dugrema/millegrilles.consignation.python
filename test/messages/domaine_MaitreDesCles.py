@@ -127,7 +127,7 @@ class MessagesSample(BaseCallback):
         # Attendre le certificat de maitre des cles pour chiffrer la cle
         self.cert_maitredescles_recu.wait(5)
 
-        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffage_asymmetrique(self.mot_de_passe.encode('utf-8'))
+        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffrage_asymmetrique(self.mot_de_passe.encode('utf-8'))
 
         requete_cle_racine = {
             'fingerprint': '',
@@ -174,7 +174,7 @@ class MessagesSample(BaseCallback):
         key_chiffree_bytes = clecert.private_key_bytes
 
         self.cert_maitredescles_recu.wait(5)
-        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffage_asymmetrique(self.mot_de_passe.encode('utf-8'))
+        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffrage_asymmetrique(self.mot_de_passe.encode('utf-8'))
 
         enveloppe = EnveloppeCleCert()
         enveloppe.key_from_pem_bytes(key_bytes, None)
@@ -182,6 +182,7 @@ class MessagesSample(BaseCallback):
         requete_cle_racine = {
             'cle_privee': key_chiffree_bytes.decode('utf-8'),
             'mot_de_passe_chiffre': str(b64encode(mot_de_passe_chiffre), 'utf-8'),
+            'fingerprint_base64': 'Ut/UQ5aKomoGzXB7mpUduPk4Xzg=',
         }
         enveloppe_requete = self.generateur.transmettre_commande(
             requete_cle_racine,

@@ -74,6 +74,7 @@ class EnveloppeCleCert:
         self.password = password
         self.csr = None
         self.chaine = None
+        self.__fingerprint_b64 = None
 
     def set_cert(self, cert):
         self.cert = cert
@@ -132,7 +133,7 @@ class EnveloppeCleCert:
         with open(private_key, 'rb') as fichier:
             self.key_from_pem_bytes(fichier.read(), password_bytes)
 
-    def chiffage_asymmetrique(self, cle_secrete):
+    def chiffrage_asymmetrique(self, cle_secrete):
         public_key = self.cert.public_key()
         cle_secrete_backup = public_key.encrypt(
             cle_secrete,
@@ -163,7 +164,6 @@ class EnveloppeCleCert:
         )
 
         return contenu_dechiffre
-
 
     @property
     def get_roles(self):
@@ -210,7 +210,14 @@ class EnveloppeCleCert:
 
     @property
     def fingerprint_b64(self):
-        return str(base64.b64encode(self.cert.fingerprint(hashes.SHA1())), 'utf-8')
+        if not self.__fingerprint_b64:
+            self.__fingerprint_b64 = str(base64.b64encode(self.cert.fingerprint(hashes.SHA1())), 'utf-8')
+
+        return self.__fingerprint_b64
+
+    @fingerprint_b64.setter
+    def fingerprint_b64(self, fingerprint_b64):
+        self.__fingerprint_b64 = fingerprint_b64
 
     @property
     def idmg(self) -> str:
