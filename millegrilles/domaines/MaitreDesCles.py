@@ -94,6 +94,9 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
         resultat = None
         if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP):
             resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
+        elif routing_key == 'commande.%s.%s' % (
+            ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_RESTAURER_BACKUP_CLES):
+                resultat = self.gestionnaire.restaurer_backup_cles(properties, message_dict)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -678,6 +681,38 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             'cert': clecert.cert_bytes.decode('utf-8'),
             'fullchain': clecert.chaine,
         }
+
+    def restaurer_backup_cles(self, properties, message_dict):
+        """
+        Rechiffrer les cles secretes avec la cle de maitre des cles. Utilise une cle privee de backup.
+        :param properties:
+        :param message_dict:
+        :return:
+        """
+        self._logger.debug("Restaurer cles a partir de backup : %s" % str(message_dict))
+
+        fingerprint_maitredescles_b64 = self.__clecert_maitredescles.fingerprint_b64
+
+        # Extraire la liste de cles qui n'ont pas tous ces certificats
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
+            ]},
+            'cles.%s' % fingerprint_maitredescles_b64: {'$exists': False},
+        }
+
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        curseur = collection_documents.find(filtre)
+
+        mot_de_passe_chiffre = message_dict['mot_de_passe_chiffre']
+        mot_de_passe_dechiffre = self.decrypter_contenu(mot_de_passe_chiffre.encode('utf-8'))
+        # self._logger.debug("Mot de passe dechiffre : %s" % mot_de_passe_dechiffre)
+
+        for doc in curseur:
+            self._logger.debug("Rechiffrage cle pour maitre des cles : %s" % str(doc))
+
+        return {'ok': True}
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM

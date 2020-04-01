@@ -36,6 +36,8 @@ class MessagesSample(BaseCallback):
         self.certificat_maitredescles = None
         self.cert_maitredescles_recu = Event()
 
+        self.mot_de_passe = 'sjdpo-1824-JWAZ'
+
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
@@ -122,16 +124,13 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def requete_cle_racine(self):
-        mot_de_passe = 'sjdpo-1824-JWAZ'
-
         # Attendre le certificat de maitre des cles pour chiffrer la cle
         self.cert_maitredescles_recu.wait(5)
 
-        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffage_asymmetrique(mot_de_passe.encode('utf-8'))
+        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffage_asymmetrique(self.mot_de_passe.encode('utf-8'))
 
         requete_cle_racine = {
             'fingerprint': '',
-            # 'mot_de_passe': 'sjdpo-1824-JWAZ',
             'mot_de_passe_chiffre': str(b64encode(mot_de_passe_chiffre), 'utf-8'),
         }
         enveloppe_requete = self.generateur.transmettre_requete(
@@ -154,12 +153,39 @@ class MessagesSample(BaseCallback):
 
         requete_cle_racine = {
             'cle_publique': public_bytes.decode('utf-8'),
-            'mot_de_passe': 'allo',
-            'motDePasseChiffre': '',
         }
         enveloppe_requete = self.generateur.transmettre_commande(
             requete_cle_racine,
             'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def commande_restaurer_backup_cle(self):
+        with open ('/home/mathieu/mgdev/certs/pki.connecteur.key', 'rb') as fichier:
+            key_bytes = fichier.read()
+
+        clecert = EnveloppeCleCert()
+        clecert.key_from_pem_bytes(key_bytes, None)
+        clecert.password = self.mot_de_passe.encode('utf-8')
+        key_chiffree_bytes = clecert.private_key_bytes
+
+        self.cert_maitredescles_recu.wait(5)
+        mot_de_passe_chiffre, fingerprint = self.certificat_maitredescles.chiffage_asymmetrique(self.mot_de_passe.encode('utf-8'))
+
+        enveloppe = EnveloppeCleCert()
+        enveloppe.key_from_pem_bytes(key_bytes, None)
+
+        requete_cle_racine = {
+            'cle_privee': key_chiffree_bytes.decode('utf-8'),
+            'mot_de_passe_chiffre': str(b64encode(mot_de_passe_chiffre), 'utf-8'),
+        }
+        enveloppe_requete = self.generateur.transmettre_commande(
+            requete_cle_racine,
+            'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_RESTAURER_BACKUP_CLES,
             correlation_id='abcd-1234',
             reply_to=self.queue_name
         )
@@ -316,8 +342,9 @@ class MessagesSample(BaseCallback):
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
 
-        self.requete_cle_racine()
+        # self.requete_cle_racine()
         # self.commande_signer_cle_backup()
+        self.commande_restaurer_backup_cle()
 
 
 # --- MAIN ---

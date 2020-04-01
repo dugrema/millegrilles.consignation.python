@@ -209,6 +209,10 @@ class EnveloppeCleCert:
         return self.idmg
 
     @property
+    def fingerprint_b64(self):
+        return str(base64.b64encode(self.cert.fingerprint(hashes.SHA1())), 'utf-8')
+
+    @property
     def idmg(self) -> str:
         """
         Retourne le idmg du certificat.

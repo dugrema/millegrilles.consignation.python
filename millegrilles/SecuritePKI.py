@@ -75,6 +75,10 @@ class EnveloppeCertificat:
         return str(binascii.hexlify(self._fingerprint), 'utf-8')
 
     @property
+    def fingerprint_b64(self):
+        return str(base64.b64encode(self.fingerprint), 'utf-8')
+
+    @property
     def fingerprint_base58(self):
         """
         Retourne le idmg

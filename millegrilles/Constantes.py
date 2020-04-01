@@ -657,6 +657,7 @@ class ConstantesMaitreDesCles:
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
 
     COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
+    COMMANDE_RESTAURER_BACKUP_CLES = 'restaurerBackupCles'
 
     CORRELATION_CERTIFICATS_BACKUP = 'certificatsBackup'
 
