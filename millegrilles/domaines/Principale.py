@@ -37,6 +37,8 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         profil_millegrille[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.DOCUMENT_PROFIL_MILLEGRILLE)
 
+        self.upgrade_menu()
+
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
 
@@ -83,6 +85,8 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Principale:ProcessusMajProfilUsager"
         elif domaine_transaction == ConstantesPrincipale.TRANSACTION_ACTION_MAJ_PROFILMILLEGRILLE:
             processus = "millegrilles_domaines_Principale:ProcessusMajProfilMilleGrille"
+        elif domaine_transaction == ConstantesPrincipale.TRANSACTION_MAJ_MENU:
+            processus = "millegrilles_domaines_Principale:ProcessusMajMenu"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -114,6 +118,48 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         if resultat.matched_count < 1:
             raise ErreurMAJProcessus("Erreur MAJ processus %s, document inexistant" % self.__class__.__name__)
+
+    def upgrade_menu(self):
+        domaines = ConstantesPrincipale.DOCUMENT_DOMAINES
+
+        collection_principale = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        filtre_menu = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_DOMAINES
+        }
+        document_domaines = collection_principale.find_one(filtre_menu)
+
+        domaines_configures = list(document_domaines[ConstantesPrincipale.LIBELLE_DOMAINES].keys())
+        domaines_disponibles = list(domaines[ConstantesPrincipale.LIBELLE_DOMAINES].keys())
+
+        domaine_manquant = False
+        for domaine in domaines_disponibles:
+            if domaine not in domaines_configures:
+                domaine_manquant = True
+
+        if domaine_manquant:
+            # Creer transaction pour remplacer le document
+            domaine = ConstantesPrincipale.TRANSACTION_MAJ_MENU
+            nouveau_doc = {
+                ConstantesPrincipale.LIBELLE_DOMAINES: domaines[ConstantesPrincipale.LIBELLE_DOMAINES],
+                ConstantesPrincipale.LIBELLE_MENU: domaines[ConstantesPrincipale.LIBELLE_MENU],
+            }
+            self.generateur_transactions.soumettre_transaction(nouveau_doc, domaine)
+
+    def maj_menu(self, transaction):
+        collection_principale = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
+        filtre_menu = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_DOMAINES
+        }
+        set_ops = {
+            ConstantesPrincipale.LIBELLE_DOMAINES: transaction[ConstantesPrincipale.LIBELLE_DOMAINES],
+            ConstantesPrincipale.LIBELLE_MENU: transaction[ConstantesPrincipale.LIBELLE_MENU],
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_principale.update_one(filtre_menu, ops)
 
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
@@ -392,5 +438,14 @@ class ProcessusMajProfilMilleGrille(ProcessusMajFiches):
         # Creer transactions pour mettre a jour les fiches privees et publiques de l'annuaire.
         # Copier le contenu directement
         self._generer_transactions_fiches(fiche)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusMajMenu(ProcessusPrincipale):
+
+    def initiale(self):
+        transaction = self.transaction
+        self.controleur.gestionnaire.maj_menu(transaction)
 
         self.set_etape_suivante()  # Termine

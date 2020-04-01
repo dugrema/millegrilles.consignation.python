@@ -280,6 +280,8 @@ class ConstantesPrincipale:
     LIBELLE_NOM_MILLEGRILLE_PAR_LANGUE = 'nomMilleGrilleParLangue'
     LIBELLE_LANGUE_PRINCIPALE = 'langue'
     LIBELLE_LANGUES_ADDITIONNELLES = 'languesAdditionnelles'
+    LIBELLE_DOMAINES = 'domaines'
+    LIBELLE_MENU = 'menu'
 
     TRANSACTION_ACTION_FERMERALERTE = '%s.fermerAlerte' % DOMAINE_NOM
     TRANSACTION_ACTION_CREERALERTE = '%s.creerAlerte' % DOMAINE_NOM
@@ -287,6 +289,7 @@ class ConstantesPrincipale:
     TRANSACTION_ACTION_AJOUTER_TOKEN = '%s.ajouterToken' % DOMAINE_NOM
     TRANSACTION_ACTION_MAJ_PROFILUSAGER = '%s.majProfilUsager' % DOMAINE_NOM
     TRANSACTION_ACTION_MAJ_PROFILMILLEGRILLE = '%s.majProfilMilleGrille' % DOMAINE_NOM
+    TRANSACTION_MAJ_MENU = '%s.majMenu' % DOMAINE_NOM
 
     DOCUMENT_ALERTES = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
@@ -332,6 +335,10 @@ class ConstantesPrincipale:
             'Annuaire': {
                 'rang': 1,
                 'description': 'Annuaire'
+            },
+            'Backup': {
+                'rang': 1,
+                'description': 'Backup'
             }
         },
         "menu": [
@@ -342,12 +349,14 @@ class ConstantesPrincipale:
             'SenseursPassifs',
             'Pki',
             'Parametres',
+            'Backup',
         ]
     }
 
     # Document par defaut pour la configuration de l'interface principale
     DOCUMENT_DEFAUT = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        TRANSACTION_MESSAGE_LIBELLE_VERSION: 7,
     }
 
     DOCUMENT_PROFIL_USAGER = {
