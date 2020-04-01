@@ -715,6 +715,8 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
 
         if routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL:
             resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL:
+            resultat = self.gestionnaire.reset_backup(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
         elif commande == ConstantesDomaines.COMMANDE_REGENERER:
@@ -937,6 +939,24 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         }
 
         self.demarrer_processus(processus, parametres)
+
+    def reset_backup(self, message_dict):
+        self._logger.debug("Reset backup transactions pour domaine " + self.get_nom_domaine())
+
+        champs = list()
+        for champ in [
+            Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE,
+            Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
+            Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR]:
+
+            champs.append('_evenements.%s.%s' % (self._contexte.idmg, champ))
+
+        evenement = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: self.get_nom_domaine(),
+            Constantes.EVENEMENT_MESSAGE_EVENEMENTS: champs,
+        }
+        self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENTRESET)
 
     def executer_backup_horaire(self, declencheur: dict):
         heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)

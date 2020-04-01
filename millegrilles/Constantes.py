@@ -151,6 +151,7 @@ TRANSACTION_MESSAGE_LIBELLE_RESOUMISSIONS = 'resoumissions'
 
 TRANSACTION_ROUTING_NOUVELLE = 'transaction.nouvelle'
 TRANSACTION_ROUTING_EVENEMENT = 'transaction.evenement'
+TRANSACTION_ROUTING_EVENEMENTRESET = 'transaction.evenementReset'
 TRANSACTION_ROUTING_RESTAURER = 'transaction.restaurer'
 TRANSACTION_ROUTING_DOCINITIAL = 'docInitial'
 TRANSACTION_ROUTING_UPDATE_DOC = 'updateDoc'
@@ -200,6 +201,7 @@ DOCUMENT_SECTION_CRYPTE = 'crypte'
 
 # Evenements
 EVENEMENT_MESSAGE_EVENEMENT = 'evenement'
+EVENEMENT_MESSAGE_EVENEMENTS = 'evenements'
 EVENEMENT_TRANSACTION_NOUVELLE = 'transaction_nouvelle'
 EVENEMENT_TRANSACTION_ESTAMPILLE = '_estampille'
 EVENEMENT_TRANSACTION_COMPLETE = 'transaction_complete'
@@ -1218,6 +1220,7 @@ class ConstantesBackup:
     COMMANDE_BACKUP_ANNUEL = 'commande.backup.genererBackupAnnuel'
 
     COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL = 'commande.global.declencherBackupHoraire'
+    COMMANDE_BACKUP_RESET_GLOBAL = 'commande.global.resetBackup'
     COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande._DOMAINE_.declencherBackupHoraire'
     COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande._DOMAINE_.declencherBackupQuotidien'
     COMMANDE_BACKUP_DECLENCHER_MENSUEL = 'commande._DOMAINE_.declencherBackupMensuel'

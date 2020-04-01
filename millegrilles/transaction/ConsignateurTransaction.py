@@ -331,6 +331,8 @@ class EvenementTransactionCallback(BaseCallback):
         if exchange == self.contexte.configuration.exchange_middleware:
             if routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENT:
                 self.ajouter_evenement(message_dict)
+            elif routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENTRESET:
+                self.reset_evenements_transactions(message_dict)
             else:
                 raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
         else:
@@ -348,6 +350,27 @@ class EvenementTransactionCallback(BaseCallback):
             # L'evenement n'est pas pour une seule transaction, on recupere la liste des uuids
             uuid_transactions = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             self.ajouter_evenement_transactions(uuid_transactions, nom_collection, evenement)
+
+    def reset_evenements_transactions(self, message_dict):
+        """
+        Permet d'ajouter un evenement a une liste de transactions par UUID.
+
+        :param uuid_transaction:
+        :param nom_collection:
+        :param evenement:
+        :return:
+        """
+        nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        unset_fields = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENTS]
+
+        unset_ops = dict()
+        for field in unset_fields:
+            unset_ops[field] = ''
+
+        ops = {'$unset': unset_ops}
+
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
+        collection_transactions.update_many({}, ops)
 
     def set_evenement_traitement_transaction(self, id_transaction, nom_collection, evenement):
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
