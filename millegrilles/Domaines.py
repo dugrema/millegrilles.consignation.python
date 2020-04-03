@@ -25,7 +25,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
-from millegrilles.SecuritePKI import HachageInvalide
+from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
 
 
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
@@ -1644,6 +1644,8 @@ class HandlerBackupDomaine:
                     self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup de %s" % (uuid_transaction, nom_collection_mongo))
                     # Marquer la transaction comme invalide pour backup
                     liste_uuids_invalides.append(uuid_transaction)
+                except CertificatInvalide:
+                    self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA3-512 du fichier de backup des transactions
@@ -1913,7 +1915,7 @@ class HandlerBackupDomaine:
             if len(certs_manquants) > 0:
                 filtre_certs_pki = {
                     ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(certs_manquants)},
-                    ConstantesPki.LIBELLE_CHAINE_COMPLETE: True,
+                    # ConstantesPki.LIBELLE_CHAINE_COMPLETE: True,
                     Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
                         ConstantesPki.LIBVAL_CERTIFICAT_ROOT,
                         ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE,
@@ -1930,7 +1932,7 @@ class HandlerBackupDomaine:
 
                 # Verifier s'il manque des certificats
                 if len(certs_manquants) > 0:
-                    raise Exception("Certificats manquants : %s" % str(certs_manquants))
+                    raise Exception("Certificats manquants  dans backup domaine %s : %s" % (self._nom_domaine, str(certs_manquants)))
 
             # Filtrer catalogue pour retirer les champs Mongo
             for champ in catalogue.copy().keys():

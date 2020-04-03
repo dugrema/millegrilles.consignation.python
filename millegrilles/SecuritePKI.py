@@ -654,7 +654,7 @@ class VerificateurCertificats(UtilCertificats):
         self.close()
 
     def get_par_akid(self, akid):
-        return [cert for cert in self._liste_CAs_connus if cert.subject_key_identifier == akid]
+        return [cert for cert in self._cache_certificats_ca.values() if cert.subject_key_identifier == akid]
 
     def charger_certificats_CA_millegrille(self, idmg: str):
         """
@@ -688,7 +688,7 @@ class VerificateurCertificats(UtilCertificats):
                     enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
                     if enveloppe_ca.is_rootCA and enveloppe_ca.idmg == idmg:
                         # Certificat racine est valide
-                        self._liste_CAs_connus.append(enveloppe_ca)
+                        # self._liste_CAs_connus.append(enveloppe_ca)
                         with open(file_ca_racine, 'w') as fichier:
                             fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
 
@@ -702,7 +702,7 @@ class VerificateurCertificats(UtilCertificats):
                     # Certificat intermediaire, on l'ajoute au untrusted (pas besoin de verifier ici, c'est untrusted)
                     enveloppe_ca = EnveloppeCertificat(
                         certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                    self._liste_CAs_connus.append(enveloppe_ca)
+                    # self._liste_CAs_connus.append(enveloppe_ca)
                     self._ajouter_untrusted_ca(enveloppe_ca)
         else:
             # Certificat racine pour la MilleGrille est deja charge
@@ -819,6 +819,7 @@ class VerificateurCertificats(UtilCertificats):
 
         idmg = enveloppe.subject_organization_name
 
+        self._liste_CAs_connus.append(enveloppe.fingerprint_ascii)
         untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
         with open(untrusted_cas_filename, 'w+') as untrusted_cas_writer:
             untrusted_cas_writer.write(enveloppe.certificat_pem)
