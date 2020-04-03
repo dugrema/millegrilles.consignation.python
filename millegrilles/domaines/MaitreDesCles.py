@@ -709,13 +709,37 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         clecert_backup = EnveloppeCleCert()
         clecert_backup.key_from_pem_bytes(message_dict['cle_privee'].encode('utf-8'), mot_de_passe_dechiffre)
-        fingerprint_backup = message_dict['fingerprint_base64']
-        clecert_backup.fingerprint_b64 = fingerprint_backup
+        fingerprint_backup = message_dict.get('fingerprint_base64')
+
+        # Le fingerprint est optionnel. Si seule la cle privee est transmise, on va trouver quel certificat
+        # correspond lors du dechiffrage.
+        if fingerprint_backup:
+            clecert_backup.fingerprint_b64 = fingerprint_backup
 
         for doc in curseur:
             self._logger.debug("Rechiffrage cle pour maitre des cles : %s" % str(doc))
-            secret_backup = doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].get(fingerprint_backup)
-            secret_backup_dechiffre = clecert_backup.dechiffrage_asymmetrique(secret_backup)
+            secret_backup_dechiffre = None
+            if fingerprint_backup:
+                secret_backup = doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].get(clecert_backup.fingerprint_b64)
+                secret_backup_dechiffre = clecert_backup.dechiffrage_asymmetrique(secret_backup)
+            else:
+                # Le fingerprint de la cle n'a pas ete fourni. On va parcourir toutes les cles
+                # pour tenter de trouver une cle qui fonctionne avec notre cle de backup.
+                for fingerprint_public, secret_backup in doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].items():
+                    try:
+                        secret_backup_dechiffre = clecert_backup.dechiffrage_asymmetrique(secret_backup)
+
+                        # On a un match, fingerprint du certificat de backup trouve, on conserve le fingerprint.
+                        fingerprint_backup = fingerprint_public
+                        clecert_backup.fingerprint_b64 = fingerprint_public
+                        break
+                    except ValueError:
+                        # Mismatch, essayer prochaine cle secrete chiffree
+                        continue
+
+            if not secret_backup_dechiffre:
+                raise ValueError("Le cle de backup ne correspond a aucun certificat utilise")
+
             # self._logger.debug("Cle document dechiffree : %s" % str(secret_backup_dechiffre))
             secret_backup_rechiffre, fingerprint_maitredescles_b64 = self.crypter_cle(secret_backup_dechiffre)
             secret_backup_rechiffre = str(b64encode(secret_backup_rechiffre), 'utf-8')

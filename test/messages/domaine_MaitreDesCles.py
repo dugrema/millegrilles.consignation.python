@@ -182,7 +182,7 @@ class MessagesSample(BaseCallback):
         requete_cle_racine = {
             'cle_privee': key_chiffree_bytes.decode('utf-8'),
             'mot_de_passe_chiffre': str(b64encode(mot_de_passe_chiffre), 'utf-8'),
-            'fingerprint_base64': 'Ut/UQ5aKomoGzXB7mpUduPk4Xzg=',
+            # 'fingerprint_base64': 'Ut/UQ5aKomoGzXB7mpUduPk4Xzg=',
         }
         enveloppe_requete = self.generateur.transmettre_commande(
             requete_cle_racine,
