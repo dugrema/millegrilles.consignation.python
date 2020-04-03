@@ -141,6 +141,39 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
         return {'dernier_backup': info_dernier_backup}
 
+    def reset_backup(self, message_dict):
+        super().reset_backup(message_dict)
+
+        # Suppression des documents et transactions de backup
+        backup_domaines = [
+            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE,
+            ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN,
+            ConstantesBackup.TRANSACTION_CATALOGUE_MENSUEL,
+            ConstantesBackup.TRANSACTION_CATALOGUE_ANNUEL,
+            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA3_512,
+            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE,
+            ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO,
+            ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO,
+            ConstantesBackup.TRANSACTION_ARCHIVE_MENSUELLE_INFO,
+        ]
+        filtre_transactions = {
+            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE): {'$in': backup_domaines}
+        }
+        collection_transactions = self.document_dao.get_collection(ConstantesBackup.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions.delete_many(filtre_transactions)
+
+        backup_libval = [
+            ConstantesBackup.LIBVAL_CATALOGUE_HORAIRE,
+            ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
+            ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
+            ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
+        ]
+        filtre_documents = {
+           Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': backup_libval}
+        }
+        collection_documents = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_documents.delete_many(filtre_documents)
+
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
