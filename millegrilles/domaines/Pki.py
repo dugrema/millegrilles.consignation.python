@@ -2,6 +2,7 @@
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
+from millegrilles.Erreurs import ErreurModeRegeneration
 from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
@@ -393,16 +394,21 @@ class PKIDocumentHelper:
         result = collection.update_one(filtre, {'$set': document_cert, '$setOnInsert': set_on_insert}, upsert=True)
         if result.matched_count == 0:
             # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
-            # de manier permanente
+            # de maniere permanente
             transaction = {
                 ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
                 ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
                 ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
             }
-            self._contexte.generateur_transactions.soumettre_transaction(
-                transaction,
-                domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-            )
+            try:
+                self._contexte.generateur_transactions.soumettre_transaction(
+                    transaction,
+                    domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+                )
+            except ErreurModeRegeneration:
+                # Mode de regeneration de document, rien a faire
+                pass
+
 
         # # Demarrer validation des certificats
         # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides

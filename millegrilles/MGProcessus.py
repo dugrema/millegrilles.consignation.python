@@ -9,6 +9,7 @@ import json
 import uuid
 
 from millegrilles import Constantes
+from millegrilles.Erreurs import ErreurModeRegeneration
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.transaction import GenerateurTransaction
@@ -675,6 +676,10 @@ class RegenerationContexteWrapper:
     @property
     def message_dao(self):
         raise NotImplemented("Contexte de regeneration - message dao non disponible")
+
+    @property
+    def generateur_transactions(self):
+        raise ErreurModeRegeneration()
 
     @property
     def document_dao(self):
