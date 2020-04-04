@@ -972,10 +972,13 @@ class MGProcessus:
             tokens = {}
             if self._ajouter_token_resumer is not None:
                 tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_RESUMER] = self._ajouter_token_resumer
+                self.marquer_evenement_transaction_token(Constantes.EVENEMENT_TOKEN_RESUMER, self._ajouter_token_resumer)
             if self._ajouter_token_attente is not None:
                 tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_ATTENTE] = self._ajouter_token_attente
+                self.marquer_evenement_transaction_token(Constantes.EVENEMENT_TOKEN_ATTENTE, self._ajouter_token_attente)
             if self._tokens_connectes is not None:
                 tokens[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES] = self._tokens_connectes
+                # self.marquer_evenement_transaction_token(Constantes.EVENEMENT_TOKEN_RESUMER, self._tokens_connectes)
             if len(tokens) > 0:
                 document_etape[Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKENS] = tokens
 
@@ -1345,6 +1348,15 @@ class MGProcessus:
     def controleur(self) -> MGPProcesseur:
         return self._controleur
 
+    def marquer_evenement_transaction_token(self, type_token, token):
+        """
+        Hook pour sous-classes
+        :param type_token:
+        :param token:
+        :return:
+        """
+        pass
+
 
 # Classe de processus pour les transactions. Contient certaines actions dans finale() pour marquer la transaction
 # comme ayant ete completee.
@@ -1401,8 +1413,24 @@ class MGProcessusTransaction(MGProcessus):
             Constantes.MONGO_DOC_ID: id_transaction,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: datetime.datetime.utcnow().timestamp(),
         }
         self._controleur.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT,
+                                                         channel=self.controleur.connectionmq_publisher.channel)
+
+    def marquer_evenement_transaction_token(self, type_token, token):
+        info_transaction = self.trouver_id_transaction()
+        id_transaction = info_transaction.get('id_transaction')
+        nom_collection = info_transaction['nom_collection']
+
+        evenement = {
+            Constantes.MONGO_DOC_ID: id_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection,
+            Constantes.EVENEMENT_MESSAGE_TYPE_TOKEN: type_token,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT_TOKEN: token,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: datetime.datetime.utcnow().timestamp(),
+        }
+        self._controleur.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN,
                                                          channel=self.controleur.connectionmq_publisher.channel)
 
     @property

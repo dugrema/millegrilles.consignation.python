@@ -463,7 +463,7 @@ class PikaDAO:
             self.__channel_consumer,
             exchange_middleware,
             self.queuename_evenements_transactions(),
-            [Constantes.TRANSACTION_ROUTING_EVENEMENT, Constantes.TRANSACTION_ROUTING_EVENEMENTRESET],
+            [Constantes.TRANSACTION_ROUTING_EVENEMENT, Constantes.TRANSACTION_ROUTING_EVENEMENTRESET, Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN],
             queue_durable=True
         ))
 

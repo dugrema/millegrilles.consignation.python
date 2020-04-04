@@ -334,6 +334,8 @@ class EvenementTransactionCallback(BaseCallback):
                 self.ajouter_evenement(message_dict)
             elif routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENTRESET:
                 self.reset_evenements_transactions(message_dict)
+            elif routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN:
+                self.ajouter_evenement_token(message_dict)
             else:
                 raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
         else:
@@ -351,6 +353,15 @@ class EvenementTransactionCallback(BaseCallback):
             # L'evenement n'est pas pour une seule transaction, on recupere la liste des uuids
             uuid_transactions = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             self.ajouter_evenement_transactions(uuid_transactions, nom_collection, evenement)
+
+    def ajouter_evenement_token(self, message_dict):
+        id_transaction = message_dict[Constantes.MONGO_DOC_ID]
+        nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        token = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENT_TOKEN]
+        type_token = message_dict[Constantes.EVENEMENT_MESSAGE_TYPE_TOKEN]
+        timestamp = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP]
+
+        self.set_evenement_token_transaction(id_transaction, nom_collection, type_token, token, timestamp)
 
     def reset_evenements_transactions(self, message_dict):
         """
@@ -409,6 +420,24 @@ class EvenementTransactionCallback(BaseCallback):
                     resultat.modified_count, str(id_transaction), nom_collection, evenement
                 )
             )
+
+    def set_evenement_token_transaction(self, id_transaction, nom_collection, type_token, tokens, timestamp):
+        timestamp_datetime = datetime.datetime.fromtimestamp(timestamp)
+        for token in tokens:
+            info_token = {'token': token, 'timestamp': timestamp_datetime}
+            push_ops = {
+                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, self.configuration.idmg, type_token): info_token
+            }
+            ops = {
+                '$push': push_ops
+            }
+
+            filtre = {
+                Constantes.MONGO_DOC_ID: ObjectId(id_transaction)
+            }
+
+            collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
+            collection_transactions.update_one(filtre, ops)
 
     def ajouter_evenement_transactions(self, uuid_transaction: list, nom_collection: str, evenement: str):
         """
