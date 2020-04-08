@@ -749,6 +749,10 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         """
         regenerateur = self._gestionnaire.creer_regenerateur_documents()
 
+        # Creer un dict pour conserver les transactions avec token resumer
+        # Ces transactions doivent etre executees apres les transactions d'initialisation
+        tokens_resumer = dict()
+
         # Deconnecter les Q (channel - consumer tags)
         if stop_consuming:
             self.gestionnaire.stop_consuming()
@@ -760,8 +764,54 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         generateur_groupes_transactions = regenerateur.creer_generateur_transactions()
         try:
             for transaction in generateur_groupes_transactions:
+                uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                transactions_a_resumer = list()
+
                 if transaction is not None:
-                    self.traiter_transaction_wrapper(transaction)
+                    traiter = True
+
+                    # Verifier si la transaction a un token resumer / attente
+                    try:
+                        evenements = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT]
+                        evenements_idmg = evenements[self.configuration.idmg]
+
+                        try:
+                            resumer_transaction = evenements_idmg[Constantes.EVENEMENT_TOKEN_RESUMER]
+                            for dict_token in resumer_transaction:
+                                cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
+                                tokens_resumer[cle_token] = transaction
+                                traiter = False
+                                self.__logger.debug("Transaction %s, mise en attente" % uuid_transaction)
+                        except KeyError:
+                            # Ok, aucuns tokens resumer
+                            pass
+
+                        try:
+                            attente_transactions = evenements_idmg[Constantes.EVENEMENT_TOKEN_ATTENTE]
+                            for dict_token in attente_transactions:
+                                try:
+                                    cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
+                                    transaction_resumer = tokens_resumer[cle_token]
+                                    transactions_a_resumer.append(transaction_resumer)
+                                    del tokens_resumer[cle_token]
+                                except KeyError:
+                                    # Aucun token resumer pour ce token attente specifique
+                                    pass
+                        except KeyError:
+                            # Aucuns tokens attente
+                            pass
+
+                    except KeyError:
+                        # Aucune info d'evenements
+                        pass
+
+                    if traiter:
+                        self.traiter_transaction_wrapper(transaction)
+
+                        for transaction_resumer in transactions_a_resumer:
+                            self.__logger.debug("Transaction master completee, resumer transaction " + str(transaction_resumer))
+                            self.traiter_transaction_wrapper(transaction_resumer)
+
         except StopIteration as se:
             self.__logger.info("Traitement transactions termine - StopIteration")
 
