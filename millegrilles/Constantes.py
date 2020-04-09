@@ -1034,6 +1034,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_TORRENT_HASHSTRING = 'torrent_hashstring'
 
     TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
+    TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE = '%s.demandeThumbnailProtege' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM
     TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM

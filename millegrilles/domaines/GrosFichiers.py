@@ -182,6 +182,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Fichiers
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDemandeThumbnailProtege"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
@@ -1175,32 +1177,31 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         document_fichier = collection_domaine.find_one_and_update(filtre, ops)
         return document_fichier
 
-    def enregistrer_image_info(self, uuid_fichier, image_info):
+    def enregistrer_image_info(self, image_info):
 
         fuuid_fichier = image_info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
         info_image_maj = dict()
+        cle_version = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_fichier)
+
         if image_info.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
-            libelle_thumbnail = '%s.%s.%s' % (
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-                fuuid_fichier,
+            libelle_thumbnail = '%s.%s' % (
+                cle_version,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL
             )
             info_image_maj[libelle_thumbnail] = image_info[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL]
 
         if image_info.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None:
-            libelle_fuuid_preview = '%s.%s.%s' % (
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-                fuuid_fichier,
+            libelle_fuuid_preview = '%s.%s' % (
+                cle_version,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW
             )
             info_image_maj[libelle_fuuid_preview] = image_info[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
 
-            libelle_mimetype_preview = '%s.%s.%s' % (
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-                fuuid_fichier,
+            libelle_mimetype_preview = '%s.%s' % (
+                cle_version,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW
             )
             info_image_maj[libelle_mimetype_preview] = image_info[
@@ -1216,7 +1217,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier
+                cle_version: {'$exists': True}
             }
 
             collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1586,14 +1587,26 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         document_uuid = transaction.get('documentuuid')  # Represente la collection, si present
 
         transaction = self.charger_transaction()
-        resultat = self._controleur.gestionnaire.maj_fichier(transaction)
-        resultat.update({
+        # resultat = self._controleur.gestionnaire.maj_fichier(transaction)
+        # resultat = {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier, 'info_version': info_version}
+        # info-version :
+        #   "date_version": ISODate("2020-04-09T13:22:16.000Z"),
+        #   "fuuid": "20805bb0-7a65-11ea-8d47-6740c3cdc870",
+        #   "securite": "3.protege",
+        #   "nom": "IMG_0005.JPG",
+        #   "taille": 265334,
+        #   "mimetype": "image/jpeg",
+        #   "sha256": "a99e771ebda5b9c599852782d5317334b2358aeb78931e3ba569a29d95ce5ae1",
+        #   "extension": "jpg",
+        resultat = {
             'fuuid': fuuid,
             'securite': transaction['securite'],
             'collection_uuid': document_uuid,
             'type_operation': 'Nouveau fichier',
             'mimetype': transaction['mimetype'],
-        })
+            'extension': '',
+            'uuid_fichier': '',
+        }
 
         self.set_etape_suivante(
             ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
@@ -1610,6 +1623,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         est_video = mimetype == 'video'
 
         chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
+        id_transaction_image = None
         if not chiffre and (est_image or est_video):
             tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
 
@@ -1625,53 +1639,120 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
                 }
                 self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
 
-            transaction_image = None
             try:
                 id_transaction_image = self.parametres['millegrilles']['domaines']['GrosFichiers'][
                     'nouvelleVersion']['transfertComplete']['_id-transaction']
-                transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
+                # transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
             except Exception as e:
                 # Charger la transaction par recherche direct - on est probablement en regeneration
                 token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
                 try:
                     transaction_image = self.controleur.gestionnaire.get_transaction_par_token_resumer(token_resumer)
+                    id_transaction_image = str(transaction_image['_id'])
                 except Exception:
                     self.__logger.exception("Erreur chargement preview/thumbnail")
 
-            if transaction_image is not None:
-                self.__logger.debug("Enregistrement preview et thumbnail image : %s" % str(transaction_image))
-                self.controleur.gestionnaire.enregistrer_image_info(
-                    self.parametres['uuid_fichier'], transaction_image)
+            if id_transaction_image is not None:
+                self.__logger.debug("Presence preview et thumbnail image : %s" % str(id_transaction_image))
+                # self.controleur.gestionnaire.enregistrer_image_info(transaction_image)
             else:
                 self.__logger.warning("Image ajoutee sans thumbnail/preview (non transmis)")
 
         # Met a jour les collections existantes avec ce fichier
-        uuid_fichier = self.parametres['uuid_fichier']
-        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+        # uuid_fichier = self.parametres['uuid_fichier']
+        # self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
         # Verifier si le fichier est une image protegee - il faut generer un thumbnail
         self.__logger.debug("Mimetype fichier %s" % self.parametres['mimetype'])
-        if chiffre and (est_image or est_video):
-            self.__logger.info("Mimetype est une image/video")
 
-            # Transmettre requete pour certificat de consignation.grosfichiers
-            self.set_requete('pki.role.fichiers', {})
-
-            # Le processus est en mode regeneration
-            # self._traitement_collection()
-            token_attente = 'associer_thumbnail:%s' % fuuid
-            if not self._controleur.is_regeneration:
-                self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__, [token_attente])
-            else:
-                self.set_etape_suivante(
-                    ProcessusTransactionNouvelleVersionMetadata.sauvegarde_thumbnail_protege.__name__,
-                    [token_attente]
-                )  # Termine
-
-        else:
-            self._traitement_collection()
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.persister.__name__)
 
         self.__logger.debug("Fin confirmer_reception_update_collections")
+
+        return {
+            'id_transaction_image': id_transaction_image,
+            'chiffre': chiffre,
+            'est_image': est_image,
+            'est_video': est_video,
+        }
+
+    def persister(self):
+        """
+        Etape de persistance des changements au fichier.
+
+        :return:
+        """
+        transaction = self.charger_transaction()
+
+        id_transaction_image = self.parametres.get('id_transaction_image')
+        if id_transaction_image:
+            pass
+
+        resultat = self._controleur.gestionnaire.maj_fichier(transaction)
+        uuid_fichier = resultat['uuid_fichier']
+        # self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+
+        try:
+            collection_uuid = self.parametres['collection_uuid']
+            self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, [uuid_fichier])
+        except KeyError:
+            pass
+
+        if self.parametres.get('chiffre') and (self.parametres.get('est_image') or self.parametres.get('est_video')):
+            self.__logger.info("Mimetype est une image/video")
+            # Les changements sont sauvegardes. Lancer une nouvelle transaction pour demander le thumbnail protege.
+
+            transaction_thumbnail = {
+                'fuuid': transaction['fuuid'],
+                'uuid_fichier': uuid_fichier,
+            }
+            self.ajouter_transaction_a_soumettre(
+                ConstantesGrosFichiers.TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE,
+                transaction_thumbnail
+            )
+
+        self.set_etape_suivante()  # Termine
+
+        return resultat
+
+    def _get_tokens_attente(self, resultat):
+        fuuid = resultat['fuuid']
+        tokens = [
+            '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
+        ]
+
+        if resultat['securite'] in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+            tokens.append('%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid))
+
+        return tokens
+
+
+class ProcessusTransactionDemandeThumbnailProtege(ProcessusGrosFichiersActivite):
+    """
+    Transaction qui sert a synchroniser la demande et reception d'un thumbnail protege.
+    """
+    def initiale(self):
+
+        transaction = self.transaction
+        fuuid = transaction['fuuid']
+        uuid_fichier = transaction['uuid_fichier']
+
+        # Transmettre requete pour certificat de consignation.grosfichiers
+        self.set_requete('pki.role.fichiers', {})
+
+        # Le processus est en mode regeneration
+        # self._traitement_collection()
+        token_attente = 'associer_thumbnail:%s' % fuuid
+        if not self._controleur.is_regeneration:
+            self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.attente_cle_decryptage.__name__,
+                                    [token_attente])
+        else:
+            self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.persister.__name__, [token_attente])  # Termine
+
+        return {
+            'fuuid': fuuid,
+            'uuid_fichier': uuid_fichier,
+        }
 
     def attente_cle_decryptage(self):
         fuuid = self.parametres['fuuid']
@@ -1691,18 +1772,15 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
 
         # token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.demander_thumbnail_protege.__name__)
+        self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.demander_thumbnail_protege.__name__)
 
     def demander_thumbnail_protege(self):
-
         information_cle_secrete = self.parametres['reponse'][1]
 
         cle_secrete_chiffree = information_cle_secrete['cle']
         iv = information_cle_secrete['iv']
 
         information_fichier = self.controleur.gestionnaire.get_fichier_par_fuuid(self.parametres['fuuid'])
-
-        self.__logger.debug("Info tran chiffree: cle %s, iv %s" % (cle_secrete_chiffree, iv))
 
         fuuid = self.parametres['fuuid']
         token_attente = 'associer_thumbnail:%s' % fuuid
@@ -1721,31 +1799,14 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         self.controleur.generateur_transactions.transmettre_commande(
             commande, ConstantesGrosFichiers.COMMANDE_GENERER_THUMBNAIL_PROTEGE)
 
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.sauvegarde_thumbnail_protege.__name__, [token_attente])
+        self.set_etape_suivante(ProcessusTransactionDemandeThumbnailProtege.persister.__name__, [token_attente])
 
-    def sauvegarde_thumbnail_protege(self):
-        self._traitement_collection()
+    def persister(self):
 
-    def _traitement_collection(self):
-        collection_uuid = self.parametres.get('collection_uuid')
-        if collection_uuid is not None:
-            fichier_uuid = self.parametres.get('uuid_fichier')
-            collection_uuid = self.parametres.get('collection_uuid')
+        # MAJ Collections associes au fichier
+        self.controleur.gestionnaire.maj_fichier_dans_collection(self.parametres['uuid_fichier'])
 
-            self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, [fichier_uuid])
-
-        self.set_etape_suivante()  # Processus termine
-
-    def _get_tokens_attente(self, resultat):
-        fuuid = resultat['fuuid']
-        tokens = [
-            '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
-        ]
-
-        if resultat['securite'] in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
-            tokens.append('%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid))
-
-        return tokens
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers):
