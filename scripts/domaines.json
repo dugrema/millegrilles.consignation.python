@@ -16,9 +16,6 @@
       "module": "millegrilles.domaines.Parametres",
       "classe": "GestionnaireParametres"
     },{
-      "module": "millegrilles.domaines.Taches",
-      "classe": "GestionnaireTaches"
-    },{
       "module": "millegrilles.domaines.Annuaire",
       "classe": "GestionnaireAnnuaire"
     },{
