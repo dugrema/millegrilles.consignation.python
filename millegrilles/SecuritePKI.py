@@ -277,7 +277,7 @@ class UtilCertificats:
             if not key.startswith('_'):
                 transaction_temp[key] = value
 
-        self._logger.debug("Message nettoye: %s" % str(transaction_temp))
+        # self._logger.debug("Message nettoye: %s" % str(transaction_temp))
 
         # Premiere passe, converti les dates. Les nombre floats sont incorrects.
         message_json = json.dumps(
@@ -586,7 +586,7 @@ class VerificateurTransaction(UtilCertificats):
         # message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
         # message_bytes = bytes(message_json, 'utf-8')
         message_bytes = self.preparer_transaction_bytes(dict_message)
-        self._logger.debug("Verifier signature, Message: %s" % str(dict_message))
+        # self._logger.debug("Verifier signature, Message: %s" % str(dict_message))
 
         cle_publique = certificat.public_key()
         cle_publique.verify(

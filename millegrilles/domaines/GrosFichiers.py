@@ -1518,7 +1518,7 @@ class RegenerateurGrosFichiers(RegenerateurDeDocuments):
     def creer_generateur_transactions(self):
 
         transactions_a_ignorer = [
-            ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER,
+            # ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER,
         ]
 
         return GroupeurTransactionsARegenerer(self._gestionnaire_domaine, transactions_a_ignorer)
@@ -1631,10 +1631,12 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
                     'nouvelleVersion']['transfertComplete']['_id-transaction']
                 transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
             except Exception as e:
-                self.__logger.exception("Erreur chargement preview/thumbnail")
                 # Charger la transaction par recherche direct - on est probablement en regeneration
                 token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
-                transaction_image = self.controleur.gestionnaire.get_transaction_par_token_resumer(token_resumer)
+                try:
+                    transaction_image = self.controleur.gestionnaire.get_transaction_par_token_resumer(token_resumer)
+                except Exception:
+                    self.__logger.exception("Erreur chargement preview/thumbnail")
 
             if transaction_image is not None:
                 self.__logger.debug("Enregistrement preview et thumbnail image : %s" % str(transaction_image))
@@ -1658,7 +1660,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             # Le processus est en mode regeneration
             # self._traitement_collection()
             token_attente = 'associer_thumbnail:%s' % fuuid
-            if self._controleur.is_regeneration:
+            if not self._controleur.is_regeneration:
                 self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__, [token_attente])
             else:
                 self.set_etape_suivante(
@@ -1919,7 +1921,7 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
         # nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         documents = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS)
 
-        uuid_collection = str(uuid.uuid1())
+        uuid_collection = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
         self._controleur.gestionnaire.creer_collection(uuid_collection, documents)
 
@@ -2276,8 +2278,12 @@ class ProcessusTransactionDecrypterFichier(ProcessusGrosFichiers):
         # self.controleur.generateur_transactions.soumettre_transaction(transaction_maitredescles, domaine)
         self.ajouter_transaction_a_soumettre(domaine, transaction_maitredescles)
 
-        token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
-        self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
+        if not self.controleur.is_regeneration:
+            token_attente = 'decrypterFichier_cleSecrete:%s' % fuuid
+            self.set_etape_suivante(ProcessusTransactionDecrypterFichier.decrypter_fichier.__name__, [token_attente])
+        else:
+            token_attente = 'decrypterFichier_nouveauFichier:%s' % fuuid
+            self.set_etape_suivante('finale', [token_attente])
 
         return {
             'fuuid': fuuid,

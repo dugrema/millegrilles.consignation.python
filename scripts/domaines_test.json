@@ -3,6 +3,24 @@
     {
       "module": "millegrilles.domaines.SenseursPassifs",
       "classe": "GestionnaireSenseursPassifs"
+    },{
+      "module": "millegrilles.domaines.Principale",
+      "classe": "GestionnairePrincipale"
+    },{
+      "module": "millegrilles.domaines.Plume",
+      "classe": "GestionnairePlume"
+    },{
+      "module": "millegrilles.domaines.Parametres",
+      "classe": "GestionnaireParametres"
+    },{
+      "module": "millegrilles.domaines.Taches",
+      "classe": "GestionnaireTaches"
+    },{
+      "module": "millegrilles.domaines.Annuaire",
+      "classe": "GestionnaireAnnuaire"
+    },{
+      "module": "millegrilles.domaines.Backup",
+      "classe": "GestionnaireBackup"
     }
   ]
 }

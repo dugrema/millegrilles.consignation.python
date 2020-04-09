@@ -365,7 +365,7 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
     def initiale(self):
         transaction = self.charger_transaction()
 
-        self.__logger.debug("Transaction information archive quotidienne : %s" % str(transaction))
+        # self.__logger.debug("Transaction information archive quotidienne : %s" % str(transaction))
         jour_backup = datetime.datetime.fromtimestamp(
             transaction[ConstantesBackup.LIBELLE_JOUR],
             tz=datetime.timezone.utc

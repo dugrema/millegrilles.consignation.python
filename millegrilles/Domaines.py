@@ -1333,7 +1333,7 @@ class GroupeurTransactionsARegenerer:
 
         curseur = self.__preparer_curseur_transactions()
         for valeur in curseur:
-            self.__logger.debug("Transaction: %s" % str(valeur))
+            # self.__logger.debug("Transaction: %s" % str(valeur))
             yield valeur
 
         self.__complet = True
