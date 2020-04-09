@@ -714,6 +714,8 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+        self._transactions_resumer = dict()  # Transactions a resumer
+
     @property
     def is_regeneration(self):
         return True
@@ -731,6 +733,22 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         :return: Message Dao dummy qui ne fait rien.
         """
         return self.__message_dao
+
+    def ajouter_transaction_resumer(self, token, transaction):
+        self._transactions_resumer[token] = transaction
+
+    def consommer_transaction_resumer(self, token_resumer: str):
+        """
+        Retourner une transaction qui correspond au token. Supprime la reference.
+
+        :param token_resumer:
+        :return:
+        """
+        transaction = self._transactions_resumer.get(token_resumer)
+        if transaction:
+            del self._transactions_resumer[token_resumer]
+
+        return transaction
 
     @property
     def generateur_transactions(self):
@@ -751,7 +769,7 @@ class MGPProcesseurRegeneration(MGPProcesseur):
 
         # Creer un dict pour conserver les transactions avec token resumer
         # Ces transactions doivent etre executees apres les transactions d'initialisation
-        tokens_resumer = dict()
+        # tokens_resumer = dict()
 
         # Deconnecter les Q (channel - consumer tags)
         if stop_consuming:
@@ -779,27 +797,28 @@ class MGPProcesseurRegeneration(MGPProcesseur):
                             resumer_transaction = evenements_idmg[Constantes.EVENEMENT_TOKEN_RESUMER]
                             for dict_token in resumer_transaction:
                                 cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
-                                tokens_resumer[cle_token] = transaction
+                                # tokens_resumer[cle_token] = transaction
+                                self.ajouter_transaction_resumer(cle_token, transaction)
                                 traiter = False
                                 self.__logger.debug("Transaction %s, mise en attente" % uuid_transaction)
                         except KeyError:
                             # Ok, aucuns tokens resumer
                             pass
 
-                        try:
-                            attente_transactions = evenements_idmg[Constantes.EVENEMENT_TOKEN_ATTENTE]
-                            for dict_token in attente_transactions:
-                                try:
-                                    cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
-                                    transaction_resumer = tokens_resumer[cle_token]
-                                    transactions_a_resumer.append(transaction_resumer)
-                                    del tokens_resumer[cle_token]
-                                except KeyError:
-                                    # Aucun token resumer pour ce token attente specifique
-                                    pass
-                        except KeyError:
-                            # Aucuns tokens attente
-                            pass
+                        # try:
+                        #     attente_transactions = evenements_idmg[Constantes.EVENEMENT_TOKEN_ATTENTE]
+                        #     for dict_token in attente_transactions:
+                        #         try:
+                        #             cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
+                        #             transaction_resumer = tokens_resumer[cle_token]
+                        #             transactions_a_resumer.append(transaction_resumer)
+                        #             del tokens_resumer[cle_token]
+                        #         except KeyError:
+                        #             # Aucun token resumer pour ce token attente specifique
+                        #             pass
+                        # except KeyError:
+                        #     # Aucuns tokens attente
+                        #     pass
 
                     except KeyError:
                         # Aucune info d'evenements
@@ -887,6 +906,16 @@ class MGPProcesseurRegeneration(MGPProcesseur):
         pass  # Aucun effet
 
     def transmettre_message_continuer(self, id_document_processus, tokens=None):
+        if tokens:
+            for token in tokens:
+                try:
+                    transaction_a_resumer = self._transactions_resumer[token]
+                    uuid_transaction = transaction_a_resumer[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                    self.__logger.debug("Resumer traitement transaction %s" % uuid_transaction)
+                    self.traiter_transaction_wrapper(transaction_a_resumer)
+                except KeyError:
+                    # Aucune transaction correspondante
+                    pass
         pass  # Aucun effet
 
     @property
@@ -1155,6 +1184,18 @@ class MGProcessus:
             etape_execution = self._etape_suivante
             self._etape_suivante = None
             self._etape_complete = False
+
+            if self._ajouter_token_attente:
+                for token in self._ajouter_token_attente:
+                    controleur = self.controleur
+                    transaction_resumer = controleur.consommer_transaction_resumer(token)
+                    if transaction_resumer:
+                        uuid_transaction_resumer = transaction_resumer[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                        self._logger.debug("Resumer transaction apres attente : %s" % uuid_transaction_resumer)
+                        controleur.traiter_transaction_wrapper(transaction_resumer)
+
+            # if self._ajouter_token_resumer is not None:
+            #     self._logger.debug("Resumer transaction token %s" % self._ajouter_token_resumer)
 
             if nombre_etapes_executees > 100:
                 raise Exception("Nombre d'etapes executees > 100, depasse limite")

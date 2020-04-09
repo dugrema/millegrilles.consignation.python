@@ -1595,14 +1595,9 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             'mimetype': transaction['mimetype'],
         })
 
-        if not self._controleur.is_regeneration:
-            self.set_etape_suivante(
-                ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
-                self._get_tokens_attente(resultat))
-        else:
-            # Le processus est en mode regeneration
-            self._traitement_collection()
-            self.set_etape_suivante()  # Termine
+        self.set_etape_suivante(
+            ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
+            self._get_tokens_attente(resultat))
 
         return resultat
 
@@ -1657,7 +1652,17 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             # Transmettre requete pour certificat de consignation.grosfichiers
             self.set_requete('pki.role.fichiers', {})
 
-            self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__)
+            # Le processus est en mode regeneration
+            # self._traitement_collection()
+            token_attente = 'associer_thumbnail:%s' % fuuid
+            if self._controleur.is_regeneration:
+                self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.attente_cle_decryptage.__name__, [token_attente])
+            else:
+                self.set_etape_suivante(
+                    ProcessusTransactionNouvelleVersionMetadata.sauvegarde_thumbnail_protege.__name__,
+                    [token_attente]
+                )  # Termine
+
         else:
             self._traitement_collection()
 

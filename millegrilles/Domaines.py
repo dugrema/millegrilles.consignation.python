@@ -1203,9 +1203,27 @@ class RegenerateurDeDocuments:
         self._gestionnaire_domaine = gestionnaire_domaine
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+        self._transactions_resumer = dict()  # Transactions a resumer
+
     @property
     def contexte(self):
         return self._gestionnaire_domaine.contexte
+
+    def ajouter_transaction_resumer(self, token, transaction):
+        self._transactions_resumer[token] = transaction
+
+    def consommer_transaction_resumer(self, token_resumer: str):
+        """
+        Retourner une transaction qui correspond au token. Supprime la reference.
+
+        :param token_resumer:
+        :return:
+        """
+        transaction = self._transactions_resumer.get(token_resumer)
+        if transaction:
+            del self._transactions_resumer[token_resumer]
+
+        return transaction
 
     def supprimer_documents(self):
         """
