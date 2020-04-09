@@ -72,7 +72,7 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
             sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256]
             nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
-            extension = nom_fichier.split('.')[-1].lower()
+            extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
 
             fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
                 'securite': securite,
@@ -135,6 +135,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
 
         self.__handler_backup = HandlerBackupGrosFichiers(self._contexte)
+
+    @staticmethod
+    def extension_fichier(nom_fichier):
+        extension = nom_fichier.split('.')[-1].lower()
+        return extension
 
     def configurer(self):
         super().configurer()
@@ -1598,14 +1603,15 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         #   "mimetype": "image/jpeg",
         #   "sha256": "a99e771ebda5b9c599852782d5317334b2358aeb78931e3ba569a29d95ce5ae1",
         #   "extension": "jpg",
+        nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
+        extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
         resultat = {
             'fuuid': fuuid,
             'securite': transaction['securite'],
             'collection_uuid': document_uuid,
             'type_operation': 'Nouveau fichier',
             'mimetype': transaction['mimetype'],
-            'extension': '',
-            'uuid_fichier': '',
+            'extension': extension,
         }
 
         self.set_etape_suivante(
@@ -1621,6 +1627,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         fuuid = self.parametres['fuuid']
         est_image = mimetype == 'image'
         est_video = mimetype == 'video'
+        extension = self.parametres['extension']
 
         chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
         id_transaction_image = None
@@ -1634,7 +1641,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
                 transaction_transcoder = {
                     'fuuid': fuuid,
                     'mimetype': mimetype,
-                    'extension': self.parametres['info_version']['extension'],
+                    'extension': self.parametres['extension'],
                     'securite': self.parametres['securite'],
                 }
                 self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
@@ -1683,20 +1690,21 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         :return:
         """
         transaction = self.charger_transaction()
+        resultat = self._controleur.gestionnaire.maj_fichier(transaction)
+        uuid_fichier = resultat['uuid_fichier']
 
         id_transaction_image = self.parametres.get('id_transaction_image')
         if id_transaction_image:
-            pass
-
-        resultat = self._controleur.gestionnaire.maj_fichier(transaction)
-        uuid_fichier = resultat['uuid_fichier']
-        # self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+            transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
+            self.controleur.gestionnaire.enregistrer_image_info(transaction_image)
 
         try:
             collection_uuid = self.parametres['collection_uuid']
             self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, [uuid_fichier])
         except KeyError:
-            pass
+            # On n'ajoute pas le document a une collection specifique.
+            # MAJ Collections associes au fichier
+            self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
         if self.parametres.get('chiffre') and (self.parametres.get('est_image') or self.parametres.get('est_video')):
             self.__logger.info("Mimetype est une image/video")
