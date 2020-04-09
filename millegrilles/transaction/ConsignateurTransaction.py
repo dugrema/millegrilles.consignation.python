@@ -232,15 +232,14 @@ class ConsignateurTransactionCallback(BaseCallback):
         date_estampille = datetime.datetime.fromtimestamp(estampille)
         evenements = {
             Constantes.EVENEMENT_DOCUMENT_PERSISTE: datetime.datetime.now(tz=datetime.timezone.utc),
+            Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,
+            Constantes.EVENEMENT_TRANSACTION_COMPLETE: False,
+            Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG: False,
         }
         if signature_valide:
             evenements[Constantes.EVENEMENT_SIGNATURE_VERIFIEE] = datetime.datetime.now(tz=datetime.timezone.utc)
 
-        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = {
-            Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE: date_estampille,
-            Constantes.EVENEMENT_TRANSACTION_COMPLETE: False,
-            self.contexte.configuration.idmg: evenements
-        }
+        enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = evenements
 
         resultat = collection_transactions.insert_one(enveloppe_transaction)
         doc_id = resultat.inserted_id
@@ -251,7 +250,6 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         domaine_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        idmg = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
 
         nom_collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine_transaction)
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
@@ -277,13 +275,11 @@ class ConsignateurTransactionCallback(BaseCallback):
         # Ajouter la date de restauration
         evenements = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT)
         if not evenements:
-            evenements = {
-                idmg: dict()
-            }
+            evenements = dict()
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = evenements
 
-        evenements_idmg = evenements[idmg]
-        evenements_idmg[Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE] = datetime.datetime.utcnow()
+        evenements[Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE] = datetime.datetime.utcnow()
+        evenements[Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG] = True
 
         try:
             collection_transactions.insert_one(enveloppe_transaction)
@@ -396,9 +392,8 @@ class EvenementTransactionCallback(BaseCallback):
         ]:
             transaction_complete = True
 
-        libelle_transaction_traitee = '%s.%s.%s' % (
+        libelle_transaction_traitee = '%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            self.contexte.configuration.idmg,
             evenement
         )
         libelle_transaction_complete = '%s.%s' %  (
@@ -426,7 +421,7 @@ class EvenementTransactionCallback(BaseCallback):
         for token in tokens:
             info_token = {'token': token, 'timestamp': timestamp_datetime}
             push_ops = {
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, self.configuration.idmg, type_token): info_token
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, type_token): info_token
             }
             ops = {
                 '$push': push_ops
@@ -450,9 +445,8 @@ class EvenementTransactionCallback(BaseCallback):
         """
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
-        libelle_evenement = '%s.%s.%s' % (
+        libelle_evenement = '%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            self.contexte.configuration.idmg,
             evenement
         )
         selection = {
@@ -560,14 +554,13 @@ class EntretienCollectionsDomaines(BaseCallback):
         )
 
     def _setup_index_domaines(self):
-        idmg = self.contexte.configuration.idmg
-
         for nom_collection_transaction in self.__liste_domaines:
             try:
                 collection = self.contexte.document_dao.get_collection(nom_collection_transaction)
                 champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
-                champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
-                champ_traitee = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
+                champ_persiste = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+                champ_traitee = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
+                champ_backup_flag = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
 
                 # en-tete.uuid-transaction
                 collection.create_index(
@@ -586,7 +579,7 @@ class EntretienCollectionsDomaines(BaseCallback):
                     name='estampille'
                 )
 
-                # _evenements.IDMG.transaction_traitee
+                # _evenements.transaction_traitee
                 collection.create_index(
                     [
                         (champ_complete, 1),
@@ -595,13 +588,22 @@ class EntretienCollectionsDomaines(BaseCallback):
                     name='transaction_traitee'
                 )
 
-                # _evenements.IDMG.transaction_persistee
+                # _evenements.transaction_persistee
                 collection.create_index(
                     [
                         (champ_complete, 1),
                         (champ_persiste, 1)
                     ],
                     name='transaction_persistee'
+                )
+
+                # _evenements.backup_horaire
+                collection.create_index(
+                    [
+                        (champ_complete, 1),
+                        (champ_backup_flag, 1)
+                    ],
+                    name='transaction_backup_flag'
                 )
 
             except Exception:
@@ -614,9 +616,8 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         idmg = self.configuration.idmg
 
-        label_date_resoumise = '%s.%s.%s' % (
+        label_date_resoumise = '%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            idmg,
             Constantes.EVENEMENT_TRANSACTION_DATE_RESOUMISE
         )
 
@@ -624,7 +625,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$lt': date_verif},
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$lt': date_verif},
             }
             collection_transaction = self.contexte.document_dao.get_collection(nom_collection_transaction)
             curseur_transactions = collection_transaction.find(filtre).limit(2000)
@@ -641,24 +642,20 @@ class EntretienCollectionsDomaines(BaseCallback):
 
                         compteur_resoumission = 0
                         if evenements_transaction is not None:
-                            evenements_millegrille = evenements_transaction.get(idmg)
-                            if evenements_millegrille is not None:
-                                resoumissions = evenements_millegrille.get(Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE)
-                                if resoumissions is not None:
-                                    compteur_resoumission = resoumissions
+                            resoumissions = evenements_transaction.get(Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE)
+                            if resoumissions is not None:
+                                compteur_resoumission = resoumissions
 
                         if compteur_resoumission < 3:
                             compteur_resoumission = compteur_resoumission + 1
 
                             # Signature valide, on trigger le traitement de persistance
-                            label_signature = '%s.%s.%s' % (
+                            label_signature = '%s.%s' % (
                                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                idmg,
                                 Constantes.EVENEMENT_SIGNATURE_VERIFIEE
                             )
-                            label_compte_resoumise = '%s.%s.%s' % (
+                            label_compte_resoumise = '%s.%s' % (
                                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                idmg,
                                 Constantes.EVENEMENT_TRANSACTION_COMPTE_RESOUMISE
                             )
                             collection_transaction.update_one(
@@ -678,9 +675,8 @@ class EntretienCollectionsDomaines(BaseCallback):
                         else:
                             # La transaction a ete re-soumise trop de fois, on la met en erreur
                             self.__logger.error("Marquer transaction comme resoumise trop de fois %s" % str(transaction_id))
-                            libelle_transaction_traitee = '%s.%s.%s' % (
+                            libelle_transaction_traitee = '%s.%s' % (
                                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                self.contexte.configuration.idmg,
                                 Constantes.EVENEMENT_TRANSACTION_ERREUR_RESOUMISSION
                             )
                             libelle_transaction_complete = '%s.%s' % (
@@ -735,7 +731,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         operations = {
             '$set': {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                                Constantes.EVENEMENT_TRANSACTION_ERREUR_EXPIREE): date_courante,
             }
         }
@@ -743,7 +739,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
-                '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_expiration},
+                '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_DOCUMENT_PERSISTE): {'$gt': date_expiration},
             }
 
             self.__logger.debug("Entretien collection %s: %s" % (nom_collection_transaction, filtre))

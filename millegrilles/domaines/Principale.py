@@ -128,8 +128,12 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         }
         document_domaines = collection_principale.find_one(filtre_menu)
 
-        domaines_configures = list(document_domaines[ConstantesPrincipale.LIBELLE_DOMAINES].keys())
-        domaines_disponibles = list(domaines[ConstantesPrincipale.LIBELLE_DOMAINES].keys())
+        try:
+            domaines_configures = list(document_domaines[ConstantesPrincipale.LIBELLE_DOMAINES].keys())
+            domaines_disponibles = list(domaines[ConstantesPrincipale.LIBELLE_DOMAINES].keys())
+        except TypeError:
+            # Rien a faire
+            return
 
         domaine_manquant = False
         for domaine in domaines_disponibles:

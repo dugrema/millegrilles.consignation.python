@@ -384,7 +384,7 @@ class GestionnaireDomaine:
         """
         idmg = self.configuration.idmg
         champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
-        champ_persiste = '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+        champ_persiste = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
         filtre = {
             champ_complete: False
         }
@@ -622,9 +622,8 @@ class GestionnaireDomaine:
 
     def get_transaction_par_token_resumer(self, token_resumer):
         collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
-        libelle_token = '%s.%s.%s.%s' % (
+        libelle_token = '%s.%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-            self.configuration.idmg,
             Constantes.EVENEMENT_RESUMER,
             Constantes.EVENEMENT_MESSAGE_TOKEN
         )
@@ -1297,7 +1296,7 @@ class GroupeurTransactionsARegenerer:
         index = [
             ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                         Constantes.EVENEMENT_TRANSACTION_COMPLETE), 1),
-            ('%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+            ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                            Constantes.EVENEMENT_TRANSACTION_TRAITEE), 1)
         ]
         # ordre_tri = index  # L'index est trie dans l'ordre necessaire
@@ -1308,7 +1307,7 @@ class GroupeurTransactionsARegenerer:
         filtre = {
             '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                        Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
-            '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                           Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
         }
 
@@ -1569,20 +1568,20 @@ class HandlerBackupDomaine:
             },
             '$and': [
                 {
-                    '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                                   Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE): {'$exists': False}
                 }, {
-                    '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                                   Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': False}
                 }, {
-                    '%s.%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, idmg,
+                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
                                   Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR): {'$exists': False}
                 }
             ]
 
         }
         sort = [
-            ('_evenements.%s.transaction_traitee' % idmg, 1)
+            ('_evenements.transaction_traitee', 1)
         ]
 
         curseur = coltrans.find(filtre, sort=sort)
