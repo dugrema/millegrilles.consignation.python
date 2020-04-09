@@ -1632,6 +1632,9 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
                 transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
             except Exception as e:
                 self.__logger.exception("Erreur chargement preview/thumbnail")
+                # Charger la transaction par recherche direct - on est probablement en regeneration
+                token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
+                transaction_image = self.controleur.gestionnaire.get_transaction_par_token_resumer(token_resumer)
 
             if transaction_image is not None:
                 self.__logger.debug("Enregistrement preview et thumbnail image : %s" % str(transaction_image))

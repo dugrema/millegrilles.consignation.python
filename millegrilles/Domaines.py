@@ -620,6 +620,16 @@ class GestionnaireDomaine:
         collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
         return collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_transaction)})
 
+    def get_transaction_par_token_resumer(self, token_resumer):
+        collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
+        libelle_token = '%s.%s.%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+            self.configuration.idmg,
+            Constantes.EVENEMENT_RESUMER,
+            Constantes.EVENEMENT_MESSAGE_TOKEN
+        )
+        return collection_transactions.find_one({libelle_token: token_resumer})
+
     def arreter(self):
         self._logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
