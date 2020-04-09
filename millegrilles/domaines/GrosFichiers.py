@@ -1760,22 +1760,13 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers
         """
         transaction = self.charger_transaction()
         fuuid = transaction.get('fuuid')
-
-        # Verifier si on a recu un thumbnail et preview d'image
-        # if transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW) is not None or \
-        #         transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
-        #     self.controleur.gestionnaire.enregistrer_image_info(transaction)
-
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionTransfertComplete.declencher_resumer.__name__)
-        return {'fuuid': fuuid}
-
-    def declencher_resumer(self):
-        fuuid = self.parametres.get('fuuid')
         token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
         self.resumer_processus([token_resumer])
 
         # Une fois les tokens consommes, le processus sera termine.
         self.set_etape_suivante()
+
+        return {'fuuid': fuuid}
 
 
 class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
