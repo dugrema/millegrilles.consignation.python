@@ -934,18 +934,37 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         collection_processus.delete_many(filtre_incomplet)
 
     def declencher_backup_horaire(self, declencheur: dict):
-        heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
+        """
+        Declenche un backup horaire. Maximum qui peut etre demande est est l'heure precedente.
+
+        :param declencheur:
+        :return:
+        """
+        # Verifier qu'on ne demande pas un backup de l'heure courante
+        maintenant = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+        heure_precedente = datetime.datetime(year=maintenant.year, month=maintenant.month, day=maintenant.day, hour=maintenant.hour)
+
+        try:
+            heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
+            heure_demandee = datetime.datetime(year=heure.year, month=heure.month, day=heure.day, hour=heure.hour)
+
+            if heure_demandee > heure_precedente:
+                # Reculer d'une heure
+                heure_demandee = heure_precedente
+        except KeyError:
+            heure_demandee = heure_precedente
+
         domaine = self.get_nom_domaine()
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
 
-        self._logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
+        self._logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure_demandee)))
         routing = domaine
         nom_module = 'millegrilles_Domaines'
         nom_classe = 'BackupHoraire'
         processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
 
         parametres = {
-            'heure': heure,
+            'heure': heure_demandee,
             'securite': securite,
         }
 
