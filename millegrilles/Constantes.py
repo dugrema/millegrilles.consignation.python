@@ -248,6 +248,7 @@ SECURITE_SECURE = '4.secure'    # Niveau 4, accessible uniquement a l'usager et 
 SECURITE_LIBELLE_REPONSE = 'acces'
 SECURITE_ACCES_REFUSE = '0.refuse'
 SECURITE_ACCES_PERMIS = '1.permis'
+SECURITE_ACCES_ERREUR = '2.erreur'
 
 CLE_CERT_CA = 'pki.millegrille'
 

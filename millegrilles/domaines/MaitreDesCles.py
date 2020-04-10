@@ -545,13 +545,19 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
             if acces_permis:
                 cle_secrete = self.decrypter_cle(document['cles'])
-                cle_secrete_reencryptee, fingerprint = self.crypter_cle(
-                    cle_secrete, enveloppe_certificat.certificat)
-                reponse = {
-                    'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                    'iv': document['iv'],
-                    Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
-                }
+                try:
+                    cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+                        cle_secrete, enveloppe_certificat.certificat)
+                    reponse = {
+                        'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                        'iv': document['iv'],
+                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                    }
+                except TypeError:
+                    self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
+                    reponse = {
+                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+                    }
 
         self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
@@ -708,7 +714,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         curseur = collection_documents.find(filtre)
 
         mot_de_passe_chiffre = message_dict['mot_de_passe_chiffre']
-        mot_de_passe_dechiffre = self.decrypter_contenu(mot_de_passe_chiffre.encode('utf-8'))
+        try:
+            mot_de_passe_dechiffre = self.decrypter_contenu(mot_de_passe_chiffre.encode('utf-8'))
+        except ValueError as ve:
+            self._logger.error("Erreur dechiffrage, mot de passe non dechiffrable")
+            raise ve
         # self._logger.debug("Mot de passe dechiffre : %s" % mot_de_passe_dechiffre)
 
         clecert_backup = EnveloppeCleCert()
@@ -725,7 +735,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             secret_backup_dechiffre = None
             if fingerprint_backup:
                 secret_backup = doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].get(clecert_backup.fingerprint_b64)
-                secret_backup_dechiffre = clecert_backup.dechiffrage_asymmetrique(secret_backup)
+                try:
+                    secret_backup_dechiffre = clecert_backup.dechiffrage_asymmetrique(secret_backup)
+                except TypeError:
+                    self._logger.exception("Erreur extraction secret, document non rechiffrable: %s" %
+                                           doc.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS))
             else:
                 # Le fingerprint de la cle n'a pas ete fourni. On va parcourir toutes les cles
                 # pour tenter de trouver une cle qui fonctionne avec notre cle de backup.
@@ -847,7 +861,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     fingerprint, identificateur_document))
                 enveloppe_backup = dict_certs[fingerprint]
                 fingerprint_backup_b64 = enveloppe_backup.fingerprint_b64
-                cle_chiffree_backup, fingerprint_hex = self.crypter_cle(cle_dechiffree, cert=enveloppe_backup.certificat)
+
+                try:
+                    # Type EnveloppeCertificat
+                    certificat = enveloppe_backup.certificat
+                except AttributeError:
+                    # Type EnveloppeCleCert
+                    certificat = enveloppe_backup.cert
+
+                cle_chiffree_backup, fingerprint_hex = self.crypter_cle(cle_dechiffree, cert=certificat)
                 cle_chiffree_backup_base64 = str(b64encode(cle_chiffree_backup), 'utf-8')
                 self._logger.debug("Cle chiffree pour cert %s : %s" % (fingerprint_backup_b64, cle_chiffree_backup_base64))
 
