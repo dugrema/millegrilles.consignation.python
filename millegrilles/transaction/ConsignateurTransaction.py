@@ -369,13 +369,14 @@ class EvenementTransactionCallback(BaseCallback):
         :return:
         """
         nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        unset_fields = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENTS]
+        unset_fields = message_dict[Constantes.EVENEMENT_MESSAGE_UNSET]
+        set_fields = message_dict[Constantes.EVENEMENT_MESSAGE_EVENEMENTS]
 
         unset_ops = dict()
         for field in unset_fields:
             unset_ops[field] = ''
 
-        ops = {'$unset': unset_ops}
+        ops = {'$unset': unset_ops, '$set': set_fields}
 
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
         collection_transactions.update_many({}, ops)
@@ -453,11 +454,23 @@ class EvenementTransactionCallback(BaseCallback):
             '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID):
                 {'$in': uuid_transaction}
         }
-        operation = {
-            '$set': {
-                libelle_evenement: datetime.datetime.now(tz=datetime.timezone.utc),
-            }
+        set_ops = {
+            libelle_evenement: datetime.datetime.now(tz=datetime.timezone.utc),
         }
+        operation = {
+            '$set': set_ops
+        }
+
+        if evenement in [
+            Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR,
+            Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
+        ]:
+            libelle_backup_flag = '%s.%s' % (
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG,
+            )
+            set_ops[libelle_backup_flag] = True
+
         resultat = collection_transactions.update_many(selection, operation)
 
         if resultat.modified_count != len(uuid_transaction):

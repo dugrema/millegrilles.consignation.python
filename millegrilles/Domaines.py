@@ -954,17 +954,22 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def reset_backup(self, message_dict):
         self._logger.debug("Reset backup transactions pour domaine " + self.get_nom_domaine())
 
-        champs = list()
+        unset_champs = list()
         for champ in [
             Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE,
             Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
             Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR]:
 
-            champs.append('_evenements.%s.%s' % (self._contexte.idmg, champ))
+            unset_champs.append('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, champ))
+
+        champs = {
+            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG): False,
+        }
 
         evenement = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: self.get_nom_domaine(),
+            Constantes.EVENEMENT_MESSAGE_UNSET: unset_champs,
             Constantes.EVENEMENT_MESSAGE_EVENEMENTS: champs,
         }
         self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENTRESET)
@@ -1522,16 +1527,14 @@ class HandlerBackupDomaine:
 
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % idmg: {'$lt': heure},
-            '_evenements.%s.%s' % (idmg, Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE): {'$exists': False},
-            '_evenements.%s.%s' % (idmg, Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR): {'$exists': False},
-            '_evenements.%s.%s' % (idmg, Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': False},
+            '_evenements.%s' % Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG: False,
+            '_evenements.transaction_traitee': {'$lt': heure},
         }
         regroupement_periode = {
-            'year': {'$year': '$_evenements.%s.transaction_traitee' % idmg},
-            'month': {'$month': '$_evenements.%s.transaction_traitee' % idmg},
-            'day': {'$dayOfMonth': '$_evenements.%s.transaction_traitee' % idmg},
-            'hour': {'$hour': '$_evenements.%s.transaction_traitee' % idmg},
+            'year': {'$year': '$_evenements.transaction_traitee'},
+            'month': {'$month': '$_evenements.transaction_traitee'},
+            'day': {'$dayOfMonth': '$_evenements.transaction_traitee'},
+            'hour': {'$hour': '$_evenements.transaction_traitee'},
         }
         regroupement = {
             '_id': {
@@ -1548,7 +1551,7 @@ class HandlerBackupDomaine:
         ]
         hint = {
             '_evenements.transaction_complete': 1,
-            '_evenements.%s.transaction_traitee' % idmg: 1,
+            '_evenements.%s' % Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG: 1,
         }
         collection_transactions = self._contexte.document_dao.get_collection(self._nom_collection_transactions)
 
@@ -1560,31 +1563,21 @@ class HandlerBackupDomaine:
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
 
         coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
+        label_tran = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
+        label_backup = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
         filtre = {
-            '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % idmg: {
-                '$gte': heure,
-                '$lt': heure_fin
-            },
-            '$and': [
-                {
-                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE): {'$exists': False}
-                }, {
-                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': False}
-                }, {
-                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR): {'$exists': False}
-                }
-            ]
-
+            label_tran: True,
+            label_backup: False,
         }
         sort = [
             ('_evenements.transaction_traitee', 1)
         ]
+        hint = [
+            (label_tran, 1),
+            (label_backup, 1),
+        ]
 
-        curseur = coltrans.find(filtre, sort=sort)
+        curseur = coltrans.find(filtre, sort=sort, hint=hint)
 
         # Creer repertoire backup et determiner path fichier
         backup_workdir = self._contexte.configuration.backup_workdir
