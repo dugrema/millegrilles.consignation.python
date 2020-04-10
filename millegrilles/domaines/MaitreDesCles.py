@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import x509
 from base64 import b64encode, b64decode
 
+import binascii
 import logging
 import datetime
 import json
@@ -322,7 +323,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             fingerprint_b64 = EnveloppeCertificat.calculer_fingerprint_b64(enveloppe.certificat)
 
             # Verifier que c'est un certificat du bon type
-            if ConstantesGenerateurCertificat.ROLE_BACKUP in enveloppe.get_roles:
+            roles_acceptes = [
+                ConstantesGenerateurCertificat.ROLE_BACKUP, ConstantesGenerateurCertificat.ROLE_MAITREDESCLES
+            ]
+            if any([role in roles_acceptes for role in enveloppe.get_roles]):
                 resultat_verification = verificateur_certificats.verifier_chaine(enveloppe)
                 if resultat_verification:
                     self.__certificats_backup[fingerprint_b64] = enveloppe
@@ -819,8 +823,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
 
         # Extraire cle secrete en utilisant le certificat du maitre des cles courant
-        cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES][fingerprint_cert_dechiffrage]
-        cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+        try:
+            cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES][fingerprint_cert_dechiffrage]
+            cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+        except KeyError:
+            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert local %s introuvable" % (
+                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS),
+                                   fingerprint_cert_dechiffrage))
+            return
 
         # Recuperer liste des certs a inclure
         dict_certs = self.get_certificats_backup.copy()
@@ -885,8 +895,9 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         # Re-encrypter la cle secrete avec les cles backup
         if self._controleur.gestionnaire.get_certificats_backup is not None:
             for backup in self._controleur.gestionnaire.get_certificats_backup.values():
-                cle_secrete_backup, fingerprint =self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
-                cles_secretes_encryptees[fingerprint] = b64encode(cle_secrete_backup).decode('utf-8')
+                cle_secrete_backup, fingerprint = self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
+                fingerprint_b64 = b64encode(binascii.unhexlify(fingerprint)).decode('utf-8')
+                cles_secretes_encryptees[fingerprint_b64] = b64encode(cle_secrete_backup).decode('utf-8')
 
         return cles_secretes_encryptees
 
