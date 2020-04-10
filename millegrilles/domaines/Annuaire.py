@@ -412,8 +412,10 @@ class ProcessusMajFichePrivee(ProcessusAnnuaire):
 
         fiche_exportee = self.controleur.gestionnaire.maj_fiche_privee(transaction)
 
-        if fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT) is None:
-            # Le certificat du maitre des cles n'a pas ete ajoute. On fait une requete.
+        if fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT) or self.controleur.is_regeneration:
+            self.set_etape_suivante()  # Termine
+        else:
+            # Le certificat du maitre des cles n'a pas ete ajoute. On fait une requete pour resoumettre en transaction.
             domaine = 'millegrilles.domaines.MaitreDesCles.certMaitreDesCles'
             requete = {
                 '_evenements': 'certMaitreDesCles'
@@ -422,13 +424,13 @@ class ProcessusMajFichePrivee(ProcessusAnnuaire):
             self.set_requete(domaine, requete)
             self.set_etape_suivante(ProcessusMajFichePrivee.maj_maitredescles.__name__)
 
-        else:
-            self.set_etape_suivante()  # Termine
-
     def maj_maitredescles(self):
         reponse = self.parametres['reponse'][0]
 
-        self.controleur.gestionnaire.maj_fiche_privee(reponse)
+        # self.controleur.gestionnaire.maj_fiche_privee(reponse)
+
+        # Resoumettre cette transaction avec l'information du maitre des cles
+        self.ajouter_transaction_a_soumettre(ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPRIVEE, reponse)
 
         self.set_etape_suivante()  # Termine
 
@@ -443,11 +445,12 @@ class ProcessusMajFichePublique(ProcessusAnnuaire):
 
     def initiale(self):
         transaction = self.transaction
-        self.set_etape_suivante()  # Termine
 
         fiche_exportee = self.controleur.gestionnaire.maj_fiche_publique(transaction)
 
-        if fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT) is None:
+        if fiche_exportee.get(ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT) or self.controleur.is_regeneration:
+            self.set_etape_suivante()  # Termine
+        else:
             # Le certificat du maitre des cles n'a pas ete ajoute. On fait une requete.
             domaine = 'millegrilles.domaines.MaitreDesCles.certMaitreDesCles'
             requete = {
@@ -457,13 +460,11 @@ class ProcessusMajFichePublique(ProcessusAnnuaire):
             self.set_requete(domaine, requete)
             self.set_etape_suivante(ProcessusMajFichePublique.maj_maitredescles.__name__)
 
-        else:
-            self.set_etape_suivante()  # Termine
-
     def maj_maitredescles(self):
         reponse = self.parametres['reponse'][0]
 
-        self.controleur.gestionnaire.maj_fiche_publique(reponse)
+        # Resoumettre cette transaction avec l'information du maitre des cles
+        self.ajouter_transaction_a_soumettre(ConstantesAnnuaire.TRANSACTION_MAJ_FICHEPUBLIQUE, reponse)
 
         self.set_etape_suivante()  # Termine
 
