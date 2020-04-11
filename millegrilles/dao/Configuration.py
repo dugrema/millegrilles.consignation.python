@@ -64,9 +64,9 @@ class TransactionConfiguration:
         self._mongo_config = {
             Constantes.CONFIG_MONGO_HOST: Constantes.DEFAUT_HOSTNAME,
             Constantes.CONFIG_MONGO_PORT: '27017',
-            Constantes.CONFIG_MONGO_USER: 'root',
-            Constantes.CONFIG_MONGO_PASSWORD: 'example',
-            Constantes.CONFIG_MONGO_SSL: 'on',   # Options on, off, nocert
+            # Constantes.CONFIG_MONGO_USER: 'root',
+            # Constantes.CONFIG_MONGO_PASSWORD: 'example',
+            Constantes.CONFIG_MONGO_SSL: 'x509',   # Options on, off, x509, nocert
             Constantes.CONFIG_MONGO_SSL_CAFILE: Constantes.DEFAUT_CA_CERTS,
             Constantes.CONFIG_MONGO_SSL_KEYFILE: Constantes.DEFAUT_KEYCERTFILE
         }
@@ -155,20 +155,24 @@ class TransactionConfiguration:
         """ Formatte la configuration pour connexion a Mongo """
 
         config_mongo = dict()
-        config_mongo['authSource'] = '%s' % self.idmg
 
         parametres_mongo = ['host', 'username', 'password']
         parametres_mongo_int = ['port']
 
         # Configuration specifique pour ssl
         mongo_ssl_param = self._mongo_config.get(Constantes.CONFIG_MONGO_SSL)
-        config_mongo['ssl'] = mongo_ssl_param in ['on', 'nocert']  # Mettre ssl=True ou ssl=False
+        config_mongo['ssl'] = mongo_ssl_param in ['on', 'nocert', 'x509']  # Mettre ssl=True ou ssl=False
         if mongo_ssl_param == 'on':
-            config_mongo['ssl'] = True
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
+            parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
+        elif mongo_ssl_param == 'x509':
+            config_mongo['authMechanism'] = 'MONGODB-X509'
             parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
         elif mongo_ssl_param == 'nocert':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
+
+        if mongo_ssl_param != 'x509':
+            config_mongo['authSource'] = self.idmg
 
         # Copier toutes les valeurs necessaires, enlever le prefixe mongo_ de chaque cle.
         for cle in self._mongo_config:
