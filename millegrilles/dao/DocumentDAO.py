@@ -31,7 +31,7 @@ class MongoDAO:
 
     def connecter(self):
         configuration_mongo = self._configuration.format_mongo_config()
-        self._logger.debug("Connexion a MmongoDB\n%s" % str(configuration_mongo))
+        self._logger.debug("Connexion a MongoDB")
 
         self._client = MongoClient(**configuration_mongo)
 
