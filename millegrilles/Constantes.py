@@ -1288,6 +1288,15 @@ class ConstantesBackup:
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
 
 
+class ConstantesHebergement:
+
+    DOMAINE_NOM = 'millegrilles.domaines.Hebergement'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = DOMAINE_NOM
+
+
 class CommandesSurRelai:
     """
     Commandes qui sont supportes dans l'espace relai pour permettre aux connecteurs d'interagir
