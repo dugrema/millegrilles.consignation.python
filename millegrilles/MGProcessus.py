@@ -1101,7 +1101,7 @@ class MGProcessus:
                 # self._logger.debug("Continuer %s" % self.parametres['_id-transaction'])
                 self.transmettre_message_etape_suivante(resultat)
             elif self._ajouter_token_attente is not None:
-                self._logger.debug("Verifier si continuer/resumer %s" % self.parametres['_id-transaction'])
+                self._logger.debug("Verifier si continuer/resumer %s" % self.parametres.get('_id-transaction'))
                 self.transmettre_message_verifier_resumer()
 
             # Verifier s'il faut avertir d'autres processus que le traitement de l'etape est complete

@@ -1452,11 +1452,13 @@ class RenouvelleurCertificat:
                 ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_racine,
                 'cle': cle_privee_racine,
                 'motdepasse': mot_de_passe_millegrille,
+                'fingerprint_b64': enveloppe_racine.fingerprint_b64,
             },
             'intermediaire': {
                 ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_intermediaire,
                 'cle': cle_privee_intermediaire,
                 'motdepasse': mot_de_passe_intermediaire,
+                'fingerprint_b64': enveloppe_intermediaire.fingerprint_b64,
             }
         }
 

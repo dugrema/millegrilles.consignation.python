@@ -363,6 +363,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererDemandeInscription"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatPourTiers"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementNouveauTrousseau"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMotdepasseCle"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -912,25 +916,51 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         motdepasse_millegrille_crypte, fingerprint_cert_hex = self.crypter_cle(b64decode(motdepasse_millegrille))
         motdepasse_intermediaire_crypte, fingerprint_cert_hex = self.crypter_cle(b64decode(motdepasse_intermediaire))
 
-        fingerprint_cert_maitredescles = binascii.unhexlify(fingerprint_cert_hex)
-        fingerprint_maitredescles_b64 = str(b64encode(fingerprint_cert_maitredescles), 'utf-8')
+        # fingerprint_cert_maitredescles = binascii.unhexlify(fingerprint_cert_hex)
+        # fingerprint_maitredescles_b64 = str(b64encode(fingerprint_cert_maitredescles), 'utf-8')
 
-        transaction_cle_millegrille = {
-            'idmg': idmg,
-            ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
-            'cle': trousseau_millegrille['millegrille']['cle'],
-            'motdepasse': str(b64encode(motdepasse_millegrille_crypte), 'utf-8'),
-            'fingerprint': fingerprint_maitredescles_b64,
-        }
-        transaction_cle_intermediaire = {
-            'idmg': idmg,
-            ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
-            'cle': trousseau_millegrille['intermediaire']['cle'],
-            'motdepasse': str(b64encode(motdepasse_intermediaire_crypte), 'utf-8'),
-            'fingerprint': fingerprint_maitredescles_b64,
+        transactions = {
+            'paires': {
+                'idmg': idmg,
+                'millegrille': {
+                    ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                    'cle': trousseau_millegrille['millegrille']['cle'],
+                    # 'motdepasse': str(b64encode(motdepasse_millegrille_crypte), 'utf-8'),
+                    'fingerprint': trousseau_millegrille['millegrille']['fingerprint_b64'],
+                },
+                'intermediaire': {
+                    ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                    'cle': trousseau_millegrille['intermediaire']['cle'],
+                    # 'motdepasse': str(b64encode(motdepasse_intermediaire_crypte), 'utf-8'),
+                    'fingerprint': trousseau_millegrille['intermediaire']['fingerprint_b64'],
+                },
+                'securite': Constantes.SECURITE_SECURE,
+            },
+            'transaction_cle_millegrille': {
+                'domaine': 'millegrilles.domaines.Hebergement',
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    'idmg': idmg,
+                    'role': 'millegrille',
+                    'fingerprint': trousseau_millegrille['millegrille']['fingerprint_b64'],
+                },
+                'sujet': 'motdepasse.cleprivee',
+                'motdepasse': str(b64encode(motdepasse_millegrille_crypte), 'utf-8'),
+                'securite': Constantes.SECURITE_SECURE,
+            },
+            'transaction_cle_intermediaire': {
+                'domaine': 'millegrilles.domaines.Hebergement',
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    'idmg': idmg,
+                    'role': 'intermediaire',
+                    'fingerprint': trousseau_millegrille['intermediaire']['fingerprint_b64'],
+                },
+                'sujet': 'motdepasse.cleprivee',
+                'motdepasse': str(b64encode(motdepasse_intermediaire_crypte), 'utf-8'),
+                'securite': Constantes.SECURITE_SECURE,
+            },
         }
 
-        pass
+        return transactions
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -1700,8 +1730,75 @@ class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def initiale(self):
-        resultat = self.controleur.gestionnaire.creer_cles_millegrille_hebergee(self.parametres)
+        transactions = self.controleur.gestionnaire.creer_cles_millegrille_hebergee(self.parametres)
+
+        transaction_paires = transactions['paires']
+        idmg = transaction_paires['idmg']
+        transaction_cle_millegrille = transactions['transaction_cle_millegrille']
+        transaction_cle_intermediaire = transactions['transaction_cle_intermediaire']
+
+        # Soumettre transactions immediatement, emettre tokens attente
+        uuid_transaction_paires = self.controleur.contexte.generateur_transactions.soumettre_transaction(
+            transaction_paires, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU)
+
+        uuid_transaction_cle_millegrille = self.controleur.contexte.generateur_transactions.soumettre_transaction(
+            transaction_cle_millegrille, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
+
+        uuid_transaction_cle_intermediaire = self.controleur.contexte.generateur_transactions.soumettre_transaction(
+            transaction_cle_intermediaire, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
+
+        # Emettre tokens attente
+        tokens_attente = [
+            'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction_paires,
+            'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction_cle_millegrille,
+            'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction_cle_intermediaire,
+        ]
+        # uuids = [uuid_transaction_paires, uuid_transaction_cle_millegrille, uuid_transaction_cle_intermediaire]
+        # tokens_attente = ['ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction for uuid_transaction in uuids]
+        self.set_etape_suivante(ProcessusCreerClesMilleGrilleHebergee.creer_cles_modules.__name__, tokens_attente)
+
+        return {
+            'idmg': idmg,
+        }
+
+    def creer_cles_modules(self):
+        """
+        Generer cles et certificats pour les modules de la MilleGrille
+        :return:
+        """
+
+        self.set_etape_suivante(ProcessusCreerClesMilleGrilleHebergee.transmettre_transaction_hebergement.__name__)
+
+    def transmettre_transaction_hebergement(self):
+        idmg = self.parametres['idmg']
+
+        transaction_hebergement = {
+            'idmg': idmg,
+        }
+        domaine = Constantes.ConstantesHebergement.TRANSACTION_NOUVEAU_IDMG
+        self.ajouter_transaction_a_soumettre(domaine, transaction_hebergement)
 
         self.set_etape_suivante()  # Termine
 
-        return resultat
+
+class ProcessusHebergementNouveauTrousseau(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+        uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction
+
+        self.resumer_processus([token_resumer])
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusHebergementMotdepasseCle(MGProcessusTransaction):
+
+    def initiale(self):
+        transaction = self.transaction
+        uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction
+
+        self.resumer_processus([token_resumer])
+        self.set_etape_suivante()  # Termine

@@ -675,6 +675,9 @@ class ConstantesMaitreDesCles:
     TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
     TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
 
+    TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU = '%s.nouveauTrousseauHebergement' % DOMAINE_NOM
+    TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE = '%s.nouveauMotDePasseCleHebergement' % DOMAINE_NOM
+
     REQUETE_CLE_RACINE = 'requeteCleRacine'
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
@@ -1296,6 +1299,8 @@ class ConstantesHebergement:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
+
+    TRANSACTION_NOUVEAU_IDMG = '%s.nouveauIdmg' % DOMAINE_NOM
 
 
 class CommandesSurRelai:
