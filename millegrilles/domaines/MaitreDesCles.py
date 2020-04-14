@@ -351,6 +351,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocument"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_MOTDEPASSE:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJMotdepasse"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_SIGNER_CERTIFICAT_NOEUD:
@@ -1013,6 +1015,29 @@ class ProcessusReceptionCles(MGProcessusTransaction):
             version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
         )
 
+    def generer_transaction_maj_motdepasse(self, sujet, information):
+        generateur_transaction = self.generateur_transactions
+
+        transaction_nouvellescles = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_CONSERVER_CLES.copy()
+        transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
+        transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE] = \
+            information['motdepasse_chiffre']
+
+        # Copier les champs d'identification de ce document
+        transaction_nouvellescles[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = \
+            information[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        transaction_nouvellescles[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = \
+            information[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = \
+            information[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+
+        # La transaction va mettre a jour (ou creer) les mots de passe
+        generateur_transaction.soumettre_transaction(
+            transaction_nouvellescles,
+            ConstantesMaitreDesCles.TRANSACTION_MAJ_MOTDEPASSE,
+            version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+        )
+
 
 class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
 
@@ -1068,6 +1093,39 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         return {'resumer': transaction_resumer}
 
 
+class ProcessusNouveauMotDePasse(ProcessusReceptionCles):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
+        pass
+
+    def initiale(self):
+        transaction = self.transaction
+        uuid_transaction = self.transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+        mot_de_passe_chiffre = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE]
+        mot_de_passe_rechiffre = self.recrypterCle(mot_de_passe_chiffre)
+
+        domaine = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE]
+        identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+
+        information = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+            'motdepasse_chiffre': mot_de_passe_rechiffre,
+        }
+        self.generer_transaction_maj_motdepasse(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE, information)
+
+        self.set_etape_suivante()  # Termine
+        return information
+
+
 class ProcessusMAJDocumentCles(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement):
@@ -1121,6 +1179,63 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         self.__logger.debug("Operations: %s" % str({'filtre': cles_document, 'operation': operations_mongo}))
 
         resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
+        self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusMAJMotdepasse(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Extraire les cles de document de la transaction (par processus d'elimination)
+        filtre_document = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
+                transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
+                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
+        }
+
+        contenu_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        contenu_on_insert.update(filtre_document)
+
+        contenu_date = {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
+        }
+
+        contenu_set = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+        }
+        for fingerprint in transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE].keys():
+            cle_dict = ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE + '.' + fingerprint
+            valeur = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE].get(fingerprint)
+            contenu_set[cle_dict] = valeur
+
+        if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
+            contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = \
+                transaction[ConstantesMaitreDesCles.DOCUMENT_SECURITE]
+        else:
+            # Par defaut, on met le document en mode secure
+            contenu_on_insert[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = Constantes.SECURITE_SECURE
+
+        operations_mongo = {
+            '$set': contenu_set,
+            '$currentDate': contenu_date,
+            '$setOnInsert': contenu_on_insert,
+        }
+
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        self.__logger.debug("Operations: %s" % str({'filtre': filtre_document, 'operation': operations_mongo}))
+
+        resultat_update = collection_documents.update_one(filter=filtre_document, update=operations_mongo, upsert=True)
         self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
 
         self.set_etape_suivante()  # Termine
@@ -1792,7 +1907,7 @@ class ProcessusHebergementNouveauTrousseau(MGProcessusTransaction):
         self.set_etape_suivante()  #Termine
 
 
-class ProcessusHebergementMotdepasseCle(MGProcessusTransaction):
+class ProcessusHebergementMotdepasseCle(ProcessusNouveauMotDePasse):
 
     def initiale(self):
         transaction = self.transaction
@@ -1800,5 +1915,8 @@ class ProcessusHebergementMotdepasseCle(MGProcessusTransaction):
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction
 
+        resultat = super().initiale()
+
         self.resumer_processus([token_resumer])
-        self.set_etape_suivante()  # Termine
+
+        return resultat

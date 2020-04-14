@@ -666,6 +666,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.nouvelleCle.grosFichier' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.nouvelleCle.document' % DOMAINE_NOM
     TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
+    TRANSACTION_MAJ_MOTDEPASSE = '%s.maj_motdepasse' % DOMAINE_NOM
 
     TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
     TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
@@ -703,6 +704,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CSR_CORRELATION = 'csr_correlation'
     TRANSACTION_CHAMP_TYPEDEMANDE = 'type_demande'
     TRANSACTION_CHAMP_FULLCHAIN = 'certificat_fullchain_signataire'
+    TRANSACTION_CHAMP_MOTDEPASSE = 'motdepasse'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -710,6 +712,7 @@ class ConstantesMaitreDesCles:
 
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
+    DOCUMENT_LIBVAL_MOTDEPASSE = 'motdepasse.document'
 
     DOCUMENT_SECURITE = 'securite'
 
