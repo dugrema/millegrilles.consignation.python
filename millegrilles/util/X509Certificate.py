@@ -167,9 +167,8 @@ class EnveloppeCleCert:
 
     @property
     def get_roles(self):
-        MQ_ROLES_OID = x509.ObjectIdentifier('1.2.3.4.1')
         extensions = self.cert.extensions
-        oid_attribute = extensions.get_extension_for_oid(MQ_ROLES_OID)
+        oid_attribute = extensions.get_extension_for_oid(ConstantesGenerateurCertificat.MQ_ROLES_OID)
         oid_value = oid_attribute.value
         oid_value = oid_value.value.decode('utf-8')
         attribute_values = oid_value.split(',')
@@ -652,6 +651,9 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
 
 class GenerateurInitial(GenerateurCertificatMilleGrille):
+    """
+    Sert a generer une chaine initiale de cles et certs CA pour une millegrille.
+    """
 
     def __init__(self, idmg, autorite: EnveloppeCleCert = None):
         super().__init__(idmg, None, None)
@@ -659,16 +661,18 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
     def generer(self) -> EnveloppeCleCert:
         """
-        Sert a generer une chaine initiale de cles et certs CA pour une millegrille
         :return:
         """
-        if self._autorite is None:
+        if self.autorite is None:
             # Le certificat d'autorite n'a pas encore ete generer, on s'en occupe
             self._autorite = self._generer_self_signed()
 
-        ss_cert = self._autorite.cert
-        ss_skid = self._autorite.skid
+        ss_cert = self.autorite.cert
+        ss_skid = self.autorite.skid
         self._dict_ca = {ss_skid: ss_cert}
+
+        # Calculer idmg de la nouvelle MilleGrille
+        self._idmg = self.autorite.idmg
 
         millegrille = super().generer()
         millegrille_skid = EnveloppeCleCert.get_subject_identifier(ss_cert)
@@ -693,13 +697,12 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
     def _generer_self_signed(self) -> EnveloppeCleCert:
         clecert = EnveloppeCleCert()
-        clecert.generer_private_key(generer_password=True)
+        clecert.generer_private_key(generer_password=True, keysize=4096)
         builder = self.__preparer_builder(clecert.private_key, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_ROOT)
 
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
-            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, u'SSRoot'),
-            x509.NameAttribute(NameOID.COMMON_NAME, u'SSRoot'),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u'MilleGrille'),
+            x509.NameAttribute(NameOID.COMMON_NAME, u'Racine'),
         ])
         builder = builder.subject_name(name)
         builder = builder.issuer_name(name)
@@ -721,7 +724,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
         certificate = builder.sign(
             private_key=clecert.private_key,
-            algorithm = hashes.SHA512(),
+            algorithm=hashes.SHA3_512(),
             backend=default_backend()
         )
 
@@ -1426,6 +1429,38 @@ class RenouvelleurCertificat:
         csr_instance = x509.load_pem_x509_csr(csr.encode('utf-8'), default_backend())
         certificat = generateur.signer(csr_instance)
         return certificat
+
+    def generer_nouveau_idmg(self):
+        generateur = GenerateurInitial(None, None)
+        enveloppe_intermediaire = generateur.generer()
+        enveloppe_racine = generateur.autorite
+        idmg = enveloppe_racine.idmg
+
+        # Generer mots de passe pour les cles de millegrille, intermediaire.
+        mot_de_passe_millegrille = enveloppe_racine.password
+        mot_de_passe_intermediaire = enveloppe_intermediaire.password
+
+        cle_privee_racine = enveloppe_racine.private_key_bytes
+        cle_privee_intermediaire = enveloppe_intermediaire.private_key_bytes
+
+        cert_racine = enveloppe_racine.cert_bytes
+        cert_intermediaire = enveloppe_intermediaire.cert_bytes
+
+        trousseau = {
+            'idmg': idmg,
+            'racine': {
+                ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_racine,
+                'cle': cle_privee_racine,
+                'motdepasse': mot_de_passe_millegrille,
+            },
+            'intermediaire': {
+                ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_intermediaire,
+                'cle': cle_privee_intermediaire,
+                'motdepasse': mot_de_passe_intermediaire,
+            }
+        }
+
+        return trousseau
 
 
 class DecryptionHelper:

@@ -110,8 +110,14 @@ class TraitementCommandesMaitreDesClesSecures(TraitementCommandesSecures):
         routing_key = method.routing_key
         correlation_id = properties.correlation_id
 
-        if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP):
+        prefixe_commande = 'commande.' + ConstantesMaitreDesCles.DOMAINE_NOM + '.'
+
+        if routing_key == prefixe_commande + ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP:
             resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
+
+        elif routing_key == prefixe_commande + ConstantesMaitreDesCles.COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusCreerClesMilleGrilleHebergee"
+            resultat = self.gestionnaire.demarreur_processus.demarrer_processus(processus, message_dict)
 
         elif correlation_id == ConstantesMaitreDesCles.CORRELATION_CERTIFICATS_BACKUP:
             resultat = self.gestionnaire.verifier_certificats_backup(message_dict)
@@ -896,6 +902,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
                 )
 
+    def creer_cles_millegrille_hebergee(self, parametres):
+        trousseau_millegrille = self.__renouvelleur_certificat.generer_nouveau_idmg()
+
+        # Sauvegarder les certificats et cles de la nouvelle millegrille
+        pass
+
 
 class ProcessusReceptionCles(MGProcessusTransaction):
 
@@ -1652,3 +1664,20 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
 
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         return collection_documents.find(filtre)
+
+
+class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
+    """
+    Genere les cles et certificats pour une nouvelle MilleGrille herbergee.
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        resultat = self.controleur.gestionnaire.creer_cles_millegrille_hebergee(self.parametres)
+
+        self.set_etape_suivante()  # Termine
+
+        return resultat

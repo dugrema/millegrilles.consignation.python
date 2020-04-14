@@ -7,6 +7,7 @@ from millegrilles.Constantes import ConstantesHebergement
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.util import X509Certificate
 
 
 class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
@@ -82,6 +83,7 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
         Genere un nouveau domaine heberge.
         :return: Le idmg du nouveau
         """
+
 
 
 class ProcessusXXX(MGProcessusTransaction):

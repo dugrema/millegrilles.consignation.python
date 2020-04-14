@@ -194,6 +194,18 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def commande_creer_cles_millegrille_hebergee(self):
+        enveloppe_requete = self.generateur.transmettre_commande(
+            dict(),
+            'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def nouvelle_cle_grosfichiers(self):
 
         cle_secrete = 'Mon mot de passe secret'
@@ -332,7 +344,7 @@ class MessagesSample(BaseCallback):
         self.event_recu.wait(5)
         self.event_recu.clear()
 
-        enveloppe = self.requete_cert_maitredescles()
+        # enveloppe = self.requete_cert_maitredescles()
 
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
@@ -345,7 +357,8 @@ class MessagesSample(BaseCallback):
 
         # self.requete_cle_racine()
         # self.commande_signer_cle_backup()
-        self.commande_restaurer_backup_cle()
+        # self.commande_restaurer_backup_cle()
+        self.commande_creer_cles_millegrille_hebergee()
 
 
 # --- MAIN ---

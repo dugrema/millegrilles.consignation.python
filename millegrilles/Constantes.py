@@ -682,6 +682,7 @@ class ConstantesMaitreDesCles:
 
     COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
     COMMANDE_RESTAURER_BACKUP_CLES = 'restaurerBackupCles'
+    COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE = 'creerClesMilleGrilleHebergee'
 
     CORRELATION_CERTIFICATS_BACKUP = 'certificatsBackup'
 
