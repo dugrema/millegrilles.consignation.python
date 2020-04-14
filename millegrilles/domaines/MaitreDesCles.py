@@ -904,8 +904,32 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def creer_cles_millegrille_hebergee(self, parametres):
         trousseau_millegrille = self.__renouvelleur_certificat.generer_nouveau_idmg()
+        idmg = trousseau_millegrille['idmg']
 
         # Sauvegarder les certificats et cles de la nouvelle millegrille
+        motdepasse_millegrille = trousseau_millegrille['millegrille']['motdepasse']
+        motdepasse_intermediaire = trousseau_millegrille['intermediaire']['motdepasse']
+        motdepasse_millegrille_crypte, fingerprint_cert_hex = self.crypter_cle(b64decode(motdepasse_millegrille))
+        motdepasse_intermediaire_crypte, fingerprint_cert_hex = self.crypter_cle(b64decode(motdepasse_intermediaire))
+
+        fingerprint_cert_maitredescles = binascii.unhexlify(fingerprint_cert_hex)
+        fingerprint_maitredescles_b64 = str(b64encode(fingerprint_cert_maitredescles), 'utf-8')
+
+        transaction_cle_millegrille = {
+            'idmg': idmg,
+            ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+            'cle': trousseau_millegrille['millegrille']['cle'],
+            'motdepasse': str(b64encode(motdepasse_millegrille_crypte), 'utf-8'),
+            'fingerprint': fingerprint_maitredescles_b64,
+        }
+        transaction_cle_intermediaire = {
+            'idmg': idmg,
+            ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+            'cle': trousseau_millegrille['intermediaire']['cle'],
+            'motdepasse': str(b64encode(motdepasse_intermediaire_crypte), 'utf-8'),
+            'fingerprint': fingerprint_maitredescles_b64,
+        }
+
         pass
 
 

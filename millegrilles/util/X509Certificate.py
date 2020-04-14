@@ -1440,15 +1440,15 @@ class RenouvelleurCertificat:
         mot_de_passe_millegrille = enveloppe_racine.password
         mot_de_passe_intermediaire = enveloppe_intermediaire.password
 
-        cle_privee_racine = enveloppe_racine.private_key_bytes
-        cle_privee_intermediaire = enveloppe_intermediaire.private_key_bytes
+        cle_privee_racine = str(enveloppe_racine.private_key_bytes, 'utf-8')
+        cle_privee_intermediaire = str(enveloppe_intermediaire.private_key_bytes, 'utf-8')
 
-        cert_racine = enveloppe_racine.cert_bytes
-        cert_intermediaire = enveloppe_intermediaire.cert_bytes
+        cert_racine = str(enveloppe_racine.cert_bytes, 'utf-8')
+        cert_intermediaire = str(enveloppe_intermediaire.cert_bytes, 'utf-8')
 
         trousseau = {
             'idmg': idmg,
-            'racine': {
+            'millegrille': {
                 ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_racine,
                 'cle': cle_privee_racine,
                 'motdepasse': mot_de_passe_millegrille,
