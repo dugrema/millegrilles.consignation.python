@@ -739,11 +739,13 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
 class GenerateurNoeud(GenerateurCertificateParRequest):
 
-    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None, domaines_publics: list = None):
+    def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
+                 domaines_publics: list = None, generer_password=False):
         super().__init__(idmg, dict_ca, autorite, domaines_publics)
         self._organization_name = organization_nom
         self._common_name = common_name
         self._domaines_publics = domaines_publics
+        self._generer_password = generer_password
 
     def generer(self) -> EnveloppeCleCert:
         # Preparer une nouvelle cle et CSR pour la millegrille
@@ -765,7 +767,7 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
 
     @property
     def generer_password(self):
-        return False
+        return self._generer_password
 
 
 class GenererDeployeur(GenerateurNoeud):
@@ -1308,10 +1310,11 @@ class GenerateurCertificatBackup(GenerateurCertificateParClePublique):
 
 class RenouvelleurCertificat:
 
-    def __init__(self, idmg, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None):
+    def __init__(self, idmg, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None, generer_password=False):
         self.__idmg = idmg
         self.__dict_ca = dict_ca
         self.__millegrille = millegrille
+        self.__generer_password = generer_password
         self.__generateurs_par_role = {
             ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
             ConstantesGenerateurCertificat.ROLE_COUPDOEIL: GenererCoupdoeil,
@@ -1394,8 +1397,12 @@ class RenouvelleurCertificat:
 
     def renouveller_par_role(self, role, common_name):
         generateur = self.__generateurs_par_role[role]
-        generateur_instance = generateur(
-            self.__idmg, role, common_name, self.__dict_ca, self.__millegrille)
+        if issubclass(generateur, GenerateurNoeud):
+            generateur_instance = generateur(
+                self.__idmg, role, common_name, self.__dict_ca, self.__millegrille, generer_password=True)
+        else:
+            generateur_instance = generateur(
+                self.__idmg, role, common_name, self.__dict_ca, self.__millegrille)
 
         cert_dict = generateur_instance.generer()
         return cert_dict

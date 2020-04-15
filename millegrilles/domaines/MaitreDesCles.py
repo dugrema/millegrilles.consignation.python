@@ -1143,9 +1143,36 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         clecert_intermediaire = clecerts[fingerprint_intermediaire]
         renouvelleur_certificat_hebergement = RenouvelleurCertificat(idmg, dict_ca, clecert_intermediaire)
 
+        transaction_trousseau = dict()
+        transactions_motsdepasse = list()
         for role in noms_roles:
-            cert_dict = renouvelleur_certificat_hebergement.renouveller_par_role(role, 'heberge')
-            pass
+            clecert = renouvelleur_certificat_hebergement.renouveller_par_role(role, 'heberge')
+            motdepasse_cle_chiffre, fingerprint = self.crypter_cle(b64decode(clecert.password))
+            motdepasse_cle_chiffre = str(b64encode(motdepasse_cle_chiffre), 'utf-8')
+            fingerprint_b64 = clecert.fingerprint_b64
+
+            transaction_trousseau[role] = {
+                ConstantesPki.LIBELLE_CERTIFICAT_PEM: str(clecert.cert_bytes, 'utf-8'),
+                ConstantesPki.LIBELLE_CLE: str(clecert.private_key_bytes, 'utf-8'),
+                ConstantesPki.LIBELLE_FINGERPRINT: fingerprint_b64,
+            }
+
+            transactions_motsdepasse.append({
+                'domaine': 'millegrilles.domaines.Hebergement',
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    'idmg': idmg,
+                    'role': role,
+                    'fingerprint': fingerprint_b64,
+                },
+                'sujet': 'motdepasse.cleprivee',
+                'motdepasse': motdepasse_cle_chiffre,
+                'securite': Constantes.SECURITE_SECURE,
+            })
+
+        return {
+            'trousseau': transaction_trousseau,
+            'motsdepasse': transactions_motsdepasse,
+        }
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -2119,13 +2146,14 @@ class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
         """
         idmg = self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
         roles = [
-            ConstantesGenerateurCertificat.ROLE_MONGO,
-            ConstantesGenerateurCertificat.ROLE_MQ,
             ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+            ConstantesGenerateurCertificat.ROLE_FICHIERS,
+            ConstantesGenerateurCertificat.ROLE_DOMAINES,
         ]
 
-        self.controleur.gestionnaire.creer_cles_modules_heberges(idmg, roles)
+        transactions = self.controleur.gestionnaire.creer_cles_modules_heberges(idmg, roles)
 
         self.set_etape_suivante(ProcessusCreerClesMilleGrilleHebergee.transmettre_transaction_hebergement.__name__)
 
