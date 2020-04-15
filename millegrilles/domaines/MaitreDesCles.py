@@ -942,6 +942,80 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
                 )
 
+    def creer_transaction_motsdepasse_manquants(self, document, clecert_dechiffrage: EnveloppeCleCert = None):
+        """
+        Methode qui va dechiffrer un mot de passe et le rechiffrer pour chaque cle backup/maitre des cles manquant.
+
+        :param clecert_dechiffrage: Clecert qui peut dechiffrer toutes les cles chiffrees.
+        :param document: Document avec des cles chiffrees manquantes.
+        :return:
+        """
+
+        if not clecert_dechiffrage:
+            # Par defaut, utiliser clecert du maitredescles
+            clecert_dechiffrage = self.__clecert_maitredescles
+
+        fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
+
+        # Extraire cle secrete en utilisant le certificat du maitre des cles courant
+        try:
+            cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE][fingerprint_cert_dechiffrage]
+            cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+        except KeyError:
+            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert local %s introuvable" % (
+                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS),
+                                   fingerprint_cert_dechiffrage))
+            return
+
+        # Recuperer liste des certs a inclure
+        dict_certs = self.get_certificats_backup.copy()
+        dict_certs[self.__clecert_maitredescles.fingerprint_b64] = self.__clecert_maitredescles
+        cles_connues = list(dict_certs.keys())
+        cles_documents = list(document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE].keys())
+
+        # Parcourir
+        for fingerprint in cles_connues:
+            if fingerprint not in cles_documents:
+                identificateur_document = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+
+                self._logger.debug("Ajouter cle %s dans document %s" % (
+                    fingerprint, identificateur_document))
+                enveloppe_backup = dict_certs[fingerprint]
+                fingerprint_backup_b64 = enveloppe_backup.fingerprint_b64
+
+                try:
+                    # Type EnveloppeCertificat
+                    certificat = enveloppe_backup.certificat
+                except AttributeError:
+                    # Type EnveloppeCleCert
+                    certificat = enveloppe_backup.cert
+
+                cle_chiffree_backup, fingerprint_hex = self.crypter_cle(cle_dechiffree, cert=certificat)
+                cle_chiffree_backup_base64 = str(b64encode(cle_chiffree_backup), 'utf-8')
+                self._logger.debug("Cle chiffree pour cert %s : %s" % (fingerprint_backup_b64, cle_chiffree_backup_base64))
+
+                transaction = {
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE: document[Constantes.DOCUMENT_INFODOC_LIBELLE],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE: {
+                        fingerprint_backup_b64: cle_chiffree_backup_base64
+                    },
+
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateur_document,
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                }
+                sujet = document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE)
+                if sujet:
+                    transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
+
+                # Soumettre la transaction immediatement
+                # Permet de fonctionner incrementalement si le nombre de cles est tres grand
+                self.generateur_transactions.soumettre_transaction(
+                    transaction,
+                    ConstantesMaitreDesCles.TRANSACTION_MAJ_MOTDEPASSE,
+                    version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
+                )
+
     def creer_cles_millegrille_hebergee(self, parametres):
         trousseau_millegrille = self.__renouvelleur_certificat.generer_nouveau_idmg()
         idmg = trousseau_millegrille['idmg']
@@ -1876,12 +1950,14 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
     def initiale(self):
         fingerprints = self.parametres['fingerprints_base64']
 
-        curseur = self.curseur_docs_cle_manquante(fingerprints)
-
         erreurs = list()
-        for doc in curseur:
+        for doc in self.curseur_docs_cle_manquante(fingerprints):
             self.__logger.debug("Cles manquantes dans " + str(doc))
             self.controleur.gestionnaire.creer_transaction_cles_manquantes(doc)
+
+        for doc in self.curseur_motsdepasse_manquants(fingerprints):
+            self.__logger.debug("Mot de passe manquants dans " + str(doc))
+            self.controleur.gestionnaire.creer_transaction_motsdepasse_manquants(doc)
 
         self.set_etape_suivante()  # Termine
 
@@ -1896,6 +1972,22 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
                 ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
                 ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
+            ]},
+            '$or': liste_operateurs
+        }
+
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        return collection_documents.find(filtre)
+
+    def curseur_motsdepasse_manquants(self, fingerprints):
+        liste_operateurs = list()
+        for fingerprint_base64 in fingerprints:
+            liste_operateurs.append({'motdepasse.%s' % fingerprint_base64: {'$exists': False}})
+
+        # Extraire la liste des mots de passe qui n'ont pas tous ces certificats
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
             ]},
             '$or': liste_operateurs
         }
