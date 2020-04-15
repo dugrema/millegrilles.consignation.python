@@ -196,6 +196,7 @@ DOCUMENT_INFODOC_LIBELLE = '_mg-libelle'
 DOCUMENT_INFODOC_DERNIERE_MODIFICATION = '_mg-derniere-modification'
 DOCUMENT_INFODOC_DATE_CREATION = '_mg-creation'
 DOCUMENT_INFODOC_SOUSDOCUMENT = 'document'
+DOCUMENT_INFODOC_SECURITE = 'securite'
 
 # Section cryptee d'un document
 DOCUMENT_SECTION_CRYPTE = 'crypte'
@@ -706,6 +707,8 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_FULLCHAIN = 'certificat_fullchain_signataire'
     TRANSACTION_CHAMP_MOTDEPASSE = 'motdepasse'
     TRANSACTION_CHAMP_SYNCHRONISER = 'synchroniser'
+    TRANSACTION_CHAMP_MILLEGRILLE = 'millegrille'
+    TRANSACTION_CHAMP_INTERMEDIAIRE = 'intermediaire'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -716,6 +719,7 @@ class ConstantesMaitreDesCles:
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
     DOCUMENT_LIBVAL_MOTDEPASSE = 'motdepasse.document'
+    DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU = 'hebergement.trousseau'
 
     DOCUMENT_SECURITE = 'securite'
 

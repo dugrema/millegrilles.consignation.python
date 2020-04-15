@@ -780,6 +780,40 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
+    def sauvegarder_trousseau_hebergement(self, transaction):
+        """
+        Conserve le trousseau (certs, cles) dans un document d'hebergement
+        :param transaction:
+        :return:
+        """
+        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        set_ops = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE: transaction[
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE: transaction[
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE],
+        }
+        contenu_on_insert = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_SECURE,
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': contenu_on_insert,
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+        }
+
+        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        collection.update_one(filtre, ops, upsert=True)
+
+
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
 
@@ -913,8 +947,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         idmg = trousseau_millegrille['idmg']
 
         # Sauvegarder les certificats et cles de la nouvelle millegrille
-        motdepasse_millegrille = trousseau_millegrille['millegrille']['motdepasse']
-        motdepasse_intermediaire = trousseau_millegrille['intermediaire']['motdepasse']
+        motdepasse_millegrille = trousseau_millegrille[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE]['motdepasse']
+        motdepasse_intermediaire = trousseau_millegrille[ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE]['motdepasse']
         motdepasse_millegrille_crypte, fingerprint_cert_hex = self.crypter_cle(b64decode(motdepasse_millegrille))
         motdepasse_intermediaire_crypte, fingerprint_cert_hex = self.crypter_cle(b64decode(motdepasse_intermediaire))
 
@@ -1937,6 +1971,9 @@ class ProcessusHebergementNouveauTrousseau(MGProcessusTransaction):
         transaction = self.transaction
         uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction
+
+        # Conserver information du trousseau dans le document d'herbergement sous le maitre des cles
+        self.controleur.gestionnaire.sauvegarder_trousseau_hebergement(transaction)
 
         self.resumer_processus([token_resumer])
         self.set_etape_suivante()  #Termine
