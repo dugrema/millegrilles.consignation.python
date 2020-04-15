@@ -507,6 +507,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         processus_declencheur = collection_processus.find_one(filtre_declencheur)
         parametres_declencheur = processus_declencheur.get('parametres')
 
+        # Mettre a jour le document en attente
         tokens_restants = list()
         tokens_connectes = dict()
         set_update = dict()
@@ -522,13 +523,26 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         set_update.update(tokens_connectes)
         collection_processus.update_one(filtre_processus, {'$set': set_update})
 
-        self.message_etape_suivante(processus.get('_id'),
-                                    processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
-                                    processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
-                                    tokens={
-                                        'processus': id_declencheur,
-                                        'tokens': tokens}
-                                    )
+        # Terminer l'execution du processus "resumer" correspondant
+        self.message_etape_suivante(
+            id_declencheur,
+            processus_declencheur.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
+            processus_declencheur.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
+            tokens={
+                'processus': id_declencheur,
+                'tokens': tokens}
+        )
+
+        # Il ne reste aucun token d'attente, on resume le processus maitre
+        if len(tokens_restants) == 0:
+            self.message_etape_suivante(
+                processus.get('_id'),
+                processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS),
+                processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_ETAPESUIVANTE),
+                tokens={
+                    'processus': id_declencheur,
+                    'tokens': tokens}
+            )
 
     def verifier_resumer(self, evenement_dict: dict):
         """
@@ -975,6 +989,7 @@ class MGProcessus:
         if nom_methode is None:
             raise ErreurEtapeInconnue("etape-suivante est manquante sur evenement pour classe %s: %s" % (
                 self.__class__.__name__, self._evenement))
+
         methode_a_executer = getattr(self, nom_methode)
 
         return methode_a_executer
@@ -1033,6 +1048,7 @@ class MGProcessus:
 
             # Executer l'etape
             etape_execution = self._identifier_etape_courante()
+
             resultat = etape_execution()
             self._etape_complete = True
 
@@ -1113,6 +1129,20 @@ class MGProcessus:
                     id_document_processus,
                     {'processus': id_document_processus, 'tokens': info_tokens_resume.get('tokens')}
                 )
+
+        except ErreurEtapeInconnue as eei:
+            # Verifier si c'est un evenement de "resumer" pour ce processus
+            # Ces evenements sont transmis de maniere redondante, simplifie la synchronisation
+            erreur_ok = False
+            info_evenement = self._evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_INFO)
+            if info_evenement:
+                id_processus_resume = info_evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
+                if id_processus_resume == self._evenement.get(
+                        Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS):
+                    erreur_ok = True
+
+            if not erreur_ok:
+                raise eei
 
         except ErreurOptimisticLocking:
             self._logger.info("Echec optimistic locking, on abandonne le travail pour cette thread")

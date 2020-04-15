@@ -1017,6 +1017,13 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         )
 
     def generer_transaction_maj_motdepasse(self, sujet, information):
+        """
+        Genere une transaction pour sauvegarder le mot de passe avec toutes les cles connues.
+
+        :param sujet:
+        :param information:
+        :return: uuid-transaction de la transaction soumise
+        """
         generateur_transaction = self.generateur_transactions
 
         transaction_nouvellescles = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_CONSERVER_CLES.copy()
@@ -1032,12 +1039,17 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = \
             information[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
+        if information.get('synchroniser'):
+            transaction_nouvellescles['synchroniser'] = True
+
         # La transaction va mettre a jour (ou creer) les mots de passe
-        generateur_transaction.soumettre_transaction(
+        uuid_transaction = generateur_transaction.soumettre_transaction(
             transaction_nouvellescles,
             ConstantesMaitreDesCles.TRANSACTION_MAJ_MOTDEPASSE,
             version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
         )
+
+        return uuid_transaction
 
 
 class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
@@ -1121,10 +1133,27 @@ class ProcessusNouveauMotDePasse(ProcessusReceptionCles):
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
             'motdepasse_chiffre': mot_de_passe_rechiffre,
         }
-        self.generer_transaction_maj_motdepasse(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE, information)
 
-        self.set_etape_suivante()  # Termine
+        etape_resumer = self._etape_resumer()
+        if etape_resumer:
+            information[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SYNCHRONISER] = True
+
+        uuid_transaction = self.generer_transaction_maj_motdepasse(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE, information)
+
+        if etape_resumer:
+            token_resumer = ConstantesMaitreDesCles.TOKEN_SYNCHRONISER + ':' + uuid_transaction
+            self.set_etape_suivante(etape_resumer, [token_resumer])
+        else:
+            self.set_etape_suivante()  # Termine
+
         return information
+
+    def _etape_resumer(self):
+        """
+        Si retourne True, le processus a une etape resumer.
+        :return: Etape resumer, ou False si non supporte
+        """
+        return False
 
 
 class ProcessusMAJDocumentCles(MGProcessusTransaction):
@@ -1238,6 +1267,11 @@ class ProcessusMAJMotdepasse(MGProcessusTransaction):
 
         resultat_update = collection_documents.update_one(filter=filtre_document, update=operations_mongo, upsert=True)
         self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+
+        if transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SYNCHRONISER):
+            uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            token_resumer = ConstantesMaitreDesCles.TOKEN_SYNCHRONISER + ':' + uuid_transaction
+            self.resumer_processus([token_resumer])
 
         self.set_etape_suivante()  # Termine
 
@@ -1909,15 +1943,18 @@ class ProcessusHebergementNouveauTrousseau(MGProcessusTransaction):
 
 
 class ProcessusHebergementMotdepasseCle(ProcessusNouveauMotDePasse):
+    """
+    Conserve un mot de passe de cle de certificat d'hebergement
+    """
 
-    def initiale(self):
+    def resumer(self):
         transaction = self.transaction
         uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction
 
-        resultat = super().initiale()
-
         self.resumer_processus([token_resumer])
+        self.set_etape_suivante()  # Termine
 
-        return resultat
+    def _etape_resumer(self):
+        return ProcessusHebergementMotdepasseCle.resumer.__name__

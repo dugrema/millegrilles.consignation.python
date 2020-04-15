@@ -705,10 +705,13 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_TYPEDEMANDE = 'type_demande'
     TRANSACTION_CHAMP_FULLCHAIN = 'certificat_fullchain_signataire'
     TRANSACTION_CHAMP_MOTDEPASSE = 'motdepasse'
+    TRANSACTION_CHAMP_SYNCHRONISER = 'synchroniser'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
     TRANSACTION_VERSION_COURANTE = 5
+
+    TOKEN_SYNCHRONISER = 'synchroniser'
 
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
