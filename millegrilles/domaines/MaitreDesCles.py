@@ -408,6 +408,21 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             return None
 
+    def decrypter_motdepasse(self, dict_cles):
+        """
+        Decrypte un mot de passe en trouvant la cle correspondante
+        :param dict_cles: Dictionnaire de mots de passes cryptes, la key est le fingerprint du certificat
+        :return:
+        """
+        fingerprint_courant = self.get_fingerprint_cert()
+        cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
+        if cle_secrete_cryptee is not None:
+            # On peut decoder la cle secrete
+            motdepasse = self.decrypter_contenu(cle_secrete_cryptee)
+            return b64encode(motdepasse)
+        else:
+            return None
+
     def crypter_cle(self, cle_secrete, cert=None):
         if cert is not None:
             clecert = EnveloppeCleCert(cert=cert)
@@ -795,9 +810,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE],
         }
         contenu_on_insert = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_SECURE,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg
+            }
         }
         ops = {
             '$set': set_ops,
@@ -1071,6 +1090,62 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
 
         return transactions
+
+    def creer_cles_modules_heberges(self, idmg: str, noms_roles: list):
+        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+
+        filtre_trousseau = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+        }
+        trousseau = collection.find_one(filtre_trousseau)
+
+        info_roles_cles = dict()  # Roles pour lesquels on charge la cle
+        fingerprint_intermediaire = None
+        clecerts = dict()
+        dict_ca = dict()  # Liste de clecert CA par skid, utilise par RenouvelleurCertificats
+        for cle, valeur in trousseau.items():
+            if isinstance(valeur, dict):
+                fingerprint = valeur.get(ConstantesPki.LIBELLE_FINGERPRINT)
+
+                if fingerprint:
+                    clecert = EnveloppeCleCert()
+                    clecert.cert_from_pem_bytes(valeur[ConstantesPki.LIBELLE_CERTIFICAT_PEM].encode('utf-8'))
+                    clecerts[fingerprint] = clecert
+
+                    # Ajouter cert dans la liste des autorites connues
+                    dict_ca[clecert.skid] = clecert.cert
+
+                    if cle in ['intermediaire']:  # Role pour lesquels on charge la cle
+                        fingerprint = valeur[ConstantesPki.LIBELLE_FINGERPRINT]
+                        info_roles_cles[fingerprint] = valeur
+
+                    if cle == 'intermediaire':
+                        fingerprint_intermediaire = fingerprint
+
+        filtre_motsdepasse = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + "." + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + "." + ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(info_roles_cles.keys())},
+        }
+        curseur_mots_de_passe = collection.find(filtre_motsdepasse)
+        for doc_motdepasse in curseur_mots_de_passe:
+            fingerprint = doc_motdepasse[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesPki.LIBELLE_FINGERPRINT]
+            motdepasse = self.decrypter_motdepasse(doc_motdepasse[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE])
+
+            info_role_courant = info_roles_cles[fingerprint]
+            key_pem = info_role_courant[ConstantesPki.LIBELLE_CLE].encode('utf-8')
+
+            clecert = clecerts[fingerprint]
+            clecert.key_from_pem_bytes(key_pem, motdepasse)
+
+        # Preparer le generateur de certicats
+        clecert_intermediaire = clecerts[fingerprint_intermediaire]
+        renouvelleur_certificat_hebergement = RenouvelleurCertificat(idmg, dict_ca, clecert_intermediaire)
+
+        for role in noms_roles:
+            cert_dict = renouvelleur_certificat_hebergement.renouveller_par_role(role, 'heberge')
+            pass
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -2042,6 +2117,15 @@ class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
         Generer cles et certificats pour les modules de la MilleGrille
         :return:
         """
+        idmg = self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        roles = [
+            ConstantesGenerateurCertificat.ROLE_MONGO,
+            ConstantesGenerateurCertificat.ROLE_MQ,
+            ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+        ]
+
+        self.controleur.gestionnaire.creer_cles_modules_heberges(idmg, roles)
 
         self.set_etape_suivante(ProcessusCreerClesMilleGrilleHebergee.transmettre_transaction_hebergement.__name__)
 

@@ -456,6 +456,7 @@ class ConstantesPki:
     LIBELLE_CLE_CRYPTEE = 'cle_cryptee'
     LIBELLE_ROLES = 'roles'
     LIBELLE_EXCHANGES = 'exchanges'
+    LIBELLE_CLE = 'cle'
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_CERTIFICAT_ROOT = 'certificat.root'
