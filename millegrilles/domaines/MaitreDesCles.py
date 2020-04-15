@@ -984,7 +984,8 @@ class ProcessusReceptionCles(MGProcessusTransaction):
 
         # Re-encrypter la cle secrete avec les cles backup
         if self._controleur.gestionnaire.get_certificats_backup is not None:
-            for backup in self._controleur.gestionnaire.get_certificats_backup.values():
+            certificats_backup = self.controleur.gestionnaire.get_certificats_backup
+            for backup in certificats_backup.values():
                 cle_secrete_backup, fingerprint = self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
                 fingerprint_b64 = b64encode(binascii.unhexlify(fingerprint)).decode('utf-8')
                 cles_secretes_encryptees[fingerprint_b64] = b64encode(cle_secrete_backup).decode('utf-8')
@@ -1853,13 +1854,13 @@ class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
         transaction_cle_intermediaire = transactions['transaction_cle_intermediaire']
 
         # Soumettre transactions immediatement, emettre tokens attente
-        uuid_transaction_paires = self.controleur.contexte.generateur_transactions.soumettre_transaction(
+        uuid_transaction_paires = self.controleur.generateur_transactions.soumettre_transaction(
             transaction_paires, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU)
 
-        uuid_transaction_cle_millegrille = self.controleur.contexte.generateur_transactions.soumettre_transaction(
+        uuid_transaction_cle_millegrille = self.controleur.generateur_transactions.soumettre_transaction(
             transaction_cle_millegrille, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
 
-        uuid_transaction_cle_intermediaire = self.controleur.contexte.generateur_transactions.soumettre_transaction(
+        uuid_transaction_cle_intermediaire = self.controleur.generateur_transactions.soumettre_transaction(
             transaction_cle_intermediaire, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
 
         # Emettre tokens attente
