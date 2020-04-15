@@ -679,6 +679,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
 
     TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU = '%s.nouveauTrousseauHebergement' % DOMAINE_NOM
+    TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU = '%s.majTrousseauHebergement' % DOMAINE_NOM
     TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE = '%s.nouveauMotDePasseCleHebergement' % DOMAINE_NOM
 
     REQUETE_CLE_RACINE = 'requeteCleRacine'
