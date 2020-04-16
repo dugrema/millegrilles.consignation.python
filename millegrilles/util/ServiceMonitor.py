@@ -4,6 +4,7 @@ import logging
 import sys
 import docker
 import json
+import datetime
 
 from threading import Event, Thread
 from docker.errors import APIError
@@ -14,7 +15,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.util import UtilScriptLigneCommande
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
-from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat
+from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 
@@ -35,7 +36,7 @@ class ServiceMonitor:
         self.__connexion_middleware = None  # Connexion a MQ, MongoDB
         self.__docker: docker.DockerClient  # Client docker
         self.__nodename: str                # Node name de la connexion locale dans Docker
-        self.__idmg: str                    # IDMG de la MilleGrille hote
+        self.__idmg: str = None             # IDMG de la MilleGrille hote
 
         self.__fermeture_event = Event()
 
@@ -163,12 +164,12 @@ class ServiceMonitor:
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
         except HTTPError:
             # La configuration n'existe pas
-            self.__gestionnaire_certificats.generer_nouveau_idmg()
+            pass
 
     def configurer_millegrille(self):
         if not self.__idmg:
             # Generer certificat de MilleGrille
-            pass
+            self.__idmg = self.__gestionnaire_certificats.generer_nouveau_idmg()
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -196,14 +197,56 @@ class ServiceMonitor:
 
 class GestionnaireCertificats:
 
-    def __init__(self, docker_client: docker.DockerClient):
+    def __init__(self, docker_client: docker.DockerClient, idmg: str = None):
         self.__docker = docker_client
+        self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
+        self.idmg = idmg
+        self.clecert_intermediaire: EnveloppeCleCert
 
     def generer_nouveau_idmg(self):
         generateur_initial = GenerateurInitial(None)
         clecert_intermediaire = generateur_initial.generer()
         clecert_millegrille = generateur_initial.autorite
-        pass
+
+        self.clecert_intermediaire = clecert_intermediaire
+        self.idmg = clecert_millegrille.idmg
+
+        # Sauvegarder certificats, cles et mots de passe dans docker
+        self.ajouter_secret('pki.millegrille.key', clecert_millegrille.private_key_bytes)
+        self.ajouter_secret('pki.millegrille.passwd', clecert_millegrille.password)
+        self.ajouter_config('pki.millegrille.cert', clecert_millegrille.cert_bytes)
+
+        self.ajouter_secret('pki.intermediaire.key', clecert_intermediaire.private_key_bytes)
+        self.ajouter_secret('pki.intermediaire.passwd', clecert_intermediaire.password)
+        self.ajouter_config('pki.intermediaire.cert', clecert_intermediaire.cert_bytes)
+
+        # Conserver la configuration de base pour ServiceMonitor
+        configuration = {
+            'idmg': self.idmg,
+            'pem': str(clecert_millegrille.cert_bytes, 'utf-8'),
+            'securite': '3.protege',
+        }
+        configuration_bytes = json.dumps(configuration).encode('utf-8')
+        self.__docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
+
+        return self.idmg
+
+    def __preparer_label(self, name):
+        params = {
+            'idmg_tronque': self.idmg[0:12],
+            'name': name,
+            'date': self.__date,
+        }
+        name_docker = '%(idmg_tronque)s.%(name)s.%(date)s' % params
+        return name_docker[0:64]  # Max 64 chars pour name docker
+
+    def ajouter_config(self, name: str, data: bytes):
+        name_tronque = self.__preparer_label(name)
+        self.__docker.configs.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+
+    def ajouter_secret(self, name: str, data: bytes):
+        name_tronque = self.__preparer_label(name)
+        self.__docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
 
 
 class ConnexionMiddleware:
