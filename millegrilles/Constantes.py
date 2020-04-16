@@ -1350,3 +1350,13 @@ class CommandesSurRelai:
     # Commandes de relai de messages
     # Le contenu doit etre contre-signee par le certificat de connecteur pour etre admises
     COMMANDE_MESSAGE_RELAI = 'commande.message.relai'  # Relai message de la MilleGrille d'origine
+
+
+class ConstantesServiceMonitor:
+
+    ETAT_SYSTEME_INITIAL = '1.initial'
+    ETAT_SYSTEME_CERTSMILLEGRILLE_PRET = '2.certs_millegrille_pret'
+    ETAT_SYSTEME_MIDDLEWARE_PRET = '3.middleware_pret'
+    ETAT_SYSTEME_MODULES_PRET = '4.modules_prets'
+    ETAT_SYSTEME_ACTIF = '5.systeme_actif'
+    ETAT_SYSTEME_FERMETURE = '6.systeme_fermeture'
