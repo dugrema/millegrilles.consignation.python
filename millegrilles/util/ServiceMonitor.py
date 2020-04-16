@@ -8,11 +8,13 @@ import json
 from threading import Event, Thread
 from docker.errors import APIError
 from base64 import b64decode
+from requests.exceptions import HTTPError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.util import UtilScriptLigneCommande
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
+from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 
@@ -36,6 +38,8 @@ class ServiceMonitor:
         self.__idmg: str                    # IDMG de la MilleGrille hote
 
         self.__fermeture_event = Event()
+
+        self.__gestionnaire_certificats: GestionnaireCertificats
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -148,21 +152,33 @@ class ServiceMonitor:
         self.__logger.debug("--------------")
 
     def __charger_configuration(self):
-        configuration_docker = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
-        if configuration_docker:
+        self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker)
+
+        try:
+            configuration_docker = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
             data = b64decode(configuration_docker.attrs['Spec']['Data'])
             configuration_json = json.loads(data)
             self.__idmg = configuration_json[Constantes.CONFIG_IDMG]
             self.__securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
+        except HTTPError:
+            # La configuration n'existe pas
+            self.__gestionnaire_certificats.generer_nouveau_idmg()
+
+    def configurer_millegrille(self):
+        if not self.__idmg:
+            # Generer certificat de MilleGrille
+            pass
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
         self.parse()
-        self.__connecter_docker()
-        self.__charger_configuration()
 
         try:
+            self.__connecter_docker()
+            self.__charger_configuration()
+            self.configurer_millegrille()
+
             self.__logger.debug("Cycle entretien ServiceMonitor")
 
             self.__logger.debug("Fin cycle entretien ServiceMonitor")
@@ -172,6 +188,22 @@ class ServiceMonitor:
             self.__fermeture_event.wait(30)
 
         self.__logger.info("Fermeture du ServiceMonitor")
+
+    @property
+    def idmg_tronque(self):
+        return self.__idmg[0:12]
+
+
+class GestionnaireCertificats:
+
+    def __init__(self, docker_client: docker.DockerClient):
+        self.__docker = docker_client
+
+    def generer_nouveau_idmg(self):
+        generateur_initial = GenerateurInitial(None)
+        clecert_intermediaire = generateur_initial.generer()
+        clecert_millegrille = generateur_initial.autorite
+        pass
 
 
 class ConnexionMiddleware:
@@ -242,6 +274,24 @@ class ConnexionMiddleware:
         self.__logger.info("Thread middleware demarree")
 
         self.__logger.info("Fin thread middleware")
+
+
+class GestionnaireComptesMQ:
+    """
+    Permet de gerer les comptes RabbitMQ via connexion https a la management console.
+    """
+
+    def __init__(self, connexion_middleware: ConnexionMiddleware):
+        self.__connexion = connexion_middleware
+
+
+class GestionnaireComptesMqMongo(GestionnaireComptesMQ):
+    """
+    Permet de gerer les comptes RabbitMQ et MongoDB.
+    """
+
+    def __init__(self, connexion_middleware: ConnexionMiddleware):
+        super().__init__(connexion_middleware)
 
 
 # Section main
