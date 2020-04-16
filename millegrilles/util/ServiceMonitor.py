@@ -60,6 +60,11 @@ class ServiceMonitor:
         )
 
         parser.add_argument(
+            '--dev', action="store_true", required=False,
+            help="Active des options de developpement (insecure)"
+        )
+
+        parser.add_argument(
             '--securite', type=str, required=False, default='protege',
             choices=['prive', 'protege', 'secure'],
             help="Niveau de securite du noeud. Defaut = protege"
@@ -153,23 +158,30 @@ class ServiceMonitor:
         self.__logger.debug("--------------")
 
     def __charger_configuration(self):
-        self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker)
-
         try:
             configuration_docker = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
             data = b64decode(configuration_docker.attrs['Spec']['Data'])
             configuration_json = json.loads(data)
             self.__idmg = configuration_json[Constantes.CONFIG_IDMG]
             self.__securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, self.__idmg)
+            self.__gestionnaire_certificats.charger_intermediaire()
+
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
         except HTTPError:
             # La configuration n'existe pas
-            pass
+            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker)
 
     def configurer_millegrille(self):
         if not self.__idmg:
             # Generer certificat de MilleGrille
             self.__idmg = self.__gestionnaire_certificats.generer_nouveau_idmg()
+
+            if self.__args.dev:
+                self.__gestionnaire_certificats.sauvegarder_intermediaire()
+
+        pass
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -230,6 +242,31 @@ class GestionnaireCertificats:
         self.__docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
 
         return self.idmg
+
+    def sauvegarder_intermediaire(self):
+        """
+        Sauvegarder le certificat de millegrille sous /run/secrets - surtout utilise pour dev (insecure)
+        :return:
+        """
+        with open('/run/secrets/pki.intermediaire.key.pem', 'wb') as fichiers:
+            fichiers.write(self.clecert_intermediaire.private_key_bytes)
+        with open('/run/secrets/pki.intermediaire.cert.pem', 'wb') as fichiers:
+            fichiers.write(self.clecert_intermediaire.cert_bytes)
+        with open('/run/secrets/pki.intermediaire.passwd.pem', 'wb') as fichiers:
+            fichiers.write(self.clecert_intermediaire.password)
+
+    def charger_intermediaire(self):
+        with open('/run/secrets/pki.intermediaire.key.pem', 'rb') as fichiers:
+            key_pem = fichiers.read()
+        with open('/run/secrets/pki.intermediaire.cert.pem', 'rb') as fichiers:
+            cert_pem = fichiers.read()
+        with open('/run/secrets/pki.intermediaire.passwd.pem', 'rb') as fichiers:
+            passwd_bytes = fichiers.read()
+
+        clecert_intermediaire = EnveloppeCleCert()
+        clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
+        clecert_intermediaire.password = None  # Effacer mot de passe
+        self.clecert_intermediaire = clecert_intermediaire
 
     def __preparer_label(self, name):
         params = {

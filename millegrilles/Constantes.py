@@ -1361,4 +1361,4 @@ class ConstantesServiceMonitor:
     ETAT_SYSTEME_ACTIF = '5.systeme_actif'
     ETAT_SYSTEME_FERMETURE = '6.systeme_fermeture'
 
-    DOCKER_LIBVAL_CONFIG = 'millegrille.config'
+    DOCKER_LIBVAL_CONFIG = 'millegrille.configuration'
