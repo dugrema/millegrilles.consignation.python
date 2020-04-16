@@ -2,8 +2,10 @@ import argparse
 import signal
 import logging
 import sys
+import docker
 
 from threading import Event, Thread
+from docker.errors import APIError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -27,6 +29,7 @@ class ServiceMonitor:
         self.__securite = None              # Niveau de securite de la swarm docker
         self.__args = None                  # Arguments de la ligne de commande
         self.__connexion_middleware = None  # Connexion a MQ, MongoDB
+        self.__docker = None                # Client docker
 
         self.__fermeture_event = Event()
 
@@ -114,9 +117,33 @@ class ServiceMonitor:
         """
         pass
 
+    def __connecter_docker(self):
+        self.__docker = docker.DockerClient('unix://' + self.__args.docker)
+
+        self.__logger.debug("--------------")
+        self.__logger.debug("Docker configs")
+        self.__logger.debug("--------------")
+        for config in self.__docker.configs.list():
+            self.__logger.debug("  %s", str(config.name))
+
+        self.__logger.debug("--------------")
+        self.__logger.debug("Docker secrets")
+        self.__logger.debug("--------------")
+        for secret in self.__docker.secrets.list():
+            self.__logger.debug("  %s", str(secret.name))
+
+        self.__logger.debug("--------------")
+        self.__logger.debug("Docker services")
+        self.__logger.debug("--------------")
+        for service in self.__docker.services.list():
+            self.__logger.debug("  %s", str(service.name))
+
+        self.__logger.debug("--------------")
+
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
         self.parse()
+        self.__connecter_docker()
 
         try:
             self.__logger.debug("Cycle entretien ServiceMonitor")
