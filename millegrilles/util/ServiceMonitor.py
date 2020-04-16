@@ -3,9 +3,11 @@ import signal
 import logging
 import sys
 import docker
+import json
 
 from threading import Event, Thread
 from docker.errors import APIError
+from base64 import b64decode
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -26,10 +28,12 @@ class ServiceMonitor:
     def __init__(self):
         self.__logger = logging.getLogger('%s' % self.__class__.__name__)
 
-        self.__securite = None              # Niveau de securite de la swarm docker
+        self.__securite: str                # Niveau de securite de la swarm docker
         self.__args = None                  # Arguments de la ligne de commande
         self.__connexion_middleware = None  # Connexion a MQ, MongoDB
-        self.__docker = None                # Client docker
+        self.__docker: docker.DockerClient  # Client docker
+        self.__nodename: str                # Node name de la connexion locale dans Docker
+        self.__idmg: str                    # IDMG de la MilleGrille hote
 
         self.__fermeture_event = Event()
 
@@ -67,8 +71,8 @@ class ServiceMonitor:
         )
 
         parser.add_argument(
-            '--config', type=str, required=False, default='/etc/opt/millegrilles',
-            help="Path de la configuration de l'hote MilleGrilles"
+            '--config', type=str, required=False, default='/etc/opt/millegrilles/servicemonitor.json',
+            help="Path du fichier de configuration de l'hote MilleGrilles"
         )
 
         parser.add_argument(
@@ -119,6 +123,9 @@ class ServiceMonitor:
 
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
+        # self.__logger.debug("Docker info: %s", str(self.__docker.info()))
+        self.__nodename = self.__docker.info()['Name']
+        self.__logger.debug("Docker node name: %s", self.__nodename)
 
         self.__logger.debug("--------------")
         self.__logger.debug("Docker configs")
@@ -140,10 +147,20 @@ class ServiceMonitor:
 
         self.__logger.debug("--------------")
 
+    def __charger_configuration(self):
+        configuration_docker = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
+        if configuration_docker:
+            data = b64decode(configuration_docker.attrs['Spec']['Data'])
+            configuration_json = json.loads(data)
+            self.__idmg = configuration_json[Constantes.CONFIG_IDMG]
+            self.__securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
+            self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
+
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
         self.parse()
         self.__connecter_docker()
+        self.__charger_configuration()
 
         try:
             self.__logger.debug("Cycle entretien ServiceMonitor")
