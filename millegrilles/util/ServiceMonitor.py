@@ -8,6 +8,7 @@ import datetime
 
 from threading import Event, Thread
 from docker.errors import APIError
+from docker.types import Resources, RestartPolicy, ServiceMode
 from base64 import b64decode
 from requests.exceptions import HTTPError
 from os import path
@@ -632,21 +633,34 @@ class GestionnaireModulesDocker:
 
     def __formatter_configuration_service(self, service_name):
         config_service = json.loads(self.charger_config(self.idmg_tronque + '.docker.cfg.' + service_name))
-        version_services = json.loads(self.charger_config(self.idmg_tronque + '.docker.versions'))
-
-        self.__logger.debug("Configuration versions : %s", str(version_services))
-
-        self.__remplacer_variables(service_name, config_service)
         self.__logger.debug("Configuration service %s : %s", service_name, str(config_service))
 
-        return config_service
+        dict_config_docker = self.__remplacer_variables(service_name, config_service)
+
+        return dict_config_docker
 
     def __remplacer_variables(self, nom_service, config_service):
         self.__logger.debug("Remplacer variables %s" % nom_service)
+        dict_config_docker = dict()
 
         try:
             # Name
-            config_service['name'] = self.idmg_tronque + '_' + config_service['name']
+            dict_config_docker['name'] = self.idmg_tronque + '_' + config_service['name']
+
+            # Resources
+            config_resources = config_service.get('resources')
+            if config_resources:
+                dict_config_docker['resources'] = Resources(**config_resources)
+
+            # Restart Policy
+            config_restart_policy = config_service.get('restart_policy')
+            if config_restart_policy:
+                dict_config_docker['restart_policy'] = RestartPolicy(**config_restart_policy)
+
+            # Service Mode
+            config_service_mode = config_service.get('mode')
+            if config_service_mode:
+                dict_config_docker['mode'] = ServiceMode(**config_service_mode)
 
             # # /TaskTemplate
             # task_template = config_service['TaskTemplate']
@@ -722,6 +736,8 @@ class GestionnaireModulesDocker:
         except TypeError as te:
             self.__logger.error("Erreur mapping %s", nom_service)
             raise te
+
+        return dict_config_docker
 
     @property
     def idmg_tronque(self):
