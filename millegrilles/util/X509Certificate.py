@@ -587,6 +587,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
             if akid_autorite == akid_autorite_suivante:
                 # On est rendu au root
+                chaine.pop()
                 break
 
             akid_autorite = akid_autorite_suivante

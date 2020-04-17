@@ -15,7 +15,8 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.util import UtilScriptLigneCommande
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
-from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert
+from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert, \
+    ConstantesGenerateurCertificat
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 
@@ -165,13 +166,59 @@ class ServiceMonitor:
             self.__idmg = configuration_json[Constantes.CONFIG_IDMG]
             self.__securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
 
-            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, self.__idmg)
-            self.__gestionnaire_certificats.charger_intermediaire()
+            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, self.__idmg, configuration_json['pem'])
+            self.__gestionnaire_certificats.charger_cas()
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
         except HTTPError:
             # La configuration n'existe pas
             self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker)
+
+    def __entretien_certificats(self):
+        """
+        Effectue l'entretien des certificats : genere certificats manquants ou expires avec leur cle
+        :return:
+        """
+        prefixe_certificats = self.idmg_tronque + '.pki.'
+        filtre = {'name': prefixe_certificats}
+        roles = {
+            ConstantesGenerateurCertificat.ROLE_MONGO: dict(),
+            ConstantesGenerateurCertificat.ROLE_MQ: dict(),
+            ConstantesGenerateurCertificat.ROLE_TRANSACTIONS: dict(),
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: dict(),
+            ConstantesGenerateurCertificat.ROLE_CEDULEUR: dict(),
+            ConstantesGenerateurCertificat.ROLE_FICHIERS: dict(),
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL: dict(),
+            ConstantesGenerateurCertificat.ROLE_DOMAINES: dict(),
+        }
+
+        # Charger la configuration existante
+        date_renouvellement = datetime.datetime.utcnow() + datetime.timedelta(days=21)
+        for config in self.__docker.configs.list(filters=filtre):
+            self.__logger.debug("Config : %s", str(config))
+            nom_config = config.name.split('.')
+            nom_role = nom_config[2]
+            if nom_config[3] == 'cert' and nom_role in roles.keys():
+                role_info = roles[nom_role]
+                self.__logger.debug("Verification cert %s date %s", nom_role, nom_config[4])
+                pem = b64decode(config.attrs['Spec']['Data'])
+                clecert = EnveloppeCleCert()
+                clecert.cert_from_pem_bytes(pem)
+                date_expiration = clecert.not_valid_after
+
+                expiration_existante = role_info.get('expiration')
+                if not expiration_existante or expiration_existante < date_expiration:
+                    role_info['expiration'] = date_expiration
+                    if date_expiration < date_renouvellement:
+                        role_info['est_expire'] = True
+                    else:
+                        role_info['est_expire'] = False
+
+        # Generer certificats expires et manquants
+        for nom_role, info_role in roles.items():
+            if not info_role.get('expiration') or info_role.get('est_expire'):
+                self.__logger.debug("Generer nouveau certificat role %s", nom_role)
+                self.__gestionnaire_certificats.generer_clecert_module(nom_role, self.__nodename)
 
     def configurer_millegrille(self):
         if not self.__idmg:
@@ -179,9 +226,10 @@ class ServiceMonitor:
             self.__idmg = self.__gestionnaire_certificats.generer_nouveau_idmg()
 
             if self.__args.dev:
-                self.__gestionnaire_certificats.sauvegarder_intermediaire()
+                self.__gestionnaire_certificats.sauvegarder_cas()
 
-        pass
+        # Generer certificats de module manquants ou expires, avec leur cle
+        self.__entretien_certificats()
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -209,17 +257,24 @@ class ServiceMonitor:
 
 class GestionnaireCertificats:
 
-    def __init__(self, docker_client: docker.DockerClient, idmg: str = None):
+    def __init__(self, docker_client: docker.DockerClient, idmg: str = None, millegrille_cert_pem: str = None):
         self.__docker = docker_client
         self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
         self.idmg = idmg
+        self.clecert_millegrille: EnveloppeCleCert
         self.clecert_intermediaire: EnveloppeCleCert
+        self.renouvelleur: RenouvelleurCertificat = None
+
+        if millegrille_cert_pem:
+            self.clecert_millegrille = EnveloppeCleCert()
+            self.clecert_millegrille.cert_from_pem_bytes(millegrille_cert_pem.encode('utf-8'))
 
     def generer_nouveau_idmg(self):
         generateur_initial = GenerateurInitial(None)
         clecert_intermediaire = generateur_initial.generer()
         clecert_millegrille = generateur_initial.autorite
 
+        self.clecert_millegrille = clecert_millegrille
         self.clecert_intermediaire = clecert_intermediaire
         self.idmg = clecert_millegrille.idmg
 
@@ -243,7 +298,13 @@ class GestionnaireCertificats:
 
         return self.idmg
 
-    def sauvegarder_intermediaire(self):
+    def generer_clecert_module(self, role: str, common_name: str):
+        clecert = self.renouvelleur.renouveller_par_role(role, common_name)
+        chaine_certs = '\n'.join(clecert.chaine)
+        self.ajouter_secret('pki.%s.key' % role, clecert.private_key_bytes)
+        self.ajouter_config('pki.%s.cert' % role, chaine_certs.encode('utf-8'))
+
+    def sauvegarder_cas(self):
         """
         Sauvegarder le certificat de millegrille sous /run/secrets - surtout utilise pour dev (insecure)
         :return:
@@ -255,7 +316,9 @@ class GestionnaireCertificats:
         with open('/run/secrets/pki.intermediaire.passwd.pem', 'wb') as fichiers:
             fichiers.write(self.clecert_intermediaire.password)
 
-    def charger_intermediaire(self):
+        self.__charger_renouvelleur()
+
+    def charger_cas(self):
         with open('/run/secrets/pki.intermediaire.key.pem', 'rb') as fichiers:
             key_pem = fichiers.read()
         with open('/run/secrets/pki.intermediaire.cert.pem', 'rb') as fichiers:
@@ -267,6 +330,16 @@ class GestionnaireCertificats:
         clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
         clecert_intermediaire.password = None  # Effacer mot de passe
         self.clecert_intermediaire = clecert_intermediaire
+
+        self.__charger_renouvelleur()
+
+    def __charger_renouvelleur(self):
+        dict_ca = {
+            self.clecert_intermediaire.skid: self.clecert_intermediaire.cert,
+            self.clecert_millegrille.skid: self.clecert_millegrille.cert,
+        }
+
+        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.clecert_intermediaire)
 
     def __preparer_label(self, name):
         params = {
