@@ -8,14 +8,14 @@ import datetime
 
 from threading import Event, Thread
 from docker.errors import APIError
-from docker.types import Resources, RestartPolicy, ServiceMode, Placement, NetworkAttachmentConfig, ConfigReference, SecretReference, EndpointSpec
+from docker.types import Resources, RestartPolicy, ServiceMode, NetworkAttachmentConfig, ConfigReference, \
+    SecretReference, EndpointSpec
 from base64 import b64decode
 from requests.exceptions import HTTPError
 from os import path
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
-from millegrilles.util import UtilScriptLigneCommande
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert, \
     ConstantesGenerateurCertificat
@@ -400,7 +400,7 @@ class GestionnaireCertificats:
             self.clecert_millegrille.skid: self.clecert_millegrille.cert,
         }
 
-        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.clecert_intermediaire)
+        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.clecert_intermediaire, generer_password=False)
 
     def __preparer_label(self, name):
         params = {
@@ -648,7 +648,7 @@ class GestionnaireModulesDocker:
         return valeur
 
     def __formatter_configuration_service(self, service_name):
-        config_service = json.loads(self.charger_config(self.idmg_tronque + '.docker.cfg.' + service_name))
+        config_service = json.loads(self.charger_config('docker.cfg.' + service_name))
         self.__logger.debug("Configuration service %s : %s", service_name, str(config_service))
 
         dict_config_docker = self.__remplacer_variables(service_name, config_service)
@@ -821,7 +821,7 @@ class GestionnaireImagesDocker:
         return self.__idmg[0:12]
 
     def charger_versions(self):
-        filtre = {'name': self.tronquer_idmg + '.docker.versions'}
+        filtre = {'name': 'docker.versions'}
         self.__versions_images = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
 
     def telecharger_images_docker(self):

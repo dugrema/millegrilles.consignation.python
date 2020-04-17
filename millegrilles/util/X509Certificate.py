@@ -1400,7 +1400,7 @@ class RenouvelleurCertificat:
         generateur = self.__generateurs_par_role[role]
         if issubclass(generateur, GenerateurNoeud):
             generateur_instance = generateur(
-                self.__idmg, role, common_name, self.__dict_ca, self.__millegrille, generer_password=True)
+                self.__idmg, role, common_name, self.__dict_ca, self.__millegrille, generer_password=self.__generer_password)
         else:
             generateur_instance = generateur(
                 self.__idmg, role, common_name, self.__dict_ca, self.__millegrille)
