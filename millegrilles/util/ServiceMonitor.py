@@ -8,7 +8,7 @@ import datetime
 
 from threading import Event, Thread
 from docker.errors import APIError
-from docker.types import Resources, RestartPolicy, ServiceMode
+from docker.types import Resources, RestartPolicy, ServiceMode, Placement, NetworkAttachmentConfig
 from base64 import b64decode
 from requests.exceptions import HTTPError
 from os import path
@@ -661,6 +661,28 @@ class GestionnaireModulesDocker:
             config_service_mode = config_service.get('mode')
             if config_service_mode:
                 dict_config_docker['mode'] = ServiceMode(**config_service_mode)
+
+            config_env = config_service.get('env')
+            if config_env:
+                dict_config_docker['env'] = config_env
+
+            config_constraints = config_service.get('constraints')
+            # config_preferences = config_service.get('preferences')
+            # if config_constraints:
+            #     dict_config_docker['constraints'] = Placement(constraints=config_constraints)
+
+            config_labels = config_service.get('labels')
+            if config_labels:
+                dict_config_docker['labels'] = config_labels
+
+            config_networks = config_service.get('networks')
+            if config_networks:
+                networks = list()
+                for network in config_networks:
+                    network['target'] = self.__mapping(network['target'])
+                    networks.append(NetworkAttachmentConfig(**network))
+
+                dict_config_docker['networks'] = networks
 
             # # /TaskTemplate
             # task_template = config_service['TaskTemplate']
