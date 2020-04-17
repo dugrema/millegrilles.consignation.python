@@ -8,7 +8,7 @@ import datetime
 
 from threading import Event, Thread
 from docker.errors import APIError
-from docker.types import Resources, RestartPolicy, ServiceMode, Placement, NetworkAttachmentConfig, ConfigReference, SecretReference
+from docker.types import Resources, RestartPolicy, ServiceMode, Placement, NetworkAttachmentConfig, ConfigReference, SecretReference, EndpointSpec
 from base64 import b64decode
 from requests.exceptions import HTTPError
 from os import path
@@ -749,6 +749,23 @@ class GestionnaireModulesDocker:
                     liste_secrets.append(SecretReference(**secret_reference))
 
                 dict_config_docker['secrets'] = liste_secrets
+
+            config_endpoint_spec = config_service.get('endpoint_spec')
+            if config_endpoint_spec:
+                ports = dict()
+                mode = config_endpoint_spec.get('mode') or 'vip'
+                for port in config_endpoint_spec.get('ports'):
+                    published_port = port['published_port']
+                    target_port = port['target_port']
+                    protocol = port.get('protocol') or 'tcp'
+                    publish_mode = port.get('publish_mode')
+
+                    if protocol or publish_mode:
+                        ports[published_port] = (target_port, protocol, publish_mode)
+                    else:
+                        ports[published_port] = target_port
+
+                dict_config_docker['endpoint_spec'] = EndpointSpec(mode=mode, ports=ports)
 
         # # /TaskTemplate
             # task_template = config_service['TaskTemplate']
