@@ -197,12 +197,12 @@ class ServiceMonitor:
             self.__gestionnaire_certificats.charger_cas()
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
-        except HTTPError:
-            # La configuration n'existe pas
-            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, secrets=self.__args.secrets)
-
-        self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker, self.__fermeture_event)
-        self.__gestionnaire_docker.start_events()
+        except HTTPError as he:
+            if he.status_code == 404:
+                # La configuration n'existe pas
+                self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, secrets=self.__args.secrets)
+            else:
+                raise he
 
     def __entretien_certificats(self):
         """
@@ -254,12 +254,20 @@ class ServiceMonitor:
                 self.__gestionnaire_certificats.generer_clecert_module(nom_role, self.__nodename)
 
     def configurer_millegrille(self):
-        if not self.__idmg:
+        besoin_initialiser = not self.__idmg
+
+        if besoin_initialiser:
             # Generer certificat de MilleGrille
             self.__idmg = self.__gestionnaire_certificats.generer_nouveau_idmg()
 
             if self.__args.dev:
                 self.__gestionnaire_certificats.sauvegarder_cas()
+
+        self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker, self.__fermeture_event)
+        self.__gestionnaire_docker.start_events()
+
+        if besoin_initialiser:
+            self.__gestionnaire_docker.initialiser_millegrille()
 
         # Generer certificats de module manquants ou expires, avec leur cle
         self.__entretien_certificats()
@@ -530,6 +538,12 @@ class GestionnaireModulesDocker:
             if self.__fermeture_event.is_set():
                 break
         self.__logger.info("Fin ecouter events docker")
+
+    def initialiser_millegrille(self):
+        # Creer reseau pour cette millegrille
+        network_name = 'mg_' + self.__idmg + '_net'
+        labels = {'millegrille': self.__idmg}
+        self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
 
     def entretien_services(self):
         """
