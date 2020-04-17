@@ -767,6 +767,10 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['endpoint_spec'] = EndpointSpec(mode=mode, ports=ports)
 
+            config_mounts = config_service.get('mounts')
+            if config_mounts:
+                dict_config_docker['mounts'] = [self.__mapping(mount) for mount in config_mounts]
+
         # # /TaskTemplate
             # task_template = config_service['TaskTemplate']
             #
