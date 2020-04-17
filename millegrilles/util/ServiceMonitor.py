@@ -502,7 +502,7 @@ class GestionnaireModulesDocker:
         # Liste de modules requis. L'ordre est important, les dependances sont implicites.
         self.__modules_requis = [
             ConstantesServiceMonitor.MODULE_MQ,
-            # ConstantesServiceMonitor.MODULE_MONGO,
+            ConstantesServiceMonitor.MODULE_MONGO,
             # ConstantesServiceMonitor.MODULE_TRANSACTION,
             # ConstantesServiceMonitor.MODULE_MAITREDESCLES,
             # ConstantesServiceMonitor.MODULE_CEDULEUR,
