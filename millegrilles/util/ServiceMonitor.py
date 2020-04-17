@@ -576,6 +576,11 @@ class GestionnaireModulesDocker:
         image_tag = image.tags[0]
 
         configuration = self.__formatter_configuration_service(service_name)
+
+        constraints = configuration.get('constraints')
+        if constraints:
+            self.__add_node_labels(constraints)
+
         self.__docker.services.create(image_tag, **configuration)
 
     def verifier_etat_service(self, service):
@@ -783,6 +788,21 @@ class GestionnaireModulesDocker:
             raise te
 
         return dict_config_docker
+
+    def __add_node_labels(self, constraints: list):
+        labels_ajoutes = dict()
+        for constraint in constraints:
+            if '== true' in constraint:
+                valeurs = constraint.split('==')
+                labels_ajoutes[valeurs[0].strip().replace('node.labels.', '')] = valeurs[1].strip()
+
+        if len(labels_ajoutes) > 0:
+            nodename = self.__docker.info()['Name']
+            node_info = self.__docker.nodes.get(nodename)
+            node_spec = node_info.attrs['Spec']
+            labels = node_spec['Labels']
+            labels.update(labels_ajoutes)
+            node_info.update(node_spec)
 
     @property
     def idmg_tronque(self):
