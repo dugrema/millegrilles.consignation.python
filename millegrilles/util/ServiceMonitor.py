@@ -676,8 +676,11 @@ class GestionnaireModulesDocker:
             if config_service_mode:
                 dict_config_docker['mode'] = ServiceMode(**config_service_mode)
 
+            # Variables d'environnement, inclus mapping
             config_env = config_service.get('env')
             if config_env:
+                # Mapping des variables
+                config_env = [self.__mapping(valeur) for valeur in config_env]
                 dict_config_docker['env'] = config_env
 
             config_constraints = config_service.get('constraints')
@@ -687,7 +690,19 @@ class GestionnaireModulesDocker:
 
             config_labels = config_service.get('labels')
             if config_labels:
-                dict_config_docker['labels'] = config_labels
+                updated_labels = dict()
+                for key, value in config_labels.items():
+                    value = self.__mapping(value)
+                    updated_labels[key] = value
+                dict_config_docker['labels'] = updated_labels
+
+            config_container_labels = config_service.get('container_labels')
+            if config_container_labels:
+                updated_labels = dict()
+                for key, value in config_container_labels.items():
+                    value = self.__mapping(value)
+                    updated_labels[key] = value
+                dict_config_docker['container_labels'] = updated_labels
 
             config_networks = config_service.get('networks')
             if config_networks:
