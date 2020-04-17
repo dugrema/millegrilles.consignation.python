@@ -234,22 +234,33 @@ class ServiceMonitor:
         # Generer certificats de module manquants ou expires, avec leur cle
         self.__entretien_certificats()
 
+    def __entretien_modules(self):
+        # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
+        pass
+
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
-        self.parse()
 
         try:
+            self.parse()
             self.__connecter_docker()
             self.__charger_configuration()
             self.configurer_millegrille()
 
-            self.__logger.debug("Cycle entretien ServiceMonitor")
+            while not self.__fermeture_event.is_set():
+                try:
+                    self.__logger.debug("Cycle entretien ServiceMonitor")
 
-            self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                    self.__entretien_modules()
+
+                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                except Exception:
+                    self.__logger.exception("ServiceMonitor: erreur generique")
+                finally:
+                    self.__fermeture_event.wait(30)
+
         except Exception:
-            self.__logger.exception("Erreur generique")
-        finally:
-            self.__fermeture_event.wait(30)
+            self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
 
         self.__logger.info("Fermeture du ServiceMonitor")
 
@@ -435,6 +446,22 @@ class ConnexionMiddleware:
         self.__logger.info("Thread middleware demarree")
 
         self.__logger.info("Fin thread middleware")
+
+
+class GestionnaireModulesDocker:
+
+    def __init__(self, docker_client: docker.DockerClient):
+        self.__modules_requis = [
+            ConstantesServiceMonitor.MODULE_MQ,
+            ConstantesServiceMonitor.MODULE_MONGO,
+            ConstantesServiceMonitor.MODULE_TRANSACTION,
+            ConstantesServiceMonitor.MODULE_MAITREDESCLES,
+            ConstantesServiceMonitor.MODULE_CEDULEUR,
+            ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            ConstantesServiceMonitor.MODULE_TRANSMISSION,
+            ConstantesServiceMonitor.MODULE_DOMAINES,
+        ]
 
 
 class GestionnaireComptesMQ:

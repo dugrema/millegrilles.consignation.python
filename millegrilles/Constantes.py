@@ -1362,3 +1362,13 @@ class ConstantesServiceMonitor:
     ETAT_SYSTEME_FERMETURE = '6.systeme_fermeture'
 
     DOCKER_LIBVAL_CONFIG = 'millegrille.configuration'
+
+    MODULE_MQ = 'mq'
+    MODULE_MONGO = 'mongo'
+    MODULE_TRANSACTION = 'transaction'
+    MODULE_MAITREDESCLES = 'maitredescles'
+    MODULE_CEDULEUR = 'ceduleur'
+    MODULE_CONSIGNATIONFICHIERS = 'consignationfichiers'
+    MODULE_COUPDOEIL = 'coupdoeilreact'
+    MODULE_TRANSMISSION = 'transmission'
+    MODULE_DOMAINES = 'domaines'
