@@ -179,6 +179,9 @@ class ServiceMonitor:
         Effectue l'entretien des certificats : genere certificats manquants ou expires avec leur cle
         :return:
         """
+        # MAJ date pour creation de certificats
+        self.__gestionnaire_certificats.maj_date()
+
         prefixe_certificats = self.idmg_tronque + '.pki.'
         filtre = {'name': prefixe_certificats}
         roles = {
@@ -259,15 +262,20 @@ class GestionnaireCertificats:
 
     def __init__(self, docker_client: docker.DockerClient, idmg: str = None, millegrille_cert_pem: str = None):
         self.__docker = docker_client
-        self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
+        self.__date: datetime.datetime = None
         self.idmg = idmg
         self.clecert_millegrille: EnveloppeCleCert
         self.clecert_intermediaire: EnveloppeCleCert
         self.renouvelleur: RenouvelleurCertificat = None
 
+        self.maj_date()
+
         if millegrille_cert_pem:
             self.clecert_millegrille = EnveloppeCleCert()
             self.clecert_millegrille.cert_from_pem_bytes(millegrille_cert_pem.encode('utf-8'))
+
+    def maj_date(self):
+        self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
 
     def generer_nouveau_idmg(self):
         generateur_initial = GenerateurInitial(None)
