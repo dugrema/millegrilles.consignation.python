@@ -10,6 +10,7 @@ from threading import Event, Thread
 from docker.errors import APIError
 from base64 import b64decode
 from requests.exceptions import HTTPError
+from os import path
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -63,6 +64,16 @@ class ServiceMonitor:
         parser.add_argument(
             '--dev', action="store_true", required=False,
             help="Active des options de developpement (insecure)"
+        )
+
+        parser.add_argument(
+            '--secrets', type=str, required=False, default="/run/secrets",
+            help="Repertoire de secrets"
+        )
+
+        parser.add_argument(
+            '--configs', type=str, required=False, default="/etc/opt/millegrille",
+            help="Repertoire de configuration"
         )
 
         parser.add_argument(
@@ -166,13 +177,14 @@ class ServiceMonitor:
             self.__idmg = configuration_json[Constantes.CONFIG_IDMG]
             self.__securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
 
-            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, self.__idmg, configuration_json['pem'])
+            self.__gestionnaire_certificats = GestionnaireCertificats(
+                self.__docker, idmg=self.__idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self.__args.secrets)
             self.__gestionnaire_certificats.charger_cas()
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
         except HTTPError:
             # La configuration n'existe pas
-            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker)
+            self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, secrets=self.__args.secrets)
 
     def __entretien_certificats(self):
         """
@@ -271,19 +283,21 @@ class ServiceMonitor:
 
 class GestionnaireCertificats:
 
-    def __init__(self, docker_client: docker.DockerClient, idmg: str = None, millegrille_cert_pem: str = None):
+    def __init__(self, docker_client: docker.DockerClient, **kwargs):
         self.__docker = docker_client
         self.__date: datetime.datetime = None
-        self.idmg = idmg
+        self.idmg = kwargs.get('idmg')
         self.clecert_millegrille: EnveloppeCleCert
         self.clecert_intermediaire: EnveloppeCleCert
         self.renouvelleur: RenouvelleurCertificat = None
+        self.secret_path = kwargs.get('secrets')
 
         self.maj_date()
 
-        if millegrille_cert_pem:
+        cert_pem = kwargs.get('millegrille_cert_pem')
+        if cert_pem:
             self.clecert_millegrille = EnveloppeCleCert()
-            self.clecert_millegrille.cert_from_pem_bytes(millegrille_cert_pem.encode('utf-8'))
+            self.clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
 
     def maj_date(self):
         self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
@@ -325,24 +339,26 @@ class GestionnaireCertificats:
 
     def sauvegarder_cas(self):
         """
-        Sauvegarder le certificat de millegrille sous /run/secrets - surtout utilise pour dev (insecure)
+        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
         :return:
         """
-        with open('/run/secrets/pki.intermediaire.key.pem', 'wb') as fichiers:
+        secret_path = path.abspath(self.secret_path)
+        with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_intermediaire.private_key_bytes)
-        with open('/run/secrets/pki.intermediaire.cert.pem', 'wb') as fichiers:
+        with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_intermediaire.cert_bytes)
-        with open('/run/secrets/pki.intermediaire.passwd.pem', 'wb') as fichiers:
+        with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_intermediaire.password)
 
         self.__charger_renouvelleur()
 
     def charger_cas(self):
-        with open('/run/secrets/pki.intermediaire.key.pem', 'rb') as fichiers:
+        secret_path = path.abspath(self.secret_path)
+        with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'rb') as fichiers:
             key_pem = fichiers.read()
-        with open('/run/secrets/pki.intermediaire.cert.pem', 'rb') as fichiers:
+        with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'rb') as fichiers:
             cert_pem = fichiers.read()
-        with open('/run/secrets/pki.intermediaire.passwd.pem', 'rb') as fichiers:
+        with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'rb') as fichiers:
             passwd_bytes = fichiers.read()
 
         clecert_intermediaire = EnveloppeCleCert()
