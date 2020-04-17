@@ -685,11 +685,12 @@ class GestionnaireModulesDocker:
                 config_env = [self.__mapping(valeur) for valeur in config_env]
                 dict_config_docker['env'] = config_env
 
+            # Constraints
             config_constraints = config_service.get('constraints')
-            # config_preferences = config_service.get('preferences')
-            # if config_constraints:
-            #     dict_config_docker['constraints'] = Placement(constraints=config_constraints)
+            if config_constraints:
+                dict_config_docker['constraints'] = config_constraints
 
+            # Service labels
             config_labels = config_service.get('labels')
             if config_labels:
                 updated_labels = dict()
@@ -698,6 +699,7 @@ class GestionnaireModulesDocker:
                     updated_labels[key] = value
                 dict_config_docker['labels'] = updated_labels
 
+            # Container labels
             config_container_labels = config_service.get('container_labels')
             if config_container_labels:
                 updated_labels = dict()
@@ -706,6 +708,7 @@ class GestionnaireModulesDocker:
                     updated_labels[key] = value
                 dict_config_docker['container_labels'] = updated_labels
 
+            # Networks
             config_networks = config_service.get('networks')
             if config_networks:
                 networks = list()
@@ -715,6 +718,7 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['networks'] = networks
 
+            # Configs
             config_configs = config_service.get('configs')
             dates_configs = dict()
             if config_configs:
@@ -735,6 +739,7 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['configs'] = liste_configs
 
+            # Secrets
             config_secrets = config_service.get('secrets')
             if config_secrets:
                 liste_secrets = list()
@@ -750,6 +755,7 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['secrets'] = liste_secrets
 
+            # Ports
             config_endpoint_spec = config_service.get('endpoint_spec')
             if config_endpoint_spec:
                 ports = dict()
@@ -767,81 +773,11 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['endpoint_spec'] = EndpointSpec(mode=mode, ports=ports)
 
+            # Mounts
             config_mounts = config_service.get('mounts')
             if config_mounts:
                 dict_config_docker['mounts'] = [self.__mapping(mount) for mount in config_mounts]
 
-        # # /TaskTemplate
-            # task_template = config_service['TaskTemplate']
-            #
-            # # /TaskTemplate/ContainerSpec
-            # container_spec = task_template['ContainerSpec']
-            #
-            # # /TaskTemplate/ContainerSpec/Image
-            # nom_image = container_spec['Image']
-            # if nom_image.startswith('${'):
-            #     nom_image = nom_image.replace('${', '').replace('}', '')
-            #     # container_spec['Image'] = self.__gestionnaire_images.get_image_parconfig(nom_image)
-            #
-            # # /TaskTemplate/ContainerSpec/Args
-            # if container_spec.get('Args') is not None:
-            #     args_list = list()
-            #     for arg in container_spec.get('Args'):
-            #         args_list.append(self.__mapping(arg))
-            #     container_spec['Args'] = args_list
-            #
-            # # /TaskTemplate/ContainerSpec/Env
-            # env_list = container_spec.get('Env')
-            # if env_list is not None:
-            #     # Appliquer param mapping aux parametres
-            #     updated_env = list()
-            #     for env_param in env_list:
-            #         updated_env.append(self.__mapping(env_param))
-            #     container_spec['Env'] = updated_env
-            #
-            # # /TaskTemplate/ContainerSpec/Mounts
-            # mounts = container_spec.get('Mounts')
-            # if mounts is not None:
-            #     for mount in mounts:
-            #         mount['Source'] = self.__mapping(mount['Source'])
-            #         mount['Target'] = self.__mapping(mount['Target'])
-            #
-            # # /TaskTemplate/ContainerSpec/Secrets
-            # configs = container_spec.get('Configs')
-            # dates_configs = dict()
-            # if configs is not None:
-            #     for config in configs:
-            #         self.__logger.debug("Mapping configs %s" % config)
-            #         config_name = config['ConfigName']
-            #         config_dict = self.__trouver_config(config_name)
-            #         config['ConfigName'] = config_dict['Name']
-            #         config['ConfigID'] = config_dict['Id']
-            #         dates_configs[config_name] = config_dict['date']
-            #
-            # # /TaskTemplate/ContainerSpec/Secrets
-            # secrets = container_spec.get('Secrets')
-            # if secrets is not None:
-            #     for secret in secrets:
-            #         self.__logger.debug("Mapping secret %s" % secret)
-            #         secret_name = secret['SecretName']
-            #         secret_dict = self.__trouver_secret(secret_name, dates_configs)
-            #         secret['SecretName'] = secret_dict['Name']
-            #         secret['SecretID'] = secret_dict['Id']
-            #
-            # # /TaskTemplate/Networks/Target
-            # networks = task_template.get('Networks')
-            # if networks is not None:
-            #     for network in networks:
-            #         network['Target'] = self.__mapping(network['Target'])
-            #         aliases = network.get('Aliases')
-            #         if aliases is not None:
-            #             mapped_aliases = list()
-            #             for alias in aliases:
-            #                 mapped_aliases.append(self.__mapping(alias))
-            #             network['Aliases'] = mapped_aliases
-            #
-            # # /Labels
-            # config_service['Labels']['millegrille'] = self.__idmg
         except TypeError as te:
             self.__logger.error("Erreur mapping %s", nom_service)
             raise te
