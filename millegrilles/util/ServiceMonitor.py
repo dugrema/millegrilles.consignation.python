@@ -43,6 +43,7 @@ class ServiceMonitor:
         self.__fermeture_event = Event()
 
         self.__gestionnaire_certificats: GestionnaireCertificats
+        self.__gestionnaire_docker: GestionnaireModulesDocker
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -106,9 +107,11 @@ class ServiceMonitor:
 
         # Appliquer args
         if self.__args.debug:
+            logging.getLogger('__main__').setLevel(logging.DEBUG)
             logging.getLogger('millegrilles').setLevel(logging.DEBUG)
             self.__logger.setLevel(logging.DEBUG)
         elif self.__args.info:
+            logging.getLogger('__main__').setLevel(logging.INFO)
             logging.getLogger('millegrilles').setLevel(logging.INFO)
 
         self.__securite = self.__args.securite
@@ -146,6 +149,7 @@ class ServiceMonitor:
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
         # self.__logger.debug("Docker info: %s", str(self.__docker.info()))
+
         self.__nodename = self.__docker.info()['Name']
         self.__logger.debug("Docker node name: %s", self.__nodename)
 
@@ -185,6 +189,8 @@ class ServiceMonitor:
         except HTTPError:
             # La configuration n'existe pas
             self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, secrets=self.__args.secrets)
+
+        self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker)
 
     def __entretien_certificats(self):
         """
@@ -248,7 +254,7 @@ class ServiceMonitor:
 
     def __entretien_modules(self):
         # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
-        pass
+        self.__gestionnaire_docker.entretien_services()
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -466,18 +472,62 @@ class ConnexionMiddleware:
 
 class GestionnaireModulesDocker:
 
-    def __init__(self, docker_client: docker.DockerClient):
+    def __init__(self, idmg: str, docker_client: docker.DockerClient):
+        self.__idmg = idmg
+        self.__docker = docker_client
+
+        # Liste de modules requis. L'ordre est important, les dependances sont implicites.
         self.__modules_requis = [
             ConstantesServiceMonitor.MODULE_MQ,
             ConstantesServiceMonitor.MODULE_MONGO,
-            ConstantesServiceMonitor.MODULE_TRANSACTION,
-            ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-            ConstantesServiceMonitor.MODULE_CEDULEUR,
-            ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            ConstantesServiceMonitor.MODULE_TRANSMISSION,
-            ConstantesServiceMonitor.MODULE_DOMAINES,
+            # ConstantesServiceMonitor.MODULE_TRANSACTION,
+            # ConstantesServiceMonitor.MODULE_MAITREDESCLES,
+            # ConstantesServiceMonitor.MODULE_CEDULEUR,
+            # ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            # ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            # ConstantesServiceMonitor.MODULE_TRANSMISSION,
+            # ConstantesServiceMonitor.MODULE_DOMAINES,
         ]
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def entretien_services(self):
+        """
+        Verifie si les services sont actifs, les demarre au besoin.
+        :return:
+        """
+        filtre = {'name': self.idmg_tronque + '.'}
+        liste_services = self.__docker.services.list(filters=filtre)
+        dict_services = dict()
+        for service in liste_services:
+            service_name = service.name.split('.')[1]
+            dict_services[service_name] = service
+
+        for service_name in self.__modules_requis:
+            service = dict_services.get(service_name)
+            if not service:
+                self.demarrer_service(service_name)
+                break  # On demarre un seul service a la fois, on attend qu'il soit pret
+            else:
+                # Verifier etat service
+                self.verifier_etat_service(service)
+
+    def demarrer_service(self, service_name: str):
+        self.__logger.info("Demarrage service %s", service_name)
+        filtre = {'name': self.idmg_tronque + '.docker.cfg.' + service_name}
+        config_service = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
+        filtre = {'name': self.idmg_tronque + '.docker.versions'}
+        version_services = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
+
+        self.__logger.debug("Configuration versions : %s", str(version_services))
+        self.__logger.debug("Configuration service %s : %s", service_name, str(config_service))
+
+    def verifier_etat_service(self, service):
+        pass
+
+    @property
+    def idmg_tronque(self):
+        return self.__idmg[0:12]
 
 
 class GestionnaireComptesMQ:
