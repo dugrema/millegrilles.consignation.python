@@ -124,6 +124,16 @@ class ServiceMonitor:
         if not self.__fermeture_event.is_set():
             self.__fermeture_event.set()
 
+        try:
+            self.__docker.close()
+        except Exception:
+            pass
+
+        try:
+            self.__gestionnaire_docker.fermer()
+        except Exception:
+            pass
+
     def verifier_etat_courant(self):
         """
         :return: Etat courant detecte sur le systeme.
@@ -190,7 +200,8 @@ class ServiceMonitor:
             # La configuration n'existe pas
             self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, secrets=self.__args.secrets)
 
-        self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker)
+        self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker, self.__fermeture_event)
+        self.__gestionnaire_docker.start_events()
 
     def __entretien_certificats(self):
         """
@@ -472,9 +483,12 @@ class ConnexionMiddleware:
 
 class GestionnaireModulesDocker:
 
-    def __init__(self, idmg: str, docker_client: docker.DockerClient):
+    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
         self.__idmg = idmg
         self.__docker = docker_client
+        self.__fermeture_event = fermeture_event
+        self.__thread_events: Thread = None
+        self.__event_stream = None
 
         # Liste de modules requis. L'ordre est important, les dependances sont implicites.
         self.__modules_requis = [
@@ -496,6 +510,25 @@ class GestionnaireModulesDocker:
         }
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def start_events(self):
+        self.__thread_events = Thread(target=self.ecouter_events, name='events')
+        self.__thread_events.start()
+
+    def fermer(self):
+        try:
+            self.__event_stream.close()
+        except Exception:
+            pass
+
+    def ecouter_events(self):
+        self.__logger.info("Debut ecouter events docker")
+        self.__event_stream = self.__docker.events()
+        for event in self.__event_stream:
+            self.__logger.debug("Event\n%s", str(event))
+            if self.__fermeture_event.is_set():
+                break
+        self.__logger.info("Fin ecouter events docker")
 
     def entretien_services(self):
         """
@@ -521,6 +554,9 @@ class GestionnaireModulesDocker:
     def demarrer_service(self, service_name: str):
         self.__logger.info("Demarrage service %s", service_name)
         configuration = self.__formatter_configuration_service(service_name)
+
+        gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
+        gestionnaire_images.telecharger_image_docker(service_name)
 
     def verifier_etat_service(self, service):
         pass
@@ -700,6 +736,155 @@ class GestionnaireComptesMqMongo(GestionnaireComptesMQ):
 
     def __init__(self, connexion_middleware: ConnexionMiddleware):
         super().__init__(connexion_middleware)
+
+
+class GestionnaireImagesDocker:
+
+    def __init__(self, idmg: str, docker_client: docker.DockerClient):
+        self.__idmg = idmg
+        self.__docker = docker_client
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self.__versions_images: dict = None
+
+    @property
+    def tronquer_idmg(self):
+        return self.__idmg[0:12]
+
+    def charger_versions(self):
+        filtre = {'name': self.tronquer_idmg + '.docker.versions'}
+        self.__versions_images = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
+
+    def telecharger_images_docker(self):
+        """
+        S'assure d'avoir une version locale de chaque image - telecharge au besoin
+        :return:
+        """
+        images_non_trouvees = list()
+
+        self.charger_versions()
+
+        for service in self.__versions_images['images'].keys():
+            # Il est possible de definir des registre specifiquement pour un service
+            self.pull_image(service, images_non_trouvees)
+
+        if len(images_non_trouvees) > 0:
+            message = "Images non trouvees: %s" % str(images_non_trouvees)
+            raise Exception(message)
+
+    def telecharger_image_docker(self, nom_service):
+        """
+        S'assure d'avoir une version locale de chaque image - telecharge au besoin
+        :return:
+        """
+        images_non_trouvees = list()
+
+        self.charger_versions()
+
+        # Il est possible de definir des registre specifiquement pour un service
+        self.pull_image(nom_service, images_non_trouvees)
+
+        if len(images_non_trouvees) > 0:
+            message = "Images non trouvees: %s" % str(images_non_trouvees)
+            raise Exception(message)
+        
+    def pull_image(self, service, images_non_trouvees):
+        registries = self.__versions_images['registries']
+        config = self.__versions_images['images'][service]
+        nom_image = config['image']
+        tag = config['version']
+
+        service_registries = config.get('registries')
+        if service_registries is None:
+            service_registries = registries
+        image_locale = self.get_image_locale(nom_image, tag)
+        if image_locale is None:
+            image = None
+            for registry in service_registries:
+                if registry != '':
+                    nom_image_reg = '%s/%s' % (registry, nom_image)
+                else:
+                    # Le registre '' represente une image docker officielle
+                    nom_image_reg = nom_image
+
+                self.__logger.info("Telecharger image %s:%s" % (nom_image, tag))
+                image = self.pull(nom_image_reg, tag)
+                if image is not None:
+                    self.__logger.info("Image %s:%s sauvegardee avec succes" % (nom_image, tag))
+                    break
+            if image is None:
+                images_non_trouvees.append('%s:%s' % (nom_image, tag))
+
+    def pull(self, image_name, tag):
+        """
+        Effectue le telechargement d'une image.
+        Cherche dans tous les registres configures.
+        """
+
+        image = None
+        try:
+            self.__logger.info("Telechargement image %s" % image_name)
+            image = self.__docker.images.pull(image_name, tag)
+            self.__logger.debug("Image telechargee : %s" % str(image))
+        except APIError as e:
+            if e.status_code == 404:
+                self.__logger.debug("Image inconnue: %s" % e.explanation)
+            else:
+                self.__logger.warning("Erreur api, %s" % str(e))
+
+        return image
+
+    def get_image_locale(self, image_name, tag, custom_registries: list = tuple()):
+        """
+        Verifie si une image existe deja localement. Cherche dans tous les registres.
+        :param image_name:
+        :param tag:
+        :param custom_registries:
+        :return:
+        """
+        self.__logger.debug("Get image locale %s:%s" % (image_name, tag))
+
+        registries = self.__versions_images['registries'].copy()
+        registries.extend(custom_registries)
+        registries.append('')
+        for registry in registries:
+            if registry != '':
+                nom_image_reg = '%s/%s:%s' % (registry, image_name, tag)
+            else:
+                # Verifier nom de l'image sans registre (e.g. docker.io)
+                nom_image_reg = '%s:%s' % (image_name, tag)
+
+            try:
+                image = self.__docker.images.get(nom_image_reg)
+                self.__logger.info("Image locale %s:%s trouvee" % (image_name, tag))
+                return image
+            except APIError:
+                self.__logger.debug("Image non trouvee: %s" % nom_image_reg)
+
+        return None
+
+    def get_image_parconfig(self, config_key: str):
+        config_values = self.__versions_images['images'].get(config_key)
+        self.__logger.debug("Config values pour %s: %s" % (config_key, str(config_values)))
+        custom_registries = list()
+        if config_values.get('registries') is not None:
+            custom_registries = config_values['registries']
+        image = self.get_image_locale(config_values['image'], config_values['version'], custom_registries)
+        if image is not None:
+            self.__logger.debug("Tags pour image %s : %s" % (config_key, str(image.tags)))
+            nom_image = image.tags[0]  # On prend un tag au hasard
+        else:
+            self.__logger.warning("Image locale non trouvee pour config_key: %s " % config_key)
+            raise ImageNonTrouvee(config_key)
+
+        return nom_image
+
+
+class ImageNonTrouvee(Exception):
+
+    def __init__(self, image, t=None, obj=None):
+        super().__init__(t, obj)
+        self.image = image
 
 
 # Section main
