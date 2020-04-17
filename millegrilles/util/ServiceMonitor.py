@@ -8,7 +8,7 @@ import datetime
 
 from threading import Event, Thread
 from docker.errors import APIError
-from docker.types import Resources, RestartPolicy, ServiceMode, Placement, NetworkAttachmentConfig
+from docker.types import Resources, RestartPolicy, ServiceMode, Placement, NetworkAttachmentConfig, ConfigReference, SecretReference
 from base64 import b64decode
 from requests.exceptions import HTTPError
 from os import path
@@ -608,8 +608,10 @@ class GestionnaireModulesDocker:
         pass
 
         return {
-            'Id': config_retenue.attrs['ID'],
-            'Name': config_retenue.name,
+            'config_reference': {
+                'config_id': config_retenue.attrs['ID'],
+                'config_name': config_retenue.name,
+            },
             'date': str(date_config),
         }
 
@@ -622,7 +624,7 @@ class GestionnaireModulesDocker:
                 date_secret = date_secrets[config_name]
 
                 nom_filtre = self.idmg_tronque + '.' + secret_name + '.' + date_secret
-                filtre = {'name': self.idmg_tronque + '.' + secret_name}
+                filtre = {'name': nom_filtre}
                 secrets = self.__docker.secrets.list(filters=filtre)
 
                 if len(secrets) != 1:
@@ -631,8 +633,8 @@ class GestionnaireModulesDocker:
                 secret = secrets[0]
 
                 return {
-                    'Id': secret.attrs['ID'],
-                    'Name': secret.name,
+                    'secret_id': secret.attrs['ID'],
+                    'secret_name': secret.name,
                 }
 
             except KeyError:
@@ -713,7 +715,42 @@ class GestionnaireModulesDocker:
 
                 dict_config_docker['networks'] = networks
 
-            # # /TaskTemplate
+            config_configs = config_service.get('configs')
+            dates_configs = dict()
+            if config_configs:
+                liste_configs = list()
+                for config in config_configs:
+                    self.__logger.debug("Mapping configs %s" % config)
+                    config_name = config['name']
+                    config_dict = self.__trouver_config(config_name)
+
+                    config_reference = config_dict['config_reference']
+                    config_reference['filename'] = config['filename']
+                    config_reference['uid'] = config.get('uid') or 0
+                    config_reference['gid'] = config.get('gid') or 0
+                    config_reference['mode'] = config.get('mode') or 0o444
+                    liste_configs.append(ConfigReference(**config_reference))
+
+                    dates_configs[config_name] = config_dict['date']
+
+                dict_config_docker['configs'] = liste_configs
+
+            config_secrets = config_service.get('secrets')
+            if config_secrets:
+                liste_secrets = list()
+                for secret in config_secrets:
+                    self.__logger.debug("Mapping secret %s" % secret)
+                    secret_name = secret['name']
+                    secret_reference = self.__trouver_secret(secret_name, dates_configs)
+                    secret_reference['filename'] = secret['filename']
+                    secret_reference['uid'] = secret.get('uid') or 0
+                    secret_reference['gid'] = secret.get('gid') or 0
+                    secret_reference['mode'] = secret.get('mode') or 0o444
+                    liste_secrets.append(SecretReference(**secret_reference))
+
+                dict_config_docker['secrets'] = liste_secrets
+
+        # # /TaskTemplate
             # task_template = config_service['TaskTemplate']
             #
             # # /TaskTemplate/ContainerSpec
