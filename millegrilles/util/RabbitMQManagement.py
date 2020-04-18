@@ -55,7 +55,7 @@ class RabbitMQAPI:
         :type tracing: bool
         """
         data = {'tracing': True} if tracing else {}
-        self._api_put(
+        return self._api_put(
             '/api/vhosts/{0}'.format(urllib.parse.quote_plus(name)),
             data=data,
         )
@@ -245,7 +245,7 @@ class RabbitMQAPI:
         headers.update(kwargs.get('headers', {}))
         kwargs['headers'] = headers
         kwargs['verify'] = self.ca_cert_path
-        self._put(**kwargs)
+        return self._put(**kwargs)
 
     def _put(self, *args, **kwargs):
         """
@@ -259,6 +259,8 @@ class RabbitMQAPI:
         response = requests.put(*args, **kwargs)
         print(str(response))
         response.raise_for_status()
+
+        return response
 
     def _api_post(self, url, **kwargs):
         """

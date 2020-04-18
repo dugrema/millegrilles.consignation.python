@@ -1005,9 +1005,12 @@ class GestionnaireComptesMQ:
             except ConnectionError:
                 if self.__logger.isEnabledFor(logging.DEBUG):
                     self.__logger.exception("MQ Connection Error")
-            except HTTPError as e:
-                if self.__logger.isEnabledFor(logging.DEBUG):
-                    self.__logger.exception("MQ HTTPError")
+            except HTTPError as httpe:
+                if httpe.response.status_code in [401]:
+                    raise httpe
+                else:
+                    if self.__logger.isEnabledFor(logging.DEBUG):
+                        self.__logger.exception("MQ HTTPError")
 
             self.__logger.debug("Attente MQ (%s/%s)" % (essai, nb_essais_max))
             self.__wait_event.wait(periode_attente)
@@ -1033,11 +1036,23 @@ class GestionnaireComptesMQ:
             mq_pret = self.attendre_mq(10)  # Healthcheck, attendre 10 secondes
             if mq_pret:
                 # Verifier vhost, compte admin
-                if not self.__millegrille_prete:
-                    # Initialiser compte admin
-                    self.initialiser_motdepasse_admin()
+                self.__entretien_comptes_mq()
         except SSLError:
             self.__logger.debug("SSL Erreur sur MQ, initialisation incorrecte")
+        except HTTPError as httpe:
+            if httpe.response.status_code == 401:
+                # Erreur authentification, tenter d'initialiser avec compte guest
+                self.initialiser_motdepasse_admin()
+                self.__entretien_comptes_mq()
+
+    def __entretien_comptes_mq(self):
+        response = self._admin_api.create_vhost(self.__idmg)
+        if response.status_code == 204:
+            # Host existant, on fait entretien de base
+            pass
+        elif response.status_code == 201:
+            # Vhost cree, on continue l'initialisation
+            pass
 
 
 class GestionnaireComptesMongo:
