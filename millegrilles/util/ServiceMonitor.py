@@ -15,12 +15,14 @@ from docker.types import Resources, RestartPolicy, ServiceMode, NetworkAttachmen
 from base64 import b64encode, b64decode
 from requests.exceptions import HTTPError
 from os import path
+from requests.exceptions import SSLError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert, \
     ConstantesGenerateurCertificat
+from millegrilles.util.RabbitMQManagement import RabbitMQAPI
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 
@@ -47,6 +49,7 @@ class ServiceMonitor:
 
         self.__gestionnaire_certificats: GestionnaireCertificats
         self.__gestionnaire_docker: GestionnaireModulesDocker
+        self.__gestionnaire_mq: GestionnaireComptesMQ
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -137,27 +140,16 @@ class ServiceMonitor:
         except Exception:
             pass
 
-    def verifier_etat_courant(self):
-        """
-        :return: Etat courant detecte sur le systeme.
-        """
-        pass
-
-    def generer_certificats_CA_initiaux(self):
-        """
-        Generer un certificat de millegrille, intermediaire et leurs cles/mots de passe.
-        Insere les fichiers dans docker config/secret.
-        :return:
-        """
-        pass
-
     def connecter_middleware(self):
         """
         Genere un contexte et se connecte a MQ et MongoDB.
         Lance une thread distincte pour s'occuper des messages.
         :return:
         """
-        pass
+        mode_insecure = self.__args.dev
+        path_secrets = self.__args.secrets
+        self.__gestionnaire_mq = GestionnaireComptesMQ(
+            self.__idmg, host=self.__nodename, secrets=path_secrets, insecure=mode_insecure)
 
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
@@ -278,6 +270,9 @@ class ServiceMonitor:
         # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
         self.__gestionnaire_docker.entretien_services()
 
+        # Entretien du middleware
+        self.__gestionnaire_mq.entretien()
+
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
 
@@ -286,6 +281,7 @@ class ServiceMonitor:
             self.__connecter_docker()
             self.__charger_configuration()
             self.configurer_millegrille()
+            self.connecter_middleware()
 
             while not self.__fermeture_event.is_set():
                 try:
@@ -315,9 +311,13 @@ class GestionnaireCertificats:
         self.__docker = docker_client
         self.__date: datetime.datetime = None
         self.idmg = kwargs.get('idmg')
-        self.clecert_millegrille: EnveloppeCleCert
-        self.clecert_intermediaire: EnveloppeCleCert
+
+        self.__clecert_millegrille: EnveloppeCleCert
+        self.__clecert_intermediaire: EnveloppeCleCert
         self.clecert_monitor: EnveloppeCleCert
+        self.__passwd_mongo: str
+        self.__passwd_mq: str
+
         self.renouvelleur: RenouvelleurCertificat = None
         self.secret_path = kwargs.get('secrets')
 
@@ -327,19 +327,24 @@ class GestionnaireCertificats:
 
         cert_pem = kwargs.get('millegrille_cert_pem')
         if cert_pem:
-            self.clecert_millegrille = EnveloppeCleCert()
-            self.clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
+            self.__clecert_millegrille = EnveloppeCleCert()
+            self.__clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
 
     def maj_date(self):
         self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
 
-    def generer_nouveau_idmg(self):
+    def generer_nouveau_idmg(self) -> str:
+        """
+        Generer nouveau trousseau de MilleGrille, incluant cle/cert de MilleGrille, intermediaire et monitor.
+        Insere les entrees de configs et secrets dans docker.
+        :return: idmg
+        """
         generateur_initial = GenerateurInitial(None)
         clecert_intermediaire = generateur_initial.generer()
         clecert_millegrille = generateur_initial.autorite
 
-        self.clecert_millegrille = clecert_millegrille
-        self.clecert_intermediaire = clecert_intermediaire
+        self.__clecert_millegrille = clecert_millegrille
+        self.__clecert_intermediaire = clecert_intermediaire
         self.idmg = clecert_millegrille.idmg
 
         # Sauvegarder certificats, cles et mots de passe dans docker
@@ -347,9 +352,11 @@ class GestionnaireCertificats:
         self.ajouter_secret('pki.millegrille.passwd', clecert_millegrille.password)
         self.ajouter_config('pki.millegrille.cert', clecert_millegrille.cert_bytes)
 
+        chaine_certs = '\n'.join(clecert_intermediaire.chaine).encode('utf-8')
         self.ajouter_secret('pki.intermediaire.key', clecert_intermediaire.private_key_bytes)
         self.ajouter_secret('pki.intermediaire.passwd', clecert_intermediaire.password)
         self.ajouter_config('pki.intermediaire.cert', clecert_intermediaire.cert_bytes)
+        self.ajouter_config('pki.intermediaire.chain', chaine_certs)
 
         # Conserver la configuration de base pour ServiceMonitor
         configuration = {
@@ -374,9 +381,20 @@ class GestionnaireCertificats:
         return self.idmg
 
     def generer_motsdepasse(self):
-        passwd_mongo = b64encode(secrets.token_bytes(32))
+        """
+        Genere les mots de passes pour composants internes de middleware
+        :return:
+        """
+
+        passwd_mongo = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
+        self.__passwd_mongo = str(passwd_mongo, 'utf-8')
         label_passwd_mongo = self.idmg_tronque + '.passwd.mongo.' + self.__date
         self.__docker.secrets.create(name=label_passwd_mongo, data=passwd_mongo, labels={'millegrille': self.idmg})
+
+        passwd_mq = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
+        self.__passwd_mq = str(passwd_mq, 'utf-8')
+        label_passwd_mq = self.idmg_tronque + '.passwd.mq.' + self.__date
+        self.__docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
 
     def preparer_repertoires(self):
         mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
@@ -388,9 +406,10 @@ class GestionnaireCertificats:
         mongo_scripts = path.join(mounts, 'mongo/scripts')
         os.makedirs(mongo_scripts, mode=0o700)
 
-    def generer_clecert_module(self, role: str, common_name: str):
+    def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
         clecert = self.renouvelleur.renouveller_par_role(role, common_name)
-        chaine_certs = '\n'.join(clecert.chaine)
+        chaine = list(clecert.chaine)
+        chaine_certs = '\n'.join(chaine)
 
         secret = clecert.private_key_bytes
 
@@ -417,17 +436,26 @@ class GestionnaireCertificats:
 
         # Sauvegarder information certificat intermediaire
         with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_intermediaire.private_key_bytes)
+            fichiers.write(self.__clecert_intermediaire.private_key_bytes)
         with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_intermediaire.cert_bytes)
+            fichiers.write(self.__clecert_intermediaire.cert_bytes)
         with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_intermediaire.password)
+            fichiers.write(self.__clecert_intermediaire.password)
+
+        # Sauvegarder information certificat CA (millegrille)
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_CERT_CA), 'wb') as fichiers:
+            fichiers.write(self.__clecert_millegrille.cert_bytes)
 
         # Sauvegarder information certificat monitor
         with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.cert_bytes)
         with open(path.join(secret_path, 'pki.monitor.key.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.private_key_bytes)
+
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'w') as fichiers:
+            fichiers.write(self.__passwd_mongo)
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'w') as fichiers:
+            fichiers.write(self.__passwd_mq)
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
@@ -443,7 +471,7 @@ class GestionnaireCertificats:
         clecert_intermediaire = EnveloppeCleCert()
         clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
         clecert_intermediaire.password = None  # Effacer mot de passe
-        self.clecert_intermediaire = clecert_intermediaire
+        self.__clecert_intermediaire = clecert_intermediaire
 
         # Charger information certificat monitor
         with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'rb') as fichiers:
@@ -454,15 +482,20 @@ class GestionnaireCertificats:
         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
         self.clecert_monitor = clecert_monitor
 
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
+            self.__passwd_mongo = fichiers.read()
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
+            self.__passwd_mq = fichiers.read()
+
         self.__charger_renouvelleur()
 
     def __charger_renouvelleur(self):
         dict_ca = {
-            self.clecert_intermediaire.skid: self.clecert_intermediaire.cert,
-            self.clecert_millegrille.skid: self.clecert_millegrille.cert,
+            self.__clecert_intermediaire.skid: self.__clecert_intermediaire.cert,
+            self.__clecert_millegrille.skid: self.__clecert_millegrille.cert,
         }
 
-        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.clecert_intermediaire, generer_password=False)
+        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.__clecert_intermediaire, generer_password=False)
 
     def __preparer_label(self, name):
         params = {
@@ -912,17 +945,108 @@ class GestionnaireComptesMQ:
     Permet de gerer les comptes RabbitMQ via connexion https a la management console.
     """
 
+    def __init__(self, idmg, **kwargs):
+        self.__idmg = idmg
+        self.__host: str = kwargs.get('host') or 'mq'
+        self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
+        self.__file_passwd: str = kwargs.get('passwd_file') or ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE
+        self.__file_ca: str = kwargs.get('cert_ca') or ConstantesServiceMonitor.FICHIER_CERT_CA
+        self.__insecure_mode: bool = kwargs.get('insecure') or False
+
+        self.__wait_event = Event()
+        self.__password_mq: str = None
+
+        self.__path_ca = path.join(self.__path_secrets, self.__file_ca)
+
+        self.__millegrille_prete = False
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.charger_api()
+
+    def charger_api(self):
+        with open(path.join(self.__path_secrets, self.__file_passwd), 'r') as fichier:
+            motdepasse = fichier.read()
+        self._admin_api = RabbitMQAPI(self.__host, motdepasse, self.__path_ca)
+
+    def fermer(self):
+        self.__wait_event.set()
+
+    def initialiser_motdepasse_admin(self):
+        fichier_motdepasse = path.join(self.__path_secrets, self.__file_passwd)
+        with open(fichier_motdepasse, 'r') as fichiers:
+            nouveau_motdepasse = fichiers.read()
+
+        admin_api = RabbitMQAPI(self.__host, '', self.__path_ca, guest=True)
+        admin_api.create_admin('admin', nouveau_motdepasse)
+
+        # Recharger api avec nouveau mot de passe
+        self.charger_api()
+
+        # Supprimer le user guest
+        self._admin_api.delete_user('guest')
+
+    def attendre_mq(self, attente_sec=300):
+        """
+        Attendre que le container et rabbitmq soit disponible. Effectue un ping a rabbitmq pour confirmer.
+        :param attente_sec:
+        :return:
+        """
+        mq_pret = False
+        periode_attente = 5  # Secondes entre essais de connexion
+        nb_essais_max = int(attente_sec / periode_attente) + 1
+        for essai in range(1, nb_essais_max):
+            try:
+                resultat_healthcheck = self._admin_api.healthchecks()
+                if resultat_healthcheck.get('status') == 'ok':
+                    self.__logger.debug("MQ est pret")
+                    mq_pret = True
+                    break
+            except ConnectionError:
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.exception("MQ Connection Error")
+            except HTTPError as e:
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.exception("MQ HTTPError")
+
+            self.__logger.debug("Attente MQ (%s/%s)" % (essai, nb_essais_max))
+            self.__wait_event.wait(periode_attente)
+
+        return mq_pret
+
+    def ajouter_compte(self, enveloppe: EnveloppeCleCert):
+        idmg = self.__idmg
+        subject = enveloppe.subject_rfc4514_string_mq()
+
+        self._admin_api.create_user(subject)
+        self._admin_api.create_user_permission(subject, idmg)
+        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.middleware')
+        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.inter')
+        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.noeuds')
+        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.public')
+
+    def ajouter_vhost(self):
+        self._admin_api.create_vhost(self.__idmg)
+
+    def entretien(self):
+        try:
+            mq_pret = self.attendre_mq(10)  # Healthcheck, attendre 10 secondes
+            if mq_pret:
+                # Verifier vhost, compte admin
+                if not self.__millegrille_prete:
+                    # Initialiser compte admin
+                    self.initialiser_motdepasse_admin()
+        except SSLError:
+            self.__logger.debug("SSL Erreur sur MQ, initialisation incorrecte")
+
+
+class GestionnaireComptesMongo:
+    """
+    Permet de gerer les comptes MongoDB.
+    """
+
     def __init__(self, connexion_middleware: ConnexionMiddleware):
         self.__connexion = connexion_middleware
-
-
-class GestionnaireComptesMqMongo(GestionnaireComptesMQ):
-    """
-    Permet de gerer les comptes RabbitMQ et MongoDB.
-    """
-
-    def __init__(self, connexion_middleware: ConnexionMiddleware):
-        super().__init__(connexion_middleware)
 
 
 class GestionnaireImagesDocker:

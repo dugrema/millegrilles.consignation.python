@@ -1372,3 +1372,7 @@ class ConstantesServiceMonitor:
     MODULE_COUPDOEIL = 'coupdoeilreact'
     MODULE_TRANSMISSION = 'transmission'
     MODULE_DOMAINES = 'domaines'
+
+    FICHIER_MONGO_MOTDEPASSE = 'passwd.mongo.txt'
+    FICHIER_MQ_MOTDEPASSE = 'passwd.mq.txt'
+    FICHIER_CERT_CA = 'pki.millegrille.cert.pem'

@@ -284,6 +284,20 @@ class EnveloppeCleCert:
 
         return sujet_dict
 
+    def subject_rfc4514_string(self):
+        return self.cert.subject.rfc4514_string()
+
+    def subject_rfc4514_string_mq(self):
+        """
+        Subject avec ordre inverse pour RabbitMQ EXTERNAL
+        :return:
+        """
+        subject = self.subject_rfc4514_string()
+        subject_list = subject.split(',')
+        subject_list.reverse()
+        return ','.join(subject_list)
+
+
 
 class GenerateurCertificat:
 
@@ -459,7 +473,7 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         cle_autorite = self._autorite.private_key
         certificate = builder.sign(
             private_key=cle_autorite,
-            algorithm=hashes.SHA512(),
+            algorithm=hashes.SHA256(),
             backend=default_backend()
         )
 
@@ -562,7 +576,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         cle_autorite = self._autorite.private_key
         certificate = builder.sign(
             private_key=cle_autorite,
-            algorithm=hashes.SHA512(),
+            algorithm=hashes.SHA256(),
             backend=default_backend()
         )
         return certificate
@@ -577,7 +591,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
         akid_autorite = EnveloppeCleCert.get_authority_identifier(certificat)
         idx = 0
-        for idx in range(0, 100):
+        for idx in range(0, 5):
             cert_autorite = self._dict_ca.get(akid_autorite)
 
             if cert_autorite is None:
@@ -588,12 +602,12 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
             if akid_autorite == akid_autorite_suivante:
                 # On est rendu au root
-                chaine.pop()
+                # chaine.pop()
                 break
 
             akid_autorite = akid_autorite_suivante
 
-        if idx == 100:
+        if idx == 5:
             raise Exception("Depasse limite profondeur")
 
         # Generer la chaine de certificats avec les intermediaires
@@ -726,7 +740,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 
         certificate = builder.sign(
             private_key=clecert.private_key,
-            algorithm=hashes.SHA3_512(),
+            algorithm=hashes.SHA512(),
             backend=default_backend()
         )
 
