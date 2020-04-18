@@ -42,6 +42,7 @@ class ConstantesGenerateurCertificat:
     ROLE_MONGOEXPRESS = 'mongoxp'
     ROLE_NGINX = 'vitrineweb'
     ROLE_CONNECTEUR = 'connecteur'
+    ROLE_MONITOR = 'monitor'
     ROLE_CONNECTEUR_TIERS = 'tiers'
     ROLE_BACKUP = 'backup'
 
@@ -977,6 +978,37 @@ class GenererConnecteur(GenerateurNoeud):
         return builder
 
 
+class GenererMonitor(GenerateurNoeud):
+    """
+    Generateur de certificats pour le monitor de services
+    """
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+
+        exchanges = ','.join([
+            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE
+        ]).encode('utf-8')
+
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_MONITOR.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class GenererMQ(GenerateurNoeud):
 
     def _get_keyusage(self, builder):
@@ -1331,6 +1363,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
+            ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
         }
 
         self.__generateur_par_csr = GenerateurCertificateParRequest

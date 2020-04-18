@@ -196,7 +196,7 @@ class ServiceMonitor:
 
             self.__gestionnaire_certificats = GestionnaireCertificats(
                 self.__docker, idmg=self.__idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self.__args.secrets)
-            self.__gestionnaire_certificats.charger_cas()
+            self.__gestionnaire_certificats.charger_certificats()
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
         except HTTPError as he:
@@ -263,7 +263,7 @@ class ServiceMonitor:
             self.__idmg = self.__gestionnaire_certificats.generer_nouveau_idmg()
 
             if self.__args.dev:
-                self.__gestionnaire_certificats.sauvegarder_cas()
+                self.__gestionnaire_certificats.sauvegarder_certificats()
 
         self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker, self.__fermeture_event)
         self.__gestionnaire_docker.start_events()
@@ -317,10 +317,13 @@ class GestionnaireCertificats:
         self.idmg = kwargs.get('idmg')
         self.clecert_millegrille: EnveloppeCleCert
         self.clecert_intermediaire: EnveloppeCleCert
+        self.clecert_monitor: EnveloppeCleCert
         self.renouvelleur: RenouvelleurCertificat = None
         self.secret_path = kwargs.get('secrets')
 
         self.maj_date()
+
+        self.__nodename = self.__docker.info()['Name']
 
         cert_pem = kwargs.get('millegrille_cert_pem')
         if cert_pem:
@@ -357,6 +360,12 @@ class GestionnaireCertificats:
         configuration_bytes = json.dumps(configuration).encode('utf-8')
         self.__docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
 
+        # Initialiser le renouvelleur de certificats avec le nouveau trousseau
+        self.__charger_renouvelleur()
+
+        # Generer certificat pour monitor
+        self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self.__nodename)
+
         # Generer mots de passes
         self.generer_motsdepasse()
 
@@ -379,7 +388,6 @@ class GestionnaireCertificats:
         mongo_scripts = path.join(mounts, 'mongo/scripts')
         os.makedirs(mongo_scripts, mode=0o700)
 
-
     def generer_clecert_module(self, role: str, common_name: str):
         clecert = self.renouvelleur.renouveller_par_role(role, common_name)
         chaine_certs = '\n'.join(clecert.chaine)
@@ -395,12 +403,19 @@ class GestionnaireCertificats:
         self.ajouter_secret('pki.%s.key' % role, secret)
         self.ajouter_config('pki.%s.cert' % role, chaine_certs.encode('utf-8'))
 
-    def sauvegarder_cas(self):
+        return clecert
+
+    def sauvegarder_certificats(self):
         """
         Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
         :return:
         """
         secret_path = path.abspath(self.secret_path)
+
+        # S'assurer que le repertoire existe
+        os.makedirs(secret_path, mode=0o700, exist_ok=True)
+
+        # Sauvegarder information certificat intermediaire
         with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_intermediaire.private_key_bytes)
         with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'wb') as fichiers:
@@ -408,10 +423,16 @@ class GestionnaireCertificats:
         with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_intermediaire.password)
 
-        self.__charger_renouvelleur()
+        # Sauvegarder information certificat monitor
+        with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'wb') as fichiers:
+            fichiers.write(self.clecert_monitor.cert_bytes)
+        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'wb') as fichiers:
+            fichiers.write(self.clecert_monitor.private_key_bytes)
 
-    def charger_cas(self):
+    def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
+
+        # Charger information certificat intermediaire
         with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'rb') as fichiers:
             key_pem = fichiers.read()
         with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'rb') as fichiers:
@@ -423,6 +444,15 @@ class GestionnaireCertificats:
         clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
         clecert_intermediaire.password = None  # Effacer mot de passe
         self.clecert_intermediaire = clecert_intermediaire
+
+        # Charger information certificat monitor
+        with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'rb') as fichiers:
+            cert_pem = fichiers.read()
+        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'rb') as fichiers:
+            key_pem = fichiers.read()
+        clecert_monitor = EnveloppeCleCert()
+        clecert_monitor.from_pem_bytes(key_pem, cert_pem)
+        self.clecert_monitor = clecert_monitor
 
         self.__charger_renouvelleur()
 
@@ -630,6 +660,7 @@ class GestionnaireModulesDocker:
 
     def __trouver_config(self, config_name):
         config_names = config_name.split(';')
+        configs = None
         for config_name_val in config_names:
             filtre = {'name': self.idmg_tronque + '.' + config_name_val}
             configs = self.__docker.configs.list(filters=filtre)
@@ -660,6 +691,7 @@ class GestionnaireModulesDocker:
 
     def __trouver_secret(self, secret_name):
         secret_names = secret_name.split(';')
+        secrets = None
         for secret_name_val in secret_names:
             filtre = {'name': self.idmg_tronque + '.' + secret_name_val}
             secrets = self.__docker.secrets.list(filters=filtre)
