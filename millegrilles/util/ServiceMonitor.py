@@ -5,12 +5,14 @@ import sys
 import docker
 import json
 import datetime
+import secrets
+import os
 
 from threading import Event, Thread
 from docker.errors import APIError
 from docker.types import Resources, RestartPolicy, ServiceMode, NetworkAttachmentConfig, ConfigReference, \
     SecretReference, EndpointSpec
-from base64 import b64decode
+from base64 import b64encode, b64decode
 from requests.exceptions import HTTPError
 from os import path
 
@@ -355,12 +357,42 @@ class GestionnaireCertificats:
         configuration_bytes = json.dumps(configuration).encode('utf-8')
         self.__docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
 
+        # Generer mots de passes
+        self.generer_motsdepasse()
+
+        self.preparer_repertoires()
+
         return self.idmg
+
+    def generer_motsdepasse(self):
+        passwd_mongo = b64encode(secrets.token_bytes(32))
+        label_passwd_mongo = self.idmg_tronque + '.passwd.mongo.' + self.__date
+        self.__docker.secrets.create(name=label_passwd_mongo, data=passwd_mongo, labels={'millegrille': self.idmg})
+
+    def preparer_repertoires(self):
+        mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
+        os.makedirs(mounts, mode=0o770)
+
+        mongo_data = path.join(mounts, 'mongo/data')
+        os.makedirs(mongo_data, mode=0o700)
+
+        mongo_scripts = path.join(mounts, 'mongo/scripts')
+        os.makedirs(mongo_scripts, mode=0o700)
+
 
     def generer_clecert_module(self, role: str, common_name: str):
         clecert = self.renouvelleur.renouveller_par_role(role, common_name)
         chaine_certs = '\n'.join(clecert.chaine)
-        self.ajouter_secret('pki.%s.key' % role, clecert.private_key_bytes)
+
+        secret = clecert.private_key_bytes
+
+        # Verifier si on doit combiner le cert et la cle (requis pour Mongo)
+        if role in [ConstantesGenerateurCertificat.ROLE_MONGO, ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS]:
+            secret_str = [str(secret, 'utf-8')]
+            secret_str.extend(clecert.chaine)
+            secret = '\n'.join(secret_str).encode('utf-8')
+
+        self.ajouter_secret('pki.%s.key' % role, secret)
         self.ajouter_config('pki.%s.cert' % role, chaine_certs.encode('utf-8'))
 
     def sauvegarder_cas(self):
@@ -418,6 +450,10 @@ class GestionnaireCertificats:
     def ajouter_secret(self, name: str, data: bytes):
         name_tronque = self.__preparer_label(name)
         self.__docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+
+    @property
+    def idmg_tronque(self):
+        return self.idmg[0:12]
 
 
 class ConnexionMiddleware:
@@ -516,6 +552,8 @@ class GestionnaireModulesDocker:
             'IDMG': self.__idmg,
             'IDMGLOWER': self.__idmg.lower(),
             'IDMGTRUNCLOWER': self.idmg_tronque,
+            'MONGO_INITDB_ROOT_USERNAME': 'admin',
+            'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
         }
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -534,7 +572,7 @@ class GestionnaireModulesDocker:
         self.__logger.info("Debut ecouter events docker")
         self.__event_stream = self.__docker.events()
         for event in self.__event_stream:
-            self.__logger.debug("Event\n%s", str(event))
+            self.__logger.debug("Event : %s", str(event))
             if self.__fermeture_event.is_set():
                 break
         self.__logger.info("Fin ecouter events docker")
@@ -620,7 +658,32 @@ class GestionnaireModulesDocker:
             'date': str(date_config),
         }
 
-    def __trouver_secret(self, secret_names, date_secrets: dict):
+    def __trouver_secret(self, secret_name):
+        secret_names = secret_name.split(';')
+        for secret_name_val in secret_names:
+            filtre = {'name': self.idmg_tronque + '.' + secret_name_val}
+            secrets = self.__docker.secrets.list(filters=filtre)
+            if len(secrets) > 0:
+                break
+
+        # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
+        date_secret: int = None
+        secret_retenue = None
+        for secret in secrets:
+            nom_secret = secret.name
+            split_secret = nom_secret.split('.')
+            date_secret_str = split_secret[-1]
+            date_secret_int = int(date_secret_str)
+            if not date_secret or date_secret_int > date_secret:
+                date_secret = date_secret_int
+                secret_retenue = secret
+
+        return {
+            'secret_id': secret_retenue.attrs['ID'],
+            'secret_name': secret_retenue.name,
+        }
+
+    def __trouver_secret_matchdate(self, secret_names, date_secrets: dict):
         for secret_name in secret_names.split(';'):
             secret_name_split = secret_name.split('.')[0:2]
             secret_name_split.append('cert')
@@ -751,7 +814,10 @@ class GestionnaireModulesDocker:
                 for secret in config_secrets:
                     self.__logger.debug("Mapping secret %s" % secret)
                     secret_name = secret['name']
-                    secret_reference = self.__trouver_secret(secret_name, dates_configs)
+                    if secret.get('match_config'):
+                        secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
+                    else:
+                        secret_reference = self.__trouver_secret(secret_name)
                     secret_reference['filename'] = secret['filename']
                     secret_reference['uid'] = secret.get('uid') or 0
                     secret_reference['gid'] = secret.get('gid') or 0
