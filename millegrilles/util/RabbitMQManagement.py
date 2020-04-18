@@ -257,7 +257,7 @@ class RabbitMQAPI:
         if 'data' in kwargs:
             kwargs['data'] = json.dumps(kwargs['data'])
         response = requests.put(*args, **kwargs)
-        print(str(response))
+        # print(str(response))
         response.raise_for_status()
 
         return response

@@ -149,7 +149,9 @@ class ServiceMonitor:
         mode_insecure = self.__args.dev
         path_secrets = self.__args.secrets
         self.__gestionnaire_mq = GestionnaireComptesMQ(
-            self.__idmg, host=self.__nodename, secrets=path_secrets, insecure=mode_insecure)
+            self.__idmg, self.__gestionnaire_certificats.clecert_monitor,
+            host=self.__nodename, secrets=path_secrets, insecure=mode_insecure
+        )
 
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
@@ -945,8 +947,10 @@ class GestionnaireComptesMQ:
     Permet de gerer les comptes RabbitMQ via connexion https a la management console.
     """
 
-    def __init__(self, idmg, **kwargs):
+    def __init__(self, idmg, clecert_monitor: EnveloppeCleCert, **kwargs):
         self.__idmg = idmg
+        self.__clecert_monitor = clecert_monitor
+
         self.__host: str = kwargs.get('host') or 'mq'
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
         self.__file_passwd: str = kwargs.get('passwd_file') or ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE
@@ -1023,10 +1027,11 @@ class GestionnaireComptesMQ:
 
         self._admin_api.create_user(subject)
         self._admin_api.create_user_permission(subject, idmg)
-        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.middleware')
-        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.inter')
-        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.noeuds')
-        self._admin_api.create_user_topic(subject, idmg, 'millegrilles.public')
+
+        exchanges = enveloppe.get_exchanges
+        for exchange in exchanges:
+            self._admin_api.create_user_topic(subject, idmg, exchange)
+            self._admin_api.create_user_permission(subject, idmg)
 
     def ajouter_exchanges(self):
         self._admin_api.create_vhost(self.__idmg)
@@ -1059,12 +1064,17 @@ class GestionnaireComptesMQ:
 
     def __entretien_comptes_mq(self):
         response = self._admin_api.create_vhost(self.__idmg)
-        if response.status_code == 204:
+        if self.__millegrille_prete and response.status_code == 204:
             # Host existant, on fait entretien de base
             pass
-        elif response.status_code == 201:
+        else:
             # Vhost cree, on continue l'initialisation
             self.ajouter_exchanges()
+
+            # Ajouter compte du monitor
+            self.ajouter_compte(self.__clecert_monitor)
+
+        self.__millegrille_prete = True
 
 
 class GestionnaireComptesMongo:

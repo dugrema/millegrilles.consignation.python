@@ -176,6 +176,26 @@ class EnveloppeCleCert:
         return attribute_values
 
     @property
+    def get_exchanges(self):
+        MQ_EXCHANGES_OID = x509.ObjectIdentifier('1.2.3.4.0')
+        extensions = self.cert.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_EXCHANGES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
+
+    @property
+    def get_domaines(self):
+        MQ_DOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.2')
+        extensions = self.cert.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_DOMAINES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        attribute_values = oid_value.split(',')
+        return attribute_values
+
+    @property
     def cert_bytes(self):
         return self.cert.public_bytes(serialization.Encoding.PEM)
 
