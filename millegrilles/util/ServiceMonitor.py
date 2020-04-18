@@ -1028,8 +1028,20 @@ class GestionnaireComptesMQ:
         self._admin_api.create_user_topic(subject, idmg, 'millegrilles.noeuds')
         self._admin_api.create_user_topic(subject, idmg, 'millegrilles.public')
 
-    def ajouter_vhost(self):
+    def ajouter_exchanges(self):
         self._admin_api.create_vhost(self.__idmg)
+
+        params_exchange = {
+            "type": "topic",
+            "auto_delete": False,
+            "durable": True,
+            "internal": False
+        }
+        self._admin_api.create_exchange_for_vhost('millegrilles.middleware', self.__idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.noeuds', self.__idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.private', self.__idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.public', self.__idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.inter', self.__idmg, params_exchange)
 
     def entretien(self):
         try:
@@ -1052,7 +1064,7 @@ class GestionnaireComptesMQ:
             pass
         elif response.status_code == 201:
             # Vhost cree, on continue l'initialisation
-            pass
+            self.ajouter_exchanges()
 
 
 class GestionnaireComptesMongo:
