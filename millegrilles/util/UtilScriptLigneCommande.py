@@ -6,6 +6,8 @@ import logging
 import time
 import sys
 import threading
+import os
+import json
 
 from threading import Event
 
@@ -178,3 +180,27 @@ class ModeleConfiguration:
     @property
     def channel(self):
         return self.__channel
+
+    @staticmethod
+    def preparer_mongo_keycert():
+        json_file = os.getenv('MG_CONFIG_JSON')
+        if json_file:
+            with open(json_file, 'r') as fichier:
+                params = json.load(fichier)
+        else:
+            params = os.environ
+
+        certfile = params['MG_MQ_CERTFILE']
+        keyfile = params['MG_MQ_KEYFILE']
+
+        dir_key = os.path.dirname(keyfile)
+        cert_file_name = os.path.basename(certfile)
+        mongo_keycert = os.path.join(dir_key, cert_file_name + '.keycert.pem')
+
+        with open(mongo_keycert, 'w') as keycert:
+            with open(keyfile, 'r') as fichiers:
+                keycert.write(fichiers.read())
+            with open(certfile, 'r') as fichiers:
+                keycert.write(fichiers.read())
+
+        os.environ["MG_MONGO_SSL_CERTFILE"] = mongo_keycert

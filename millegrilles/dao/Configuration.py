@@ -163,6 +163,7 @@ class TransactionConfiguration:
         # Configuration specifique pour ssl
         mongo_ssl_param = self._mongo_config.get(Constantes.CONFIG_MONGO_SSL)
         config_mongo['ssl'] = mongo_ssl_param in ['on', 'nocert', 'x509']  # Mettre ssl=True ou ssl=False
+        config_mongo['authSource'] = self._mongo_config.get(Constantes.CONFIG_MONGO_AUTHSOURCE) or self.idmg
         if mongo_ssl_param == 'on':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
             parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs', 'username', 'password'])
@@ -170,11 +171,11 @@ class TransactionConfiguration:
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
             config_mongo['authMechanism'] = 'MONGODB-X509'
             parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
+            del config_mongo['authSource']
         elif mongo_ssl_param == 'nocert':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
             parametres_mongo.extend(['username', 'password'])
 
-        config_mongo['authSource'] = self._mongo_config.get(Constantes.CONFIG_MONGO_AUTHSOURCE) or self.idmg
 
         # if mongo_ssl_param != 'x509':
         #     config_mongo['authSource'] = self.idmg
@@ -425,7 +426,8 @@ class ContexteRessourcesMilleGrilles:
         :param connecter: Si true, la connexion aux DAOs est ouverte immediatement
         """
 
-        # self._configuration = TransactionConfiguration()
+        if not self._configuration:
+            self._configuration = TransactionConfiguration()
         self._configuration.loadEnvironment(additionals=self._additionnals)
         self._message_dao = None
 

@@ -1,6 +1,9 @@
 #!/usr/bin/python3
 # Executer ce script pour demarrer le consignateur de transaction
-
 from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransaction
-consignateur = ConsignateurTransaction()
-consignateur.main()
+
+
+if __name__ == '__main__':
+    ConsignateurTransaction.preparer_mongo_keycert()
+    consignateur = ConsignateurTransaction()
+    consignateur.main()
