@@ -1373,6 +1373,7 @@ class ConstantesServiceMonitor:
     MODULE_COUPDOEIL = 'coupdoeilreact'
     MODULE_TRANSMISSION = 'transmission'
     MODULE_DOMAINES = 'domaines'
+    MODULE_PYTHON = 'mg-python'
 
     FICHIER_MONGO_MOTDEPASSE = 'passwd.mongo.txt'
     FICHIER_MQ_MOTDEPASSE = 'passwd.mq.txt'

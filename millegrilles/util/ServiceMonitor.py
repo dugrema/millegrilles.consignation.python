@@ -750,17 +750,17 @@ class GestionnaireModulesDocker:
         self.__event_stream = None
 
         # Liste de modules requis. L'ordre est important, les dependances sont implicites.
-        self.__modules_requis = [
-            ConstantesServiceMonitor.MODULE_MQ,
-            ConstantesServiceMonitor.MODULE_MONGO,
-            # ConstantesServiceMonitor.MODULE_TRANSACTION,
-            # ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-            # ConstantesServiceMonitor.MODULE_CEDULEUR,
-            # ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            # ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            # ConstantesServiceMonitor.MODULE_TRANSMISSION,
-            # ConstantesServiceMonitor.MODULE_DOMAINES,
-        ]
+        self.__modules_requis = {
+            ConstantesServiceMonitor.MODULE_MQ: {'nom': ConstantesServiceMonitor.MODULE_MQ},
+            ConstantesServiceMonitor.MODULE_MONGO: {'nom': ConstantesServiceMonitor.MODULE_MONGO},
+            ConstantesServiceMonitor.MODULE_TRANSACTION: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
+            # ConstantesServiceMonitor.MODULE_MAITREDESCLES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
+            # ConstantesServiceMonitor.MODULE_CEDULEUR: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
+            # ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS},
+            # ConstantesServiceMonitor.MODULE_COUPDOEIL: {'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL},
+            # ConstantesServiceMonitor.MODULE_TRANSMISSION: {'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION},
+            # ConstantesServiceMonitor.MODULE_DOMAINES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
+        }
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -809,20 +809,21 @@ class GestionnaireModulesDocker:
             service_name = service.name.split('_')[1]
             dict_services[service_name] = service
 
-        for service_name in self.__modules_requis:
+        for service_name, params in self.__modules_requis.items():
             service = dict_services.get(service_name)
             if not service:
-                self.demarrer_service(service_name)
+                self.demarrer_service(service_name, **params)
                 break  # On demarre un seul service a la fois, on attend qu'il soit pret
             else:
                 # Verifier etat service
                 self.verifier_etat_service(service)
 
-    def demarrer_service(self, service_name: str):
+    def demarrer_service(self, service_name: str, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
-
         gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
-        image = gestionnaire_images.telecharger_image_docker(service_name)
+
+        nom_image_docker = kwargs.get('nom') or service_name
+        image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
 
         # Prendre un tag au hasard
         image_tag = image.tags[0]
