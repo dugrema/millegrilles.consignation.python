@@ -16,7 +16,7 @@ from base64 import b64encode, b64decode
 from requests.exceptions import HTTPError
 from os import path
 from requests.exceptions import SSLError
-from pymongo.errors import OperationFailure
+from pymongo.errors import OperationFailure, DuplicateKeyError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -26,6 +26,7 @@ from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCer
 from millegrilles.util.RabbitMQManagement import RabbitMQAPI
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
+from millegrilles.dao.DocumentDAO import MongoDAO
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 
@@ -569,6 +570,8 @@ class ConnexionMiddleware:
 
         self.__certificat_event_handler: GestionnaireEvenementsCertificat
 
+        self.__monitor_cert_file: str
+
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
         # Connecter
@@ -593,7 +596,7 @@ class ConnexionMiddleware:
             mongo_passwd = fichier.read()
 
         ca_certs_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem')
-        monitor_cert_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_CERT + '.pem')
+        self.__monitor_cert_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_CERT + '.pem')
         monitor_key_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem')
 
         # Preparer fichier keycert pour mongo
@@ -601,7 +604,7 @@ class ConnexionMiddleware:
         with open(monitor_keycert_file, 'w') as keycert:
             with open(monitor_key_file, 'r') as fichier:
                 keycert.write(fichier.read())
-            with open(monitor_cert_file, 'r') as fichier:
+            with open(self.__monitor_cert_file, 'r') as fichier:
                 keycert.write(fichier.read())
 
         additionnals = [
@@ -609,7 +612,7 @@ class ConnexionMiddleware:
                 'MG_MQ_HOST': 'mg-dev3',
                 'MG_MQ_PORT': 5673,
                 'MG_MQ_CA_CERTS': ca_certs_file,
-                'MG_MQ_CERTFILE': monitor_cert_file,
+                'MG_MQ_CERTFILE': self.__monitor_cert_file,
                 'MG_MQ_KEYFILE': monitor_key_file,
                 'MG_MQ_SSL': 'on',
                 'MG_MQ_AUTH_CERT': 'on',
@@ -661,7 +664,7 @@ class ConnexionMiddleware:
 
         while not self.__fermeture_event.is_set():
             try:
-                self.__mongo.init_replication()
+                self.__mongo.entretien()
             except Exception:
                 self.__logger.exception("Exception generique")
             finally:
@@ -670,8 +673,16 @@ class ConnexionMiddleware:
         self.__logger.info("Fin thread middleware")
 
     @property
-    def document_dao(self):
+    def document_dao(self) -> MongoDAO:
         return self.__contexte.document_dao
+
+    @property
+    def configuration(self) -> TransactionConfiguration:
+        return self.__configuration
+
+    @property
+    def monitor_cert_file(self) -> str:
+        return self.__monitor_cert_file
 
 
 class GestionnaireModulesDocker:
@@ -1173,12 +1184,51 @@ class GestionnaireComptesMongo:
     def __init__(self, connexion_middleware: ConnexionMiddleware):
         self.__connexion = connexion_middleware
 
+        self.__rs_init_ok = False
+        # self.__compte_monitor_ok = False
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def entretien(self):
+        if not self.__rs_init_ok:
+            self.init_replication()
+
+        # if not self.__compte_monitor_ok:
+        #     with open(self.__connexion.monitor_cert_file, 'rb') as fichier:
+        #         cert_monitor = EnveloppeCleCert()
+        #         cert_monitor.cert_from_pem_bytes(fichier.read())
+        #
+        #     try:
+        #         self.creer_compte(cert_monitor)
+        #         self.__compte_monitor_ok = True
+        #     except DuplicateKeyError:
+        #         self.__compte_monitor_ok = True
+
     def init_replication(self):
         document_dao = self.__connexion.document_dao
         try:
             document_dao.commande('replSetInitiate')
+            self.__rs_init_ok = True
         except OperationFailure:
-            pass
+            self.__rs_init_ok = True
+
+    def creer_compte(self, cert: EnveloppeCleCert):
+        idmg = self.__connexion.configuration.idmg
+        nom_compte = cert.subject_rfc4514_string_mq()
+        commande = {
+            'createUser': nom_compte,
+            'roles': [{
+                'role': 'readWrite',
+                'db': idmg,
+            }]
+        }
+
+        self.__logger.debug("Creation compte Mongo : %s", commande)
+
+        document_dao = self.__connexion.document_dao
+        external_db = document_dao.get_database('$external')
+        external_db.command(commande)
+
 
 class GestionnaireImagesDocker:
 

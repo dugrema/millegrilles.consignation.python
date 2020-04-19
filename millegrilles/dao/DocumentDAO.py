@@ -95,11 +95,14 @@ class MongoDAO:
     def get_collection(self, collection):
         return self._mg_database[collection]
 
-    def get_database(self):
-        return self._mg_database
+    def get_database(self, db=None):
+        if not db:
+            return self._mg_database
+        else:
+            return self._client.get_database(db)
 
-    def commande(self, commande):
-        self._client.admin.command(commande)
+    def commande(self, commande, params=None):
+        self._client.admin.command(commande, params)
 
 class MongoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
