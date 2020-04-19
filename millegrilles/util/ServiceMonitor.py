@@ -153,7 +153,8 @@ class ServiceMonitor:
         :return:
         """
         configuration = TransactionConfiguration()
-        self.__connexion_middleware = ConnexionMiddleware(configuration, secrets=self.__args.secrets)
+        self.__connexion_middleware = ConnexionMiddleware(
+            configuration, self.__docker, self.__gestionnaire_mq, secrets=self.__args.secrets)
 
         try:
             self.__connexion_middleware.initialiser()
@@ -552,8 +553,11 @@ class ConnexionMiddleware:
     Connexion au middleware de la MilleGrille en service.
     """
 
-    def __init__(self, configuration: TransactionConfiguration, **kwargs):
+    def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
+                 gestionnaire_mq, **kwargs):
         self.__configuration = configuration
+        self.__docker = client_docker
+        self.__gestionnaire_mq = gestionnaire_mq
 
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
         self.__file_mongo_passwd: str = kwargs.get('mongo_passwd_file') or ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE
@@ -571,6 +575,8 @@ class ConnexionMiddleware:
         self.__certificat_event_handler: GestionnaireEvenementsCertificat
 
         self.__monitor_cert_file: str
+
+        self.__comptes_mongo_ok = False
 
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
@@ -665,12 +671,61 @@ class ConnexionMiddleware:
         while not self.__fermeture_event.is_set():
             try:
                 self.__mongo.entretien()
+                self.__entretien_comptes()
             except Exception:
                 self.__logger.exception("Exception generique")
             finally:
                 self.__fermeture_event.wait(30)
 
         self.__logger.info("Fin thread middleware")
+
+    def __entretien_comptes(self):
+
+        if not self.__comptes_mongo_ok:
+            try:
+                idmg = self.__configuration.idmg
+                igmd_tronque = idmg[0:12]
+                roles_comptes = [
+                    ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+                    ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+                    ConstantesGenerateurCertificat.ROLE_CEDULEUR,
+                    ConstantesGenerateurCertificat.ROLE_FICHIERS,
+                    ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+                    ConstantesGenerateurCertificat.ROLE_DOMAINES,
+                ]
+                roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
+
+                for role in roles_comptes:
+                    filtre = {'name': role}
+                    configs = self.__docker.configs.list(filters=filtre)
+
+                    dict_configs = dict()
+                    for config in configs:
+                        dict_configs[config.name] = config
+
+                    # Choisir plus recent certificat
+                    liste_configs_str = list(dict_configs.keys())
+                    liste_configs_str.sort()
+                    nom_config = liste_configs_str[-1]
+                    config_cert = dict_configs[nom_config]
+
+                    # Extraire certificat
+                    cert_pem = b64decode(config_cert.attrs['Spec']['Data'])
+                    clecert = EnveloppeCleCert()
+                    clecert.cert_from_pem_bytes(cert_pem)
+
+                    # Creer compte
+                    try:
+                        self.__mongo.creer_compte(clecert)
+                    except DuplicateKeyError:
+                        self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
+
+                    self.__gestionnaire_mq.ajouter_compte(clecert)
+
+                self.__comptes_mongo_ok = True
+
+            except Exception:
+                self.__logger.exception("Erreur enregistrement comptes")
 
     @property
     def document_dao(self) -> MongoDAO:
