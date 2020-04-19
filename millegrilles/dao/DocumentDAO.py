@@ -20,7 +20,7 @@ class MongoDAO:
         self._configuration = configuration
         self._idmg = self._configuration.idmg
 
-        self._client = None
+        self._client: MongoClient = None
         self._mg_database = None
         self._collection_transactions = None
         self._collection_processus = None
@@ -98,6 +98,8 @@ class MongoDAO:
     def get_database(self):
         return self._mg_database
 
+    def commande(self, commande):
+        self._client.admin.command(commande)
 
 class MongoJSONEncoder(json.JSONEncoder):
     def default(self, obj):

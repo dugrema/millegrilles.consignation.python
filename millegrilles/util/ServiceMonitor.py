@@ -16,6 +16,7 @@ from base64 import b64encode, b64decode
 from requests.exceptions import HTTPError
 from os import path
 from requests.exceptions import SSLError
+from pymongo.errors import OperationFailure
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -155,6 +156,7 @@ class ServiceMonitor:
 
         try:
             self.__connexion_middleware.initialiser()
+            self.__connexion_middleware.start()
         except BrokenBarrierError:
             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
             self.__connexion_middleware.stop()
@@ -561,6 +563,8 @@ class ConnexionMiddleware:
 
         self.__fermeture_event = Event()
 
+        self.__mongo = GestionnaireComptesMongo(connexion_middleware=self)
+
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.__certificat_event_handler: GestionnaireEvenementsCertificat
@@ -655,10 +659,19 @@ class ConnexionMiddleware:
     def run(self):
         self.__logger.info("Thread middleware demarree")
 
-        while self.__fermeture_event.is_set():
-            self.__fermeture_event.wait(30)
+        while not self.__fermeture_event.is_set():
+            try:
+                self.__mongo.init_replication()
+            except Exception:
+                self.__logger.exception("Exception generique")
+            finally:
+                self.__fermeture_event.wait(30)
 
         self.__logger.info("Fin thread middleware")
+
+    @property
+    def document_dao(self):
+        return self.__contexte.document_dao
 
 
 class GestionnaireModulesDocker:
@@ -1160,6 +1173,12 @@ class GestionnaireComptesMongo:
     def __init__(self, connexion_middleware: ConnexionMiddleware):
         self.__connexion = connexion_middleware
 
+    def init_replication(self):
+        document_dao = self.__connexion.document_dao
+        try:
+            document_dao.commande('replSetInitiate')
+        except OperationFailure:
+            pass
 
 class GestionnaireImagesDocker:
 
