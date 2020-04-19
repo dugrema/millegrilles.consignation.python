@@ -68,7 +68,8 @@ class TransactionConfiguration:
             Constantes.CONFIG_MONGO_PASSWORD: 'example',
             Constantes.CONFIG_MONGO_SSL: 'x509',   # Options on, off, x509, nocert
             Constantes.CONFIG_MONGO_SSL_CAFILE: Constantes.DEFAUT_CA_CERTS,
-            Constantes.CONFIG_MONGO_SSL_KEYFILE: Constantes.DEFAUT_KEYCERTFILE
+            Constantes.CONFIG_MONGO_SSL_KEYFILE: Constantes.DEFAUT_KEYCERTFILE,
+            Constantes.CONFIG_MONGO_AUTHSOURCE: None,
         }
 
         self._domaines_config = {
@@ -164,7 +165,6 @@ class TransactionConfiguration:
         config_mongo['ssl'] = mongo_ssl_param in ['on', 'nocert', 'x509']  # Mettre ssl=True ou ssl=False
         if mongo_ssl_param == 'on':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
-            config_mongo['authSource'] = self.idmg
             parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs', 'username', 'password'])
         elif mongo_ssl_param == 'x509':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
@@ -172,8 +172,9 @@ class TransactionConfiguration:
             parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
         elif mongo_ssl_param == 'nocert':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
-            config_mongo['authSource'] = self.idmg
             parametres_mongo.extend(['username', 'password'])
+
+        config_mongo['authSource'] = self._mongo_config.get(Constantes.CONFIG_MONGO_AUTHSOURCE) or self.idmg
 
         # if mongo_ssl_param != 'x509':
         #     config_mongo['authSource'] = self.idmg
@@ -298,6 +299,10 @@ class TransactionConfiguration:
     @property
     def mongo_keycert(self):
         return self._mongo_config[Constantes.CONFIG_MONGO_SSL_KEYFILE]
+
+    @property
+    def mongo_authsource(self):
+        return self._mongo_config[Constantes.CONFIG_MONGO_AUTHSOURCE]
 
     @property
     def queue_nouvelles_transactions(self):

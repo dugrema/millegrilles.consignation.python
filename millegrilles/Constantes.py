@@ -68,6 +68,7 @@ CONFIG_MONGO_PASSWORD = 'mongo_password'
 CONFIG_MONGO_SSL = 'mongo_ssl'
 CONFIG_MONGO_SSL_CAFILE = 'mongo_ssl_ca_certs'
 CONFIG_MONGO_SSL_KEYFILE = 'mongo_ssl_certfile'
+CONFIG_MONGO_AUTHSOURCE = 'mongo_authsource'
 
 MONGO_DOC_ID = '_id'
 

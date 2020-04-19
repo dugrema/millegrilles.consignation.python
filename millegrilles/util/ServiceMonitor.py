@@ -589,6 +589,13 @@ class ConnexionMiddleware:
                 'MG_MQ_KEYFILE': '/tmp/secrets/pki.monitor.key.pem',
                 'MG_MQ_SSL': 'on',
                 'MG_MQ_AUTH_CERT': 'on',
+                'MG_MONGO_HOST': 'mg-dev3',
+                'MG_MONGO_USERNAME': 'admin',
+                'MG_MONGO_PASSWORD': 'QRv+S+UhzJSW63yhdwMNAgMwH3J0EgsAiCmBZr9DPHs',
+                'MG_MONGO_AUTHSOURCE': 'admin',
+                'MG_MONGO_SSL': 'on',
+                'MG_MONGO_SSL_CA_CERTS': '/tmp/secrets/pki.millegrille.cert.pem',
+                'MG_MONGO_SSL_CERTFILE': '/tmp/secrets/pki.monitor.key_cert.pem',
             }
         ]
 
@@ -596,7 +603,7 @@ class ConnexionMiddleware:
             configuration=self.__configuration, additionals=additionnals)
 
         self.__contexte.initialiser(
-            init_document=False,
+            init_document=True,
             init_message=True,
             connecter=True,
         )
@@ -840,6 +847,11 @@ class GestionnaireModulesDocker:
         try:
             # Name
             dict_config_docker['name'] = self.idmg_tronque + '_' + config_service['name']
+
+            # Resources
+            config_args = config_service.get('args')
+            if config_args:
+                dict_config_docker['args'] = config_args
 
             # Resources
             config_resources = config_service.get('resources')
