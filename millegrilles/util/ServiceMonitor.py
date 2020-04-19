@@ -8,7 +8,7 @@ import datetime
 import secrets
 import os
 
-from threading import Event, Thread
+from threading import Event, Thread, BrokenBarrierError
 from docker.errors import APIError
 from docker.types import Resources, RestartPolicy, ServiceMode, NetworkAttachmentConfig, ConfigReference, \
     SecretReference, EndpointSpec
@@ -23,6 +23,8 @@ from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert, \
     ConstantesGenerateurCertificat
 from millegrilles.util.RabbitMQManagement import RabbitMQAPI
+from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 
@@ -38,12 +40,12 @@ class ServiceMonitor:
     def __init__(self):
         self.__logger = logging.getLogger('%s' % self.__class__.__name__)
 
-        self.__securite: str                # Niveau de securite de la swarm docker
-        self.__args = None                  # Arguments de la ligne de commande
-        self.__connexion_middleware = None  # Connexion a MQ, MongoDB
-        self.__docker: docker.DockerClient  # Client docker
-        self.__nodename: str                # Node name de la connexion locale dans Docker
-        self.__idmg: str = None             # IDMG de la MilleGrille hote
+        self.__securite: str                                     # Niveau de securite de la swarm docker
+        self.__args = None                                       # Arguments de la ligne de commande
+        self.__connexion_middleware: ConnexionMiddleware = None  # Connexion a MQ, MongoDB
+        self.__docker: docker.DockerClient                       # Client docker
+        self.__nodename: str                                     # Node name de la connexion locale dans Docker
+        self.__idmg: str = None                                  # IDMG de la MilleGrille hote
 
         self.__fermeture_event = Event()
 
@@ -146,6 +148,17 @@ class ServiceMonitor:
         Lance une thread distincte pour s'occuper des messages.
         :return:
         """
+        configuration = TransactionConfiguration()
+        self.__connexion_middleware = ConnexionMiddleware(configuration)
+
+        try:
+            self.__connexion_middleware.initialiser()
+        except BrokenBarrierError:
+            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+            self.__connexion_middleware.stop()
+            self.__connexion_middleware = None
+
+    def preparer_gestionnaire_certificats(self):
         mode_insecure = self.__args.dev
         path_secrets = self.__args.secrets
         self.__gestionnaire_mq = GestionnaireComptesMQ(
@@ -283,11 +296,17 @@ class ServiceMonitor:
             self.__connecter_docker()
             self.__charger_configuration()
             self.configurer_millegrille()
-            self.connecter_middleware()
+            self.preparer_gestionnaire_certificats()
 
             while not self.__fermeture_event.is_set():
                 try:
                     self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                    if not self.__connexion_middleware:
+                        try:
+                            self.connecter_middleware()
+                        except BrokenBarrierError:
+                            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
                     self.__entretien_modules()
 
@@ -301,6 +320,7 @@ class ServiceMonitor:
             self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
 
         self.__logger.info("Fermeture du ServiceMonitor")
+        self.fermer()
 
     @property
     def idmg_tronque(self):
@@ -449,8 +469,9 @@ class GestionnaireCertificats:
             fichiers.write(self.__clecert_millegrille.cert_bytes)
 
         # Sauvegarder information certificat monitor
-        with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_monitor.cert_bytes)
+        chaine_monitor = '\n'.join(self.clecert_monitor.chaine)
+        with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'w') as fichiers:
+            fichiers.write(chaine_monitor)
         with open(path.join(secret_path, 'pki.monitor.key.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.private_key_bytes)
 
@@ -526,8 +547,10 @@ class ConnexionMiddleware:
     Connexion au middleware de la MilleGrille en service.
     """
 
-    def __init__(self):
-        self.__contexte = None
+    def __init__(self, configuration: TransactionConfiguration):
+        self.__configuration = configuration
+
+        self.__contexte: ContexteRessourcesDocumentsMilleGrilles = None
         self.__thread = None
         self.__channel = None
 
@@ -535,12 +558,10 @@ class ConnexionMiddleware:
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
+        self.__certificat_event_handler: GestionnaireEvenementsCertificat
 
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
-        # Generer contexte
-
         # Connecter
 
         # Demarrer thread
@@ -550,20 +571,37 @@ class ConnexionMiddleware:
     def stop(self):
         self.__fermeture_event.set()
 
-        # try:
-        #     self.__contexte.deconnecter()
-        # except Exception:
-        #     pass
+        try:
+            self.__contexte.message_dao.deconnecter()
+            self.__contexte.document_dao.deconnecter()
+        except Exception:
+            pass
 
-    def initialiser(self, init_document=True, init_message=True, connecter=True):
+    def initialiser(self):
+        additionnals = [
+            {
+                'MG_MQ_HOST': 'mg-dev3',
+                'MG_MQ_PORT': 5673,
+                'MG_MQ_CA_CERTS': '/tmp/secrets/pki.millegrille.cert.pem',
+                'MG_MQ_CERTFILE': '/tmp/secrets/pki.monitor.cert.pem',
+                'MG_MQ_KEYFILE': '/tmp/secrets/pki.monitor.key.pem',
+                'MG_MQ_SSL': 'on',
+                'MG_MQ_AUTH_CERT': 'on',
+            }
+        ]
+
+        self.__contexte = ContexteRessourcesDocumentsMilleGrilles(
+            configuration=self.__configuration, additionals=additionnals)
+
         self.__contexte.initialiser(
-            init_document=init_document,
-            init_message=init_message,
-            connecter=connecter
+            init_document=False,
+            init_message=True,
+            connecter=True,
         )
 
-        if init_message:
-            self.__contexte.message_dao.register_channel_listener(self)
+        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
+
+        self.__contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)

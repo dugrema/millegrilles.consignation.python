@@ -420,7 +420,7 @@ class ContexteRessourcesMilleGrilles:
         :param connecter: Si true, la connexion aux DAOs est ouverte immediatement
         """
 
-        self._configuration = TransactionConfiguration()
+        # self._configuration = TransactionConfiguration()
         self._configuration.loadEnvironment(additionals=self._additionnals)
         self._message_dao = None
 
