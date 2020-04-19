@@ -1369,7 +1369,7 @@ class ConstantesServiceMonitor:
     MODULE_TRANSACTION = 'transaction'
     MODULE_MAITREDESCLES = 'maitredescles'
     MODULE_CEDULEUR = 'ceduleur'
-    MODULE_CONSIGNATIONFICHIERS = 'consignationfichiers'
+    MODULE_CONSIGNATIONFICHIERS = 'fichiers'
     MODULE_COUPDOEIL = 'coupdoeilreact'
     MODULE_TRANSMISSION = 'transmission'
     MODULE_DOMAINES = 'domaines'

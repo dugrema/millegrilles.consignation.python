@@ -434,6 +434,9 @@ class GestionnaireCertificats:
         mongo_scripts = path.join(mounts, 'mongo/scripts')
         os.makedirs(mongo_scripts, mode=0o700)
 
+        mongo_scripts = path.join(mounts, 'consignation')
+        os.makedirs(mongo_scripts, mode=0o700)
+
     def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
         clecert = self.renouvelleur.renouveller_par_role(role, common_name)
         chaine = list(clecert.chaine)
@@ -756,7 +759,7 @@ class GestionnaireModulesDocker:
             ConstantesServiceMonitor.MODULE_TRANSACTION: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
             # ConstantesServiceMonitor.MODULE_MAITREDESCLES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
             ConstantesServiceMonitor.MODULE_CEDULEUR: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
-            # ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS},
+            ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS},
             # ConstantesServiceMonitor.MODULE_COUPDOEIL: {'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL},
             # ConstantesServiceMonitor.MODULE_TRANSMISSION: {'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION},
             ConstantesServiceMonitor.MODULE_DOMAINES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
