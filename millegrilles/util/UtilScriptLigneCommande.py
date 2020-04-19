@@ -8,6 +8,7 @@ import sys
 import threading
 import os
 import json
+import tempfile
 
 from threading import Event
 
@@ -193,14 +194,15 @@ class ModeleConfiguration:
         certfile = params['MG_MQ_CERTFILE']
         keyfile = params['MG_MQ_KEYFILE']
 
-        dir_key = os.path.dirname(keyfile)
-        cert_file_name = os.path.basename(certfile)
-        mongo_keycert = os.path.join(dir_key, cert_file_name + '.keycert.pem')
+        mongo_keycert_handle, mongo_keycert = tempfile.mkstemp(dir='/tmp', text=True)
+        try:
+            with open(keyfile, 'rb') as fichiers:
+                os.write(mongo_keycert_handle, fichiers.read())
+            with open(certfile, 'rb') as fichiers:
+                os.write(mongo_keycert_handle, fichiers.read())
 
-        with open(mongo_keycert, 'w') as keycert:
-            with open(keyfile, 'r') as fichiers:
-                keycert.write(fichiers.read())
-            with open(certfile, 'r') as fichiers:
-                keycert.write(fichiers.read())
+            os.environ["MG_MONGO_SSL_CERTFILE"] = mongo_keycert
+        finally:
+            os.close(mongo_keycert_handle)
 
-        os.environ["MG_MONGO_SSL_CERTFILE"] = mongo_keycert
+        return mongo_keycert
