@@ -5,7 +5,6 @@
   "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.transaction.cert",
   "MG_MQ_SSL": "on",
   "MG_MQ_AUTH_CERT": "on",
-  "MG_MONGO_USERNAME": "transaction",
   "MG_MONGO_SSL": "x509",
   "MG_MONGO_SSL_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.cert",
   "MG_PKI_SECRETS": "/home/mathieu/mgdev/certs"
