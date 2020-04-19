@@ -151,7 +151,7 @@ class ServiceMonitor:
         :return:
         """
         configuration = TransactionConfiguration()
-        self.__connexion_middleware = ConnexionMiddleware(configuration)
+        self.__connexion_middleware = ConnexionMiddleware(configuration, secrets=self.__args.secrets)
 
         try:
             self.__connexion_middleware.initialiser()
@@ -372,21 +372,21 @@ class GestionnaireCertificats:
         self.idmg = clecert_millegrille.idmg
 
         # Sauvegarder certificats, cles et mots de passe dans docker
-        self.ajouter_secret('pki.millegrille.key', clecert_millegrille.private_key_bytes)
-        self.ajouter_secret('pki.millegrille.passwd', clecert_millegrille.password)
-        self.ajouter_config('pki.millegrille.cert', clecert_millegrille.cert_bytes)
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY, clecert_millegrille.private_key_bytes)
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD, clecert_millegrille.password)
+        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT, clecert_millegrille.cert_bytes)
 
         chaine_certs = '\n'.join(clecert_intermediaire.chaine).encode('utf-8')
-        self.ajouter_secret('pki.intermediaire.key', clecert_intermediaire.private_key_bytes)
-        self.ajouter_secret('pki.intermediaire.passwd', clecert_intermediaire.password)
-        self.ajouter_config('pki.intermediaire.cert', clecert_intermediaire.cert_bytes)
-        self.ajouter_config('pki.intermediaire.chain', chaine_certs)
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY, clecert_intermediaire.private_key_bytes)
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD, clecert_intermediaire.password)
+        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT, clecert_intermediaire.cert_bytes)
+        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CHAIN, chaine_certs)
 
         # Conserver la configuration de base pour ServiceMonitor
         configuration = {
-            'idmg': self.idmg,
+            Constantes.CONFIG_IDMG: self.idmg,
             'pem': str(clecert_millegrille.cert_bytes, 'utf-8'),
-            'securite': '3.protege',
+            Constantes.DOCUMENT_INFODOC_SECURITE: '3.protege',
         }
         configuration_bytes = json.dumps(configuration).encode('utf-8')
         self.__docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
@@ -459,22 +459,22 @@ class GestionnaireCertificats:
         os.makedirs(secret_path, mode=0o700, exist_ok=True)
 
         # Sauvegarder information certificat intermediaire
-        with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self.__clecert_intermediaire.private_key_bytes)
-        with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT + '.pem'), 'wb') as fichiers:
             fichiers.write(self.__clecert_intermediaire.cert_bytes)
-        with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
             fichiers.write(self.__clecert_intermediaire.password)
 
         # Sauvegarder information certificat CA (millegrille)
-        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_CERT_CA), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem'), 'wb') as fichiers:
             fichiers.write(self.__clecert_millegrille.cert_bytes)
 
         # Sauvegarder information certificat monitor
         chaine_monitor = '\n'.join(self.clecert_monitor.chaine)
-        with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'w') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_CERT + '.pem'), 'w') as fichiers:
             fichiers.write(chaine_monitor)
-        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.private_key_bytes)
 
         with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'w') as fichiers:
@@ -549,8 +549,11 @@ class ConnexionMiddleware:
     Connexion au middleware de la MilleGrille en service.
     """
 
-    def __init__(self, configuration: TransactionConfiguration):
+    def __init__(self, configuration: TransactionConfiguration, **kwargs):
         self.__configuration = configuration
+
+        self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
+        self.__file_mongo_passwd: str = kwargs.get('mongo_passwd_file') or ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE
 
         self.__contexte: ContexteRessourcesDocumentsMilleGrilles = None
         self.__thread = None
@@ -580,22 +583,39 @@ class ConnexionMiddleware:
             pass
 
     def initialiser(self):
+
+        mongo_passwd_file = path.join(self.__path_secrets, self.__file_mongo_passwd)
+        with open(mongo_passwd_file, 'r') as fichier:
+            mongo_passwd = fichier.read()
+
+        ca_certs_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem')
+        monitor_cert_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_CERT + '.pem')
+        monitor_key_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem')
+
+        # Preparer fichier keycert pour mongo
+        monitor_keycert_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '_cert.pem')
+        with open(monitor_keycert_file, 'w') as keycert:
+            with open(monitor_key_file, 'r') as fichier:
+                keycert.write(fichier.read())
+            with open(monitor_cert_file, 'r') as fichier:
+                keycert.write(fichier.read())
+
         additionnals = [
             {
                 'MG_MQ_HOST': 'mg-dev3',
                 'MG_MQ_PORT': 5673,
-                'MG_MQ_CA_CERTS': '/tmp/secrets/pki.millegrille.cert.pem',
-                'MG_MQ_CERTFILE': '/tmp/secrets/pki.monitor.cert.pem',
-                'MG_MQ_KEYFILE': '/tmp/secrets/pki.monitor.key.pem',
+                'MG_MQ_CA_CERTS': ca_certs_file,
+                'MG_MQ_CERTFILE': monitor_cert_file,
+                'MG_MQ_KEYFILE': monitor_key_file,
                 'MG_MQ_SSL': 'on',
                 'MG_MQ_AUTH_CERT': 'on',
                 'MG_MONGO_HOST': 'mg-dev3',
                 'MG_MONGO_USERNAME': 'admin',
-                'MG_MONGO_PASSWORD': 'QRv+S+UhzJSW63yhdwMNAgMwH3J0EgsAiCmBZr9DPHs',
+                'MG_MONGO_PASSWORD': mongo_passwd,
                 'MG_MONGO_AUTHSOURCE': 'admin',
                 'MG_MONGO_SSL': 'on',
-                'MG_MONGO_SSL_CA_CERTS': '/tmp/secrets/pki.millegrille.cert.pem',
-                'MG_MONGO_SSL_CERTFILE': '/tmp/secrets/pki.monitor.key_cert.pem',
+                'MG_MONGO_SSL_CA_CERTS': ca_certs_file,
+                'MG_MONGO_SSL_CERTFILE': monitor_keycert_file,
             }
         ]
 
@@ -1009,7 +1029,7 @@ class GestionnaireComptesMQ:
         self.__host: str = kwargs.get('host') or 'mq'
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
         self.__file_passwd: str = kwargs.get('passwd_file') or ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE
-        self.__file_ca: str = kwargs.get('cert_ca') or ConstantesServiceMonitor.FICHIER_CERT_CA
+        self.__file_ca: str = kwargs.get('cert_ca') or ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem'
         self.__insecure_mode: bool = kwargs.get('insecure') or False
 
         self.__wait_event = Event()
