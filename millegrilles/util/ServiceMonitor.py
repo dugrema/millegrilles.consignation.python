@@ -132,15 +132,17 @@ class ServiceMonitor:
         if not self.__fermeture_event.is_set():
             self.__fermeture_event.set()
 
-        try:
-            self.__docker.close()
-        except Exception:
-            pass
+            self.__connexion_middleware.stop()
 
-        try:
-            self.__gestionnaire_docker.fermer()
-        except Exception:
-            pass
+            try:
+                self.__docker.close()
+            except Exception:
+                pass
+
+            try:
+                self.__gestionnaire_docker.fermer()
+            except Exception:
+                pass
 
     def connecter_middleware(self):
         """
@@ -625,6 +627,9 @@ class ConnexionMiddleware:
 
     def run(self):
         self.__logger.info("Thread middleware demarree")
+
+        while self.__fermeture_event.is_set():
+            self.__fermeture_event.wait(30)
 
         self.__logger.info("Fin thread middleware")
 
