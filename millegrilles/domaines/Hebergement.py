@@ -69,10 +69,12 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
         return self.__handler_requetes_noeuds
 
     def identifier_processus(self, domaine_transaction):
-        if domaine_transaction == ConstantesHebergement.TRANSACTION_XXX:
-            processus = "millegrilles_domaines_Hebergement:ProcessusXXX"
-        else:
-            processus = super().identifier_processus(domaine_transaction)
+        # if domaine_transaction == ConstantesHebergement.TRANSACTION_XXX:
+        #     processus = "millegrilles_domaines_Hebergement:ProcessusXXX"
+        # else:
+        #     processus = super().identifier_processus(domaine_transaction)
+
+        processus = super().identifier_processus(domaine_transaction)
 
         return processus
 
