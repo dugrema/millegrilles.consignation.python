@@ -7,6 +7,7 @@ import json
 import datetime
 import secrets
 import os
+import tempfile
 
 from threading import Event, Thread, BrokenBarrierError
 from docker.errors import APIError
@@ -134,7 +135,10 @@ class ServiceMonitor:
         if not self.__fermeture_event.is_set():
             self.__fermeture_event.set()
 
-            self.__connexion_middleware.stop()
+            try:
+                self.__connexion_middleware.stop()
+            except Exception:
+                pass
 
             try:
                 self.__docker.close()
@@ -146,6 +150,13 @@ class ServiceMonitor:
             except Exception:
                 pass
 
+            # Cleanup fichiers temporaires de certificats/cles
+            try:
+                for fichier in self.__gestionnaire_certificats.certificats.values():
+                    os.remove(fichier)
+            except:
+                pass
+
     def connecter_middleware(self):
         """
         Genere un contexte et se connecte a MQ et MongoDB.
@@ -153,8 +164,9 @@ class ServiceMonitor:
         :return:
         """
         configuration = TransactionConfiguration()
+
         self.__connexion_middleware = ConnexionMiddleware(
-            configuration, self.__docker, self.__gestionnaire_mq, secrets=self.__args.secrets)
+            configuration, self.__docker, self.__gestionnaire_mq, self.__gestionnaire_certificats.certificats, secrets=self.__args.secrets)
 
         try:
             self.__connexion_middleware.initialiser()
@@ -168,7 +180,7 @@ class ServiceMonitor:
         mode_insecure = self.__args.dev
         path_secrets = self.__args.secrets
         self.__gestionnaire_mq = GestionnaireComptesMQ(
-            self.__idmg, self.__gestionnaire_certificats.clecert_monitor,
+            self.__idmg, self.__gestionnaire_certificats.clecert_monitor, self.__gestionnaire_certificats.certificats,
             host=self.__nodename, secrets=path_secrets, insecure=mode_insecure
         )
 
@@ -284,6 +296,12 @@ class ServiceMonitor:
         if besoin_initialiser:
             self.__gestionnaire_docker.initialiser_millegrille()
 
+            if not self.__args.dev:
+                # Modifier service docker du service monitor pour ajouter secrets
+                self.__gestionnaire_docker.configurer_monitor()
+                self.fermer()  # Fermer le monitor, va forcer un redemarrage du service
+                raise Exception("Redemarrage")
+
         # Generer certificats de module manquants ou expires, avec leur cle
         self.__entretien_certificats()
 
@@ -340,6 +358,7 @@ class GestionnaireCertificats:
         self.__date: datetime.datetime = None
         self.idmg = kwargs.get('idmg')
 
+        self.certificats = dict()
         self.__clecert_millegrille: EnveloppeCleCert
         self.__clecert_intermediaire: EnveloppeCleCert
         self.clecert_monitor: EnveloppeCleCert
@@ -490,10 +509,9 @@ class GestionnaireCertificats:
         secret_path = path.abspath(self.secret_path)
 
         # Charger information certificat intermediaire
+        cert_pem = self.__charger_certificat_docker('pki.intermediaire.cert')
         with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'rb') as fichiers:
             key_pem = fichiers.read()
-        with open(path.join(secret_path, 'pki.intermediaire.cert.pem'), 'rb') as fichiers:
-            cert_pem = fichiers.read()
         with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'rb') as fichiers:
             passwd_bytes = fichiers.read()
 
@@ -503,8 +521,7 @@ class GestionnaireCertificats:
         self.__clecert_intermediaire = clecert_intermediaire
 
         # Charger information certificat monitor
-        with open(path.join(secret_path, 'pki.monitor.cert.pem'), 'rb') as fichiers:
-            cert_pem = fichiers.read()
+        cert_pem = self.__charger_certificat_docker('pki.monitor.cert')
         with open(path.join(secret_path, 'pki.monitor.key.pem'), 'rb') as fichiers:
             key_pem = fichiers.read()
         clecert_monitor = EnveloppeCleCert()
@@ -516,7 +533,29 @@ class GestionnaireCertificats:
         with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
             self.__passwd_mq = fichiers.read()
 
+        # Charger le certificat de millegrille, chaine pour intermediaire
+        self.__charger_certificat_docker('pki.intermediaire.chain')
+        self.__charger_certificat_docker('pki.millegrille.cert')
+
         self.__charger_renouvelleur()
+
+    def __charger_certificat_docker(self, nom_certificat) -> bytes:
+        """
+        Extrait un certificat de la config docker vers un fichier temporaire.
+        Conserve le nom du fichier dans self.__certificats.
+        :param nom_certificat:
+        :return: Contenu du certificat en PEM
+        """
+        cert = GestionnaireModulesDocker.trouver_config(nom_certificat, self.idmg_tronque, self.__docker)['config']
+        cert_pem = b64decode(cert.attrs['Spec']['Data'])
+        fp, fichier_cert = tempfile.mkstemp(dir='/tmp')
+        try:
+            os.write(fp, cert_pem)
+            self.certificats[nom_certificat] = fichier_cert
+        finally:
+            os.close(fp)
+
+        return cert_pem
 
     def __charger_renouvelleur(self):
         dict_ca = {
@@ -554,13 +593,15 @@ class ConnexionMiddleware:
     """
 
     def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
-                 gestionnaire_mq, **kwargs):
+                 gestionnaire_mq, certificats: dict, **kwargs):
         self.__configuration = configuration
         self.__docker = client_docker
         self.__gestionnaire_mq = gestionnaire_mq
+        self.__certificats = certificats
 
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
         self.__file_mongo_passwd: str = kwargs.get('mongo_passwd_file') or ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE
+        self.__monitor_keycert_file: str
 
         self.__contexte: ContexteRessourcesDocumentsMilleGrilles = None
         self.__thread = None
@@ -601,36 +642,35 @@ class ConnexionMiddleware:
         with open(mongo_passwd_file, 'r') as fichier:
             mongo_passwd = fichier.read()
 
-        ca_certs_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem')
-        self.__monitor_cert_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_CERT + '.pem')
+        ca_certs_file = self.__certificats['pki.intermediaire.chain']
+        monitor_cert_file = self.__certificats['pki.monitor.cert']
         monitor_key_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem')
 
         # Preparer fichier keycert pour mongo
-        monitor_keycert_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '_cert.pem')
-        with open(monitor_keycert_file, 'w') as keycert:
-            with open(monitor_key_file, 'r') as fichier:
-                keycert.write(fichier.read())
-            with open(self.__monitor_cert_file, 'r') as fichier:
-                keycert.write(fichier.read())
+        keycert, monitor_keycert_file = tempfile.mkstemp(dir='/tmp')
+        with open(monitor_key_file, 'rb') as fichier:
+            os.write(keycert, fichier.read())
+        with open(monitor_cert_file, 'rb') as fichier:
+            os.write(keycert, fichier.read())
+        self.__monitor_keycert_file = monitor_keycert_file
+        os.close(keycert)
 
-        additionnals = [
-            {
-                'MG_MQ_HOST': 'mg-dev3',
-                'MG_MQ_PORT': 5673,
-                'MG_MQ_CA_CERTS': ca_certs_file,
-                'MG_MQ_CERTFILE': self.__monitor_cert_file,
-                'MG_MQ_KEYFILE': monitor_key_file,
-                'MG_MQ_SSL': 'on',
-                'MG_MQ_AUTH_CERT': 'on',
-                'MG_MONGO_HOST': 'mg-dev3',
-                'MG_MONGO_USERNAME': 'admin',
-                'MG_MONGO_PASSWORD': mongo_passwd,
-                'MG_MONGO_AUTHSOURCE': 'admin',
-                'MG_MONGO_SSL': 'on',
-                'MG_MONGO_SSL_CA_CERTS': ca_certs_file,
-                'MG_MONGO_SSL_CERTFILE': monitor_keycert_file,
-            }
-        ]
+        additionnals = [{
+            'MG_MQ_HOST': 'mg-dev3',
+            'MG_MQ_PORT': 5673,
+            'MG_MQ_CA_CERTS': ca_certs_file,
+            'MG_MQ_CERTFILE': monitor_cert_file,
+            'MG_MQ_KEYFILE': monitor_key_file,
+            'MG_MQ_SSL': 'on',
+            'MG_MQ_AUTH_CERT': 'on',
+            'MG_MONGO_HOST': 'mg-dev3',
+            'MG_MONGO_USERNAME': 'admin',
+            'MG_MONGO_PASSWORD': mongo_passwd,
+            'MG_MONGO_AUTHSOURCE': 'admin',
+            'MG_MONGO_SSL': 'on',
+            'MG_MONGO_SSL_CA_CERTS': ca_certs_file,
+            'MG_MONGO_SSL_CERTFILE': monitor_keycert_file,
+        }]
 
         self.__contexte = ContexteRessourcesDocumentsMilleGrilles(
             configuration=self.__configuration, additionals=additionnals)
@@ -797,6 +837,36 @@ class GestionnaireModulesDocker:
         labels = {'millegrille': self.__idmg}
         self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
 
+    def configurer_monitor(self):
+        """
+        Ajoute les element de configuration generes (e.g. secrets).
+        :return:
+        """
+        noms_secrets = {
+            'passwd.mongo': ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE,
+            'passwd.mq': ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE,
+            ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
+            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem',
+            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
+        }
+
+        liste_secrets = list()
+        for nom_secret, nom_fichier in noms_secrets.items():
+            self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
+            secret_reference = self.__trouver_secret(nom_secret)
+            secret_reference['filename'] = nom_fichier
+            secret_reference['uid'] = 0
+            secret_reference['gid'] = 0
+            secret_reference['mode'] = 0o444
+
+            liste_secrets.append(SecretReference(**secret_reference))
+
+        # Ajouter secrets au service monitor
+        filtre = {'name': 'service_monitor'}
+        services_list = self.__docker.services.list(filters=filtre)
+        service_monitor = services_list[0]
+        service_monitor.update(secrets=liste_secrets)
+
     def entretien_services(self):
         """
         Verifie si les services sont actifs, les demarre au besoin.
@@ -844,11 +914,15 @@ class GestionnaireModulesDocker:
         return b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data'])
 
     def __trouver_config(self, config_name):
+        return GestionnaireModulesDocker.trouver_config(config_name, self.__idmg[0:12], self.__docker)
+
+    @ staticmethod
+    def trouver_config(config_name: str, idmg_tronque: str, docker_client: docker.DockerClient):
         config_names = config_name.split(';')
         configs = None
         for config_name_val in config_names:
-            filtre = {'name': self.idmg_tronque + '.' + config_name_val}
-            configs = self.__docker.configs.list(filters=filtre)
+            filtre = {'name': idmg_tronque + '.' + config_name_val}
+            configs = docker_client.configs.list(filters=filtre)
             if len(configs) > 0:
                 break
 
@@ -864,14 +938,13 @@ class GestionnaireModulesDocker:
                 date_config = date_config_int
                 config_retenue = config
 
-        pass
-
         return {
             'config_reference': {
                 'config_id': config_retenue.attrs['ID'],
                 'config_name': config_retenue.name,
             },
             'date': str(date_config),
+            'config': config_retenue,
         }
 
     def __trouver_secret(self, secret_name):
@@ -1102,9 +1175,10 @@ class GestionnaireComptesMQ:
     Permet de gerer les comptes RabbitMQ via connexion https a la management console.
     """
 
-    def __init__(self, idmg, clecert_monitor: EnveloppeCleCert, **kwargs):
+    def __init__(self, idmg, clecert_monitor: EnveloppeCleCert, certificats: dict, **kwargs):
         self.__idmg = idmg
         self.__clecert_monitor = clecert_monitor
+        self.__certificats = certificats
 
         self.__host: str = kwargs.get('host') or 'mq'
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
@@ -1115,7 +1189,7 @@ class GestionnaireComptesMQ:
         self.__wait_event = Event()
         self.__password_mq: str = None
 
-        self.__path_ca = path.join(self.__path_secrets, self.__file_ca)
+        self.__path_ca = certificats['pki.millegrille.cert']
 
         self.__millegrille_prete = False
 
