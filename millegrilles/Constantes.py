@@ -1367,7 +1367,7 @@ class ConstantesServiceMonitor:
     MODULE_MQ = 'mq'
     MODULE_MONGO = 'mongo'
     MODULE_TRANSACTION = 'transaction'
-    MODULE_MAITREDESCLES = 'maitredescles'
+    MODULE_MAITREDESCLES = 'maitrecles'
     MODULE_CEDULEUR = 'ceduleur'
     MODULE_CONSIGNATIONFICHIERS = 'fichiers'
     MODULE_COUPDOEIL = 'coupdoeilreact'

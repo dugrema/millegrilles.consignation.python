@@ -431,11 +431,8 @@ class GestionnaireCertificats:
         mongo_data = path.join(mounts, 'mongo/data')
         os.makedirs(mongo_data, mode=0o700)
 
-        mongo_scripts = path.join(mounts, 'mongo/scripts')
-        os.makedirs(mongo_scripts, mode=0o700)
-
         mongo_scripts = path.join(mounts, 'consignation/torrents/downloads')
-        os.makedirs(mongo_scripts, mode=0o700)
+        os.makedirs(mongo_scripts, mode=0o770)
 
     def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
         clecert = self.renouvelleur.renouveller_par_role(role, common_name)
