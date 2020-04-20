@@ -762,7 +762,7 @@ class GestionnaireModulesDocker:
             ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS},
             ConstantesServiceMonitor.MODULE_COUPDOEIL: {'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL},
             ConstantesServiceMonitor.MODULE_TRANSMISSION: {'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION},
-            ConstantesServiceMonitor.MODULE_DOMAINES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
+            # ConstantesServiceMonitor.MODULE_DOMAINES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
         }
 
         self.__mappings = {

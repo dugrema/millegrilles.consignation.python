@@ -137,7 +137,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
 
         self.__nomfichier_maitredescles_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MAITREDESCLES]
-        self.__nomfichier_autorite_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_AUTORITE]
+        self.__nomfichier_autorite_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MILLEGRILLE]
         self.__nomfichier_maitredescles_key = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MAITREDESCLES]
         self.__nomfichier_maitredescles_password = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES]
         self.__clecert_millegrille = None  # Cle et certificat de millegrille
@@ -226,17 +226,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
     def charger_clecert_millegrille(self) -> EnveloppeCleCert:
         repertoire_secrets = self.configuration.pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
-        passwords_ca = self.configuration.pki_config[Constantes.CONFIG_CA_PASSWORDS]
-        with open('%s/%s' % (repertoire_secrets, passwords_ca)) as fichier:
-            passwords_ca_dict = json.load(fichier)
+        password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
+        with open('%s/%s' % (repertoire_secrets, password_intermediaire_path), 'rb') as fichier:
+            password_intermediaire = fichier.read()
 
-        cert_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MILLEGRILLE])
-        key_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MILLEGRILLE])
+        cert_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE])
+        key_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE])
         clecert = EnveloppeCleCert()
         clecert.from_files(
             key_millegrille,
             cert_millegrille,
-            passwords_ca_dict['pki.ca.millegrille'].encode('utf-8')
+            password_intermediaire,
         )
 
         return clecert
@@ -493,17 +493,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         with open(path_ca_cert, 'r') as fichier:
             fichier_cert_racine = fichier.read()
 
-        path_key_racine = path.join(self.configuration.pki_secretdir, self.configuration.pki_keyautorite)
+        path_key_racine = path.join(self.configuration.pki_secretdir, self.configuration.pki_keymillegrille)
         with open(path_key_racine, 'rb') as fichier:
             fichier_key_racine = fichier.read()
 
-        path_ca_passwords = path.join(self.configuration.pki_secretdir, self.configuration.pki_capasswords)
-        with open(path_ca_passwords, 'r') as fichier:
-            passwords = json.load(fichier)
+        path_ca_passwords = path.join(self.configuration.pki_secretdir, self.configuration.pki_password_millegrille)
+        with open(path_ca_passwords, 'rb') as fichier:
+            password_millegrille = fichier.read()
 
-        password_racine = passwords['pki.ca.root']
         clecert = EnveloppeCleCert()
-        clecert.key_from_pem_bytes(fichier_key_racine, password_racine.encode('utf-8'))
+        clecert.key_from_pem_bytes(fichier_key_racine, password_millegrille)
 
         # Dechiffrer le mot de passe demande pour le retour de la cle privee chiffree
         mot_de_passe_chiffre = message_dict['mot_de_passe_chiffre']

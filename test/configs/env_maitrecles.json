@@ -10,6 +10,12 @@
   "MG_MONGO_SSL_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.cert",
   "MG_PKI_SECRETS": "/home/mathieu/mgdev/certs",
   "MG_MAITREDESCLES_DIR": "/home/mathieu/mgdev/maitredescles",
+  "MG_PKI_PASSWORD_INTERMEDIAIRE": "pki.intermediaire.passwd",
+  "MG_PKI_CERT_INTERMEDIAIRE": "pki.intermediaire.cert",
+  "MG_PKI_KEY_INTERMEDIAIRE": "pki.intermediaire.key",
+  "MG_PKI_PASSWORD_MILLEGRILLE": "pki.millegrille.passwd",
+  "MG_PKI_KEY_MILLEGRILLE": "pki.millegrille.key",
+  "MG_PKI_CERT_MILLEGRILLE": "pki.millegrille.cert",
   "MG_CONSIGNATIONFICHIERS_HOST": "mg-dev3",
   "MG_CONSIGNATIONFICHIERS_PORT": 3003
 }

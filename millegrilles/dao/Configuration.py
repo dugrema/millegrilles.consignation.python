@@ -48,12 +48,12 @@ class TransactionConfiguration:
             Constantes.CONFIG_PKI_WORKDIR: Constantes.DEFAUT_PKI_WORKDIR,
             Constantes.CONFIG_MAITREDESCLES_DIR: Constantes.DEFAUT_MAITREDESCLES_DIR,
             Constantes.CONFIG_PKI_SECRET_DIR: Constantes.DEFAUT_PKI_SECRET_DIR,
+            Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE: Constantes.DEFAUT_PKI_CERT_INTERMEDIAIRE,
+            Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE: Constantes.DEFAUT_PKI_KEY_INTERMEDIAIRE,
+            Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE: Constantes.DEFAUT_PKI_PASSWORD_INTERMEDIAIRE,
             Constantes.CONFIG_PKI_CERT_MILLEGRILLE: Constantes.DEFAUT_PKI_CERT_MILLEGRILLE,
             Constantes.CONFIG_PKI_KEY_MILLEGRILLE: Constantes.DEFAUT_PKI_KEY_MILLEGRILLE,
             Constantes.CONFIG_PKI_PASSWORD_MILLEGRILLE: Constantes.DEFAUT_PKI_PASSWORD_MILLEGRILLE,
-            Constantes.CONFIG_PKI_CERT_AUTORITE: Constantes.DEFAUT_PKI_CERT_AUTORITE,
-            Constantes.CONFIG_PKI_KEY_AUTORITE: Constantes.DEFAUT_PKI_KEY_AUTORITE,
-            Constantes.CONFIG_PKI_PASSWORD_AUTORITE: Constantes.DEFAUT_PKI_PASSWORD_AUTORITE,
             Constantes.CONFIG_PKI_CERT_MAITREDESCLES: Constantes.DEFAUT_PKI_CERT_MAITREDESCLES,
             Constantes.CONFIG_PKI_KEY_MAITREDESCLES: Constantes.DEFAUT_PKI_KEY_MAITREDESCLES,
             Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES: Constantes.DEFAUT_PKI_PASSWORD_MAITREDESCLES,
@@ -262,12 +262,16 @@ class TransactionConfiguration:
         return self._pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
 
     @property
-    def pki_keyautorite(self):
-        return self._pki_config[Constantes.CONFIG_PKI_KEY_AUTORITE]
+    def pki_keymillegrille(self):
+        return self._pki_config[Constantes.CONFIG_PKI_KEY_MILLEGRILLE]
 
     @property
     def pki_capasswords(self):
         return self._pki_config[Constantes.CONFIG_CA_PASSWORDS]
+
+    @property
+    def pki_password_millegrille(self):
+        return self._pki_config[Constantes.CONFIG_PKI_PASSWORD_MILLEGRILLE]
 
     @property
     def pki_config(self):
