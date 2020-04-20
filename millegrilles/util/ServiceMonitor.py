@@ -434,7 +434,7 @@ class GestionnaireCertificats:
         mongo_scripts = path.join(mounts, 'mongo/scripts')
         os.makedirs(mongo_scripts, mode=0o700)
 
-        mongo_scripts = path.join(mounts, 'consignation')
+        mongo_scripts = path.join(mounts, 'consignation/torrents/downloads')
         os.makedirs(mongo_scripts, mode=0o700)
 
     def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
