@@ -87,7 +87,7 @@ class RabbitMQAPI:
         else:
             data['password'] = password
 
-        self._api_put(
+        return self._api_put(
             '/api/users/{0}'.format(urllib.parse.quote_plus(name)),
             data=data,
         )
@@ -148,7 +148,7 @@ class RabbitMQAPI:
             'write': write or '.*',
             'read': read or '.*',
         }
-        self._api_put(
+        return self._api_put(
             '/api/permissions/{0}/{1}'.format(
                 urllib.parse.quote_plus(vhost),
                 urllib.parse.quote_plus(name)
@@ -162,7 +162,7 @@ class RabbitMQAPI:
             'write': write or '.*',
             'read': read or '.*',
         }
-        self._api_put(
+        return self._api_put(
             '/api/topic-permissions/{0}/{1}'.format(
                 urllib.parse.quote_plus(vhost),
                 urllib.parse.quote_plus(name)

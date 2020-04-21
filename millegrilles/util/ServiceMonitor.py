@@ -17,6 +17,7 @@ from base64 import b64encode, b64decode
 from requests.exceptions import HTTPError
 from os import path
 from requests.exceptions import SSLError
+from requests import Response
 from pymongo.errors import OperationFailure, DuplicateKeyError
 
 from millegrilles import Constantes
@@ -43,19 +44,19 @@ class ServiceMonitor:
     def __init__(self):
         self.__logger = logging.getLogger('%s' % self.__class__.__name__)
 
-        self.__securite: str                                     # Niveau de securite de la swarm docker
+        self.__securite: str = None                              # Niveau de securite de la swarm docker
         self.__args = None                                       # Arguments de la ligne de commande
         self.__connexion_middleware: ConnexionMiddleware = None  # Connexion a MQ, MongoDB
-        self.__docker: docker.DockerClient                       # Client docker
-        self.__nodename: str                                     # Node name de la connexion locale dans Docker
+        self.__docker: docker.DockerClient = None                # Client docker
+        self.__nodename: str = None                              # Node name de la connexion locale dans Docker
         self.__idmg: str = None                                  # IDMG de la MilleGrille hote
 
         self.__fermeture_event = Event()
         self.__attente_event = Event()
 
-        self.__gestionnaire_certificats: GestionnaireCertificats
-        self.__gestionnaire_docker: GestionnaireModulesDocker
-        self.__gestionnaire_mq: GestionnaireComptesMQ
+        self.__gestionnaire_certificats: GestionnaireCertificats = None
+        self.__gestionnaire_docker: GestionnaireModulesDocker = None
+        self.__gestionnaire_mq: GestionnaireComptesMQ = None
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -371,9 +372,9 @@ class GestionnaireCertificats:
         self.idmg = kwargs.get('idmg')
 
         self.certificats = dict()
-        self.__clecert_millegrille: EnveloppeCleCert
-        self.__clecert_intermediaire: EnveloppeCleCert
-        self.clecert_monitor: EnveloppeCleCert
+        self.__clecert_millegrille: EnveloppeCleCert = None
+        self.__clecert_intermediaire: EnveloppeCleCert = None
+        self.clecert_monitor: EnveloppeCleCert = None
         self.__passwd_mongo: str
         self.__passwd_mq: str
 
@@ -629,7 +630,8 @@ class ConnexionMiddleware:
 
         self.__monitor_cert_file: str
 
-        self.__comptes_mongo_ok = False
+        self.__comptes_middleware_ok = False
+        self.__comptes_mq_ok = False
 
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
@@ -733,7 +735,8 @@ class ConnexionMiddleware:
 
     def __entretien_comptes(self):
 
-        if not self.__comptes_mongo_ok:
+        if not self.__comptes_middleware_ok or not self.__comptes_mq_ok:
+            comptes_mq_ok = True  # Va etre mis a false si un compte n'esp pas ajoute correctement
             try:
                 idmg = self.__configuration.idmg
                 igmd_tronque = idmg[0:12]
@@ -772,12 +775,17 @@ class ConnexionMiddleware:
                     except DuplicateKeyError:
                         self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
 
-                    self.__gestionnaire_mq.ajouter_compte(clecert)
+                    try:
+                        self.__gestionnaire_mq.ajouter_compte(clecert)
+                    except ValueError:
+                        comptes_mq_ok = False
 
-                self.__comptes_mongo_ok = True
+                self.__comptes_middleware_ok = True
 
             except Exception:
                 self.__logger.exception("Erreur enregistrement comptes")
+
+            self.__comptes_mq_ok = comptes_mq_ok
 
     @property
     def document_dao(self) -> MongoDAO:
@@ -786,10 +794,6 @@ class ConnexionMiddleware:
     @property
     def configuration(self) -> TransactionConfiguration:
         return self.__configuration
-
-    @property
-    def monitor_cert_file(self) -> str:
-        return self.__monitor_cert_file
 
 
 class GestionnaireModulesDocker:
@@ -1306,13 +1310,15 @@ class GestionnaireComptesMQ:
         idmg = self.__idmg
         subject = enveloppe.subject_rfc4514_string_mq()
 
-        self._admin_api.create_user(subject)
-        self._admin_api.create_user_permission(subject, idmg)
+        responses = list()
+        responses.append(self._admin_api.create_user(subject))
+        responses.append(self._admin_api.create_user_permission(subject, idmg))
 
-        exchanges = enveloppe.get_exchanges
-        for exchange in exchanges:
-            self._admin_api.create_user_topic(subject, idmg, exchange)
-            self._admin_api.create_user_permission(subject, idmg)
+        for exchange in enveloppe.get_exchanges:
+            responses.append(self._admin_api.create_user_topic(subject, idmg, exchange))
+
+        if any([response.status_code not in [201, 204] for response in responses]):
+            raise ValueError("Erreur ajout compte", subject)
 
     def ajouter_exchanges(self):
         self._admin_api.create_vhost(self.__idmg)
