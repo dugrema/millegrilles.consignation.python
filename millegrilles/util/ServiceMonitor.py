@@ -976,6 +976,11 @@ class GestionnaireModulesDocker:
 
         self.__docker.services.create(image_tag, **configuration)
 
+    def supprimer_service(self, service_name: str):
+        filter = {'name': self.idmg_tronque + '_' + service_name}
+        service_list = self.__docker.services.list(filters=filter)
+        service_list[0].remove()
+
     def verifier_etat_service(self, service):
         update_state = None
         update_status = service.attrs.get('UpdateStatus')
@@ -1700,6 +1705,19 @@ class GestionnaireCommandes:
         if nom_commande == 'demarrer_service':
             nom_service = contenu['nom_service']
             self.__gestionnaire_docker.demarrer_service(nom_service, **contenu)
+
+        elif nom_commande == 'supprimer_service':
+            nom_service = contenu['nom_service']
+            self.__gestionnaire_docker.supprimer_service(nom_service)
+
+            # ConstantesMonitor.COMMANDE_AJOUTER_COMPTE:
+
+            # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
+
+            # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_PAR_ROLE:
+
+            # ConstantesMonitor.COMMANDE_FERMER_MILLEGRILLES:
+
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)
 
