@@ -19,6 +19,7 @@ from os import path
 from requests.exceptions import SSLError
 from requests import Response
 from pymongo.errors import OperationFailure, DuplicateKeyError
+from json.decoder import JSONDecodeError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -208,8 +209,8 @@ class ServiceMonitor:
             self.__logger.debug("Pipe %s deja cree", PATH_FIFO)
 
         os.chmod(PATH_FIFO, 0o620)
-        self.__socket_fifo = open(PATH_FIFO, 'r')
-        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event, self.__socket_fifo)
+        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event)
+        self.__gestionnaire_commandes.start()
 
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
@@ -1590,30 +1591,65 @@ class GestionnaireImagesDocker:
         return nom_image
 
 
+class CommandeMonitor:
+
+    def __init__(self, contenu: dict):
+        self.__contenu = contenu
+
+    @property
+    def contenu(self):
+        return self.__contenu
+
+    @property
+    def nom_commande(self):
+        return self.__contenu['commande']
+
+
 class GestionnaireCommandes:
     """
     Execute les commandes transmissions au service monitor (via MQ, unix pipe, etc.)
     """
 
-    def __init__(self, fermeture_event: Event, socket_fifo):
+    def __init__(self, fermeture_event: Event):
         self.__fermeture_event = fermeture_event
-        self.__socket_fifo = socket_fifo
 
         self.__commandes_queue = list()
         self.__action_event = Event()
+
+        self.__thread_fifo: Thread
         self.__thread_commandes: Thread
 
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def start(self):
-        self.__thread_commandes = Thread(target=self.run, name="cmds")
+        self.__thread_fifo = Thread(target=self.lire_fifo, name="fifo")
+        self.__thread_commandes = Thread(target=self.executer_commandes, name="cmds")
+
+        self.__thread_fifo.start()
+        self.__thread_commandes.start()
 
     def stop(self):
         self.__action_event.set()
         self.__action_event = None
 
-    def ajouter_commande(self, commande):
+    def ajouter_commande(self, commande: CommandeMonitor):
         self.__commandes_queue.append(commande)
 
-    def run(self):
+    def lire_fifo(self):
+        while not self.__fermeture_event.is_set():
+            socket_fifo = open(PATH_FIFO, 'r')
+            try:
+                while True:
+                    json_commande = json.load(socket_fifo)
+                    self.ajouter_commande(CommandeMonitor(json_commande))
+            except JSONDecodeError as jse:
+                if jse.pos > 0:
+                    self.__logger.exception("Erreur decodage commande : %s", jse.doc)
+
+            self.__action_event.set()
+            socket_fifo.close()
+
+    def executer_commandes(self):
 
         while not self.__fermeture_event.is_set():
             self.__action_event.clear()
@@ -1621,7 +1657,9 @@ class GestionnaireCommandes:
             try:
                 # Executer toutes les commandes, en ordre.
                 while True:
-                    self.__executer_commande(self.__commandes_queue.pop(0))
+                    commande = self.__commandes_queue.pop(0)
+                    self.__logger.debug("Executer commande %s", commande.nom_commande)
+                    self.__executer_commande(commande)
             except IndexError:
                 pass
 
