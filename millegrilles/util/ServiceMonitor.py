@@ -363,6 +363,7 @@ class ServiceMonitor:
                 self.__logger.debug("Container demarre: %s", event_json)
                 self.__attente_event.set()
 
+
 class GestionnaireCertificats:
 
     def __init__(self, docker_client: docker.DockerClient, **kwargs):
@@ -940,7 +941,26 @@ class GestionnaireModulesDocker:
         self.__docker.services.create(image_tag, **configuration)
 
     def verifier_etat_service(self, service):
-        pass
+        update_state = None
+        update_status = service.attrs.get('UpdateStatus')
+        if update_status is not None:
+            update_state = update_status['State']
+
+        # Compter le nombre de taches actives
+        running = list()
+
+        for task in service.tasks():
+            status = task['Status']
+            state = status['State']
+            desired_state = task['DesiredState']
+            if state == 'running' or desired_state == 'running' or update_state == 'updating':
+                # Le service est actif
+                running.append(running)
+
+        if len(running) == 0:
+            # Redemarrer
+            self.__logger.info("Redemarrer service %s", service.name)
+            service.force_update()
 
     def charger_config(self, config_name):
         filtre = {'name': config_name}
