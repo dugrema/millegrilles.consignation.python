@@ -861,11 +861,13 @@ class GestionnaireModulesDocker:
 
             liste_secrets.append(SecretReference(**secret_reference))
 
+        network = NetworkAttachmentConfig(target='mg_%s_net' % self.__idmg)
+
         # Ajouter secrets au service monitor
         filtre = {'name': 'service_monitor'}
         services_list = self.__docker.services.list(filters=filtre)
         service_monitor = services_list[0]
-        service_monitor.update(secrets=liste_secrets)
+        service_monitor.update(secrets=liste_secrets, networks=[network])
 
     def entretien_services(self):
         """

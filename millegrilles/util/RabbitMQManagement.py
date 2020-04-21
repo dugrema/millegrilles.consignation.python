@@ -15,7 +15,7 @@ class RabbitMQAPI:
     def __init__(self, docker_nodename, password, ca_certs, port=8443, guest=False):
         self.logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         if guest:
-            self.url = 'https://localhost:%d' % port
+            self.url = 'https://%s:%d' % (docker_nodename, port)
             self.auth = ('guest', 'guest')
             self.verify = False
             self.ca_cert_path = False  # Desactive verify pour le compte guest (localhost)
