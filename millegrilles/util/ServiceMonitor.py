@@ -162,13 +162,13 @@ class ServiceMonitor:
             try:
                 for fichier in self.__gestionnaire_certificats.certificats.values():
                     os.remove(fichier)
-            except:
+            except Exception:
                 pass
 
             try:
-                os.close(self.__socket_fifo)
+                self.__gestionnaire_commandes.stop()
             except Exception:
-                pass
+                self.__logger.exception("Erreur fermeture gestionnaire commandes")
 
             try:
                 os.remove(PATH_FIFO)
@@ -664,7 +664,7 @@ class ConnexionMiddleware:
         # Connecter
 
         # Demarrer thread
-        self.__thread = Thread(target=self.run, name="mw")
+        self.__thread = Thread(target=self.run, name="mw", daemon=True)
         self.__thread.start()
 
     def stop(self):
@@ -857,7 +857,7 @@ class GestionnaireModulesDocker:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def start_events(self):
-        self.__thread_events = Thread(target=self.ecouter_events, name='events')
+        self.__thread_events = Thread(target=self.ecouter_events, name='events', daemon=True)
         self.__thread_events.start()
 
     def fermer(self):
@@ -1619,11 +1619,13 @@ class GestionnaireCommandes:
         self.__thread_fifo: Thread
         self.__thread_commandes: Thread
 
+        self.__socket_fifo = None
+
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def start(self):
-        self.__thread_fifo = Thread(target=self.lire_fifo, name="fifo")
-        self.__thread_commandes = Thread(target=self.executer_commandes, name="cmds")
+        self.__thread_fifo = Thread(target=self.lire_fifo, name="fifo", daemon=True)
+        self.__thread_commandes = Thread(target=self.executer_commandes, name="cmds", daemon=True)
 
         self.__thread_fifo.start()
         self.__thread_commandes.start()
@@ -1632,22 +1634,30 @@ class GestionnaireCommandes:
         self.__action_event.set()
         self.__action_event = None
 
+        if self.__socket_fifo:
+            self.__socket_fifo.close()
+
     def ajouter_commande(self, commande: CommandeMonitor):
         self.__commandes_queue.append(commande)
 
     def lire_fifo(self):
+        self.__logger.info("Demarrage thread FIFO commandes")
+
         while not self.__fermeture_event.is_set():
-            socket_fifo = open(PATH_FIFO, 'r')
+            self.__socket_fifo = open(PATH_FIFO, 'r')
             try:
                 while True:
-                    json_commande = json.load(socket_fifo)
+                    json_commande = json.load(self.__socket_fifo)
                     self.ajouter_commande(CommandeMonitor(json_commande))
             except JSONDecodeError as jse:
                 if jse.pos > 0:
                     self.__logger.exception("Erreur decodage commande : %s", jse.doc)
 
             self.__action_event.set()
-            socket_fifo.close()
+            self.__socket_fifo.close()
+            self.__socket_fifo = None
+
+        self.__logger.info("Fermeture thread FIFO commandes")
 
     def executer_commandes(self):
 
