@@ -20,6 +20,7 @@ from requests.exceptions import SSLError
 from requests import Response
 from pymongo.errors import OperationFailure, DuplicateKeyError
 from json.decoder import JSONDecodeError
+from cryptography.x509.extensions import ExtensionNotFound
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -209,7 +210,7 @@ class ServiceMonitor:
             self.__logger.debug("Pipe %s deja cree", PATH_FIFO)
 
         os.chmod(PATH_FIFO, 0o620)
-        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event)
+        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event, self.__gestionnaire_docker)
         self.__gestionnaire_commandes.start()
 
     def __connecter_docker(self):
@@ -277,6 +278,7 @@ class ServiceMonitor:
             ConstantesGenerateurCertificat.ROLE_FICHIERS: dict(),
             ConstantesGenerateurCertificat.ROLE_COUPDOEIL: dict(),
             ConstantesGenerateurCertificat.ROLE_DOMAINES: dict(),
+            ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: dict(),
         }
 
         # Charger la configuration existante
@@ -481,6 +483,10 @@ class GestionnaireCertificats:
         self.__passwd_mq = str(passwd_mq, 'utf-8')
         label_passwd_mq = self.idmg_tronque + '.passwd.mq.' + self.__date
         self.__docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
+
+        passwd_mongoxpweb = b64encode(secrets.token_bytes(24)).replace(b'=', b'')
+        label_passwd_mongoxp = self.idmg_tronque + '.passwd.mongoxpweb.' + self.__date
+        self.__docker.secrets.create(name=label_passwd_mongoxp, data=passwd_mongoxpweb, labels={'millegrille': self.idmg})
 
     def preparer_repertoires(self):
         mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
@@ -773,6 +779,7 @@ class ConnexionMiddleware:
                     ConstantesGenerateurCertificat.ROLE_FICHIERS,
                     ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
                     ConstantesGenerateurCertificat.ROLE_DOMAINES,
+                    ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
                 ]
                 roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
 
@@ -1336,15 +1343,22 @@ class GestionnaireComptesMQ:
         idmg = self.__idmg
         subject = enveloppe.subject_rfc4514_string_mq()
 
-        responses = list()
-        responses.append(self._admin_api.create_user(subject))
-        responses.append(self._admin_api.create_user_permission(subject, idmg))
+        try:
+            # Charger exchanges immediatement - un certificat sans exchanges ne peut pas acceder a mongo/mq
+            exchanges = enveloppe.get_exchanges
 
-        for exchange in enveloppe.get_exchanges:
-            responses.append(self._admin_api.create_user_topic(subject, idmg, exchange))
+            responses = list()
+            responses.append(self._admin_api.create_user(subject))
+            responses.append(self._admin_api.create_user_permission(subject, idmg))
 
-        if any([response.status_code not in [201, 204] for response in responses]):
-            raise ValueError("Erreur ajout compte", subject)
+            for exchange in exchanges:
+                responses.append(self._admin_api.create_user_topic(subject, idmg, exchange))
+
+            if any([response.status_code not in [201, 204] for response in responses]):
+                raise ValueError("Erreur ajout compte", subject)
+
+        except ExtensionNotFound:
+            self.__logger.info("Aucun access a MQ pour certificat %s", subject)
 
     def ajouter_exchanges(self):
         self._admin_api.create_vhost(self.__idmg)
@@ -1610,8 +1624,9 @@ class GestionnaireCommandes:
     Execute les commandes transmissions au service monitor (via MQ, unix pipe, etc.)
     """
 
-    def __init__(self, fermeture_event: Event):
+    def __init__(self, fermeture_event: Event, gestionnaire_docker: GestionnaireModulesDocker):
         self.__fermeture_event = fermeture_event
+        self.__gestionnaire_docker = gestionnaire_docker
 
         self.__commandes_queue = list()
         self.__action_event = Event()
@@ -1669,14 +1684,24 @@ class GestionnaireCommandes:
                 while True:
                     commande = self.__commandes_queue.pop(0)
                     self.__logger.debug("Executer commande %s", commande.nom_commande)
-                    self.__executer_commande(commande)
+                    try:
+                        self.__executer_commande(commande)
+                    except Exception:
+                        self.__logger.exception("Erreur execution commande")
             except IndexError:
                 pass
 
             self.__action_event.wait(30)
 
-    def __executer_commande(self, commande):
-        pass
+    def __executer_commande(self, commande: CommandeMonitor):
+        nom_commande = commande.nom_commande
+        contenu = commande.contenu
+
+        if nom_commande == 'demarrer_service':
+            nom_service = contenu['nom_service']
+            self.__gestionnaire_docker.demarrer_service(nom_service, **contenu)
+        else:
+            self.__logger.error("Commande inconnue : %s", nom_commande)
 
 
 class ImageNonTrouvee(Exception):
