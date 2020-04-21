@@ -31,6 +31,7 @@ from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMi
 from millegrilles.dao.DocumentDAO import MongoDAO
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
+PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
 
 
 class ServiceMonitor:
@@ -51,12 +52,15 @@ class ServiceMonitor:
         self.__nodename: str = None                              # Node name de la connexion locale dans Docker
         self.__idmg: str = None                                  # IDMG de la MilleGrille hote
 
+        self.__socket_fifo = None  # Socket FIFO pour les commandes
+
         self.__fermeture_event = Event()
         self.__attente_event = Event()
 
         self.__gestionnaire_certificats: GestionnaireCertificats = None
         self.__gestionnaire_docker: GestionnaireModulesDocker = None
         self.__gestionnaire_mq: GestionnaireComptesMQ = None
+        self.__gestionnaire_commandes: GestionnaireCommandes = None
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -160,6 +164,16 @@ class ServiceMonitor:
             except:
                 pass
 
+            try:
+                os.close(self.__socket_fifo)
+            except Exception:
+                pass
+
+            try:
+                os.remove(PATH_FIFO)
+            except Exception:
+                pass
+
     def connecter_middleware(self):
         """
         Genere un contexte et se connecte a MQ et MongoDB.
@@ -186,6 +200,16 @@ class ServiceMonitor:
             self.__idmg, self.__gestionnaire_certificats.clecert_monitor, self.__gestionnaire_certificats.certificats,
             host=self.__nodename, secrets=path_secrets, insecure=mode_insecure
         )
+
+    def preparer_gestionnaire_commandes(self):
+        try:
+            os.mkfifo(PATH_FIFO)
+        except FileExistsError:
+            self.__logger.debug("Pipe %s deja cree", PATH_FIFO)
+
+        os.chmod(PATH_FIFO, 0o620)
+        self.__socket_fifo = open(PATH_FIFO, 'r')
+        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event, self.__socket_fifo)
 
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
@@ -325,6 +349,7 @@ class ServiceMonitor:
             self.__charger_configuration()
             self.configurer_millegrille()
             self.preparer_gestionnaire_certificats()
+            self.preparer_gestionnaire_commandes()
 
             while not self.__fermeture_event.is_set():
                 self.__attente_event.clear()
@@ -1563,6 +1588,47 @@ class GestionnaireImagesDocker:
             raise ImageNonTrouvee(config_key)
 
         return nom_image
+
+
+class GestionnaireCommandes:
+    """
+    Execute les commandes transmissions au service monitor (via MQ, unix pipe, etc.)
+    """
+
+    def __init__(self, fermeture_event: Event, socket_fifo):
+        self.__fermeture_event = fermeture_event
+        self.__socket_fifo = socket_fifo
+
+        self.__commandes_queue = list()
+        self.__action_event = Event()
+        self.__thread_commandes: Thread
+
+    def start(self):
+        self.__thread_commandes = Thread(target=self.run, name="cmds")
+
+    def stop(self):
+        self.__action_event.set()
+        self.__action_event = None
+
+    def ajouter_commande(self, commande):
+        self.__commandes_queue.append(commande)
+
+    def run(self):
+
+        while not self.__fermeture_event.is_set():
+            self.__action_event.clear()
+
+            try:
+                # Executer toutes les commandes, en ordre.
+                while True:
+                    self.__executer_commande(self.__commandes_queue.pop(0))
+            except IndexError:
+                pass
+
+            self.__action_event.wait(30)
+
+    def __executer_commande(self, commande):
+        pass
 
 
 class ImageNonTrouvee(Exception):
