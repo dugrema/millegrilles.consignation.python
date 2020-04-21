@@ -51,6 +51,7 @@ class ServiceMonitor:
         self.__idmg: str = None                                  # IDMG de la MilleGrille hote
 
         self.__fermeture_event = Event()
+        self.__attente_event = Event()
 
         self.__gestionnaire_certificats: GestionnaireCertificats
         self.__gestionnaire_docker: GestionnaireModulesDocker
@@ -134,6 +135,7 @@ class ServiceMonitor:
             self.__logger.warning("Fermeture ServiceMonitor, signum=%d", signum)
         if not self.__fermeture_event.is_set():
             self.__fermeture_event.set()
+            self.__attente_event.set()
 
             try:
                 self.__connexion_middleware.stop()
@@ -292,8 +294,10 @@ class ServiceMonitor:
 
         self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker, self.__fermeture_event)
         self.__gestionnaire_docker.start_events()
+        self.__gestionnaire_docker.add_event_listener(self)
 
         if besoin_initialiser:
+            self.__gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
             self.__gestionnaire_docker.initialiser_millegrille()
 
             if not self.__args.dev:
@@ -323,6 +327,8 @@ class ServiceMonitor:
             self.preparer_gestionnaire_certificats()
 
             while not self.__fermeture_event.is_set():
+                self.__attente_event.clear()
+
                 try:
                     self.__logger.debug("Cycle entretien ServiceMonitor")
 
@@ -338,7 +344,7 @@ class ServiceMonitor:
                 except Exception:
                     self.__logger.exception("ServiceMonitor: erreur generique")
                 finally:
-                    self.__fermeture_event.wait(30)
+                    self.__attente_event.wait(30)
 
         except Exception:
             self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
@@ -350,6 +356,12 @@ class ServiceMonitor:
     def idmg_tronque(self):
         return self.__idmg[0:12]
 
+    def event(self, event):
+        event_json = json.loads(event)
+        if event_json.get('Type') == 'container':
+            if event_json.get('Action') == 'start' and event_json.get('status') == 'start':
+                self.__logger.debug("Container demarre: %s", event_json)
+                self.__attente_event.set()
 
 class GestionnaireCertificats:
 
@@ -810,6 +822,8 @@ class GestionnaireModulesDocker:
             'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
         }
 
+        self.__event_listeners = list()
+
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def start_events(self):
@@ -822,11 +836,28 @@ class GestionnaireModulesDocker:
         except Exception:
             pass
 
+    def add_event_listener(self, listener):
+        self.__event_listeners.append(listener)
+
+    def remove_event_listener(self, listener):
+        self.__event_listeners = [l for l in self.__event_listeners if l is not listener]
+
     def ecouter_events(self):
         self.__logger.info("Debut ecouter events docker")
         self.__event_stream = self.__docker.events()
         for event in self.__event_stream:
             self.__logger.debug("Event : %s", str(event))
+            to_remove = list()
+            for listener in self.__event_listeners:
+                try:
+                    listener.event(event)
+                except Exception:
+                    self.__logger.exception("Erreur event listener")
+                    to_remove.append(listener)
+
+            for listener in to_remove:
+                self.remove_event_listener(listener)
+
             if self.__fermeture_event.is_set():
                 break
         self.__logger.info("Fin ecouter events docker")
