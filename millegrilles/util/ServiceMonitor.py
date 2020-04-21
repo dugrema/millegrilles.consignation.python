@@ -223,7 +223,6 @@ class ServiceMonitor:
 
             self.__gestionnaire_certificats = GestionnaireCertificats(
                 self.__docker, idmg=self.__idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self.__args.secrets)
-            self.__gestionnaire_certificats.charger_certificats()
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
         except HTTPError as he:
@@ -297,7 +296,6 @@ class ServiceMonitor:
         self.__gestionnaire_docker.add_event_listener(self)
 
         if besoin_initialiser:
-            self.__gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
             self.__gestionnaire_docker.initialiser_millegrille()
 
             if not self.__args.dev:
@@ -307,6 +305,7 @@ class ServiceMonitor:
                 raise Exception("Redemarrage")
 
         # Generer certificats de module manquants ou expires, avec leur cle
+        self.__gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
         self.__entretien_certificats()
 
     def __entretien_modules(self):
