@@ -1386,8 +1386,11 @@ class ConstantesServiceMonitor:
     MODULE_TRANSMISSION = 'transmission'
     MODULE_DOMAINES = 'domaines'
     MODULE_PYTHON = 'mg-python'
+    MODULE_MONGOEXPRESS = 'mongoexpress'
+    MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
 
     FICHIER_MONGO_MOTDEPASSE = 'passwd.mongo.txt'
+    FICHIER_MONGOXPWEB_MOTDEPASSE = 'passwd.mongoxpweb.txt'
     FICHIER_MQ_MOTDEPASSE = 'passwd.mq.txt'
 
     CERT_SUFFIX = '.cert'

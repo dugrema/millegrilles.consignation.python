@@ -45,6 +45,12 @@ class ConstantesGenerateurCertificat:
     ROLE_MONITOR = 'monitor'
     ROLE_CONNECTEUR_TIERS = 'tiers'
     ROLE_BACKUP = 'backup'
+    ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
+    ROLE_HEBERGEMENT_DOMAINES = 'heb_domaines'
+    ROLE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
+    ROLE_HEBERGEMENT_CONSIGNATIONFICHIERS = 'heb_fichiers'
+    ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
+
 
     ROLES_ACCES_MONGO = [
         ROLE_MONGO,
@@ -1286,6 +1292,28 @@ class GenererNginx(GenerateurNoeud):
         return builder
 
 
+class GenererHebergementTransactions(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_TRANSACTIONS).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
 
     def __init__(self, idmg, domaines: list, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
@@ -1398,6 +1426,8 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
             ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
+
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS: GenererHebergementTransactions,
         }
 
         self.__generateur_par_csr = GenerateurCertificateParRequest

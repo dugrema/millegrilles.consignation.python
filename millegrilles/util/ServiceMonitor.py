@@ -44,6 +44,48 @@ class ServiceMonitor:
     Supporte aussi les MilleGrilles hebergees par l'hote.
     """
 
+    DICT_MODULES = {
+        ConstantesServiceMonitor.MODULE_MQ: {
+            'nom': ConstantesServiceMonitor.MODULE_MQ,
+            'role': ConstantesGenerateurCertificat.ROLE_MQ,
+        },
+        ConstantesServiceMonitor.MODULE_MONGO: {
+            'nom': ConstantesServiceMonitor.MODULE_MONGO,
+            'role': ConstantesGenerateurCertificat.ROLE_MONGO,
+        },
+        ConstantesServiceMonitor.MODULE_TRANSACTION: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+        },
+        ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+        },
+        ConstantesServiceMonitor.MODULE_CEDULEUR: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_CEDULEUR,
+        },
+        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
+            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
+        },
+        ConstantesServiceMonitor.MODULE_COUPDOEIL: {
+            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+        },
+        ConstantesServiceMonitor.MODULE_TRANSMISSION: {
+            'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION,
+        },
+        ConstantesServiceMonitor.MODULE_DOMAINES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
+            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
+        },
+    }
+
     def __init__(self):
         self.__logger = logging.getLogger('%s' % self.__class__.__name__)
 
@@ -269,17 +311,11 @@ class ServiceMonitor:
 
         prefixe_certificats = self.idmg_tronque + '.pki.'
         filtre = {'name': prefixe_certificats}
-        roles = {
-            ConstantesGenerateurCertificat.ROLE_MONGO: dict(),
-            ConstantesGenerateurCertificat.ROLE_MQ: dict(),
-            ConstantesGenerateurCertificat.ROLE_TRANSACTIONS: dict(),
-            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: dict(),
-            ConstantesGenerateurCertificat.ROLE_CEDULEUR: dict(),
-            ConstantesGenerateurCertificat.ROLE_FICHIERS: dict(),
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL: dict(),
-            ConstantesGenerateurCertificat.ROLE_DOMAINES: dict(),
-            ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: dict(),
-        }
+
+        # Generer tous les certificas qui peuvent etre utilises
+        roles = dict()
+        for role in [info['role'] for info in ServiceMonitor.DICT_MODULES.values() if info.get('role')]:
+            roles[role] = dict()
 
         # Charger la configuration existante
         date_renouvellement = datetime.datetime.utcnow() + datetime.timedelta(days=21)
@@ -832,25 +868,29 @@ class ConnexionMiddleware:
 
 class GestionnaireModulesDocker:
 
+    # Liste de modules requis. L'ordre est important
+    MODULES_REQUIS = [
+        ConstantesServiceMonitor.MODULE_MQ,
+        ConstantesServiceMonitor.MODULE_MONGO,
+        ConstantesServiceMonitor.MODULE_TRANSACTION,
+        ConstantesServiceMonitor.MODULE_MAITREDESCLES,
+        ConstantesServiceMonitor.MODULE_CEDULEUR,
+        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+        ConstantesServiceMonitor.MODULE_COUPDOEIL,
+        ConstantesServiceMonitor.MODULE_TRANSMISSION,
+        ConstantesServiceMonitor.MODULE_DOMAINES,
+    ]
+
+    MODULES_HEBERGEMENT = [
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
+    ]
+
     def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
         self.__idmg = idmg
         self.__docker = docker_client
         self.__fermeture_event = fermeture_event
         self.__thread_events: Thread = None
         self.__event_stream = None
-
-        # Liste de modules requis. L'ordre est important, les dependances sont implicites.
-        self.__modules_requis = {
-            ConstantesServiceMonitor.MODULE_MQ: {'nom': ConstantesServiceMonitor.MODULE_MQ},
-            ConstantesServiceMonitor.MODULE_MONGO: {'nom': ConstantesServiceMonitor.MODULE_MONGO},
-            ConstantesServiceMonitor.MODULE_TRANSACTION: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
-            ConstantesServiceMonitor.MODULE_MAITREDESCLES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
-            ConstantesServiceMonitor.MODULE_CEDULEUR: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
-            ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS},
-            ConstantesServiceMonitor.MODULE_COUPDOEIL: {'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL},
-            ConstantesServiceMonitor.MODULE_TRANSMISSION: {'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION},
-            ConstantesServiceMonitor.MODULE_DOMAINES: {'nom': ConstantesServiceMonitor.MODULE_PYTHON},
-        }
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -914,6 +954,7 @@ class GestionnaireModulesDocker:
         noms_secrets = {
             'passwd.mongo': ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE,
             'passwd.mq': ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE,
+            'passwd.mongoxpweb': ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE,
             ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
             ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem',
             ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
@@ -950,7 +991,8 @@ class GestionnaireModulesDocker:
             service_name = service.name.split('_')[1]
             dict_services[service_name] = service
 
-        for service_name, params in self.__modules_requis.items():
+        for service_name in self.MODULES_REQUIS:
+            params = ServiceMonitor.DICT_MODULES[service_name]
             service = dict_services.get(service_name)
             if not service:
                 self.demarrer_service(service_name, **params)
@@ -981,6 +1023,17 @@ class GestionnaireModulesDocker:
         filter = {'name': self.idmg_tronque + '_' + service_name}
         service_list = self.__docker.services.list(filters=filter)
         service_list[0].remove()
+
+    def activer_hebergement(self):
+        """
+        Active les modules d'hebergement (si pas deja fait).
+        :param idmg: MilleGrille a heberger
+        :return:
+        """
+        pass
+
+    def desactiver_hebergement(self, idmg):
+        pass
 
     def verifier_etat_service(self, service):
         update_state = None
