@@ -45,6 +45,7 @@ class ConstantesGenerateurCertificat:
     ROLE_MONITOR = 'monitor'
     ROLE_CONNECTEUR_TIERS = 'tiers'
     ROLE_BACKUP = 'backup'
+    ROLE_HEBERGEMENT = 'hebergement'
     ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     ROLE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     ROLE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
@@ -1305,7 +1306,11 @@ class GenererHebergementTransactions(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_TRANSACTIONS).encode('utf-8')
+        roles_list = [
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
+        ]
+        roles = ','.join(roles_list).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False

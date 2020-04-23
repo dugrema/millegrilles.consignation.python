@@ -80,6 +80,10 @@ class ServiceMonitor:
             'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
         },
+        ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
+            'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
+            'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
+        },
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
             'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
@@ -441,6 +445,7 @@ class GestionnaireCertificats:
         self.clecert_monitor: EnveloppeCleCert = None
         self.__passwd_mongo: str
         self.__passwd_mq: str
+        self.__passwd_mongoxp: str
 
         self.renouvelleur: RenouvelleurCertificat = None
         self.secret_path = kwargs.get('secrets')
@@ -521,6 +526,7 @@ class GestionnaireCertificats:
         self.__docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
 
         passwd_mongoxpweb = b64encode(secrets.token_bytes(24)).replace(b'=', b'')
+        self.__passwd_mongoxp = str(passwd_mongoxpweb, 'utf-8')
         label_passwd_mongoxp = self.idmg_tronque + '.passwd.mongoxpweb.' + self.__date
         self.__docker.secrets.create(name=label_passwd_mongoxp, data=passwd_mongoxpweb, labels={'millegrille': self.idmg})
 
@@ -585,6 +591,8 @@ class GestionnaireCertificats:
             fichiers.write(self.__passwd_mongo)
         with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'w') as fichiers:
             fichiers.write(self.__passwd_mq)
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE), 'w') as fichiers:
+            fichiers.write(self.__passwd_mongoxp)
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
@@ -809,17 +817,14 @@ class ConnexionMiddleware:
             try:
                 idmg = self.__configuration.idmg
                 igmd_tronque = idmg[0:12]
-                roles_comptes = [
-                    ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-                    ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-                    ConstantesGenerateurCertificat.ROLE_CEDULEUR,
-                    ConstantesGenerateurCertificat.ROLE_FICHIERS,
-                    ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
-                    ConstantesGenerateurCertificat.ROLE_DOMAINES,
-                    ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
-                ]
+                roles_comptes = [info['role'] for info in ServiceMonitor.DICT_MODULES.values() if info.get('role')]
                 roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
 
+                roles_mongo = [
+                    ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+                    ConstantesGenerateurCertificat.ROLE_DOMAINES,
+                    ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+                ]
                 for role in roles_comptes:
                     filtre = {'name': role}
                     configs = self.__docker.configs.list(filters=filtre)
@@ -840,10 +845,12 @@ class ConnexionMiddleware:
                     clecert.cert_from_pem_bytes(cert_pem)
 
                     # Creer compte
-                    try:
-                        self.__mongo.creer_compte(clecert)
-                    except DuplicateKeyError:
-                        self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
+                    roles_cert = clecert.get_roles
+                    if any([role in roles_mongo for role in roles_cert]):
+                        try:
+                            self.__mongo.creer_compte(clecert)
+                        except DuplicateKeyError:
+                            self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
 
                     try:
                         self.__gestionnaire_mq.ajouter_compte(clecert)
@@ -1003,6 +1010,12 @@ class GestionnaireModulesDocker:
 
     def demarrer_service(self, service_name: str, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
+        configuration_service = ServiceMonitor.DICT_MODULES.get(service_name)
+
+        if configuration_service:
+            # S'assurer que le certificat existe et est a date
+            pass
+
         gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
 
         nom_image_docker = kwargs.get('nom') or service_name
