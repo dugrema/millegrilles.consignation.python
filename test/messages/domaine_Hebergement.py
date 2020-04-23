@@ -93,8 +93,32 @@ class MessagesSample(BaseCallback):
         print("Envoi commande: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def transaction_desactiver_millegrille_hebergee(self):
+        enveloppe_requete = self.generateur.soumettre_transaction(
+            {'idmg': '3Pt8to1u6ZifkbBUEYoKQBFUy2agrhQwPLVzj4o'},
+            ConstantesHebergement.TRANSACTION_DESACTIVER_MILLEGRILLE_HEBERGEE,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def transaction_activer_millegrille_hebergee(self):
+        enveloppe_requete = self.generateur.soumettre_transaction(
+            {'idmg': '3Pt8to1u6ZifkbBUEYoKQBFUy2agrhQwPLVzj4o'},
+            ConstantesHebergement.TRANSACTION_ACTIVER_MILLEGRILLE_HEBERGEE,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
-        self.commande_creer_millegrille_hebergee()
+        # self.commande_creer_millegrille_hebergee()
+        # self.transaction_desactiver_millegrille_hebergee()
+        self.transaction_activer_millegrille_hebergee()
 
 
 # --- MAIN ---

@@ -75,12 +75,16 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
         return self.__handlers_commandes
 
     def identifier_processus(self, domaine_transaction):
-        # if domaine_transaction == ConstantesHebergement.TRANSACTION_XXX:
-        #     processus = "millegrilles_domaines_Hebergement:ProcessusXXX"
-        # else:
-        #     processus = super().identifier_processus(domaine_transaction)
 
-        processus = super().identifier_processus(domaine_transaction)
+        if domaine_transaction == ConstantesHebergement.TRANSACTION_NOUVEAU_IDMG:
+            processus = "millegrilles_domaines_Hebergement:ProcessusNouveauIdmg"
+        elif domaine_transaction == ConstantesHebergement.TRANSACTION_ACTIVER_MILLEGRILLE_HEBERGEE:
+            processus = "millegrilles_domaines_Hebergement:ProcessusActiverHebergement"
+        elif domaine_transaction == ConstantesHebergement.TRANSACTION_DESACTIVER_MILLEGRILLE_HEBERGEE:
+            processus = "millegrilles_domaines_Hebergement:ProcessusDesactiverHebergement"
+
+        else:
+            processus = super().identifier_processus(domaine_transaction)
 
         return processus
 
@@ -99,8 +103,36 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
         self.generateur_transactions.transmettre_commande(
             commande, domaine, exchange=self.configuration.exchange_middleware)
 
+    def maj_hebergement(self, parametres: dict):
+        idmg = parametres['idmg']
 
-class ProcessusXXX(MGProcessusTransaction):
+        activite = parametres.get(ConstantesHebergement.CHAMP_HEBERGEMENT_ETAT) or ConstantesHebergement.VALEUR_HEBERGEMENT_ACTIF
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesHebergement.LIBVAL_MILLEGRILLE_HEBERGEE,
+            'idmg': idmg,
+        }
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)
+
+        set_ops = {
+            ConstantesHebergement.CHAMP_HEBERGEMENT_ETAT: activite,
+        }
+
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection = self.document_dao.get_collection(ConstantesHebergement.COLLECTION_DOCUMENTS_NOM)
+        collection.update_one(filtre, ops, upsert=True)
+
+
+class ProcessusNouveauIdmg(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement, transaction_mapper=None):
         super().__init__(controleur, evenement, transaction_mapper)
@@ -108,3 +140,71 @@ class ProcessusXXX(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.charger_transaction()
+        idmg = transaction['idmg']
+
+        parametres = {
+            ConstantesHebergement.CHAMP_HEBERGEMENT_ETAT: ConstantesHebergement.VALEUR_HEBERGEMENT_ACTIF,
+            Constantes.CONFIG_IDMG: idmg,
+        }
+
+        # Creer document d'hebergement de la MilleGrille
+        self.controleur.gestionnaire.maj_hebergement(parametres)
+
+        # Transmettre commande pour activer l'hebergement de la MilleGrille
+        commande = {'idmg': idmg}
+        commande_domaine = 'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT
+        self.ajouter_commande_a_transmettre(commande_domaine, commande)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusActiverHebergement(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        idmg = transaction['idmg']
+
+        parametres = {
+            ConstantesHebergement.CHAMP_HEBERGEMENT_ETAT: ConstantesHebergement.VALEUR_HEBERGEMENT_ACTIF,
+            Constantes.CONFIG_IDMG: idmg,
+        }
+
+        # Creer document d'hebergement de la MilleGrille
+        self.controleur.gestionnaire.maj_hebergement(parametres)
+
+        # Transmettre commande pour activer l'hebergement de la MilleGrille
+        commande = {'idmg': idmg}
+        commande_domaine = 'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT
+        self.ajouter_commande_a_transmettre(commande_domaine, commande)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusDesactiverHebergement(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        idmg = transaction['idmg']
+
+        parametres = {
+            ConstantesHebergement.CHAMP_HEBERGEMENT_ETAT: ConstantesHebergement.VALEUR_HEBERGEMENT_INACTIF,
+            Constantes.CONFIG_IDMG: idmg,
+        }
+
+        # Creer document d'hebergement de la MilleGrille
+        self.controleur.gestionnaire.maj_hebergement(parametres)
+
+        # Transmettre commande pour activer l'hebergement de la MilleGrille
+        commande = {'idmg': idmg}
+        commande_domaine = 'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT
+        self.ajouter_commande_a_transmettre(commande_domaine, commande)
+
+        self.set_etape_suivante()  # Termine
