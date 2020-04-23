@@ -1320,12 +1320,18 @@ class ConstantesHebergement:
     VALEUR_HEBERGEMENT_ACTIF = 'actif'
     VALEUR_HEBERGEMENT_INACTIF = 'inactif'
 
+    REQUETE_MILLEGRILLES_ACTIVES = '%s.requeteMilleGrillesActives' % DOMAINE_NOM
+
     TRANSACTION_NOUVEAU_IDMG = '%s.nouveauIdmg' % DOMAINE_NOM
     TRANSACTION_ACTIVER_MILLEGRILLE_HEBERGEE = '%s.activerMilleGrilleHebergee' % DOMAINE_NOM
     TRANSACTION_DESACTIVER_MILLEGRILLE_HEBERGEE = '%s.desactiverMilleGrilleHebergee' % DOMAINE_NOM
 
     COMMANDE_CREER_MILLEGRILLE_HEBERGEE = '%s.creerMilleGrilleHebergee' % DOMAINE_NOM
 
+
+class ConstantesHebergementTransactions:
+
+    CORRELATION_MILLEGRILLES_ACTIVES = 'millegrilles_actives'
 
 
 class CommandesSurRelai:

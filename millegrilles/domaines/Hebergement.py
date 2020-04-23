@@ -13,7 +13,16 @@ from millegrilles.util import X509Certificate
 class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
-        super().traiter_requete(ch, method, properties, body, message_dict)
+        routing_key = method.routing_key
+
+        reponse = None
+        if routing_key == 'requete.%s' % ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES:
+            reponse = self.gestionnaire.get_millegrilles_actives()
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementCommandesHebergementProtegees(TraitementCommandesProtegees):
@@ -131,6 +140,23 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
         collection = self.document_dao.get_collection(ConstantesHebergement.COLLECTION_DOCUMENTS_NOM)
         collection.update_one(filtre, ops, upsert=True)
 
+    def get_millegrilles_actives(self):
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesHebergement.LIBVAL_MILLEGRILLE_HEBERGEE,
+            ConstantesHebergement.CHAMP_HEBERGEMENT_ETAT: ConstantesHebergement.VALEUR_HEBERGEMENT_ACTIF,
+        }
+
+        collection = self.document_dao.get_collection(ConstantesHebergement.COLLECTION_DOCUMENTS_NOM)
+        curseur = collection.find(filtre)
+
+        liste = list()
+        for doc in curseur:
+            liste.append({
+                'idmg': doc['idmg']
+            })
+
+        return liste
 
 class ProcessusNouveauIdmg(MGProcessusTransaction):
 

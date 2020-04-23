@@ -59,7 +59,7 @@ class MessagesSample(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        self.event_recu.set()
+        sample.executer()
 
     # def run_ioloop(self):
     #     self.contexte.message_dao.run_ioloop()
@@ -80,6 +80,7 @@ class MessagesSample(BaseCallback):
             self.cert_maitredescles_recu.set()
         else:
             self.event_recu.set()
+            print(json.dumps(message_dict, indent=4))
 
     def commande_creer_millegrille_hebergee(self):
         enveloppe_requete = self.generateur.transmettre_commande(
@@ -115,20 +116,30 @@ class MessagesSample(BaseCallback):
         print("Envoi commande: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_millegrilles_actives(self):
+        enveloppe_requete = self.generateur.transmettre_requete(
+            {},
+            ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        self.event_recu.clear()
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
-        self.transaction_activer_millegrille_hebergee()
+        # self.transaction_activer_millegrille_hebergee()
+        self.requete_millegrilles_actives()
 
 
 # --- MAIN ---
 sample = MessagesSample()
 
-# TEST
-sample.executer()
-
 # FIN TEST
-sample.event_recu.wait(10)
+sample.event_recu.wait(5)
 try:
     sample.deconnecter()
 except Exception:
