@@ -1261,7 +1261,7 @@ class TraitementMessageDomaineCommande(TraitementMessageDomaine):
             fingerprint = ci.fingerprint
             self.message_dao.transmettre_demande_certificat(fingerprint)
 
-    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         raise NotImplementedError()
 
     def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None):

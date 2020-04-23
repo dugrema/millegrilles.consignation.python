@@ -552,6 +552,7 @@ class GestionnaireCertificats:
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
+        os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
 
         # Charger information certificat intermediaire
         cert_pem = self.__charger_certificat_docker('pki.intermediaire.cert')

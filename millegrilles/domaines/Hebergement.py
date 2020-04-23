@@ -6,7 +6,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesHebergement
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementCommandesProtegees
-from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.util import X509Certificate
 
 
@@ -18,12 +18,12 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
 class TraitementCommandesHebergementProtegees(TraitementCommandesProtegees):
 
-    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         routing_key = method.routing_key
 
-        resultat = None
-        if routing_key == 'commande.%s.%s' % (ConstantesHebergement.DOMAINE_NOM, ConstantesHebergement.COMMANDE_SIGNER_CLE_BACKUP):
-            resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
+        resultat: dict
+        if routing_key == 'commande.%s' % ConstantesHebergement.COMMANDE_CREER_MILLEGRILLE_HEBERGEE:
+            resultat = self._gestionnaire.creer_trousseau_millegrille(message_dict)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -41,6 +41,9 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+        }
+        self.__handlers_commandes = {
+            Constantes.SECURITE_PROTEGE: TraitementCommandesHebergementProtegees(self),
         }
 
     def demarrer(self):
@@ -68,6 +71,9 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
 
+    def get_handler_commandes(self) -> dict:
+        return self.__handlers_commandes
+
     def identifier_processus(self, domaine_transaction):
         # if domaine_transaction == ConstantesHebergement.TRANSACTION_XXX:
         #     processus = "millegrilles_domaines_Hebergement:ProcessusXXX"
@@ -80,12 +86,18 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
 
     # --- Operations du domaine ---
 
-    def creer_domaine_heberge(self) -> str:
+    def creer_trousseau_millegrille(self, commande):
         """
-        Genere un nouveau domaine heberge.
-        :return: Le idmg du nouveau
+        Lance les commandes / transactions requises pour creer une nouvelle MilleGrille hebergee
+        :param commande:
+        :return:
         """
-
+        domaine = 'commande.%s.%s' % (
+            Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+            Constantes.ConstantesMaitreDesCles.COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE
+        )
+        self.generateur_transactions.transmettre_commande(
+            commande, domaine, exchange=self.configuration.exchange_middleware)
 
 
 class ProcessusXXX(MGProcessusTransaction):

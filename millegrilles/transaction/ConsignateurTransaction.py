@@ -526,7 +526,7 @@ class EntretienCollectionsDomaines(BaseCallback):
             'millegrilles.domaines.Principale',
             'millegrilles.domaines.SenseursPassifs',
             'millegrilles.domaines.Pki',
-            'millegrilles.domaines.Taches',
+            'millegrilles.domaines.Hebergement',
         ]
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))

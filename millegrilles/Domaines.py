@@ -716,7 +716,7 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
 class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
 
-    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         routing_key = method.routing_key
 
         commande = method.routing_key.split('.')[-1]

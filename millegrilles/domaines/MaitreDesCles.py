@@ -1160,9 +1160,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             clecert = clecerts[fingerprint]
             clecert.key_from_pem_bytes(key_pem, motdepasse)
 
-        # Preparer le generateur de certicats
+        # Preparer le generateur de certicats. Toujours generer cles privees avec mots de passe.
         clecert_intermediaire = clecerts[fingerprint_intermediaire]
-        renouvelleur_certificat_hebergement = RenouvelleurCertificat(idmg, dict_ca, clecert_intermediaire)
+        renouvelleur_certificat_hebergement = RenouvelleurCertificat(
+            idmg, dict_ca, clecert_intermediaire, generer_password=True)
 
         transaction_trousseau = {
             'idmg': idmg,

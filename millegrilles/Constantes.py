@@ -1315,6 +1315,8 @@ class ConstantesHebergement:
 
     TRANSACTION_NOUVEAU_IDMG = '%s.nouveauIdmg' % DOMAINE_NOM
 
+    COMMANDE_CREER_MILLEGRILLE_HEBERGEE = '%s.creerMilleGrilleHebergee' % DOMAINE_NOM
+
 
 class CommandesSurRelai:
     """
