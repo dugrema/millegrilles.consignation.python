@@ -6,9 +6,12 @@ from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransac
 
 
 if __name__ == '__main__':
-    keycert_file = ConsignateurTransaction.preparer_mongo_keycert()
-    try:
-        consignateur = ConsignateurTransaction()
-        consignateur.main()
-    finally:
-        os.remove(keycert_file)
+    # keycert_file = ConsignateurTransaction.preparer_mongo_keycert()
+    # try:
+    #     consignateur = ConsignateurTransaction()
+    #     consignateur.main()
+    # finally:
+    #     os.remove(keycert_file)
+
+    consignateur = ConsignateurTransaction()
+    consignateur.main()

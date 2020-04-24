@@ -166,24 +166,22 @@ class TransactionConfiguration:
         config_mongo['authSource'] = self._mongo_config.get(Constantes.CONFIG_MONGO_AUTHSOURCE) or self.idmg
         if mongo_ssl_param == 'on':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
-            parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs', 'username', 'password'])
+            # parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs', 'username', 'password'])
+            parametres_mongo.extend(['ssl_ca_certs', 'username', 'password'])
         elif mongo_ssl_param == 'x509':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
             config_mongo['authMechanism'] = 'MONGODB-X509'
-            parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
+            # parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
+            parametres_mongo.extend(['ssl_ca_certs'])
             del config_mongo['authSource']
         elif mongo_ssl_param == 'nocert':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
             parametres_mongo.extend(['username', 'password'])
 
-
-        # if mongo_ssl_param != 'x509':
-        #     config_mongo['authSource'] = self.idmg
-        #     config_mongo['username'] = self._mongo_config[Constantes.CONFIG_MONGO_USER]
-        #     config_mongo['password'] = self._mongo_config[Constantes.CONFIG_MONGO_PASSWORD]
-
-        # config_mongo['host'] = self._mongo_config[Constantes.CONFIG_MONGO_HOST]
-        # config_mongo['port'] = int(self._mongo_config[Constantes.CONFIG_MONGO_PORT])
+        if mongo_ssl_param in ['x509', 'on']:
+            # Copier key/cert MQ. Va etre override au besoin
+            config_mongo['ssl_certfile'] = self.mq_certfile
+            config_mongo['ssl_keyfile'] = self.mq_keyfile
 
         # Copier toutes les valeurs necessaires, enlever le prefixe mongo_ de chaque cle.
         for cle in self._mongo_config:

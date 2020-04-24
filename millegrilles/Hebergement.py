@@ -145,14 +145,36 @@ class Hebergement(ModeleConfiguration):
             cle_pem = trousseau['cle'].encode('utf-8')
             motdepasse_chiffre = trousseau['motdepasse_chiffre']
 
-            # Dechiffrer mot de passe
+            # Dechiffrer mot de passe, charger cle privee et certificat
             signateur = self.contexte.signateur_transactions
             motdepasse = signateur.dechiffrage_asymmetrique(motdepasse_chiffre.encode('utf-8'))
 
             clecert = EnveloppeCleCert()
             clecert.from_pem_bytes(cle_pem, certificat_pem, motdepasse)
-            motdepasse = None
             clecert.password = None
+
+            configuration['clecert'] = clecert
+
+            # Charger la chaine de certificats pour se connecter a l'hote
+            certificat_pem_str = str(certificat_pem, 'utf-8')
+            certificats = trousseau['certificats']
+            chaine_hote = [
+                certificat_pem_str,
+                certificats['hebergement'],
+                certificats['hote_pem'],
+            ]
+            chaine_cert = [
+                certificat_pem_str,
+                certificats['intermediaire'],
+            ]
+
+            configuration['chaine_hote'] = chaine_hote
+            configuration['chaine_cert'] = chaine_cert
+            configuration['millegrille'] = certificats['millegrille']
+
+            # Sauvegarder les fichiers CA, chaine hote, cert et cle.
+            pass
+
 
 
     @property
