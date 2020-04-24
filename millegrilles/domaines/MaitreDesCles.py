@@ -874,6 +874,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE: transaction[
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT: transaction[
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT],
         }
         contenu_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,

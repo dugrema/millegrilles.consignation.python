@@ -713,6 +713,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_SYNCHRONISER = 'synchroniser'
     TRANSACTION_CHAMP_MILLEGRILLE = 'millegrille'
     TRANSACTION_CHAMP_INTERMEDIAIRE = 'intermediaire'
+    TRANSACTION_CHAMP_HEBERGEMENT = 'hebergement'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
