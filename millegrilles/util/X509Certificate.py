@@ -1616,6 +1616,7 @@ class RenouvelleurCertificat:
         cle_privee_racine = str(enveloppe_racine.private_key_bytes, 'utf-8')
         cle_privee_intermediaire = str(enveloppe_intermediaire.private_key_bytes, 'utf-8')
 
+        cert_hote = str(self.__millegrille.cert_bytes, 'utf-8')
         cert_racine = str(enveloppe_racine.cert_bytes, 'utf-8')
         cert_intermediaire = str(enveloppe_intermediaire.cert_bytes, 'utf-8')
         cert_hebergement = str(enveloppe_hebergement_xs.cert_bytes, 'utf-8')
@@ -1636,6 +1637,7 @@ class RenouvelleurCertificat:
             },
             'hebergement': {
                 ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_hebergement,
+                'hote_pem': cert_hote,
             }
         }
 

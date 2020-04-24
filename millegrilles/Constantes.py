@@ -714,6 +714,8 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_MILLEGRILLE = 'millegrille'
     TRANSACTION_CHAMP_INTERMEDIAIRE = 'intermediaire'
     TRANSACTION_CHAMP_HEBERGEMENT = 'hebergement'
+    TRANSACTION_CHAMP_HOTE = 'hote'
+    TRANSACTION_CHAMP_HOTE_PEM = 'hote_pem'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 

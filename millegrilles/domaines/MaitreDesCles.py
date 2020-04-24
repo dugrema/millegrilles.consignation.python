@@ -668,7 +668,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         # Identifier le role a extraire des trousseaux / mots de passe
         roles = certificat_destinataire.get_roles
-        role = 'transaction'
+        # role = 'transaction'
+        role = roles[0]
 
         collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         liste_idmg = evenement['idmg']
@@ -703,10 +704,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 'certificats': {
                     'millegrille': doc['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
                     'intermediaire': doc['intermediaire'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT:
+                        doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT][
+                            ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_HOTE_PEM:
+                        doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT][
+                            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HOTE_PEM],
                 },
-                role: doc[role],
                 'motdepasse_chiffre': dict_motsdepasse_paridmg[idmg],
             }
+            info_millegrille.update(doc[role])
             resultats.append(info_millegrille)
 
             # Extraire

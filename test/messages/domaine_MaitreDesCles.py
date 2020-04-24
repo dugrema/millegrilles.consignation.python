@@ -98,7 +98,7 @@ class MessagesSample(BaseCallback):
 
     def requete_trousseau_hebergement(self):
         requete = {
-            'idmg': ['3FmPYS4Q1HkoHxc12BN5oq7gPyyKr2wkBbPSXBL']
+            'idmg': ['2aMvfBTqyfeQsMgSsYbtJuMeqUJ5TZV2iNiy2ES']
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete,
@@ -361,7 +361,7 @@ class MessagesSample(BaseCallback):
         # self.event_recu.clear()
 
         # enveloppe = self.requete_cert_maitredescles()
-        # self.requete_trousseau_hebergement()
+        self.requete_trousseau_hebergement()
 
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
@@ -375,7 +375,7 @@ class MessagesSample(BaseCallback):
         # self.requete_cle_racine()
         # self.commande_signer_cle_backup()
         # self.commande_restaurer_backup_cle()
-        self.commande_creer_cles_millegrille_hebergee()
+        # self.commande_creer_cles_millegrille_hebergee()
 
 
 # --- MAIN ---
