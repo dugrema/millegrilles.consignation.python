@@ -397,8 +397,8 @@ class UtilCertificats:
 
         contenu_dechiffre = self._cle.decrypt(
             contenu_bytes,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
             )

@@ -1332,12 +1332,13 @@ class ConstantesHebergement:
 
     COMMANDE_CREER_MILLEGRILLE_HEBERGEE = '%s.creerMilleGrilleHebergee' % DOMAINE_NOM
 
-
-class ConstantesHebergementTransactions:
-
     CORRELATION_MILLEGRILLES_ACTIVES = 'millegrilles_actives'
     CORRELATION_TROUSSEAU_MODULE = 'trousseau_module'
 
+
+class ConstantesHebergementTransactions:
+
+    pass
 
 class CommandesSurRelai:
     """
