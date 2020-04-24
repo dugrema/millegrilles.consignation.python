@@ -80,6 +80,8 @@ class TraitementRequetesProtegees(TraitementRequetesNoeuds):
             self.gestionnaire.transmettre_cle_grosfichier(message_dict, properties)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
             self.gestionnaire.transmettre_cle_document(message_dict, properties)
+        elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_TROUSSEAU_HEBERGEMENT:
+            self.gestionnaire.transmettre_trousseau_hebergement(message_dict, properties)
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -649,6 +651,69 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
                 }
 
+        self.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id
+        )
+
+    def transmettre_trousseau_hebergement(self, evenement: dict, properties):
+        """
+        Charge et transmet le trousseau de cle-cert de millegrilles hebergees, avec mot de passe chiffre.
+        :param evenement:
+        :param properties:
+        :return:
+        """
+        fingerprint = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+        certificat_destinataire: EnveloppeCertificat = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+        certificat = certificat_destinataire.certificat
+
+        # Identifier le role a extraire des trousseaux / mots de passe
+        roles = certificat_destinataire.get_roles
+        role = 'transaction'
+
+        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        liste_idmg = evenement['idmg']
+
+        # Charger mots de passe, rechiffrer pour destination
+        filtre_motsdepasses = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.idmg': {'$in': liste_idmg},
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.role': role,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
+        }
+        curseur_motsdepasse = collection.find(filtre_motsdepasses)
+        dict_motsdepasse_paridmg = dict()
+        for motdepasse_info in curseur_motsdepasse:
+            idmg = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['idmg']
+            motdepasse = self.decrypter_motdepasse(motdepasse_info['motdepasse'])
+            motdepasse_dechiffre = motdepasse
+            motdepasse_chiffre, fingerprint = self.crypter_cle(motdepasse_dechiffre, cert=certificat)
+            dict_motsdepasse_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
+
+        filtre = {
+            'identificateurs_document.idmg': {'$in': liste_idmg},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+        }
+        curseur_trousseaux = collection.find(filtre)
+
+        resultats = []
+        for doc in curseur_trousseaux:
+            # Charger trousseaux
+            idmg = doc['idmg']
+            info_millegrille = {
+                'idmg': idmg,
+                'certificats': {
+                    'millegrille': doc['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                    'intermediaire': doc['intermediaire'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                },
+                role: doc[role],
+                'motdepasse_chiffre': dict_motsdepasse_paridmg[idmg],
+            }
+            resultats.append(info_millegrille)
+
+            # Extraire
+
+        reponse = {
+            'resultats': resultats
+        }
         self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )

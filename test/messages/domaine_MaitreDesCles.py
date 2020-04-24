@@ -58,7 +58,8 @@ class MessagesSample(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        self.event_recu.set()
+        # self.event_recu.set()
+        self.executer()
 
     # def run_ioloop(self):
     #     self.contexte.message_dao.run_ioloop()
@@ -79,6 +80,7 @@ class MessagesSample(BaseCallback):
             self.cert_maitredescles_recu.set()
         else:
             self.event_recu.set()
+            print(json.dumps(message_dict, indent=4))
 
     def requete_cert_maitredescles(self):
         requete_cert_maitredescles = {
@@ -87,6 +89,20 @@ class MessagesSample(BaseCallback):
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
             'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def requete_trousseau_hebergement(self):
+        requete = {
+            'idmg': ['3FmPYS4Q1HkoHxc12BN5oq7gPyyKr2wkBbPSXBL']
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete,
+            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_TROUSSEAU_HEBERGEMENT,
             'abcd-1234',
             self.queue_name
         )
@@ -341,10 +357,11 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        self.event_recu.wait(5)
-        self.event_recu.clear()
+        # self.event_recu.wait(5)
+        # self.event_recu.clear()
 
         # enveloppe = self.requete_cert_maitredescles()
+        self.requete_trousseau_hebergement()
 
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
@@ -358,14 +375,14 @@ class MessagesSample(BaseCallback):
         # self.requete_cle_racine()
         # self.commande_signer_cle_backup()
         # self.commande_restaurer_backup_cle()
-        self.commande_creer_cles_millegrille_hebergee()
+        # self.commande_creer_cles_millegrille_hebergee()
 
 
 # --- MAIN ---
 sample = MessagesSample()
 
 # TEST
-sample.executer()
+# sample.executer()
 
 # FIN TEST
 sample.event_recu.wait(10)

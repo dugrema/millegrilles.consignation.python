@@ -57,7 +57,7 @@ class Hebergement(ModeleConfiguration):
 
     def __init__(self):
         super().__init__()
-        self.__millegrilles = None
+        self._millegrilles = dict()
         self.__fermeture_event = Event()
         self.__traitement_messages = None
         self.queue_prete = Event()
@@ -105,7 +105,24 @@ class Hebergement(ModeleConfiguration):
     def entretien_millegrilles_actives(self, liste_millegrilles: list):
 
         for info in liste_millegrilles:
-            self.__logger.debug("Entretien idmg %s", info['idmg'])
+            idmg = info['idmg']
+            self.__logger.debug("Entretien idmg %s", idmg)
+
+            config_millegrille = self._millegrilles.get(idmg)
+            if not config_millegrille:
+                # Demarrer l'hebergement de la millegrille
+                config_millegrille = info
+                self._millegrilles[idmg] = config_millegrille
+                self.demarrer_hebergement(idmg)
+            else:
+                # Entretien
+                pass
+
+    def demarrer_hebergement(self, idmg):
+        raise NotImplementedError()
+
+    def recevoir_trousseau(self, info: dict):
+        pass
 
 
 class HebergementTransactions(Hebergement):
@@ -113,6 +130,9 @@ class HebergementTransactions(Hebergement):
     def __init__(self):
         super().__init__()
         self.__logging = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def demarrer_hebergement(self, idmg):
+        configuration = self._millegrilles[idmg]
 
 
 class HebergementDomaines(Hebergement):
