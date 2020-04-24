@@ -94,7 +94,7 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
 
-        resultat = None
+        resultat: dict
         if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP):
             resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
         elif routing_key == 'commande.%s.%s' % (
@@ -174,7 +174,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__renouvelleur_certificat = RenouvelleurCertificat(
             self.configuration.idmg,
             self.__dict_ca,
-            self.__clecert_millegrille
+            millegrille=self.__clecert_millegrille
         )
 
         try:
@@ -1144,11 +1144,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     'fingerprint': trousseau_millegrille['millegrille']['fingerprint_b64'],
                 },
                 'intermediaire': {
-                    ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+                    ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: trousseau_millegrille['intermediaire'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
                     'cle': trousseau_millegrille['intermediaire']['cle'],
                     # 'motdepasse': str(b64encode(motdepasse_intermediaire_crypte), 'utf-8'),
                     'fingerprint': trousseau_millegrille['intermediaire']['fingerprint_b64'],
                 },
+                'hebergement': trousseau_millegrille['hebergement'],
                 'securite': Constantes.SECURITE_SECURE,
             },
             'transaction_cle_millegrille': {
@@ -1228,7 +1229,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Preparer le generateur de certicats. Toujours generer cles privees avec mots de passe.
         clecert_intermediaire = clecerts[fingerprint_intermediaire]
         renouvelleur_certificat_hebergement = RenouvelleurCertificat(
-            idmg, dict_ca, clecert_intermediaire, generer_password=True)
+            idmg, dict_ca, millegrille=clecert_intermediaire, generer_password=True)
 
         transaction_trousseau = {
             'idmg': idmg,
