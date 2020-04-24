@@ -128,12 +128,9 @@ class TransactionConfiguration:
 
             # Configuration de connection a RabbitMQ
             for property in config_dict.keys():
-                env_value = os.environ.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
-                json_value = dict_fichier_json.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
-                if env_value is not None :
-                    config_dict[property] = env_value
-                elif json_value is not None:
-                    config_dict[property] = json_value
+                value = self.find_value(dict_fichier_json, property)
+                if value is not None :
+                    config_dict[property] = value
 
         # Si le IDMG n'est pas fourni, tenter de le charger a partir du certificat MQ
         if self.idmg == Constantes.DEFAUT_IDMG:
@@ -146,6 +143,12 @@ class TransactionConfiguration:
                         self._millegrille_config[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = organization[0].value
             except FileNotFoundError:
                 self.__logger.exception("IDMG inconne, on utilise sansnom")
+
+    def find_value(self, dict_fichier_json, property):
+        value = os.environ.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
+        if not value:
+            value = dict_fichier_json.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
+        return value
 
     def load_property(self, map, property, env_name):
         env_value = os.environ[env_name]

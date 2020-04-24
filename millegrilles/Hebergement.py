@@ -1,4 +1,6 @@
 import logging
+import tempfile
+import os
 
 from base64 import b64decode
 from threading import Event
@@ -8,6 +10,101 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesHebergement, ConstantesHebergementTransactions
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
+
+
+class ConfigurationHebergement(TransactionConfiguration):
+
+    PROPERTIES_OVERRIDE = {
+        Constantes.CONFIG_MQ_KEYFILE: '',
+        Constantes.CONFIG_MQ_CERTFILE: '',
+        Constantes.CONFIG_MQ_AUTH_CERT: '',
+        Constantes.CONFIG_MQ_SSL: 'on',
+        Constantes.CONFIG_MONGO_SSL: 'x509',
+        Constantes.CONFIG_MONGO_AUTHSOURCE: '$external',
+    }
+
+    def __init__(self, configuration_hote: TransactionConfiguration, config_hebergement: dict):
+        super().__init__()
+        self.__configuration_hote = configuration_hote
+        self.__config_hebergement = config_hebergement
+
+        self.__parametres = dict()
+
+        self.__temp_folder: str = None
+
+        self.preparer_configuration_hebergement()
+        self.preparer_fichiers()
+
+    def preparer_configuration_hebergement(self):
+
+        properties_override = ConfigurationHebergement.PROPERTIES_OVERRIDE.copy()
+
+        configurations = [
+            self.__configuration_hote._mq_config,
+            self.__configuration_hote._mongo_config,
+            self.__configuration_hote._millegrille_config,
+            self.__configuration_hote._domaines_config,
+            self.__configuration_hote._email_config,
+            self.__configuration_hote._pki_config,
+            self.__configuration_hote._serveurs,
+            self.__configuration_hote._backup,
+        ]
+
+        for conf in configurations:
+            for key, value in conf.items():
+                override_value = properties_override.get(key)
+
+                if override_value:
+                    self.__parametres[key] = override_value
+                else:
+                    self.__parametres[key] = value
+
+    def preparer_fichiers(self):
+        # Creer nouveau repertoire temporaire pour fichiers
+
+        self.__temp_folder = tempfile.mkdtemp(dir='/tmp')
+        os.chmod(self.__temp_folder, mode=0o700)
+
+        chaine_hote = '\n'.join(self.__config_hebergement['chaine_hote'])
+        fp, fichier_chaine_hote = tempfile.mkstemp(suffix='.pem', dir=self.__temp_folder)
+        os.write(fp, chaine_hote.encode('utf-8'))
+        os.close(fp)
+
+        chaine_cert = '\n'.join(self.__config_hebergement['chaine_cert'])
+        fp, fichier_chaine_cert = tempfile.mkstemp(suffix='.pem', dir=self.__temp_folder)
+        os.write(fp, chaine_cert.encode('utf-8'))
+        os.close(fp)
+
+        cert_millegrille = self.__config_hebergement['millegrille']
+        fp, fichier_cert_millegrille = tempfile.mkstemp(suffix='.pem', dir=self.__temp_folder)
+        os.write(fp, cert_millegrille.encode('utf-8'))
+        os.close(fp)
+
+        cle = self.__config_hebergement['cle']
+        fp, fichier_cle = tempfile.mkstemp(suffix='.pem', dir=self.__temp_folder)
+        os.write(fp, cle.encode('utf-8'))
+        os.close(fp)
+
+        self.__parametres[Constantes.CONFIG_MQ_CERTFILE] = fichier_chaine_hote
+        self.__parametres[Constantes.CONFIG_MQ_KEYFILE] = fichier_cle
+        # self.__parametres[Constantes.CONFIG_MQ_CA_CERTS] = fichier_cert_millegrille
+
+        # Charger idmg a partir du certificat
+        cert = self.__config_hebergement['chaine_hote'][0]
+        clecert = EnveloppeCleCert()
+        clecert.cert_from_pem_bytes(cert.encode('utf-8'))
+        subject = clecert.formatter_subject()
+        self.__parametres[Constantes.CONFIG_IDMG] = subject['organizationName']
+
+    def find_value(self, dict_fichier_json, property):
+        """
+        :param dict_fichier_json:
+        :param property:
+        :return:
+        """
+        return self.__parametres.get(property)
 
 
 class TraitementMessage(BaseCallback):
@@ -171,11 +268,16 @@ class Hebergement(ModeleConfiguration):
             configuration['chaine_hote'] = chaine_hote
             configuration['chaine_cert'] = chaine_cert
             configuration['millegrille'] = certificats['millegrille']
+            configuration['cle'] = str(clecert.private_key_bytes, 'utf-8')
 
             # Sauvegarder les fichiers CA, chaine hote, cert et cle.
             pass
 
-
+            configuration_contexte = ConfigurationHebergement(self.contexte.configuration, configuration)
+            # configuration_contexte.loadEnvironment()
+            contexte_hebergement = ContexteRessourcesDocumentsMilleGrilles(configuration=configuration_contexte)
+            contexte_hebergement.initialiser()
+            pass
 
     @property
     def queue_name(self):
