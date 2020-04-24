@@ -158,6 +158,7 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
 
         return liste
 
+
 class ProcessusNouveauIdmg(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement, transaction_mapper=None):

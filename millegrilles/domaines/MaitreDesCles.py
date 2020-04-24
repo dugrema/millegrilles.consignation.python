@@ -669,7 +669,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Identifier le role a extraire des trousseaux / mots de passe
         roles = certificat_destinataire.get_roles
         # role = 'transaction'
-        role = roles[0]
+        # role = roles[0]
+
+        roles = [role.replace('heb_', '') for role in roles if role.startswith('heb_')]
+        if len(roles) == 1:
+            role = roles[0]
+        else:
+            raise ValueError("Plusieurs roles d'hebergement trouve : %s" % roles)
 
         collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         liste_idmg = evenement['idmg']
@@ -677,7 +683,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Charger mots de passe, rechiffrer pour destination
         filtre_motsdepasses = {
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.idmg': {'$in': liste_idmg},
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.role': role,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.role': {'$in': roles},
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
         }
         curseur_motsdepasse = collection.find(filtre_motsdepasses)

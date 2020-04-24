@@ -24,9 +24,12 @@ class TraitementMessage(BaseCallback):
         correlation_id = properties.correlation_id
         exchange = method.exchange
 
+        self.__logger.debug("Message recu : %s" % message_dict)
+
         if correlation_id == ConstantesHebergementTransactions.CORRELATION_MILLEGRILLES_ACTIVES:
-            self.__logger.debug("Message recu : %s" % message_dict)
             self.__gestionnaire.entretien_millegrilles_actives(message_dict['resultats'])
+        elif correlation_id == ConstantesHebergementTransactions.CORRELATION_TROUSSEAU_MODULE:
+            self.__gestionnaire.recevoir_trousseau(message_dict['resultats'])
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
@@ -91,7 +94,7 @@ class Hebergement(ModeleConfiguration):
         :return:
         """
         domaine_requete = Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES
-        queue_name = self.__traitement_messages.queue_name
+        queue_name = self.queue_name
         if not queue_name:
             raise ValueError("Queue reception non initialisee")
 
@@ -99,7 +102,7 @@ class Hebergement(ModeleConfiguration):
             {},
             domaine_requete,
             correlation_id=ConstantesHebergementTransactions.CORRELATION_MILLEGRILLES_ACTIVES,
-            reply_to=self.__traitement_messages.queue_name
+            reply_to=self.queue_name
         )
 
     def entretien_millegrilles_actives(self, liste_millegrilles: list):
@@ -121,8 +124,9 @@ class Hebergement(ModeleConfiguration):
     def demarrer_hebergement(self, idmg):
         raise NotImplementedError()
 
-    def recevoir_trousseau(self, info: dict):
-        pass
+    @property
+    def queue_name(self):
+        return self.__traitement_messages.queue_name
 
 
 class HebergementTransactions(Hebergement):
@@ -133,6 +137,19 @@ class HebergementTransactions(Hebergement):
 
     def demarrer_hebergement(self, idmg):
         configuration = self._millegrilles[idmg]
+
+        # Aller chercher le plus recent trousseau pour cette millegrille
+        requete = {'idmg': [idmg]}
+        domaine_requete = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_TROUSSEAU_HEBERGEMENT
+        self.contexte.generateur_transactions.transmettre_requete(
+            requete,
+            domaine_requete,
+            correlation_id=ConstantesHebergementTransactions.CORRELATION_TROUSSEAU_MODULE,
+            reply_to=self.queue_name,
+        )
+
+    def recevoir_trousseau(self, trousseau: dict):
+        pass
 
 
 class HebergementDomaines(Hebergement):

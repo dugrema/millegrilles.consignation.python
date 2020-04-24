@@ -1336,6 +1336,7 @@ class ConstantesHebergement:
 class ConstantesHebergementTransactions:
 
     CORRELATION_MILLEGRILLES_ACTIVES = 'millegrilles_actives'
+    CORRELATION_TROUSSEAU_MODULE = 'trousseau_module'
 
 
 class CommandesSurRelai:
