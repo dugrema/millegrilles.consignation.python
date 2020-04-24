@@ -1182,6 +1182,10 @@ class GestionnaireModulesDocker:
             # Name
             dict_config_docker['name'] = self.idmg_tronque + '_' + config_service['name']
 
+            hostname = config_service.get('hostname')
+            if hostname:
+                dict_config_docker['hostname'] = hostname
+
             # Resources
             config_args = config_service.get('args')
             if config_args:
