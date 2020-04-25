@@ -17,7 +17,6 @@ from base64 import b64encode, b64decode
 from requests.exceptions import HTTPError
 from os import path
 from requests.exceptions import SSLError
-from requests import Response
 from pymongo.errors import OperationFailure, DuplicateKeyError
 from json.decoder import JSONDecodeError
 from cryptography.x509.extensions import ExtensionNotFound
@@ -31,6 +30,7 @@ from millegrilles.util.RabbitMQManagement import RabbitMQAPI
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
+from millegrilles.dao.MessageDAO import BaseCallback
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
@@ -231,7 +231,8 @@ class ServiceMonitor:
         configuration = TransactionConfiguration()
 
         self.__connexion_middleware = ConnexionMiddleware(
-            configuration, self.__docker, self.__gestionnaire_mq, self.__gestionnaire_certificats.certificats, secrets=self.__args.secrets)
+            configuration, self.__docker, self, self.__gestionnaire_certificats.certificats,
+            secrets=self.__args.secrets)
 
         try:
             self.__connexion_middleware.initialiser()
@@ -256,7 +257,7 @@ class ServiceMonitor:
             self.__logger.debug("Pipe %s deja cree", PATH_FIFO)
 
         os.chmod(PATH_FIFO, 0o620)
-        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event, self.__gestionnaire_docker)
+        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event, self)
         self.__gestionnaire_commandes.start()
 
     def __connecter_docker(self):
@@ -430,6 +431,22 @@ class ServiceMonitor:
             if event_json.get('Action') == 'start' and event_json.get('status') == 'start':
                 self.__logger.debug("Container demarre: %s", event_json)
                 self.__attente_event.set()
+
+    @property
+    def gestionnaire_mq(self):
+        return self.__gestionnaire_mq
+
+    @property
+    def gestionnaire_mongo(self):
+        return self.__connexion_middleware.get_gestionnaire_comptes_mongo
+
+    @property
+    def gestionnaire_docker(self):
+        return self.__gestionnaire_docker
+
+    @property
+    def gestionnaire_commandes(self):
+        return self.__gestionnaire_commandes
 
 
 class GestionnaireCertificats:
@@ -677,16 +694,72 @@ class GestionnaireCertificats:
         return self.idmg[0:12]
 
 
+class TraitementMessages(BaseCallback):
+
+    def __init__(self, gestionnaire_commandes, contexte):
+        super().__init__(contexte)
+        self.__gestionnaire_commandes = gestionnaire_commandes
+        self.__channel = None
+        self.queue_name = None
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        correlation_id = properties.correlation_id
+        exchange = method.exchange
+
+        self.__logger.debug("Message recu : %s" % message_dict)
+
+        if routing_key.startswith('commande.'):
+            contenu = {
+                'commande': routing_key.replace('commande.', ''),
+                'properties': properties,
+                'contenu': message_dict,
+            }
+            commande = CommandeMonitor(contenu=contenu)
+            self.__gestionnaire_commandes.ajouter_commande(commande)
+        else:
+            raise ValueError("Type message inconnu", correlation_id, routing_key)
+
+    def on_channel_open(self, channel):
+        self.__channel = channel
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=1)
+
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+
+    def queue_open(self, queue):
+        self.queue_name = queue.method.queue
+        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+
+        # Ajouter les routing keys
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitor.#',
+            callback=None
+        )
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+        self.queue_name = None
+
+    def is_channel_open(self):
+        return self.__channel is not None and not self.__channel.is_closed
+
+
 class ConnexionMiddleware:
     """
     Connexion au middleware de la MilleGrille en service.
     """
 
     def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
-                 gestionnaire_mq, certificats: dict, **kwargs):
+                 service_monitor, certificats: dict, **kwargs):
         self.__configuration = configuration
         self.__docker = client_docker
-        self.__gestionnaire_mq = gestionnaire_mq
+        self.__service_monitor = service_monitor
         self.__certificats = certificats
 
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
@@ -704,6 +777,7 @@ class ConnexionMiddleware:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.__certificat_event_handler: GestionnaireEvenementsCertificat
+        self.__commandes_handler: TraitementMessages
 
         self.__monitor_cert_file: str
 
@@ -773,8 +847,10 @@ class ConnexionMiddleware:
         )
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
+        self.__commandes_handler = TraitementMessages(self, self.__contexte)
 
         self.__contexte.message_dao.register_channel_listener(self)
+        self.__contexte.message_dao.register_channel_listener(self.__commandes_handler)
 
     def on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)
@@ -853,7 +929,8 @@ class ConnexionMiddleware:
                             self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
 
                     try:
-                        self.__gestionnaire_mq.ajouter_compte(clecert)
+                        gestionnaire_mq: GestionnaireComptesMQ = self.__service_monitor.gestionnaire_mq
+                        gestionnaire_mq.ajouter_compte(clecert)
                     except ValueError:
                         comptes_mq_ok = False
 
@@ -864,6 +941,10 @@ class ConnexionMiddleware:
 
             self.__comptes_mq_ok = comptes_mq_ok
 
+    def ajouter_commande(self, commande):
+        gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
+        gestionnaire_commandes.ajouter_commande(commande)
+
     @property
     def document_dao(self) -> MongoDAO:
         return self.__contexte.document_dao
@@ -871,6 +952,10 @@ class ConnexionMiddleware:
     @property
     def configuration(self) -> TransactionConfiguration:
         return self.__configuration
+
+    @property
+    def get_gestionnaire_comptes_mongo(self):
+        return self.__mongo
 
 
 class GestionnaireModulesDocker:
@@ -1700,9 +1785,9 @@ class GestionnaireCommandes:
     Execute les commandes transmissions au service monitor (via MQ, unix pipe, etc.)
     """
 
-    def __init__(self, fermeture_event: Event, gestionnaire_docker: GestionnaireModulesDocker):
+    def __init__(self, fermeture_event: Event, service_monitor: ServiceMonitor):
         self.__fermeture_event = fermeture_event
-        self.__gestionnaire_docker = gestionnaire_docker
+        self.__service_monitor = service_monitor
 
         self.__commandes_queue = list()
         self.__action_event = Event()
@@ -1730,6 +1815,7 @@ class GestionnaireCommandes:
 
     def ajouter_commande(self, commande: CommandeMonitor):
         self.__commandes_queue.append(commande)
+        self.__action_event.set()
 
     def lire_fifo(self):
         self.__logger.info("Demarrage thread FIFO commandes")
@@ -1775,13 +1861,16 @@ class GestionnaireCommandes:
 
         if nom_commande == 'demarrer_service':
             nom_service = contenu['nom_service']
-            self.__gestionnaire_docker.demarrer_service(nom_service, **contenu)
+            gestionnaire_docker: GestionnaireModulesDocker = self.__service_monitor.gestionnaire_docker
+            gestionnaire_docker.demarrer_service(nom_service, **contenu)
 
         elif nom_commande == 'supprimer_service':
             nom_service = contenu['nom_service']
-            self.__gestionnaire_docker.supprimer_service(nom_service)
+            gestionnaire_docker: GestionnaireModulesDocker = self.__service_monitor.gestionnaire_docker
+            gestionnaire_docker.supprimer_service(nom_service)
 
-            # ConstantesMonitor.COMMANDE_AJOUTER_COMPTE:
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE:
+            self.ajouter_comptes(contenu)
 
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
 
@@ -1791,6 +1880,25 @@ class GestionnaireCommandes:
 
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)
+
+    def ajouter_comptes(self, commande: dict):
+        contenu = commande['contenu']
+        cert_pem = contenu['certificat']
+        # chaine_pem = contenu['chaine']
+
+        # Charger pem
+        certificat = EnveloppeCleCert()
+        certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
+
+        try:
+            gestionnaire_mongo: GestionnaireComptesMongo = self.__service_monitor.gestionnaire_mongo
+            gestionnaire_mongo.creer_compte(certificat)
+        except DuplicateKeyError:
+            self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
+
+        gestionnaire_comptes_mq: GestionnaireComptesMQ = self.__service_monitor.gestionnaire_mq
+        gestionnaire_comptes_mq.ajouter_compte(certificat)
+
 
 
 class ImageNonTrouvee(Exception):

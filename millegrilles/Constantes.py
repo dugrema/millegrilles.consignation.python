@@ -1425,5 +1425,6 @@ class ConstantesServiceMonitor:
     DOCKER_CONFIG_MONITOR_CERT = DOCKER_CONFIG_NAME_MONITOR + CERT_SUFFIX
     DOCKER_CONFIG_MONITOR_KEY = DOCKER_CONFIG_NAME_MONITOR + KEY_SUFFIX
 
-    COMMANDE_ACTIVER_HEBERGEMENT = 'monitor.activerHebergement'
-    COMMANDE_DESACTIVER_HEBERGEMENT = 'monitor.desactiverHebergement'
+    COMMANDE_ACTIVER_HEBERGEMENT = 'servicemonitor.activerHebergement'
+    COMMANDE_DESACTIVER_HEBERGEMENT = 'servicemonitor.desactiverHebergement'
+    COMMANDE_AJOUTER_COMPTE = 'servicemonitor.ajouterCompte'

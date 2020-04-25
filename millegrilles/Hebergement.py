@@ -144,6 +144,15 @@ class TraitementMessage(BaseCallback):
         self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
         self.__gestionnaire.queue_prete.set()
 
+        # Ajouter les routing keys
+        for rk in self.__gestionnaire.get_routing_keys:
+            self.__channel.queue_bind(
+                exchange=self.configuration.exchange_noeuds,
+                queue=self.queue_name,
+                routing_key=rk,
+                callback=None
+            )
+
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
         self.queue_name = None
@@ -283,6 +292,10 @@ class Hebergement(ModeleConfiguration):
     def queue_name(self):
         return self.__traitement_messages.queue_name
 
+    @property
+    def get_routing_keys(self):
+        raise NotImplementedError()
+
 
 class HebergementTransactions(Hebergement):
 
@@ -290,6 +303,11 @@ class HebergementTransactions(Hebergement):
         super().__init__()
         self.__logging = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    @property
+    def get_routing_keys(self):
+        return [
+            'commande.hebergement.transactions.#'
+        ]
 
 
 class HebergementDomaines(Hebergement):
