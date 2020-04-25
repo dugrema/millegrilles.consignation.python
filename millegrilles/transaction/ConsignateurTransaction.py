@@ -34,6 +34,11 @@ class ConsignateurTransaction(ModeleConfiguration):
     # Initialise les DAOs, connecte aux serveurs.
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
+        self.initialiser_2()
+
+    def initialiser_2(self, contexte=None):
+        if contexte is not None:
+            self._contexte = contexte
 
         if self.args.debug:
             logging.getLogger('millegrilles.SecuritePKI').setLevel(logging.DEBUG)

@@ -312,6 +312,15 @@ class EnveloppeCleCert:
 
         return sujet_dict
 
+    def formatter_issuer(self):
+        sujet_dict = {}
+
+        sujet = self.cert.issuer
+        for elem in sujet:
+            sujet_dict[elem.oid._name] = elem.value
+
+        return sujet_dict
+
     def subject_rfc4514_string(self):
         return self.cert.subject.rfc4514_string()
 

@@ -1501,10 +1501,14 @@ class GestionnaireComptesMQ:
         return mq_pret
 
     def ajouter_compte(self, enveloppe: EnveloppeCleCert):
-        idmg = self.__idmg
+        issuer = enveloppe.formatter_issuer()
+        idmg = issuer['organizationName']
+
         subject = enveloppe.subject_rfc4514_string_mq()
 
         try:
+            self.ajouter_exchanges(idmg)
+
             # Charger exchanges immediatement - un certificat sans exchanges ne peut pas acceder a mongo/mq
             exchanges = enveloppe.get_exchanges
 
@@ -1521,8 +1525,11 @@ class GestionnaireComptesMQ:
         except ExtensionNotFound:
             self.__logger.info("Aucun access a MQ pour certificat %s", subject)
 
-    def ajouter_exchanges(self):
-        self._admin_api.create_vhost(self.__idmg)
+    def ajouter_exchanges(self, idmg: str = None):
+        if idmg is None:
+            idmg = self.__idmg
+
+        self._admin_api.create_vhost(idmg)
 
         params_exchange = {
             "type": "topic",
@@ -1530,11 +1537,11 @@ class GestionnaireComptesMQ:
             "durable": True,
             "internal": False
         }
-        self._admin_api.create_exchange_for_vhost('millegrilles.middleware', self.__idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.noeuds', self.__idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.private', self.__idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.public', self.__idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.inter', self.__idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.middleware', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.noeuds', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.private', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.public', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('millegrilles.inter', idmg, params_exchange)
 
     def entretien(self):
         try:
@@ -1602,7 +1609,8 @@ class GestionnaireComptesMongo:
             self.__rs_init_ok = True
 
     def creer_compte(self, cert: EnveloppeCleCert):
-        idmg = self.__connexion.configuration.idmg
+        issuer = cert.formatter_issuer()
+        idmg = issuer['organizationName']
         nom_compte = cert.subject_rfc4514_string_mq()
         commande = {
             'createUser': nom_compte,

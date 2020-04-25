@@ -3,7 +3,7 @@ import tempfile
 import os
 
 from base64 import b64decode
-from threading import Event
+from threading import Event, Thread
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
 from millegrilles import Constantes
@@ -12,6 +12,7 @@ from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInco
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
+from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransaction
 
 
 class ConfigurationHebergement(TransactionConfiguration):
@@ -279,6 +280,16 @@ class Hebergement(ModeleConfiguration):
             configuration['millegrille'] = certificats['millegrille']
             configuration['cle'] = str(clecert.private_key_bytes, 'utf-8')
 
+            commande_ajouter_compte = {
+                'certificat': str(certificat_pem, 'utf-8'),
+                'chaine': chaine_hote[1:],
+            }
+            self.contexte.generateur_transactions.transmettre_commande(
+                commande_ajouter_compte,
+                'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+                exchange=self.contexte.configuration.exchange_middleware,
+            )
+
             # Sauvegarder les fichiers CA, chaine hote, cert et cle.
             pass
 
@@ -287,6 +298,15 @@ class Hebergement(ModeleConfiguration):
             contexte_hebergement = ContexteRessourcesDocumentsMilleGrilles(configuration=configuration_contexte)
             contexte_hebergement.initialiser()
             pass
+
+            # Demarrer le gestionnaire de transaction
+            consignateur_transactions = ConsignateurTransaction()
+            consignateur_transactions.configurer_parser()
+            consignateur_transactions.parse()
+            consignateur_transactions.initialiser_2(contexte_hebergement)
+
+            thread = Thread(target=consignateur_transactions.executer, name=idmg)
+            thread.start()
 
     @property
     def queue_name(self):
