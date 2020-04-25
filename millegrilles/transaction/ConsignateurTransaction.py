@@ -37,8 +37,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.initialiser_2()
 
     def initialiser_2(self, contexte=None):
-        if contexte is not None:
-            self._contexte = contexte
+        super().initialiser_2(contexte)
 
         if self.args.debug:
             logging.getLogger('millegrilles.SecuritePKI').setLevel(logging.DEBUG)

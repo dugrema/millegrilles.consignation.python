@@ -355,6 +355,22 @@ class HebergementDomaines(Hebergement):
         super().__init__()
         self.__logging = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def configurer_parser(self):
+        super().configurer_parser()
+        self.parser.add_argument(
+            '--domaines',
+            type=str,
+            required=False,
+            help="Gestionnaires de domaines a charger. Format: nom_module1:nom_classe1,nom_module2:nom_classe2,[...]"
+        )
+
+        self.parser.add_argument(
+            '--configuration',
+            type=str,
+            required=False,
+            help="Chemin du fichier de configuration des domaines"
+        )
+
     def demarrer_contexte(self, idmg: str):
         configuration = self._millegrilles[idmg]
         configuration_contexte = ConfigurationHebergement(self.contexte.configuration, configuration)

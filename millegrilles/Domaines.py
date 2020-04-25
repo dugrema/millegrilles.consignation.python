@@ -48,9 +48,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self.initialiser_2()
 
     def initialiser_2(self, contexte=None):
-        if contexte is not None:
-            self._contexte = contexte
-
+        super().initialiser_2(contexte)
         self.contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):

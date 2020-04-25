@@ -28,7 +28,7 @@ class ModeleConfiguration:
 
         self.__fermeture_event = Event()
 
-        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
+        self.__certificat_event_handler: GestionnaireEvenementsCertificat = None
         self.__channel = None
 
     def initialiser(self, init_document=True, init_message=True, connecter=True):
@@ -44,6 +44,11 @@ class ModeleConfiguration:
 
         if init_message:
             self._contexte.message_dao.register_channel_listener(self)
+
+    def initialiser_2(self, contexte):
+        if contexte is not None:
+            self._contexte = contexte
+        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
 
     def on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)
