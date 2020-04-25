@@ -8,6 +8,7 @@ from threading import Event, Thread
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesHebergement, ConstantesHebergementTransactions
+from millegrilles.Domaines import GestionnaireDomainesMilleGrilles
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.dao.Configuration import TransactionConfiguration
@@ -353,6 +354,39 @@ class HebergementDomaines(Hebergement):
     def __init__(self):
         super().__init__()
         self.__logging = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def demarrer_contexte(self, idmg: str):
+        configuration = self._millegrilles[idmg]
+        configuration_contexte = ConfigurationHebergement(self.contexte.configuration, configuration)
+
+        contexte_hebergement = ContexteRessourcesDocumentsMilleGrilles(configuration=configuration_contexte)
+        configuration['contexte'] = contexte_hebergement
+
+        contexte_hebergement.initialiser()
+
+        # Demarrer le gestionnaire de domaines
+        gestionnaire_domaines = GestionnaireDomainesMilleGrilles()
+        configuration['gestionnaire'] = gestionnaire_domaines
+
+        gestionnaire_domaines.configurer_parser()
+        gestionnaire_domaines.parse()
+
+        # Bypass initialiser - utilise les parametres system
+        gestionnaire_domaines.initialiser_2(contexte_hebergement)
+
+        thread = Thread(target=gestionnaire_domaines.executer, name=idmg)
+        configuration['thread'] = thread
+
+        thread.start()
+
+    def entretien_module(self, module: dict):
+        pass
+
+    @property
+    def get_routing_keys(self):
+        return [
+            'commande.hebergement.domaines.#'
+        ]
 
 
 class HebergementMaitreDesCles(Hebergement):

@@ -1401,6 +1401,8 @@ class ConstantesServiceMonitor:
     MODULE_PYTHON = 'mg-python'
     MODULE_MONGOEXPRESS = 'mongoexpress'
     MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
+    MODULE_HEBERGEMENT_DOMAINES = 'heb_domaines'
+    MODULE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
 
     FICHIER_MONGO_MOTDEPASSE = 'passwd.mongo.txt'
     FICHIER_MONGOXPWEB_MOTDEPASSE = 'passwd.mongoxpweb.txt'

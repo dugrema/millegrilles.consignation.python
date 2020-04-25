@@ -1309,7 +1309,13 @@ class GenererHebergementTransactions(GenerateurNoeud):
         builder = super()._get_keyusage(builder)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
+        exchange_list = [
+            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
+        ]
+        exchanges = '\n'.join(exchange_list).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1317,8 +1323,72 @@ class GenererHebergementTransactions(GenerateurNoeud):
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
+        ]
+        roles = ','.join(roles_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
+class GenererHebergementDomaines(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchange_list = [
+            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
+        ]
+        exchanges = '\n'.join(exchange_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles_list = [
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
+        ]
+        roles = ','.join(roles_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
+class GenererHebergementMaitredescles(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchange_list = [
+            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
+        ]
+        exchanges = '\n'.join(exchange_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles_list = [
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
         ]
         roles = ','.join(roles_list).encode('utf-8')
         builder = builder.add_extension(
@@ -1501,6 +1571,8 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,
 
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS: GenererHebergementTransactions,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES: GenererHebergementDomaines,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES: GenererHebergementMaitredescles,
         }
 
         self.__generateur_par_csr = GenerateurCertificateParRequest

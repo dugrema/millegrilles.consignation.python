@@ -129,10 +129,10 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def executer(self):
-        # self.commande_creer_millegrille_hebergee()
+        self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
         # self.transaction_activer_millegrille_hebergee()
-        self.requete_millegrilles_actives()
+        # self.requete_millegrilles_actives()
 
 
 # --- MAIN ---

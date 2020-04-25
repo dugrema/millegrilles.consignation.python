@@ -45,6 +45,12 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         """ L'initialisation connecte RabbitMQ, MongoDB, lance la configuration """
         super().initialiser(init_document, init_message, connecter)
+        self.initialiser_2()
+
+    def initialiser_2(self, contexte=None):
+        if contexte is not None:
+            self._contexte = contexte
+
         self.contexte.message_dao.register_channel_listener(self)
 
     def on_channel_open(self, channel):

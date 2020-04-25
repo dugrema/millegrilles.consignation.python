@@ -88,6 +88,14 @@ class ServiceMonitor:
             'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
         },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
+            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
+            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
+        },
     }
 
     def __init__(self):
