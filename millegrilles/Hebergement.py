@@ -228,7 +228,10 @@ class Hebergement(ModeleConfiguration):
                 self.demarrer_hebergement(idmg)
             else:
                 # Entretien
-                pass
+                self.entretien_module(config_millegrille)
+
+    def entretien_module(self, module: dict):
+        raise NotImplementedError()
 
     def demarrer_hebergement(self, idmg):
         # Aller chercher le plus recent trousseau pour cette millegrille
@@ -291,22 +294,10 @@ class Hebergement(ModeleConfiguration):
             )
 
             # Sauvegarder les fichiers CA, chaine hote, cert et cle.
-            pass
+            self.demarrer_contexte(idmg)
 
-            configuration_contexte = ConfigurationHebergement(self.contexte.configuration, configuration)
-            # configuration_contexte.loadEnvironment()
-            contexte_hebergement = ContexteRessourcesDocumentsMilleGrilles(configuration=configuration_contexte)
-            contexte_hebergement.initialiser()
-            pass
-
-            # Demarrer le gestionnaire de transaction
-            consignateur_transactions = ConsignateurTransaction()
-            consignateur_transactions.configurer_parser()
-            consignateur_transactions.parse()
-            consignateur_transactions.initialiser_2(contexte_hebergement)
-
-            thread = Thread(target=consignateur_transactions.executer, name=idmg)
-            thread.start()
+    def demarrer_contexte(self, idmg: str):
+        raise NotImplementedError()
 
     @property
     def queue_name(self):
@@ -322,6 +313,33 @@ class HebergementTransactions(Hebergement):
     def __init__(self):
         super().__init__()
         self.__logging = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def demarrer_contexte(self, idmg: str):
+        configuration = self._millegrilles[idmg]
+        configuration_contexte = ConfigurationHebergement(self.contexte.configuration, configuration)
+
+        contexte_hebergement = ContexteRessourcesDocumentsMilleGrilles(configuration=configuration_contexte)
+        configuration['contexte'] = contexte_hebergement
+
+        contexte_hebergement.initialiser()
+
+        # Demarrer le gestionnaire de transaction
+        consignateur_transactions = ConsignateurTransaction()
+        configuration['consignateur'] = consignateur_transactions
+
+        consignateur_transactions.configurer_parser()
+        consignateur_transactions.parse()
+
+        # Bypass initialiser - utilise les parametres system
+        consignateur_transactions.initialiser_2(contexte_hebergement)
+
+        thread = Thread(target=consignateur_transactions.executer, name=idmg)
+        configuration['thread'] = thread
+
+        thread.start()
+
+    def entretien_module(self, module: dict):
+        pass
 
     @property
     def get_routing_keys(self):
