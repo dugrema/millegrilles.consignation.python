@@ -1,6 +1,7 @@
 import logging
 import tempfile
 import os
+import gc
 
 from base64 import b64decode
 from threading import Event, Thread
@@ -202,6 +203,7 @@ class Hebergement(ModeleConfiguration):
 
         while not self.__fermeture_event.is_set():
             self.verifier_millegrilles_actives()
+            gc.collect()
             self.__fermeture_event.wait(10)
 
         self.__logger.info("Arret hebergement")

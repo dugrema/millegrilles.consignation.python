@@ -674,6 +674,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             raise ValueError("Plusieurs roles d'hebergement trouve : %s" % roles)
 
+        if role == ConstantesGenerateurCertificat.ROLE_MAITREDESCLES:
+            # Ajouter le mot de passe et cle intermediaire
+            role.append('intermediaire')
+
         collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         liste_idmg = evenement['idmg']
 
@@ -685,12 +689,18 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
         curseur_motsdepasse = collection.find(filtre_motsdepasses)
         dict_motsdepasse_paridmg = dict()
+        dict_motsdepasse_intermediaire_paridmg = dict()
         for motdepasse_info in curseur_motsdepasse:
             idmg = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['idmg']
+            role = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['role']
             motdepasse = self.decrypter_motdepasse(motdepasse_info['motdepasse'])
             motdepasse_dechiffre = motdepasse
             motdepasse_chiffre, fingerprint = self.crypter_cle(motdepasse_dechiffre, cert=certificat)
-            dict_motsdepasse_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
+
+            if role == 'intermediaire':
+                dict_motsdepasse_intermediaire_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
+            else:
+                dict_motsdepasse_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
 
         filtre = {
             'identificateurs_document.idmg': {'$in': liste_idmg},
@@ -717,9 +727,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 'motdepasse_chiffre': dict_motsdepasse_paridmg[idmg],
             }
             info_millegrille.update(doc[role])
-            resultats.append(info_millegrille)
 
-            # Extraire
+            motdepasse_intermediaire = dict_motsdepasse_intermediaire_paridmg.get(idmg)
+            if motdepasse_intermediaire:
+                info_millegrille['intermediaire_passwd'] = motdepasse_intermediaire
+                info_millegrille['intermediaire_cle'] = doc['intermediaire']['cle']
+
+            resultats.append(info_millegrille)
 
         reponse = {
             'resultats': resultats

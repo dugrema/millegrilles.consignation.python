@@ -3,8 +3,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
-from cryptography.x509.name import NameOID
-from cryptography.x509.extensions import ExtensionNotFound
 from cryptography.hazmat.primitives import asymmetric
 
 import datetime
@@ -378,10 +376,10 @@ class GenerateurCertificat:
         builder = x509.CertificateSigningRequestBuilder()
 
         # Batir subject
-        name_list = [x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg)]
+        name_list = [x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg)]
         if unit_name is not None:
-            name_list.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name))
-        name_list.append(x509.NameAttribute(NameOID.COMMON_NAME, common_name))
+            name_list.append(x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name))
+        name_list.append(x509.NameAttribute(x509.name.NameOID.COMMON_NAME, common_name))
         name = x509.Name(name_list)
         builder = builder.subject_name(name)
 
@@ -406,9 +404,9 @@ class GenerateurCertificat:
 
         builder = x509.CertificateSigningRequestBuilder()
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
-            x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name),
-            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, unit_name),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, common_name),
         ])
         builder = builder.subject_name(name)
 
@@ -466,8 +464,8 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         builder = x509.CertificateBuilder()
 
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
-            x509.NameAttribute(NameOID.COMMON_NAME, sujet),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, sujet),
         ])
         builder = builder.subject_name(name)
 
@@ -584,13 +582,6 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         cert_autorite = self._autorite.cert
         builder = self._preparer_builder_from_csr(
             csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
-
-        # Ajouter noms DNS valides pour MQ
-        # try:
-        #     subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-        #     builder = builder.add_extension(x509.SubjectAlternativeName(subject_alt_names.value), critical=False)
-        # except ExtensionNotFound:
-        #     pass
 
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
@@ -754,8 +745,8 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
         builder = self.__preparer_builder(clecert.private_key, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_ROOT)
 
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u'MilleGrille'),
-            x509.NameAttribute(NameOID.COMMON_NAME, u'Racine'),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, u'MilleGrille'),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, u'Racine'),
         ])
         builder = builder.subject_name(name)
         builder = builder.issuer_name(name)
@@ -1387,7 +1378,7 @@ class GenererHebergementMaitredescles(GenerateurNoeud):
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles_list = [
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
         ]
         roles = ','.join(roles_list).encode('utf-8')
@@ -1436,8 +1427,8 @@ class GenerateurCertificatTiers(GenerateurCertificateParRequest):
 
         # Modifier le nom
         name = x509.Name([
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, self._idmg),
-            x509.NameAttribute(NameOID.COMMON_NAME, self._idmg_tiers),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, self._idmg_tiers),
         ])
 
         builder = builder.subject_name(name)
@@ -1608,7 +1599,7 @@ class RenouvelleurCertificat:
         try:
             subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             domaines_publics = [d.value for d in subject_alt_names.value]
-        except ExtensionNotFound:
+        except x509.extensions.ExtensionNotFound:
             pass
 
         generateur = self.__generateurs_par_role[role]

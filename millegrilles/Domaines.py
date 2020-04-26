@@ -6,6 +6,7 @@ import lzma
 import hashlib
 import requests
 import pytz
+import gc
 
 from os import path
 from pika.exceptions import ChannelClosed
@@ -180,7 +181,9 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
                         self._logger.error("Gestionnaire domaine %s est en erreur/termine, on arrete le controleur" % gestionnaire.__class__.__name__)
                         self.arreter()
 
+                gc.collect()
                 self._stop_event.wait(15)   # Boucler pour maintenance
+
         except Exception:
             self._logger.exception("Erreur execution controleur de gestionnaires, arret force")
         finally:

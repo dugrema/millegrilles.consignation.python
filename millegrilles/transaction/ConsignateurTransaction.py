@@ -3,6 +3,7 @@ import logging
 import datetime
 import traceback
 import psutil
+import gc
 
 from bson.objectid import ObjectId
 from threading import Thread, Event
@@ -81,6 +82,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         while not self.__stop_event.is_set():
             try:
                 self.entretien()
+                gc.collect()
             except Exception as e:
                 self.__logger.exception("Erreur entretien")
             self.__stop_event.wait(30)
