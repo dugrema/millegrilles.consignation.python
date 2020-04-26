@@ -45,6 +45,8 @@ class ModeleConfiguration:
         if init_message:
             self._contexte.message_dao.register_channel_listener(self)
 
+        self.initialiser_2(contexte=self._contexte)
+
     def initialiser_2(self, contexte):
         if contexte is not None:
             self._contexte = contexte

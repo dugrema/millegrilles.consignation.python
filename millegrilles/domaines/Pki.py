@@ -189,8 +189,8 @@ class GestionnairePki(GestionnaireDomaineStandard):
             self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
             verificateur.charger_certificat(enveloppe=enveloppe)
 
-        mq_certfile = self.configuration.mq_certfile
-        with open(mq_certfile, 'r') as f:
+        pki_certfile = self.configuration.pki_certfile
+        with open(pki_certfile, 'r') as f:
             contenu_pem = f.read()
         pems = PemHelpers.split_certificats(contenu_pem)
         pems.reverse()  # Commencer par les certs intermediaires

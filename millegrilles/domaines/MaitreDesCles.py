@@ -228,13 +228,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         Charge le certificat et la cle intermediaire. Permet de signer des certificats au nom de la MilleGrille.
         :return:
         """
-        repertoire_secrets = self.configuration.pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
         password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
-        with open('%s/%s' % (repertoire_secrets, password_intermediaire_path), 'rb') as fichier:
+        with open(password_intermediaire_path, 'rb') as fichier:
             password_intermediaire = fichier.read()
 
-        cert_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE])
-        key_millegrille = '%s/%s' % (repertoire_secrets, self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE])
+        cert_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE]
+        key_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE]
         clecert = EnveloppeCleCert()
         clecert.from_files(
             key_millegrille,

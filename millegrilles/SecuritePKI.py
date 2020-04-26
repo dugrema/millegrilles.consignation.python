@@ -11,14 +11,12 @@ import tempfile
 import secrets
 import base58
 import shutil
-import math
 
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
-from cryptography.x509.name import NameOID
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
@@ -147,14 +145,14 @@ class EnveloppeCertificat:
 
     @property
     def subject_organization_name(self):
-        organization = self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        organization = self._certificat.subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
         if len(organization) > 0:
             return organization[0].value
         return None
 
     @property
     def subject_organizational_unit_name(self):
-        org = self._certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATIONAL_UNIT_NAME)
+        org = self._certificat.subject.get_attributes_for_oid(x509.NameOID.ORGANIZATIONAL_UNIT_NAME)
         if org is not None and len(org) > 0:
             return org[0].value
         return None
@@ -162,7 +160,7 @@ class EnveloppeCertificat:
     @property
     def subject_common_name(self):
         sujet = self.certificat.subject
-        cn = sujet.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+        cn = sujet.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
         return cn
 
     @property
@@ -315,7 +313,7 @@ class UtilCertificats:
         return val_float
 
     def _charger_certificat(self):
-        certfile_path = self.configuration.mq_certfile
+        certfile_path = self.configuration.pki_certfile
         self._certificat = self._charger_pem(certfile_path)
 
     def _charger_pem(self, certfile_path):
@@ -328,7 +326,7 @@ class UtilCertificats:
         return certificat
 
     def _charger_cle_privee(self):
-        keyfile_path = self.configuration.mq_keyfile
+        keyfile_path = self.configuration.pki_keyfile
         with open(keyfile_path, "rb") as keyfile:
             cle = serialization.load_pem_private_key(
                 keyfile.read(),
@@ -378,8 +376,8 @@ class UtilCertificats:
         public_key = self.certificat.public_key()
         cle_secrete_backup = public_key.encrypt(
             cle_secrete,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
             )
@@ -1064,7 +1062,3 @@ class HachageInvalide(Exception):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
         self.errors = errors
-
-    @property
-    def key_subject_identifier(self):
-        return self._key_subject_identifier

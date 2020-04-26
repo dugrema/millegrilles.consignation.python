@@ -6,7 +6,7 @@ import logging
 import ssl
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.x509.name import NameOID
+from cryptography import x509
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
@@ -48,16 +48,18 @@ class TransactionConfiguration:
             Constantes.CONFIG_PKI_WORKDIR: Constantes.DEFAUT_PKI_WORKDIR,
             Constantes.CONFIG_MAITREDESCLES_DIR: Constantes.DEFAUT_MAITREDESCLES_DIR,
             Constantes.CONFIG_PKI_SECRET_DIR: Constantes.DEFAUT_PKI_SECRET_DIR,
-            Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE: Constantes.DEFAUT_PKI_CERT_INTERMEDIAIRE,
-            Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE: Constantes.DEFAUT_PKI_KEY_INTERMEDIAIRE,
-            Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE: Constantes.DEFAUT_PKI_PASSWORD_INTERMEDIAIRE,
-            Constantes.CONFIG_PKI_CERT_MILLEGRILLE: Constantes.DEFAUT_PKI_CERT_MILLEGRILLE,
-            Constantes.CONFIG_PKI_KEY_MILLEGRILLE: Constantes.DEFAUT_PKI_KEY_MILLEGRILLE,
-            Constantes.CONFIG_PKI_PASSWORD_MILLEGRILLE: Constantes.DEFAUT_PKI_PASSWORD_MILLEGRILLE,
-            Constantes.CONFIG_PKI_CERT_MAITREDESCLES: Constantes.DEFAUT_PKI_CERT_MAITREDESCLES,
-            Constantes.CONFIG_PKI_KEY_MAITREDESCLES: Constantes.DEFAUT_PKI_KEY_MAITREDESCLES,
-            Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES: Constantes.DEFAUT_PKI_PASSWORD_MAITREDESCLES,
-            Constantes.CONFIG_CA_PASSWORDS: Constantes.DEFAULT_CA_PASSWORDS,
+            Constantes.CONFIG_PKI_CERTILE: '',
+            Constantes.CONFIG_PKI_KEYFILE: '',
+            Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE: '',
+            Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE: '',
+            Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE: '',
+            Constantes.CONFIG_PKI_CERT_MILLEGRILLE: '',
+            Constantes.CONFIG_PKI_KEY_MILLEGRILLE: '',
+            Constantes.CONFIG_PKI_PASSWORD_MILLEGRILLE: '',
+            Constantes.CONFIG_PKI_CERT_MAITREDESCLES: '',
+            Constantes.CONFIG_PKI_KEY_MAITREDESCLES: '',
+            Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES: '',
+            Constantes.CONFIG_CA_PASSWORDS: '',
         }
 
         # Configuration de connection a MongoDB
@@ -138,7 +140,7 @@ class TransactionConfiguration:
                 with open(self.pki_certfile, 'rb') as fichier:
                     pem = fichier.read()
                     certificat = default_backend().load_pem_x509_certificate(pem)
-                    organization = certificat.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+                    organization = certificat.subject.get_attributes_for_oid(x509.name.NameOID.ORGANIZATION_NAME)
                     if len(organization) > 0:
                         self._millegrille_config[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = organization[0].value
             except FileNotFoundError:
@@ -244,15 +246,24 @@ class TransactionConfiguration:
 
     @property
     def pki_keyfile(self):
-        return self._mq_config[Constantes.CONFIG_MQ_KEYFILE]
+        fichier = self._pki_config[Constantes.CONFIG_PKI_KEYFILE]
+        if fichier == '':
+            fichier = self.mq_keyfile
+        return fichier
 
     @property
     def pki_certfile(self):
-        return self._mq_config[Constantes.CONFIG_MQ_CERTFILE]
+        fichier = self._pki_config[Constantes.CONFIG_PKI_CERTILE]
+        if fichier == '':
+            fichier = self.mq_certfile
+        return fichier
 
     @property
     def pki_cafile(self):
-        return self._mq_config[Constantes.CONFIG_MQ_CA_CERTS]
+        fichier = self._pki_config[Constantes.CONFIG_PKI_CERT_MILLEGRILLE]
+        if fichier == '':
+            fichier = self.mq_cafile
+        return fichier
 
     @property
     def pki_workdir(self):
