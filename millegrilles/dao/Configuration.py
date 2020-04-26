@@ -46,8 +46,6 @@ class TransactionConfiguration:
 
         self._pki_config = {
             Constantes.CONFIG_PKI_WORKDIR: Constantes.DEFAUT_PKI_WORKDIR,
-            Constantes.CONFIG_MAITREDESCLES_DIR: Constantes.DEFAUT_MAITREDESCLES_DIR,
-            Constantes.CONFIG_PKI_SECRET_DIR: Constantes.DEFAUT_PKI_SECRET_DIR,
             Constantes.CONFIG_PKI_CERTILE: '',
             Constantes.CONFIG_PKI_KEYFILE: '',
             Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE: '',
