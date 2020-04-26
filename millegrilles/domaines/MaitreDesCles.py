@@ -488,16 +488,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if not any(exchange in roles_acceptes for exchange in roles_certificat):
             raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
 
-        path_ca_cert = path.join(self.configuration.pki_secretdir, self.configuration.pki_cafile)
-        with open(path_ca_cert, 'r') as fichier:
+        with open(self.configuration.pki_cafile, 'r') as fichier:
             fichier_cert_racine = fichier.read()
 
-        path_key_racine = path.join(self.configuration.pki_secretdir, self.configuration.pki_keymillegrille)
-        with open(path_key_racine, 'rb') as fichier:
+        with open(self.configuration.pki_keymillegrille, 'rb') as fichier:
             fichier_key_racine = fichier.read()
 
-        path_ca_passwords = path.join(self.configuration.pki_secretdir, self.configuration.pki_password_millegrille)
-        with open(path_ca_passwords, 'rb') as fichier:
+        with open(self.configuration.pki_password_millegrille, 'rb') as fichier:
             password_millegrille = fichier.read()
 
         clecert = EnveloppeCleCert()
