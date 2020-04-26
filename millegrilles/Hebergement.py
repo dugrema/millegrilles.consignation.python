@@ -25,6 +25,9 @@ class ConfigurationHebergement(TransactionConfiguration):
         Constantes.CONFIG_MQ_SSL: 'on',
         Constantes.CONFIG_MONGO_SSL: 'x509',
         Constantes.CONFIG_MONGO_AUTHSOURCE: '$external',
+        Constantes.CONFIG_PKI_KEYFILE: '',
+        Constantes.CONFIG_PKI_CERTFILE: '',
+        Constantes.CONFIG_PKI_CERT_MILLEGRILLE: '',
     }
 
     def __init__(self, configuration_hote: TransactionConfiguration, config_hebergement: dict):
@@ -89,9 +92,14 @@ class ConfigurationHebergement(TransactionConfiguration):
         os.write(fp, cle.encode('utf-8'))
         os.close(fp)
 
+        # Batir chaine avec certificat XS pour connecter au middleware hote
         self.__parametres[Constantes.CONFIG_MQ_CERTFILE] = fichier_chaine_hote
         self.__parametres[Constantes.CONFIG_MQ_KEYFILE] = fichier_cle
-        # self.__parametres[Constantes.CONFIG_MQ_CA_CERTS] = fichier_cert_millegrille
+
+        # Batir PKI pour la MilleGrille hebergee, avec son propre certificat de millegrille
+        self.__parametres[Constantes.CONFIG_PKI_CERTFILE] = fichier_chaine_cert
+        self.__parametres[Constantes.CONFIG_PKI_KEYFILE] = fichier_cle
+        self.__parametres[Constantes.CONFIG_PKI_CERT_MILLEGRILLE] = fichier_cert_millegrille
 
         # Charger idmg a partir du certificat
         cert = self.__config_hebergement['chaine_hote'][0]

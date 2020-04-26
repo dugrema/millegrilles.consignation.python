@@ -46,7 +46,7 @@ class TransactionConfiguration:
 
         self._pki_config = {
             Constantes.CONFIG_PKI_WORKDIR: Constantes.DEFAUT_PKI_WORKDIR,
-            Constantes.CONFIG_PKI_CERTILE: '',
+            Constantes.CONFIG_PKI_CERTFILE: '',
             Constantes.CONFIG_PKI_KEYFILE: '',
             Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE: '',
             Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE: '',
@@ -170,12 +170,11 @@ class TransactionConfiguration:
         if mongo_ssl_param == 'on':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
             # parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs', 'username', 'password'])
-            parametres_mongo.extend(['ssl_ca_certs', 'username', 'password'])
+            parametres_mongo.extend(['username', 'password'])
         elif mongo_ssl_param == 'x509':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_REQUIRED
             config_mongo['authMechanism'] = 'MONGODB-X509'
             # parametres_mongo.extend(['ssl_certfile', 'ssl_ca_certs'])
-            parametres_mongo.extend(['ssl_ca_certs'])
             del config_mongo['authSource']
         elif mongo_ssl_param == 'nocert':
             config_mongo['ssl_cert_reqs'] = ssl.CERT_NONE
@@ -185,6 +184,7 @@ class TransactionConfiguration:
             # Copier key/cert MQ. Va etre override au besoin
             config_mongo['ssl_certfile'] = self.mq_certfile
             config_mongo['ssl_keyfile'] = self.mq_keyfile
+            config_mongo['ssl_ca_certs'] = self.mq_cafile
 
         # Copier toutes les valeurs necessaires, enlever le prefixe mongo_ de chaque cle.
         for cle in self._mongo_config:
@@ -251,7 +251,7 @@ class TransactionConfiguration:
 
     @property
     def pki_certfile(self):
-        fichier = self._pki_config[Constantes.CONFIG_PKI_CERTILE]
+        fichier = self._pki_config[Constantes.CONFIG_PKI_CERTFILE]
         if fichier == '':
             fichier = self.mq_certfile
         return fichier
