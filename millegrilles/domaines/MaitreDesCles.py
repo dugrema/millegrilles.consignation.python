@@ -955,6 +955,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return self.__handler_commandes
 
     @property
+    def get_certificat(self):
+        return self._contexte.signateur_transactions.enveloppe_certificat_courant.certificat
+
+    @property
     def get_certificat_pem(self):
         return self._contexte.signateur_transactions.enveloppe_certificat_courant.certificat_pem
 
