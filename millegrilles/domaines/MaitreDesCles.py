@@ -6,9 +6,9 @@ from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite,
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, \
     TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementCommandesSecures
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.dao.MessageDAO import CertificatInconnu, TraitementMessageDomaineCommande
+from millegrilles.dao.MessageDAO import CertificatInconnu
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
-from millegrilles.util.X509Certificate import EnveloppeCleCert, GenererMaitredesclesCryptage, \
+from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
 from millegrilles.util.JSONEncoders import DocElemFilter
 from millegrilles.domaines.Pki import ConstantesPki
@@ -16,16 +16,13 @@ from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 from cryptography import x509
 from base64 import b64encode, b64decode
 
 import binascii
 import logging
 import datetime
-import json
-import socket
 from os import path
 
 
@@ -136,15 +133,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
-        self.__repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
+        # self.__repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
 
-        self.__nomfichier_maitredescles_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MAITREDESCLES]
+        # self.__nomfichier_maitredescles_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MAITREDESCLES]
         self.__nomfichier_autorite_cert = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_MILLEGRILLE]
-        self.__nomfichier_maitredescles_key = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MAITREDESCLES]
-        self.__nomfichier_maitredescles_password = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES]
-        self.__clecert_millegrille = None  # Cle et certificat de millegrille
-        self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
-        self.__certificat_courant_pem = None
+        # self.__nomfichier_maitredescles_key = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_MAITREDESCLES]
+        # self.__nomfichier_maitredescles_password = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES]
+        self.__clecert_intermediaire = None  # Cle et certificat de millegrille
+        # self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
+        # self.__certificat_courant_pem = None
         self.__certificat_intermediaires_pem = None
         self.__certificats_backup = dict()  # Liste de certificats backup utilises pour conserver les cles secretes.
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
@@ -169,19 +166,19 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().configurer()
 
         self.charger_ca_chaine()
-        self.__clecert_millegrille = self.charger_clecert_millegrille()
+        self.__clecert_intermediaire = self.charger_clecert_intermediaire()
 
         self.__renouvelleur_certificat = RenouvelleurCertificat(
             self.configuration.idmg,
             self.__dict_ca,
-            millegrille=self.__clecert_millegrille
+            millegrille=self.__clecert_intermediaire
         )
 
-        try:
-            self.charger_certificat_courant()
-        except FileNotFoundError as fnf:
-            self._logger.warning("Certificat maitredescles non trouve, on va en generer un nouveau. %s" % str(fnf))
-            self.creer_certificat_maitredescles()
+        # try:
+        #     self.charger_certificat_courant()
+        # except FileNotFoundError as fnf:
+        #     self._logger.warning("Certificat maitredescles non trouve, on va en generer un nouveau. %s" % str(fnf))
+        #     self.creer_certificat_maitredescles()
 
         # Faire une demande pour charger les certificats de backup courants
         self.demander_certificats_backup()
@@ -226,7 +223,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
                 self.__dict_ca[skid] = x509_cert
 
-    def charger_clecert_millegrille(self) -> EnveloppeCleCert:
+    def charger_clecert_intermediaire(self) -> EnveloppeCleCert:
+        """
+        Charge le certificat et la cle intermediaire. Permet de signer des certificats au nom de la MilleGrille.
+        :return:
+        """
         repertoire_secrets = self.configuration.pki_config[Constantes.CONFIG_PKI_SECRET_DIR]
         password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
         with open('%s/%s' % (repertoire_secrets, password_intermediaire_path), 'rb') as fichier:
@@ -243,65 +244,65 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return clecert
 
-    def creer_certificat_maitredescles(self):
-        self._logger.info("Generation de nouveau certificat de maitre des cles")
-        hostname = socket.gethostname()
-        generateurMaitreDesCles = GenererMaitredesclesCryptage(
-            self.configuration.idmg,
-            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-            hostname,
-            self.__dict_ca,
-            self.__clecert_millegrille
-        )
-        clecert = generateurMaitreDesCles.generer()
+    # def creer_certificat_maitredescles(self):
+    #     self._logger.info("Generation de nouveau certificat de maitre des cles")
+    #     hostname = socket.gethostname()
+    #     generateurMaitreDesCles = GenererMaitredesclesCryptage(
+    #         self.configuration.idmg,
+    #         ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+    #         hostname,
+    #         self.__dict_ca,
+    #         self.__clecert_intermediaire
+    #     )
+    #     clecert = generateurMaitreDesCles.generer()
+    #
+    #     # repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
+    #     self._logger.debug("Sauvegarde cert maitre des cles: %s/%s" % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert))
+    #     with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key), 'wb') as fichier:
+    #         fichier.write(clecert.private_key_bytes)
+    #     with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password), 'wb') as fichier:
+    #         fichier.write(clecert.password)
+    #     with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert), 'wb') as fichier:
+    #         fichier.write(clecert.cert_bytes)
+    #     with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_autorite_cert), 'w') as fichier:
+    #         fichier.write(clecert.chaine[1])
+    #
+    #     self._logger.info("Nouveau certificat MaitreDesCles genere:\n%s" % (clecert.cert_bytes.decode('utf-8')))
+    #
+    #     # Enchainer pour charger le certificat normalement
+    #     self.charger_certificat_courant()
 
-        # repertoire_maitredescles = self.configuration.pki_config[Constantes.CONFIG_MAITREDESCLES_DIR]
-        self._logger.debug("Sauvegarde cert maitre des cles: %s/%s" % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert))
-        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key), 'wb') as fichier:
-            fichier.write(clecert.private_key_bytes)
-        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password), 'wb') as fichier:
-            fichier.write(clecert.password)
-        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert), 'wb') as fichier:
-            fichier.write(clecert.cert_bytes)
-        with open('%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_autorite_cert), 'w') as fichier:
-            fichier.write(clecert.chaine[1])
-
-        self._logger.info("Nouveau certificat MaitreDesCles genere:\n%s" % (clecert.cert_bytes.decode('utf-8')))
-
-        # Enchainer pour charger le certificat normalement
-        self.charger_certificat_courant()
-
-    def charger_certificat_courant(self):
-        fichier_cert = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert)
-        fichier_autorite = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_autorite_cert)
-        fichier_cle = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key)
-        mot_de_passe = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password)
-
-        with open(mot_de_passe, 'rb') as motpasse_courant:
-            motpass = motpasse_courant.readline().strip()
-        with open(fichier_cle, "rb") as keyfile:
-            cle = serialization.load_pem_private_key(
-                keyfile.read(),
-                password=motpass,
-                backend=default_backend()
-            )
-
-        with open(fichier_cert, 'rb') as certificat_pem:
-            certificat_courant_pem = certificat_pem.read()
-            cert = x509.load_pem_x509_certificate(
-                certificat_courant_pem,
-                backend=default_backend()
-            )
-            cert_fullchain = certificat_courant_pem.decode('utf8')
-            self.__certificat_courant_pem = PemHelpers.split_certificats(cert_fullchain)[0]
-
-        with open(fichier_autorite, 'rb') as fichier:
-            certificat_autorite_pem = fichier.read()
-            self.__certificat_intermediaires_pem = certificat_autorite_pem.decode('utf8')
-
-        self.__clecert_maitredescles = EnveloppeCleCert(cle, cert, motpass)
-
-        self._logger.info("Certificat courant: %s" % str(cert.subject))
+    # def charger_certificat_courant(self):
+    #     fichier_cert = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_cert)
+    #     fichier_autorite = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_autorite_cert)
+    #     fichier_cle = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_key)
+    #     mot_de_passe = '%s/%s' % (self.__repertoire_maitredescles, self.__nomfichier_maitredescles_password)
+    #
+    #     with open(mot_de_passe, 'rb') as motpasse_courant:
+    #         motpass = motpasse_courant.readline().strip()
+    #     with open(fichier_cle, "rb") as keyfile:
+    #         cle = serialization.load_pem_private_key(
+    #             keyfile.read(),
+    #             password=motpass,
+    #             backend=default_backend()
+    #         )
+    #
+    #     with open(fichier_cert, 'rb') as certificat_pem:
+    #         certificat_courant_pem = certificat_pem.read()
+    #         cert = x509.load_pem_x509_certificate(
+    #             certificat_courant_pem,
+    #             backend=default_backend()
+    #         )
+    #         cert_fullchain = certificat_courant_pem.decode('utf8')
+    #         self.__certificat_courant_pem = PemHelpers.split_certificats(cert_fullchain)[0]
+    #
+    #     with open(fichier_autorite, 'rb') as fichier:
+    #         certificat_autorite_pem = fichier.read()
+    #         self.__certificat_intermediaires_pem = certificat_autorite_pem.decode('utf8')
+    #
+    #     self.__clecert_maitredescles = EnveloppeCleCert(cle, cert, motpass)
+    #
+    #     self._logger.info("Certificat courant: %s" % str(cert.subject))
 
     def demander_certificats_backup(self):
         requete = {}
@@ -385,18 +386,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :param contenu:
         :return:
         """
-        # contenu_bytes = b64decode(contenu)
-        #
-        # contenu_decrypte = self.__clecert_maitredescles.private_key.decrypt(
-        #     contenu_bytes,
-        #     padding.OAEP(
-        #         mgf=padding.MGF1(algorithm=hashes.SHA256()),
-        #         algorithm=hashes.SHA256(),
-        #         label=None
-        #     )
-        # )
-        # return contenu_decrypte
-        return self.__clecert_maitredescles.dechiffrage_asymmetrique(contenu)
+        return self._contexte.signateur_transactions.dechiffrage_asymmetrique(contenu)
 
     def decrypter_cle(self, dict_cles):
         """
@@ -404,7 +394,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :param dict_cles: Dictionnaire de cles secretes cryptes, la cle_dict est le fingerprint du certificat
         :return:
         """
-        fingerprint_courant = self.get_fingerprint_cert()
+        enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        fingerprint_courant = enveloppe.fingerprint_b64
         cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
         if cle_secrete_cryptee is not None:
             # On peut decoder la cle secrete
@@ -418,7 +409,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :param dict_cles: Dictionnaire de mots de passes cryptes, la key est le fingerprint du certificat
         :return:
         """
-        fingerprint_courant = self.get_fingerprint_cert()
+        enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        fingerprint_courant = enveloppe.fingerprint_b64
         cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
         if cle_secrete_cryptee is not None:
             # On peut decoder la cle secrete
@@ -428,11 +420,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             return None
 
     def crypter_cle(self, cle_secrete, cert=None):
+        """
+        Chiffre une cle de maniere asymmetrique
+        :param cle_secrete:
+        :param cert:
+        :return:
+        """
         if cert is not None:
             clecert = EnveloppeCleCert(cert=cert)
+            return clecert.chiffrage_asymmetrique(cle_secrete)
         else:
-            clecert = self.__clecert_maitredescles
-        return clecert.chiffrage_asymmetrique(cle_secrete)
+            return self._contexte.signateur_transactions.chiffrage_asymmetrique(cle_secrete)
 
     def decrypter_grosfichier(self, fuuid):
         """
@@ -916,7 +914,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def maj_trousseau_hebergement(self, idmg, cles):
         """
         Conserve le trousseau (certs, cles) dans un document d'hebergement
-        :param transaction:
+        :param idmg:
+        :param cles:
         :return:
         """
         set_ops = cles
@@ -956,12 +955,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return self.__handler_commandes
 
     @property
-    def get_certificat(self):
-        return self.__clecert_maitredescles.cert
-
-    @property
     def get_certificat_pem(self):
-        return self.__certificat_courant_pem
+        return self._contexte.signateur_transactions.enveloppe_certificat_courant.certificat_pem
 
     @property
     def get_intermediaires_pem(self):
@@ -970,11 +965,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     @property
     def get_certificats_backup(self):
         return self.__certificats_backup
-
-    def get_fingerprint_cert(self, cert=None):
-        if cert is None:
-            cert = self.get_certificat
-        return b64encode(cert.fingerprint(hashes.SHA1())).decode('utf-8')
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
@@ -996,25 +986,28 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
 
-        if not clecert_dechiffrage:
-            # Par defaut, utiliser clecert du maitredescles
-            clecert_dechiffrage = self.__clecert_maitredescles
-
-        fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
-
         # Extraire cle secrete en utilisant le certificat du maitre des cles courant
         try:
-            cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES][fingerprint_cert_dechiffrage]
-            cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+
+            if clecert_dechiffrage:
+                fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
+                cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE][
+                    fingerprint_cert_dechiffrage]
+                cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+            else:
+                # Par defaut, utiliser clecert du maitredescles
+                cle_dechiffree = self.decrypter_motdepasse(document)
+
         except KeyError:
-            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert local %s introuvable" % (
-                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS),
-                                   fingerprint_cert_dechiffrage))
+            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert introuvable" %
+                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS))
             return
 
         # Recuperer liste des certs a inclure
+        enveloppe_maitredescles = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        clecert_maitredescles = EnveloppeCleCert(cert=enveloppe_maitredescles.certificat)
         dict_certs = self.get_certificats_backup.copy()
-        dict_certs[self.__clecert_maitredescles.fingerprint_b64] = self.__clecert_maitredescles
+        dict_certs[clecert_maitredescles.fingerprint_b64] = clecert_maitredescles
         cles_connues = list(dict_certs.keys())
         cles_documents = list(document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].keys())
 
@@ -1071,25 +1064,29 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
 
-        if not clecert_dechiffrage:
-            # Par defaut, utiliser clecert du maitredescles
-            clecert_dechiffrage = self.__clecert_maitredescles
-
-        fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
-
         # Extraire cle secrete en utilisant le certificat du maitre des cles courant
         try:
-            cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE][fingerprint_cert_dechiffrage]
-            cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+
+            if clecert_dechiffrage:
+                fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
+                cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE][
+                    fingerprint_cert_dechiffrage]
+                cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
+            else:
+                # Par defaut, utiliser clecert du maitredescles
+                cle_dechiffree = self.decrypter_motdepasse(document)
+
         except KeyError:
-            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert local %s introuvable" % (
-                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS),
-                                   fingerprint_cert_dechiffrage))
+            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert introuvable" %
+                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS))
             return
 
         # Recuperer liste des certs a inclure
+        enveloppe_maitredescles = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        clecert_maitredescles = EnveloppeCleCert(cert=enveloppe_maitredescles.certificat)
+
         dict_certs = self.get_certificats_backup.copy()
-        dict_certs[self.__clecert_maitredescles.fingerprint_b64] = self.__clecert_maitredescles
+        dict_certs[clecert_maitredescles.fingerprint_b64] = clecert_maitredescles
         cles_connues = list(dict_certs.keys())
         cles_documents = list(document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE].keys())
 

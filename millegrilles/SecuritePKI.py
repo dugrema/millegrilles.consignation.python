@@ -374,7 +374,7 @@ class UtilCertificats:
 
         return digest_base64
 
-    def chiffage_asymmetrique(self, cle_secrete):
+    def chiffrage_asymmetrique(self, cle_secrete):
         public_key = self.certificat.public_key()
         cle_secrete_backup = public_key.encrypt(
             cle_secrete,

@@ -671,7 +671,7 @@ class GestionnaireDomaine:
         return RegenerateurDeDocuments(self)
 
     @property
-    def _contexte(self):
+    def _contexte(self) -> ContexteRessourcesDocumentsMilleGrilles:
         return self.__contexte
 
     @property

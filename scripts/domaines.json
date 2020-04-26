@@ -24,6 +24,9 @@
     },{
       "module": "millegrilles.domaines.Hebergement",
       "classe": "GestionnaireHebergement"
+    },{
+      "module": "millegrilles.domaines.Pki",
+      "classe": "GestionnairePki"
     }
   ]
 }
