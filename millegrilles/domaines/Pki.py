@@ -382,9 +382,11 @@ class PKIDocumentHelper:
             if enveloppe.is_CA:
                 document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
                 # document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
-            elif ConstantesGenerateurCertificat.ROLE_BACKUP in (enveloppe.get_roles):
-                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
-                self.maj_liste_certificats_backup(fingerprint, document_cert)
+            else:
+                roles = enveloppe.get_roles
+                if ConstantesGenerateurCertificat.ROLE_BACKUP in roles:
+                    document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
+                    self.maj_liste_certificats_backup(fingerprint, document_cert)
 
         filtre = {
             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint

@@ -96,6 +96,14 @@ class ServiceMonitor:
             'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
         },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
+            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
+            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
+        },
     }
 
     def __init__(self):

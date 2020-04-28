@@ -48,7 +48,7 @@ class ConstantesGenerateurCertificat:
     ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     ROLE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     ROLE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
-    ROLE_HEBERGEMENT_CONSIGNATIONFICHIERS = 'heb_fichiers'
+    ROLE_HEBERGEMENT_FICHIERS = 'heb_fichiers'
     ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
 
 
@@ -1306,7 +1306,7 @@ class GenererHebergementTransactions(GenerateurNoeud):
             Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
             Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
         ]
-        exchanges = '\n'.join(exchange_list).encode('utf-8')
+        exchanges = ','.join(exchange_list).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1338,7 +1338,7 @@ class GenererHebergementDomaines(GenerateurNoeud):
             Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
             Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
         ]
-        exchanges = '\n'.join(exchange_list).encode('utf-8')
+        exchanges = ','.join(exchange_list).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1370,7 +1370,7 @@ class GenererHebergementMaitredescles(GenerateurNoeud):
             Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
             Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
         ]
-        exchanges = '\n'.join(exchange_list).encode('utf-8')
+        exchanges = ','.join(exchange_list).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
@@ -1379,6 +1379,66 @@ class GenererHebergementMaitredescles(GenerateurNoeud):
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles_list = [
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
+        ]
+        roles = ','.join(roles_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
+class GenererHebergementCoupdoeil(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchange_list = [
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+        ]
+        exchanges = ','.join(exchange_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles_list = [
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
+        ]
+        roles = ','.join(roles_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
+class GenererHebergementFichiers(GenerateurNoeud):
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchange_list = [
+            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
+        ]
+        exchanges = ','.join(exchange_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles_list = [
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT,
         ]
         roles = ','.join(roles_list).encode('utf-8')
@@ -1564,6 +1624,8 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS: GenererHebergementTransactions,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES: GenererHebergementDomaines,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES: GenererHebergementMaitredescles,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL: GenererHebergementCoupdoeil,
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS: GenererHebergementFichiers,
         }
 
         self.__generateur_par_csr = GenerateurCertificateParRequest

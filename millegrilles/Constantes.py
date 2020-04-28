@@ -1405,6 +1405,8 @@ class ConstantesServiceMonitor:
     MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     MODULE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     MODULE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
+    MODULE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
+    MODULE_HEBERGEMENT_FICHIERS = 'heb_fichiers'
 
     FICHIER_MONGO_MOTDEPASSE = 'passwd.mongo.txt'
     FICHIER_MONGOXPWEB_MOTDEPASSE = 'passwd.mongoxpweb.txt'
