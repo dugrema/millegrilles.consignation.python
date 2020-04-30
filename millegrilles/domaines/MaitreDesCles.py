@@ -673,7 +673,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         if role == ConstantesGenerateurCertificat.ROLE_MAITREDESCLES:
             # Ajouter le mot de passe et cle intermediaire
-            role.append('intermediaire')
+            roles.append('intermediaire')
 
         collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         liste_idmg = evenement['idmg']

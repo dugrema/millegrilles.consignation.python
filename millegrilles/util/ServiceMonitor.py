@@ -19,7 +19,7 @@ from os import path
 from requests.exceptions import SSLError
 from pymongo.errors import OperationFailure, DuplicateKeyError
 from json.decoder import JSONDecodeError
-from cryptography.x509.extensions import ExtensionNotFound
+from cryptography import x509
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -464,6 +464,10 @@ class ServiceMonitor:
     def gestionnaire_commandes(self):
         return self.__gestionnaire_commandes
 
+    @property
+    def generateur_transactions(self):
+        return self.__connexion_middleware.generateur_transactions
+
 
 class GestionnaireCertificats:
 
@@ -731,6 +735,7 @@ class TraitementMessages(BaseCallback):
         if routing_key.startswith('commande.'):
             contenu = {
                 'commande': routing_key.replace('commande.', ''),
+                'exchange': exchange,
                 'properties': properties,
                 'contenu': message_dict,
             }
@@ -755,6 +760,12 @@ class TraitementMessages(BaseCallback):
             exchange=self.configuration.exchange_middleware,
             queue=self.queue_name,
             routing_key='commande.servicemonitor.#',
+            callback=None
+        )
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_noeuds,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitor.ajouterCompte',
             callback=None
         )
 
@@ -972,6 +983,10 @@ class ConnexionMiddleware:
     @property
     def get_gestionnaire_comptes_mongo(self):
         return self.__mongo
+
+    @property
+    def generateur_transactions(self):
+        return self.__contexte.generateur_transactions
 
 
 class GestionnaireModulesDocker:
@@ -1538,7 +1553,7 @@ class GestionnaireComptesMQ:
             if any([response.status_code not in [201, 204] for response in responses]):
                 raise ValueError("Erreur ajout compte", subject)
 
-        except ExtensionNotFound:
+        except x509.extensions.ExtensionNotFound:
             self.__logger.info("Aucun access a MQ pour certificat %s", subject)
 
     def ajouter_exchanges(self, idmg: str = None):
@@ -1923,6 +1938,14 @@ class GestionnaireCommandes:
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self.__service_monitor.gestionnaire_mq
         gestionnaire_comptes_mq.ajouter_compte(certificat)
 
+        # Transmettre reponse d'ajout de compte, au besoin
+        properties = commande.get('properties')
+        if properties:
+            reply_to = properties.reply_to
+            correlation_id = properties.correlation_id
+
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                {'resultat_ok': True}, reply_to, correlation_id)
 
 
 class ImageNonTrouvee(Exception):
