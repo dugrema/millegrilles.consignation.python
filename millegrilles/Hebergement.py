@@ -103,7 +103,9 @@ class ConfigurationHebergement(TransactionConfiguration):
         self.__parametres[Constantes.CONFIG_PKI_CERT_MILLEGRILLE] = fichier_cert_millegrille
 
         # Override de l'info intermediaire, garde les fichiers en memoire
-        self.__parametres[Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE] = self.__config_hebergement['intermediaire_clecert']
+        intermediaire_clecert = self.__config_hebergement.get('intermediaire_clecert')
+        if intermediaire_clecert:
+            self.__parametres[Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE] = intermediaire_clecert
 
         # Charger idmg a partir du certificat
         cert = self.__config_hebergement['chaine_hote'][0]
