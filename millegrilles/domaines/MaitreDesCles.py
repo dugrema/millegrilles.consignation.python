@@ -228,18 +228,21 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         Charge le certificat et la cle intermediaire. Permet de signer des certificats au nom de la MilleGrille.
         :return:
         """
-        password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
-        with open(password_intermediaire_path, 'rb') as fichier:
-            password_intermediaire = fichier.read()
+        clecert = self.configuration.pki_config.get(Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE)
 
-        cert_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE]
-        key_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE]
-        clecert = EnveloppeCleCert()
-        clecert.from_files(
-            key_millegrille,
-            cert_millegrille,
-            password_intermediaire,
-        )
+        if not clecert:
+            password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
+            with open(password_intermediaire_path, 'rb') as fichier:
+                password_intermediaire = fichier.read()
+
+            cert_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE]
+            key_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE]
+            clecert = EnveloppeCleCert()
+            clecert.from_files(
+                key_millegrille,
+                cert_millegrille,
+                password_intermediaire,
+            )
 
         return clecert
 
@@ -689,12 +692,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         dict_motsdepasse_intermediaire_paridmg = dict()
         for motdepasse_info in curseur_motsdepasse:
             idmg = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['idmg']
-            role = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['role']
-            motdepasse = self.decrypter_motdepasse(motdepasse_info['motdepasse'])
-            motdepasse_dechiffre = motdepasse
+            role_motdepasse = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['role']
+            motdepasse_dechiffre = self.decrypter_motdepasse(motdepasse_info['motdepasse'])
             motdepasse_chiffre, fingerprint = self.crypter_cle(motdepasse_dechiffre, cert=certificat)
 
-            if role == 'intermediaire':
+            if role_motdepasse == 'intermediaire':
                 dict_motsdepasse_intermediaire_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
             else:
                 dict_motsdepasse_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')

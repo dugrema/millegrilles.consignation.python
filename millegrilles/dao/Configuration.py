@@ -58,6 +58,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_PKI_KEY_MAITREDESCLES: '',
             Constantes.CONFIG_PKI_PASSWORD_MAITREDESCLES: '',
             Constantes.CONFIG_CA_PASSWORDS: '',
+            Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE: '',
         }
 
         # Configuration de connection a MongoDB

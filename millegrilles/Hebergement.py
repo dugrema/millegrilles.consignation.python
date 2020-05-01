@@ -102,6 +102,9 @@ class ConfigurationHebergement(TransactionConfiguration):
         self.__parametres[Constantes.CONFIG_PKI_KEYFILE] = fichier_cle
         self.__parametres[Constantes.CONFIG_PKI_CERT_MILLEGRILLE] = fichier_cert_millegrille
 
+        # Override de l'info intermediaire, garde les fichiers en memoire
+        self.__parametres[Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE] = self.__config_hebergement['intermediaire_clecert']
+
         # Charger idmg a partir du certificat
         cert = self.__config_hebergement['chaine_hote'][0]
         clecert = EnveloppeCleCert()
@@ -276,9 +279,24 @@ class Hebergement(ModeleConfiguration):
 
             configuration['clecert'] = clecert
 
+            certificats = trousseau['certificats']
+
+            # Au besoin, charger cle et passwd intermediaire (pour maitre des cles)
+            intermediaire_passwd_chiffre = trousseau.get('intermediaire_passwd')
+            intermediaire_cle = trousseau.get('intermediaire_cle')
+            intermediaire_cert = certificats['intermediaire']
+            if intermediaire_passwd_chiffre and intermediaire_cle:
+                intermediaire_passwd = signateur.dechiffrage_asymmetrique(intermediaire_passwd_chiffre.encode('utf-8'))
+
+                # Verifier que la cle fonctionne
+                clecert_intermediaire = EnveloppeCleCert()
+                clecert_intermediaire.from_pem_bytes(intermediaire_cle.encode('utf-8'), intermediaire_cert.encode('utf-8'), intermediaire_passwd)
+                clecert_intermediaire.password = None
+
+                configuration['intermediaire_clecert'] = clecert_intermediaire
+
             # Charger la chaine de certificats pour se connecter a l'hote
             certificat_pem_str = str(certificat_pem, 'utf-8')
-            certificats = trousseau['certificats']
             chaine_hote = [
                 certificat_pem_str,
                 certificats['hebergement'],
@@ -286,7 +304,7 @@ class Hebergement(ModeleConfiguration):
             ]
             chaine_cert = [
                 certificat_pem_str,
-                certificats['intermediaire'],
+                intermediaire_cert,
             ]
 
             configuration['chaine_hote'] = chaine_hote
