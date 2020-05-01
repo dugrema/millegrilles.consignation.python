@@ -12,6 +12,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
+from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -26,6 +27,8 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.__init_config_event = Event()
         self.__channel = None
         self.__queue_name = None
+
+        self.__thread_ceduleur = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -57,6 +60,14 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.contexte.message_dao.register_channel_listener(self.message_handler)
         self.contexte.message_dao.register_channel_listener(self.evenements_handler)
         self.contexte.message_dao.register_channel_listener(self.handler_entretien)
+
+        # Demarrer thread ceduleur
+        if not self.__thread_ceduleur:
+            ceduleur = CeduleurMilleGrilles(self.contexte, self.__stop_event)
+            self.__thread_ceduleur = Thread(target=ceduleur.executer, name='ceduleur')
+            self.__thread_ceduleur.start()
+        else:
+            self.__logger.warning("Ceduleur deja demarre, initialiser_2 execute plus d'une fois")
 
         self.__logger.info("Configuration et connection completee")
 

@@ -27,44 +27,49 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 # 	}
 # }
 
-class CeduleurMilleGrilles(ModeleConfiguration):
+class CeduleurMilleGrilles:
+# (ModeleConfiguration):
 
-    def __init__(self):
+    def __init__(self, contexte, stop_event, test_indicateurs=False):
         super().__init__()
-        self._stop_event = Event()
-        self._stop_event.set()
+        self.__stop_event = stop_event
+        self.__contexte = contexte
+        self.__test_indicateurs = test_indicateurs
+
+        # self._stop_event = Event()
+        # self._stop_event.set()
         self.__channel = None
 
-        self.logger = logging.getLogger('%s.CeduleurMilleGrilles' % __name__)
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def initialiser(self, init_document=False, init_message=True, connecter=True):
-        super().initialiser(init_document, init_message, connecter)
+    # def initialiser(self, init_document=False, init_message=True, connecter=True):
+    #     super().initialiser(init_document, init_message, connecter)
 
-    def on_channel_open(self, channel):
-        channel.add_on_close_callback(self.__on_channel_close)
-        self.__channel = channel
+    # def on_channel_open(self, channel):
+    #     channel.add_on_close_callback(self.__on_channel_close)
+    #     self.__channel = channel
+    #
+    #     # self.contexte.message_dao.configurer_rabbitmq()
+    #     # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
 
-        # self.contexte.message_dao.configurer_rabbitmq()
-        # self.contexte.message_dao.demarrer_lecture_nouvelles_transactions(self.message_handler.callbackAvecAck)
+    # def __on_channel_close(self, channel=None, code=None, reason=None):
+    #     self.__channel = None
 
-    def __on_channel_close(self, channel=None, code=None, reason=None):
-        self.__channel = None
+    # def is_channel_open(self):
+    #     return self.__channel is not None
 
-    def is_channel_open(self):
-        return self.__channel is not None
-
-    def configurer_parser(self):
-        super().configurer_parser()
-
-        # self.parser.add_argument(
-        #     '--debug', action="store_true", required=False,
-        #     help="Active le debugging (logger)"
-        # )
-
-        self.parser.add_argument(
-            '--test_indicateurs', action="store_true", required=False,
-            help="Transmet tous les indicateurs a toutes les minutes (pour tester logique)"
-        )
+    # def configurer_parser(self):
+    #     super().configurer_parser()
+    #
+    #     # self.parser.add_argument(
+    #     #     '--debug', action="store_true", required=False,
+    #     #     help="Active le debugging (logger)"
+    #     # )
+    #
+    #     self.parser.add_argument(
+    #         '--test_indicateurs', action="store_true", required=False,
+    #         help="Transmet tous les indicateurs a toutes les minutes (pour tester logique)"
+    #     )
 
     def transmettre_evenement_ceduleur(self):
 
@@ -101,12 +106,12 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         ts_dict['timezones'] = nom_timezones
         ts_dict['indicateurs_partz'] = indicateurs_partimezone
 
-        self.contexte.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
+        self.__contexte.message_dao.transmettre_evenement_ceduleur(ts_dict, indicateurs)
 
     def get_indicateurs(self, timestamp):
 
         indicateurs = []
-        if not self.args.test_indicateurs:
+        if not self.__test_indicateurs:
             # Calculer quels indicateurs on doit inclure
             if timestamp.minute == 0:
                 if timestamp.hour == 0:
@@ -128,20 +133,14 @@ class CeduleurMilleGrilles(ModeleConfiguration):
         time_sleep = 62 - (time.time() % 60)
         return time_sleep
 
-    def exit_gracefully(self, signal=None, frame=None):
-        self._stop_event.set()
-        super().exit_gracefully()
+    # def exit_gracefully(self, signal=None, frame=None):
+    #     self._stop_event.set()
+    #     super().exit_gracefully()
 
     def executer(self):
 
-        self._stop_event.clear()  # Pret a l'execution
-
         # Preparer configuration / logging
-        if self.args.debug:
-            self.logger.setLevel(logging.DEBUG)
-            logging.getLogger('millegrilles').setLevel(logging.INFO)  # Mettre le reste du domaine a INFO
-
-        while not self._stop_event.is_set():
+        while not self.__stop_event.is_set():
             try:
                 # Verifier avant d'executer, s'il reste moins de 30 secondes on attend la prochaine minute
                 temps_restant = CeduleurMilleGrilles.temps_restant_pourminute()
@@ -157,18 +156,16 @@ class CeduleurMilleGrilles(ModeleConfiguration):
                 else:
                     self.logger.warning("On skip, il reste juste %d secondes d'attente" % temps_restant)
 
-                self._stop_event.wait(temps_restant)
+                self.__stop_event.wait(temps_restant)
 
             except ChannelClosed as ce:
-                self.logger.fatal("Connection a Pika fermee, on termine l'execution. %s" % str(ce))
-                self.exit_gracefully()  # Connection perdue, On va fermer l'application
+                self.logger.fatal("Connection a Pika fermee. %s" % str(ce))
 
             except ConnectionClosed as ce:
                 self.logger.fatal("Connection a Pika fermee, on termine l'execution. %s" % str(ce))
-                self.exit_gracefully()  # Connection perdue, On va fermer l'application
 
             except Exception as e:
                 self.logger.exception("Erreur durant le cycle de ceduleur: %s" % str(e))
 
-                # On attend 30 secondes pour tenter a nouveau sauf si l'erreur vient de l'arret de l'application
-                self._stop_event.wait(30)
+                # On attend 60 secondes pour tenter a nouveau sauf si l'erreur vient de l'arret de l'application
+                self.__stop_event.wait(60)

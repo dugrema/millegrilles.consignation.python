@@ -61,10 +61,10 @@ class ServiceMonitor:
             'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
         },
-        ConstantesServiceMonitor.MODULE_CEDULEUR: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_CEDULEUR,
-        },
+        # ConstantesServiceMonitor.MODULE_CEDULEUR: {
+        #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        #     'role': ConstantesGenerateurCertificat.ROLE_CEDULEUR,
+        # },
         ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
             'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
             'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
@@ -997,7 +997,7 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_MONGO,
         ConstantesServiceMonitor.MODULE_TRANSACTION,
         ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-        ConstantesServiceMonitor.MODULE_CEDULEUR,
+        # ConstantesServiceMonitor.MODULE_CEDULEUR,
         ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
         ConstantesServiceMonitor.MODULE_COUPDOEIL,
         ConstantesServiceMonitor.MODULE_TRANSMISSION,
