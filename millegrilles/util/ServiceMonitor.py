@@ -1673,7 +1673,11 @@ class GestionnaireImagesDocker:
 
     def charger_versions(self):
         filtre = {'name': 'docker.versions'}
-        self.__versions_images = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
+        try:
+            self.__versions_images = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
+        except IndexError:
+            self.__logger.error(
+                "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")
 
     def telecharger_images_docker(self):
         """
