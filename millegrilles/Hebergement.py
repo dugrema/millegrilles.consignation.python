@@ -2,6 +2,7 @@ import logging
 import tempfile
 import os
 import gc
+import datetime
 
 from base64 import b64decode
 from threading import Event, Thread
@@ -130,6 +131,7 @@ class TraitementMessage(BaseCallback):
         self.__gestionnaire = gestionnaire
         self.__channel = None
         self.queue_name = None
+        self.__events_attente = dict()
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -145,6 +147,8 @@ class TraitementMessage(BaseCallback):
             self.__gestionnaire.entretien_millegrilles_actives(message_dict['resultats'])
         elif correlation_id == ConstantesHebergement.CORRELATION_TROUSSEAU_MODULE:
             self.__gestionnaire.recevoir_trousseau(message_dict['resultats'])
+        elif self.message_recu(correlation_id, message_dict):
+            pass
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
@@ -175,6 +179,25 @@ class TraitementMessage(BaseCallback):
 
     def is_channel_open(self):
         return self.__channel is not None and not self.__channel.is_closed
+
+    def attendre_message(self, correlation_id):
+        attente = Event()
+        corr_complet = correlation_id
+        self.__events_attente[corr_complet] = {
+            'event': attente,
+            'timestamp': datetime.datetime.utcnow(),
+        }
+        return attente
+
+    def message_recu(self, correlation_id, message):
+        self.__logger.debug("Message event recu : %s", correlation_id)
+        attente = self.__events_attente[correlation_id]
+        if attente:
+            event = attente['event']
+            event.set()
+            del self.__events_attente[correlation_id]
+            return True
+        return False
 
 
 class Hebergement(ModeleConfiguration):
@@ -314,18 +337,29 @@ class Hebergement(ModeleConfiguration):
             configuration['millegrille'] = certificats['millegrille']
             configuration['cle'] = str(clecert.private_key_bytes, 'utf-8')
 
-            commande_ajouter_compte = {
-                'certificat': str(certificat_pem, 'utf-8'),
-                'chaine': chaine_hote[1:],
-            }
-            self.contexte.generateur_transactions.transmettre_commande(
-                commande_ajouter_compte,
-                'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
-                exchange=self.contexte.configuration.exchange_middleware,
-            )
+            self.ajouter_compte(idmg, chaine_hote)
 
-            # Sauvegarder les fichiers CA, chaine hote, cert et cle.
+    def ajouter_compte(self, idmg, chaine_hote):
+        commande_ajouter_compte = {
+            'certificat': chaine_hote[0],
+            'chaine': chaine_hote[1:],
+        }
+
+        correlation_id = 'compte:' + idmg
+        self.contexte.generateur_transactions.transmettre_commande(
+            commande_ajouter_compte,
+            'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+            reply_to=self.queue_name,
+            correlation_id=correlation_id,
+            exchange=self.contexte.configuration.exchange_middleware,
+        )
+
+        # Attendre confirmation que le compte a ete cree
+        def demarrer_contexte_anon():
+            event = self.__traitement_messages.attendre_message(correlation_id)
+            event.wait(5)
             self.demarrer_contexte(idmg)
+        Thread(target=demarrer_contexte_anon).start()
 
     def demarrer_contexte(self, idmg: str):
         raise NotImplementedError()
