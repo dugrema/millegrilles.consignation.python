@@ -59,7 +59,7 @@ class MessagesSample(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        sample.executer()
+        self.executer()
 
     # def run_ioloop(self):
     #     self.contexte.message_dao.run_ioloop()
@@ -96,7 +96,7 @@ class MessagesSample(BaseCallback):
 
     def transaction_desactiver_millegrille_hebergee(self):
         enveloppe_requete = self.generateur.soumettre_transaction(
-            {'idmg': '3Pt8to1u6ZifkbBUEYoKQBFUy2agrhQwPLVzj4o'},
+            {'idmg': '2sfSoBQd5BAWvzkCf8Yd5ZwgjmvZ8fRpMrkeBeB'},
             ConstantesHebergement.TRANSACTION_DESACTIVER_MILLEGRILLE_HEBERGEE,
             correlation_id='abcd-1234',
             reply_to=self.queue_name
@@ -130,9 +130,9 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # self.commande_creer_millegrille_hebergee()
-        # self.transaction_desactiver_millegrille_hebergee()
+        self.transaction_desactiver_millegrille_hebergee()
         # self.transaction_activer_millegrille_hebergee()
-        self.requete_millegrilles_actives()
+        # self.requete_millegrilles_actives()
 
 
 # --- MAIN ---
