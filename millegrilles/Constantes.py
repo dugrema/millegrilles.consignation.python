@@ -357,6 +357,10 @@ class ConstantesPrincipale:
             'Backup': {
                 'rang': 1,
                 'description': 'Backup'
+            },
+            'Hebergement': {
+                'rang': 1,
+                'description': 'Hebergement'
             }
         },
         "menu": [
@@ -368,6 +372,7 @@ class ConstantesPrincipale:
             'Pki',
             'Parametres',
             'Backup',
+            'Hebergement',
         ]
     }
 
