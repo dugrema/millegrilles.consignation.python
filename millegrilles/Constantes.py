@@ -1325,6 +1325,7 @@ class ConstantesHebergement:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
+    ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_Hebergement.documents'
 
     LIBVAL_MILLEGRILLE_HEBERGEE = 'millegrille.hebergee'
 
@@ -1334,6 +1335,7 @@ class ConstantesHebergement:
     VALEUR_HEBERGEMENT_INACTIF = 'inactif'
 
     REQUETE_MILLEGRILLES_ACTIVES = '%s.requeteMilleGrillesActives' % DOMAINE_NOM
+    REQUETE_MILLEGRILLES_HEBERGEES = '%s.requeteMilleGrillesHebergees' % DOMAINE_NOM
 
     TRANSACTION_NOUVEAU_IDMG = '%s.nouveauIdmg' % DOMAINE_NOM
     TRANSACTION_ACTIVER_MILLEGRILLE_HEBERGEE = '%s.activerMilleGrilleHebergee' % DOMAINE_NOM
