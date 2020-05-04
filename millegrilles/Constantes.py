@@ -114,7 +114,7 @@ CONFIG_PKI_CERT_MAITREDESCLES = 'pki_cert_maitredescles'
 CONFIG_PKI_KEY_MAITREDESCLES = 'pki_key_maitredescles'
 CONFIG_PKI_PASSWORD_MAITREDESCLES = 'pki_password_maitredescles'
 
-DEFAUT_PKI_WORKDIR = '/opt/millegrilles/dist/secure/pki'
+DEFAUT_PKI_WORKDIR = '/tmp'
 DEFAUT_MAITREDESCLES_DIR = '/opt/millegrilles/dist/secure/maitredescles'
 DEFAUT_PKI_SECRET_DIR = '/run/secrets'
 DEFAULT_CA_PASSWORDS = 'pki.ca.passwords'
