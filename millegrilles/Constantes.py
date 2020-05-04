@@ -691,6 +691,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU = '%s.nouveauTrousseauHebergement' % DOMAINE_NOM
     TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU = '%s.majTrousseauHebergement' % DOMAINE_NOM
     TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE = '%s.nouveauMotDePasseCleHebergement' % DOMAINE_NOM
+    TRANSACTION_HEBERGEMENT_SUPPRIMER = '%s.supprimerHebergement' % DOMAINE_NOM
 
     REQUETE_CLE_RACINE = 'requeteCleRacine'
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
@@ -1340,6 +1341,7 @@ class ConstantesHebergement:
     TRANSACTION_NOUVEAU_IDMG = '%s.nouveauIdmg' % DOMAINE_NOM
     TRANSACTION_ACTIVER_MILLEGRILLE_HEBERGEE = '%s.activerMilleGrilleHebergee' % DOMAINE_NOM
     TRANSACTION_DESACTIVER_MILLEGRILLE_HEBERGEE = '%s.desactiverMilleGrilleHebergee' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_MILLEGRILLE_HEBERGEE = '%s.supprimerMilleGrilleHebergee' % DOMAINE_NOM
 
     COMMANDE_CREER_MILLEGRILLE_HEBERGEE = '%s.creerMilleGrilleHebergee' % DOMAINE_NOM
 

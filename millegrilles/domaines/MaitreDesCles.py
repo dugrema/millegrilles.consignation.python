@@ -376,6 +376,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMajTrousseau"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMotdepasseCle"
+        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_SUPPRIMER:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementSupprimer"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -944,6 +946,25 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         collection.update_one(filtre, ops)
+
+    def supprimer_trousseau_hebergement(self, idmg):
+        """
+        Supprimer le trousseau d'une MilleGrille hebergee
+        :param idmg:
+        :param cles:
+        :return:
+        """
+        filtre = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
+            ]}
+        }
+
+        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        collection.delete_many(filtre)
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
@@ -2355,3 +2376,16 @@ class ProcessusHebergementMotdepasseCle(ProcessusNouveauMotDePasse):
 
     def _etape_resumer(self):
         return ProcessusHebergementMotdepasseCle.resumer.__name__
+
+
+class ProcessusHebergementSupprimer(MGProcessusTransaction):
+    """
+    Supprime le trousseau d'une MilleGrille hebergee
+    """
+    def initiale(self):
+        transaction = self.transaction
+        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        self.controleur.gestionnaire.supprimer_trousseau_hebergement(idmg)
+
+        self.set_etape_suivante()  #Termine

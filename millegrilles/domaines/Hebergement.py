@@ -117,6 +117,8 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Hebergement:ProcessusActiverHebergement"
         elif domaine_transaction == ConstantesHebergement.TRANSACTION_DESACTIVER_MILLEGRILLE_HEBERGEE:
             processus = "millegrilles_domaines_Hebergement:ProcessusDesactiverHebergement"
+        elif domaine_transaction == ConstantesHebergement.TRANSACTION_SUPPRIMER_MILLEGRILLE_HEBERGEE:
+            processus = "millegrilles_domaines_Hebergement:ProcessusSupprimerHebergement"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -167,6 +169,13 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
 
         collection = self.document_dao.get_collection(ConstantesHebergement.COLLECTION_DOCUMENTS_NOM)
         collection.update_one(filtre, ops, upsert=True)
+
+    def supprimer_hebergement(self, idmg):
+        filtre = {
+            'idmg': idmg,
+        }
+        collection = self.document_dao.get_collection(ConstantesHebergement.COLLECTION_DOCUMENTS_NOM)
+        collection.delete_one(filtre)
 
     def get_millegrilles_actives(self):
 
@@ -281,5 +290,30 @@ class ProcessusDesactiverHebergement(MGProcessusTransaction):
         commande = {'idmg': idmg}
         commande_domaine = 'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT
         self.ajouter_commande_a_transmettre(commande_domaine, commande)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusSupprimerHebergement(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        idmg = transaction['idmg']
+
+        # Creer document d'hebergement de la MilleGrille
+        self.controleur.gestionnaire.supprimer_hebergement(idmg)
+
+        # Transmettre commande pour desactiver l'hebergement de la MilleGrille
+        commande = {'idmg': idmg}
+        commande_domaine = 'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT
+        self.ajouter_commande_a_transmettre(commande_domaine, commande)
+
+        # Supprimer trousseau de la MilleGrille hebergee du MaitreDesCles
+        transaction_domaine = 'commande.' + Constantes.ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_SUPPRIMER
+        self.ajouter_transaction_a_soumettre(transaction_domaine, commande)
 
         self.set_etape_suivante()  # Termine

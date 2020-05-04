@@ -356,12 +356,25 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_supprimer_trousseau_hebergement(self):
+        domaine = ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_SUPPRIMER
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            {'idmg': '3M87pZxVVWbT1dVLeRarQnge1mvADTs4trG7Caa'},
+            domaine,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # self.event_recu.wait(5)
         # self.event_recu.clear()
 
         # enveloppe = self.requete_cert_maitredescles()
-        self.requete_trousseau_hebergement()
+        # self.requete_trousseau_hebergement()
 
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
@@ -371,6 +384,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
+        self.transaction_supprimer_trousseau_hebergement()
 
         # self.requete_cle_racine()
         # self.commande_signer_cle_backup()
