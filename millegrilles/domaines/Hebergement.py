@@ -140,7 +140,7 @@ class GestionnaireHebergement(GestionnaireDomaineStandard):
         self.generateur_transactions.transmettre_commande(
             commande, domaine, exchange=self.configuration.exchange_middleware)
 
-        self.generateur_transactions.transmettre_reponse({'ok': True}, properties.reply_to, properties.correlation_id)
+        self.generateur_transactions.transmettre_reponse({'resultats': {'ok': True}}, properties.reply_to, properties.correlation_id)
 
     def maj_hebergement(self, parametres: dict):
         idmg = parametres['idmg']
