@@ -1444,3 +1444,19 @@ class ConstantesServiceMonitor:
     COMMANDE_ACTIVER_HEBERGEMENT = 'servicemonitor.activerHebergement'
     COMMANDE_DESACTIVER_HEBERGEMENT = 'servicemonitor.desactiverHebergement'
     COMMANDE_AJOUTER_COMPTE = 'servicemonitor.ajouterCompte'
+
+    GROUP_MILLEGRILLES = 'millegrilles'
+    GROUP_MILLEGRILLES_GID = 980
+
+    USER_MONITOR = 'mg_monitor'
+    USER_MONITOR_UID = 980
+    USER_MAITREDESCLES = 'mg_maitredescles'
+    USER_MAITREDESCLES_UID = 981
+    USER_PYTHON = 'mg_python'
+    USER_PYTHON_UID = 982
+    USER_MONGO = 'mg_mongo'
+    USER_MONGO_UID = 983
+    USER_PUBLIC = 'mg_public'
+    USER_PUBLIC_UID = 984
+    USER_FICHIERS = 'mg_fichiers'
+    USER_FICHIERS_UID = 985
