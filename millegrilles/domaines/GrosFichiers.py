@@ -1833,9 +1833,12 @@ class ProcessusTransactionNouvelleVersionTransfertComplete(ProcessusGrosFichiers
         self.resumer_processus([token_resumer])
 
         # Une fois les tokens consommes, le processus sera termine.
-        self.set_etape_suivante()
+        self.set_etape_suivante(ProcessusTransactionNouvelleVersionTransfertComplete.attente_token.__name__)
 
         return {'fuuid': fuuid}
+
+    def attente_token(self):
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
