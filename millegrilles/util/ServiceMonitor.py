@@ -85,23 +85,23 @@ class ServiceMonitor:
             'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
         },
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
-            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
         },
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
-            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
         },
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
-            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
         },
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
+            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
         },
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
-            'nom': ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
+            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
             'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
         },
     }
@@ -768,6 +768,18 @@ class TraitementMessages(BaseCallback):
             routing_key='commande.servicemonitor.ajouterCompte',
             callback=None
         )
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_noeuds,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitor.activerHebergement',
+            callback=None
+        )
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_noeuds,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitor.desactiverHebergement',
+            callback=None
+        )
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -1006,6 +1018,10 @@ class GestionnaireModulesDocker:
 
     MODULES_HEBERGEMENT = [
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
     ]
 
     def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
@@ -1014,6 +1030,7 @@ class GestionnaireModulesDocker:
         self.__fermeture_event = fermeture_event
         self.__thread_events: Thread = None
         self.__event_stream = None
+        self.__modules_requis = GestionnaireModulesDocker.MODULES_REQUIS.copy()
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -1114,11 +1131,14 @@ class GestionnaireModulesDocker:
             service_name = service.name.split('_')[1]
             dict_services[service_name] = service
 
-        for service_name in self.MODULES_REQUIS:
+        for service_name in self.__modules_requis:
             params = ServiceMonitor.DICT_MODULES[service_name]
             service = dict_services.get(service_name)
             if not service:
-                self.demarrer_service(service_name, **params)
+                try:
+                    self.demarrer_service(service_name, **params)
+                except IndexError:
+                    self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
                 break  # On demarre un seul service a la fois, on attend qu'il soit pret
             else:
                 # Verifier etat service
@@ -1146,7 +1166,13 @@ class GestionnaireModulesDocker:
         if constraints:
             self.__add_node_labels(constraints)
 
-        self.__docker.services.create(image_tag, **configuration)
+        try:
+            self.__docker.services.create(image_tag, **configuration)
+        except APIError as apie:
+            if apie.status_code == 409:
+                self.__logger.info("Service %s deja demarre" % service_name)
+            else:
+                self.__logger.exception("Erreur demarrage service %s" % service_name)
 
     def supprimer_service(self, service_name: str):
         filter = {'name': self.idmg_tronque + '_' + service_name}
@@ -1156,13 +1182,26 @@ class GestionnaireModulesDocker:
     def activer_hebergement(self):
         """
         Active les modules d'hebergement (si pas deja fait).
-        :param idmg: MilleGrille a heberger
         :return:
         """
-        pass
+        modules_requis = set(self.__modules_requis)
+        modules_requis.update(self.MODULES_HEBERGEMENT)
+        self.__modules_requis = list(modules_requis)
 
-    def desactiver_hebergement(self, idmg):
-        pass
+        for service_name in self.MODULES_HEBERGEMENT:
+            module_config = ServiceMonitor.DICT_MODULES[service_name]
+            self.demarrer_service(service_name, **module_config)
+
+    def desactiver_hebergement(self):
+        modules_requis = set(self.__modules_requis)
+        modules_requis.difference_update(self.MODULES_HEBERGEMENT)
+        self.__modules_requis = list(modules_requis)
+
+        for service_name in self.MODULES_HEBERGEMENT:
+            try:
+                self.supprimer_service(service_name)
+            except IndexError:
+                self.__logger.warning("Erreur retrait service %s" % service_name)
 
     def verifier_etat_service(self, service):
         update_state = None
@@ -1915,6 +1954,11 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE:
             self.ajouter_comptes(contenu)
 
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT:
+            self.activer_hebergement(contenu)
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT:
+            self.desactiver_hebergement(contenu)
+
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
 
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_PAR_ROLE:
@@ -1951,6 +1995,11 @@ class GestionnaireCommandes:
             self.__service_monitor.generateur_transactions.transmettre_reponse(
                 {'resultat_ok': True}, reply_to, correlation_id)
 
+    def activer_hebergement(self, message):
+        self.__service_monitor.gestionnaire_docker.activer_hebergement()
+
+    def desactiver_hebergement(self, message):
+        self.__service_monitor.gestionnaire_docker.desactiver_hebergement()
 
 class ImageNonTrouvee(Exception):
 

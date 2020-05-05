@@ -59,7 +59,7 @@ class MessagesSample(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        sample.executer()
+        self.executer()
 
     # def run_ioloop(self):
     #     self.contexte.message_dao.run_ioloop()
@@ -105,11 +105,35 @@ class MessagesSample(BaseCallback):
         print("Envoi commande: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def commande_activer_hebergement(self):
+        enveloppe_requete = self.generateur.transmettre_commande(
+            {},
+            'commande.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def commande_desactiver_hebergement(self):
+        enveloppe_requete = self.generateur.transmettre_commande(
+            {},
+            'commande.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        print("Envoi commande: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
         # self.transaction_activer_millegrille_hebergee()
-        self.commande_ajouter_compte()
+        # self.commande_ajouter_compte()
+        self.commande_activer_hebergement()
+        # self.commande_desactiver_hebergement()
 
 
 # --- MAIN ---
