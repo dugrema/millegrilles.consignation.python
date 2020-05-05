@@ -54,6 +54,7 @@ DEFAUT_KEYFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'
 DEFAUT_KEYCERTFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key_cert'
 DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert'
 DEFAUT_CA_CERTS = '/opt/millegrilles/etc/millegrilles.RootCA.pem'
+DEFAUT_VAR_MILLEGRILLES = '/var/opt/millegrilles'
 
 DEFAUT_CONSIGNATIONFICHIERS_HOST = 'consignationfichiers'
 DEFAUT_CONSIGNATIONFICHIERS_PORT = '443'

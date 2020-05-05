@@ -1212,6 +1212,11 @@ class GestionnaireModulesDocker:
         :return:
         """
         if not self.__hebergement_actif:
+            # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
+            path_hebergement = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES, self.__idmg, 'mounts/hebergement')
+            os.mkdir(path_hebergement, mode=0o770)
+            
+            # Ajouter modules requis
             modules_requis = set(self.__modules_requis)
             modules_requis.update(self.MODULES_HEBERGEMENT)
             self.__modules_requis = list(modules_requis)
