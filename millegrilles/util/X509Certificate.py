@@ -1593,7 +1593,6 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_VITRINE: GenererVitrine,
             ConstantesGenerateurCertificat.ROLE_DEPLOYEUR: GenererDeployeur,
             ConstantesGenerateurCertificat.ROLE_CEDULEUR: GenererCeduleur,
-            ConstantesGenerateurCertificat.ROLE_PUBLICATEUR: GenererPublicateur,
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
