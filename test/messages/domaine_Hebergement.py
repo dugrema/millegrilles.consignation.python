@@ -156,9 +156,9 @@ class MessagesSample(BaseCallback):
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
         # self.transaction_activer_millegrille_hebergee()
-        # self.requete_millegrilles_actives()
+        self.requete_millegrilles_actives()
         # self.requete_millegrilles_hebergees()
-        self.transaction_supprimer_millegrille_hebergee()
+        # self.transaction_supprimer_millegrille_hebergee()
 
 
 # --- MAIN ---

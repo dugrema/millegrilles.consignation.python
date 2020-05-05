@@ -1445,6 +1445,8 @@ class ConstantesServiceMonitor:
     COMMANDE_DESACTIVER_HEBERGEMENT = 'servicemonitor.desactiverHebergement'
     COMMANDE_AJOUTER_COMPTE = 'servicemonitor.ajouterCompte'
 
+    CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
+
     GROUP_MILLEGRILLES = 'millegrilles'
     GROUP_MILLEGRILLES_GID = 980
 

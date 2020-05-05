@@ -741,6 +741,8 @@ class TraitementMessages(BaseCallback):
             }
             commande = CommandeMonitor(contenu=contenu)
             self.__gestionnaire_commandes.ajouter_commande(commande)
+        elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
+            self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
@@ -886,7 +888,7 @@ class ConnexionMiddleware:
         )
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
-        self.__commandes_handler = TraitementMessages(self, self.__contexte)
+        self.__commandes_handler = TraitementMessages(self.__service_monitor.gestionnaire_commandes, self.__contexte)
 
         self.__contexte.message_dao.register_channel_listener(self)
         self.__contexte.message_dao.register_channel_listener(self.__commandes_handler)
@@ -918,6 +920,7 @@ class ConnexionMiddleware:
             try:
                 self.__mongo.entretien()
                 self.__entretien_comptes()
+                self.__entretien()
             except Exception:
                 self.__logger.exception("Exception generique")
             finally:
@@ -980,6 +983,15 @@ class ConnexionMiddleware:
 
             self.__comptes_mq_ok = comptes_mq_ok
 
+    def __entretien(self):
+        # Transmettre requete pour avoir l'etat de l'hebergement
+        self.generateur_transactions.transmettre_requete(
+            dict(), Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
+            reply_to=self.__commandes_handler.queue_name,
+            correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE
+        )
+
+
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
         gestionnaire_commandes.ajouter_commande(commande)
@@ -1031,6 +1043,7 @@ class GestionnaireModulesDocker:
         self.__thread_events: Thread = None
         self.__event_stream = None
         self.__modules_requis = GestionnaireModulesDocker.MODULES_REQUIS.copy()
+        self.__hebergement_actif = False
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -1184,24 +1197,29 @@ class GestionnaireModulesDocker:
         Active les modules d'hebergement (si pas deja fait).
         :return:
         """
-        modules_requis = set(self.__modules_requis)
-        modules_requis.update(self.MODULES_HEBERGEMENT)
-        self.__modules_requis = list(modules_requis)
+        if not self.__hebergement_actif:
+            modules_requis = set(self.__modules_requis)
+            modules_requis.update(self.MODULES_HEBERGEMENT)
+            self.__modules_requis = list(modules_requis)
 
-        for service_name in self.MODULES_HEBERGEMENT:
-            module_config = ServiceMonitor.DICT_MODULES[service_name]
-            self.demarrer_service(service_name, **module_config)
+            for service_name in self.MODULES_HEBERGEMENT:
+                module_config = ServiceMonitor.DICT_MODULES[service_name]
+                self.demarrer_service(service_name, **module_config)
+
+            self.__hebergement_actif = True
 
     def desactiver_hebergement(self):
-        modules_requis = set(self.__modules_requis)
-        modules_requis.difference_update(self.MODULES_HEBERGEMENT)
-        self.__modules_requis = list(modules_requis)
+        if self.__hebergement_actif:
+            modules_requis = set(self.__modules_requis)
+            modules_requis.difference_update(self.MODULES_HEBERGEMENT)
+            self.__modules_requis = list(modules_requis)
 
-        for service_name in self.MODULES_HEBERGEMENT:
-            try:
-                self.supprimer_service(service_name)
-            except IndexError:
-                self.__logger.warning("Erreur retrait service %s" % service_name)
+            for service_name in self.MODULES_HEBERGEMENT:
+                try:
+                    self.supprimer_service(service_name)
+                except IndexError:
+                    self.__logger.warning("Erreur retrait service %s" % service_name)
+                self.__hebergement_actif = False
 
     def verifier_etat_service(self, service):
         update_state = None
@@ -2000,6 +2018,15 @@ class GestionnaireCommandes:
 
     def desactiver_hebergement(self, message):
         self.__service_monitor.gestionnaire_docker.desactiver_hebergement()
+
+    def traiter_reponse_hebergement(self, message):
+        self.__logger.debug("Reponse hebergement: %s" % str(message))
+        resultats = message['resultats']
+        if len(resultats) > 0:
+            self.activer_hebergement(resultats)
+        else:
+            self.desactiver_hebergement(resultats)
+
 
 class ImageNonTrouvee(Exception):
 
