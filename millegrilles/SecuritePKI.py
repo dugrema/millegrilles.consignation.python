@@ -556,6 +556,13 @@ class VerificateurTransaction(UtilCertificats):
                 self._charger_fiche(fiche, certs_signataires)
                 enveloppe_certificat = self._identifier_certificat(dict_message)
             else:
+                self._logger.info("Certificat inconnu, requete MQ pour trouver %s" % ci.fingerprint)
+                routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
+                # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
+                self.contexte.generateur_transactions.emettre_commande_noeuds(
+                    dict(),
+                    routing,
+                )
                 raise ci  # On re-souleve l'erreur
 
         self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
@@ -607,6 +614,7 @@ class VerificateurTransaction(UtilCertificats):
         """
 
         fingerprint = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+        self._logger.debug("Identifier certificat transaction, fingerprint %s" % fingerprint)
         verificateur_certificats = self._contexte.verificateur_certificats
 
         enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint)
