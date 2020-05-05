@@ -1214,7 +1214,10 @@ class GestionnaireModulesDocker:
         if not self.__hebergement_actif:
             # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
             path_hebergement = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES, self.__idmg, 'mounts/hebergement')
-            os.mkdir(path_hebergement, mode=0o770)
+            try:
+                os.mkdir(path_hebergement, mode=0o770)
+            except FileExistsError:
+                self.__logger.debug("Repertoire %s existe, ok" % path_hebergement)
             
             # Ajouter modules requis
             modules_requis = set(self.__modules_requis)
