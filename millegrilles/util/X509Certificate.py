@@ -872,37 +872,6 @@ class GenererCeduleur(GenerateurNoeud):
         return builder
 
 
-class GenererPublicateur(GenerateurNoeud):
-    """
-    Publicateur de MilleGrilles
-    """
-
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-
-        exchanges_supportes = [
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
-        ]
-
-        exchanges = (','.join(exchanges_supportes)).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_PUBLICATEUR).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
 class GenererMaitredescles(GenerateurNoeud):
 
     def _get_keyusage(self, builder):

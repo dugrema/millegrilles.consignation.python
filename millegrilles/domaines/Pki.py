@@ -38,7 +38,7 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
             reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_DEMANDE:
-            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
+            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'], properties)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
             reponse = self.gestionnaire.get_certificats_backup()
         else:
@@ -252,7 +252,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         return certs
 
-    def get_certificat(self, fingerprint):
+    def get_certificat(self, fingerprint, properties=None):
         collection_pki = self.document_dao.get_collection(self.get_nom_collection())
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
@@ -261,11 +261,25 @@ class GestionnairePki(GestionnaireDomaineStandard):
         certificat = collection_pki.find_one(filtre)
 
         certificat_filtre = dict()
-        for key, value in certificat.items():
-            if not key.startswith('_'):
-                certificat_filtre[key] = value
+        try:
+            for key, value in certificat.items():
+                if not key.startswith('_'):
+                    certificat_filtre[key] = value
+        except AttributeError:
+            self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint)
+            # Le certificat n'est pas connu, on fait une requete
+            self.demander_certificat_via_mq(fingerprint)
+            certificat_filtre = None  # Aucune reponse avant retour
 
         return certificat_filtre
+
+    def demander_certificat_via_mq(self, fingerprint):
+        routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + fingerprint
+        # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
+        self.generateur_transactions.emettre_commande_noeuds(
+            dict(),
+            routing,
+        )
 
     def get_certificats_backup(self):
         collection_pki = self.document_dao.get_collection(self.get_nom_collection())
@@ -727,6 +741,7 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        correlation_id = properties.correlation_id
         # Pas de verification du contenu - le certificat est sa propre validation via CAs
         # self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
@@ -740,7 +755,8 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
             self.confirmer_certificat(properties, message_dict)
         elif routing_key == 'requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR:
             self.transmettre_certificats_correlation_csr(properties, message_dict)
-
+        elif correlation_id.startswith('certificat'):
+            self.recevoir_certificat(message_dict)
         else:
             raise Exception("Type evenement inconnu: %s" % method.routing_key)
 

@@ -8,6 +8,7 @@ import datetime
 import secrets
 import os
 import tempfile
+import psutil
 
 from threading import Event, Thread, BrokenBarrierError
 from docker.errors import APIError
@@ -125,6 +126,8 @@ class ServiceMonitor:
         self.__gestionnaire_docker: GestionnaireModulesDocker = None
         self.__gestionnaire_mq: GestionnaireComptesMQ = None
         self.__gestionnaire_commandes: GestionnaireCommandes = None
+
+        self.limiter_entretien = True
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -394,11 +397,12 @@ class ServiceMonitor:
         self.__entretien_certificats()
 
     def __entretien_modules(self):
-        # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
-        self.__gestionnaire_docker.entretien_services()
+        if not self.limiter_entretien:
+            # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
+            self.__gestionnaire_docker.entretien_services()
 
-        # Entretien du middleware
-        self.__gestionnaire_mq.entretien()
+            # Entretien du middleware
+            self.__gestionnaire_mq.entretien()
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -416,6 +420,8 @@ class ServiceMonitor:
 
                 try:
                     self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                    self.verifier_load()
 
                     if not self.__connexion_middleware:
                         try:
@@ -436,6 +442,14 @@ class ServiceMonitor:
 
         self.__logger.info("Fermeture du ServiceMonitor")
         self.fermer()
+
+    def verifier_load(self):
+        cpu_load, cpu_load5, cpu_load10 = psutil.getloadavg()
+        if cpu_load > 3.0 or cpu_load5 > 4.0:
+            self.limiter_entretien = True
+            self.__logger.warning("Charge de travail elevee %s / %s, entretien limite" % (cpu_load, cpu_load5))
+        else:
+            self.limiter_entretien = False
 
     @property
     def idmg_tronque(self):
