@@ -146,8 +146,8 @@ class InitialiserServiceMonitor:
         self.__parse()
         self.__connecter_docker()
 
-        config_item = self.__docker.configs.get('millegrille.configuration')
-        if config_item:
+        try:
+            config_item = self.__docker.configs.get('millegrille.configuration')
             configuration = json.loads(b64decode(config_item.attrs['Spec']['Data']))
             self._configuration_json = configuration
             self.__logger.debug("Configuration millegrille : %s" % configuration)
@@ -171,8 +171,8 @@ class InitialiserServiceMonitor:
                 service_monitor_classe = ServiceMonitorPrincipal
             else:
                 raise ValueError("Noeud de type non reconnu")
-        else:
-            self.__logger.debug("Configuration millegrille abstente, on initialise un noeud principal")
+        except docker.errors.NotFound:
+            self.__logger.info("Config millegrille.configuration n'existe pas, on initialise un noeud protege principal")
             service_monitor_classe = ServiceMonitorPrincipal
 
         return service_monitor_classe
@@ -258,7 +258,6 @@ class ServiceMonitor:
 
         self._securite: str = None                              # Niveau de securite de la swarm docker
         self._connexion_middleware: ConnexionMiddleware = None  # Connexion a MQ, MongoDB
-        self._nodename: str = None                              # Node name de la connexion locale dans Docker
         self._idmg: str = None                                  # IDMG de la MilleGrille hote
 
         self._socket_fifo = None  # Socket FIFO pour les commandes
@@ -272,6 +271,8 @@ class ServiceMonitor:
         self._gestionnaire_commandes: GestionnaireCommandes = None
 
         self.limiter_entretien = True
+
+        self._nodename = self._docker.info()['Name']            # Node name de la connexion locale dans Docker
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -355,6 +356,7 @@ class ServiceMonitor:
         self._gestionnaire_commandes.start()
 
     def _charger_configuration(self):
+        classe_configuration = self._classe_configuration()
         try:
             configuration_docker = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
             data = b64decode(configuration_docker.attrs['Spec']['Data'])
@@ -362,16 +364,23 @@ class ServiceMonitor:
             self._idmg = configuration_json[Constantes.CONFIG_IDMG]
             self._securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
 
-            self._gestionnaire_certificats = GestionnaireCertificats(
+            self._gestionnaire_certificats = classe_configuration(
                 self._docker, idmg=self._idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self._args.secrets)
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
         except HTTPError as he:
             if he.status_code == 404:
                 # La configuration n'existe pas
-                self._gestionnaire_certificats = GestionnaireCertificats(self._docker, secrets=self._args.secrets)
+                self._gestionnaire_certificats = classe_configuration(self._docker, secrets=self._args.secrets)
             else:
                 raise he
+
+    def _classe_configuration(self):
+        """
+        Retourne la classe de gestion de certificat
+        :return: Sous-classe de GestionnaireCertificats
+        """
+        raise NotImplementedError()
 
     def __entretien_certificats(self):
         """
@@ -425,7 +434,7 @@ class ServiceMonitor:
             self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
 
             if self._args.dev:
-                self._gestionnaire_certificats.sauvegarder_certificats()
+                self._gestionnaire_certificats.sauvegarder_secrets()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
         self._gestionnaire_docker.start_events()
@@ -444,7 +453,7 @@ class ServiceMonitor:
         self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
         self.__entretien_certificats()
 
-    def __entretien_modules(self):
+    def _entretien_modules(self):
         if not self.limiter_entretien:
             # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
             self._gestionnaire_docker.entretien_services()
@@ -527,7 +536,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
-                    self.__entretien_modules()
+                    self._entretien_modules()
 
                     self.__logger.debug("Fin cycle entretien ServiceMonitor")
                 except Exception:
@@ -540,6 +549,9 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
         self.__logger.info("Fermeture du ServiceMonitor")
         self.fermer()
+
+    def _classe_configuration(self):
+        return GestionnaireCertificatsNoeudProtegePrincipal
 
 
 class ServiceMonitorDependant(ServiceMonitor):
@@ -657,83 +669,81 @@ class ServiceMonitorDependant(ServiceMonitor):
         )
         return info_cle
 
+    def __charger_cle(self):
+        if self._args.dev:
+            path_cle = '/var/opt/millegrilles/pki/servicemonitor.key.pem'
+        else:
+            path_cle = '/run/secrets/pki.monitor.key.pem'
+
+        with open(path_cle, 'rb') as fichier:
+            cle_bytes = fichier.read()
+
 
 class GestionnaireCertificats:
 
     def __init__(self, docker_client: docker.DockerClient, **kwargs):
-        self.__docker = docker_client
-        self.__date: datetime.datetime = None
+        self._docker = docker_client
+        self._date: datetime.datetime = None
         self.idmg = kwargs.get('idmg')
 
         self.certificats = dict()
-        self.__clecert_millegrille: EnveloppeCleCert = None
-        self.__clecert_intermediaire: EnveloppeCleCert = None
+        self._clecert_millegrille: EnveloppeCleCert = None
         self.clecert_monitor: EnveloppeCleCert = None
-        self.__passwd_mongo: str
-        self.__passwd_mq: str
-        self.__passwd_mongoxp: str
 
         self.renouvelleur: RenouvelleurCertificat = None
         self.secret_path = kwargs.get('secrets')
 
         self.maj_date()
 
-        self.__nodename = self.__docker.info()['Name']
+        self._nodename = self._docker.info()['Name']
 
         cert_pem = kwargs.get('millegrille_cert_pem')
         if cert_pem:
-            self.__clecert_millegrille = EnveloppeCleCert()
-            self.__clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
+            self._clecert_millegrille = EnveloppeCleCert()
+            self._clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
 
     def maj_date(self):
-        self.__date = str(datetime.datetime.utcnow().strftime(DOCKER_LABEL_TIME))
+        self._date = str(datetime.datetime.utcnow().strftime(DOCKER_LABEL_TIME))
 
-    def generer_nouveau_idmg(self) -> str:
-        """
-        Generer nouveau trousseau de MilleGrille, incluant cle/cert de MilleGrille, intermediaire et monitor.
-        Insere les entrees de configs et secrets dans docker.
-        :return: idmg
-        """
-        generateur_initial = GenerateurInitial(None)
-        clecert_intermediaire = generateur_initial.generer()
-        clecert_millegrille = generateur_initial.autorite
-
-        self.__clecert_millegrille = clecert_millegrille
-        self.__clecert_intermediaire = clecert_intermediaire
-        self.idmg = clecert_millegrille.idmg
-
-        # Sauvegarder certificats, cles et mots de passe dans docker
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY, clecert_millegrille.private_key_bytes)
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD, clecert_millegrille.password)
-        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT, clecert_millegrille.cert_bytes)
-
-        chaine_certs = '\n'.join(clecert_intermediaire.chaine).encode('utf-8')
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY, clecert_intermediaire.private_key_bytes)
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD, clecert_intermediaire.password)
-        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT, clecert_intermediaire.cert_bytes)
-        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CHAIN, chaine_certs)
-
-        # Conserver la configuration de base pour ServiceMonitor
-        configuration = {
-            Constantes.CONFIG_IDMG: self.idmg,
-            'pem': str(clecert_millegrille.cert_bytes, 'utf-8'),
-            Constantes.DOCUMENT_INFODOC_SECURITE: '3.protege',
+    def __preparer_label(self, name):
+        params = {
+            'idmg_tronque': self.idmg[0:12],
+            'name': name,
+            'date': self._date,
         }
-        configuration_bytes = json.dumps(configuration).encode('utf-8')
-        self.__docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
+        name_docker = '%(idmg_tronque)s.%(name)s.%(date)s' % params
+        return name_docker[0:64]  # Max 64 chars pour name docker
 
-        # Initialiser le renouvelleur de certificats avec le nouveau trousseau
-        self.__charger_renouvelleur()
+    def ajouter_config(self, name: str, data: bytes):
+        name_tronque = self.__preparer_label(name)
+        self._docker.configs.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
 
-        # Generer certificat pour monitor
-        self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self.__nodename)
+    def ajouter_secret(self, name: str, data: bytes):
+        name_tronque = self.__preparer_label(name)
+        self._docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
 
-        # Generer mots de passes
-        self.generer_motsdepasse()
+    @property
+    def idmg_tronque(self):
+        return self.idmg[0:12]
 
-        self.preparer_repertoires()
+    def sauvegarder_secrets(self):
+        raise NotImplementedError()
 
-        return self.idmg
+    def charger_certificats(self):
+        raise NotImplementedError()
+
+    def generer_nouveau_idmg(self):
+        raise NotImplementedError()
+
+    def generer_clecert_module(self, role: str, node_name: str) -> EnveloppeCleCert:
+        raise NotImplementedError()
+
+
+class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
+
+    def __init__(self, docker_client: docker.DockerClient, **kwargs):
+        super().__init__(docker_client, **kwargs)
+        self._passwd_mq: str
 
     def generer_motsdepasse(self):
         """
@@ -741,30 +751,67 @@ class GestionnaireCertificats:
         :return:
         """
 
-        passwd_mongo = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
-        self.__passwd_mongo = str(passwd_mongo, 'utf-8')
-        label_passwd_mongo = self.idmg_tronque + '.passwd.mongo.' + self.__date
-        self.__docker.secrets.create(name=label_passwd_mongo, data=passwd_mongo, labels={'millegrille': self.idmg})
-
         passwd_mq = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
-        self.__passwd_mq = str(passwd_mq, 'utf-8')
-        label_passwd_mq = self.idmg_tronque + '.passwd.mq.' + self.__date
-        self.__docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
+        self._passwd_mq = str(passwd_mq, 'utf-8')
+        label_passwd_mq = self.idmg_tronque + '.passwd.mq.' + self._date
+        self._docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
+
+    def sauvegarder_secrets(self):
+        """
+        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
+        :return:
+        """
+        secret_path = path.abspath(self.secret_path)
+
+        # S'assurer que le repertoire existe
+        os.makedirs(secret_path, mode=0o700, exist_ok=True)
+
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'w') as fichiers:
+            fichiers.write(self._passwd_mq)
+
+
+class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudPrive):
+
+    def __init__(self, docker_client: docker.DockerClient, **kwargs):
+        super().__init__(docker_client, **kwargs)
+        self._passwd_mongo: str
+        self._passwd_mongoxp: str
+
+    def generer_motsdepasse(self):
+        """
+        Genere les mots de passes pour composants internes de middleware
+        :return:
+        """
+        super().generer_motsdepasse()
+        passwd_mongo = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
+        self._passwd_mongo = str(passwd_mongo, 'utf-8')
+        label_passwd_mongo = self.idmg_tronque + '.passwd.mongo.' + self._date
+        self._docker.secrets.create(name=label_passwd_mongo, data=passwd_mongo, labels={'millegrille': self.idmg})
 
         passwd_mongoxpweb = b64encode(secrets.token_bytes(24)).replace(b'=', b'')
-        self.__passwd_mongoxp = str(passwd_mongoxpweb, 'utf-8')
-        label_passwd_mongoxp = self.idmg_tronque + '.passwd.mongoxpweb.' + self.__date
-        self.__docker.secrets.create(name=label_passwd_mongoxp, data=passwd_mongoxpweb, labels={'millegrille': self.idmg})
+        self._passwd_mongoxp = str(passwd_mongoxpweb, 'utf-8')
+        label_passwd_mongoxp = self.idmg_tronque + '.passwd.mongoxpweb.' + self._date
+        self._docker.secrets.create(name=label_passwd_mongoxp, data=passwd_mongoxpweb, labels={'millegrille': self.idmg})
 
-    def preparer_repertoires(self):
-        mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
-        os.makedirs(mounts, mode=0o770)
+    def sauvegarder_secrets(self):
+        """
+        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
+        :return:
+        """
+        super().sauvegarder_secrets()
+        secret_path = path.abspath(self.secret_path)
 
-        mongo_data = path.join(mounts, 'mongo/data')
-        os.makedirs(mongo_data, mode=0o700)
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'w') as fichiers:
+            fichiers.write(self._passwd_mongo)
+        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE), 'w') as fichiers:
+            fichiers.write(self._passwd_mongoxp)
 
-        mongo_scripts = path.join(mounts, 'consignation/torrents/downloads')
-        os.makedirs(mongo_scripts, mode=0o770)
+
+class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudProtegeDependant):
+
+    def __init__(self, docker_client: docker.DockerClient, **kwargs):
+        super().__init__(docker_client, **kwargs)
+        self._clecert_intermediaire: EnveloppeCleCert = None
 
     def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
         clecert = self.renouvelleur.renouveller_par_role(role, common_name)
@@ -784,41 +831,23 @@ class GestionnaireCertificats:
 
         return clecert
 
-    def sauvegarder_certificats(self):
+    def sauvegarder_secrets(self):
         """
         Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
         :return:
         """
+        super().sauvegarder_secrets()
         secret_path = path.abspath(self.secret_path)
-
-        # S'assurer que le repertoire existe
-        os.makedirs(secret_path, mode=0o700, exist_ok=True)
 
         # Sauvegarder information certificat intermediaire
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.__clecert_intermediaire.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.__clecert_intermediaire.cert_bytes)
+            fichiers.write(self._clecert_intermediaire.private_key_bytes)
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.__clecert_intermediaire.password)
-
-        # Sauvegarder information certificat CA (millegrille)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.__clecert_millegrille.cert_bytes)
+            fichiers.write(self._clecert_intermediaire.password)
 
         # Sauvegarder information certificat monitor
-        chaine_monitor = '\n'.join(self.clecert_monitor.chaine)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_CERT + '.pem'), 'w') as fichiers:
-            fichiers.write(chaine_monitor)
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.private_key_bytes)
-
-        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'w') as fichiers:
-            fichiers.write(self.__passwd_mongo)
-        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'w') as fichiers:
-            fichiers.write(self.__passwd_mq)
-        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE), 'w') as fichiers:
-            fichiers.write(self.__passwd_mongoxp)
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
@@ -834,7 +863,7 @@ class GestionnaireCertificats:
         clecert_intermediaire = EnveloppeCleCert()
         clecert_intermediaire.from_pem_bytes(key_pem, cert_pem, passwd_bytes)
         clecert_intermediaire.password = None  # Effacer mot de passe
-        self.__clecert_intermediaire = clecert_intermediaire
+        self._clecert_intermediaire = clecert_intermediaire
 
         # Charger information certificat monitor
         cert_pem = self.__charger_certificat_docker('pki.monitor.cert')
@@ -845,9 +874,9 @@ class GestionnaireCertificats:
         self.clecert_monitor = clecert_monitor
 
         with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
-            self.__passwd_mongo = fichiers.read()
+            self._passwd_mongo = fichiers.read()
         with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
-            self.__passwd_mq = fichiers.read()
+            self._passwd_mq = fichiers.read()
 
         # Charger le certificat de millegrille, chaine pour intermediaire
         self.__charger_certificat_docker('pki.intermediaire.chain')
@@ -862,7 +891,7 @@ class GestionnaireCertificats:
         :param nom_certificat:
         :return: Contenu du certificat en PEM
         """
-        cert = GestionnaireModulesDocker.trouver_config(nom_certificat, self.idmg_tronque, self.__docker)['config']
+        cert = GestionnaireModulesDocker.trouver_config(nom_certificat, self.idmg_tronque, self._docker)['config']
         cert_pem = b64decode(cert.attrs['Spec']['Data'])
         fp, fichier_cert = tempfile.mkstemp(dir='/tmp')
         try:
@@ -875,32 +904,69 @@ class GestionnaireCertificats:
 
     def __charger_renouvelleur(self):
         dict_ca = {
-            self.__clecert_intermediaire.skid: self.__clecert_intermediaire.cert,
-            self.__clecert_millegrille.skid: self.__clecert_millegrille.cert,
+            self._clecert_intermediaire.skid: self._clecert_intermediaire.cert,
+            self._clecert_millegrille.skid: self._clecert_millegrille.cert,
         }
 
-        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self.__clecert_intermediaire, generer_password=False)
+        self.renouvelleur = RenouvelleurCertificat(self.idmg, dict_ca, self._clecert_intermediaire, generer_password=False)
 
-    def __preparer_label(self, name):
-        params = {
-            'idmg_tronque': self.idmg[0:12],
-            'name': name,
-            'date': self.__date,
+    def preparer_repertoires(self):
+        mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
+        os.makedirs(mounts, mode=0o770)
+
+        mongo_data = path.join(mounts, 'mongo/data')
+        os.makedirs(mongo_data, mode=0o700)
+
+        mongo_scripts = path.join(mounts, 'consignation/torrents/downloads')
+        os.makedirs(mongo_scripts, mode=0o770)
+
+    def generer_nouveau_idmg(self) -> str:
+        """
+        Generer nouveau trousseau de MilleGrille, incluant cle/cert de MilleGrille, intermediaire et monitor.
+        Insere les entrees de configs et secrets dans docker.
+        :return: idmg
+        """
+        generateur_initial = GenerateurInitial(None)
+        clecert_intermediaire = generateur_initial.generer()
+        clecert_millegrille = generateur_initial.autorite
+
+        self._clecert_millegrille = clecert_millegrille
+        self._clecert_intermediaire = clecert_intermediaire
+        self.idmg = clecert_millegrille.idmg
+
+        # Preparer repertoires locaux pour le noeud
+        self.preparer_repertoires()
+
+        # Conserver la configuration de base pour ServiceMonitor
+        configuration = {
+            Constantes.CONFIG_IDMG: self.idmg,
+            'pem': str(clecert_millegrille.cert_bytes, 'utf-8'),
+            Constantes.DOCUMENT_INFODOC_SECURITE: '3.protege',
         }
-        name_docker = '%(idmg_tronque)s.%(name)s.%(date)s' % params
-        return name_docker[0:64]  # Max 64 chars pour name docker
+        configuration_bytes = json.dumps(configuration).encode('utf-8')
+        self._docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
 
-    def ajouter_config(self, name: str, data: bytes):
-        name_tronque = self.__preparer_label(name)
-        self.__docker.configs.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+        # Sauvegarder certificats, cles et mots de passe dans docker
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY, clecert_millegrille.private_key_bytes)
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD, clecert_millegrille.password)
+        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT, clecert_millegrille.cert_bytes)
 
-    def ajouter_secret(self, name: str, data: bytes):
-        name_tronque = self.__preparer_label(name)
-        self.__docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+        chaine_certs = '\n'.join(clecert_intermediaire.chaine).encode('utf-8')
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY, clecert_intermediaire.private_key_bytes)
+        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD, clecert_intermediaire.password)
+        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT, clecert_intermediaire.cert_bytes)
+        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CHAIN, chaine_certs)
 
-    @property
-    def idmg_tronque(self):
-        return self.idmg[0:12]
+        # Initialiser le renouvelleur de certificats avec le nouveau trousseau
+        self.__charger_renouvelleur()
+
+        # Generer certificat pour monitor
+        self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self._nodename)
+
+        # Generer mots de passes
+        self.generer_motsdepasse()
+
+        return self.idmg
 
 
 class TraitementMessages(BaseCallback):
@@ -1050,15 +1116,17 @@ class ConnexionMiddleware:
         self.__monitor_keycert_file = monitor_keycert_file
         os.close(keycert)
 
+        node_name = self.__docker.info()['Name']
+
         additionnals = [{
-            'MG_MQ_HOST': 'mg-dev3',
+            'MG_MQ_HOST': node_name,
             'MG_MQ_PORT': 5673,
             'MG_MQ_CA_CERTS': ca_certs_file,
             'MG_MQ_CERTFILE': monitor_cert_file,
             'MG_MQ_KEYFILE': monitor_key_file,
             'MG_MQ_SSL': 'on',
             'MG_MQ_AUTH_CERT': 'on',
-            'MG_MONGO_HOST': 'mg-dev3',
+            'MG_MONGO_HOST': node_name,
             'MG_MONGO_USERNAME': 'admin',
             'MG_MONGO_PASSWORD': mongo_passwd,
             'MG_MONGO_AUTHSOURCE': 'admin',
@@ -1526,6 +1594,7 @@ class GestionnaireModulesDocker:
                 return {
                     'secret_id': secret.attrs['ID'],
                     'secret_name': secret.name,
+                    'date': date_secret,
                 }
 
             except KeyError:
@@ -1650,10 +1719,13 @@ class GestionnaireModulesDocker:
                         secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
                     else:
                         secret_reference = self.trouver_secret(secret_name)
+
                     secret_reference['filename'] = secret['filename']
                     secret_reference['uid'] = secret.get('uid') or 0
                     secret_reference['gid'] = secret.get('gid') or 0
                     secret_reference['mode'] = secret.get('mode') or 0o444
+
+                    del secret_reference['date']  # Cause probleme lors du chargement du secret
                     liste_secrets.append(SecretReference(**secret_reference))
 
                 dict_config_docker['secrets'] = liste_secrets
