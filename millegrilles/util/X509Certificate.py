@@ -42,6 +42,7 @@ class ConstantesGenerateurCertificat:
     ROLE_NGINX = 'vitrineweb'
     ROLE_CONNECTEUR = 'connecteur'
     ROLE_MONITOR = 'monitor'
+    ROLE_MONITOR_DEPENDANT = 'monitor_dependant'
     ROLE_CONNECTEUR_TIERS = 'tiers'
     ROLE_BACKUP = 'backup'
     ROLE_HEBERGEMENT = 'hebergement'
@@ -991,7 +992,7 @@ class GenererConnecteur(GenerateurNoeud):
 
 class GenererMonitor(GenerateurNoeud):
     """
-    Generateur de certificats pour le monitor de services
+    Generateur de certificats pour le monitor de noeud protege principal
     """
 
     def _get_keyusage(self, builder):
@@ -1012,6 +1013,37 @@ class GenererMonitor(GenerateurNoeud):
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ConstantesGenerateurCertificat.ROLE_MONITOR.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
+class GenererMonitorDependant(GenerateurNoeud):
+    """
+    Generateur de certificats pour le monitor de services
+    """
+
+    def _get_keyusage(self, builder):
+        builder = super()._get_keyusage(builder)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+
+        exchanges = ','.join([
+            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
+            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE
+        ]).encode('utf-8')
+
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT.encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1596,9 +1628,13 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
-            ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,
 
+            # Monitors de service pour noeuds middleware
+            ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
+            ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT: GenererMonitorDependant,
+
+            # Hebergement
+            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS: GenererHebergementTransactions,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES: GenererHebergementDomaines,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES: GenererHebergementMaitredescles,
@@ -1657,15 +1693,23 @@ class RenouvelleurCertificat:
         return clecert
 
     def signer_noeud(self, csr_bytes: bytes, domaines: list = None):
-        generateur = GenerateurCertificateNoeud(self.__idmg, domaines, self.__dict_ca, self.__millegrille)
-
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
 
-        certificat = generateur.signer(csr)
-        chaine = generateur.aligner_chaine(certificat)
-
-        clecert = EnveloppeCleCert(cert=certificat)
-        clecert.chaine = chaine
+        if domaines is not None:
+            generateur = GenerateurCertificateNoeud(self.__idmg, domaines, self.__dict_ca, self.__millegrille)
+            certificat = generateur.signer(csr)
+            chaine = generateur.aligner_chaine(certificat)
+            clecert = EnveloppeCleCert(cert=certificat)
+            clecert.chaine = chaine
+        else:
+            # Verifier si on peut trouver un generateur de certificat
+            sujet = csr.subject
+            sujet_dict = dict()
+            for elem in sujet:
+                sujet_dict[elem.oid._name] = elem.value
+            role = sujet_dict['organizationalUnitName']
+            common_name = sujet_dict['commonName']
+            clecert = self.renouveller_par_role(role, common_name)
 
         return clecert
 
