@@ -21,6 +21,8 @@ from requests.exceptions import SSLError
 from pymongo.errors import OperationFailure, DuplicateKeyError
 from json.decoder import JSONDecodeError
 from cryptography import x509
+from cryptography.hazmat.primitives import asymmetric, hashes, serialization
+from cryptography.hazmat.backends import default_backend
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -35,105 +37,18 @@ from millegrilles.dao.MessageDAO import BaseCallback
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
+DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
-
-class ServiceMonitor:
-    """
-    Service deploye dans un swarm docker en mode global qui s'occupe du deploiement des autres modules de la
-    MilleGrille et du renouvellement des certificats. S'occupe de configurer les comptes RabbitMQ et MongoDB.
-
-    Supporte aussi les MilleGrilles hebergees par l'hote.
-    """
-
-    DICT_MODULES = {
-        ConstantesServiceMonitor.MODULE_MQ: {
-            'nom': ConstantesServiceMonitor.MODULE_MQ,
-            'role': ConstantesGenerateurCertificat.ROLE_MQ,
-        },
-        ConstantesServiceMonitor.MODULE_MONGO: {
-            'nom': ConstantesServiceMonitor.MODULE_MONGO,
-            'role': ConstantesGenerateurCertificat.ROLE_MONGO,
-        },
-        ConstantesServiceMonitor.MODULE_TRANSACTION: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-        },
-        ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-        },
-        # ConstantesServiceMonitor.MODULE_CEDULEUR: {
-        #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-        #     'role': ConstantesGenerateurCertificat.ROLE_CEDULEUR,
-        # },
-        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
-            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
-        },
-        ConstantesServiceMonitor.MODULE_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
-        },
-        ConstantesServiceMonitor.MODULE_TRANSMISSION: {
-            'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION,
-        },
-        ConstantesServiceMonitor.MODULE_DOMAINES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-        },
-        ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
-            'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
-            'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
-            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
-        },
-    }
+class InitialiserServiceMonitor:
 
     def __init__(self):
-        self.__logger = logging.getLogger('%s' % self.__class__.__name__)
+        self.__docker: docker.DockerClient = None  # Client docker
+        self.__args = None
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-        self.__securite: str = None                              # Niveau de securite de la swarm docker
-        self.__args = None                                       # Arguments de la ligne de commande
-        self.__connexion_middleware: ConnexionMiddleware = None  # Connexion a MQ, MongoDB
-        self.__docker: docker.DockerClient = None                # Client docker
-        self.__nodename: str = None                              # Node name de la connexion locale dans Docker
-        self.__idmg: str = None                                  # IDMG de la MilleGrille hote
+        self._configuration_json = None
 
-        self.__socket_fifo = None  # Socket FIFO pour les commandes
-
-        self.__fermeture_event = Event()
-        self.__attente_event = Event()
-
-        self.__gestionnaire_certificats: GestionnaireCertificats = None
-        self.__gestionnaire_docker: GestionnaireModulesDocker = None
-        self.__gestionnaire_mq: GestionnaireComptesMQ = None
-        self.__gestionnaire_commandes: GestionnaireCommandes = None
-
-        self.limiter_entretien = True
-
-        # Gerer les signaux OS, permet de deconnecter les ressources au besoin
-        signal.signal(signal.SIGINT, self.fermer)
-        signal.signal(signal.SIGTERM, self.fermer)
-
-    def parse(self):
+    def __parse(self):
         parser = argparse.ArgumentParser(description="Service Monitor de MilleGrilles")
 
         parser.add_argument(
@@ -198,86 +113,7 @@ class ServiceMonitor:
             logging.getLogger('__main__').setLevel(logging.INFO)
             logging.getLogger('millegrilles').setLevel(logging.INFO)
 
-        self.__securite = self.__args.securite
-
         self.__logger.info("Arguments: %s", self.__args)
-
-    def fermer(self, signum=None, frame=None):
-        if signum:
-            self.__logger.warning("Fermeture ServiceMonitor, signum=%d", signum)
-        if not self.__fermeture_event.is_set():
-            self.__fermeture_event.set()
-            self.__attente_event.set()
-
-            try:
-                self.__connexion_middleware.stop()
-            except Exception:
-                pass
-
-            try:
-                self.__docker.close()
-            except Exception:
-                pass
-
-            try:
-                self.__gestionnaire_docker.fermer()
-            except Exception:
-                pass
-
-            # Cleanup fichiers temporaires de certificats/cles
-            try:
-                for fichier in self.__gestionnaire_certificats.certificats.values():
-                    os.remove(fichier)
-            except Exception:
-                pass
-
-            try:
-                self.__gestionnaire_commandes.stop()
-            except Exception:
-                self.__logger.exception("Erreur fermeture gestionnaire commandes")
-
-            try:
-                os.remove(PATH_FIFO)
-            except Exception:
-                pass
-
-    def connecter_middleware(self):
-        """
-        Genere un contexte et se connecte a MQ et MongoDB.
-        Lance une thread distincte pour s'occuper des messages.
-        :return:
-        """
-        configuration = TransactionConfiguration()
-
-        self.__connexion_middleware = ConnexionMiddleware(
-            configuration, self.__docker, self, self.__gestionnaire_certificats.certificats,
-            secrets=self.__args.secrets)
-
-        try:
-            self.__connexion_middleware.initialiser()
-            self.__connexion_middleware.start()
-        except BrokenBarrierError:
-            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
-            self.__connexion_middleware.stop()
-            self.__connexion_middleware = None
-
-    def preparer_gestionnaire_certificats(self):
-        mode_insecure = self.__args.dev
-        path_secrets = self.__args.secrets
-        self.__gestionnaire_mq = GestionnaireComptesMQ(
-            self.__idmg, self.__gestionnaire_certificats.clecert_monitor, self.__gestionnaire_certificats.certificats,
-            host=self.__nodename, secrets=path_secrets, insecure=mode_insecure
-        )
-
-    def preparer_gestionnaire_commandes(self):
-        try:
-            os.mkfifo(PATH_FIFO)
-        except FileExistsError:
-            self.__logger.debug("Pipe %s deja cree", PATH_FIFO)
-
-        os.chmod(PATH_FIFO, 0o620)
-        self.__gestionnaire_commandes = GestionnaireCommandes(self.__fermeture_event, self)
-        self.__gestionnaire_commandes.start()
 
     def __connecter_docker(self):
         self.__docker = docker.DockerClient('unix://' + self.__args.docker)
@@ -306,22 +142,234 @@ class ServiceMonitor:
 
         self.__logger.debug("--------------")
 
-    def __charger_configuration(self):
+    def detecter_type_noeud(self):
+        self.__parse()
+        self.__connecter_docker()
+
+        config_item = self.__docker.configs.get('millegrille.configuration')
+        if config_item:
+            configuration = json.loads(b64decode(config_item.attrs['Spec']['Data']))
+            self._configuration_json = configuration
+            self.__logger.debug("Configuration millegrille : %s" % configuration)
+
+            specialisation = configuration.get('specialisation')
+            securite = configuration.get('securite')
+            if securite == '1.public':
+                self.__logger.error("Noeud public, non supporte")
+                raise ValueError("Noeud de type non reconnu")
+            elif securite == '2.prive':
+                self.__logger.error("Noeud prive, non supporte")
+                raise ValueError("Noeud de type non reconnu")
+            elif securite == '3.protege' and specialisation == 'dependant':
+                service_monitor_classe = ServiceMonitorDependant
+            elif securite == '3.protege' and specialisation == 'extension':
+                self.__logger.error("Noeud d'extension, non supporte")
+                raise ValueError("Noeud de type non reconnu")
+            elif securite == '3.protege' and specialisation == 'principal':
+                service_monitor_classe = ServiceMonitorPrincipal
+            elif securite == '3.protege':
+                service_monitor_classe = ServiceMonitorPrincipal
+            else:
+                raise ValueError("Noeud de type non reconnu")
+        else:
+            self.__logger.debug("Configuration millegrille abstente, on initialise un noeud principal")
+            service_monitor_classe = ServiceMonitorPrincipal
+
+        return service_monitor_classe
+
+    def demarrer(self):
+        class_noeud = self.detecter_type_noeud()
+        service_monitor = class_noeud(self.__args, self.__docker, self._configuration_json)
+        service_monitor.run()
+
+
+class ServiceMonitor:
+    """
+    Service deploye dans un swarm docker en mode global qui s'occupe du deploiement des autres modules de la
+    MilleGrille et du renouvellement des certificats. S'occupe de configurer les comptes RabbitMQ et MongoDB.
+
+    Supporte aussi les MilleGrilles hebergees par l'hote.
+    """
+
+    DICT_MODULES = {
+        ConstantesServiceMonitor.MODULE_MQ: {
+            'nom': ConstantesServiceMonitor.MODULE_MQ,
+            'role': ConstantesGenerateurCertificat.ROLE_MQ,
+        },
+        ConstantesServiceMonitor.MODULE_MONGO: {
+            'nom': ConstantesServiceMonitor.MODULE_MONGO,
+            'role': ConstantesGenerateurCertificat.ROLE_MONGO,
+        },
+        ConstantesServiceMonitor.MODULE_TRANSACTION: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+        },
+        ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+        },
+        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
+            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
+        },
+        ConstantesServiceMonitor.MODULE_COUPDOEIL: {
+            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+        },
+        ConstantesServiceMonitor.MODULE_TRANSMISSION: {
+            'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION,
+        },
+        ConstantesServiceMonitor.MODULE_DOMAINES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        },
+        ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
+            'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
+            'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
+            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
+            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
+        },
+    }
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self._args = args                                       # Arguments de la ligne de commande
+        self._docker: docker.DockerClient = docker_client       # Client docker
+        self._configuration_json = configuration_json           # millegrille.configuration dans docker
+
+        self._securite: str = None                              # Niveau de securite de la swarm docker
+        self._connexion_middleware: ConnexionMiddleware = None  # Connexion a MQ, MongoDB
+        self._nodename: str = None                              # Node name de la connexion locale dans Docker
+        self._idmg: str = None                                  # IDMG de la MilleGrille hote
+
+        self._socket_fifo = None  # Socket FIFO pour les commandes
+
+        self._fermeture_event = Event()
+        self._attente_event = Event()
+
+        self._gestionnaire_certificats: GestionnaireCertificats = None
+        self._gestionnaire_docker: GestionnaireModulesDocker = None
+        self._gestionnaire_mq: GestionnaireComptesMQ = None
+        self._gestionnaire_commandes: GestionnaireCommandes = None
+
+        self.limiter_entretien = True
+
+        # Gerer les signaux OS, permet de deconnecter les ressources au besoin
+        signal.signal(signal.SIGINT, self.fermer)
+        signal.signal(signal.SIGTERM, self.fermer)
+
+    def fermer(self, signum=None, frame=None):
+        if signum:
+            self.__logger.warning("Fermeture ServiceMonitor, signum=%d", signum)
+        if not self._fermeture_event.is_set():
+            self._fermeture_event.set()
+            self._attente_event.set()
+
+            try:
+                self._connexion_middleware.stop()
+            except Exception:
+                pass
+
+            try:
+                self._docker.close()
+            except Exception:
+                pass
+
+            try:
+                self._gestionnaire_docker.fermer()
+            except Exception:
+                pass
+
+            # Cleanup fichiers temporaires de certificats/cles
+            try:
+                for fichier in self._gestionnaire_certificats.certificats.values():
+                    os.remove(fichier)
+            except Exception:
+                pass
+
+            try:
+                self._gestionnaire_commandes.stop()
+            except Exception:
+                self.__logger.exception("Erreur fermeture gestionnaire commandes")
+
+            try:
+                os.remove(PATH_FIFO)
+            except Exception:
+                pass
+
+    def connecter_middleware(self):
+        """
+        Genere un contexte et se connecte a MQ et MongoDB.
+        Lance une thread distincte pour s'occuper des messages.
+        :return:
+        """
+        configuration = TransactionConfiguration()
+
+        self._connexion_middleware = ConnexionMiddleware(
+            configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+            secrets=self._args.secrets)
+
         try:
-            configuration_docker = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
+            self._connexion_middleware.initialiser()
+            self._connexion_middleware.start()
+        except BrokenBarrierError:
+            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+            self._connexion_middleware.stop()
+            self._connexion_middleware = None
+
+    def preparer_gestionnaire_certificats(self):
+        mode_insecure = self._args.dev
+        path_secrets = self._args.secrets
+        self._gestionnaire_mq = GestionnaireComptesMQ(
+            self._idmg, self._gestionnaire_certificats.clecert_monitor, self._gestionnaire_certificats.certificats,
+            host=self._nodename, secrets=path_secrets, insecure=mode_insecure
+        )
+
+    def preparer_gestionnaire_commandes(self):
+        try:
+            os.mkfifo(PATH_FIFO)
+        except FileExistsError:
+            self.__logger.debug("Pipe %s deja cree", PATH_FIFO)
+
+        os.chmod(PATH_FIFO, 0o620)
+        self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
+        self._gestionnaire_commandes.start()
+
+    def _charger_configuration(self):
+        try:
+            configuration_docker = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
             data = b64decode(configuration_docker.attrs['Spec']['Data'])
             configuration_json = json.loads(data)
-            self.__idmg = configuration_json[Constantes.CONFIG_IDMG]
-            self.__securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
+            self._idmg = configuration_json[Constantes.CONFIG_IDMG]
+            self._securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
 
-            self.__gestionnaire_certificats = GestionnaireCertificats(
-                self.__docker, idmg=self.__idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self.__args.secrets)
+            self._gestionnaire_certificats = GestionnaireCertificats(
+                self._docker, idmg=self._idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self._args.secrets)
 
-            self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self.__idmg, self.__securite)
+            self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
         except HTTPError as he:
             if he.status_code == 404:
                 # La configuration n'existe pas
-                self.__gestionnaire_certificats = GestionnaireCertificats(self.__docker, secrets=self.__args.secrets)
+                self._gestionnaire_certificats = GestionnaireCertificats(self._docker, secrets=self._args.secrets)
             else:
                 raise he
 
@@ -331,7 +379,7 @@ class ServiceMonitor:
         :return:
         """
         # MAJ date pour creation de certificats
-        self.__gestionnaire_certificats.maj_date()
+        self._gestionnaire_certificats.maj_date()
 
         prefixe_certificats = self.idmg_tronque + '.pki.'
         filtre = {'name': prefixe_certificats}
@@ -343,7 +391,7 @@ class ServiceMonitor:
 
         # Charger la configuration existante
         date_renouvellement = datetime.datetime.utcnow() + datetime.timedelta(days=21)
-        for config in self.__docker.configs.list(filters=filtre):
+        for config in self._docker.configs.list(filters=filtre):
             self.__logger.debug("Config : %s", str(config))
             nom_config = config.name.split('.')
             nom_role = nom_config[2]
@@ -367,81 +415,45 @@ class ServiceMonitor:
         for nom_role, info_role in roles.items():
             if not info_role.get('expiration') or info_role.get('est_expire'):
                 self.__logger.debug("Generer nouveau certificat role %s", nom_role)
-                self.__gestionnaire_certificats.generer_clecert_module(nom_role, self.__nodename)
+                self._gestionnaire_certificats.generer_clecert_module(nom_role, self._nodename)
 
     def configurer_millegrille(self):
-        besoin_initialiser = not self.__idmg
+        besoin_initialiser = not self._idmg
 
         if besoin_initialiser:
             # Generer certificat de MilleGrille
-            self.__idmg = self.__gestionnaire_certificats.generer_nouveau_idmg()
+            self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
 
-            if self.__args.dev:
-                self.__gestionnaire_certificats.sauvegarder_certificats()
+            if self._args.dev:
+                self._gestionnaire_certificats.sauvegarder_certificats()
 
-        self.__gestionnaire_docker = GestionnaireModulesDocker(self.__idmg, self.__docker, self.__fermeture_event)
-        self.__gestionnaire_docker.start_events()
-        self.__gestionnaire_docker.add_event_listener(self)
+        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
+        self._gestionnaire_docker.start_events()
+        self._gestionnaire_docker.add_event_listener(self)
 
         if besoin_initialiser:
-            self.__gestionnaire_docker.initialiser_millegrille()
+            self._gestionnaire_docker.initialiser_millegrille()
 
-            if not self.__args.dev:
+            if not self._args.dev:
                 # Modifier service docker du service monitor pour ajouter secrets
-                self.__gestionnaire_docker.configurer_monitor()
+                self._gestionnaire_docker.configurer_monitor()
                 self.fermer()  # Fermer le monitor, va forcer un redemarrage du service
                 raise Exception("Redemarrage")
 
         # Generer certificats de module manquants ou expires, avec leur cle
-        self.__gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
+        self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
         self.__entretien_certificats()
 
     def __entretien_modules(self):
         if not self.limiter_entretien:
             # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
-            self.__gestionnaire_docker.entretien_services()
+            self._gestionnaire_docker.entretien_services()
 
             # Entretien du middleware
-            self.__gestionnaire_mq.entretien()
+            self._gestionnaire_mq.entretien()
 
     def run(self):
-        self.__logger.info("Demarrage du ServiceMonitor")
-
-        try:
-            self.parse()
-            self.__connecter_docker()
-            self.__charger_configuration()
-            self.configurer_millegrille()
-            self.preparer_gestionnaire_certificats()
-            self.preparer_gestionnaire_commandes()
-
-            while not self.__fermeture_event.is_set():
-                self.__attente_event.clear()
-
-                try:
-                    self.__logger.debug("Cycle entretien ServiceMonitor")
-
-                    self.verifier_load()
-
-                    if not self.__connexion_middleware:
-                        try:
-                            self.connecter_middleware()
-                        except BrokenBarrierError:
-                            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
-
-                    self.__entretien_modules()
-
-                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
-                except Exception:
-                    self.__logger.exception("ServiceMonitor: erreur generique")
-                finally:
-                    self.__attente_event.wait(30)
-
-        except Exception:
-            self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
-
-        self.__logger.info("Fermeture du ServiceMonitor")
-        self.fermer()
+        raise NotImplementedError()
 
     def verifier_load(self):
         cpu_load, cpu_load5, cpu_load10 = psutil.getloadavg()
@@ -453,34 +465,197 @@ class ServiceMonitor:
 
     @property
     def idmg_tronque(self):
-        return self.__idmg[0:12]
+        return self._idmg[0:12]
 
     def event(self, event):
         event_json = json.loads(event)
         if event_json.get('Type') == 'container':
             if event_json.get('Action') == 'start' and event_json.get('status') == 'start':
                 self.__logger.debug("Container demarre: %s", event_json)
-                self.__attente_event.set()
+                self._attente_event.set()
 
     @property
     def gestionnaire_mq(self):
-        return self.__gestionnaire_mq
+        return self._gestionnaire_mq
 
     @property
     def gestionnaire_mongo(self):
-        return self.__connexion_middleware.get_gestionnaire_comptes_mongo
+        return self._connexion_middleware.get_gestionnaire_comptes_mongo
 
     @property
     def gestionnaire_docker(self):
-        return self.__gestionnaire_docker
+        return self._gestionnaire_docker
 
     @property
     def gestionnaire_commandes(self):
-        return self.__gestionnaire_commandes
+        return self._gestionnaire_commandes
 
     @property
     def generateur_transactions(self):
-        return self.__connexion_middleware.generateur_transactions
+        return self._connexion_middleware.generateur_transactions
+
+
+class ServiceMonitorPrincipal(ServiceMonitor):
+    """
+    ServiceMonitor pour noeud protege principal
+    """
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        super().__init__(args, docker_client, configuration_json)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def run(self):
+        self.__logger.info("Demarrage du ServiceMonitor")
+
+        try:
+            self._charger_configuration()
+            self.configurer_millegrille()
+            self.preparer_gestionnaire_certificats()
+            self.preparer_gestionnaire_commandes()
+
+            while not self._fermeture_event.is_set():
+                self._attente_event.clear()
+
+                try:
+                    self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                    self.verifier_load()
+
+                    if not self._connexion_middleware:
+                        try:
+                            self.connecter_middleware()
+                        except BrokenBarrierError:
+                            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+
+                    self.__entretien_modules()
+
+                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                except Exception:
+                    self.__logger.exception("ServiceMonitor: erreur generique")
+                finally:
+                    self._attente_event.wait(30)
+
+        except Exception:
+            self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
+
+        self.__logger.info("Fermeture du ServiceMonitor")
+        self.fermer()
+
+
+class ServiceMonitorDependant(ServiceMonitor):
+    """
+    ServiceMonitor pour noeud protege dependant
+    """
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        super().__init__(args, docker_client, configuration_json)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def run(self):
+        self.__logger.debug("Execution noeud dependant")
+        self._charger_configuration()
+        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
+        self._gestionnaire_docker.start_events()
+        self._gestionnaire_docker.add_event_listener(self)
+
+        methode_run = self.__determiner_type_run()
+        methode_run()  # Excuter run
+
+    def __determiner_type_run(self):
+        # Verifier si le certificat de millegrille a ete charge
+        try:
+            info_cert_millegrille = self.gestionnaire_docker.trouver_config(
+                'pki.millegrille.cert', self.idmg_tronque, self._docker)
+            self.__logger.debug("Cert millegrille deja charge, date %s" % info_cert_millegrille['date'])
+        except AttributeError:
+            self.__logger.info("Run initialisation noeud dependant")
+            return self.run_configuration_initiale
+
+        # Le certificat de millegrille est charge, s'assurer que la cle de monitor est generee
+        # Il est anormal que le cert millegrille soit charge et la cle de monitor absente, mais c'est supporte
+        try:
+            info_cle_monitor = self.gestionnaire_docker.trouver_secret('pki.monitor.key')
+            self.__logger.debug("Cle monitor deja chargee, date %s" % info_cle_monitor['date'])
+        except AttributeError:
+            self.__logger.warning("Cle secrete monitor manquante, run initialisation noeud dependant")
+            return self.run_configuration_initiale
+
+        # Verifier si le certificat de monitor correspondant a la cle est charge
+
+
+        return self.run_monitor
+
+    def run_configuration_initiale(self):
+        self.__logger.info("Run configuration initiale")
+
+        # Creer CSR pour le service monitor
+        self.__preparer_csr()
+
+        # Inserer certificat millegrille dans docker config
+
+    def run_monitor(self):
+        self.__logger.info("Run monitor noeud protege dependant")
+
+    def __preparer_csr(self):
+        date_courante = datetime.datetime.utcnow().strftime(DOCKER_LABEL_TIME)
+        print(date_courante)
+
+        # Generer cle privee
+        info_cle = self.__generer_private_key()
+
+        # Generer CSR
+        node_name = self._docker.info()['Name']
+        builder = x509.CertificateSigningRequestBuilder()
+        name = x509.Name([
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, 'ServiceMonitor'),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, node_name)
+        ])
+        builder = builder.subject_name(name)
+        request = builder.sign(
+            info_cle['cle'], hashes.SHA256(), default_backend()
+        )
+        request_pem = request.public_bytes(serialization.Encoding.PEM)
+        cle_pem = info_cle['cle'].private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption()
+        )
+        self.__logger.debug("Request CSR : %s" % request_pem)
+
+        # Preparer repertoire pour CSR
+        try:
+            os.mkdir('/var/opt/millegrilles/pki', mode=0o755)
+        except FileExistsError:
+            pass
+
+        # Sauvegarder information pour CSR, cle
+        try:
+            with open('/var/opt/millegrilles/pki/servicemonitor.csr.pem', 'xb') as fichier:
+                fichier.write(request_pem)
+
+            if self._args.dev:  # Mode insecure
+                with open('/var/opt/millegrilles/pki/servicemonitor.key.pem', 'xb') as fichier:
+                    fichier.write(cle_pem)
+
+            label_key_monitor = self.idmg_tronque + '.pki.monitor.key.' + date_courante
+            label_cert_millegrille = self.idmg_tronque + '.pki.millegrille.cert.' + date_courante
+            self._docker.secrets.create(name=label_key_monitor, data=cle_pem)
+            self._docker.configs.create(name=label_cert_millegrille, data=json.dumps(self._configuration_json['pem']))
+        except FileExistsError:
+            self.__logger.warning("Fichier CSR sous /var/opt/millegrilles/pki existe deja")
+
+    def __generer_private_key(self, generer_password=False, keysize=2048, public_exponent=65537):
+        info_cle = dict()
+        if generer_password:
+            info_cle['password'] = b64encode(secrets.token_bytes(16))
+
+        info_cle['cle'] = asymmetric.rsa.generate_private_key(
+            public_exponent=public_exponent,
+            key_size=keysize,
+            backend=default_backend()
+        )
+        return info_cle
 
 
 class GestionnaireCertificats:
@@ -511,7 +686,7 @@ class GestionnaireCertificats:
             self.__clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
 
     def maj_date(self):
-        self.__date = str(datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S'))
+        self.__date = str(datetime.datetime.utcnow().strftime(DOCKER_LABEL_TIME))
 
     def generer_nouveau_idmg(self) -> str:
         """
@@ -1053,6 +1228,7 @@ class GestionnaireModulesDocker:
     def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
         self.__idmg = idmg
         self.__docker = docker_client
+        self.configuration_json = None
         self.__fermeture_event = fermeture_event
         self.__thread_events: Thread = None
         self.__event_stream = None
@@ -1130,7 +1306,7 @@ class GestionnaireModulesDocker:
         liste_secrets = list()
         for nom_secret, nom_fichier in noms_secrets.items():
             self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
-            secret_reference = self.__trouver_secret(nom_secret)
+            secret_reference = self.trouver_secret(nom_secret)
             secret_reference['filename'] = nom_fichier
             secret_reference['uid'] = 0
             secret_reference['gid'] = 0
@@ -1303,7 +1479,7 @@ class GestionnaireModulesDocker:
             'config': config_retenue,
         }
 
-    def __trouver_secret(self, secret_name):
+    def trouver_secret(self, secret_name):
         secret_names = secret_name.split(';')
         secrets = None
         for secret_name_val in secret_names:
@@ -1327,6 +1503,7 @@ class GestionnaireModulesDocker:
         return {
             'secret_id': secret_retenue.attrs['ID'],
             'secret_name': secret_retenue.name,
+            'date': date_secret,
         }
 
     def __trouver_secret_matchdate(self, secret_names, date_secrets: dict):
@@ -1472,7 +1649,7 @@ class GestionnaireModulesDocker:
                     if secret.get('match_config'):
                         secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
                     else:
-                        secret_reference = self.__trouver_secret(secret_name)
+                        secret_reference = self.trouver_secret(secret_name)
                     secret_reference['filename'] = secret['filename']
                     secret_reference['uid'] = secret.get('uid') or 0
                     secret_reference['gid'] = secret.get('gid') or 0
@@ -2062,4 +2239,5 @@ if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, format=SERVICEMONITOR_LOGGING_FORMAT)
     logging.getLogger(ServiceMonitor.__name__).setLevel(logging.INFO)
 
-    ServiceMonitor().run()
+    # ServiceMonitor().run()
+    InitialiserServiceMonitor().demarrer()

@@ -1,5 +1,5 @@
 certifi
-pika==0.12
+pika==0.12.0
 pytz==2018.7
 feedparser==5.2.1
 cryptography==2.7
