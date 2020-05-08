@@ -1694,6 +1694,8 @@ class RenouvelleurCertificat:
 
     def signer_noeud(self, csr_bytes: bytes, domaines: list = None):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+        if not csr.is_signature_valid:
+            raise ValueError("Signature invalide")
 
         if domaines is not None:
             generateur = GenerateurCertificateNoeud(self.__idmg, domaines, self.__dict_ca, self.__millegrille)
