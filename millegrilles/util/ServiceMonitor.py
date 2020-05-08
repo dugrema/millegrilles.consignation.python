@@ -38,6 +38,7 @@ from millegrilles.dao.MessageDAO import BaseCallback
 
 SERVICEMONITOR_LOGGING_FORMAT = '%(threadName)s:%(levelname)s:%(message)s'
 PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
+PATH_PKI = '/var/opt/millegrilles/pki'
 DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
 class InitialiserServiceMonitor:
@@ -681,6 +682,8 @@ class ServiceMonitorDependant(ServiceMonitor):
                 self.__logger.info("Attente du certificat de monitor dependant")
                 self.__event_attente.wait(120)
 
+        self.__logger.debug("Certificat monitor valide jusqu'a : %s" % clecert_monitor.not_valid_after)
+
         self.__logger.info("Certificat du service monitor pret")
 
     def _initialiser_middleware(self):
@@ -689,8 +692,38 @@ class ServiceMonitorDependant(ServiceMonitor):
         :return:
         """
         self.__logger.info("Verifier et attendre certificats du middleware")
-        self.preparer_gestionnaire_comptesmq()
 
+        # Confirmer que les cles mq, mongo, mongoxp ont ete crees
+        roles = [
+            ConstantesGenerateurCertificat.ROLE_MQ,
+            ConstantesGenerateurCertificat.ROLE_MONGO,
+            ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
+        ]
+        liste_csr = list()
+        for role in roles:
+            label_key = 'pki.%s.key' % role
+            fichier_csr = 'pki.%s.csr.pem' % role
+            try:
+                self._gestionnaire_docker.trouver_secret(label_key)
+                path_fichier = os.path.join(PATH_PKI, fichier_csr)
+                with open(path_fichier, 'r') as fichier:
+                    csr = fichier.read()
+            except AttributeError:
+                # Creer la cle, CSR correspondant
+                info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev)
+                csr = info_csr['request']
+            liste_csr.append(csr)
+
+        if self.__logger.isEnabledFor(logging.INFO):
+            self.__logger.info("CSR a transmettre: %s" % json.dumps(liste_csr, indent=4))
+
+        # Transmettre commande de signature de certificats, attendre reponse
+        self.__event_attente.clear()
+        while not self.__event_attente.is_set():
+            self.__logger.info("Attente certificats signes du middleware")
+            self.__event_attente.wait(120)
+
+        self.preparer_gestionnaire_comptesmq()
         self.__logger.info("Certificats du middleware prets")
 
     def _run_entretien(self):
@@ -827,7 +860,7 @@ class GestionnaireCertificats:
         except FileExistsError:
             pass
 
-        with open('/var/opt/millegrilles/pki/%s.csr.pem' % type_cle, 'wb') as fichier:
+        with open('/var/opt/millegrilles/pki/pki.%s.csr.pem' % type_cle, 'wb') as fichier:
             fichier.write(request_pem)
 
         if insecure:  # Mode insecure
@@ -2467,6 +2500,9 @@ class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):
         gestionnaire_certificats = self._service_monitor.gestionnaire_certificats
         label_cert = 'pki.' + ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT + ".cert"
         gestionnaire_certificats.ajouter_config(label_cert, cert_pem, secret_cle['date'])
+
+        # S'assurer que le certificat est charge dans la clecert du monitor
+        gestionnaire_certificats.clecert_monitor.cert_from_pem_bytes(cert_pem)
 
         # Inserer configuration de connexion
         label_config_connexion = 'millegrille.connexion'
