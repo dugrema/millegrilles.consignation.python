@@ -359,7 +359,7 @@ class ServiceMonitor:
         os.chmod(PATH_FIFO, 0o620)
 
         # Verifier si on doit creer une instance (utilise pour override dans sous-classe)
-        if self._gestionnaire_certificats is None:
+        if self._gestionnaire_commandes is None:
             self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
 
         self._gestionnaire_commandes.start()
@@ -443,9 +443,6 @@ class ServiceMonitor:
         if besoin_initialiser:
             # Generer certificat de MilleGrille
             self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
-
-            if self._args.dev:
-                self._gestionnaire_certificats.sauvegarder_secrets()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
         self._gestionnaire_docker.start_events()
@@ -572,8 +569,18 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         self.__logger.info("Fermeture du ServiceMonitor")
         self.fermer()
 
-    def _classe_configuration(self):
-        return GestionnaireCertificatsNoeudProtegePrincipal
+    def preparer_gestionnaire_certificats(self):
+        params = dict()
+        if self._args.dev:
+            params['insecure'] = True
+        if self._args.secrets:
+            params['secrets'] = self._args.secrets
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegePrincipal(self._docker, **params)
+
+    def preparer_gestionnaire_commandes(self):
+        self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
+
+        super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
 
 
 class ServiceMonitorDependant(ServiceMonitor):
@@ -783,17 +790,18 @@ class GestionnaireCertificats:
             self._clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
         else:
             # Tenter de charger le certificat a partir de millegrille.configuration
-            config = self._docker.configs.get('millegrille.configuration')
-            config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
-            self._clecert_millegrille = EnveloppeCleCert()
-            self._clecert_millegrille.cert_from_pem_bytes(config_json['pem'].encode('utf-8'))
+            try:
+                config = self._docker.configs.get('millegrille.configuration')
+                config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
+                self._clecert_millegrille = EnveloppeCleCert()
+                self._clecert_millegrille.cert_from_pem_bytes(config_json['pem'].encode('utf-8'))
+            except docker.errors.NotFound:
+                self.__logger.info("millegrille.configuration abstente : Nouvelle MilleGrille, noeud principal.")
 
         # Calculer le IDMG a partir du certificat de MilleGrille
         if self._clecert_millegrille:
             self.idmg = self._clecert_millegrille.idmg
             self.__logger.info("Gestionnaire certificat, idmg : %s" % self.idmg)
-        else:
-            self.__logger.warning("configuration.millegrille n'existe pas")
 
     def maj_date(self):
         self._date = str(datetime.datetime.utcnow().strftime(DOCKER_LABEL_TIME))
@@ -1022,24 +1030,6 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         return clecert
 
-    def sauvegarder_secrets(self):
-        """
-        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
-        :return:
-        """
-        super().sauvegarder_secrets()
-        secret_path = path.abspath(self.secret_path)
-
-        # Sauvegarder information certificat intermediaire
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self._clecert_intermediaire.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
-            fichiers.write(self._clecert_intermediaire.password)
-
-        # Sauvegarder information certificat monitor
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_monitor.private_key_bytes)
-
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
         os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
@@ -1136,10 +1126,37 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Generer certificat pour monitor
         self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self._nodename)
 
+        if self._mode_insecure:
+            self.sauvegarder_secrets()
+
         # Generer mots de passes
         self.generer_motsdepasse()
 
         return self.idmg
+
+    def sauvegarder_secrets(self):
+        """
+        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
+        :return:
+        """
+        secret_path = path.abspath(self.secret_path)
+        os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
+
+        # Sauvegarder information certificat intermediaire
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_millegrille.private_key_bytes)
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_millegrille.password)
+
+        # Sauvegarder information certificat intermediaire
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_intermediaire.private_key_bytes)
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_intermediaire.password)
+
+        # Sauvegarder information certificat monitor
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
+            fichiers.write(self.clecert_monitor.private_key_bytes)
 
 
 class TraitementMessages(BaseCallback):
