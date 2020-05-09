@@ -189,7 +189,7 @@ class InitialiserServiceMonitor:
 
 class GestionnaireModulesDocker:
     # Liste de modules requis. L'ordre est important
-    MODULES_REQUIS = [
+    MODULES_REQUIS_PRIMAIRE = [
         ConstantesServiceMonitor.MODULE_MQ,
         ConstantesServiceMonitor.MODULE_MONGO,
         ConstantesServiceMonitor.MODULE_TRANSACTION,
@@ -201,6 +201,12 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_DOMAINES,
     ]
 
+    MODULES_REQUIS_DEPENDANT = [
+        ConstantesServiceMonitor.MODULE_MQ,
+        ConstantesServiceMonitor.MODULE_MONGO,
+        # ConstantesServiceMonitor.MODULE_TRANSACTION,
+    ]
+
     MODULES_HEBERGEMENT = [
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
@@ -209,14 +215,14 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
     ]
 
-    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
+    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list):
         self.__idmg = idmg
         self.__docker = docker_client
         self.configuration_json = None
         self.__fermeture_event = fermeture_event
         self.__thread_events: Thread = cast(Thread, None)
         self.__event_stream = None
-        self.__modules_requis = GestionnaireModulesDocker.MODULES_REQUIS.copy()
+        self.__modules_requis = modules_requis
         self.__hebergement_actif = False
 
         self.__mappings = {
@@ -614,16 +620,19 @@ class GestionnaireModulesDocker:
                 for config in config_configs:
                     self.__logger.debug("Mapping configs %s" % config)
                     config_name = config['name']
-                    config_dict = self.__trouver_config(config_name)
+                    try:
+                        config_dict = self.__trouver_config(config_name)
 
-                    config_reference = config_dict['config_reference']
-                    config_reference['filename'] = config['filename']
-                    config_reference['uid'] = config.get('uid') or 0
-                    config_reference['gid'] = config.get('gid') or 0
-                    config_reference['mode'] = config.get('mode') or 0o444
-                    liste_configs.append(ConfigReference(**config_reference))
+                        config_reference = config_dict['config_reference']
+                        config_reference['filename'] = config['filename']
+                        config_reference['uid'] = config.get('uid') or 0
+                        config_reference['gid'] = config.get('gid') or 0
+                        config_reference['mode'] = config.get('mode') or 0o444
+                        liste_configs.append(ConfigReference(**config_reference))
 
-                    dates_configs[config_name] = config_dict['date']
+                        dates_configs[config_name] = config_dict['date']
+                    except AttributeError:
+                        self.__logger.exception("Parametres de configuration manquants pour : %s" % config_name)
 
                 dict_config_docker['configs'] = liste_configs
 
@@ -949,7 +958,8 @@ class ServiceMonitor:
             # Generer certificat de MilleGrille
             self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
 
-        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
+        self._gestionnaire_docker = GestionnaireModulesDocker(
+            self._idmg, self._docker, self._fermeture_event, GestionnaireModulesDocker.MODULES_REQUIS_PRIMAIRE.copy())
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 
@@ -1110,7 +1120,8 @@ class ServiceMonitorDependant(ServiceMonitor):
     def run(self):
         self.__logger.debug("Execution noeud dependant")
         self._charger_configuration()
-        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
+        self._gestionnaire_docker = GestionnaireModulesDocker(
+            self._idmg, self._docker, self._fermeture_event, GestionnaireModulesDocker.MODULES_REQUIS_DEPENDANT.copy())
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
         self.preparer_gestionnaire_certificats()
@@ -1162,6 +1173,8 @@ class ServiceMonitorDependant(ServiceMonitor):
         cert_millegrille = self._configuration_json['pem'].encode('utf-8')
         self._gestionnaire_certificats.ajouter_config(
             name='pki.millegrille.cert', data=cert_millegrille)
+
+        self._gestionnaire_docker.initialiser_millegrille()
 
         print("Preparation CSR du noeud dependant terminee")
         print("Redemarrer le service monitor")
@@ -1222,39 +1235,52 @@ class ServiceMonitorDependant(ServiceMonitor):
         ]
         liste_csr = list()
         for role in roles:
-            label_key = 'pki.%s.key' % role
-            fichier_csr = 'pki.%s.csr.pem' % role
+            label_cert = 'pki.%s.cert' % role
             try:
-                self._gestionnaire_docker.trouver_secret(label_key)
-                path_fichier = os.path.join(PATH_PKI, fichier_csr)
-                with open(path_fichier, 'r') as fichier:
-                    csr = fichier.read()
+                self._gestionnaire_docker.trouver_config(label_cert, self.idmg_tronque, self._docker)
             except AttributeError:
-                # Creer la cle, CSR correspondant
-                info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev)
-                csr = str(info_csr['request'], 'utf-8')
-            liste_csr.append(csr)
+                label_key = 'pki.%s.key' % role
+                fichier_csr = 'pki.%s.csr.pem' % role
+                try:
+                    self._gestionnaire_docker.trouver_secret(label_key)
+                    path_fichier = os.path.join(PATH_PKI, fichier_csr)
+                    with open(path_fichier, 'r') as fichier:
+                        csr = fichier.read()
+                except AttributeError:
+                    # Creer la cle, CSR correspondant
+                    info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev)
+                    csr = str(info_csr['request'], 'utf-8')
+                liste_csr.append(csr)
 
         if self.__logger.isEnabledFor(logging.INFO):
             self.__logger.info("CSR a transmettre: %s" % json.dumps(liste_csr, indent=4))
 
-        self.__event_attente.clear()
-        commande = {
-            'liste_csr': liste_csr,
-        }
-        self.__connexion_principal.generateur_transactions.transmettre_commande(
-            commande,
-            'commande.millegrilles.domaines.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
-            correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
-            reply_to=self.__connexion_principal.reply_q
-        )
-        # Transmettre commande de signature de certificats, attendre reponse
-        while not self.__event_attente.is_set():
-            self.__logger.info("Attente certificats signes du middleware")
-            self.__event_attente.wait(120)
+        if len(liste_csr) > 0:
+            self.__event_attente.clear()
+            commande = {
+                'liste_csr': liste_csr,
+            }
+            self.__connexion_principal.generateur_transactions.transmettre_commande(
+                commande,
+                'commande.millegrilles.domaines.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
+                correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
+                reply_to=self.__connexion_principal.reply_q
+            )
+            # Transmettre commande de signature de certificats, attendre reponse
+            while not self.__event_attente.is_set():
+                self.__logger.info("Attente certificats signes du middleware")
+                self.__event_attente.wait(120)
 
         self.preparer_gestionnaire_comptesmq()
         self.__logger.info("Certificats du middleware prets")
+
+    def _entretien_modules(self):
+        if not self.limiter_entretien:
+            # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
+            self._gestionnaire_docker.entretien_services()
+
+            # Entretien du middleware
+            self._gestionnaire_mq.entretien()
 
     def _run_entretien(self):
         """
@@ -1262,6 +1288,11 @@ class ServiceMonitorDependant(ServiceMonitor):
         :return:
         """
         self.__logger.info("Debut boucle d'entretien du service monitor")
+
+        while not self._fermeture_event.is_set():
+            self.verifier_load()
+            self._entretien_modules()
+            self._fermeture_event.wait(30)
 
         self.__logger.info("Fin execution de la boucle d'entretien du service monitor")
 
