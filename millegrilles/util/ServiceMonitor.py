@@ -1188,6 +1188,8 @@ class TraitementMessages(BaseCallback):
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
+        elif correlation_id == ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS:
+            self.__gestionnaire_commandes.traiter_reponse_comptes_noeuds(message_dict)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
@@ -1437,7 +1439,12 @@ class ConnexionMiddleware:
             reply_to=self.__commandes_handler.queue_name,
             correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE
         )
-
+        self.generateur_transactions.transmettre_requete(
+            dict(),
+            Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
+            correlation_id = ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
+            reply_to=self.__commandes_handler.queue_name,
+        )
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
@@ -2454,19 +2461,19 @@ class GestionnaireCommandes:
         cert_pem = contenu[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
         # chaine_pem = contenu['chaine']
 
+        self._ajouter_compte_pem(cert_pem, commande)
+
+    def _ajouter_compte_pem(self, cert_pem, commande):
         # Charger pem
         certificat = EnveloppeCleCert()
         certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
-
         try:
             gestionnaire_mongo: GestionnaireComptesMongo = self._service_monitor.gestionnaire_mongo
             gestionnaire_mongo.creer_compte(certificat)
         except DuplicateKeyError:
             self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
-
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
         gestionnaire_comptes_mq.ajouter_compte(certificat)
-
         # Transmettre reponse d'ajout de compte, au besoin
         properties = commande.get('properties')
         if properties:
@@ -2490,6 +2497,14 @@ class GestionnaireCommandes:
             self.activer_hebergement(resultats)
         else:
             self.desactiver_hebergement(resultats)
+
+    def traiter_reponse_comptes_noeuds(self, message):
+        self.__logger.debug("Reponse comptes noeuds: %s" % str(message))
+        resultats = message['resultats']
+
+        for cert in resultats:
+            pem = cert[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+            self._ajouter_compte_pem(pem, message)
 
 
 class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):
