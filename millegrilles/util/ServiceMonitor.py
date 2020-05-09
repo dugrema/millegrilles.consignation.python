@@ -10,6 +10,7 @@ import os
 import tempfile
 import psutil
 
+from typing import cast, Union
 from threading import Event, Thread, BrokenBarrierError
 from docker.errors import APIError
 from docker.types import Resources, RestartPolicy, ServiceMode, NetworkAttachmentConfig, ConfigReference, \
@@ -41,10 +42,11 @@ PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
 PATH_PKI = '/var/opt/millegrilles/pki'
 DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
+
 class InitialiserServiceMonitor:
 
     def __init__(self):
-        self.__docker: docker.DockerClient = None  # Client docker
+        self.__docker: docker.DockerClient = cast(docker.DockerClient, None)  # Client docker
         self.__args = None
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -185,6 +187,514 @@ class InitialiserServiceMonitor:
         service_monitor.run()
 
 
+class GestionnaireModulesDocker:
+    # Liste de modules requis. L'ordre est important
+    MODULES_REQUIS = [
+        ConstantesServiceMonitor.MODULE_MQ,
+        ConstantesServiceMonitor.MODULE_MONGO,
+        ConstantesServiceMonitor.MODULE_TRANSACTION,
+        ConstantesServiceMonitor.MODULE_MAITREDESCLES,
+        # ConstantesServiceMonitor.MODULE_CEDULEUR,
+        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+        ConstantesServiceMonitor.MODULE_COUPDOEIL,
+        ConstantesServiceMonitor.MODULE_TRANSMISSION,
+        ConstantesServiceMonitor.MODULE_DOMAINES,
+    ]
+
+    MODULES_HEBERGEMENT = [
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
+    ]
+
+    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
+        self.__idmg = idmg
+        self.__docker = docker_client
+        self.configuration_json = None
+        self.__fermeture_event = fermeture_event
+        self.__thread_events: Thread = cast(Thread, None)
+        self.__event_stream = None
+        self.__modules_requis = GestionnaireModulesDocker.MODULES_REQUIS.copy()
+        self.__hebergement_actif = False
+
+        self.__mappings = {
+            'IDMG': self.__idmg,
+            'IDMGLOWER': self.__idmg.lower(),
+            'IDMGTRUNCLOWER': self.idmg_tronque,
+            'MONGO_INITDB_ROOT_USERNAME': 'admin',
+            'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
+        }
+
+        self.__event_listeners = list()
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def start_events(self):
+        self.__thread_events = Thread(target=self.ecouter_events, name='events', daemon=True)
+        self.__thread_events.start()
+
+    def fermer(self):
+        try:
+            self.__event_stream.close()
+        except Exception:
+            pass
+
+    def add_event_listener(self, listener):
+        self.__event_listeners.append(listener)
+
+    def remove_event_listener(self, listener):
+        self.__event_listeners = [l for l in self.__event_listeners if l is not listener]
+
+    def ecouter_events(self):
+        self.__logger.info("Debut ecouter events docker")
+        self.__event_stream = self.__docker.events()
+        for event in self.__event_stream:
+            self.__logger.debug("Event : %s", str(event))
+            to_remove = list()
+            for listener in self.__event_listeners:
+                try:
+                    listener.event(event)
+                except Exception:
+                    self.__logger.exception("Erreur event listener")
+                    to_remove.append(listener)
+
+            for listener in to_remove:
+                self.remove_event_listener(listener)
+
+            if self.__fermeture_event.is_set():
+                break
+        self.__logger.info("Fin ecouter events docker")
+
+    def initialiser_millegrille(self):
+        # Creer reseau pour cette millegrille
+        network_name = 'mg_' + self.__idmg + '_net'
+        labels = {'millegrille': self.__idmg}
+        self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
+
+    def configurer_monitor(self):
+        """
+        Ajoute les element de configuration generes (e.g. secrets).
+        :return:
+        """
+        noms_secrets = {
+            'passwd.mongo': ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE,
+            'passwd.mq': ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE,
+            'passwd.mongoxpweb': ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE,
+            ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
+            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem',
+            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
+        }
+
+        liste_secrets = list()
+        for nom_secret, nom_fichier in noms_secrets.items():
+            self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
+            secret_reference = self.trouver_secret(nom_secret)
+            secret_reference['filename'] = nom_fichier
+            secret_reference['uid'] = 0
+            secret_reference['gid'] = 0
+            secret_reference['mode'] = 0o444
+
+            liste_secrets.append(SecretReference(**secret_reference))
+
+        network = NetworkAttachmentConfig(target='mg_%s_net' % self.__idmg)
+
+        # Ajouter secrets au service monitor
+        filtre = {'name': 'service_monitor'}
+        services_list = self.__docker.services.list(filters=filtre)
+        service_monitor = services_list[0]
+        service_monitor.update(secrets=liste_secrets, networks=[network])
+
+    def entretien_services(self):
+        """
+        Verifie si les services sont actifs, les demarre au besoin.
+        :return:
+        """
+        filtre = {'name': self.idmg_tronque + '_'}
+        liste_services = self.__docker.services.list(filters=filtre)
+        dict_services = dict()
+        for service in liste_services:
+            service_name = service.name.split('_')[1]
+            dict_services[service_name] = service
+
+        for service_name in self.__modules_requis:
+            params = ServiceMonitor.DICT_MODULES[service_name]
+            service = dict_services.get(service_name)
+            if not service:
+                try:
+                    self.demarrer_service(service_name, **params)
+                except IndexError:
+                    self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
+                break  # On demarre un seul service a la fois, on attend qu'il soit pret
+            else:
+                # Verifier etat service
+                self.verifier_etat_service(service)
+
+    def demarrer_service(self, service_name: str, **kwargs):
+        self.__logger.info("Demarrage service %s", service_name)
+        configuration_service = ServiceMonitor.DICT_MODULES.get(service_name)
+
+        if configuration_service:
+            # S'assurer que le certificat existe et est a date
+            pass
+
+        gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
+
+        nom_image_docker = kwargs.get('nom') or service_name
+        image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+
+        # Prendre un tag au hasard
+        image_tag = image.tags[0]
+
+        configuration = self.__formatter_configuration_service(service_name)
+
+        constraints = configuration.get('constraints')
+        if constraints:
+            self.__add_node_labels(constraints)
+
+        try:
+            self.__docker.services.create(image_tag, **configuration)
+        except APIError as apie:
+            if apie.status_code == 409:
+                self.__logger.info("Service %s deja demarre" % service_name)
+            else:
+                self.__logger.exception("Erreur demarrage service %s" % service_name)
+
+    def supprimer_service(self, service_name: str):
+        filter = {'name': self.idmg_tronque + '_' + service_name}
+        service_list = self.__docker.services.list(filters=filter)
+        service_list[0].remove()
+
+    def activer_hebergement(self):
+        """
+        Active les modules d'hebergement (si pas deja fait).
+        :return:
+        """
+        if not self.__hebergement_actif:
+            # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
+            path_hebergement = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES, self.__idmg, 'mounts/hebergement')
+            try:
+                os.mkdir(path_hebergement, mode=0o770)
+            except FileExistsError:
+                self.__logger.debug("Repertoire %s existe, ok" % path_hebergement)
+
+            # Ajouter modules requis
+            modules_requis = set(self.__modules_requis)
+            modules_requis.update(self.MODULES_HEBERGEMENT)
+            self.__modules_requis = list(modules_requis)
+
+            for service_name in self.MODULES_HEBERGEMENT:
+                module_config = ServiceMonitor.DICT_MODULES[service_name]
+                self.demarrer_service(service_name, **module_config)
+
+            self.__hebergement_actif = True
+
+    def desactiver_hebergement(self):
+        if self.__hebergement_actif:
+            modules_requis = set(self.__modules_requis)
+            modules_requis.difference_update(self.MODULES_HEBERGEMENT)
+            self.__modules_requis = list(modules_requis)
+
+            for service_name in self.MODULES_HEBERGEMENT:
+                try:
+                    self.supprimer_service(service_name)
+                except IndexError:
+                    self.__logger.warning("Erreur retrait service %s" % service_name)
+                self.__hebergement_actif = False
+
+    def verifier_etat_service(self, service):
+        update_state = None
+        update_status = service.attrs.get('UpdateStatus')
+        if update_status is not None:
+            update_state = update_status['State']
+
+        # Compter le nombre de taches actives
+        running = list()
+
+        for task in service.tasks():
+            status = task['Status']
+            state = status['State']
+            desired_state = task['DesiredState']
+            if state == 'running' or desired_state == 'running' or update_state == 'updating':
+                # Le service est actif
+                running.append(running)
+
+        if len(running) == 0:
+            # Redemarrer
+            self.__logger.info("Redemarrer service %s", service.name)
+            service.force_update()
+
+    def charger_config(self, config_name):
+        filtre = {'name': config_name}
+        return b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data'])
+
+    def __trouver_config(self, config_name):
+        return GestionnaireModulesDocker.trouver_config(config_name, self.__idmg[0:12], self.__docker)
+
+    @staticmethod
+    def trouver_config(config_name: str, idmg_tronque: str, docker_client: docker.DockerClient):
+        config_names = config_name.split(';')
+        configs = None
+        for config_name_val in config_names:
+            filtre = {'name': idmg_tronque + '.' + config_name_val}
+            configs = docker_client.configs.list(filters=filtre)
+            if len(configs) > 0:
+                break
+
+        # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
+        date_config: int = cast(int, None)
+        config_retenue = None
+        for config in configs:
+            nom_config = config.name
+            split_config = nom_config.split('.')
+            date_config_str = split_config[-1]
+            date_config_int = int(date_config_str)
+            if not date_config or date_config_int > date_config:
+                date_config = date_config_int
+                config_retenue = config
+
+        return {
+            'config_reference': {
+                'config_id': config_retenue.attrs['ID'],
+                'config_name': config_retenue.name,
+            },
+            'date': str(date_config),
+            'config': config_retenue,
+        }
+
+    def trouver_secret(self, secret_name):
+        secret_names = secret_name.split(';')
+        secrets = None
+        for secret_name_val in secret_names:
+            filtre = {'name': self.idmg_tronque + '.' + secret_name_val}
+            secrets = self.__docker.secrets.list(filters=filtre)
+            if len(secrets) > 0:
+                break
+
+        # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
+        date_secret: int = cast(int, None)
+        secret_retenue = None
+        for secret in secrets:
+            nom_secret = secret.name
+            split_secret = nom_secret.split('.')
+            date_secret_str = split_secret[-1]
+            date_secret_int = int(date_secret_str)
+            if not date_secret or date_secret_int > date_secret:
+                date_secret = date_secret_int
+                secret_retenue = secret
+
+        return {
+            'secret_id': secret_retenue.attrs['ID'],
+            'secret_name': secret_retenue.name,
+            'date': date_secret,
+        }
+
+    def __trouver_secret_matchdate(self, secret_names, date_secrets: dict):
+        for secret_name in secret_names.split(';'):
+            secret_name_split = secret_name.split('.')[0:2]
+            secret_name_split.append('cert')
+            config_name = '.'.join(secret_name_split)
+            try:
+                date_secret = date_secrets[config_name]
+
+                nom_filtre = self.idmg_tronque + '.' + secret_name + '.' + date_secret
+                filtre = {'name': nom_filtre}
+                secrets = self.__docker.secrets.list(filters=filtre)
+
+                if len(secrets) != 1:
+                    raise ValueError("Le secret_name ne correspond pas a un secret : %s", nom_filtre)
+
+                secret = secrets[0]
+
+                return {
+                    'secret_id': secret.attrs['ID'],
+                    'secret_name': secret.name,
+                    'date': date_secret,
+                }
+
+            except KeyError:
+                continue
+
+    def __mapping(self, valeur: str):
+        for cle, valeur_mappee in self.__mappings.items():
+            cle = cle.upper()
+            valeur = valeur.replace('${%s}' % cle, valeur_mappee)
+
+        return valeur
+
+    def __formatter_configuration_service(self, service_name):
+        config_service = json.loads(self.charger_config('docker.cfg.' + service_name))
+        self.__logger.debug("Configuration service %s : %s", service_name, str(config_service))
+
+        dict_config_docker = self.__remplacer_variables(service_name, config_service)
+
+        return dict_config_docker
+
+    def __remplacer_variables(self, nom_service, config_service):
+        self.__logger.debug("Remplacer variables %s" % nom_service)
+        dict_config_docker = dict()
+
+        try:
+            # Name
+            dict_config_docker['name'] = self.idmg_tronque + '_' + config_service['name']
+
+            hostname = config_service.get('hostname')
+            if hostname:
+                dict_config_docker['hostname'] = hostname
+
+            # Resources
+            config_args = config_service.get('args')
+            if config_args:
+                dict_config_docker['args'] = config_args
+
+            # Resources
+            config_resources = config_service.get('resources')
+            if config_resources:
+                dict_config_docker['resources'] = Resources(**config_resources)
+
+            # Restart Policy
+            config_restart_policy = config_service.get('restart_policy')
+            if config_restart_policy:
+                dict_config_docker['restart_policy'] = RestartPolicy(**config_restart_policy)
+
+            # Service Mode
+            config_service_mode = config_service.get('mode')
+            if config_service_mode:
+                dict_config_docker['mode'] = ServiceMode(**config_service_mode)
+
+            # Variables d'environnement, inclus mapping
+            config_env = config_service.get('env')
+            if config_env:
+                # Mapping des variables
+                config_env = [self.__mapping(valeur) for valeur in config_env]
+                dict_config_docker['env'] = config_env
+
+            # Constraints
+            config_constraints = config_service.get('constraints')
+            if config_constraints:
+                dict_config_docker['constraints'] = config_constraints
+
+            # Service labels
+            config_labels = config_service.get('labels')
+            if config_labels:
+                updated_labels = dict()
+                for key, value in config_labels.items():
+                    value = self.__mapping(value)
+                    updated_labels[key] = value
+                dict_config_docker['labels'] = updated_labels
+
+            # Container labels
+            config_container_labels = config_service.get('container_labels')
+            if config_container_labels:
+                updated_labels = dict()
+                for key, value in config_container_labels.items():
+                    value = self.__mapping(value)
+                    updated_labels[key] = value
+                dict_config_docker['container_labels'] = updated_labels
+
+            # Networks
+            config_networks = config_service.get('networks')
+            if config_networks:
+                networks = list()
+                for network in config_networks:
+                    network['target'] = self.__mapping(network['target'])
+                    networks.append(NetworkAttachmentConfig(**network))
+
+                dict_config_docker['networks'] = networks
+
+            # Configs
+            config_configs = config_service.get('configs')
+            dates_configs = dict()
+            if config_configs:
+                liste_configs = list()
+                for config in config_configs:
+                    self.__logger.debug("Mapping configs %s" % config)
+                    config_name = config['name']
+                    config_dict = self.__trouver_config(config_name)
+
+                    config_reference = config_dict['config_reference']
+                    config_reference['filename'] = config['filename']
+                    config_reference['uid'] = config.get('uid') or 0
+                    config_reference['gid'] = config.get('gid') or 0
+                    config_reference['mode'] = config.get('mode') or 0o444
+                    liste_configs.append(ConfigReference(**config_reference))
+
+                    dates_configs[config_name] = config_dict['date']
+
+                dict_config_docker['configs'] = liste_configs
+
+            # Secrets
+            config_secrets = config_service.get('secrets')
+            if config_secrets:
+                liste_secrets = list()
+                for secret in config_secrets:
+                    self.__logger.debug("Mapping secret %s" % secret)
+                    secret_name = secret['name']
+                    if secret.get('match_config'):
+                        secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
+                    else:
+                        secret_reference = self.trouver_secret(secret_name)
+
+                    secret_reference['filename'] = secret['filename']
+                    secret_reference['uid'] = secret.get('uid') or 0
+                    secret_reference['gid'] = secret.get('gid') or 0
+                    secret_reference['mode'] = secret.get('mode') or 0o444
+
+                    del secret_reference['date']  # Cause probleme lors du chargement du secret
+                    liste_secrets.append(SecretReference(**secret_reference))
+
+                dict_config_docker['secrets'] = liste_secrets
+
+            # Ports
+            config_endpoint_spec = config_service.get('endpoint_spec')
+            if config_endpoint_spec:
+                ports = dict()
+                mode = config_endpoint_spec.get('mode') or 'vip'
+                for port in config_endpoint_spec.get('ports'):
+                    published_port = port['published_port']
+                    target_port = port['target_port']
+                    protocol = port.get('protocol') or 'tcp'
+                    publish_mode = port.get('publish_mode')
+
+                    if protocol or publish_mode:
+                        ports[published_port] = (target_port, protocol, publish_mode)
+                    else:
+                        ports[published_port] = target_port
+
+                dict_config_docker['endpoint_spec'] = EndpointSpec(mode=mode, ports=ports)
+
+            # Mounts
+            config_mounts = config_service.get('mounts')
+            if config_mounts:
+                dict_config_docker['mounts'] = [self.__mapping(mount) for mount in config_mounts]
+
+        except TypeError as te:
+            self.__logger.error("Erreur mapping %s", nom_service)
+            raise te
+
+        return dict_config_docker
+
+    def __add_node_labels(self, constraints: list):
+        labels_ajoutes = dict()
+        for constraint in constraints:
+            if '== true' in constraint:
+                valeurs = constraint.split('==')
+                labels_ajoutes[valeurs[0].strip().replace('node.labels.', '')] = valeurs[1].strip()
+
+        if len(labels_ajoutes) > 0:
+            nodename = self.__docker.info()['Name']
+            node_info = self.__docker.nodes.get(nodename)
+            node_spec = node_info.attrs['Spec']
+            labels = node_spec['Labels']
+            labels.update(labels_ajoutes)
+            node_info.update(node_spec)
+
+    @property
+    def idmg_tronque(self):
+        return self.__idmg[0:12]
+
+
 class ServiceMonitor:
     """
     Service deploye dans un swarm docker en mode global qui s'occupe du deploiement des autres modules de la
@@ -258,19 +768,19 @@ class ServiceMonitor:
         self._docker: docker.DockerClient = docker_client       # Client docker
         self._configuration_json = configuration_json           # millegrille.configuration dans docker
 
-        self._securite: str = None                              # Niveau de securite de la swarm docker
-        self._connexion_middleware: ConnexionMiddleware = None  # Connexion a MQ, MongoDB
-        self._idmg: str = None                                  # IDMG de la MilleGrille hote
+        self._securite: str = cast(str, None)                   # Niveau de securite de la swarm docker
+        self._connexion_middleware: ConnexionMiddleware = cast(ConnexionMiddleware, None)  # Connexion a MQ, MongoDB
+        self._idmg: str = cast(str, None)                       # IDMG de la MilleGrille hote
 
         self._socket_fifo = None  # Socket FIFO pour les commandes
 
         self._fermeture_event = Event()
         self._attente_event = Event()
 
-        self._gestionnaire_certificats: GestionnaireCertificats = None
-        self._gestionnaire_docker: GestionnaireModulesDocker = None
-        self._gestionnaire_mq: GestionnaireComptesMQ = None
-        self._gestionnaire_commandes: GestionnaireCommandes = None
+        self._gestionnaire_certificats: GestionnaireCertificats = cast(GestionnaireCertificats, None)
+        self._gestionnaire_docker: GestionnaireModulesDocker = cast(GestionnaireModulesDocker, None)
+        self._gestionnaire_mq: GestionnaireComptesMQ = cast(GestionnaireComptesMQ, None)
+        self._gestionnaire_commandes: GestionnaireCommandes = cast(GestionnaireCommandes, None)
 
         self.limiter_entretien = True
 
@@ -373,15 +883,10 @@ class ServiceMonitor:
             self._idmg = configuration_json[Constantes.CONFIG_IDMG]
             self._securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
 
-            # self._gestionnaire_certificats = classe_configuration(
-            #     self._docker, idmg=self._idmg, millegrille_cert_pem=configuration_json['pem'], secrets=self._args.secrets)
-
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
         except HTTPError as he:
             if he.status_code == 404:
                 # La configuration n'existe pas
-                # self._gestionnaire_certificats = classe_configuration(self._docker, secrets=self._args.secrets)
-                # self._gestionnaire_certificats = classe_configuration(self._docker, secrets=self._args.secrets)
                 pass
             else:
                 raise he
@@ -506,7 +1011,7 @@ class ServiceMonitor:
         return self._connexion_middleware.get_gestionnaire_comptes_mongo
 
     @property
-    def gestionnaire_docker(self):
+    def gestionnaire_docker(self) -> GestionnaireModulesDocker:
         return self._gestionnaire_docker
 
     @property
@@ -718,8 +1223,8 @@ class ServiceMonitorDependant(ServiceMonitor):
             except AttributeError:
                 # Creer la cle, CSR correspondant
                 info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev)
-                csr = info_csr['request']
-            liste_csr.append(str(csr, 'utf-8'))
+                csr = str(info_csr['request'], 'utf-8')
+            liste_csr.append(csr)
 
         if self.__logger.isEnabledFor(logging.INFO):
             self.__logger.info("CSR a transmettre: %s" % json.dumps(liste_csr, indent=4))
@@ -769,12 +1274,12 @@ class GestionnaireCertificats:
 
     def __init__(self, docker_client: docker.DockerClient, **kwargs):
         self._docker = docker_client
-        self._date: str = None
+        self._date: str = cast(str, None)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.certificats = dict()
-        self._clecert_millegrille: EnveloppeCleCert = None
-        self.clecert_monitor: EnveloppeCleCert = None
+        self._clecert_millegrille: EnveloppeCleCert = cast(EnveloppeCleCert, None)
+        self.clecert_monitor: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
         self.secret_path = kwargs.get('secrets')
         self._mode_insecure = kwargs.get('insecure') or False
@@ -782,7 +1287,7 @@ class GestionnaireCertificats:
         self.maj_date()
 
         self._nodename = self._docker.info()['Name']
-        self.idmg = None
+        self.idmg: str = cast(str, None)
 
         cert_pem = kwargs.get('millegrille_cert_pem')
         if cert_pem:
@@ -923,7 +1428,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
     def __init__(self, docker_client: docker.DockerClient, **kwargs):
         super().__init__(docker_client, **kwargs)
-        self._passwd_mq: str
+        self._passwd_mq: str = cast(str, None)
 
     def generer_motsdepasse(self):
         """
@@ -949,8 +1454,8 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
 
     def __init__(self, docker_client: docker.DockerClient, **kwargs):
         super().__init__(docker_client, **kwargs)
-        self._passwd_mongo: str
-        self._passwd_mongoxp: str
+        self._passwd_mongo: str = cast(str, None)
+        self._passwd_mongoxp: str = cast(str, None)
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1009,8 +1514,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
     def __init__(self, docker_client: docker.DockerClient, **kwargs):
         super().__init__(docker_client, **kwargs)
-        self.__renouvelleur: RenouvelleurCertificat = None
-        self._clecert_intermediaire: EnveloppeCleCert = None
+        self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
+        self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
     def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
         clecert = self.__renouvelleur.renouveller_par_role(role, common_name)
@@ -1238,6 +1743,18 @@ class TraitementMessages(BaseCallback):
         return self.__channel is not None and not self.__channel.is_closed
 
 
+class ConnexionPrincipal:
+    """
+    Connexion au noeud protege principal
+    """
+
+    def __init__(self, client_docker: docker.DockerClient, service_monitor: ServiceMonitorDependant):
+        self.__docker = client_docker
+        self.__service_monitor = service_monitor
+
+        self.__configuration: TransactionConfiguration = cast(TransactionConfiguration, None)
+
+
 class ConnexionMiddleware:
     """
     Connexion au middleware de la MilleGrille en service.
@@ -1254,8 +1771,8 @@ class ConnexionMiddleware:
         self.__file_mongo_passwd: str = kwargs.get('mongo_passwd_file') or ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE
         self.__monitor_keycert_file: str
 
-        self.__contexte: ContexteRessourcesDocumentsMilleGrilles = None
-        self.__thread = None
+        self.__contexte: ContexteRessourcesDocumentsMilleGrilles = cast(ContexteRessourcesDocumentsMilleGrilles, None)
+        self.__thread: Thread = cast(Thread, None)
         self.__channel = None
 
         self.__fermeture_event = Event()
@@ -1473,513 +1990,6 @@ class ConnexionMiddleware:
         return self.__contexte.generateur_transactions
 
 
-class GestionnaireModulesDocker:
-
-    # Liste de modules requis. L'ordre est important
-    MODULES_REQUIS = [
-        ConstantesServiceMonitor.MODULE_MQ,
-        ConstantesServiceMonitor.MODULE_MONGO,
-        ConstantesServiceMonitor.MODULE_TRANSACTION,
-        ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-        # ConstantesServiceMonitor.MODULE_CEDULEUR,
-        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-        ConstantesServiceMonitor.MODULE_COUPDOEIL,
-        ConstantesServiceMonitor.MODULE_TRANSMISSION,
-        ConstantesServiceMonitor.MODULE_DOMAINES,
-    ]
-
-    MODULES_HEBERGEMENT = [
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
-    ]
-
-    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event):
-        self.__idmg = idmg
-        self.__docker = docker_client
-        self.configuration_json = None
-        self.__fermeture_event = fermeture_event
-        self.__thread_events: Thread = None
-        self.__event_stream = None
-        self.__modules_requis = GestionnaireModulesDocker.MODULES_REQUIS.copy()
-        self.__hebergement_actif = False
-
-        self.__mappings = {
-            'IDMG': self.__idmg,
-            'IDMGLOWER': self.__idmg.lower(),
-            'IDMGTRUNCLOWER': self.idmg_tronque,
-            'MONGO_INITDB_ROOT_USERNAME': 'admin',
-            'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
-        }
-
-        self.__event_listeners = list()
-
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def start_events(self):
-        self.__thread_events = Thread(target=self.ecouter_events, name='events', daemon=True)
-        self.__thread_events.start()
-
-    def fermer(self):
-        try:
-            self.__event_stream.close()
-        except Exception:
-            pass
-
-    def add_event_listener(self, listener):
-        self.__event_listeners.append(listener)
-
-    def remove_event_listener(self, listener):
-        self.__event_listeners = [l for l in self.__event_listeners if l is not listener]
-
-    def ecouter_events(self):
-        self.__logger.info("Debut ecouter events docker")
-        self.__event_stream = self.__docker.events()
-        for event in self.__event_stream:
-            self.__logger.debug("Event : %s", str(event))
-            to_remove = list()
-            for listener in self.__event_listeners:
-                try:
-                    listener.event(event)
-                except Exception:
-                    self.__logger.exception("Erreur event listener")
-                    to_remove.append(listener)
-
-            for listener in to_remove:
-                self.remove_event_listener(listener)
-
-            if self.__fermeture_event.is_set():
-                break
-        self.__logger.info("Fin ecouter events docker")
-
-    def initialiser_millegrille(self):
-        # Creer reseau pour cette millegrille
-        network_name = 'mg_' + self.__idmg + '_net'
-        labels = {'millegrille': self.__idmg}
-        self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
-
-    def configurer_monitor(self):
-        """
-        Ajoute les element de configuration generes (e.g. secrets).
-        :return:
-        """
-        noms_secrets = {
-            'passwd.mongo': ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE,
-            'passwd.mq': ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE,
-            'passwd.mongoxpweb': ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE,
-            ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
-            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem',
-            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
-        }
-
-        liste_secrets = list()
-        for nom_secret, nom_fichier in noms_secrets.items():
-            self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
-            secret_reference = self.trouver_secret(nom_secret)
-            secret_reference['filename'] = nom_fichier
-            secret_reference['uid'] = 0
-            secret_reference['gid'] = 0
-            secret_reference['mode'] = 0o444
-
-            liste_secrets.append(SecretReference(**secret_reference))
-
-        network = NetworkAttachmentConfig(target='mg_%s_net' % self.__idmg)
-
-        # Ajouter secrets au service monitor
-        filtre = {'name': 'service_monitor'}
-        services_list = self.__docker.services.list(filters=filtre)
-        service_monitor = services_list[0]
-        service_monitor.update(secrets=liste_secrets, networks=[network])
-
-    def entretien_services(self):
-        """
-        Verifie si les services sont actifs, les demarre au besoin.
-        :return:
-        """
-        filtre = {'name': self.idmg_tronque + '_'}
-        liste_services = self.__docker.services.list(filters=filtre)
-        dict_services = dict()
-        for service in liste_services:
-            service_name = service.name.split('_')[1]
-            dict_services[service_name] = service
-
-        for service_name in self.__modules_requis:
-            params = ServiceMonitor.DICT_MODULES[service_name]
-            service = dict_services.get(service_name)
-            if not service:
-                try:
-                    self.demarrer_service(service_name, **params)
-                except IndexError:
-                    self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
-                break  # On demarre un seul service a la fois, on attend qu'il soit pret
-            else:
-                # Verifier etat service
-                self.verifier_etat_service(service)
-
-    def demarrer_service(self, service_name: str, **kwargs):
-        self.__logger.info("Demarrage service %s", service_name)
-        configuration_service = ServiceMonitor.DICT_MODULES.get(service_name)
-
-        if configuration_service:
-            # S'assurer que le certificat existe et est a date
-            pass
-
-        gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
-
-        nom_image_docker = kwargs.get('nom') or service_name
-        image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
-
-        # Prendre un tag au hasard
-        image_tag = image.tags[0]
-
-        configuration = self.__formatter_configuration_service(service_name)
-
-        constraints = configuration.get('constraints')
-        if constraints:
-            self.__add_node_labels(constraints)
-
-        try:
-            self.__docker.services.create(image_tag, **configuration)
-        except APIError as apie:
-            if apie.status_code == 409:
-                self.__logger.info("Service %s deja demarre" % service_name)
-            else:
-                self.__logger.exception("Erreur demarrage service %s" % service_name)
-
-    def supprimer_service(self, service_name: str):
-        filter = {'name': self.idmg_tronque + '_' + service_name}
-        service_list = self.__docker.services.list(filters=filter)
-        service_list[0].remove()
-
-    def activer_hebergement(self):
-        """
-        Active les modules d'hebergement (si pas deja fait).
-        :return:
-        """
-        if not self.__hebergement_actif:
-            # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
-            path_hebergement = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES, self.__idmg, 'mounts/hebergement')
-            try:
-                os.mkdir(path_hebergement, mode=0o770)
-            except FileExistsError:
-                self.__logger.debug("Repertoire %s existe, ok" % path_hebergement)
-            
-            # Ajouter modules requis
-            modules_requis = set(self.__modules_requis)
-            modules_requis.update(self.MODULES_HEBERGEMENT)
-            self.__modules_requis = list(modules_requis)
-
-            for service_name in self.MODULES_HEBERGEMENT:
-                module_config = ServiceMonitor.DICT_MODULES[service_name]
-                self.demarrer_service(service_name, **module_config)
-
-            self.__hebergement_actif = True
-
-    def desactiver_hebergement(self):
-        if self.__hebergement_actif:
-            modules_requis = set(self.__modules_requis)
-            modules_requis.difference_update(self.MODULES_HEBERGEMENT)
-            self.__modules_requis = list(modules_requis)
-
-            for service_name in self.MODULES_HEBERGEMENT:
-                try:
-                    self.supprimer_service(service_name)
-                except IndexError:
-                    self.__logger.warning("Erreur retrait service %s" % service_name)
-                self.__hebergement_actif = False
-
-    def verifier_etat_service(self, service):
-        update_state = None
-        update_status = service.attrs.get('UpdateStatus')
-        if update_status is not None:
-            update_state = update_status['State']
-
-        # Compter le nombre de taches actives
-        running = list()
-
-        for task in service.tasks():
-            status = task['Status']
-            state = status['State']
-            desired_state = task['DesiredState']
-            if state == 'running' or desired_state == 'running' or update_state == 'updating':
-                # Le service est actif
-                running.append(running)
-
-        if len(running) == 0:
-            # Redemarrer
-            self.__logger.info("Redemarrer service %s", service.name)
-            service.force_update()
-
-    def charger_config(self, config_name):
-        filtre = {'name': config_name}
-        return b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data'])
-
-    def __trouver_config(self, config_name):
-        return GestionnaireModulesDocker.trouver_config(config_name, self.__idmg[0:12], self.__docker)
-
-    @ staticmethod
-    def trouver_config(config_name: str, idmg_tronque: str, docker_client: docker.DockerClient):
-        config_names = config_name.split(';')
-        configs = None
-        for config_name_val in config_names:
-            filtre = {'name': idmg_tronque + '.' + config_name_val}
-            configs = docker_client.configs.list(filters=filtre)
-            if len(configs) > 0:
-                break
-
-        # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
-        date_config: int = None
-        config_retenue = None
-        for config in configs:
-            nom_config = config.name
-            split_config = nom_config.split('.')
-            date_config_str = split_config[-1]
-            date_config_int = int(date_config_str)
-            if not date_config or date_config_int > date_config:
-                date_config = date_config_int
-                config_retenue = config
-
-        return {
-            'config_reference': {
-                'config_id': config_retenue.attrs['ID'],
-                'config_name': config_retenue.name,
-            },
-            'date': str(date_config),
-            'config': config_retenue,
-        }
-
-    def trouver_secret(self, secret_name):
-        secret_names = secret_name.split(';')
-        secrets = None
-        for secret_name_val in secret_names:
-            filtre = {'name': self.idmg_tronque + '.' + secret_name_val}
-            secrets = self.__docker.secrets.list(filters=filtre)
-            if len(secrets) > 0:
-                break
-
-        # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
-        date_secret: int = None
-        secret_retenue = None
-        for secret in secrets:
-            nom_secret = secret.name
-            split_secret = nom_secret.split('.')
-            date_secret_str = split_secret[-1]
-            date_secret_int = int(date_secret_str)
-            if not date_secret or date_secret_int > date_secret:
-                date_secret = date_secret_int
-                secret_retenue = secret
-
-        return {
-            'secret_id': secret_retenue.attrs['ID'],
-            'secret_name': secret_retenue.name,
-            'date': date_secret,
-        }
-
-    def __trouver_secret_matchdate(self, secret_names, date_secrets: dict):
-        for secret_name in secret_names.split(';'):
-            secret_name_split = secret_name.split('.')[0:2]
-            secret_name_split.append('cert')
-            config_name = '.'.join(secret_name_split)
-            try:
-                date_secret = date_secrets[config_name]
-
-                nom_filtre = self.idmg_tronque + '.' + secret_name + '.' + date_secret
-                filtre = {'name': nom_filtre}
-                secrets = self.__docker.secrets.list(filters=filtre)
-
-                if len(secrets) != 1:
-                    raise ValueError("Le secret_name ne correspond pas a un secret : %s", nom_filtre)
-
-                secret = secrets[0]
-
-                return {
-                    'secret_id': secret.attrs['ID'],
-                    'secret_name': secret.name,
-                    'date': date_secret,
-                }
-
-            except KeyError:
-                continue
-
-    def __mapping(self, valeur: str):
-        for cle, valeur_mappee in self.__mappings.items():
-            cle = cle.upper()
-            valeur = valeur.replace('${%s}' % cle, valeur_mappee)
-
-        return valeur
-
-    def __formatter_configuration_service(self, service_name):
-        config_service = json.loads(self.charger_config('docker.cfg.' + service_name))
-        self.__logger.debug("Configuration service %s : %s", service_name, str(config_service))
-
-        dict_config_docker = self.__remplacer_variables(service_name, config_service)
-
-        return dict_config_docker
-
-    def __remplacer_variables(self, nom_service, config_service):
-        self.__logger.debug("Remplacer variables %s" % nom_service)
-        dict_config_docker = dict()
-
-        try:
-            # Name
-            dict_config_docker['name'] = self.idmg_tronque + '_' + config_service['name']
-
-            hostname = config_service.get('hostname')
-            if hostname:
-                dict_config_docker['hostname'] = hostname
-
-            # Resources
-            config_args = config_service.get('args')
-            if config_args:
-                dict_config_docker['args'] = config_args
-
-            # Resources
-            config_resources = config_service.get('resources')
-            if config_resources:
-                dict_config_docker['resources'] = Resources(**config_resources)
-
-            # Restart Policy
-            config_restart_policy = config_service.get('restart_policy')
-            if config_restart_policy:
-                dict_config_docker['restart_policy'] = RestartPolicy(**config_restart_policy)
-
-            # Service Mode
-            config_service_mode = config_service.get('mode')
-            if config_service_mode:
-                dict_config_docker['mode'] = ServiceMode(**config_service_mode)
-
-            # Variables d'environnement, inclus mapping
-            config_env = config_service.get('env')
-            if config_env:
-                # Mapping des variables
-                config_env = [self.__mapping(valeur) for valeur in config_env]
-                dict_config_docker['env'] = config_env
-
-            # Constraints
-            config_constraints = config_service.get('constraints')
-            if config_constraints:
-                dict_config_docker['constraints'] = config_constraints
-
-            # Service labels
-            config_labels = config_service.get('labels')
-            if config_labels:
-                updated_labels = dict()
-                for key, value in config_labels.items():
-                    value = self.__mapping(value)
-                    updated_labels[key] = value
-                dict_config_docker['labels'] = updated_labels
-
-            # Container labels
-            config_container_labels = config_service.get('container_labels')
-            if config_container_labels:
-                updated_labels = dict()
-                for key, value in config_container_labels.items():
-                    value = self.__mapping(value)
-                    updated_labels[key] = value
-                dict_config_docker['container_labels'] = updated_labels
-
-            # Networks
-            config_networks = config_service.get('networks')
-            if config_networks:
-                networks = list()
-                for network in config_networks:
-                    network['target'] = self.__mapping(network['target'])
-                    networks.append(NetworkAttachmentConfig(**network))
-
-                dict_config_docker['networks'] = networks
-
-            # Configs
-            config_configs = config_service.get('configs')
-            dates_configs = dict()
-            if config_configs:
-                liste_configs = list()
-                for config in config_configs:
-                    self.__logger.debug("Mapping configs %s" % config)
-                    config_name = config['name']
-                    config_dict = self.__trouver_config(config_name)
-
-                    config_reference = config_dict['config_reference']
-                    config_reference['filename'] = config['filename']
-                    config_reference['uid'] = config.get('uid') or 0
-                    config_reference['gid'] = config.get('gid') or 0
-                    config_reference['mode'] = config.get('mode') or 0o444
-                    liste_configs.append(ConfigReference(**config_reference))
-
-                    dates_configs[config_name] = config_dict['date']
-
-                dict_config_docker['configs'] = liste_configs
-
-            # Secrets
-            config_secrets = config_service.get('secrets')
-            if config_secrets:
-                liste_secrets = list()
-                for secret in config_secrets:
-                    self.__logger.debug("Mapping secret %s" % secret)
-                    secret_name = secret['name']
-                    if secret.get('match_config'):
-                        secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
-                    else:
-                        secret_reference = self.trouver_secret(secret_name)
-
-                    secret_reference['filename'] = secret['filename']
-                    secret_reference['uid'] = secret.get('uid') or 0
-                    secret_reference['gid'] = secret.get('gid') or 0
-                    secret_reference['mode'] = secret.get('mode') or 0o444
-
-                    del secret_reference['date']  # Cause probleme lors du chargement du secret
-                    liste_secrets.append(SecretReference(**secret_reference))
-
-                dict_config_docker['secrets'] = liste_secrets
-
-            # Ports
-            config_endpoint_spec = config_service.get('endpoint_spec')
-            if config_endpoint_spec:
-                ports = dict()
-                mode = config_endpoint_spec.get('mode') or 'vip'
-                for port in config_endpoint_spec.get('ports'):
-                    published_port = port['published_port']
-                    target_port = port['target_port']
-                    protocol = port.get('protocol') or 'tcp'
-                    publish_mode = port.get('publish_mode')
-
-                    if protocol or publish_mode:
-                        ports[published_port] = (target_port, protocol, publish_mode)
-                    else:
-                        ports[published_port] = target_port
-
-                dict_config_docker['endpoint_spec'] = EndpointSpec(mode=mode, ports=ports)
-
-            # Mounts
-            config_mounts = config_service.get('mounts')
-            if config_mounts:
-                dict_config_docker['mounts'] = [self.__mapping(mount) for mount in config_mounts]
-
-        except TypeError as te:
-            self.__logger.error("Erreur mapping %s", nom_service)
-            raise te
-
-        return dict_config_docker
-
-    def __add_node_labels(self, constraints: list):
-        labels_ajoutes = dict()
-        for constraint in constraints:
-            if '== true' in constraint:
-                valeurs = constraint.split('==')
-                labels_ajoutes[valeurs[0].strip().replace('node.labels.', '')] = valeurs[1].strip()
-
-        if len(labels_ajoutes) > 0:
-            nodename = self.__docker.info()['Name']
-            node_info = self.__docker.nodes.get(nodename)
-            node_spec = node_info.attrs['Spec']
-            labels = node_spec['Labels']
-            labels.update(labels_ajoutes)
-            node_info.update(node_spec)
-
-    @property
-    def idmg_tronque(self):
-        return self.__idmg[0:12]
 
 
 class GestionnaireComptesMQ:
@@ -1999,7 +2009,7 @@ class GestionnaireComptesMQ:
         self.__insecure_mode: bool = kwargs.get('insecure') or False
 
         self.__wait_event = Event()
-        self.__password_mq: str = None
+        self.__password_mq: str = cast(str, None)
 
         self.__path_ca = certificats['pki.millegrille.cert']
 
@@ -2196,7 +2206,7 @@ class GestionnaireImagesDocker:
         self.__docker = docker_client
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self.__versions_images: dict = None
+        self.__versions_images: dict = cast(dict, None)
 
     @property
     def tronquer_idmg(self):
@@ -2359,7 +2369,7 @@ class GestionnaireCommandes:
     Execute les commandes transmissions au service monitor (via MQ, unix pipe, etc.)
     """
 
-    def __init__(self, fermeture_event: Event, service_monitor: ServiceMonitor):
+    def __init__(self, fermeture_event: Event, service_monitor: Union[ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal]):
         self.__fermeture_event = fermeture_event
         self._service_monitor = service_monitor
 
