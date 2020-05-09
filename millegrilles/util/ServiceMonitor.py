@@ -359,7 +359,7 @@ class ServiceMonitor:
         os.chmod(PATH_FIFO, 0o620)
 
         # Verifier si on doit creer une instance (utilise pour override dans sous-classe)
-        if self._gestionnaire_certificats is None:
+        if self._gestionnaire_commandes is None:
             self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
 
         self._gestionnaire_commandes.start()
@@ -443,9 +443,6 @@ class ServiceMonitor:
         if besoin_initialiser:
             # Generer certificat de MilleGrille
             self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
-
-            if self._args.dev:
-                self._gestionnaire_certificats.sauvegarder_secrets()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event)
         self._gestionnaire_docker.start_events()
@@ -572,8 +569,18 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         self.__logger.info("Fermeture du ServiceMonitor")
         self.fermer()
 
-    def _classe_configuration(self):
-        return GestionnaireCertificatsNoeudProtegePrincipal
+    def preparer_gestionnaire_certificats(self):
+        params = dict()
+        if self._args.dev:
+            params['insecure'] = True
+        if self._args.secrets:
+            params['secrets'] = self._args.secrets
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegePrincipal(self._docker, **params)
+
+    def preparer_gestionnaire_commandes(self):
+        self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
+
+        super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
 
 
 class ServiceMonitorDependant(ServiceMonitor):
@@ -783,17 +790,18 @@ class GestionnaireCertificats:
             self._clecert_millegrille.cert_from_pem_bytes(cert_pem.encode('utf-8'))
         else:
             # Tenter de charger le certificat a partir de millegrille.configuration
-            config = self._docker.configs.get('millegrille.configuration')
-            config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
-            self._clecert_millegrille = EnveloppeCleCert()
-            self._clecert_millegrille.cert_from_pem_bytes(config_json['pem'].encode('utf-8'))
+            try:
+                config = self._docker.configs.get('millegrille.configuration')
+                config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
+                self._clecert_millegrille = EnveloppeCleCert()
+                self._clecert_millegrille.cert_from_pem_bytes(config_json['pem'].encode('utf-8'))
+            except docker.errors.NotFound:
+                self.__logger.info("millegrille.configuration abstente : Nouvelle MilleGrille, noeud principal.")
 
         # Calculer le IDMG a partir du certificat de MilleGrille
         if self._clecert_millegrille:
             self.idmg = self._clecert_millegrille.idmg
             self.__logger.info("Gestionnaire certificat, idmg : %s" % self.idmg)
-        else:
-            self.__logger.warning("configuration.millegrille n'existe pas")
 
     def maj_date(self):
         self._date = str(datetime.datetime.utcnow().strftime(DOCKER_LABEL_TIME))
@@ -1022,24 +1030,6 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         return clecert
 
-    def sauvegarder_secrets(self):
-        """
-        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
-        :return:
-        """
-        super().sauvegarder_secrets()
-        secret_path = path.abspath(self.secret_path)
-
-        # Sauvegarder information certificat intermediaire
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self._clecert_intermediaire.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
-            fichiers.write(self._clecert_intermediaire.password)
-
-        # Sauvegarder information certificat monitor
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_monitor.private_key_bytes)
-
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
         os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
@@ -1136,10 +1126,37 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Generer certificat pour monitor
         self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self._nodename)
 
+        if self._mode_insecure:
+            self.sauvegarder_secrets()
+
         # Generer mots de passes
         self.generer_motsdepasse()
 
         return self.idmg
+
+    def sauvegarder_secrets(self):
+        """
+        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
+        :return:
+        """
+        secret_path = path.abspath(self.secret_path)
+        os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
+
+        # Sauvegarder information certificat intermediaire
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_millegrille.private_key_bytes)
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_millegrille.password)
+
+        # Sauvegarder information certificat intermediaire
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_intermediaire.private_key_bytes)
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
+            fichiers.write(self._clecert_intermediaire.password)
+
+        # Sauvegarder information certificat monitor
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
+            fichiers.write(self.clecert_monitor.private_key_bytes)
 
 
 class TraitementMessages(BaseCallback):
@@ -1171,6 +1188,8 @@ class TraitementMessages(BaseCallback):
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
+        elif correlation_id == ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS:
+            self.__gestionnaire_commandes.traiter_reponse_comptes_noeuds(message_dict)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
@@ -1252,6 +1271,7 @@ class ConnexionMiddleware:
 
         self.__comptes_middleware_ok = False
         self.__comptes_mq_ok = False
+        self.__prochaine_verification_comptes_noeuds = datetime.datetime.utcnow().timestamp()
 
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
@@ -1414,6 +1434,8 @@ class ConnexionMiddleware:
             self.__comptes_mq_ok = comptes_mq_ok
 
     def __entretien(self):
+        ts_courant = datetime.datetime.utcnow().timestamp()
+
         # Transmettre requete pour avoir l'etat de l'hebergement
         self.generateur_transactions.transmettre_requete(
             dict(), Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
@@ -1421,6 +1443,14 @@ class ConnexionMiddleware:
             correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE
         )
 
+        if self.__prochaine_verification_comptes_noeuds < ts_courant:
+            self.generateur_transactions.transmettre_requete(
+                dict(),
+                Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
+                correlation_id = ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
+                reply_to=self.__commandes_handler.queue_name,
+            )
+            self.__prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
@@ -2434,30 +2464,31 @@ class GestionnaireCommandes:
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']
-        cert_pem = contenu['certificat']
+        cert_pem = contenu[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
         # chaine_pem = contenu['chaine']
 
+        self._ajouter_compte_pem(cert_pem, commande)
+
+    def _ajouter_compte_pem(self, cert_pem, commande):
         # Charger pem
         certificat = EnveloppeCleCert()
         certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
-
         try:
             gestionnaire_mongo: GestionnaireComptesMongo = self._service_monitor.gestionnaire_mongo
             gestionnaire_mongo.creer_compte(certificat)
         except DuplicateKeyError:
             self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
-
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
         gestionnaire_comptes_mq.ajouter_compte(certificat)
-
         # Transmettre reponse d'ajout de compte, au besoin
         properties = commande.get('properties')
         if properties:
             reply_to = properties.reply_to
             correlation_id = properties.correlation_id
 
-            self._service_monitor.generateur_transactions.transmettre_reponse(
-                {'resultat_ok': True}, reply_to, correlation_id)
+            if reply_to and correlation_id:
+                self._service_monitor.generateur_transactions.transmettre_reponse(
+                    {'resultat_ok': True}, reply_to, correlation_id)
 
     def activer_hebergement(self, message):
         self._service_monitor.gestionnaire_docker.activer_hebergement()
@@ -2472,6 +2503,14 @@ class GestionnaireCommandes:
             self.activer_hebergement(resultats)
         else:
             self.desactiver_hebergement(resultats)
+
+    def traiter_reponse_comptes_noeuds(self, message):
+        self.__logger.debug("Reponse comptes noeuds: %s" % str(message))
+        resultats = message['resultats']
+
+        for cert in resultats:
+            pem = cert[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+            self._ajouter_compte_pem(pem, message)
 
 
 class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):

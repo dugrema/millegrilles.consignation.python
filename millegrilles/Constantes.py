@@ -1448,6 +1448,7 @@ class ConstantesServiceMonitor:
     COMMANDE_AJOUTER_COMPTE = 'servicemonitor.ajouterCompte'
 
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
+    CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'
 
     GROUP_MILLEGRILLES = 'millegrilles'
     GROUP_MILLEGRILLES_GID = 980
