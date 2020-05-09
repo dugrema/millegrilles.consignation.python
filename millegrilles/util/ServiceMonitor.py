@@ -32,7 +32,7 @@ from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert, \
     ConstantesGenerateurCertificat
 from millegrilles.util.RabbitMQManagement import RabbitMQAPI
-from millegrilles.dao.Configuration import TransactionConfiguration
+from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -428,6 +428,9 @@ class GestionnaireModulesDocker:
     def charger_config(self, config_name):
         filtre = {'name': config_name}
         return b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data'])
+
+    def charger_config_recente(self, config_name):
+        return self.__trouver_config(config_name)
 
     def __trouver_config(self, config_name):
         return GestionnaireModulesDocker.trouver_config(config_name, self.__idmg[0:12], self.__docker)
@@ -1095,6 +1098,8 @@ class ServiceMonitorDependant(ServiceMonitor):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__event_attente = Event()
 
+        self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
+
     def fermer(self, signum=None, frame=None):
         super().fermer(signum, frame)
         self.__event_attente.set()
@@ -1154,9 +1159,9 @@ class ServiceMonitorDependant(ServiceMonitor):
         self._gestionnaire_certificats.generer_motsdepasse()
 
         # Sauvegarder information pour CSR, cle
-        cert_millegrille = json.dumps(self._configuration_json['pem'])
+        cert_millegrille = self._configuration_json['pem'].encode('utf-8')
         self._gestionnaire_certificats.ajouter_config(
-            name='pki.millegrille.cert', data=cert_millegrille.encode('utf-8'))
+            name='pki.millegrille.cert', data=cert_millegrille)
 
         print("Preparation CSR du noeud dependant terminee")
         print("Redemarrer le service monitor")
@@ -1201,6 +1206,13 @@ class ServiceMonitorDependant(ServiceMonitor):
         :return:
         """
         self.__logger.info("Verifier et attendre certificats du middleware")
+
+        # Charger certificats - copie les certs sous /tmp pour connecter a MQ
+        self._gestionnaire_certificats.charger_certificats()
+
+        # Connecter au MQ principal
+        self.__connexion_principal = ConnexionPrincipal(self._docker, self)
+        self.__connexion_principal.connecter()
 
         # Confirmer que les cles mq, mongo, mongoxp ont ete crees
         roles = [
@@ -1749,7 +1761,44 @@ class ConnexionPrincipal:
         self.__docker = client_docker
         self.__service_monitor = service_monitor
 
-        self.__configuration: TransactionConfiguration = cast(TransactionConfiguration, None)
+        self.__contexte: ContexteRessourcesMilleGrilles = cast(ContexteRessourcesMilleGrilles, None)
+
+    def connecter(self):
+        gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+        config_connexion_docker = gestionnaire_docker.charger_config_recente('millegrille.connexion')['config']
+        config_connexion = json.loads(b64decode(config_connexion_docker.attrs['Spec']['Data']))
+        # clecert_monitor = self.__service_monitor.clc
+
+        gestionnaire_certificats = self.__service_monitor.gestionnaire_certificats
+        certificats = gestionnaire_certificats.certificats
+        path_secrets = gestionnaire_certificats.secret_path
+        ca_certs_file = certificats['pki.millegrille.cert']
+        monitor_cert_file = certificats['pki.%s.cert' % ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT]
+        monitor_key_file = path.join(path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_DEPENDANT_KEY + '.pem')
+
+        node_name = config_connexion['principal_mq_url']
+
+        additionnals = [{
+            'MG_MQ_HOST': node_name,
+            'MG_MQ_PORT': 5673,
+            'MG_MQ_CA_CERTS': ca_certs_file,
+            'MG_MQ_CERTFILE': monitor_cert_file,
+            'MG_MQ_KEYFILE': monitor_key_file,
+            'MG_MQ_SSL': 'on',
+            'MG_MQ_AUTH_CERT': 'on',
+        }]
+
+        configuration = TransactionConfiguration()
+        self.__contexte = ContexteRessourcesMilleGrilles(configuration=configuration, additionals=additionnals)
+
+        # Connecter a MQ du noeud principal
+        self.__contexte.initialiser(init_message=True, connecter=True)
+
+        # self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
+        # self.__commandes_handler = TraitementMessages(self.__service_monitor.gestionnaire_commandes, self.__contexte)
+        #
+        # self.__contexte.message_dao.register_channel_listener(self)
+        # self.__contexte.message_dao.register_channel_listener(self.__commandes_handler)
 
 
 class ConnexionMiddleware:
