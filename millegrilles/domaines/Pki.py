@@ -41,6 +41,8 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
             reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'], properties)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
             reponse = self.gestionnaire.get_certificats_backup()
+        elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS:
+            reponse = self.gestionnaire.get_liste_certificats_noeuds()
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -288,6 +290,36 @@ class GestionnairePki(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
         }
         liste_certificats = collection_pki.find_one(filtre)
+
+        return liste_certificats
+
+    def get_liste_certificats_noeuds(self):
+        """
+        :return: Liste de certificats qui donnent acces a MQ pour les noeuds de la millegrille (e.g. service monitor)
+        """
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+        date_courante = datetime.datetime.utcnow()
+
+        roles = [
+            ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
+        ]
+
+        filtre = {
+            'sujet.organizationName': self._contexte.idmg,
+            'sujet.organizationalUnitName': {'$in': roles},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
+            'not_valid_after': {'$gt': date_courante},
+            'not_valid_before': {'$lt': date_courante},
+        }
+        curseur = collection_pki.find(filtre)
+
+        liste_certificats = list()
+        for cert in curseur:
+            cert_filtre = dict()
+            for key, value in cert.items():
+                if not key.startswith('_'):
+                    cert_filtre[key] = value
+            liste_certificats.append(cert_filtre)
 
         return liste_certificats
 
