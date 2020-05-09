@@ -1080,7 +1080,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             params['insecure'] = True
         if self._args.secrets:
             params['secrets'] = self._args.secrets
-        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegePrincipal(self._docker, **params)
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegePrincipal(self._docker, self, **params)
 
     def preparer_gestionnaire_commandes(self):
         self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
@@ -1238,8 +1238,17 @@ class ServiceMonitorDependant(ServiceMonitor):
         if self.__logger.isEnabledFor(logging.INFO):
             self.__logger.info("CSR a transmettre: %s" % json.dumps(liste_csr, indent=4))
 
-        # Transmettre commande de signature de certificats, attendre reponse
         self.__event_attente.clear()
+        commande = {
+            'liste_csr': liste_csr,
+        }
+        self.__connexion_principal.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.millegrilles.domaines.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
+            correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
+            reply_to=self.__connexion_principal.reply_q
+        )
+        # Transmettre commande de signature de certificats, attendre reponse
         while not self.__event_attente.is_set():
             self.__logger.info("Attente certificats signes du middleware")
             self.__event_attente.wait(120)
@@ -1271,7 +1280,7 @@ class ServiceMonitorDependant(ServiceMonitor):
             params['insecure'] = True
         if self._args.secrets:
             params['secrets'] = self._args.secrets
-        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegeDependant(self._docker, **params)
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudProtegeDependant(self._docker, self, **params)
 
     def preparer_gestionnaire_commandes(self):
         self._gestionnaire_commandes = GestionnaireCommandesNoeudProtegeDependant(self._fermeture_event, self)
@@ -1281,8 +1290,9 @@ class ServiceMonitorDependant(ServiceMonitor):
 
 class GestionnaireCertificats:
 
-    def __init__(self, docker_client: docker.DockerClient, **kwargs):
+    def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         self._docker = docker_client
+        self._service_monitor = service_monitor
         self._date: str = cast(str, None)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1419,6 +1429,23 @@ class GestionnaireCertificats:
 
         return cert_pem
 
+    def recevoir_certificat(self, message: dict):
+        self.__logger.info("Certificat recu :\n%s" % json.dumps(message, indent=2))
+        resultats = message['resultats']
+
+        for cert in resultats['certificats_pem']:
+            clecert = EnveloppeCleCert()
+            clecert.cert_from_pem_bytes(cert.encode('utf-8'))
+            subject_dict = clecert.formatter_subject()
+            role = subject_dict['organizationalUnitName']
+            label_role_cert = 'pki.%s.cert' % role
+            label_role_key = 'pki.%s.key' % role
+            info_role_key = self._service_monitor.gestionnaire_docker.trouver_secret(label_role_key)
+            date_key = info_role_key['date']
+            self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, cert, date_key)
+
+        self._service_monitor.trigger_event_attente()
+
     @property
     def idmg_tronque(self):
         return self.idmg[0:12]
@@ -1435,8 +1462,8 @@ class GestionnaireCertificats:
 
 class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
-    def __init__(self, docker_client: docker.DockerClient, **kwargs):
-        super().__init__(docker_client, **kwargs)
+    def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
+        super().__init__(docker_client, service_monitor, **kwargs)
         self._passwd_mq: str = cast(str, None)
 
     def generer_motsdepasse(self):
@@ -1461,8 +1488,8 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
 class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudPrive):
 
-    def __init__(self, docker_client: docker.DockerClient, **kwargs):
-        super().__init__(docker_client, **kwargs)
+    def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
+        super().__init__(docker_client, service_monitor, **kwargs)
         self._passwd_mongo: str = cast(str, None)
         self._passwd_mongoxp: str = cast(str, None)
 
@@ -1521,8 +1548,8 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
 
 class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudProtegeDependant):
 
-    def __init__(self, docker_client: docker.DockerClient, **kwargs):
-        super().__init__(docker_client, **kwargs)
+    def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
+        super().__init__(docker_client, service_monitor, **kwargs)
         self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
         self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
@@ -1762,6 +1789,7 @@ class ConnexionPrincipal:
         self.__service_monitor = service_monitor
 
         self.__contexte: ContexteRessourcesMilleGrilles = cast(ContexteRessourcesMilleGrilles, None)
+        self.__traitement_messages_principal: TraitementMessagesConnexionPrincipale = cast(TraitementMessagesConnexionPrincipale, None)
 
     def connecter(self):
         gestionnaire_docker = self.__service_monitor.gestionnaire_docker
@@ -1794,11 +1822,78 @@ class ConnexionPrincipal:
         # Connecter a MQ du noeud principal
         self.__contexte.initialiser(init_message=True, connecter=True)
 
-        # self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
-        # self.__commandes_handler = TraitementMessages(self.__service_monitor.gestionnaire_commandes, self.__contexte)
-        #
-        # self.__contexte.message_dao.register_channel_listener(self)
-        # self.__contexte.message_dao.register_channel_listener(self.__commandes_handler)
+        self.__traitement_messages_principal = TraitementMessagesConnexionPrincipale(self.__service_monitor, self.__contexte)
+        self.__contexte.message_dao.register_channel_listener(self.__traitement_messages_principal)
+
+    @property
+    def reply_q(self):
+        return self.__traitement_messages_principal.queue_name
+
+    @property
+    def generateur_transactions(self):
+        return self.__contexte.generateur_transactions
+
+
+class TraitementMessagesConnexionPrincipale(BaseCallback):
+
+    def __init__(self, service_monitor: ServiceMonitorDependant, contexte: ContexteRessourcesMilleGrilles):
+        super().__init__(contexte)
+        self.__service_monitor = service_monitor
+        self.__channel = None
+        self.queue_name = None
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        correlation_id = properties.correlation_id
+        exchange = method.exchange
+
+        self.__logger.debug("Message recu : %s" % message_dict)
+
+        if correlation_id == ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE:
+            self.__service_monitor.gestionnaire_certificats.recevoir_certificat(message_dict)
+        else:
+            raise ValueError("Type message inconnu", correlation_id, routing_key)
+
+    def on_channel_open(self, channel):
+        self.__channel = channel
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=1)
+
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+
+    def queue_open(self, queue):
+        self.queue_name = queue.method.queue
+        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+
+        # Ajouter les routing keys
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_middleware,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitordependant.#',
+            callback=None
+        )
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_noeuds,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitor.activerHebergement',
+            callback=None
+        )
+        self.__channel.queue_bind(
+            exchange=self.configuration.exchange_noeuds,
+            queue=self.queue_name,
+            routing_key='commande.servicemonitor.desactiverHebergement',
+            callback=None
+        )
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+        self.queue_name = None
+
+    def is_channel_open(self):
+        return self.__channel is not None and not self.__channel.is_closed
 
 
 class ConnexionMiddleware:
