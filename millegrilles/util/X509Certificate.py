@@ -334,7 +334,6 @@ class EnveloppeCleCert:
         return ','.join(subject_list)
 
 
-
 class GenerateurCertificat:
 
     def __init__(self, idmg):
@@ -1665,6 +1664,16 @@ class RenouvelleurCertificat:
         self.__clecert_millegrille_nouveau = clecert
 
         return clecert
+
+    def signer_csr(self, csr_bytes: bytes):
+        csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+        sujet_dict = dict()
+        for elem in csr.subject:
+            sujet_dict[elem.oid._name] = elem.value
+        role = sujet_dict['organizationalUnitName']
+        common_name = sujet_dict['commonName']
+
+        return self.renouveller_avec_csr(role, common_name, csr_bytes)
 
     def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())

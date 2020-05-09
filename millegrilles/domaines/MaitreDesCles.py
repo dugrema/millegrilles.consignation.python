@@ -97,6 +97,9 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
         elif routing_key == 'commande.%s.%s' % (
             ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_RESTAURER_BACKUP_CLES):
                 resultat = self.gestionnaire.restaurer_backup_cles(properties, message_dict)
+        elif routing_key == 'commande.%s.%s' % (
+            ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR):
+                resultat = self.gestionnaire.signer_csr(properties, message_dict)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -886,6 +889,43 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
+    def signer_csr(self, properties, message_dict):
+        """
+        Signer des requetes (CSR) et retourner les certificats
+        :param properties:
+        :param message_dict:
+        :return:
+        """
+        # Verifier si le demandeur est autorise
+        enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
+        roles_permis = [
+            ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
+            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+            ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+        ]
+        roles_cert = enveloppe_cert.get_roles
+        if enveloppe_cert.subject_organization_name == self.configuration.idmg and \
+            any([role in roles_cert] for role in roles_permis):
+
+            # Generer certificats
+            pems = list()
+            for pem in message_dict['liste_csr']:
+                clecert = self.__renouvelleur_certificat.signer_csr(pem.encode('utf-8'))
+                pems.append(str(clecert.cert_bytes, 'utf-8'))
+
+                # Soumettre transaction du nouveau certificat
+                self.soumettre_transaction_certificat(clecert)
+
+            # Transmettre certificats en reponse
+            reponse = {
+                'certificats_pem': pems
+            }
+            return reponse
+            # self.generateur_transactions.transmettre_reponse(
+            #     reponse, replying_to=properties.reply_to, correlation_id=properties.correlation_id)
+        else:
+            raise Exception("Certificat non autorise pour signature de CSR : %s" % str(roles_cert))
+
     def sauvegarder_trousseau_hebergement(self, transaction):
         """
         Conserve le trousseau (certs, cles) dans un document d'hebergement
@@ -1313,6 +1353,21 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             'trousseau': transaction_trousseau,
             'motsdepasse': transactions_motsdepasse,
         }
+
+    def soumettre_transaction_certificat(self, clecert):
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+        self.generateur_transactions.soumettre_transaction(
+            transaction,
+            domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -1752,19 +1807,7 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         clecert = generateur.renouveller_avec_csr(role, node_name, csr_bytes)
 
         # Generer nouvelle transaction pour sauvegarder le certificat
-        transaction = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
-            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
-            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
-            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
-            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
-            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
-        }
-        self._controleur.generateur_transactions.soumettre_transaction(
-            transaction,
-            domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-        )
+        self.controleur.gestionnaire.soumettre_transaction_certificat(clecert)
 
         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
 
