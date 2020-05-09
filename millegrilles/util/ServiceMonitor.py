@@ -2451,7 +2451,7 @@ class GestionnaireCommandes:
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']
-        cert_pem = contenu['certificat']
+        cert_pem = contenu[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
         # chaine_pem = contenu['chaine']
 
         # Charger pem
@@ -2473,8 +2473,9 @@ class GestionnaireCommandes:
             reply_to = properties.reply_to
             correlation_id = properties.correlation_id
 
-            self._service_monitor.generateur_transactions.transmettre_reponse(
-                {'resultat_ok': True}, reply_to, correlation_id)
+            if reply_to and correlation_id:
+                self._service_monitor.generateur_transactions.transmettre_reponse(
+                    {'resultat_ok': True}, reply_to, correlation_id)
 
     def activer_hebergement(self, message):
         self._service_monitor.gestionnaire_docker.activer_hebergement()

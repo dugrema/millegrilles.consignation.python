@@ -1854,7 +1854,7 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
         }
         self._controleur.generateur_transactions.transmettre_commande(
             commande_creation_compte,
-            'commande.monitor.ajouterCompteMq'
+            'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE
         )
 
         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
