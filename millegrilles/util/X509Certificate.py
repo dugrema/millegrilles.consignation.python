@@ -1711,7 +1711,7 @@ class RenouvelleurCertificat:
                 sujet_dict[elem.oid._name] = elem.value
             role = sujet_dict['organizationalUnitName']
             common_name = sujet_dict['commonName']
-            clecert = self.renouveller_par_role(role, common_name)
+            clecert = self.renouveller_avec_csr(role, common_name, csr_bytes)
 
         return clecert
 
