@@ -712,7 +712,7 @@ class ServiceMonitorDependant(ServiceMonitor):
                 # Creer la cle, CSR correspondant
                 info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev)
                 csr = info_csr['request']
-            liste_csr.append(csr)
+            liste_csr.append(str(csr, 'utf-8'))
 
         if self.__logger.isEnabledFor(logging.INFO):
             self.__logger.info("CSR a transmettre: %s" % json.dumps(liste_csr, indent=4))
