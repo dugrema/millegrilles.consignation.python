@@ -1271,6 +1271,7 @@ class ConnexionMiddleware:
 
         self.__comptes_middleware_ok = False
         self.__comptes_mq_ok = False
+        self.__prochaine_verification_comptes_noeuds = datetime.datetime.utcnow().timestamp()
 
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
@@ -1433,18 +1434,23 @@ class ConnexionMiddleware:
             self.__comptes_mq_ok = comptes_mq_ok
 
     def __entretien(self):
+        ts_courant = datetime.datetime.utcnow().timestamp()
+
         # Transmettre requete pour avoir l'etat de l'hebergement
         self.generateur_transactions.transmettre_requete(
             dict(), Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
             reply_to=self.__commandes_handler.queue_name,
             correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE
         )
-        self.generateur_transactions.transmettre_requete(
-            dict(),
-            Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
-            correlation_id = ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
-            reply_to=self.__commandes_handler.queue_name,
-        )
+
+        if self.__prochaine_verification_comptes_noeuds < ts_courant:
+            self.generateur_transactions.transmettre_requete(
+                dict(),
+                Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
+                correlation_id = ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
+                reply_to=self.__commandes_handler.queue_name,
+            )
+            self.__prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
