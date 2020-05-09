@@ -884,12 +884,9 @@ class ServiceMonitor:
             self._securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
-        except HTTPError as he:
-            if he.status_code == 404:
-                # La configuration n'existe pas
-                pass
-            else:
-                raise he
+        except docker.errors.NotFound as he:
+            # La configuration n'existe pas
+            pass
 
     def _classe_configuration(self):
         """
