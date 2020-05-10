@@ -2161,9 +2161,6 @@ class ConnexionMiddleware:
     def generateur_transactions(self):
         return self.__contexte.generateur_transactions
 
-
-
-
 class GestionnaireComptesMQ:
     """
     Permet de gerer les comptes RabbitMQ via connexion https a la management console.
@@ -2281,11 +2278,10 @@ class GestionnaireComptesMQ:
             "durable": True,
             "internal": False
         }
-        self._admin_api.create_exchange_for_vhost('millegrilles.middleware', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.noeuds', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.private', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.public', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('millegrilles.inter', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('4.secure', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('3.protege', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('2.prive', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost('1.public', idmg, params_exchange)
 
     def entretien(self):
         try:
@@ -2294,7 +2290,7 @@ class GestionnaireComptesMQ:
                 # Verifier vhost, compte admin
                 self.__entretien_comptes_mq()
         except SSLError:
-            self.__logger.debug("SSL Erreur sur MQ, initialisation incorrecte")
+            self.__logger.exception("SSL Erreur sur MQ, initialisation incorrecte")
         except HTTPError as httpe:
             if httpe.response.status_code == 401:
                 # Erreur authentification, tenter d'initialiser avec compte guest
