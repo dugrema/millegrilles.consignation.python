@@ -38,7 +38,7 @@ class ConsignateurTransaction(ModeleConfiguration):
     # Initialise les DAOs, connecte aux serveurs.
     def initialiser(self, init_document=True, init_message=True, connecter=True):
         super().initialiser(init_document, init_message, connecter)
-        self.initialiser_2()
+        # self.initialiser_2()
 
     def initialiser_2(self, contexte=None):
         super().initialiser_2(contexte)
@@ -511,6 +511,8 @@ class EvenementTransactionCallback(BaseCallback):
     def on_channel_open(self, channel):
         self.__channel = channel
 
+        self._logger.debug("Chargement channel evenements : %s" % str(channel))
+
         evenements_queue_name = self.contexte.configuration.queue_evenements_transactions
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
@@ -533,18 +535,20 @@ class EntretienCollectionsDomaines(BaseCallback):
         self.__channel = None
         self.__throttle_event = Event()
 
-        self.__liste_domaines = [
-            'millegrilles.domaines.Annuaire',
-            'millegrilles.domaines.Backup',
-            'millegrilles.domaines.GrosFichiers',
-            'millegrilles.domaines.MaitreDesCles',
-            'millegrilles.domaines.Parametres',
-            'millegrilles.domaines.Plume',
-            'millegrilles.domaines.Principale',
-            'millegrilles.domaines.SenseursPassifs',
-            'millegrilles.domaines.Pki',
-            'millegrilles.domaines.Hebergement',
-        ]
+        self.__liste_domaines = dict()
+
+        # self.__liste_domaines = [
+        #     'millegrilles.domaines.Annuaire',
+        #     'millegrilles.domaines.Backup',
+        #     'millegrilles.domaines.GrosFichiers',
+        #     'millegrilles.domaines.MaitreDesCles',
+        #     'millegrilles.domaines.Parametres',
+        #     'millegrilles.domaines.Plume',
+        #     'millegrilles.domaines.Principale',
+        #     'millegrilles.domaines.SenseursPassifs',
+        #     'millegrilles.domaines.Pki',
+        #     'millegrilles.domaines.Hebergement',
+        # ]
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -556,7 +560,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         self.__logger.info("Entretien initial transactions")
         try:
             self._setup_transaction()
-            self._setup_index_domaines()
+            # self._setup_index_domaines()
             self.__thread_entretien = None  # Cleanup thread termine
             self.__logger.info("FIN Entretien initial transactions")
         except Exception:
@@ -583,61 +587,60 @@ class EntretienCollectionsDomaines(BaseCallback):
             name='domaine-libelle'
         )
 
-    def _setup_index_domaines(self):
-        for nom_collection_transaction in self.__liste_domaines:
-            try:
-                collection = self.contexte.document_dao.get_collection(nom_collection_transaction)
-                champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
-                champ_persiste = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
-                champ_traitee = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
-                champ_backup_flag = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
+    def _setup_index_domaines(self, nom_collection_transaction):
+        try:
+            collection = self.contexte.document_dao.get_collection(nom_collection_transaction)
+            champ_complete = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
+            champ_persiste = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_DOCUMENT_PERSISTE)
+            champ_traitee = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_TRAITEE)
+            champ_backup_flag = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
 
-                # en-tete.uuid-transaction
-                collection.create_index(
-                    [
-                        ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID), 1)
-                    ],
-                    name='uuid_transaction',
-                    unique=True,
-                )
+            # en-tete.uuid-transaction
+            collection.create_index(
+                [
+                    ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID), 1)
+                ],
+                name='uuid_transaction',
+                unique=True,
+            )
 
-                # _evenements.estampille
-                collection.create_index(
-                    [
-                        ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE), -1)
-                    ],
-                    name='estampille'
-                )
+            # _evenements.estampille
+            collection.create_index(
+                [
+                    ('%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_ESTAMPILLE), -1)
+                ],
+                name='estampille'
+            )
 
-                # _evenements.transaction_traitee
-                collection.create_index(
-                    [
-                        (champ_complete, 1),
-                        (champ_traitee, 1)
-                    ],
-                    name='transaction_traitee'
-                )
+            # _evenements.transaction_traitee
+            collection.create_index(
+                [
+                    (champ_complete, 1),
+                    (champ_traitee, 1)
+                ],
+                name='transaction_traitee'
+            )
 
-                # _evenements.transaction_persistee
-                collection.create_index(
-                    [
-                        (champ_complete, 1),
-                        (champ_persiste, 1)
-                    ],
-                    name='transaction_persistee'
-                )
+            # _evenements.transaction_persistee
+            collection.create_index(
+                [
+                    (champ_complete, 1),
+                    (champ_persiste, 1)
+                ],
+                name='transaction_persistee'
+            )
 
-                # _evenements.backup_horaire
-                collection.create_index(
-                    [
-                        (champ_complete, 1),
-                        (champ_backup_flag, 1)
-                    ],
-                    name='transaction_backup_flag'
-                )
+            # _evenements.backup_horaire
+            collection.create_index(
+                [
+                    (champ_complete, 1),
+                    (champ_backup_flag, 1)
+                ],
+                name='transaction_backup_flag'
+            )
 
-            except Exception:
-                self.__logger.exception("Erreur creation index de transactions dans %s" % nom_collection_transaction)
+        except Exception:
+            self.__logger.exception("Erreur creation index de transactions dans %s" % nom_collection_transaction)
 
     def _verifier_signature(self):
         delta_verif = datetime.timedelta(minutes=5)
@@ -785,19 +788,22 @@ class EntretienCollectionsDomaines(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         exchange = method.exchange
-        indicateurs = message_dict['indicateurs']
 
-        cpu_load = psutil.getloadavg()[0]
-        if cpu_load < 3.0:
-            if self.__thread_entretien is None or not self.__thread_entretien.is_alive():
-                if 'heure' in indicateurs:
-                    self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
-                    self.__thread_entretien.start()
-                else:
-                    self.__thread_entretien = Thread(target=self._verifier_signature, name="Entretien")
-                    self.__thread_entretien.start()
-        else:
-            self.__logger.warning("CPU load %s > 2.5, pas d'entetien de transactions" % cpu_load)
+        if routing_key.startswith('ceduleur'):
+            indicateurs = message_dict['indicateurs']
+            cpu_load = psutil.getloadavg()[0]
+            if cpu_load < 3.0:
+                if self.__thread_entretien is None or not self.__thread_entretien.is_alive():
+                    if 'heure' in indicateurs:
+                        self.__thread_entretien = Thread(target=self._nettoyer_transactions_expirees, name="Entretien")
+                        self.__thread_entretien.start()
+                    else:
+                        self.__thread_entretien = Thread(target=self._verifier_signature, name="Entretien")
+                        self.__thread_entretien.start()
+            else:
+                self.__logger.warning("CPU load %s > 2.5, pas d'entetien de transactions" % cpu_load)
+        elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
+            self.__traiter_presence_domaine(message_dict, properties)
 
     def on_channel_open(self, channel):
         channel.add_on_close_callback(self.__on_channel_close)
@@ -811,3 +817,10 @@ class EntretienCollectionsDomaines(BaseCallback):
 
     def is_channel_open(self):
         return self.__channel is not None
+
+    def __traiter_presence_domaine(self, message_dict: dict, properties):
+        domaine = message_dict['domaine']
+        info_domaine = self.__liste_domaines.get(domaine)
+        if not info_domaine:
+            self._setup_index_domaines(domaine)
+            self.__liste_domaines[domaine] = info_domaine

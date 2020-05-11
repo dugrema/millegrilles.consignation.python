@@ -8,6 +8,7 @@ import requests
 import pytz
 import gc
 
+from typing import cast
 from os import path
 from pika.exceptions import ChannelClosed
 from pymongo.errors import OperationFailure
@@ -239,6 +240,8 @@ class GestionnaireDomaine:
 
         self._consumer_tags_parQ = dict()
 
+        self.__message_presence: dict = cast(dict, None)
+
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
@@ -305,6 +308,27 @@ class GestionnaireDomaine:
         :return: Liste de Q avec configuration pour le domaine
         """
         raise NotImplementedError("Pas implemente")
+
+    def emettre_presence_domaine(self):
+        """
+        Emet un evenement pour indiquer que le domaine est present, configuration, cle de routage.
+        :return:
+        """
+        if self.__message_presence is None:
+            queue_config = self.get_queue_configuration()
+            routing = set()
+            for q in queue_config:
+                if q['exchange'] in [Constantes.SECURITE_PROTEGE]:
+                    routing.update(q['routing'])
+            info_domaine = {
+                'domaine': self.get_nom_domaine(),
+                'sous_domaines': None,
+                'routing': list(routing),
+                'primaire': True,
+            }
+            self.__message_presence = info_domaine
+        routing = 'evenement.presence.domaine'
+        self.generateur_transactions.emettre_message(self.__message_presence, routing, exchanges=[Constantes.SECURITE_SECURE])
 
     def setup_rabbitmq(self, consume=True):
         """
@@ -682,7 +706,8 @@ class GestionnaireDomaine:
         return Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6
 
     def executer_entretien(self):
-        pass
+        # S'assurer que le domaine est visible et connu de tous les composants du middleware
+        self.emettre_presence_domaine()
 
     @property
     def is_ok(self):

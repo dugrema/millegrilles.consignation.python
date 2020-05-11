@@ -449,7 +449,7 @@ class PikaDAO:
                 Constantes.TRANSACTION_ROUTING_EVENEMENT,
                 Constantes.TRANSACTION_ROUTING_EVENEMENTRESET,
                 Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN,
-                Constantes.TRANSACTION_ROUTING_RESTAURER
+                Constantes.TRANSACTION_ROUTING_RESTAURER,
             ],
             queue_durable=True
         ))
@@ -464,12 +464,23 @@ class PikaDAO:
             arguments={'x-queue-mode': 'lazy'},
         ))
 
-        # Q entretien (ceduleur)
+        # Q entretien (ceduleur, presence domaines)
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
             exchange_protege,
             Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
             ['ceduleur.#'],
+            queue_durable=False,
+            arguments={'x-message-ttl': 30000}
+        ))
+
+        setupHandler.add_configuration(PikaSetupCallbackHandler(
+            self.__channel_consumer,
+            Constantes.SECURITE_SECURE,
+            Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
+            [
+                Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES,
+            ],
             queue_durable=False,
             arguments={'x-message-ttl': 30000}
         ))
