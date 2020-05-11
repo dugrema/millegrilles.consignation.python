@@ -342,27 +342,27 @@ class TransactionConfiguration:
 
     @property
     def exchange_middleware(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_MIDDLEWARE]
+        return Constantes.SECURITE_SECURE
 
     @property
     def exchange_secure(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_MIDDLEWARE]
+        return Constantes.SECURITE_SECURE
 
     @property
     def exchange_protege(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_NOEUDS]
+        return Constantes.SECURITE_PROTEGE
 
     @property
     def exchange_prive(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_PRIVE]
+        return Constantes.SECURITE_PRIVE
 
     @property
     def exchange_noeuds(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_NOEUDS]
+        return Constantes.SECURITE_PROTEGE
 
     @property
     def exchange_public(self):
-        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_PUBLIC]
+        return Constantes.SECURITE_PUBLIC
 
     @property
     def queue_generateur_documents(self):

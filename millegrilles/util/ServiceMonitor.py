@@ -2278,10 +2278,10 @@ class GestionnaireComptesMQ:
             "durable": True,
             "internal": False
         }
-        self._admin_api.create_exchange_for_vhost('4.secure', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('3.protege', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('2.prive', idmg, params_exchange)
-        self._admin_api.create_exchange_for_vhost('1.public', idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost(Constantes.SECURITE_SECURE, idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost(Constantes.SECURITE_PROTEGE, idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost(Constantes.SECURITE_PRIVE, idmg, params_exchange)
+        self._admin_api.create_exchange_for_vhost(Constantes.SECURITE_PUBLIC, idmg, params_exchange)
 
     def entretien(self):
         try:

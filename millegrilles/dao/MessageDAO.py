@@ -422,37 +422,19 @@ class PikaDAO:
 
     def configurer_rabbitmq(self):
 
-        # Generer liste de callbacks
-        nom_echanges = [
-            self.configuration.exchange_middleware,
-            self.configuration.exchange_noeuds,
-            self.configuration.exchange_prive,
-            self.configuration.exchange_public
-        ]
-
         self.attendre_channel(timeout=30)
         if not self._attendre_channel.is_set():
             raise Exception("Channel MQ n'est pas ouvert")
 
         setupHandler = PikaSetupHandler()
+        exchange_protege = self.configuration.exchange_protege
 
         # Q nouvelle.transactions, existe sur tous les exchanges
-        for nom_echange in nom_echanges:
-            setupHandler.add_configuration(PikaSetupCallbackHandler(
-                self.__channel_consumer,
-                nom_echange,
-                self.queuename_nouvelles_transactions(),
-                [Constantes.TRANSACTION_ROUTING_NOUVELLE, Constantes.TRANSACTION_ROUTING_RESTAURER],
-                queue_durable=True,
-                arguments={'x-queue-mode': 'lazy'}
-            ))
-
         # Ajouter TTL de 30 secondes pour certaines Q
 
-        exchange_middleware = self.configuration.exchange_middleware
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
-            exchange_middleware,
+            exchange_protege,
             self.queuename_nouvelles_transactions(),
             [Constantes.TRANSACTION_ROUTING_NOUVELLE],
             queue_durable=True,
@@ -461,18 +443,23 @@ class PikaDAO:
 
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
-            exchange_middleware,
+            exchange_protege,
             self.queuename_evenements_transactions(),
-            [Constantes.TRANSACTION_ROUTING_EVENEMENT, Constantes.TRANSACTION_ROUTING_EVENEMENTRESET, Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN],
+            [
+                Constantes.TRANSACTION_ROUTING_EVENEMENT,
+                Constantes.TRANSACTION_ROUTING_EVENEMENTRESET,
+                Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN,
+                Constantes.TRANSACTION_ROUTING_RESTAURER
+            ],
             queue_durable=True
         ))
 
         # Q erreurs
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
-            exchange_middleware,
+            exchange_protege,
             self.queuename_erreurs_processus(),
-            ['processus.erreur'],
+            ['erreur'],
             queue_durable=True,
             arguments={'x-queue-mode': 'lazy'},
         ))
@@ -480,7 +467,7 @@ class PikaDAO:
         # Q entretien (ceduleur)
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
-            exchange_middleware,
+            exchange_protege,
             Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
             ['ceduleur.#'],
             queue_durable=False,
