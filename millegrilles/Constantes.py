@@ -162,6 +162,7 @@ TRANSACTION_ROUTING_EVENEMENTRESET = 'commande.*.#.transactionReset'
 TRANSACTION_ROUTING_RESTAURER = 'commande.*.#.restaurerTransactions'
 TRANSACTION_ROUTING_DOCINITIAL = 'docInitial'
 TRANSACTION_ROUTING_UPDATE_DOC = 'updateDoc'
+TRANSACTION_ROUTING_ERREURS = 'erreurs'
 
 PROCESSUS_DOCUMENT_LIBELLE_MOTEUR = 'moteur'
 PROCESSUS_MESSAGE_LIBELLE_PROCESSUS = 'processus'
@@ -278,11 +279,11 @@ class ConstantesDomaines:
 class ConstantesPrincipale:
     """ Constantes pour le domaine de l'interface principale """
 
-    DOMAINE_NOM = 'millegrilles.domaines.Principale'
+    DOMAINE_NOM = 'Principale'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
-    QUEUE_NOM = 'millegrilles.domaines.Principale'
+    QUEUE_NOM = DOMAINE_NOM
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PROFIL_USAGER = 'profil.usager'
@@ -438,10 +439,10 @@ class ConstantesSecurityPki:
 
 
 class ConstantesPki:
-    DOMAINE_NOM = 'millegrilles.domaines.Pki'
+    DOMAINE_NOM = 'Pki'
     COLLECTION_TRANSACTIONS_NOM = 'millegrilles.domaines.Pki'
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
-    COLLECTION_PROCESSUS_NOM = 'millegrilles.domaines.Pki/processus'
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_NOM_CERTIFICATS = '%s.certificats' % QUEUE_NOM
 
@@ -518,7 +519,7 @@ class ConstantesPki:
 
 class ConstantesParametres:
 
-    DOMAINE_NOM = 'millegrilles.domaines.Parametres'
+    DOMAINE_NOM = 'Parametres'
     COLLECTION_NOM = DOMAINE_NOM
 
     COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
@@ -668,7 +669,7 @@ class ConstantesParametres:
 
 class ConstantesMaitreDesCles:
 
-    DOMAINE_NOM = 'millegrilles.domaines.MaitreDesCles'
+    DOMAINE_NOM = 'MaitreDesCles'
     COLLECTION_NOM = DOMAINE_NOM
 
     COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
@@ -770,7 +771,7 @@ class ConstantesMaitreDesCles:
 
 class ConstantesAnnuaire:
 
-    DOMAINE_NOM = 'millegrilles.domaines.Annuaire'
+    DOMAINE_NOM = 'Annuaire'
     QUEUE_SUFFIXE = DOMAINE_NOM
     COLLECTION_TRANSACTIONS_NOM = QUEUE_SUFFIXE
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
@@ -875,7 +876,7 @@ class ConstantesAnnuaire:
 
 class ConstantesPlume:
 
-    DOMAINE_NOM = 'millegrilles.domaines.Plume'
+    DOMAINE_NOM = 'Plume'
     COLLECTION_NOM = DOMAINE_NOM
 
     COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
@@ -990,11 +991,11 @@ class ConstantesPlume:
 class ConstantesGrosFichiers:
     """ Constantes pour le domaine de GrosFichiers """
 
-    DOMAINE_NOM = 'millegrilles.domaines.GrosFichiers'
+    DOMAINE_NOM = 'GrosFichiers'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
-    QUEUE_NOM = 'millegrilles.domaines.GrosFichiers'
+    QUEUE_NOM = DOMAINE_NOM
     QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_GrosFichiers'
 
     TRANSACTION_TYPE_METADATA = 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata'
@@ -1201,7 +1202,7 @@ class ConstantesGrosFichiers:
 # Constantes pour SenseursPassifs
 class SenseursPassifsConstantes:
 
-    DOMAINE_NOM = 'millegrilles.domaines.SenseursPassifs'
+    DOMAINE_NOM = 'SenseursPassifs'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
@@ -1255,7 +1256,7 @@ class SenseursPassifsConstantes:
 # Constantes pour le domaine Backup
 class ConstantesBackup:
 
-    DOMAINE_NOM = 'millegrilles.domaines.Backup'
+    DOMAINE_NOM = 'Backup'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
@@ -1325,7 +1326,7 @@ class ConstantesBackup:
 
 class ConstantesHebergement:
 
-    DOMAINE_NOM = 'millegrilles.domaines.Hebergement'
+    DOMAINE_NOM = 'Hebergement'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM

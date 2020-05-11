@@ -62,11 +62,6 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         super().demarrer()
         # self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
 
-    def get_queue_configuration(self):
-        configuration = super().get_queue_configuration()
-
-        return configuration
-
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
 

@@ -98,9 +98,9 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         queue_config = super().get_queue_configuration()
         queue_config.append(
             {
-                'nom': self._contexte.configuration.queue_erreurs_processus,
+                'nom': Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
                 'exchange': self.configuration.exchange_secure,
-                'routing': ['processus.erreur'],
+                'routing': [Constantes.TRANSACTION_ROUTING_ERREURS],
                 'durable': True,
                 'callback': HandlerErreurs(self.document_dao, self.message_dao, self.configuration).callbackAvecAck,
                 'arguments': {'x-queue-mode': 'lazy'},

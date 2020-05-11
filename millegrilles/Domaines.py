@@ -799,9 +799,9 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         queues_config = [
             {
-                'nom': '%s.%s' % (self.get_nom_queue(), 'transactions'),
+                'nom': '%s.%s' % (self.get_nom_queue(), 'evenements'),
                 'routing': [
-                    'destinataire.domaine.%s.#' % self.get_nom_domaine(),
+                    'evenement.%s.#.*' % self.get_nom_domaine(),
                 ],
                 'exchange': self.configuration.exchange_middleware,
                 'ttl': 300000,
@@ -815,15 +815,6 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 'exchange': self.configuration.exchange_middleware,
                 'ttl': 30000,
                 'callback': self.get_handler_cedule().callbackAvecAck
-            },
-            {
-                'nom': '%s.%s' % (self.get_nom_queue(), 'processus'),
-                'routing': [
-                    'processus.domaine.%s.#' % self.get_nom_domaine()
-                ],
-                'exchange': self.configuration.exchange_middleware,
-                'ttl': 600000,
-                'callback': self._traitement_evenements.callbackAvecAck
             }
         ]
 
@@ -839,9 +830,9 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 exchange = self.configuration.exchange_public
 
             queues_config.append({
-                'nom': '%s.%s' % (self.get_nom_queue(), 'requete.noeuds.' + securite),
+                'nom': '%s.requete.%s' % (self.get_nom_domaine(), securite),
                 'routing': [
-                    'requete.%s.#' % self.get_nom_domaine(),
+                    'requete.%s.#.*' % self.get_nom_domaine(),
                 ],
                 'exchange': exchange,
                 'ttl': 20000,
@@ -859,10 +850,9 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 exchange = self.configuration.exchange_public
 
             queues_config.append({
-                'nom': '%s.%s' % (self.get_nom_queue(), 'commande.' + securite),
+                'nom': '%s.commande.%s' % (self.get_nom_queue(), securite),
                 'routing': [
-                    'commande.%s.#' % self.get_nom_domaine(),
-                    'commande.global.#',
+                    'commande.%s.#.*' % self.get_nom_domaine()
                 ],
                 'exchange': exchange,
                 'ttl': 20000,

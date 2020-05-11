@@ -109,42 +109,6 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIG_CERTDOCKER, ConstantesPki.DOCUMENT_CONFIG_CERTDOCKER)
 
-    def get_queue_configuration(self):
-        configuration = super().get_queue_configuration()
-
-        configuration_pki = [
-            {
-                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
-                'routing': [
-                    '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
-                ],
-                'exchange': self.configuration.exchange_middleware,
-                'callback': self.__traitement_certificats.callbackAvecAck
-            },
-            {
-                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
-                'routing': [
-                    '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
-                    ConstantesPki.REQUETE_LISTE_CA,
-                    'requete.' + ConstantesSecurityPki.REQUETE_CORRELATION_CSR,
-                ],
-                'exchange': self.configuration.exchange_noeuds,
-                'callback': self.__traitement_certificats.callbackAvecAck
-            },
-            {
-                'nom': '%s.%s' % (self.get_nom_queue(), 'certificats'),
-                'routing': [
-                    '%s.#' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
-                ],
-                'exchange': self.configuration.exchange_prive,
-                'callback': self.__traitement_certificats.callbackAvecAck
-            }
-        ]
-
-        configuration.extend(configuration_pki)
-
-        return configuration
-
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
 
