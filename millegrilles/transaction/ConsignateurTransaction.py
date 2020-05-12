@@ -823,7 +823,7 @@ class EntretienCollectionsDomaines(BaseCallback):
         info_domaine = self.__liste_domaines.get(domaine)
         if not info_domaine:
             # Ajouter routing key
-            routing = 'transaction.%s.#.recevoir' % domaine
+            routing = 'transaction.%s.#.*' % domaine
             self.__channel.queue_bind(
                 queue=Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
                 exchange=Constantes.SECURITE_PROTEGE,

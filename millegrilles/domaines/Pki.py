@@ -415,12 +415,11 @@ class PKIDocumentHelper:
             try:
                 self._contexte.generateur_transactions.soumettre_transaction(
                     transaction,
-                    domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+                    routing=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
                 )
             except ErreurModeRegeneration:
                 # Mode de regeneration de document, rien a faire
                 pass
-
 
         # # Demarrer validation des certificats
         # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides

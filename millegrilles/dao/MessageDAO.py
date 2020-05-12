@@ -572,7 +572,7 @@ class PikaDAO:
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
             channel.basic_publish(
-                exchange=self.configuration.exchange_middleware,
+                exchange=Constantes.SECURITE_PROTEGE,
                 routing_key=routing_key,
                 body=message_utf8,
                 properties=properties,
@@ -747,10 +747,12 @@ class PikaDAO:
         self._in_error = False
 
     def transmettre_nouvelle_transaction(self, document_transaction, reply_to, correlation_id, channel=None):
-        routing_key = 'transaction.nouvelle'
+        action = document_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        routing_key = 'transaction.' + action
         # Utiliser delivery mode 2 (persistent) pour les transactions
         self.transmettre_message(
-            document_transaction, routing_key, delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
+            document_transaction, routing_key,
+            delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
     def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder,
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, reply_to=None, correlation_id=None):
