@@ -206,17 +206,21 @@ class TraitementMessageRequete(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
-        exchange = method.exchange
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
-        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
-        resultats = list()
-        for requete in message_dict['requetes']:
-            resultat = self.executer_requete(requete)
-            resultats.append(resultat)
 
-        # Genere message reponse
-        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+        if routing_key.endswith('generique'):
+            exchange = method.exchange
+            message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
+            resultats = list()
+            for requete in message_dict['requetes']:
+                resultat = self.executer_requete(requete)
+                resultats.append(resultat)
+
+            # Genere message reponse
+            self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+        else:
+            raise ValueError("Type de requete inconnue : %s" % routing_key)
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))

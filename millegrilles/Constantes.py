@@ -487,11 +487,11 @@ class ConstantesPki:
     CHAMP_ROLES = 'roles'
 
     REQUETE_CONFIRMER_CERTIFICAT = 'confirmerCertificat'
-    REQUETE_CERTIFICAT_EMIS = 'pki.certificat'
-    REQUETE_CERTIFICAT_DEMANDE = 'certificat'
-    REQUETE_CERTIFICAT_BACKUP = 'certificatBackup'
-    REQUETE_LISTE_CA = 'pki.requete.ca'
-    REQUETE_LISTE_CERT_COMPTES_NOEUDS = 'certificatsComptesNoeuds'
+    REQUETE_CERTIFICAT_EMIS = 'evenement.Pki.infoCertificat'
+    REQUETE_CERTIFICAT_DEMANDE = 'requete.Pki.certificat.#'
+    REQUETE_CERTIFICAT_BACKUP = 'requete.Pki.certificatBackup'
+    REQUETE_LISTE_CA = 'requete.Pki.ca'
+    REQUETE_LISTE_CERT_COMPTES_NOEUDS = 'requete.Pki.certificatsComptesNoeuds'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
     # Indique que c'est un evenement avec un certificat (reference)

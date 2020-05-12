@@ -526,7 +526,7 @@ class GestionnaireDomaine:
         for queue_config in queues_config:
 
             def callback_init_transaction(queue, gestionnaire=self, in_queue_config=queue_config, in_consume=consume):
-                if in_consume:
+                if in_consume and in_queue_config.get('callback'):
                     gestionnaire.inscrire_basicconsume(queue, in_queue_config['callback'])
 
                 routing_list = in_queue_config.get('routing')

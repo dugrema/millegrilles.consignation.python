@@ -124,6 +124,32 @@ class GestionnairePki(GestionnaireDomaineStandard):
             )
             self.demarrer_processus(processus, dict())
 
+    def get_queue_configuration(self):
+        configuration = super().get_queue_configuration()
+
+        configuration_pki = [
+            {
+                'nom': '.'.join([self.get_nom_queue(), 'evenements']),
+                'routing': [
+                    '%s' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                ],
+                'ttl': 300000,
+                'exchange': Constantes.SECURITE_PROTEGE,
+            },
+            {
+                'nom': '.'.join([self.get_nom_queue(), 'evenements']),
+                'routing': [
+                    '%s' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                ],
+                'ttl': 300000,
+                'exchange': Constantes.SECURITE_PRIVE,
+            }
+        ]
+
+        configuration.extend(configuration_pki)
+
+        return configuration
+
     def get_nom_queue(self):
         return ConstantesPki.QUEUE_NOM
 
