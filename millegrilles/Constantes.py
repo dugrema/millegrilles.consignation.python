@@ -409,7 +409,7 @@ class ConstantesPrincipale:
 class ConstantesSecurityPki:
 
     DELIM_DEBUT_CERTIFICATS = '-----BEGIN CERTIFICATE-----'
-    COLLECTION_NOM = 'millegrilles.domaines.Pki/documents'
+    COLLECTION_NOM = 'Pki/documents'
 
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'
