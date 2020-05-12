@@ -822,5 +822,17 @@ class EntretienCollectionsDomaines(BaseCallback):
         domaine = message_dict['domaine']
         info_domaine = self.__liste_domaines.get(domaine)
         if not info_domaine:
+            # Ajouter routing key
+            routing = 'transaction.%s.#.recevoir' % domaine
+            self.__channel.queue_bind(
+                queue=Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
+                exchange=Constantes.SECURITE_PROTEGE,
+                routing_key=routing,
+                callback=None
+            )
+
+            # Ajouter collection/indices
             self._setup_index_domaines(domaine)
+
+            # Conserver info domaine
             self.__liste_domaines[domaine] = info_domaine

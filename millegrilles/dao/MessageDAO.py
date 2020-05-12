@@ -436,7 +436,7 @@ class PikaDAO:
             self.__channel_consumer,
             exchange_protege,
             self.queuename_nouvelles_transactions(),
-            [Constantes.TRANSACTION_ROUTING_NOUVELLE],
+            None,
             queue_durable=True,
             arguments={'x-queue-mode': 'lazy'},
         ))
@@ -1398,6 +1398,7 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
         pass
 
+
 class PikaSetupCallbackHandler:
 
     class RoutingKeyCallback:
@@ -1460,6 +1461,9 @@ class PikaSetupCallbackHandler:
                     routing_key=routing_key,
                     callback=rk_callback.callback
                 )
+        else:
+            self.__nombre_routing_keys_restant = 0
+            self.__callback_when_done(self)
 
     def routing_key_complete(self, routing_key):
         self.__logger.debug("Routing key configuree: %s" % routing_key)

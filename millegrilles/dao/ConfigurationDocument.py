@@ -1,5 +1,7 @@
 # Configuration pour traiter les transactions
 
+from typing import cast
+
 from millegrilles.SecuritePKI import VerificateurTransaction, VerificateurCertificats
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
@@ -18,7 +20,7 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
         :param additionals: Fichiers de config additionels a combiner
         """
         super().__init__(configuration, message_dao, additionals)
-        self._document_dao = document_dao
+        self._document_dao: MongoDAO = cast(MongoDAO, document_dao)
 
         self._verificateur_certificats = None
         self._verificateur_transactions = None
@@ -32,8 +34,8 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
         :param connecter: Si true, la connexion aux DAOs est ouverte immediatement
         """
 
-        super().initialiser(init_message, connecter)
-        self._document_dao = None
+        # Connecter=False pour permettre de connecter MongoDB en premier
+        super().initialiser(init_message, connecter=False)
 
         if init_document:
             self._document_dao = MongoDAO(self._configuration)
@@ -41,6 +43,10 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
             self._verificateur_certificats = VerificateurCertificats(self)
             if connecter:
                 self._document_dao.connecter()
+
+        if connecter:
+            # Connecter RabbitMQ
+            self._message_dao.connecter()
 
     @property
     def document_dao(self) -> MongoDAO:

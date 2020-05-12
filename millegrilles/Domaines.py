@@ -241,13 +241,17 @@ class GestionnaireDomaine:
         self._consumer_tags_parQ = dict()
 
         self.__message_presence: dict = cast(dict, None)
+        self.__confirmation_setup_transaction = False  # Vrai si la collection de transactions est prete
 
         # ''' L'initialisation connecte RabbitMQ, MongoDB, lance la configuration '''
     # def initialiser(self):
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     def configurer(self):
-        self._traitement_evenements = MGPProcesseurTraitementEvenements(self._contexte, self._stop_event, gestionnaire_domaine=self)
+        self.emettre_presence_domaine()
+
+        self._traitement_evenements = MGPProcesseurTraitementEvenements(
+            self._contexte, self._stop_event, gestionnaire_domaine=self)
         self._traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         self.demarreur_processus = MGPProcessusDemarreur(
@@ -263,6 +267,16 @@ class GestionnaireDomaine:
         self._contexte.message_dao.register_channel_listener(self)
         self._logger.info("Attente Q et routes prets")
         self.wait_Q_ready.wait(30)  # Donner 30 seconde a MQ
+
+        # Verifier si la collection de transactions est prete
+        self.__confirmation_setup_transaction = self.verifier_collection_transactions()
+        if not self.__confirmation_setup_transaction:
+            self.emettre_presence_domaine()
+            Event().wait(3)
+            self.__confirmation_setup_transaction = self.verifier_collection_transactions()
+            if not self.__confirmation_setup_transaction:
+                self.wait_Q_ready.clear()
+                self._logger.error("Erreur initialisation collection Transaction pour %s" % self.get_nom_domaine())
 
         if not self.wait_Q_ready.is_set():
             self.__Q_wait_broken = datetime.datetime.utcnow()
@@ -283,6 +297,20 @@ class GestionnaireDomaine:
 
             # Lance le processus de regeneration des rapports sur cedule pour s'assurer d'avoir les donnees a jour
             self.regenerer_rapports_sur_cedule()
+
+    def verifier_collection_transactions(self):
+        """
+        Detecte si la collection de transactions du domaine est presente.
+        Utilise la presence d'index sur la collection (generes par le consignateur de transactions)
+        :return:
+        """
+        nom_collection = self.get_nom_domaine()
+        collection_transactions = self.document_dao.get_collection(nom_collection)
+        indices = collection_transactions.list_indexes()
+
+        collection_presente = len([index for index in indices]) > 0
+
+        return collection_presente
 
     def on_channel_open(self, channel):
         """
@@ -328,7 +356,10 @@ class GestionnaireDomaine:
             }
             self.__message_presence = info_domaine
         routing = 'evenement.presence.domaine'
-        self.generateur_transactions.emettre_message(self.__message_presence, routing, exchanges=[Constantes.SECURITE_SECURE])
+        self.generateur_transactions.emettre_message(
+            self.__message_presence, routing, exchanges=[Constantes.SECURITE_SECURE],
+            reply_to=self.get_nom_domaine() + '.evenements', correlation_id='presence.domaine',
+        )
 
     def setup_rabbitmq(self, consume=True):
         """

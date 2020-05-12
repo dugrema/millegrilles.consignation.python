@@ -212,7 +212,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def emettre_message(self, message_dict, routing_key, exchanges: list = None):
+    def emettre_message(self, message_dict, routing_key, exchanges: list = None, reply_to = None, correlation_id = None):
 
         enveloppe = self.preparer_enveloppe(message_dict)
 
@@ -222,13 +222,15 @@ class GenerateurTransaction:
 
         if exchanges is None:
             self._contexte.message_dao.transmettre_message_noeuds(
-                message_dict=enveloppe, routing_key=routing_key
+                message_dict=enveloppe, routing_key=routing_key,
+                reply_to=reply_to, correlation_id=correlation_id
             )
         else:
             # On transmet le message sur chaque exchange (identique, meme signature)
             for exchange in exchanges:
                 self._contexte.message_dao.transmettre_message_exchange(
-                    message_dict=enveloppe, routing_key=routing_key, exchange=exchange
+                    message_dict=enveloppe, routing_key=routing_key, exchange=exchange,
+                    reply_to=reply_to, correlation_id=correlation_id
                 )
 
         return uuid_transaction
