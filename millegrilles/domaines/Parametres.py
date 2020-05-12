@@ -95,16 +95,21 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def get_queue_configuration(self):
         queue_config = super().get_queue_configuration()
-        queue_config.append(
-            {
-                'nom': Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
-                'exchange': self.configuration.exchange_secure,
-                'routing': [Constantes.TRANSACTION_ROUTING_ERREURS],
-                'durable': True,
-                'callback': HandlerErreurs(self.document_dao, self.message_dao, self.configuration).callbackAvecAck,
-                'arguments': {'x-queue-mode': 'lazy'},
-            },
-        )
+        queue_config.append({
+            'nom': Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
+            'exchange': self.configuration.exchange_secure,
+            'routing': [Constantes.TRANSACTION_ROUTING_ERREURS],
+            'durable': True,
+            'callback': HandlerErreurs(self.document_dao, self.message_dao, self.configuration).callbackAvecAck,
+            'arguments': {'x-queue-mode': 'lazy'},
+        })
+        queue_config.append({
+            'nom': Constantes.DEFAUT_QUEUE_ERREURS_PROCESSUS,
+            'exchange': self.configuration.exchange_protege,
+            'routing': [Constantes.TRANSACTION_ROUTING_ERREURS],
+            'durable': True,
+            'arguments': {'x-queue-mode': 'lazy'},
+        })
         return queue_config
 
     def modifier_document_email_smtp(self, transaction):

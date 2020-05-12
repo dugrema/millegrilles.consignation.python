@@ -1,12 +1,28 @@
 # Domaine de l'interface principale de l'usager. Ne peut pas etre deleguee.
+import logging
+import datetime
+
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPrincipale
 from millegrilles.Domaines import GestionnaireDomaineStandard
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
+from millegrilles.Domaines import TraitementMessageDomaineRequete
 
-import logging
-import datetime
+
+class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+
+        reponse = None
+        if routing_key == ConstantesPrincipale.REQUETE_AUTHINFO_MILLEGRILLE:
+            reponse = self.gestionnaire.get_authinfo_millegrille()
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class GestionnairePrincipale(GestionnaireDomaineStandard):
@@ -14,16 +30,15 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
     def __init__(self, contexte):
         super().__init__(contexte)
         self._traitement_message = None
-        self._traitement_requetes = None
-        self.traiter_requete_noeud = None
         self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
+
+        self.__handler_requetes = {
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+        }
 
     def configurer(self):
         super().configurer()
         self._traitement_message = TraitementMessagePrincipale(self)
-
-        self._traitement_requetes = TraitementMessageRequete(self)
-        self.traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
     def demarrer(self):
         super().demarrer()
@@ -51,6 +66,9 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
     def get_nom_queue(self):
         return ConstantesPrincipale.QUEUE_NOM
 
+    def get_handler_requetes(self):
+        return self.__handler_requetes
+
     def get_nom_queue_requetes_noeuds(self):
         return '%s.noeuds' % self.get_nom_queue()
 
@@ -62,12 +80,6 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
     def get_collection_processus_nom(self):
         return ConstantesPrincipale.COLLECTION_PROCESSUS_NOM
-
-    def traiter_requete_noeud(self, ch, method, properties, body):
-        pass
-
-    def traiter_requete_inter(self, ch, method, properties, body):
-        pass
 
     def get_nom_domaine(self):
         return ConstantesPrincipale.DOMAINE_NOM
@@ -165,6 +177,21 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         collection_principale.update_one(filtre_menu, ops)
 
+    def get_authinfo_millegrille(self):
+        collection = self.get_collection()
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_CLES,
+        }
+        document_cles = collection.find_one(filtre)
+
+        info = {
+            'idmg': self.configuration.idmg,
+        }
+        for key, value in document_cles.items():
+            if not key.startswith('_'):
+                info[key] = value
+
+        return info
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
 
@@ -196,65 +223,6 @@ class TraitementMessagePrincipale(TraitementMessageDomaine):
         else:
             # Type d'evenement inconnu, on lance une exception
             raise ValueError("Type d'evenement inconnu: %s" % str(evenement))
-
-
-class TraitementMessageRequete(TraitementMessageDomaine):
-
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire)
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def traiter_message(self, ch, method, properties, body):
-        routing_key = method.routing_key
-
-        if routing_key.endswith('generique'):
-            exchange = method.exchange
-            message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
-            self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
-            resultats = list()
-            for requete in message_dict['requetes']:
-                resultat = self.executer_requete(requete)
-                resultats.append(resultat)
-
-            # Genere message reponse
-            self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
-        else:
-            raise ValueError("Type de requete inconnue : %s" % routing_key)
-
-    def executer_requete(self, requete):
-        self._logger.debug("Requete: %s" % str(requete))
-        collection = self.document_dao.get_collection(ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM)
-        filtre = requete.get('filtre')
-        projection = requete.get('projection')
-        sort_params = requete.get('sort')
-
-        if projection is None:
-            curseur = collection.find(filtre)
-        else:
-            curseur = collection.find(filtre, projection)
-
-        if sort_params is not None:
-            curseur.sort(sort_params)
-
-        resultats = list()
-        for resultat in curseur:
-            resultats.append(resultat)
-
-        self._logger.debug("Resultats: %s" % str(resultats))
-
-        return resultats
-
-    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
-        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
-        if correlation_id is None:
-            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-
-        message_resultat = {
-            'resultats': resultats,
-        }
-
-        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
 class ProcessusPrincipale(MGProcessusTransaction):

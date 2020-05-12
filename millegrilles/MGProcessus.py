@@ -162,7 +162,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         # Si limite est depasse, un cesse de consommer des messages dans MQ
         self._max_q_size = 50
         self._consume_actif = True
-        self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'processus')
+        self._q_processus = '%s.%s' % (gestionnaire_domaine.get_nom_queue(), 'evenements')
 
         self._thread_traitement = Thread(target=self.__run, name="MGPProcess", daemon=True)
         self.__connectionmq_publisher = ConnexionWrapper(self.configuration, self.__stop_event, heartbeat=15)

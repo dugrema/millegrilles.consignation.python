@@ -129,7 +129,7 @@ class GenerateurTransaction:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
-        if domaine_direct:
+        if domaine_direct or domaine.startswith('requete.'):
             routing_key = domaine
         else:
             routing_key = 'requete.%s' % domaine

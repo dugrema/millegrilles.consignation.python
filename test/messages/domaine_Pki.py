@@ -97,7 +97,7 @@ class MessagesSample(BaseCallback):
         requete_cert = {}
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert,
-            '%s.%s' % (ConstantesPki.DOMAINE_NOM, ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS),
+            ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
             'abcd-1234',
             self.queue_name,
             securite=Constantes.SECURITE_PROTEGE,

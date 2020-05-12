@@ -162,7 +162,7 @@ TRANSACTION_ROUTING_EVENEMENTRESET = 'commande.*.#.transactionReset'
 TRANSACTION_ROUTING_RESTAURER = 'commande.*.#.restaurerTransactions'
 TRANSACTION_ROUTING_DOCINITIAL = 'docInitial'
 TRANSACTION_ROUTING_UPDATE_DOC = 'updateDoc'
-TRANSACTION_ROUTING_ERREURS = 'erreurs'
+TRANSACTION_ROUTING_ERREURS = 'erreur'
 
 EVENEMENT_ROUTING_PRESENCE_DOMAINES = 'evenement.presence.domaine'
 
@@ -314,6 +314,8 @@ class ConstantesPrincipale:
     TRANSACTION_ACTION_MAJ_PROFILMILLEGRILLE = '%s.majProfilMilleGrille' % DOMAINE_NOM
     TRANSACTION_MAJ_MENU = '%s.majMenu' % DOMAINE_NOM
 
+    REQUETE_AUTHINFO_MILLEGRILLE = 'requete.Principale.getAuthInfo'
+
     DOCUMENT_ALERTES = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,
         'alertes': [
@@ -417,7 +419,7 @@ class ConstantesSecurityPki:
     LIBELLE_CORRELATION_CSR = 'csr_correlation'
 
     EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
-    EVENEMENT_REQUETE = 'pki.requete'  # Indique que c'est une requete pour trouver un certificat par fingerprint
+    EVENEMENT_REQUETE = 'requete.certificat'  # Indique que c'est une requete pour trouver un certificat par fingerprint
 
     LIBVAL_CERTIFICAT_RACINE = 'certificat.root'
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'

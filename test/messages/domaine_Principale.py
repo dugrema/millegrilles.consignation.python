@@ -116,9 +116,24 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_authinfo(self):
+        requete_cert = {}
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert,
+            ConstantesPrincipale.REQUETE_AUTHINFO_MILLEGRILLE,
+            'abcd-1234',
+            self.queue_name,
+            securite=Constantes.SECURITE_PROTEGE,
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
-        sample.transmettre_maj_profil_usager()
+        # sample.transmettre_maj_profil_usager()
         # sample.transmettre_maj_profil_millegrille()
+
+        sample.requete_authinfo()
 
 
 # --- MAIN ---

@@ -1049,41 +1049,23 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         # Ajouter les handles de requete par niveau de securite
         for securite, handler_requete in self.get_handler_requetes().items():
-            if securite == Constantes.SECURITE_SECURE:
-                exchange = self.configuration.exchange_middleware
-            elif securite == Constantes.SECURITE_PROTEGE:
-                exchange = self.configuration.exchange_noeuds
-            elif securite == Constantes.SECURITE_PRIVE:
-                exchange = self.configuration.exchange_prive
-            else:
-                exchange = self.configuration.exchange_public
-
             queues_config.append({
                 'nom': '%s.requete.%s' % (self.get_nom_domaine(), securite),
                 'routing': [
                     'requete.%s.#.*' % self.get_nom_domaine(),
                 ],
-                'exchange': exchange,
+                'exchange': securite,
                 'ttl': 20000,
                 'callback': handler_requete.callbackAvecAck
             })
 
         for securite, handler_requete in self.get_handler_commandes().items():
-            if securite == Constantes.SECURITE_SECURE:
-                exchange = self.configuration.exchange_middleware
-            elif securite == Constantes.SECURITE_PROTEGE:
-                exchange = self.configuration.exchange_noeuds
-            elif securite == Constantes.SECURITE_PRIVE:
-                exchange = self.configuration.exchange_prive
-            else:
-                exchange = self.configuration.exchange_public
-
             queues_config.append({
                 'nom': '%s.commande.%s' % (self.get_nom_queue(), securite),
                 'routing': [
                     'commande.%s.#.*' % self.get_nom_domaine()
                 ],
-                'exchange': exchange,
+                'exchange': securite,
                 'ttl': 20000,
                 'callback': handler_requete.callbackAvecAck
             })
