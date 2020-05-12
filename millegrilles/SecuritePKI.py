@@ -1031,7 +1031,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
             enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
         )
 
-        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
+        routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
         self.contexte.message_dao.transmettre_message(
             message_evenement, routing, channel=self.__channel
         )

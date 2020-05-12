@@ -388,8 +388,7 @@ class GestionnaireDomaine:
         self.nb_routes_a_config = 0
         self.__Q_wait_broken = None  # Mis utc a date si on a un timeout pour l'attente de __wait_mq_ready
 
-        self._traitement_evenements = MGPProcesseurTraitementEvenements(
-            self._contexte, self._stop_event, gestionnaire_domaine=self)
+        self._traitement_evenements = None
 
         self._consumer_tags_parQ = dict()
 
@@ -401,6 +400,8 @@ class GestionnaireDomaine:
     #     self.connecter()  # On doit se connecter immediatement pour permettre l'appel a configurer()
 
     def configurer(self):
+        self._traitement_evenements = self.initialiser_mgprocesseur_evenements()
+
         self.emettre_presence_domaine()
 
         self._traitement_evenements.initialiser([self.get_collection_processus_nom()])
@@ -408,6 +409,14 @@ class GestionnaireDomaine:
         self.demarreur_processus = MGPProcessusDemarreur(
             self._contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
             self.get_collection_processus_nom(), self._traitement_evenements, gestionnaire=self)
+
+    def initialiser_mgprocesseur_evenements(self):
+        """
+        Factory pour traitement evenements du domaine
+        :return:
+        """
+        return MGPProcesseurTraitementEvenements(
+            self._contexte, self._stop_event, gestionnaire_domaine=self)
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """

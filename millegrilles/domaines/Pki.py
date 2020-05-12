@@ -3,7 +3,7 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
 from millegrilles.Erreurs import ErreurModeRegeneration
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, MGPProcesseurTraitementEvenements
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
@@ -48,6 +48,18 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
         if reponse is not None:
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
+class TraitementEvenementsPki(MGPProcesseurTraitementEvenements):
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+
+        if routing_key == ConstantesPki.REQUETE_CERTIFICAT_EMIS:
+            message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+            self.gestionnaire.recevoir_certificat(message_dict)
+        else:
+            super().traiter_message(ch, method, properties, body)
 
 
 class GestionnairePki(GestionnaireDomaineStandard):
@@ -109,6 +121,14 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIG_CERTDOCKER, ConstantesPki.DOCUMENT_CONFIG_CERTDOCKER)
 
+    def initialiser_mgprocesseur_evenements(self):
+        """
+        Factory pour traitement evenements du domaine
+        :return:
+        """
+        return MGPProcesseurTraitementEvenements(
+            self._contexte, self._stop_event, gestionnaire_domaine=self)
+
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
 
@@ -131,7 +151,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             {
                 'nom': '.'.join([self.get_nom_queue(), 'evenements']),
                 'routing': [
-                    '%s' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                    ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PROTEGE,
@@ -139,7 +159,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             {
                 'nom': '.'.join([self.get_nom_queue(), 'evenements']),
                 'routing': [
-                    '%s' % ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                    ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PRIVE,
