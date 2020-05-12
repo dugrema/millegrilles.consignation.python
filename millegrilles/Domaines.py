@@ -20,7 +20,7 @@ from cryptography.exceptions import InvalidSignature
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki, ConstantesDomaines
-from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, CertificatInconnu
+from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, TraitementMessageDomaineMiddleware, CertificatInconnu
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration, MGProcessus
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -28,23 +28,6 @@ from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMi
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-
-
-class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
-
-    def traiter_message(self, ch, method, properties, body):
-        routing_key = method.routing_key
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-
-        if routing_key.endswith('recevoirTransaction'):
-            # Traiter nouvelle transaction, verifier quel processus demarrer.
-            domaine = message_dict['domaine']
-            try:
-                processus = self.gestionnaire.identifier_processus(domaine)
-                self.gestionnaire.demarrer_processus(processus, message_dict)
-            except Exception as e:
-                self.gestionnaire.marquer_transaction_en_erreur(message_dict)
-                raise e
 
 
 class TraitementMessageDomaineCommande(TraitementMessageDomaine):
@@ -400,11 +383,13 @@ class GestionnaireDomaine:
         self.channel_mq = None
         self._arret_en_cours = False
         self._stop_event = Event()
-        self._traitement_evenements = None
         self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
         self.wait_Q_ready_lock = Lock()
         self.nb_routes_a_config = 0
         self.__Q_wait_broken = None  # Mis utc a date si on a un timeout pour l'attente de __wait_mq_ready
+
+        self._traitement_evenements = MGPProcesseurTraitementEvenements(
+            self._contexte, self._stop_event, gestionnaire_domaine=self)
 
         self._consumer_tags_parQ = dict()
 
@@ -418,8 +403,6 @@ class GestionnaireDomaine:
     def configurer(self):
         self.emettre_presence_domaine()
 
-        self._traitement_evenements = MGPProcesseurTraitementEvenements(
-            self._contexte, self._stop_event, gestionnaire_domaine=self)
         self._traitement_evenements.initialiser([self.get_collection_processus_nom()])
         """ Configure les comptes, queues/bindings (RabbitMQ), bases de donnees (MongoDB), etc. """
         self.demarreur_processus = MGPProcessusDemarreur(
@@ -708,7 +691,7 @@ class GestionnaireDomaine:
             for watcher in self._watchers:
                 watcher.stop()
 
-            processeur_regeneration = MGPProcesseurRegeneration(self.__contexte, self)
+            processeur_regeneration = MGPProcesseurRegeneration(self, self.__contexte)
             processeur_regeneration.regenerer_documents(stop_consuming=stop_consuming)
         finally:
             # Reactiver les watchers
@@ -990,7 +973,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def __init__(self, contexte):
         super().__init__(contexte)
 
-        self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
+        #self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
         self.__traitement_noeud = TraitementMessageDomaineRequete(self)
         self.__handler_backup = HandlerBackupDomaine(
             contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(), self.get_collection())
@@ -1042,7 +1025,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 ],
                 'exchange': self.configuration.exchange_middleware,
                 'ttl': 300000,
-                'callback': self.get_handler_transaction().callbackAvecAck
+                'callback': self._traitement_evenements.callbackAvecAck
             },
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'ceduleur'),
@@ -1102,9 +1085,6 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         for key, value in transaction.items():
             if key != Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE and not key.startswith('_'):
                 document[key] = value
-
-    def get_handler_transaction(self):
-        return self.__traitement_middleware
 
     def get_handler_requetes_noeuds(self):
         return self.__traitement_noeud

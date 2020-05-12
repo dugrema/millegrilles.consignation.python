@@ -893,10 +893,10 @@ class PikaDAO:
     :param dict_parametres: (Optionnel) Parametres a utiliser pour la prochaine etape du processus.
     '''
 
-    def transmettre_evenement_mgpprocessus(self, nom_domaine: str, id_document, nom_processus, nom_etape='initiale',
-                                           tokens=None,
-                                           info=None,
-                                           channel=None):
+    def transmettre_evenement_mgpprocessus(
+            self, nom_domaine: str, id_document, nom_processus, nom_etape='initiale',
+            tokens=None, info=None, channel=None):
+
         if channel is None:
             channel = self.__channel_publisher
 
@@ -914,17 +914,18 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        routing_key = 'processus.domaine.%s.%s.%s' % \
+        routing_key = 'evenement.%s.%s_%s' % \
                       (nom_domaine, nom_processus, nom_etape)
 
         with self.lock_transmettre_message:
-            channel.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                   routing_key=routing_key,
-                                                   body=message_utf8)
+            channel.basic_publish(
+                exchange=self.configuration.exchange_middleware,
+                routing_key=routing_key,
+                body=message_utf8
+            )
 
         if channel is self.__channel_publisher:
             self.__connexionmq_publisher.publish_watch()
-
 
     def transmettre_evenement_mgp_resumer(self, nom_domaine, id_document_declencheur, tokens: list,
                                           id_document_processus_attente=None,
@@ -1224,6 +1225,23 @@ class TraitementMessageDomaine(TraitementMessageCallback):
     @property
     def gestionnaire(self):
         return self._gestionnaire
+
+
+class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        if routing_key.endswith('recevoirTransaction'):
+            # Traiter nouvelle transaction, verifier quel processus demarrer.
+            domaine = message_dict['domaine']
+            try:
+                processus = self.gestionnaire.identifier_processus(domaine)
+                self.gestionnaire.demarrer_processus(processus, message_dict)
+            except Exception as e:
+                self.gestionnaire.marquer_transaction_en_erreur(message_dict)
+                raise e
 
 
 # class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):

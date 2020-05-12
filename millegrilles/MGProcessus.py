@@ -9,8 +9,7 @@ import uuid
 
 from millegrilles import Constantes
 from millegrilles.Erreurs import ErreurModeRegeneration
-from millegrilles.Domaines import TraitementMessageDomaine
-from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, TraitementMessageDomaine, TraitementMessageDomaineMiddleware
 from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from threading import Thread, Event, Barrier
@@ -18,13 +17,13 @@ from threading import Thread, Event, Barrier
 
 class MGPProcesseur:
 
-    def __init__(self, contexte, gestionnaire_domaine=None):
-        self.__contexte = contexte
+    def __init__(self, gestionnaire_domaine, contexte):
         self.__gestionnaire_domaine = gestionnaire_domaine
+        self.__contexte = contexte
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self.__transmetteur = TransmetteurMessageMilleGrilles(contexte)
-        contexte.message_dao.register_channel_listener(self.__transmetteur)
+        self.__transmetteur = TransmetteurMessageMilleGrilles(self.__contexte)
+        self.__contexte.message_dao.register_channel_listener(self.__transmetteur)
 
     def charger_transaction_par_id(self, id_transaction, nom_collection):
         return self.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
@@ -151,7 +150,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
     """
 
     def __init__(self, contexte, stop_event, gestionnaire_domaine=None):
-        super().__init__(contexte=contexte, gestionnaire_domaine=gestionnaire_domaine)
+        super().__init__(gestionnaire_domaine, contexte)
 
         self._json_helper = JSONHelper()
         self._gestionnaire_domaine = gestionnaire_domaine
@@ -170,6 +169,8 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
         self.__wait_event = Event()
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self.__traitement_middleware = TraitementMessageDomaineMiddleware(self.gestionnaire)
 
         self._thread_traitement.start()
 
@@ -409,37 +410,42 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
     Callback pour chaque evenement. Gere l'execution d'une etape a la fois.
     '''
     def traiter_message(self, ch, method, properties, body):
-        id_doc_processus = None
-        try:
-            # Decoder l'evenement qui contient l'information sur l'etape a traiter
-            evenement_dict = self.extraire_evenement(body)
-            evenement_type = evenement_dict.get('evenement')
+        routing_key = method.routing_key
 
-            message = {
-                'evenement_dict': evenement_dict,
-                'evenement_type': evenement_type,
-            }
-            if properties.correlation_id is not None:
-                message['correlation_id'] = properties.correlation_id
+        if routing_key.endswith('recevoirTransaction'):
+            self.__traitement_middleware.traiter_message(ch, method, properties, body)
+        else:
+            id_doc_processus = None
+            try:
+                # Decoder l'evenement qui contient l'information sur l'etape a traiter
+                evenement_dict = self.extraire_evenement(body)
+                evenement_type = evenement_dict.get('evenement')
 
-                if evenement_type is None:
-                    message['evenement_type'] = 'reponse'
+                message = {
+                    'evenement_dict': evenement_dict,
+                    'evenement_type': evenement_type,
+                }
+                if properties.correlation_id is not None:
+                    message['correlation_id'] = properties.correlation_id
 
-            self._q_locale.append(message)
+                    if evenement_type is None:
+                        message['evenement_type'] = 'reponse'
 
-            if len(self._q_locale) > self._max_q_size or self.__connectionmq_publisher.is_closed:
-                # On va arreter la consommation de messages pour passer au travers de la liste en memoire
-                self.__logger.warning("Throttling Q processus : %s" % self._q_processus)
-                self._consume_actif = False
-                # ch.basic_ack(delivery_tag=method.delivery_tag)  # Transmettre ACK avant stop consuming
-                self.gestionnaire.stop_consuming(self._q_processus)
+                self._q_locale.append(message)
 
-            # Activer la thread de traitement
-            self.__wait_event.set()
+                if len(self._q_locale) > self._max_q_size or self.__connectionmq_publisher.is_closed:
+                    # On va arreter la consommation de messages pour passer au travers de la liste en memoire
+                    self.__logger.warning("Throttling Q processus : %s" % self._q_processus)
+                    self._consume_actif = False
+                    # ch.basic_ack(delivery_tag=method.delivery_tag)  # Transmettre ACK avant stop consuming
+                    self.gestionnaire.stop_consuming(self._q_processus)
 
-        except Exception as e:
-            # Mettre le message d'erreur sur la Q erreur processus
-            self.erreur_fatale(id_doc_processus, str(body), e)
+                # Activer la thread de traitement
+                self.__wait_event.set()
+
+            except Exception as e:
+                # Mettre le message d'erreur sur la Q erreur processus
+                self.erreur_fatale(id_doc_processus, str(body), e)
 
     def __prochain_message(self):
         id_doc_processus = None
