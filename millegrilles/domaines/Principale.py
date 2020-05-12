@@ -193,6 +193,7 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         return info
 
+
 class TraitementMessagePrincipale(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire):

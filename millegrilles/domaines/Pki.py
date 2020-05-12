@@ -37,7 +37,7 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         reponse = None
         if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
             reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
-        elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_DEMANDE:
+        elif domaine_routing_key.startswith('requete.certificat.'):
             reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'], properties)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
             reponse = self.gestionnaire.get_certificats_backup()
@@ -163,7 +163,15 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PRIVE,
-            }
+            },
+            {
+                'nom': 'Pki.requete.3.protege',
+                'routing': [
+                    'requete.certificat.*',
+                ],
+                'ttl': 20000,
+                'exchange': Constantes.SECURITE_PROTEGE,
+            },
         ]
 
         configuration.extend(configuration_pki)
