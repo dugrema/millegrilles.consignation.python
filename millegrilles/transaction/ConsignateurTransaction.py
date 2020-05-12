@@ -13,6 +13,8 @@ from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInco
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
+from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -165,7 +167,7 @@ class ConsignateurTransactionCallback(BaseCallback):
                     if properties.correlation_id is not None:
                         properties_mq['correlation_id'] = properties.correlation_id
 
-                self.contexte.message_dao.transmettre_evenement_persistance(
+                self.contexte.generateur_transactions.transmettre_evenement_persistance(
                     id_document, uuid_transaction, domaine, properties_mq)
 
         except Exception as e:
@@ -222,7 +224,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         ][
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE
         ]
-        nom_collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine_transaction)
+        nom_collection = GestionnaireDomaine.identifier_collection_domaine(domaine_transaction)
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
         # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
@@ -268,7 +270,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         domaine_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
 
-        nom_collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine_transaction)
+        nom_collection = GestionnaireDomaine.identifier_collection_domaine(domaine_transaction)
         collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
 
         # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
@@ -303,14 +305,6 @@ class ConsignateurTransactionCallback(BaseCallback):
         except DuplicateKeyError:
             # Ok, la transaction existe deja dans la collection - rien a faire
             pass
-
-    @staticmethod
-    def identifier_collection_domaine(domaine):
-
-        domaine_split = domaine.split('.')
-        nom_collection = domaine_split[0]
-
-        return nom_collection
 
     def on_channel_open(self, channel):
         self.__channel = channel
@@ -377,9 +371,7 @@ class EvenementTransactionCallback(BaseCallback):
         """
         Permet d'ajouter un evenement a une liste de transactions par UUID.
 
-        :param uuid_transaction:
-        :param nom_collection:
-        :param evenement:
+        :param message_dict:
         :return:
         """
         nom_collection = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
@@ -411,7 +403,7 @@ class EvenementTransactionCallback(BaseCallback):
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
             evenement
         )
-        libelle_transaction_complete = '%s.%s' %  (
+        libelle_transaction_complete = '%s.%s' % (
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
             Constantes.EVENEMENT_TRANSACTION_COMPLETE
         )
@@ -534,19 +526,6 @@ class EntretienCollectionsDomaines(BaseCallback):
 
         self.__liste_domaines = dict()
 
-        # self.__liste_domaines = [
-        #     'millegrilles.domaines.Annuaire',
-        #     'millegrilles.domaines.Backup',
-        #     'millegrilles.domaines.GrosFichiers',
-        #     'millegrilles.domaines.MaitreDesCles',
-        #     'millegrilles.domaines.Parametres',
-        #     'millegrilles.domaines.Plume',
-        #     'millegrilles.domaines.Principale',
-        #     'millegrilles.domaines.SenseursPassifs',
-        #     'millegrilles.domaines.Pki',
-        #     'millegrilles.domaines.Hebergement',
-        # ]
-
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def entretien_initial(self):
@@ -557,7 +536,6 @@ class EntretienCollectionsDomaines(BaseCallback):
         self.__logger.info("Entretien initial transactions")
         try:
             self._setup_transaction()
-            # self._setup_index_domaines()
             self.__thread_entretien = None  # Cleanup thread termine
             self.__logger.info("FIN Entretien initial transactions")
         except Exception:

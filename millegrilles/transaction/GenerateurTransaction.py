@@ -263,6 +263,30 @@ class GenerateurTransaction:
             message_evenement, routing
         )
 
+    def transmettre_evenement_persistance(self, id_document, id_transaction, domaine, properties_mq):
+        message = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee",
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_PROPERTIES_MQ: properties_mq
+        }
+        routing_key = self.formatter_routing_evenement(domaine, 'recevoirTransaction')
+        self.emettre_message(message, routing_key, exchanges=[Constantes.SECURITE_SECURE])
+
+    @staticmethod
+    def formatter_routing_evenement(domaine, action):
+        split_domaine = domaine.split('.')
+        nom_domaine = split_domaine[0]
+
+        routing = ['evenement', nom_domaine]
+        if len(split_domaine) == 3:
+            sous_domaine = split_domaine[2]
+            routing.append(sous_domaine)
+        routing.append(action)
+
+        return '.'.join(routing)
+
 
 class TransactionOperations:
 

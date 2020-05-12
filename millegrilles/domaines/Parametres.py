@@ -63,7 +63,6 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         super().__init__(contexte)
 
         # Queue message handlers
-        self.__handler_transaction = TraitementTransactionPersistee(self)
         self.__handler_cedule = TraitementMessageCedule(self)
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesParametres(self),
@@ -141,9 +140,6 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def get_nom_domaine(self):
         return ConstantesParametres.DOMAINE_NOM
-
-    def get_handler_transaction(self):
-        return self.__handler_transaction
 
     def get_handler_cedule(self):
         return self.__handler_cedule
@@ -331,26 +327,6 @@ class TraitementMessageCedule(TraitementMessageDomaine):
         }
 
         collection_erreurs.delete_many(filtre_incomplet)
-
-
-class TraitementTransactionPersistee(TraitementMessageDomaine):
-
-    def __init__(self, gestionnaire):
-        super().__init__(gestionnaire)
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-
-        # Verifier quel processus demarrer.
-        routing_key = method.routing_key
-        routing_key_sansprefixe = routing_key.replace(
-            'destinataire.domaine.',
-            ''
-        )
-
-        processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
-        self._gestionnaire.demarrer_processus(processus, message_dict)
 
 
 # ******************* Processus *******************

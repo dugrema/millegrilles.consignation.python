@@ -3,8 +3,8 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
 from millegrilles.Erreurs import ErreurModeRegeneration
-from millegrilles.Domaines import GestionnaireDomaineStandard, RegenerateurDeDocumentsSansEffet
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
 from millegrilles.util.X509Certificate import PemHelpers, ConstantesGenerateurCertificat

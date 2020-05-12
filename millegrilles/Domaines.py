@@ -16,18 +16,186 @@ from bson import ObjectId
 from threading import Thread, Event, Lock
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki, ConstantesDomaines
-from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, \
-    TraitementMessageDomaineMiddleware, TraitementMessageDomaineRequete, TraitementMessageCedule, TraitementMessageDomaineCommande
+from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, CertificatInconnu
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration, MGProcessus
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
-from millegrilles.transaction.ConsignateurTransaction import ConsignateurTransactionCallback
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+
+
+class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        if routing_key.endswith('recevoirTransaction'):
+            # Traiter nouvelle transaction, verifier quel processus demarrer.
+            domaine = message_dict['domaine']
+            try:
+                processus = self.gestionnaire.identifier_processus(domaine)
+                self.gestionnaire.demarrer_processus(processus, message_dict)
+            except Exception as e:
+                self.gestionnaire.marquer_transaction_en_erreur(message_dict)
+                raise e
+
+
+class TraitementMessageDomaineCommande(TraitementMessageDomaine):
+    """
+    Traite une commande du domaine
+    """
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        try:
+            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            reponse = self.traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+            if reponse is not None:
+                self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.message_dao.transmettre_demande_certificat(fingerprint)
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
+        raise NotImplementedError()
+
+    def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None):
+        if correlation_id is None:
+            correlation_id = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+
+
+class TraitementMessageDomaineRequete(TraitementMessageDomaine):
+
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        try:
+            self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            self.traiter_requete(ch, method, properties, body, message_dict)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.message_dao.transmettre_demande_certificat(fingerprint)
+        except InvalidSignature as erreur_signature:
+            self.__logger.debug("Erreur signature message: \n%s" % str(message_dict))
+            self.transmettre_reponse(
+                {'error': True, 'message': 'Signature invalide'},
+                None, properties.reply_to, properties.correlation_id
+            )
+            raise erreur_signature
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+
+    def executer_requete(self, requete):
+        """
+        Requetes generiques par composants avec acces protege.
+
+        Exemple:
+        {
+          'filtre': {
+            '_mg-libelle': 'blogpost',
+          },
+          'projection': {
+            "uuid": 1, "_mg-derniere-modification": 1,
+            "titre": 1, "titre_fr": 1, "titre_en": 1
+          },
+          'hint': [
+            {'_mg-libelle': 1},
+            {'_mg-derniere-modification': -1}
+          ],
+          'limit': 10,
+          'skip': 120,
+        }
+
+        :param requete:
+        :return:
+        """
+        collection = self.gestionnaire.get_collection()
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+        hint = requete.get('hint')
+        limit = requete.get('limit')
+        skip = requete.get('skip')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        if hint is not None:
+            # Reformatter les hints avec tuple
+            hints_formatte = []
+            for hint_elem in hint:
+                for key, value in hint_elem.items():
+                    hints_formatte.append((key, value))
+
+            curseur.hint(hints_formatte)
+
+        if skip is not None:
+            curseur.skip(skip)
+
+        if limit is not None:
+            curseur.limit(limit)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        return resultats
+
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        if correlation_id is None:
+            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        message_resultat = {
+            'resultats': resultats,
+        }
+
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+
+
+class TraitementMessageCedule(TraitementMessageDomaine):
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        if evenement == Constantes.EVENEMENT_CEDULEUR:
+            self.traiter_evenement(message_dict)
+        else:
+            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+
+    def traiter_evenement(self, message):
+        self.gestionnaire.traiter_cedule(message)
 
 
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
@@ -465,7 +633,7 @@ class GestionnaireDomaine:
                 en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
                 uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 domaine = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-                self.message_dao.transmettre_evenement_persistance(
+                self.generateur_transactions.transmettre_evenement_persistance(
                     id_document, uuid_transaction, domaine, None)
         except OperationFailure as of:
             self._logger.error("Collection %s, erreur requete avec hint: %s.\n%s" % (
@@ -654,7 +822,11 @@ class GestionnaireDomaine:
         # Type de transaction inconnue, on lance une exception
         id_transaction = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
         domaine = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        collection = ConsignateurTransactionCallback.identifier_collection_domaine(domaine)
+
+        # Extraire domaine et sous-domaine
+        routing = GenerateurTransaction.formatter_routing_evenement(domaine, 'transactionEvenement')
+
+        collection = GestionnaireDomaine.identifier_collection_domaine(domaine)
 
         evenement = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
@@ -662,7 +834,8 @@ class GestionnaireDomaine:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: collection,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_ERREUR_TRAITEMENT,
         }
-        self.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+
+        self.message_dao.transmettre_message(evenement, routing)
 
     '''
     Implementer cette methode pour retourner le nom de la queue.
@@ -754,6 +927,14 @@ class GestionnaireDomaine:
                 return datetime.datetime.utcnow() > self.__Q_wait_broken + datetime.timedelta(minutes=2)
         else:
             return not self._stop_event.is_set()
+
+    @staticmethod
+    def identifier_collection_domaine(domaine):
+
+        domaine_split = domaine.split('.')
+        nom_collection = domaine_split[0]
+
+        return nom_collection
 
 
 class TraitementCommandesSecures(TraitementMessageDomaineCommande):
@@ -1348,7 +1529,7 @@ class GroupeurTransactionsARegenerer:
         """
 
         :param gestionnaire_domaine:
-        :param transaction_a_ignorer: Liste de transactions a ingorer pour regenerer ce domaine.
+        :param transactions_a_ignorer: Liste de transactions a ingorer pour regenerer ce domaine.
         """
         self.__gestionnaire_domaine = gestionnaire_domaine
         self.__transactions_a_ignorer = transactions_a_ignorer

@@ -9,7 +9,7 @@ import ssl
 from threading import Lock, RLock, Event, Thread, Barrier
 from pika.credentials import PlainCredentials, ExternalCredentials
 from pika.exceptions import AMQPConnectionError
-from cryptography.exceptions import InvalidSignature
+# from cryptography.exceptions import InvalidSignature
 
 from millegrilles import Constantes
 from millegrilles.Constantes import CommandesSurRelai
@@ -805,25 +805,27 @@ class PikaDAO:
         self.transmettre_message({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
         self.transmettre_message_noeuds({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
 
-    def transmettre_evenement_persistance(self, id_document, id_transaction, nom_domaine, properties_mq):
-        message = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
-            Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee",
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_domaine,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_PROPERTIES_MQ: properties_mq
-        }
-        message_utf8 = self.json_helper.dict_vers_json(message)
-        routing_key = 'destinataire.domaine.%s' % nom_domaine
-
-        with self.lock_transmettre_message:
-            self._logger.info("Transmission evenement persistance %s pour %s" % (routing_key, id_transaction))
-            self.__channel_publisher.basic_publish(
-                exchange=self.configuration.exchange_middleware,
-                routing_key=routing_key,
-                body=message_utf8)
-
-        self.__connexionmq_publisher.publish_watch()
+    # def transmettre_evenement_persistance(self, id_document, id_transaction, domaine, properties_mq):
+    #     message = {
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
+    #         Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee",
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_PROPERTIES_MQ: properties_mq
+    #     }
+    #     message_utf8 = self.json_helper.dict_vers_json(message)
+    #     routing_key = 'evenement.%s' % domaine
+    #
+    #     self.transmettre_message_exchange(message, routing_key, exchange=Constantes.SECURITE_SECURE)
+    #
+    #     # with self.lock_transmettre_message:
+    #     #     self._logger.info("Transmission evenement persistance %s pour %s" % (routing_key, id_transaction))
+    #     #     self.__channel_publisher.basic_publish(
+    #     #         exchange=self.configuration.exchange_middleware,
+    #     #         routing_key=routing_key,
+    #     #         body=message_utf8)
+    #     #
+    #     # self.__connexionmq_publisher.publish_watch()
 
     ''' 
     Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
@@ -1224,181 +1226,181 @@ class TraitementMessageDomaine(TraitementMessageCallback):
         return self._gestionnaire
 
 
-class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
-
-    def traiter_message(self, ch, method, properties, body):
-        routing_key = method.routing_key
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-
-        # Verifier quel processus demarrer.
-        routing_key_sansprefixe = routing_key.replace(
-            'destinataire.domaine.',
-            ''
-        )
-
-        try:
-            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
-            self.gestionnaire.demarrer_processus(processus, message_dict)
-        except Exception as e:
-            self.gestionnaire.marquer_transaction_en_erreur(message_dict)
-            raise e
-
-
-class TraitementMessageDomaineCommande(TraitementMessageDomaine):
-    """
-    Traite une commande du domaine
-    """
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-
-        try:
-            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
-            reponse = self.traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
-            if reponse is not None:
-                self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
-        except CertificatInconnu as ci:
-            fingerprint = ci.fingerprint
-            self.message_dao.transmettre_demande_certificat(fingerprint)
-
-    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
-        raise NotImplementedError()
-
-    def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None):
-        if correlation_id is None:
-            correlation_id = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-
-        message_resultat = {
-            'resultats': resultats,
-        }
-        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+# class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):
+#
+#     def traiter_message(self, ch, method, properties, body):
+#         routing_key = method.routing_key
+#         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+#
+#         # Verifier quel processus demarrer.
+#         routing_key_sansprefixe = routing_key.replace(
+#             'destinataire.domaine.',
+#             ''
+#         )
+#
+#         try:
+#             processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+#             self.gestionnaire.demarrer_processus(processus, message_dict)
+#         except Exception as e:
+#             self.gestionnaire.marquer_transaction_en_erreur(message_dict)
+#             raise e
 
 
-class TraitementMessageDomaineRequete(TraitementMessageDomaine):
-
-    def __init__(self, gestionnaire_domaine):
-        super().__init__(gestionnaire_domaine)
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def traiter_message(self, ch, method, properties, body):
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-
-        try:
-            self.gestionnaire.verificateur_transaction.verifier(message_dict)
-            self.traiter_requete(ch, method, properties, body, message_dict)
-        except CertificatInconnu as ci:
-            fingerprint = ci.fingerprint
-            self.message_dao.transmettre_demande_certificat(fingerprint)
-        except InvalidSignature as erreur_signature:
-            self.__logger.debug("Erreur signature message: \n%s" % str(message_dict))
-            self.transmettre_reponse(
-                {'error': True, 'message': 'Signature invalide'},
-                None, properties.reply_to, properties.correlation_id
-            )
-            raise erreur_signature
-
-    def traiter_requete(self, ch, method, properties, body, message_dict):
-        resultats = list()
-        for requete in message_dict['requetes']:
-            resultat = self.executer_requete(requete)
-            resultats.append(resultat)
-
-        # Genere message reponse
-        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
-
-    def executer_requete(self, requete):
-        """
-        Requetes generiques par composants avec acces protege.
-
-        Exemple:
-        {
-          'filtre': {
-            '_mg-libelle': 'blogpost',
-          },
-          'projection': {
-            "uuid": 1, "_mg-derniere-modification": 1,
-            "titre": 1, "titre_fr": 1, "titre_en": 1
-          },
-          'hint': [
-            {'_mg-libelle': 1},
-            {'_mg-derniere-modification': -1}
-          ],
-          'limit': 10,
-          'skip': 120,
-        }
-
-        :param requete:
-        :return:
-        """
-        collection = self.gestionnaire.get_collection()
-        filtre = requete.get('filtre')
-        projection = requete.get('projection')
-        sort_params = requete.get('sort')
-        hint = requete.get('hint')
-        limit = requete.get('limit')
-        skip = requete.get('skip')
-
-        if projection is None:
-            curseur = collection.find(filtre)
-        else:
-            curseur = collection.find(filtre, projection)
-
-        if sort_params is not None:
-            curseur.sort(sort_params)
-
-        if hint is not None:
-            # Reformatter les hints avec tuple
-            hints_formatte = []
-            for hint_elem in hint:
-                for key, value in hint_elem.items():
-                    hints_formatte.append((key, value))
-
-            curseur.hint(hints_formatte)
-
-        if skip is not None:
-            curseur.skip(skip)
-
-        if limit is not None:
-            curseur.limit(limit)
-
-        resultats = list()
-        for resultat in curseur:
-            resultats.append(resultat)
-
-        return resultats
-
-    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
-        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
-        if correlation_id is None:
-            correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-
-        message_resultat = {
-            'resultats': resultats,
-        }
-
-        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
-
-
-class TraitementMessageCedule(TraitementMessageDomaine):
-
-    def traiter_message(self, ch, method, properties, body):
-        routing_key = method.routing_key
-        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
-
-        if evenement == Constantes.EVENEMENT_CEDULEUR:
-            self.traiter_evenement(message_dict)
-        else:
-            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
-
-    def traiter_evenement(self, message):
-        self.gestionnaire.traiter_cedule(message)
-
-
-class TraitementCommandesSecures(TraitementMessageDomaineCommande):
-
-    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
-        pass
+# class TraitementMessageDomaineCommande(TraitementMessageDomaine):
+#     """
+#     Traite une commande du domaine
+#     """
+#
+#     def traiter_message(self, ch, method, properties, body):
+#         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+#
+#         try:
+#             enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+#             reponse = self.traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+#             if reponse is not None:
+#                 self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+#         except CertificatInconnu as ci:
+#             fingerprint = ci.fingerprint
+#             self.message_dao.transmettre_demande_certificat(fingerprint)
+#
+#     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
+#         raise NotImplementedError()
+#
+#     def transmettre_reponse(self, commande, resultats, replying_to, correlation_id=None):
+#         if correlation_id is None:
+#             correlation_id = commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+#
+#         message_resultat = {
+#             'resultats': resultats,
+#         }
+#         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+#
+#
+# class TraitementMessageDomaineRequete(TraitementMessageDomaine):
+#
+#     def __init__(self, gestionnaire_domaine):
+#         super().__init__(gestionnaire_domaine)
+#         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+#
+#     def traiter_message(self, ch, method, properties, body):
+#         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+#
+#         try:
+#             self.gestionnaire.verificateur_transaction.verifier(message_dict)
+#             self.traiter_requete(ch, method, properties, body, message_dict)
+#         except CertificatInconnu as ci:
+#             fingerprint = ci.fingerprint
+#             self.message_dao.transmettre_demande_certificat(fingerprint)
+#         except InvalidSignature as erreur_signature:
+#             self.__logger.debug("Erreur signature message: \n%s" % str(message_dict))
+#             self.transmettre_reponse(
+#                 {'error': True, 'message': 'Signature invalide'},
+#                 None, properties.reply_to, properties.correlation_id
+#             )
+#             raise erreur_signature
+#
+#     def traiter_requete(self, ch, method, properties, body, message_dict):
+#         resultats = list()
+#         for requete in message_dict['requetes']:
+#             resultat = self.executer_requete(requete)
+#             resultats.append(resultat)
+#
+#         # Genere message reponse
+#         self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+#
+#     def executer_requete(self, requete):
+#         """
+#         Requetes generiques par composants avec acces protege.
+#
+#         Exemple:
+#         {
+#           'filtre': {
+#             '_mg-libelle': 'blogpost',
+#           },
+#           'projection': {
+#             "uuid": 1, "_mg-derniere-modification": 1,
+#             "titre": 1, "titre_fr": 1, "titre_en": 1
+#           },
+#           'hint': [
+#             {'_mg-libelle': 1},
+#             {'_mg-derniere-modification': -1}
+#           ],
+#           'limit': 10,
+#           'skip': 120,
+#         }
+#
+#         :param requete:
+#         :return:
+#         """
+#         collection = self.gestionnaire.get_collection()
+#         filtre = requete.get('filtre')
+#         projection = requete.get('projection')
+#         sort_params = requete.get('sort')
+#         hint = requete.get('hint')
+#         limit = requete.get('limit')
+#         skip = requete.get('skip')
+#
+#         if projection is None:
+#             curseur = collection.find(filtre)
+#         else:
+#             curseur = collection.find(filtre, projection)
+#
+#         if sort_params is not None:
+#             curseur.sort(sort_params)
+#
+#         if hint is not None:
+#             # Reformatter les hints avec tuple
+#             hints_formatte = []
+#             for hint_elem in hint:
+#                 for key, value in hint_elem.items():
+#                     hints_formatte.append((key, value))
+#
+#             curseur.hint(hints_formatte)
+#
+#         if skip is not None:
+#             curseur.skip(skip)
+#
+#         if limit is not None:
+#             curseur.limit(limit)
+#
+#         resultats = list()
+#         for resultat in curseur:
+#             resultats.append(resultat)
+#
+#         return resultats
+#
+#     def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+#         # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+#         if correlation_id is None:
+#             correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+#
+#         message_resultat = {
+#             'resultats': resultats,
+#         }
+#
+#         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+#
+#
+# class TraitementMessageCedule(TraitementMessageDomaine):
+#
+#     def traiter_message(self, ch, method, properties, body):
+#         routing_key = method.routing_key
+#         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+#         evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+#
+#         if evenement == Constantes.EVENEMENT_CEDULEUR:
+#             self.traiter_evenement(message_dict)
+#         else:
+#             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, evenement))
+#
+#     def traiter_evenement(self, message):
+#         self.gestionnaire.traiter_cedule(message)
+#
+#
+# class TraitementCommandesSecures(TraitementMessageDomaineCommande):
+#
+#     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+#         pass
 
 
 class PikaSetupCallbackHandler:

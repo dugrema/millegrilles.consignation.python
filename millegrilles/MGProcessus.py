@@ -5,13 +5,12 @@ import requests
 import hashlib
 
 from bson.objectid import ObjectId
-import json
 import uuid
 
 from millegrilles import Constantes
 from millegrilles.Erreurs import ErreurModeRegeneration
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, JSONHelper, ConnexionWrapper
-from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
+from millegrilles.Domaines import TraitementMessageDomaine
+from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, TraitementMessageDomaine
 from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from threading import Thread, Event, Barrier

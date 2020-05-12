@@ -156,7 +156,7 @@ TRANSACTION_MESSAGE_LIBELLE_PROPERTIES_MQ = 'properties'
 TRANSACTION_MESSAGE_LIBELLE_RESOUMISSIONS = 'resoumissions'
 
 TRANSACTION_ROUTING_NOUVELLE = 'transaction.*.#.*'
-TRANSACTION_ROUTING_EVENEMENT = 'evenement.*.#.transaction'
+TRANSACTION_ROUTING_EVENEMENT = 'evenement.*.#.transactionEvenement'
 TRANSACTION_ROUTING_EVENEMENTTOKEN = 'evenement.*.#.transactionToken'
 TRANSACTION_ROUTING_EVENEMENTRESET = 'commande.*.#.transactionReset'
 TRANSACTION_ROUTING_RESTAURER = 'commande.*.#.restaurerTransactions'
