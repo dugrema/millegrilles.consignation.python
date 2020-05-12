@@ -443,7 +443,7 @@ class PikaDAO:
 
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
-            exchange_protege,
+            Constantes.SECURITE_SECURE,
             self.queuename_evenements_transactions(),
             [
                 Constantes.TRANSACTION_ROUTING_EVENEMENT,
@@ -794,38 +794,11 @@ class PikaDAO:
 
         self._in_error = False
 
-    def transmettre_notification(self, document_transaction, sub_routing_key):
-        routing_key = 'notification.%s' % sub_routing_key
-        # Utiliser delivery mode 2 (persistent) pour les notifications
-        self.transmettre_message(document_transaction, routing_key, delivery_mode_v=2)
-
     def transmettre_demande_certificat(self, fingerprint):
-        routing_key = 'pki.requete.%s' % fingerprint
+        routing_key = 'requete.certificat.%s' % fingerprint
         # Utiliser delivery mode 2 (persistent) pour les notifications
         self.transmettre_message({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
         self.transmettre_message_noeuds({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
-
-    # def transmettre_evenement_persistance(self, id_document, id_transaction, domaine, properties_mq):
-    #     message = {
-    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO: str(id_document),
-    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: id_transaction,
-    #         Constantes.EVENEMENT_MESSAGE_EVENEMENT: "transaction_persistee",
-    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
-    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_PROPERTIES_MQ: properties_mq
-    #     }
-    #     message_utf8 = self.json_helper.dict_vers_json(message)
-    #     routing_key = 'evenement.%s' % domaine
-    #
-    #     self.transmettre_message_exchange(message, routing_key, exchange=Constantes.SECURITE_SECURE)
-    #
-    #     # with self.lock_transmettre_message:
-    #     #     self._logger.info("Transmission evenement persistance %s pour %s" % (routing_key, id_transaction))
-    #     #     self.__channel_publisher.basic_publish(
-    #     #         exchange=self.configuration.exchange_middleware,
-    #     #         routing_key=routing_key,
-    #     #         body=message_utf8)
-    #     #
-    #     # self.__connexionmq_publisher.publish_watch()
 
     ''' 
     Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
@@ -943,7 +916,7 @@ class PikaDAO:
             message[Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS_ATTENTE] = str(id_document_processus_attente)
 
         message_utf8 = self.json_helper.dict_vers_json(message)
-        routing_key = 'processus.domaine.%s.resumer' % nom_domaine
+        routing_key = 'evenement.%s.resumer' % nom_domaine
 
         with self.lock_transmettre_message:
             channel.basic_publish(exchange=self.configuration.exchange_middleware,
@@ -965,7 +938,7 @@ class PikaDAO:
         }
 
         message_utf8 = self.json_helper.dict_vers_json(message)
-        routing_key = 'processus.domaine.%s.verifier.resumer' % nom_domaine
+        routing_key = 'evenement.%s.verifierResumer' % nom_domaine
 
         with self.lock_transmettre_message:
             channel.basic_publish(exchange=self.configuration.exchange_middleware,
@@ -998,7 +971,7 @@ class PikaDAO:
 
         with self.lock_transmettre_message:
             self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                   routing_key='transaction.erreur',
+                                                   routing_key='erreur',
                                                    body=message_utf8)
 
         self.__connexionmq_publisher.publish_watch()
@@ -1027,7 +1000,7 @@ class PikaDAO:
 
         with self.lock_transmettre_message:
             self.__channel_publisher.basic_publish(exchange=self.configuration.exchange_middleware,
-                                                   routing_key='processus.erreur',
+                                                   routing_key='erreur',
                                                    body=message_utf8)
         self.__connexionmq_publisher.publish_watch()
 

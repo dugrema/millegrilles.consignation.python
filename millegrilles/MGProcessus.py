@@ -1534,15 +1534,18 @@ class MGProcessusTransaction(MGProcessus):
         id_transaction = info_transaction.get('id_transaction')
         nom_collection = info_transaction['nom_collection']
 
-        evenement = {
+        evenement_message = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
             Constantes.MONGO_DOC_ID: id_transaction,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: datetime.datetime.utcnow().timestamp(),
         }
-        self._controleur.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT,
-                                                         channel=self.controleur.connectionmq_publisher.channel)
+        routing = 'evenement.%s.transactionEvenement' % self.controleur.get_collection_transaction_nom()
+
+        self._controleur.message_dao.transmettre_message(
+            evenement_message, routing,
+            channel=self.controleur.connectionmq_publisher.channel)
 
     def marquer_evenement_transaction_token(self, type_token, token):
         info_transaction = self.trouver_id_transaction()

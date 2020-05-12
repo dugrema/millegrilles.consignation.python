@@ -333,17 +333,18 @@ class EvenementTransactionCallback(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         exchange = method.exchange
-        if exchange == self.contexte.configuration.exchange_middleware:
-            if routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENT:
+        action = routing_key.split('.')[-1]
+        if exchange in (Constantes.SECURITE_SECURE, Constantes.SECURITE_PROTEGE):
+            if action == 'transactionEvenement':
                 self.ajouter_evenement(message_dict)
-            elif routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENTRESET:
+            elif action == 'transactionReset':
                 self.reset_evenements_transactions(message_dict)
-            elif routing_key == Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN:
+            elif action == 'transactionToken':
                 self.ajouter_evenement_token(message_dict)
             else:
-                raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+                raise ValueError("Type d'operation inconnue: routing: %s, action=%s, message=%s" % (routing_key, action, str(message_dict)))
         else:
-            raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+            raise ValueError("Type d'operation inconnue: routing=%s, action=%s, message=%s" % (routing_key, action, str(message_dict)))
 
     def ajouter_evenement(self, message_dict):
 
