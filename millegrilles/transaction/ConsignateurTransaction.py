@@ -124,14 +124,14 @@ class ConsignateurTransactionCallback(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         exchange = method.exchange
-        if routing_key == Constantes.TRANSACTION_ROUTING_NOUVELLE:
+        if routing_key.startswith('transaction.'):
             try:
                 self.__compteur = self.__compteur + 1
                 self._logger.debug("Nouvelle transaction %d: %s" % (self.__compteur, str(message_dict['en-tete']['domaine'])))
                 self.traiter_nouvelle_transaction(message_dict, exchange, properties)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
-        elif routing_key == Constantes.TRANSACTION_ROUTING_RESTAURER:
+        elif routing_key.endswith('restaurer'):
             try:
                 self._logger.debug(
                     "Transaction restauree %s" % str(message_dict['en-tete']['domaine']))
@@ -308,10 +308,7 @@ class ConsignateurTransactionCallback(BaseCallback):
     def identifier_collection_domaine(domaine):
 
         domaine_split = domaine.split('.')
-
-        nom_collection = None
-        if domaine_split[0] == 'millegrilles' and domaine_split[1] == 'domaines':
-            nom_collection = '.'.join(domaine_split[0:3])
+        nom_collection = domaine_split[0]
 
         return nom_collection
 
