@@ -214,11 +214,7 @@ class TraitementMessagePrincipale(TraitementMessageDomaine):
         elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
             # Verifier quel processus demarrer. On match la valeur dans la routing key.
             routing_key = method.routing_key
-            routing_key_sansprefixe = routing_key.replace(
-                'destinataire.domaine.millegrilles.domaines.Principale.',
-                ''
-            )
-            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+            processus = self.gestionnaire.identifier_processus(routing_key)
             self._gestionnaire.demarrer_processus(processus, message_dict)
 
         else:

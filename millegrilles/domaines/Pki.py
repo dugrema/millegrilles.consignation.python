@@ -38,7 +38,8 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
             reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
         elif domaine_routing_key.startswith('requete.certificat.'):
-            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'], properties)
+            fingerprint = message_dict.get('fingerprint') or domaine_routing_key.split('.')[-1]
+            reponse = self.gestionnaire.get_certificat(fingerprint, properties, demander_si_inconnu=False)
         elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
             reponse = self.gestionnaire.get_certificats_backup()
         elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS:
@@ -272,7 +273,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         return certs
 
-    def get_certificat(self, fingerprint, properties=None):
+    def get_certificat(self, fingerprint, properties=None, demander_si_inconnu=True):
         collection_pki = self.document_dao.get_collection(self.get_nom_collection())
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
@@ -286,10 +287,13 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 if not key.startswith('_'):
                     certificat_filtre[key] = value
         except AttributeError:
-            self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint)
-            # Le certificat n'est pas connu, on fait une requete
-            self.demander_certificat_via_mq(fingerprint)
-            certificat_filtre = None  # Aucune reponse avant retour
+            if demander_si_inconnu:
+                self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint)
+                # Le certificat n'est pas connu, on fait une requete
+                self.demander_certificat_via_mq(fingerprint)
+                certificat_filtre = None  # Aucune reponse avant retour
+            else:
+                self._logger.warning('Certificat %s inconnu' % fingerprint)
 
         return certificat_filtre
 
