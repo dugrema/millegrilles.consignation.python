@@ -314,7 +314,9 @@ class ConstantesPrincipale:
     TRANSACTION_ACTION_MAJ_PROFILMILLEGRILLE = '%s.majProfilMilleGrille' % DOMAINE_NOM
     TRANSACTION_MAJ_MENU = '%s.majMenu' % DOMAINE_NOM
 
-    REQUETE_AUTHINFO_MILLEGRILLE = 'requete.Principale.getAuthInfo'
+    REQUETE_AUTHINFO_MILLEGRILLE = 'getAuthInfo'
+    REQUETE_PROFIL_MILLEGRILLE = 'getProfilMillegrille'
+    REQUETE_PROFIL_USAGER = 'getProfilUsager'
 
     DOCUMENT_ALERTES = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_ALERTES,

@@ -14,10 +14,15 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
 
         reponse = None
-        if routing_key == ConstantesPrincipale.REQUETE_AUTHINFO_MILLEGRILLE:
-            reponse = self.gestionnaire.get_authinfo_millegrille()
+        if action == ConstantesPrincipale.REQUETE_AUTHINFO_MILLEGRILLE:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_CLES])
+        elif action == ConstantesPrincipale.REQUETE_PROFIL_MILLEGRILLE:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.LIBVAL_DOMAINES])
+        elif action == ConstantesPrincipale.REQUETE_PROFIL_USAGER:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.LIBVAL_PROFIL_USAGER])
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -177,21 +182,27 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         collection_principale.update_one(filtre_menu, ops)
 
-    def get_authinfo_millegrille(self):
+    def charger_documents(self, liste_libval: list):
+        """
+        Charge les documents demandes, filtre les cles et les retourne dans une collection indexee par _mg-libelle
+        :param liste_libval:
+        :return:
+        """
         collection = self.get_collection()
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_CLES,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': liste_libval},
         }
-        document_cles = collection.find_one(filtre)
 
-        info = {
-            'idmg': self.configuration.idmg,
-        }
-        for key, value in document_cles.items():
-            if not key.startswith('_'):
-                info[key] = value
+        curseur = collection.find(filtre)
+        docs = dict()
+        for document in curseur:
+            info = dict()
+            for key, value in document.items():
+                if not key.startswith('_'):
+                    info[key] = value
+            docs[document['_mg-libelle']] = info
 
-        return info
+        return docs
 
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
