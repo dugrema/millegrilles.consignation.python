@@ -44,6 +44,8 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
             reponse = self.gestionnaire.get_certificats_backup()
         elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS:
             reponse = self.gestionnaire.get_liste_certificats_noeuds()
+        elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERTS_CA:
+            reponse = self.gestionnaire.get_liste_certificats_ca()
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -344,6 +346,26 @@ class GestionnairePki(GestionnaireDomaineStandard):
             liste_certificats.append(cert_filtre)
 
         return liste_certificats
+
+    def get_liste_certificats_ca(self):
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesPki.LIBVAL_CERTIFICAT_ROOT, ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+            ]},
+        }
+        curseur = collection_pki.find(filtre)
+
+        documents = dict()
+        for doc in curseur:
+            type_certificat = doc[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            document_cert = {'type_certificat': type_certificat}
+            for key, value in doc.items():
+                if not key.startswith('_'):
+                    document_cert[key] = value
+            documents[doc['fingerprint']] = document_cert
+
+        return documents
 
     def recevoir_certificat(self, message_dict):
         enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
