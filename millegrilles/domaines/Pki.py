@@ -140,7 +140,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         if 'heure' in indicateurs:
             # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
             processus = "%s:%s" % (
-                ConstantesPki.DOMAINE_NOM,
+                self.__module__.__name__,
                 ProcessusVerifierChaineCertificatsNonValides.__name__
             )
             self.demarrer_processus(processus, dict())

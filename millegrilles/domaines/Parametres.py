@@ -1,14 +1,16 @@
 # Domaine de gestion et d'administration de MilleGrilles
-from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
-from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
-from millegrilles.MGProcessus import MGProcessusTransaction
-
 import logging
 import datetime
 
 from bson import ObjectId
+from typing import cast
+
+from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesParametres
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter, \
+    TraitementMessageDomaineCommande, TraitementCommandesSecures
+from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 
 class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
@@ -32,11 +34,22 @@ class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
         elif routing_key == 'requete.' + ConstantesParametres.REQUETE_ERREURS:
             liste_erreurs = self.gestionnaire.get_erreurs(message_dict)
             self.transmettre_reponse(message_dict, liste_erreurs, properties.reply_to, properties.correlation_id)
-        elif routing_key == 'requete.' + ConstantesParametres.REQUETE_SUPPRIMER_ERREUR:
-            self.gestionnaire.supprimer_erreurs(message_dict)
-            self.transmettre_reponse(message_dict, {}, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+
+
+class TraitementParametresDomaineCommandeProtegees(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesParametres.COMMANDE_SUPPRIMER_ERREUR:
+            reponse = self.gestionnaire.supprimer_erreurs(message_dict)
+        else:
+            raise ValueError("Action inconnu pour Parametres : %s" % action)
+
+        return reponse
 
 
 class ParametresExchangeRouter(ExchangeRouter):
@@ -67,6 +80,10 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesParametres(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesParametres(self)
+        }
+        self.__handler_commandes = {
+            Constantes.SECURITE_SECURE: TraitementCommandesSecures(self),
+            Constantes.SECURITE_PROTEGE: TraitementParametresDomaineCommandeProtegees(self),
         }
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
@@ -151,6 +168,9 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
+
+    def get_handler_commandes(self) -> dict:
+        return self.__handler_commandes
 
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesParametres.TRANSACTION_MODIFIER_EMAIL_SMTP:
@@ -270,6 +290,8 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
             collection_erreurs.delete_many({})
         elif id_erreur is not None:
             collection_erreurs.delete_one({'_id': ObjectId(id_erreur)})
+
+        return dict()
 
     def maj_supprimer_noeud_public(self, url):
         filtre = {

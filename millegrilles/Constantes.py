@@ -557,7 +557,8 @@ class ConstantesParametres:
 
     REQUETE_NOEUD_PUBLIC = DOMAINE_NOM + '.noeudPublic'
     REQUETE_ERREURS = DOMAINE_NOM + '.erreurs'
-    REQUETE_SUPPRIMER_ERREUR = DOMAINE_NOM + '.supprimerErreur'
+
+    COMMANDE_SUPPRIMER_ERREUR = 'supprimerErreur'
 
     # Courriel
     DOCUMENT_CHAMP_COURRIEL_ORIGINE = 'origine'
