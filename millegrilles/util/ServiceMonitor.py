@@ -999,6 +999,14 @@ class ServiceMonitor:
     def idmg_tronque(self):
         return self._idmg[0:12]
 
+    @property
+    def nodename(self):
+        return self._nodename
+
+    @property
+    def identificateur(self):
+        return self._nodename
+
     def event(self, event):
         event_json = json.loads(event)
         if event_json.get('Type') == 'container':
@@ -1869,7 +1877,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
 
     def __init__(self, service_monitor: ServiceMonitorDependant, contexte: ContexteRessourcesMilleGrilles):
         super().__init__(contexte)
-        self.__service_monitor = service_monitor
+        self._service_monitor = service_monitor
         self.__channel = None
         self.queue_name = None
 
@@ -1881,10 +1889,12 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         correlation_id = properties.correlation_id
         exchange = method.exchange
 
-        self.__logger.debug("Message recu : %s" % message_dict)
+        # self.__logger.debug("Message recu : %s" % message_dict)
 
-        if correlation_id == ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE:
-            self.__service_monitor.gestionnaire_certificats.recevoir_certificat(message_dict)
+        if routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
+            self.__logger.debug("Presence domaine %s detectee", str(message_dict['domaine']))
+        elif correlation_id == ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE:
+            self._service_monitor.gestionnaire_certificats.recevoir_certificat(message_dict)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 
@@ -1893,31 +1903,29 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
 
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        queue_name = 'dependant.' + self._service_monitor.nodename + '.relai'
+
+        channel.queue_declare(queue=queue_name, durable=True, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
         self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
 
         # Ajouter les routing keys
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitordependant.#',
-            callback=None
-        )
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_noeuds,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitor.activerHebergement',
-            callback=None
-        )
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_noeuds,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitor.desactiverHebergement',
-            callback=None
-        )
+        routing_keys = [
+            Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES,
+            'commande.servicemonitordependant.#',
+            'commande.servicemonitor.activerHebergement',
+            'commande.servicemonitor.desactiverHebergement',
+        ]
+
+        for key in routing_keys:
+            self.__channel.queue_bind(
+                exchange=self.configuration.exchange_middleware,
+                queue=self.queue_name,
+                routing_key=key,
+                callback=None
+            )
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
