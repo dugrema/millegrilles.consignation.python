@@ -1260,22 +1260,19 @@ class ServiceMonitorDependant(ServiceMonitor):
                     csr = str(info_csr['request'], 'utf-8')
                 liste_csr.append(csr)
 
-        if self.__logger.isEnabledFor(logging.INFO):
-            self.__logger.info("CSR a transmettre: %s" % json.dumps(liste_csr, indent=4))
-
         if len(liste_csr) > 0:
             self.__event_attente.clear()
             commande = {
                 'liste_csr': liste_csr,
             }
-            self.__connexion_principal.generateur_transactions.transmettre_commande(
-                commande,
-                'commande.millegrilles.domaines.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
-                correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
-                reply_to=self.__connexion_principal.reply_q
-            )
             # Transmettre commande de signature de certificats, attendre reponse
             while not self.__event_attente.is_set():
+                self.__connexion_principal.generateur_transactions.transmettre_commande(
+                    commande,
+                    'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
+                    correlation_id=ConstantesServiceMonitor.CORRELATION_CERTIFICAT_SIGNE,
+                    reply_to=self.__connexion_principal.reply_q
+                )
                 self.__logger.info("Attente certificats signes du middleware")
                 self.__event_attente.wait(120)
 
