@@ -1366,7 +1366,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
         self.generateur_transactions.soumettre_transaction(
             transaction,
-            domaine=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+            domaine_action=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
         )
 
 

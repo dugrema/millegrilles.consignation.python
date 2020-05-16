@@ -1120,6 +1120,7 @@ class TraitementMessageCallback:
             self.message_dao.transmettre_demande_certificat(fingerprint)
         except Exception as e:
             self.__logger.exception("Erreur dans callbackAvecAck, exception: %s" % str(e))
+            self.__logger.error(body)
             self.transmettre_erreur(ch, body, e)
         finally:
             self.transmettre_ack(ch, method)

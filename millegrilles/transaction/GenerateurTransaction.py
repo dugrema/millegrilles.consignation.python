@@ -56,7 +56,7 @@ class GenerateurTransaction:
         #
         # return message_signe
 
-    def soumettre_transaction(self, message_dict, routing=None,
+    def soumettre_transaction(self, message_dict, domaine_action=None,
                               reply_to=None, correlation_id=None,
                               version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                               idmg_destination: str = None):
@@ -73,7 +73,7 @@ class GenerateurTransaction:
         """
 
         # Preparer la structure du message reconnue par MilleGrilles
-        enveloppe = self.preparer_enveloppe(message_dict, routing, version=version, idmg_destination=idmg_destination)
+        enveloppe = self.preparer_enveloppe(message_dict, domaine_action, version=version, idmg_destination=idmg_destination)
         # self.__logger.debug("Enveloppe message complet:\n%s" % str(enveloppe))
 
         # Extraire le UUID pour le retourner a l'invoqueur de la methode. Utilise pour retracer une soumission.
