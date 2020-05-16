@@ -1469,16 +1469,25 @@ class GestionnaireCertificats:
         self.__logger.info("Certificat recu :\n%s" % json.dumps(message, indent=2))
         resultats = message['resultats']
 
-        for cert in resultats['certificats_pem']:
+        for info_chaine in resultats['chaines']:
+            pems = info_chaine['pems']
+            cert = pems[0]
+
+            # Identifier le role du certificat (OU)
             clecert = EnveloppeCleCert()
             clecert.cert_from_pem_bytes(cert.encode('utf-8'))
             subject_dict = clecert.formatter_subject()
             role = subject_dict['organizationalUnitName']
+
+            # Trouver cle correspondante (date)
             label_role_cert = 'pki.%s.cert' % role
             label_role_key = 'pki.%s.key' % role
             info_role_key = self._service_monitor.gestionnaire_docker.trouver_secret(label_role_key)
             date_key = info_role_key['date']
-            self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, cert, date_key)
+
+            # Inserer la chaine de certificat
+            chaine = '\n'.join(pems)
+            self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, chaine, date_key)
 
         self._service_monitor.trigger_event_attente()
 
