@@ -30,7 +30,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
 from millegrilles.util.X509Certificate import GenerateurInitial, RenouvelleurCertificat, EnveloppeCleCert, \
-    ConstantesGenerateurCertificat
+    ConstantesGenerateurCertificat, PemHelpers
 from millegrilles.util.RabbitMQManagement import RabbitMQAPI
 from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
@@ -1256,8 +1256,11 @@ class ServiceMonitorDependant(ServiceMonitor):
                         csr = fichier.read()
                 except AttributeError:
                     # Creer la cle, CSR correspondant
-                    info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev)
+                    inserer_cle = role not in ['mongo']
+                    info_csr = self._gestionnaire_certificats.generer_csr(role, insecure=self._args.dev, inserer_cle=inserer_cle)
                     csr = str(info_csr['request'], 'utf-8')
+                    if role == 'mongo':
+                        self._gestionnaire_certificats.memoriser_cle(role, info_csr['cle_pem'])
                 liste_csr.append(csr)
 
         if len(liste_csr) > 0:
@@ -1295,9 +1298,26 @@ class ServiceMonitorDependant(ServiceMonitor):
         self.__logger.info("Debut boucle d'entretien du service monitor")
 
         while not self._fermeture_event.is_set():
-            self.verifier_load()
-            self._entretien_modules()
-            self._fermeture_event.wait(30)
+            self._attente_event.clear()
+
+            try:
+                self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                self.verifier_load()
+
+                if not self._connexion_middleware:
+                    try:
+                        self.connecter_middleware()
+                    except BrokenBarrierError:
+                        self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+
+                self._entretien_modules()
+
+                self.__logger.debug("Fin cycle entretien ServiceMonitor")
+            except Exception:
+                self.__logger.exception("ServiceMonitor: erreur generique")
+            finally:
+                self._attente_event.wait(30)
 
         self.__logger.info("Fin execution de la boucle d'entretien du service monitor")
 
@@ -1344,6 +1364,8 @@ class GestionnaireCertificats:
         self._nodename = self._docker.info()['Name']
         self.idmg: str = cast(str, None)
 
+        self.__cles_memorisees = dict()
+
         cert_pem = kwargs.get('millegrille_cert_pem')
         if cert_pem:
             self._clecert_millegrille = EnveloppeCleCert()
@@ -1384,6 +1406,7 @@ class GestionnaireCertificats:
     def ajouter_secret(self, name: str, data: bytes):
         name_tronque = self.__preparer_label(name)
         self._docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+        return name_tronque
 
     def __generer_private_key(self, generer_password=False, keysize=2048, public_exponent=65537):
         info_cle = dict()
@@ -1397,7 +1420,7 @@ class GestionnaireCertificats:
         )
         return info_cle
 
-    def generer_csr(self, type_cle: str, insecure=False):
+    def generer_csr(self, type_cle: str, insecure=False, inserer_cle=True):
         # Generer cle privee
         info_cle = self.__generer_private_key()
 
@@ -1442,8 +1465,9 @@ class GestionnaireCertificats:
             with open(key_path, 'xb') as fichier:
                 fichier.write(cle_pem)
 
-        label_key_monitor = 'pki.%s.key' % type_cle
-        self.ajouter_secret(label_key_monitor, data=cle_pem)
+        if inserer_cle:
+            label_key_monitor = 'pki.%s.key' % type_cle
+            self.ajouter_secret(label_key_monitor, data=cle_pem)
 
         return info_cle
 
@@ -1471,29 +1495,40 @@ class GestionnaireCertificats:
 
         for info_chaine in resultats['chaines']:
             pems = info_chaine['pems']
-            cert = pems[0]
 
             # Identifier le role du certificat (OU)
-            clecert = EnveloppeCleCert()
-            clecert.cert_from_pem_bytes(cert.encode('utf-8'))
-            subject_dict = clecert.formatter_subject()
-            role = subject_dict['organizationalUnitName']
-
-            # Trouver cle correspondante (date)
-            label_role_cert = 'pki.%s.cert' % role
-            label_role_key = 'pki.%s.key' % role
-            info_role_key = self._service_monitor.gestionnaire_docker.trouver_secret(label_role_key)
-            date_key = info_role_key['date']
-
-            # Inserer la chaine de certificat
-            chaine = '\n'.join(pems)
-            self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, chaine, date_key)
+            self.traiter_reception_certificat(pems)
 
         self._service_monitor.trigger_event_attente()
+
+    def traiter_reception_certificat(self, pems):
+        cert = pems[0]
+        clecert = EnveloppeCleCert()
+        clecert.cert_from_pem_bytes(cert.encode('utf-8'))
+        subject_dict = clecert.formatter_subject()
+        role = subject_dict['organizationalUnitName']
+
+        # Trouver cle correspondante (date)
+        label_role_cert = 'pki.%s.cert' % role
+        label_role_key = 'pki.%s.key' % role
+        info_role_key = self._service_monitor.gestionnaire_docker.trouver_secret(label_role_key)
+        date_key = info_role_key['date']
+
+        # Inserer la chaine de certificat
+        chaine = '\n'.join(pems)
+        self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, chaine, date_key)
 
     @property
     def idmg_tronque(self):
         return self.idmg[0:12]
+
+    def memoriser_cle(self, role, cle_pem):
+        self.__cles_memorisees[role] = cle_pem
+
+    def _recuperer_cle_memorisee(self, role):
+        cle = self.__cles_memorisees[role]
+        del self.__cles_memorisees[role]
+        return cle
 
     def charger_certificats(self):
         raise NotImplementedError()
@@ -1590,6 +1625,30 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
         # Charger le certificat de millegrille, chaine pour intermediaire
         self._charger_certificat_docker('pki.millegrille.cert')
 
+    def traiter_reception_certificat(self, pems):
+        cert = pems[0]
+        clecert = EnveloppeCleCert()
+        clecert.cert_from_pem_bytes(cert.encode('utf-8'))
+        subject_dict = clecert.formatter_subject()
+        role = subject_dict['organizationalUnitName']
+
+        if role == 'mongo':
+            # Pour MongoDB on insere la cle (en memoire) et le nouveau certificat dans le meme secret (une key_cert)
+            label_role_cert = 'pki.%s.cert' % role
+            label_role_key = 'pki.%s.key' % role
+
+            chaine = '\n'.join(pems)
+            cle_mongo = self._recuperer_cle_memorisee(role)  # Note : efface la cle en memoire
+            if not cle_mongo:
+                raise ValueError("Cle mongo n'est pas presente en memoire")
+            key_cert = str(cle_mongo, 'utf-8') + '\n' + chaine
+
+            # Inserer la chaine de certificat
+            nom_cle = self._service_monitor.gestionnaire_certificats.ajouter_secret(label_role_key, key_cert)
+            date_key = nom_cle.split('.')[-1]
+            self._service_monitor.gestionnaire_certificats.ajouter_config(label_role_cert, chaine, date_key)
+        else:
+            super().traiter_reception_certificat(pems)
 
 class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudProtegeDependant):
 
@@ -1999,25 +2058,33 @@ class ConnexionMiddleware:
         with open(mongo_passwd_file, 'r') as fichier:
             mongo_passwd = fichier.read()
 
-        ca_certs_file = self.__certificats['pki.intermediaire.chain']
-        monitor_cert_file = self.__certificats['pki.monitor.cert']
-        monitor_key_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem')
+        ca_certs_file = self.__certificats['pki.millegrille.cert']
+        monitor_cert_file = self.__certificats['pki.monitor_dependant.cert']
+        monitor_key_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_DEPENDANT_KEY + '.pem')
 
         # Preparer fichier keycert pour mongo
         keycert, monitor_keycert_file = tempfile.mkstemp(dir='/tmp')
         with open(monitor_key_file, 'rb') as fichier:
             os.write(keycert, fichier.read())
         with open(monitor_cert_file, 'rb') as fichier:
-            os.write(keycert, fichier.read())
+            cert_content = fichier.read()
+            os.write(keycert, cert_content)
+            split_cert = PemHelpers.split_certificats(str(cert_content, 'utf-8'))
         self.__monitor_keycert_file = monitor_keycert_file
         os.close(keycert)
+
+        # Creer chaine de certs CA a partir du certificat de monitor (doit inclure cert millegrille)
+        ca_certs_content = '\n'.join(split_cert[1:])
+        fp, ca_file_mq = tempfile.mkstemp(dir='/tmp')
+        os.write(fp, ca_certs_content.encode('utf-8'))
+        os.close(fp)
 
         node_name = self.__docker.info()['Name']
 
         additionnals = [{
             'MG_MQ_HOST': node_name,
             'MG_MQ_PORT': 5673,
-            'MG_MQ_CA_CERTS': ca_certs_file,
+            'MG_MQ_CA_CERTS': ca_file_mq,
             'MG_MQ_CERTFILE': monitor_cert_file,
             'MG_MQ_KEYFILE': monitor_key_file,
             'MG_MQ_SSL': 'on',
