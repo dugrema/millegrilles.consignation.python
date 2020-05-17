@@ -2167,34 +2167,35 @@ class ConnexionMiddleware:
                     filtre = {'name': role}
                     configs = self.__docker.configs.list(filters=filtre)
 
-                    dict_configs = dict()
-                    for config in configs:
-                        dict_configs[config.name] = config
+                    if len(configs) > 0:
+                        dict_configs = dict()
+                        for config in configs:
+                            dict_configs[config.name] = config
 
-                    # Choisir plus recent certificat
-                    liste_configs_str = list(dict_configs.keys())
-                    liste_configs_str.sort()
-                    nom_config = liste_configs_str[-1]
-                    config_cert = dict_configs[nom_config]
+                        # Choisir plus recent certificat
+                        liste_configs_str = list(dict_configs.keys())
+                        liste_configs_str.sort()
+                        nom_config = liste_configs_str[-1]
+                        config_cert = dict_configs[nom_config]
 
-                    # Extraire certificat
-                    cert_pem = b64decode(config_cert.attrs['Spec']['Data'])
-                    clecert = EnveloppeCleCert()
-                    clecert.cert_from_pem_bytes(cert_pem)
+                        # Extraire certificat
+                        cert_pem = b64decode(config_cert.attrs['Spec']['Data'])
+                        clecert = EnveloppeCleCert()
+                        clecert.cert_from_pem_bytes(cert_pem)
 
-                    # Creer compte
-                    roles_cert = clecert.get_roles
-                    if any([role in roles_mongo for role in roles_cert]):
+                        # Creer compte
+                        roles_cert = clecert.get_roles
+                        if any([role in roles_mongo for role in roles_cert]):
+                            try:
+                                self.__mongo.creer_compte(clecert)
+                            except DuplicateKeyError:
+                                self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
+
                         try:
-                            self.__mongo.creer_compte(clecert)
-                        except DuplicateKeyError:
-                            self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
-
-                    try:
-                        gestionnaire_mq: GestionnaireComptesMQ = self.__service_monitor.gestionnaire_mq
-                        gestionnaire_mq.ajouter_compte(clecert)
-                    except ValueError:
-                        comptes_mq_ok = False
+                            gestionnaire_mq: GestionnaireComptesMQ = self.__service_monitor.gestionnaire_mq
+                            gestionnaire_mq.ajouter_compte(clecert)
+                        except ValueError:
+                            comptes_mq_ok = False
 
                 self.__comptes_middleware_ok = True
 
