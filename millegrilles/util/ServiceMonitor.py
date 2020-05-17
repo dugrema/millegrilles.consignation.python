@@ -188,6 +188,65 @@ class InitialiserServiceMonitor:
 
 
 class GestionnaireModulesDocker:
+
+    DICT_MODULES = {
+        ConstantesServiceMonitor.MODULE_MQ: {
+            'nom': ConstantesServiceMonitor.MODULE_MQ,
+            'role': ConstantesGenerateurCertificat.ROLE_MQ,
+        },
+        ConstantesServiceMonitor.MODULE_MONGO: {
+            'nom': ConstantesServiceMonitor.MODULE_MONGO,
+            'role': ConstantesGenerateurCertificat.ROLE_MONGO,
+        },
+        ConstantesServiceMonitor.MODULE_TRANSACTION: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+        },
+        ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+        },
+        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
+            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
+        },
+        ConstantesServiceMonitor.MODULE_COUPDOEIL: {
+            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+        },
+        ConstantesServiceMonitor.MODULE_TRANSMISSION: {
+            'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION,
+        },
+        ConstantesServiceMonitor.MODULE_DOMAINES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        },
+        ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
+            'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
+            'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
+            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
+        },
+        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
+            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
+        },
+    }
+
     # Liste de modules requis. L'ordre est important
     MODULES_REQUIS_PRIMAIRE = [
         ConstantesServiceMonitor.MODULE_MQ,
@@ -204,8 +263,10 @@ class GestionnaireModulesDocker:
     MODULES_REQUIS_DEPENDANT = [
         ConstantesServiceMonitor.MODULE_MQ,
         ConstantesServiceMonitor.MODULE_MONGO,
-        # ConstantesServiceMonitor.MODULE_TRANSACTION,
+        ConstantesServiceMonitor.MODULE_TRANSACTION,
     ]
+
+    CERTIFICATS_REQUIS_DEPENDANT = [info['role'] for info in DICT_MODULES.values() if info.get('role')]
 
     MODULES_HEBERGEMENT = [
         ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
@@ -325,7 +386,7 @@ class GestionnaireModulesDocker:
             dict_services[service_name] = service
 
         for service_name in self.__modules_requis:
-            params = ServiceMonitor.DICT_MODULES[service_name]
+            params = GestionnaireModulesDocker.DICT_MODULES[service_name]
             service = dict_services.get(service_name)
             if not service:
                 try:
@@ -339,7 +400,7 @@ class GestionnaireModulesDocker:
 
     def demarrer_service(self, service_name: str, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
-        configuration_service = ServiceMonitor.DICT_MODULES.get(service_name)
+        configuration_service = GestionnaireModulesDocker.DICT_MODULES.get(service_name)
 
         if configuration_service:
             # S'assurer que le certificat existe et est a date
@@ -391,7 +452,7 @@ class GestionnaireModulesDocker:
             self.__modules_requis = list(modules_requis)
 
             for service_name in self.MODULES_HEBERGEMENT:
-                module_config = ServiceMonitor.DICT_MODULES[service_name]
+                module_config = GestionnaireModulesDocker.DICT_MODULES[service_name]
                 self.demarrer_service(service_name, **module_config)
 
             self.__hebergement_actif = True
@@ -715,64 +776,6 @@ class ServiceMonitor:
     Supporte aussi les MilleGrilles hebergees par l'hote.
     """
 
-    DICT_MODULES = {
-        ConstantesServiceMonitor.MODULE_MQ: {
-            'nom': ConstantesServiceMonitor.MODULE_MQ,
-            'role': ConstantesGenerateurCertificat.ROLE_MQ,
-        },
-        ConstantesServiceMonitor.MODULE_MONGO: {
-            'nom': ConstantesServiceMonitor.MODULE_MONGO,
-            'role': ConstantesGenerateurCertificat.ROLE_MONGO,
-        },
-        ConstantesServiceMonitor.MODULE_TRANSACTION: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-        },
-        ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-        },
-        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
-            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
-        },
-        ConstantesServiceMonitor.MODULE_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
-        },
-        ConstantesServiceMonitor.MODULE_TRANSMISSION: {
-            'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION,
-        },
-        ConstantesServiceMonitor.MODULE_DOMAINES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-        },
-        ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
-            'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
-            'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
-            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
-        },
-    }
-
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -920,7 +923,7 @@ class ServiceMonitor:
 
         # Generer tous les certificas qui peuvent etre utilises
         roles = dict()
-        for role in [info['role'] for info in ServiceMonitor.DICT_MODULES.values() if info.get('role')]:
+        for role in [info['role'] for info in GestionnaireModulesDocker.DICT_MODULES.values() if info.get('role')]:
             roles[role] = dict()
 
         # Charger la configuration existante
@@ -1236,13 +1239,8 @@ class ServiceMonitorDependant(ServiceMonitor):
         self.__connexion_principal.connecter()
 
         # Confirmer que les cles mq, mongo, mongoxp ont ete crees
-        roles = [
-            ConstantesGenerateurCertificat.ROLE_MQ,
-            ConstantesGenerateurCertificat.ROLE_MONGO,
-            ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
-        ]
         liste_csr = list()
-        for role in roles:
+        for role in GestionnaireModulesDocker.CERTIFICATS_REQUIS_DEPENDANT:
             label_cert = 'pki.%s.cert' % role
             try:
                 self._gestionnaire_docker.trouver_config(label_cert, self.idmg_tronque, self._docker)
@@ -2155,7 +2153,7 @@ class ConnexionMiddleware:
             try:
                 idmg = self.__configuration.idmg
                 igmd_tronque = idmg[0:12]
-                roles_comptes = [info['role'] for info in ServiceMonitor.DICT_MODULES.values() if info.get('role')]
+                roles_comptes = [info['role'] for info in GestionnaireModulesDocker.DICT_MODULES.values() if info.get('role')]
                 roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
 
                 roles_mongo = [
