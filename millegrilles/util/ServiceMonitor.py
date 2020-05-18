@@ -1345,8 +1345,8 @@ class ServiceMonitorDependant(ServiceMonitor):
 
         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
 
-    def inscrire_domaine(self, nom_domaine: str):
-        self._connexion_middleware.rediriger_messages_domaine(nom_domaine)
+    def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
+        self._connexion_middleware.rediriger_messages_domaine(nom_domaine, exchanges_routing)
 
 
 class GestionnaireCertificats:
@@ -1951,26 +1951,26 @@ class TransfertMessages(BaseCallback):
     def is_channel_open(self):
         return self.__channel is not None and not self.__channel.is_closed
 
-    def ajouter_domaine(self, nom_domaine: str):
+    def ajouter_domaine(self, nom_domaine: str, exchanges_routing: dict):
         if not self.__channel:
             self.__logger.warning("ServiceMonitor transfert non pret, domaine %s pas ajoute", nom_domaine)
             return
 
         self.__domaines.add(nom_domaine)
 
-        types_messages = [
-            'requete', 'commande', 'evenement', 'transaction', 'document',
+        routing_a_exclure = [
+            'erreur',
         ]
 
-        for exchange in self.__exchanges:
-            for type_message in types_messages:
-                routing_key = type_message + '.' + nom_domaine + '.#.*'
-                self.__channel.queue_bind(
-                    exchange=exchange,
-                    queue=self.queue_name,
-                    routing_key=routing_key,
-                    callback=None
-                )
+        for exchange, routing_keys in exchanges_routing.items():
+            for routing_key in routing_keys:
+                if routing_key not in routing_a_exclure:
+                    self.__channel.queue_bind(
+                        exchange=exchange,
+                        queue=self.queue_name,
+                        routing_key=routing_key,
+                        callback=None
+                    )
 
 
 class ConnexionPrincipal:
@@ -2108,8 +2108,9 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
 
     def traiter_presence_domaine(self, message_dict):
         domaine = message_dict['domaine']
-        self.__logger.debug("Presence domaine %s detectee", domaine)
-        self._service_monitor.inscrire_domaine(domaine)
+        exchanges_routing = message_dict['exchanges_routing']
+        self.__logger.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
+        self._service_monitor.inscrire_domaine(domaine, exchanges_routing)
 
 
 class ConnexionMiddleware:
@@ -2362,8 +2363,8 @@ class ConnexionMiddleware:
         gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
         gestionnaire_commandes.ajouter_commande(commande)
 
-    def rediriger_messages_domaine(self, nom_domaine):
-        self.__transfert_local_handler.ajouter_domaine(nom_domaine)
+    def rediriger_messages_domaine(self, nom_domaine: str, exchanges_routing: dict):
+        self.__transfert_local_handler.ajouter_domaine(nom_domaine, exchanges_routing)
 
     @property
     def document_dao(self) -> MongoDAO:
