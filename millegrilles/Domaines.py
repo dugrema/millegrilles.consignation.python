@@ -504,14 +504,24 @@ class GestionnaireDomaine:
         """
         if self.__message_presence is None:
             queue_config = self.get_queue_configuration()
-            routing = set()
+            exchanges = dict()
             for q in queue_config:
-                if q['exchange'] in [Constantes.SECURITE_PROTEGE]:
+                exchange = q['exchange']
+                if exchange not in [Constantes.SECURITE_SECURE]:
+                    routing = exchanges.get(exchange)
+                    if not routing:
+                        routing = set()
+                        exchanges[exchange] = routing
                     routing.update(q['routing'])
+
+            exchanges_routing = dict()
+            for exchange, routing_set in exchanges.items():
+                exchanges_routing[exchange] = list(routing_set)
+
             info_domaine = {
                 'domaine': self.get_nom_domaine(),
                 'sous_domaines': None,
-                'routing': list(routing),
+                'exchanges_routing': exchanges_routing,
                 'primaire': True,
             }
             self.__message_presence = info_domaine
