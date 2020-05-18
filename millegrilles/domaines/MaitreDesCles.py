@@ -121,6 +121,10 @@ class TraitementCommandesMaitreDesClesSecures(TraitementCommandesSecures):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusCreerClesMilleGrilleHebergee"
             resultat = self.gestionnaire.demarreur_processus.demarrer_processus(processus, message_dict)
 
+        elif routing_key == prefixe_commande + ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR_CA_DEPENDANT:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCSRCADependant"
+            resultat = self.gestionnaire.demarreur_processus.demarrer_processus(processus, message_dict)
+
         elif correlation_id == ConstantesMaitreDesCles.CORRELATION_CERTIFICATS_BACKUP:
             resultat = self.gestionnaire.verifier_certificats_backup(message_dict)
 
@@ -909,16 +913,23 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
             # Generer certificats
             pems = list()
+            chaines = list()
             for pem in message_dict['liste_csr']:
                 clecert = self.__renouvelleur_certificat.signer_csr(pem.encode('utf-8'))
                 pems.append(str(clecert.cert_bytes, 'utf-8'))
+
+                chaine = {
+                    'pems': clecert.chaine
+                }
+                chaines.append(chaine)
 
                 # Soumettre transaction du nouveau certificat
                 self.soumettre_transaction_certificat(clecert)
 
             # Transmettre certificats en reponse
             reponse = {
-                'certificats_pem': pems
+                'certificats_pem': pems,
+                'chaines': chaines,
             }
             return reponse
             # self.generateur_transactions.transmettre_reponse(
@@ -1900,6 +1911,87 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
             'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE
         )
 
+        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+
+        return {
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
+
+    def refuser_generation(self):
+        """
+        Refuser la creation d'un nouveau certificat.
+        :return:
+        """
+        # Repondre au demandeur avec le refus
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusSignerCSRCADependant(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traitement_regenerer(self, id_transaction, parametres_processus):
+        """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+        pass
+
+    def initiale(self):
+        transaction = self.transaction
+        domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
+
+        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+        roles_cert = enveloppe_cert.get_roles
+        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
+            'monitor_dependant' in roles_cert:
+            self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
+        else:
+            self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
+            return {
+                'autorise': False,
+                'domaines': domaines,
+                'description': 'demandeur non autorise a signer ce certificat',
+                'roles_demandeur': roles_cert
+            }
+
+        return {
+            'autorise': True,
+            'domaines': domaines,
+            'roles_demandeur': roles_cert,
+        }
+
+    def generer_cert(self):
+        """
+        Generer cert et creer nouvelle transaction pour PKI
+        :return:
+        """
+        transaction = self.transaction
+        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+
+        # Trouver generateur pour le role
+        renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
+        clecert = renouvelleur.signer_ca(csr_bytes)
+
+        # Generer nouvelle transaction pour sauvegarder le certificat
+        transaction = {
+            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+        }
+        self._controleur.generateur_transactions.soumettre_transaction(
+            transaction,
+            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
+
+        # Creer une commande pour que le monitor genere le compte sur RabbitMQ
         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
 
         return {

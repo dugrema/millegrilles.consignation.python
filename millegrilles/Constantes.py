@@ -715,6 +715,7 @@ class ConstantesMaitreDesCles:
     COMMANDE_RESTAURER_BACKUP_CLES = 'restaurerBackupCles'
     COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE = 'creerClesMilleGrilleHebergee'
     COMMANDE_SIGNER_CSR = 'signerCsr'
+    COMMANDE_SIGNER_CSR_CA_DEPENDANT = 'signerCSRCADependant'
 
     CORRELATION_CERTIFICATS_BACKUP = 'certificatsBackup'
 
