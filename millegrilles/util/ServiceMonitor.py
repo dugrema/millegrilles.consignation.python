@@ -1047,6 +1047,9 @@ class ServiceMonitor:
     def generateur_transactions(self):
         return self._connexion_middleware.generateur_transactions
 
+    def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
+        raise NotImplementedError()
+
 
 class ServiceMonitorPrincipal(ServiceMonitor):
     """
@@ -1307,6 +1310,7 @@ class ServiceMonitorDependant(ServiceMonitor):
                     try:
                         self.connecter_middleware()
                         self._connexion_middleware.set_relai(self.__connexion_principal)
+                        self.__connexion_principal.initialiser_relai_messages(self._connexion_middleware.relayer_message)
                     except BrokenBarrierError:
                         self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
@@ -1347,6 +1351,9 @@ class ServiceMonitorDependant(ServiceMonitor):
 
     def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
         self._connexion_middleware.rediriger_messages_domaine(nom_domaine, exchanges_routing)
+
+    def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
+        self.__connexion_principal.enregistrer_domaine(nom_domaine, exchanges_routing)
 
 
 class GestionnaireCertificats:
@@ -1822,7 +1829,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             fichiers.write(self.clecert_monitor.private_key_bytes)
 
 
-class TraitementMessages(BaseCallback):
+class TraitementMessagesMiddleware(BaseCallback):
 
     def __init__(self, gestionnaire_commandes, contexte):
         super().__init__(contexte)
@@ -1849,6 +1856,8 @@ class TraitementMessages(BaseCallback):
             }
             commande = CommandeMonitor(contenu=contenu)
             self.__gestionnaire_commandes.ajouter_commande(commande)
+        elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
+            self.traiter_presence_domaine(message_dict)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS:
@@ -1867,31 +1876,22 @@ class TraitementMessages(BaseCallback):
         self.queue_name = queue.method.queue
         self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
 
+        routing_keys = [
+            'commande.servicemonitor.#',
+            'commande.servicemonitor.ajouterCompte',
+            'commande.servicemonitor.activerHebergement',
+            'commande.servicemonitor.desactiverHebergement',
+            'evenement.presence.domaine',
+        ]
+
         # Ajouter les routing keys
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_middleware,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitor.#',
-            callback=None
-        )
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_noeuds,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitor.ajouterCompte',
-            callback=None
-        )
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_noeuds,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitor.activerHebergement',
-            callback=None
-        )
-        self.__channel.queue_bind(
-            exchange=self.configuration.exchange_noeuds,
-            queue=self.queue_name,
-            routing_key='commande.servicemonitor.desactiverHebergement',
-            callback=None
-        )
+        for routing_key in routing_keys:
+            self.__channel.queue_bind(
+                exchange=self.configuration.exchange_middleware,
+                queue=self.queue_name,
+                routing_key=routing_key,
+                callback=None
+            )
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -1900,6 +1900,12 @@ class TraitementMessages(BaseCallback):
     def is_channel_open(self):
         return self.__channel is not None and not self.__channel.is_closed
 
+    def traiter_presence_domaine(self, message_dict):
+        domaine = message_dict['domaine']
+        exchanges_routing = message_dict['exchanges_routing']
+        self.__logger.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
+        self.__gestionnaire_commandes.inscrire_domaine(domaine, exchanges_routing)
+
 
 class TransfertMessages(BaseCallback):
     """
@@ -1907,18 +1913,13 @@ class TransfertMessages(BaseCallback):
     Met un header sur le message transmis pour permettre d'empecher un retour
     """
 
-    def __init__(self, gestionnaire_commandes, contexte, connexion_relai, exchanges=None):
+    def __init__(self, contexte, fonction_relai, nom_noeud):
         super().__init__(contexte)
-        self.__gestionnaire_commandes = gestionnaire_commandes
-        self.__connexion_relai = connexion_relai
-        self.__exchanges = exchanges
-        if not exchanges:
-            self.__exchanges = [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]
+        self.__fonction_relai = fonction_relai
+        self.__nom_noeud = nom_noeud
 
         self.__channel = None
-
         self.queue_name = None
-        self.__domaines = set()
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -1929,9 +1930,15 @@ class TransfertMessages(BaseCallback):
         reply_to = properties.reply_to
         exchange = method.exchange
 
-        self.__logger.debug("Relayer message %s : %s" % (routing_key, message_dict))
+        # S'assurer que le message ne vient pas de ce noeud (si on est l'emetteur)
+        if properties.headers:
+            headers = properties.headers
+            if headers['noeud_source'] == self.__nom_noeud:
+                # Ne pas traiter le message, il a ete emis par ce noeud
+                return
 
-        self.__connexion_relai.relayer_message(message_dict, routing_key, exchange, reply_to, correlation_id)
+        self.__logger.debug("Relayer message %s : %s" % (routing_key, message_dict))
+        self.__fonction_relai(message_dict, routing_key, exchange, reply_to, correlation_id)
 
     def on_channel_open(self, channel):
         self.__channel = channel
@@ -1955,8 +1962,6 @@ class TransfertMessages(BaseCallback):
         if not self.__channel:
             self.__logger.warning("ServiceMonitor transfert non pret, domaine %s pas ajoute", nom_domaine)
             return
-
-        self.__domaines.add(nom_domaine)
 
         routing_a_exclure = [
             'erreur',
@@ -1984,6 +1989,7 @@ class ConnexionPrincipal:
 
         self.__contexte: ContexteRessourcesMilleGrilles = cast(ContexteRessourcesMilleGrilles, None)
         self.__traitement_messages_principal: TraitementMessagesConnexionPrincipale = cast(TraitementMessagesConnexionPrincipale, None)
+        self.__transfert_messages_principal: TransfertMessages = cast(TransfertMessages, None)
 
     def connecter(self):
         gestionnaire_docker = self.__service_monitor.gestionnaire_docker
@@ -2019,6 +2025,11 @@ class ConnexionPrincipal:
         self.__traitement_messages_principal = TraitementMessagesConnexionPrincipale(self.__service_monitor, self.__contexte)
         self.__contexte.message_dao.register_channel_listener(self.__traitement_messages_principal)
 
+    def initialiser_relai_messages(self, fonction_relai):
+        self.__transfert_messages_principal = TransfertMessages(
+            self.__contexte, fonction_relai, self.__service_monitor.nodename)
+        self.__contexte.message_dao.register_channel_listener(self.__transfert_messages_principal)
+
     def relayer_message(self, message_dict, routing_key, exchange, reply_to=None, correlation_id=None):
         """
         Relai un message recu vers le noeud principal
@@ -2040,6 +2051,9 @@ class ConnexionPrincipal:
     @property
     def generateur_transactions(self):
         return self.__contexte.generateur_transactions
+
+    def enregistrer_domaine(self, nom_domaine: str, exchanges_routing: dict):
+        self.__transfert_messages_principal.ajouter_domaine(nom_domaine, exchanges_routing)
 
 
 class TraitementMessagesConnexionPrincipale(BaseCallback):
@@ -2075,7 +2089,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=1)
 
-        queue_name = 'dependant.' + self._service_monitor.nodename + '.relai'
+        queue_name = 'dependant.' + self._service_monitor.nodename + '.monitor'
 
         channel.queue_declare(queue=queue_name, durable=True, exclusive=True, callback=self.queue_open)
 
@@ -2112,6 +2126,21 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         self.__logger.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
         self._service_monitor.inscrire_domaine(domaine, exchanges_routing)
 
+    # def enregistrer_domaine(self, nom_domaine: str, exchanges_routing: dict):
+    #     routing_a_exclure = [
+    #         'erreur',
+    #     ]
+    #
+    #     for exchange, routing_keys in exchanges_routing.items():
+    #         for routing_key in routing_keys:
+    #             if routing_key not in routing_a_exclure:
+    #                 self.__channel.queue_bind(
+    #                     exchange=exchange,
+    #                     queue=self.queue_name,
+    #                     routing_key=routing_key,
+    #                     callback=None
+    #                 )
+
 
 class ConnexionMiddleware:
     """
@@ -2142,7 +2171,7 @@ class ConnexionMiddleware:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.__certificat_event_handler: GestionnaireEvenementsCertificat
-        self.__commandes_handler: TraitementMessages = cast(TraitementMessages, None)
+        self.__commandes_handler: TraitementMessagesMiddleware = cast(TraitementMessagesMiddleware, None)
         self.__transfert_local_handler: TransfertMessages = cast(TransfertMessages, None)
 
         self.__monitor_cert_file: str
@@ -2224,7 +2253,7 @@ class ConnexionMiddleware:
         )
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
-        self.__commandes_handler = TraitementMessages(self.__service_monitor.gestionnaire_commandes, self.__contexte)
+        self.__commandes_handler = TraitementMessagesMiddleware(self.__service_monitor.gestionnaire_commandes, self.__contexte)
 
         self.__contexte.message_dao.register_channel_listener(self)
         self.__contexte.message_dao.register_channel_listener(self.__commandes_handler)
@@ -2232,7 +2261,7 @@ class ConnexionMiddleware:
     def set_relai(self, connexion_relai: ConnexionPrincipal):
         if not self.__transfert_local_handler:
             self.__transfert_local_handler = TransfertMessages(
-                self.__service_monitor.gestionnaire_commandes, self.__contexte, connexion_relai)
+                self.__contexte, connexion_relai.relayer_message, self.__service_monitor.nodename)
             self.__contexte.message_dao.register_channel_listener(self.__transfert_local_handler)
 
     def relayer_message(self, message_dict, routing_key, exchange, reply_to=None, correlation_id=None):
@@ -2910,6 +2939,9 @@ class GestionnaireCommandes:
         for cert in resultats:
             pem = cert[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
             self._ajouter_compte_pem(pem, message)
+
+    def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
+        self._service_monitor.rediriger_messages_downstream(nom_domaine, exchanges_routing)
 
 
 class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):
