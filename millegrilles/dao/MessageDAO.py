@@ -627,10 +627,10 @@ class PikaDAO:
     '''
 
     def transmettre_message_noeuds(self, message_dict, routing_key, delivery_mode_v=1,
-                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None):
+                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None, headers: dict = None):
 
         self.transmettre_message_exchange(message_dict, routing_key, self.configuration.exchange_noeuds,
-                                          delivery_mode_v, encoding, reply_to, correlation_id)
+                                          delivery_mode_v, encoding, reply_to, correlation_id, headers)
 
 
     ''' 
@@ -641,7 +641,7 @@ class PikaDAO:
     '''
 
     def transmettre_message_exchange(self, message_dict, routing_key, exchange: str, delivery_mode_v=1,
-                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None):
+                                   encoding=DateFormatEncoder, reply_to=None, correlation_id=None, headers: dict = None):
 
         if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
@@ -651,6 +651,8 @@ class PikaDAO:
             properties.reply_to = reply_to
         if correlation_id is not None:
             properties.correlation_id = correlation_id
+        if headers:
+            properties.headers = headers
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
