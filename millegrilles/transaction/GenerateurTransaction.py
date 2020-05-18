@@ -124,7 +124,7 @@ class GenerateurTransaction:
             reply_to = self._contexte.message_dao.queue_reponse
 
         enveloppe = message_dict.copy()
-        enveloppe = self.preparer_enveloppe(enveloppe, 'requete.%s' % domaine, idmg_destination=idmg_destination)
+        enveloppe = self.preparer_enveloppe(enveloppe, domaine, idmg_destination=idmg_destination)
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
