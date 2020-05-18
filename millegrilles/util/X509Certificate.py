@@ -1867,6 +1867,6 @@ class PemHelpers:
         END_CERT_VALUE = '-----END CERTIFICATE-----'
         liste_certs = list()
         for cert in certs.split(END_CERT_VALUE):
-            if cert != '' and not END_CERT_VALUE in cert:
+            if cert and cert.replace('\n', '') != '' and not END_CERT_VALUE in cert:
                 liste_certs.append(cert + END_CERT_VALUE + '\n')
         return liste_certs
