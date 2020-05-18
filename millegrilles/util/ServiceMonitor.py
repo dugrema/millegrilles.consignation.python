@@ -1913,6 +1913,8 @@ class TransfertMessages(BaseCallback):
     Met un header sur le message transmis pour permettre d'empecher un retour
     """
 
+    LOCAL_Q_PLACEHOLDER = '**local**'
+
     def __init__(self, contexte, fonction_relai, nom_noeud):
         super().__init__(contexte)
         self.__fonction_relai = fonction_relai
@@ -1936,6 +1938,19 @@ class TransfertMessages(BaseCallback):
             if headers['noeud_source'] == self.__nom_noeud:
                 # Ne pas traiter le message, il a ete emis par ce noeud
                 return
+
+        # Determiner si on a un message route ou une reponse
+        if routing_key == self.queue_name:
+            # C'est une reponse, on depile la reply_to queue de correlation
+            corr_split = correlation_id.split(':')
+            routing_key = corr_split[0]
+            correlation_id = ':'.join(corr_split[1:])
+            reply_to = None
+        elif reply_to:
+            # C'est un message route, on empile la reply_to queue sur correlation
+            # et on indique de repondre a notre Q distante
+            correlation_id = reply_to + ':' + correlation_id
+            reply_to = TransfertMessages.LOCAL_Q_PLACEHOLDER
 
         self.__logger.debug("Relayer message %s : %s" % (routing_key, message_dict))
         self.__fonction_relai(message_dict, routing_key, exchange, reply_to, correlation_id)
@@ -2042,6 +2057,9 @@ class ConnexionPrincipal:
         :return:
         """
         headers = {'noeud_source': self.__service_monitor.nodename}
+        if reply_to == TransfertMessages.LOCAL_Q_PLACEHOLDER:
+            # Mettre la queue de relai cote principal pour recevoir la reponse
+            reply_to = self.__transfert_messages_principal.queue_name
         self.generateur_transactions.emettre_message(message_dict, routing_key, [exchange], reply_to, correlation_id, headers)
 
     @property
@@ -2276,6 +2294,11 @@ class ConnexionMiddleware:
         :return:
         """
         headers = {'noeud_source': self.__service_monitor.nodename}
+
+        if reply_to == TransfertMessages.LOCAL_Q_PLACEHOLDER:
+            # Ajouter la Q de transfert locale pour recevoir la reponse a relayer
+            reply_to = self.__transfert_local_handler.queue_name
+
         self.generateur_transactions.emettre_message(message_dict, routing_key, [exchange], reply_to, correlation_id, headers)
 
     def on_channel_open(self, channel):
