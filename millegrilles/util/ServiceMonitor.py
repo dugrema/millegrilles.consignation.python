@@ -1351,6 +1351,9 @@ class ServiceMonitorDependant(ServiceMonitor):
 
 class GestionnaireCertificats:
 
+    MONITOR_CERT_PATH = 'monitor_cert_path'
+    MONITOR_KEY_FILE = 'monitor_key_file'
+
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         self._docker = docker_client
         self._service_monitor = service_monitor
@@ -1621,6 +1624,11 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
         try:
             cert_pem = self._charger_certificat_docker('pki.monitor_dependant.cert')
             clecert_monitor.from_pem_bytes(key_pem, cert_pem)
+
+            # Conserver reference au cert monitor
+            self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor_dependant.cert']
+            self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor_dependant.key.pem'
+
         except AttributeError:
             self.__logger.info("Certificat monitor_dependant non trouve, on va l'attendre")
             clecert_monitor.key_from_pem_bytes(key_pem)
@@ -1704,6 +1712,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         clecert_monitor = EnveloppeCleCert()
         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
         self.clecert_monitor = clecert_monitor
+
+        # Conserver reference au cert monitor pour middleware
+        self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
+        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor.key.pem'
 
         with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
             self._passwd_mongo = fichiers.read()
@@ -2162,8 +2174,8 @@ class ConnexionMiddleware:
             mongo_passwd = fichier.read()
 
         ca_certs_file = self.__certificats['pki.millegrille.cert']
-        monitor_cert_file = self.__certificats['pki.monitor_dependant.cert']
-        monitor_key_file = path.join(self.__path_secrets, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_DEPENDANT_KEY + '.pem')
+        monitor_cert_file = self.__certificats[GestionnaireCertificats.MONITOR_CERT_PATH]
+        monitor_key_file = path.join(self.__path_secrets, self.__certificats[GestionnaireCertificats.MONITOR_KEY_FILE])
 
         # Preparer fichier keycert pour mongo
         keycert, monitor_keycert_file = tempfile.mkstemp(dir='/tmp')
