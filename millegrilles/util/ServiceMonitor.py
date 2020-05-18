@@ -253,7 +253,6 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_MONGO,
         ConstantesServiceMonitor.MODULE_TRANSACTION,
         ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-        # ConstantesServiceMonitor.MODULE_CEDULEUR,
         ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
         ConstantesServiceMonitor.MODULE_COUPDOEIL,
         ConstantesServiceMonitor.MODULE_TRANSMISSION,
@@ -362,6 +361,8 @@ class GestionnaireModulesDocker:
             secret_reference['uid'] = 0
             secret_reference['gid'] = 0
             secret_reference['mode'] = 0o444
+
+            del secret_reference['date']
 
             liste_secrets.append(SecretReference(**secret_reference))
 
@@ -969,11 +970,10 @@ class ServiceMonitor:
         if besoin_initialiser:
             self._gestionnaire_docker.initialiser_millegrille()
 
-            if not self._args.dev:
-                # Modifier service docker du service monitor pour ajouter secrets
-                self._gestionnaire_docker.configurer_monitor()
-                self.fermer()  # Fermer le monitor, va forcer un redemarrage du service
-                raise Exception("Redemarrage")
+            # Modifier service docker du service monitor pour ajouter secrets
+            self._gestionnaire_docker.configurer_monitor()
+            self.fermer()  # Fermer le monitor, va forcer un redemarrage du service
+            raise Exception("Redemarrage")
 
         # Generer certificats de module manquants ou expires, avec leur cle
         self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque

@@ -495,7 +495,7 @@ class PKIDocumentHelper:
             try:
                 self._contexte.generateur_transactions.soumettre_transaction(
                     transaction,
-                    routing=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+                    ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
                 )
             except ErreurModeRegeneration:
                 # Mode de regeneration de document, rien a faire
