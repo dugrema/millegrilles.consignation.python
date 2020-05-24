@@ -1,9 +1,11 @@
 import logging
+import datetime
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds, TraitementCommandesProtegees, \
     TransactionTypeInconnuError
+from millegrilles.MGProcessus import MGProcessusTransaction
 
 
 class TraitementRequetesProtegees(TraitementRequetesNoeuds):
@@ -63,17 +65,19 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
     def identifier_processus(self, domaine_transaction):
 
-        if domaine_transaction == ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_USAGER:
+        action = domaine_transaction.split('.')[-1]
+
+        if action == ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_USAGER:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusInscrireUsager"
-        elif domaine_transaction == ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_CLE:
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_CLE:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAjouterCle"
-        elif domaine_transaction == ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_CLES:
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_CLES:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusSupprimerCles"
-        elif domaine_transaction == ConstantesMaitreDesComptes.TRANSACTION_MAJ_MOTDEPASSE:
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_MOTDEPASSE:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajMotdepasse"
-        elif domaine_transaction == ConstantesMaitreDesComptes.TRANSACTION_SUPPRESSION_MOTDEPASSE:
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_SUPPRESSION_MOTDEPASSE:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusSupprimerMotdepasse"
-        elif domaine_transaction == ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_USAGER:
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_USAGER:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusSupprimerUsager"
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -116,3 +120,40 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         else:
             return {Constantes.EVENEMENT_REPONSE: False}
 
+    def inscrire_usager(self, info_usager: dict):
+        nom_usager = info_usager[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        date_courante = datetime.datetime.utcnow()
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+        }
+
+        ops = {
+            '$set': info_usager,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops, upsert=True)
+        if not resultat.upserted_id and resultat.matched_count == 0:
+            raise Exception("Erreur inscription, aucun document modifie")
+
+
+class ProcessusInscrireUsager(MGProcessusTransaction):
+    """
+    Inscrit un nouvel usager.
+    Note : si l'usager existe deja, fait une mise a jour
+    """
+    def initiale(self):
+        transaction = self.transaction_filtree
+        self.controleur.gestionnaire.inscrire_usager(transaction)
+        self.set_etape_suivante()  #Termine

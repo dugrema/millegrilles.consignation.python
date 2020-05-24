@@ -49,13 +49,21 @@ class MessagesSample(BaseCallback):
     def requete_profil_usager(self):
         requete = {'nomUsager': 'test'}
         domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER])
-        enveloppe_requete = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+        enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
 
-        print("Envoi requete: %s" % enveloppe_requete)
-        return enveloppe_requete
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def transaction_inscrire_usager(self):
+        transaction = {'nomUsager': 'test', 'mon_info': 237}
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_USAGER])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
 
     def executer(self):
-        self.requete_profil_usager()
+        # self.requete_profil_usager()
+        self.transaction_inscrire_usager()
 
 
 # --- MAIN ---
