@@ -1111,6 +1111,9 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
 
+    def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
+        pass  # Rien a faire pour le monitor principal
+
 
 class ServiceMonitorDependant(ServiceMonitor):
     """
