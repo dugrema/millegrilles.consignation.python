@@ -109,7 +109,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         nom_usager = message_dict[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-            ConstantesMaitreDesComptes.LIBVAL_USAGER: nom_usager,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
 
         collection = self.document_dao.get_collection(self.get_nom_collection())
@@ -147,6 +147,99 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if not resultat.upserted_id and resultat.matched_count == 0:
             raise Exception("Erreur inscription, aucun document modifie")
 
+    def maj_motdepasse(self, nom_usager: str, motdepasse: dict):
+        set_ops = {
+            ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE: motdepasse
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur maj mot de passe, aucun document modifie")
+
+    def suppression_motdepasse(self, nom_usager: str):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+        ops = {
+            '$unset': {ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE: True},
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur suppression mot de passe, aucun document modifie")
+
+        return {Constantes.EVENEMENT_REPONSE: True}
+
+    def ajouter_cle(self, nom_usager: str, cle: dict, reset_autres_cles=False):
+        if reset_autres_cles:
+            op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_CLES: [cle]}}
+        else:
+            op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_CLES: cle}}
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+        ops = {
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+        ops.update(op_cle)
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur ajout cle, aucun document modifie")
+
+    def suppression_cles(self, nom_usager: str):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+        ops = {
+            '$unset': {ConstantesMaitreDesComptes.CHAMP_CLES: True},
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur suppression mot de passe, aucun document modifie")
+
+        return {Constantes.EVENEMENT_REPONSE: True}
+
+    def supprimer_usager(self, nom_usager: str):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.delete_one(filtre)
+        if resultat.deleted_count != 1:
+            raise Exception("Erreur suppression usager, aucun document modifie")
+
+        return {Constantes.EVENEMENT_REPONSE: True}
+
 
 class ProcessusInscrireUsager(MGProcessusTransaction):
     """
@@ -156,4 +249,72 @@ class ProcessusInscrireUsager(MGProcessusTransaction):
     def initiale(self):
         transaction = self.transaction_filtree
         self.controleur.gestionnaire.inscrire_usager(transaction)
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusMajMotdepasse(MGProcessusTransaction):
+    """
+    Met a jour un mot de passe d'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        motdepasse = transaction[ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE]
+        self.controleur.gestionnaire.maj_motdepasse(nom_usager, motdepasse)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusSupprimerMotdepasse(MGProcessusTransaction):
+    """
+    Met a jour un mot de passe d'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        self.controleur.gestionnaire.suppression_motdepasse(nom_usager)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusAjouterCle(MGProcessusTransaction):
+    """
+    Met a jour un mot de passe d'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        cle = self.transaction[ConstantesMaitreDesComptes.CHAMP_CLE]
+        reset_autres_cles = transaction.get(ConstantesMaitreDesComptes.CHAMP_RESET_CLES) or False
+        self.controleur.gestionnaire.ajouter_cle(nom_usager, cle, reset_autres_cles)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusSupprimerCles(MGProcessusTransaction):
+    """
+    Met a jour un mot de passe d'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        self.controleur.gestionnaire.suppression_cles(nom_usager)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusSupprimerUsager(MGProcessusTransaction):
+    """
+    Met a jour un mot de passe d'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        self.controleur.gestionnaire.supprimer_usager(nom_usager)
+
         self.set_etape_suivante()  #Termine

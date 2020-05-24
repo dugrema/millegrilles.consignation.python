@@ -61,9 +61,62 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def transaction_maj_motdepasse(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+            ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE: {'info-mot-de-passe': 1234},
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_MAJ_MOTDEPASSE])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def transaction_supprimer_motdepasse(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_SUPPRESSION_MOTDEPASSE])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def transaction_ajouter_cle(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+            ConstantesMaitreDesComptes.CHAMP_CLE: {'ma_cle': 56896, 'autre_info': 'Da da daah'},
+            # ConstantesMaitreDesComptes.CHAMP_RESET_CLES: False,
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_CLE])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def transaction_supprimer_cles(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_CLES])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def transaction_supprimer_usager(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_USAGER])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.requete_profil_usager()
-        self.transaction_inscrire_usager()
+        # self.transaction_inscrire_usager()
+        # self.transaction_maj_motdepasse()
+        # self.transaction_supprimer_motdepasse()
+        # self.transaction_ajouter_cle()
+        # self.transaction_supprimer_cles()
+        self.transaction_supprimer_usager()
 
 
 # --- MAIN ---
@@ -74,4 +127,5 @@ sample = MessagesSample()
 # FIN TEST
 sample.event_recu.wait(5)
 sample.deconnecter()
+
 

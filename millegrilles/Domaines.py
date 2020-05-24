@@ -1245,7 +1245,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         """
         document_filtre = dict()
 
-        for key, value in document:
+        for key, value in document.items():
             if not key.startswith('_') or key == Constantes.DOCUMENT_INFODOC_LIBELLE:
                 document_filtre[key] = value
 

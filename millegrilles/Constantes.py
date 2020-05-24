@@ -1374,6 +1374,10 @@ class ConstantesMaitreDesComptes:
     LIBVAL_USAGER = 'usager'
 
     CHAMP_NOM_USAGER = 'nomUsager'
+    CHAMP_MOTDEPASSE = 'motdepasse'
+    CHAMP_CLE = 'cle'
+    CHAMP_CLES = 'cles'
+    CHAMP_RESET_CLES = 'reset_cles'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
 
