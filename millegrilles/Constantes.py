@@ -1363,6 +1363,28 @@ class ConstantesHebergement:
     CORRELATION_TROUSSEAU_MODULE = 'trousseau_module'
 
 
+class ConstantesMaitreDesComptes:
+
+    DOMAINE_NOM = 'MaitreDesComptes'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = DOMAINE_NOM
+
+    LIBVAL_USAGER = 'usager'
+
+    CHAMP_NOM_USAGER = 'nomUsager'
+
+    REQUETE_CHARGER_USAGER = 'chargerUsager'
+
+    TRANSACTION_INSCRIRE_USAGER = 'inscrireUsager'
+    TRANSACTION_MAJ_MOTDEPASSE = 'majMotdepasse'
+    TRANSACTION_SUPPRESSION_MOTDEPASSE = 'suppressionMotdepasse'
+    TRANSACTION_AJOUTER_CLE = 'ajouterCle'
+    TRANSACTION_SUPPRIMER_CLES = 'supprimerCles'
+    TRANSACTION_SUPPRIMER_USAGER = 'supprimerUsager'
+
+
 class ConstantesHebergementTransactions:
 
     pass

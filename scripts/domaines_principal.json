@@ -12,6 +12,9 @@
     },{
       "module": "millegrilles.domaines.Pki",
       "classe": "GestionnairePki"
+    },{
+      "module": "millegrilles.domaines.MaitreDesComptes",
+      "classe": "GestionnaireMaitreDesComptes"
     }
   ]
 }

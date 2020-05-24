@@ -1,0 +1,7 @@
+echo '{"commande": "demarrer_service", "nom_service": "mongoxp", "nom": "mongoexpress"}' > /var/opt/millegrilles/monitor.socket
+{"commande": "supprimer_service", "nom_service": "mongo"}
+{"commande": "demarrer_service", "nom_service": "heb_transaction", "nom": "mg-python"}
+{"commande": "demarrer_service", "nom_service": "heb_domaines", "nom": "mg-python"}
+{"commande": "demarrer_service", "nom_service": "heb_maitrecles", "nom": "mg-python"}
+{"commande": "demarrer_service", "nom_service": "heb_coupdoeil", "nom": "coupdoeilreact"}
+{"commande": "demarrer_service", "nom_service": "heb_fichiers", "nom": "fichiers"}

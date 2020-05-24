@@ -1237,6 +1237,20 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         self._logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
         self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
 
+    def filtrer_champs_document(self, document):
+        """
+        Enleve les champs internes (qui commencent pas un _), exception _mg-libelle
+        :param document:
+        :return:
+        """
+        document_filtre = dict()
+
+        for key, value in document:
+            if not key.startswith('_') or key == Constantes.DOCUMENT_INFODOC_LIBELLE:
+                document_filtre[key] = value
+
+        return document_filtre
+
     @property
     def handler_backup(self):
         return self.__handler_backup
@@ -1249,10 +1263,17 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_message(self, ch, method, properties, body):
-        routing_key = method.routing_key
-        exchange = method.exchange
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
+
+        reponse = self.traiter_requete(ch, method, properties, body, message_dict)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
 
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
@@ -1261,8 +1282,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
             resultat = self.executer_requete(requete)
             resultats.append(resultat)
 
-        # Genere message reponse
-        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+        return resultats
 
     def executer_requete(self, requete):
         self._logger.debug("Requete: %s" % str(requete))
