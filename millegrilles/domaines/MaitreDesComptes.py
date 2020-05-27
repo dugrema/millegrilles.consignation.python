@@ -17,6 +17,8 @@ class TraitementRequetesProtegees(TraitementRequetesNoeuds):
 
         if action == ConstantesMaitreDesComptes.REQUETE_CHARGER_USAGER:
             reponse = self.gestionnaire.charger_usager(message_dict)
+        elif action == ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE:
+            reponse = self.gestionnaire.get_info_proprietaire()
         else:
             # Type de transaction inconnue, on lance une exception
             raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
@@ -28,6 +30,7 @@ class TraitementCommandesMaitredesclesProtegees(TraitementCommandesProtegees):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
 
         resultat: dict
         # if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.COMMANDE_SIGNER_CLE_BACKUP):
@@ -67,7 +70,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         action = domaine_transaction.split('.')[-1]
 
-        if action == ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_USAGER:
+        if action == ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_PROPRIETAIRE:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusInscrireProprietaire"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_INSCRIRE_USAGER:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusInscrireUsager"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_CLE:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAjouterCle"
@@ -108,7 +113,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
     def charger_usager(self, message_dict):
         nom_usager = message_dict[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
 
@@ -119,6 +124,50 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             return document_filtre
         else:
             return {Constantes.EVENEMENT_REPONSE: False}
+
+    def get_info_proprietaire(self):
+        """
+        Retourne l'information du proprietaire, si existant.
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
+        }
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        document_proprietaire = collection.find_one(filtre)
+        if document_proprietaire:
+            document_proprietaire = self.filtrer_champs_document(document_proprietaire)
+        else:
+            return {Constantes.EVENEMENT_REPONSE: False}
+
+        return document_proprietaire
+
+    def inscrire_proprietaire(self, info_proprietaire: dict):
+        date_courante = datetime.datetime.utcnow()
+
+        cle = info_proprietaire[ConstantesMaitreDesComptes.CHAMP_CLE]
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
+        }
+
+        doc = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+            ConstantesMaitreDesComptes.CHAMP_CLES: [cle]
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+
+        # S'assurer que le document n'existe pas deja
+        doc_existant = collection.find_one(filtre)
+        if doc_existant:
+            raise ValueError("Proprietaire deja assigne pour cette MilleGrille")
+
+        resultat = collection.insert_one(doc)
+        if not resultat.inserted_id:
+            raise Exception("Erreur prise de possession par le proprietaire, aucun document modifie")
 
     def inscrire_usager(self, info_usager: dict):
         nom_usager = info_usager[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
@@ -153,7 +202,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         }
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         ops = {
@@ -170,7 +219,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
     def suppression_motdepasse(self, nom_usager: str):
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         ops = {
@@ -194,7 +243,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_CLES: cle}}
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         ops = {
@@ -239,6 +288,16 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             raise Exception("Erreur suppression usager, aucun document modifie")
 
         return {Constantes.EVENEMENT_REPONSE: True}
+
+
+class ProcessusInscrireProprietaire(MGProcessusTransaction):
+    """
+    Permet au proprietaire de prendre possession de sa MilleGrille.
+    """
+    def initiale(self):
+        transaction = self.transaction_filtree
+        self.controleur.gestionnaire.inscrire_proprietaire(transaction)
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusInscrireUsager(MGProcessusTransaction):

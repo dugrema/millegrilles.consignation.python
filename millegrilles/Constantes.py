@@ -1372,6 +1372,7 @@ class ConstantesMaitreDesComptes:
     QUEUE_NOM = DOMAINE_NOM
 
     LIBVAL_USAGER = 'usager'
+    LIBVAL_PROPRIETAIRE = 'proprietaire'
 
     CHAMP_NOM_USAGER = 'nomUsager'
     CHAMP_MOTDEPASSE = 'motdepasse'
@@ -1380,7 +1381,9 @@ class ConstantesMaitreDesComptes:
     CHAMP_RESET_CLES = 'reset_cles'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
+    REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
 
+    TRANSACTION_INSCRIRE_PROPRIETAIRE = 'inscrireProprietaire'
     TRANSACTION_INSCRIRE_USAGER = 'inscrireUsager'
     TRANSACTION_MAJ_MOTDEPASSE = 'majMotdepasse'
     TRANSACTION_SUPPRESSION_MOTDEPASSE = 'suppressionMotdepasse'
