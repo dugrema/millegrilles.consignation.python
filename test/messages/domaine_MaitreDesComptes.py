@@ -125,11 +125,11 @@ class MessagesSample(BaseCallback):
         return enveloppe
 
     def executer(self):
-        self.requete_info_proprietaire()
+        # self.requete_info_proprietaire()
         # self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
-        # self.transaction_maj_motdepasse()
+        self.transaction_maj_motdepasse()
         # self.transaction_supprimer_motdepasse()
         # self.transaction_ajouter_cle()
         # self.transaction_supprimer_cles()

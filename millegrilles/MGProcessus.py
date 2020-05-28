@@ -1546,9 +1546,7 @@ class MGProcessusTransaction(MGProcessus):
         }
         routing = 'evenement.%s.transactionEvenement' % self.controleur.get_collection_transaction_nom()
 
-        self._controleur.message_dao.transmettre_message(
-            evenement_message, routing,
-            channel=self.controleur.connectionmq_publisher.channel)
+        self._controleur.message_dao.transmettre_message_exchange(evenement_message, routing, exchange=Constantes.SECURITE_SECURE)
 
     def marquer_evenement_transaction_token(self, type_token, token):
         info_transaction = self.trouver_id_transaction()
