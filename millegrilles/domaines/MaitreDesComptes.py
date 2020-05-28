@@ -229,7 +229,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
     def suppression_motdepasse(self, nom_usager: str):
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                '$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE]
+            },
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         ops = {
@@ -258,7 +260,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             }
         else:
             filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+                Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                    '$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE]
+                },
                 ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
             }
 
