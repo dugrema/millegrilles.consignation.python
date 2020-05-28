@@ -1379,6 +1379,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_CLE = 'cle'
     CHAMP_CLES = 'cles'
     CHAMP_RESET_CLES = 'reset_cles'
+    CHAMP_EST_PROPRIETAIRE = 'est_proprietaire'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'

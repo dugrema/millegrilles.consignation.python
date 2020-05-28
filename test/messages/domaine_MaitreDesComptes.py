@@ -86,6 +86,17 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def transaction_maj_motdepasse_proprietaire(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+            ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE: {'info-mot-de-passe': 1234},
+            ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE: True,
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_MAJ_MOTDEPASSE])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def transaction_supprimer_motdepasse(self):
         transaction = {
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
@@ -98,6 +109,17 @@ class MessagesSample(BaseCallback):
     def transaction_ajouter_cle(self):
         transaction = {
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+            ConstantesMaitreDesComptes.CHAMP_CLE: {'ma_cle': 56896, 'autre_info': 'Da da daah'},
+            ConstantesMaitreDesComptes.CHAMP_RESET_CLES: False,
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_CLE])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def transaction_ajouter_cle_proprietaire(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE: True,
             ConstantesMaitreDesComptes.CHAMP_CLE: {'ma_cle': 56896, 'autre_info': 'Da da daah'},
             ConstantesMaitreDesComptes.CHAMP_RESET_CLES: False,
         }
@@ -129,9 +151,11 @@ class MessagesSample(BaseCallback):
         # self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
-        self.transaction_maj_motdepasse()
+        # self.transaction_maj_motdepasse()
+        self.transaction_maj_motdepasse_proprietaire()
         # self.transaction_supprimer_motdepasse()
         # self.transaction_ajouter_cle()
+        # self.transaction_ajouter_cle_proprietaire()
         # self.transaction_supprimer_cles()
         # self.transaction_supprimer_usager()
 

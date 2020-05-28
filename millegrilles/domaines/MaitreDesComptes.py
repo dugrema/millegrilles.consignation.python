@@ -113,7 +113,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
     def charger_usager(self, message_dict):
         nom_usager = message_dict[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                '$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE]
+            },
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
 
@@ -196,15 +198,23 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if not resultat.upserted_id and resultat.matched_count == 0:
             raise Exception("Erreur inscription, aucun document modifie")
 
-    def maj_motdepasse(self, nom_usager: str, motdepasse: dict):
+    def maj_motdepasse(self, nom_usager: str, motdepasse: dict, est_proprietaire: False):
         set_ops = {
             ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE: motdepasse
         }
 
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-        }
+        if est_proprietaire:
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
+            }
+            # Pour le proprietaire, on permet de changer le nom d'usager a volonte
+            set_ops[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER] = nom_usager
+        else:
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+                ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+            }
+
         ops = {
             '$set': set_ops,
             '$currentDate': {
@@ -236,16 +246,22 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         return {Constantes.EVENEMENT_REPONSE: True}
 
-    def ajouter_cle(self, nom_usager: str, cle: dict, reset_autres_cles=False):
+    def ajouter_cle(self, cle: dict, nom_usager: str = None, est_proprietaire=False, reset_autres_cles=False,):
         if reset_autres_cles:
             op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_CLES: [cle]}}
         else:
             op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_CLES: cle}}
 
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE]},
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-        }
+        if est_proprietaire:
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE
+            }
+        else:
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+                ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+            }
+
         ops = {
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
@@ -320,7 +336,8 @@ class ProcessusMajMotdepasse(MGProcessusTransaction):
 
         nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         motdepasse = transaction[ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE]
-        self.controleur.gestionnaire.maj_motdepasse(nom_usager, motdepasse)
+        est_proprietaire = transaction.get(ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE) or False
+        self.controleur.gestionnaire.maj_motdepasse(nom_usager, motdepasse, est_proprietaire)
 
         self.set_etape_suivante()  #Termine
 
@@ -345,10 +362,12 @@ class ProcessusAjouterCle(MGProcessusTransaction):
     def initiale(self):
         transaction = self.transaction
 
-        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        nom_usager = transaction.get(ConstantesMaitreDesComptes.CHAMP_NOM_USAGER)
+        est_proprietaire = transaction.get(ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE)
         cle = self.transaction[ConstantesMaitreDesComptes.CHAMP_CLE]
         reset_autres_cles = transaction.get(ConstantesMaitreDesComptes.CHAMP_RESET_CLES) or False
-        self.controleur.gestionnaire.ajouter_cle(nom_usager, cle, reset_autres_cles)
+        self.controleur.gestionnaire.ajouter_cle(
+            cle, nom_usager=nom_usager, est_proprietaire=est_proprietaire, reset_autres_cles=reset_autres_cles)
 
         self.set_etape_suivante()  #Termine
 
