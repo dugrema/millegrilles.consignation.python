@@ -4,14 +4,14 @@
       "module": "millegrilles.domaines.Principale",
       "classe": "GestionnairePrincipale"
     },{
-      "module": "millegrilles.domaines.Parametres",
-      "classe": "GestionnaireParametres"
-    },{
       "module": "millegrilles.domaines.Backup",
       "classe": "GestionnaireBackup"
     },{
       "module": "millegrilles.domaines.Pki",
       "classe": "GestionnairePki"
+    },{
+      "module": "millegrilles.domaines.Parametres",
+      "classe": "GestionnaireParametres"
     },{
       "module": "millegrilles.domaines.MaitreDesComptes",
       "classe": "GestionnaireMaitreDesComptes"

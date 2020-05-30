@@ -210,14 +210,15 @@ class GestionnaireModulesDocker:
             'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
             'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
         },
-        ConstantesServiceMonitor.MODULE_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+        ConstantesServiceMonitor.MODULE_WEB: {
+            'nom': ConstantesServiceMonitor.MODULE_WEB,
             'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
         },
-        ConstantesServiceMonitor.MODULE_TRANSMISSION: {
-            'nom': ConstantesServiceMonitor.MODULE_TRANSMISSION,
+        ConstantesServiceMonitor.MODULE_NGINX: {
+            'nom': ConstantesServiceMonitor.MODULE_NGINX,
+            'role': ConstantesGenerateurCertificat.ROLE_NGINX,
         },
-        ConstantesServiceMonitor.MODULE_DOMAINES: {
+        ConstantesServiceMonitor.MODULE_PRINCIPAL: {
             'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
         },
@@ -225,26 +226,26 @@ class GestionnaireModulesDocker:
             'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
             'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
         },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
-            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
-            'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
-        },
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
-            'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-            'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
-        },
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
+        #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
+        # },
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES: {
+        #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES,
+        # },
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES: {
+        #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES,
+        # },
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL: {
+        #     'nom': ConstantesServiceMonitor.MODULE_COUPDOEIL,
+        #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_COUPDOEIL,
+        # },
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS: {
+        #     'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+        #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS,
+        # },
     }
 
     # Liste de modules requis. L'ordre est important
@@ -254,9 +255,9 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_TRANSACTION,
         ConstantesServiceMonitor.MODULE_MAITREDESCLES,
         ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-        ConstantesServiceMonitor.MODULE_COUPDOEIL,
-        ConstantesServiceMonitor.MODULE_TRANSMISSION,
-        ConstantesServiceMonitor.MODULE_DOMAINES,
+        ConstantesServiceMonitor.MODULE_NGINX,
+        ConstantesServiceMonitor.MODULE_WEB,
+        ConstantesServiceMonitor.MODULE_PRINCIPAL,
     ]
 
     MODULES_REQUIS_DEPENDANT = [
@@ -268,11 +269,11 @@ class GestionnaireModulesDocker:
     CERTIFICATS_REQUIS_DEPENDANT = [info['role'] for info in DICT_MODULES.values() if info.get('role')]
 
     MODULES_HEBERGEMENT = [
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
-        ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_DOMAINES,
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_MAITREDESCLES,
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
+        # ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
     ]
 
     def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list):
@@ -836,7 +837,8 @@ class ServiceMonitor:
                 pass
 
             try:
-                self._gestionnaire_commandes.stop()
+                if self._gestionnaire_commandes:
+                    self._gestionnaire_commandes.stop()
             except Exception:
                 self.__logger.exception("Erreur fermeture gestionnaire commandes")
 
@@ -1078,13 +1080,13 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
                     self.verifier_load()
 
+                    self._entretien_modules()
+
                     if not self._connexion_middleware:
                         try:
                             self.connecter_middleware()
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
-
-                    self._entretien_modules()
 
                     self.__logger.debug("Fin cycle entretien ServiceMonitor")
                 except Exception:
@@ -1285,14 +1287,6 @@ class ServiceMonitorDependant(ServiceMonitor):
 
         self.preparer_gestionnaire_comptesmq()
         self.__logger.info("Certificats du middleware prets")
-
-    def _entretien_modules(self):
-        if not self.limiter_entretien:
-            # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
-            self._gestionnaire_docker.entretien_services()
-
-            # Entretien du middleware
-            self._gestionnaire_mq.entretien()
 
     def _run_entretien(self):
         """
@@ -2436,6 +2430,7 @@ class ConnexionMiddleware:
     @property
     def generateur_transactions(self):
         return self.__contexte.generateur_transactions
+
 
 class GestionnaireComptesMQ:
     """
