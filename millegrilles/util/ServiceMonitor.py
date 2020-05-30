@@ -472,6 +472,11 @@ class GestionnaireModulesDocker:
                     self.__logger.warning("Erreur retrait service %s" % service_name)
                 self.__hebergement_actif = False
 
+    def force_update_service(self, service_name):
+        filter = {'name': self.idmg_tronque + '_' + service_name}
+        service_list = self.__docker.services.list(filters=filter)
+        service_list[0].force_update()
+
     def verifier_etat_service(self, service):
         update_state = None
         update_status = service.attrs.get('UpdateStatus')
@@ -798,6 +803,7 @@ class ServiceMonitor:
         self._gestionnaire_docker: GestionnaireModulesDocker = cast(GestionnaireModulesDocker, None)
         self._gestionnaire_mq: GestionnaireComptesMQ = cast(GestionnaireComptesMQ, None)
         self._gestionnaire_commandes: GestionnaireCommandes = cast(GestionnaireCommandes, None)
+        self._gestionnaire_web : GestionnaireWeb = cast(GestionnaireWeb, None)
 
         self.limiter_entretien = True
 
@@ -981,6 +987,9 @@ class ServiceMonitor:
         self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
         self.__entretien_certificats()
 
+        # Initialiser gestionnaire web
+        self._gestionnaire_web = GestionnaireWeb(self._idmg, self)
+
     def _entretien_modules(self):
         if not self.limiter_entretien:
             # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
@@ -988,6 +997,9 @@ class ServiceMonitor:
 
             # Entretien du middleware
             self._gestionnaire_mq.entretien()
+
+            # Entretien web
+            self._gestionnaire_web.entretien()
 
     def run(self):
         raise NotImplementedError()
@@ -2636,6 +2648,88 @@ class GestionnaireComptesMongo:
         document_dao = self.__connexion.document_dao
         external_db = document_dao.get_database('$external')
         external_db.command(commande)
+
+
+class GestionnaireWeb:
+    """
+    S'occupe de la configuration des applications web, specifiquement nginx (via conf.d/modules)
+    """
+
+    def __init__(self, idmg: str, service_monitor: Union[ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal]):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__idmg = idmg
+        self.__service_monitor = service_monitor
+        self.__docker_client = service_monitor.gestionnaire_docker
+
+        self.__liste_fichiers = [
+            'modules_includes.conf',
+            'protege_dev.include',
+            'protege_server.include',
+            'proxypass_coupdoeil.include',
+            'proxypass_millegrilles.include',
+            'ssl_certs.conf.include',
+        ]
+
+        self.__init_complete = False
+        self.__repertoire_modules = path.join('/var/opt/millegrilles', self.__idmg, 'mounts/nginx/conf.d/modules')
+
+    def entretien(self):
+        if not self.__init_complete:
+            self.__creer_repertoires()
+            self.__init_complete = True
+
+    def __creer_repertoires(self):
+        # Verifier si les repertoires existent
+        try:
+            os.makedirs(self.__repertoire_modules, mode=0o770)
+            self.__generer_fichiers_configuration()
+        except FileExistsError:
+            self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
+
+    def __generer_fichiers_configuration(self):
+        """
+        Genere et conserve la configuration courante
+        :return:
+        """
+        nodename = self.__service_monitor.nodename
+
+        params = {
+            'nodename': nodename,
+        }
+
+        modules_includes_content = "include /etc/nginx/conf.d/protege.conf.include;"
+        protege_server_content = "server_name {nodename}.local {nodename};".format(**params)
+        proxypass_millegrilles_content = "proxy_pass https://web:443;"
+        proxypass_coupdoeil_content = "proxy_pass https://web:443;"
+        ssl_certs_content = """
+            ssl_certificate       /run/secrets/webcert.pem;
+            ssl_certificate_key   /run/secrets/webkey.pem;
+            ssl_stapling          on;
+            ssl_stapling_verify   on;
+        """
+
+        with open(path.join(self.__repertoire_modules, 'protege_dev.include'), 'w') as fichier:
+            fichier.write('# DUMMY FILE, requis par config')
+
+        with open(path.join(self.__repertoire_modules, 'modules_includes.conf'), 'w') as fichier:
+            fichier.write(modules_includes_content)
+        with open(path.join(self.__repertoire_modules, 'protege_server.include'), 'w') as fichier:
+            fichier.write(protege_server_content)
+        with open(path.join(self.__repertoire_modules, 'proxypass_millegrilles.include'), 'w') as fichier:
+            fichier.write(proxypass_millegrilles_content)
+        with open(path.join(self.__repertoire_modules, 'proxypass_coupdoeil.include'), 'w') as fichier:
+            fichier.write(proxypass_coupdoeil_content)
+        with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
+            fichier.write(ssl_certs_content)
+
+        self.__redemarrer_nginx()
+
+    def __redemarrer_nginx(self):
+        """
+        Redemarre le service nginx
+        :return:
+        """
+        self.__service_monitor.gestionnaire_docker.force_update_service('nginx')
 
 
 class GestionnaireImagesDocker:
