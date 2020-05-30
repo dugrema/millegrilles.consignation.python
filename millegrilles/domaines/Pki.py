@@ -30,27 +30,34 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
 class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
 
-        reponse = None
-        if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
-            reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
-        elif domaine_routing_key.startswith('requete.certificat.'):
-            fingerprint = message_dict.get('fingerprint') or domaine_routing_key.split('.')[-1]
-            reponse = self.gestionnaire.get_certificat(fingerprint, properties, demander_si_inconnu=False)
-        elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
-            reponse = self.gestionnaire.get_certificats_backup()
-        elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS:
-            reponse = self.gestionnaire.get_liste_certificats_noeuds()
-        elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERTS_CA:
-            reponse = self.gestionnaire.get_liste_certificats_ca()
-        else:
-            super().traiter_requete(ch, method, properties, body, message_dict)
+        if properties.reply_to and properties.correlation_id:
+            reponse = None
+            if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
+                reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
+            elif domaine_routing_key.startswith('requete.certificat.'):
+                fingerprint = message_dict.get('fingerprint') or domaine_routing_key.split('.')[-1]
+                reponse = self.gestionnaire.get_certificat(fingerprint, properties, demander_si_inconnu=False)
+            elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
+                reponse = self.gestionnaire.get_certificats_backup()
+            elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS:
+                reponse = self.gestionnaire.get_liste_certificats_noeuds()
+            elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERTS_CA:
+                reponse = self.gestionnaire.get_liste_certificats_ca()
+            else:
+                super().traiter_requete(ch, method, properties, body, message_dict)
 
-        if reponse is not None:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            if reponse is not None:
+                self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        else:
+            self.__logger.warning("Reception requete sans reply_to/correlation_id:\n%s", str(message_dict))
 
 
 class TraitementEvenementsPki(MGPProcesseurTraitementEvenements):
