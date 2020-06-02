@@ -14,27 +14,33 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
-            noeud_publique = self.gestionnaire.get_annonces_recentes()
-            self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+            reponse = self.gestionnaire.get_annonces_recentes()
         elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ACCUEIL:
-            document_accueil = self.gestionnaire.get_document_accueil()
-            self.transmettre_reponse(message_dict, document_accueil, properties.reply_to, properties.correlation_id)
+            reponse = self.gestionnaire.get_document_accueil()
+        elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_BLOGPOSTS:
+            reponse = self.gestionnaire.get_blogposts(message_dict)
         elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_BLOGPOSTS_RECENTS:
-            document_blogposts = self.gestionnaire.get_blogposts_recents()
-            self.transmettre_reponse(message_dict, document_blogposts, properties.reply_to, properties.correlation_id)
+            reponse = self.gestionnaire.get_blogposts_recents()
+        elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_BLOGPOST:
+            reponse = self.gestionnaire.get_blogpost(message_dict['uuidBlogpost'])
         else:
             raise Exception("Requete publique non supportee " + routing_key)
+
+        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementRequetesProtegeesParametres(TraitementRequetesPubliquesParametres):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
+        reponse = None
         if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
-            noeud_publique = self.gestionnaire.get_annonces_recentes()
-            self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
+            reponse = self.gestionnaire.get_annonces_recentes()
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class PlumeExchangeRouter(ExchangeRouter):
@@ -532,11 +538,31 @@ class GestionnairePlume(GestionnaireDomaineStandard):
 
     def get_blogposts_recents(self):
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
-        # Retirer date publication blogpost
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOSTS_RECENTS,
         }
         return collection_domaine.find_one(filtre)
+
+    def get_blogposts(self, parametres: dict):
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
+
+        current_index = parametres.get('currentIndex') or 0
+        limite = parametres.get('limit') or 10
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPlume.LIBVAL_BLOGPOST,
+        }
+
+        resultats = collection_domaine. \
+            find(filtre). \
+            sort([(Constantes.DOCUMENT_INFODOC_DATE_CREATION, -1)]). \
+            skip(current_index). \
+            limit(limite)
+
+        resultats = [document for document in resultats]  # Lire curseur au complet
+
+        return resultats
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):

@@ -911,6 +911,8 @@ class ConstantesPlume:
     REQUETE_CHARGER_ANNONCES_RECENTES = DOMAINE_NOM + '.chargerAnnoncesRecentes'
     REQUETE_CHARGER_ACCUEIL = DOMAINE_NOM + '.chargerAccueil'
     REQUETE_CHARGER_BLOGPOSTS_RECENTS = DOMAINE_NOM + '.chargerBlogpostsRecents'
+    REQUETE_CHARGER_BLOGPOSTS = DOMAINE_NOM + '.chargerBlogposts'
+    REQUETE_CHARGER_BLOGPOST = DOMAINE_NOM + '.chargerBlogpost'
 
     LIBELLE_DOC_PLUME_UUID = 'uuid'
     LIBELLE_DOC_SECURITE = 'securite'
