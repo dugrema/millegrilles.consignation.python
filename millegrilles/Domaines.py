@@ -1447,7 +1447,9 @@ class WatcherCollectionMongoThread:
         exchanges = self.__exchange_router.determiner_exchanges(document)
         mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
         if mg_libelle is not None:
-            routing_key = '%s.%s' % (routing_key, mg_libelle)
+            # Remplacer separateurs . par _ pour creer routing key dans MQ
+            doc_type = mg_libelle.replace('.', '_')
+            routing_key = '%s.%s' % (routing_key, doc_type)
 
         # Transmettre document sur MQ
         self.__contexte.generateur_transactions.emettre_message(document, routing_key, exchanges)

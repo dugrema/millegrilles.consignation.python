@@ -1,0 +1,8 @@
+{
+  "domaines": [
+    {
+      "module": "millegrilles.domaines.Plume",
+      "classe": "GestionnairePlume"
+    }
+  ]
+}

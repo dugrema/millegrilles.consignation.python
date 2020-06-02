@@ -26,7 +26,7 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
             raise Exception("Requete publique non supportee " + routing_key)
 
 
-class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegeesParametres(TraitementRequetesPubliquesParametres):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key

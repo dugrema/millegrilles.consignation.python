@@ -286,6 +286,7 @@ class ConstantesPrincipale:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
+    QUEUE_ROUTING_CHANGEMENTS = 'evenement.%s.document' % DOMAINE_NOM
 
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_PROFIL_USAGER = 'profil.usager'
@@ -885,14 +886,14 @@ class ConstantesAnnuaire:
 
 class ConstantesPlume:
 
-    DOMAINE_NOM = 'Plume'
+    DOMAINE_NOM = 'Posteur'
     COLLECTION_NOM = DOMAINE_NOM
 
     COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
-    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_Plume.documents'
+    QUEUE_ROUTING_CHANGEMENTS = 'evenement.Plume.document'
 
     TRANSACTION_NOUVEAU_DOCUMENT = '%s.nouveauDocument' % DOMAINE_NOM
     TRANSACTION_MODIFIER_DOCUMENT = '%s.modifierDocument' % DOMAINE_NOM

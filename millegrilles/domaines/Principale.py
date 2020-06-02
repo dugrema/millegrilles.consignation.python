@@ -4,7 +4,7 @@ import datetime
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPrincipale
-from millegrilles.Domaines import GestionnaireDomaineStandard
+from millegrilles.Domaines import GestionnaireDomaineStandard, ExchangeRouter
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
 from millegrilles.Domaines import TraitementMessageDomaineRequete
@@ -28,6 +28,24 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
         if reponse is not None:
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
+class PrincipaleExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle in [ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE]:
+            exchanges.add(self._exchange_public)
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+        # else:
+        #     exchanges.add(self._exchange_protege)
+
+        return list(exchanges)
 
 
 class GestionnairePrincipale(GestionnaireDomaineStandard):
@@ -56,6 +74,12 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         profil_millegrille = ConstantesPrincipale.DOCUMENT_PROFIL_MILLEGRILLE
         profil_millegrille[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = self.configuration.idmg
         self.initialiser_document(ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.DOCUMENT_PROFIL_MILLEGRILLE)
+
+        self.demarrer_watcher_collection(
+            ConstantesPrincipale.COLLECTION_DOCUMENTS_NOM,
+            ConstantesPrincipale.QUEUE_ROUTING_CHANGEMENTS,
+            PrincipaleExchangeRouter(self._contexte)
+        )
 
         self.upgrade_menu()
 
