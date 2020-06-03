@@ -29,7 +29,9 @@ class TraitementRequetesPubliquesAnnuaire(TraitementRequetesAnnuaire):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PUBLIQUE:
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesAnnuaire.REQUETE_FICHE_PUBLIQUE:
             fiche_publique = self.gestionnaire.get_fiche_publique()
             self.transmettre_reponse(message_dict, fiche_publique, properties.reply_to, properties.correlation_id)
         else:
