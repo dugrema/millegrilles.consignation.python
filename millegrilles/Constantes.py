@@ -493,7 +493,7 @@ class ConstantesPki:
 
     REQUETE_CONFIRMER_CERTIFICAT = 'confirmerCertificat'
     REQUETE_CERTIFICAT_EMIS = 'evenement.Pki.infoCertificat'
-    REQUETE_CERTIFICAT_DEMANDE = 'certificat.#'
+    REQUETE_CERTIFICAT_DEMANDE = 'requete.certificat'  # requete.certificat.__fingerprint__
     REQUETE_CERTIFICAT_BACKUP = 'certificatBackup'
     REQUETE_LISTE_CA = 'requete.Pki.ca'
     REQUETE_LISTE_CERTS_CA = 'certificatsCA'
@@ -557,7 +557,7 @@ class ConstantesParametres:
     TRANSACTION_CHAMP_MGLIBELLE = 'mg-libelle'
     TRANSACTION_CHAMP_UUID = 'uuid'
 
-    REQUETE_NOEUD_PUBLIC = DOMAINE_NOM + '.noeudPublic'
+    REQUETE_NOEUD_PUBLIC = 'noeudPublic'
     REQUETE_ERREURS = DOMAINE_NOM + '.erreurs'
 
     COMMANDE_SUPPRIMER_ERREUR = 'supprimerErreur'
@@ -830,8 +830,8 @@ class ConstantesAnnuaire:
     TRANSACTION_INSCRIRE_TIERS = '%s.inscrireTiers' % DOMAINE_NOM
     TRANSACTION_SIGNATURE_INSCRIPTION_TIERS = '%s.signatureInscriptionTiers' % DOMAINE_NOM
 
-    REQUETE_FICHE_PRIVEE = 'millegrilles.domaines.Annuaire.fichePrivee'
-    REQUETE_FICHE_PUBLIQUE = 'millegrilles.domaines.Annuaire.fichePublique'
+    REQUETE_FICHE_PRIVEE = 'fichePrivee'
+    REQUETE_FICHE_PUBLIQUE = 'fichePublique'
 
     TEMPLATE_DOCUMENT_INDEX_MILLEGRILLES = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_INDEX_MILLEGRILLES,

@@ -17,7 +17,9 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesParametres.REQUETE_NOEUD_PUBLIC:
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesParametres.REQUETE_NOEUD_PUBLIC:
             noeud_publique = self.gestionnaire.get_noeud_publique(message_dict)
             self.transmettre_reponse(message_dict, noeud_publique, properties.reply_to, properties.correlation_id)
         else:

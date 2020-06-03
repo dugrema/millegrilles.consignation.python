@@ -17,10 +17,10 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
 
-        if domaine_routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
-            reponse = self.gestionnaire.get_certificat(message_dict['fingerprint'])
+        if routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
+            fingerprint = routing_key.split('.')[-1]
+            reponse = self.gestionnaire.get_certificat(fingerprint)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
@@ -172,6 +172,30 @@ class GestionnairePki(GestionnaireDomaineStandard):
                     ConstantesPki.REQUETE_CERTIFICAT_EMIS,
                 ],
                 'ttl': 300000,
+                'exchange': Constantes.SECURITE_PRIVE,
+            },
+            {
+                'nom': '.'.join([self.get_nom_queue(), 'evenements']),
+                'routing': [
+                    ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                ],
+                'ttl': 300000,
+                'exchange': Constantes.SECURITE_PUBLIC,
+            },
+            {
+                'nom': 'Pki.requete.1.public',
+                'routing': [
+                    'requete.certificat.*',
+                ],
+                'ttl': 20000,
+                'exchange': Constantes.SECURITE_PUBLIC,
+            },
+            {
+                'nom': 'Pki.requete.2.prive',
+                'routing': [
+                    'requete.certificat.*',
+                ],
+                'ttl': 20000,
                 'exchange': Constantes.SECURITE_PRIVE,
             },
             {
