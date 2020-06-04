@@ -893,7 +893,7 @@ class ConstantesPlume:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
-    QUEUE_ROUTING_CHANGEMENTS = 'evenement.Plume.document'
+    QUEUE_ROUTING_CHANGEMENTS = 'evenement.%s.document' % DOMAINE_NOM
 
     TRANSACTION_NOUVEAU_DOCUMENT = '%s.nouveauDocument' % DOMAINE_NOM
     TRANSACTION_MODIFIER_DOCUMENT = '%s.modifierDocument' % DOMAINE_NOM
@@ -908,10 +908,11 @@ class ConstantesPlume:
     TRANSACTION_RETIRER_BLOGPOST = '%s.retirerBlogpostVitrine' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_BLOGPOST = '%s.supprimerBlogpostVitrine' % DOMAINE_NOM
 
-    REQUETE_CHARGER_ANNONCES_RECENTES = DOMAINE_NOM + '.chargerAnnoncesRecentes'
-    REQUETE_CHARGER_ACCUEIL = DOMAINE_NOM + '.chargerAccueil'
+    REQUETE_CHARGER_ANNONCES_RECENTES = 'chargerAnnoncesRecentes'
+    REQUETE_CHARGER_ANNONCES = 'chargerAnnonces'
+    REQUETE_CHARGER_ACCUEIL = 'chargerAccueil'
     REQUETE_CHARGER_BLOGPOSTS_RECENTS = DOMAINE_NOM + '.chargerBlogpostsRecents'
-    REQUETE_CHARGER_BLOGPOSTS = DOMAINE_NOM + '.chargerBlogposts'
+    REQUETE_CHARGER_BLOGPOSTS = 'chargerBlogposts'
     REQUETE_CHARGER_BLOGPOST = DOMAINE_NOM + '.chargerBlogpost'
 
     LIBELLE_DOC_PLUME_UUID = 'uuid'

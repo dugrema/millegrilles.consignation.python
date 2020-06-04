@@ -158,11 +158,7 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
         if correlation_id is None:
             correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
-        message_resultat = {
-            'resultats': resultats,
-        }
-
-        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(resultats, replying_to, correlation_id)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):

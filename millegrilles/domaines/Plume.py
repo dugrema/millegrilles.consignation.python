@@ -13,11 +13,15 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
             reponse = self.gestionnaire.get_annonces_recentes()
-        elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ACCUEIL:
+        elif action == ConstantesPlume.REQUETE_CHARGER_ANNONCES:
+            reponse = self.gestionnaire.get_annonces_recentes()
+        elif action == ConstantesPlume.REQUETE_CHARGER_ACCUEIL:
             reponse = self.gestionnaire.get_document_accueil()
-        elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_BLOGPOSTS:
+        elif action == ConstantesPlume.REQUETE_CHARGER_BLOGPOSTS:
             reponse = self.gestionnaire.get_blogposts(message_dict)
         elif routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_BLOGPOSTS_RECENTS:
             reponse = self.gestionnaire.get_blogposts_recents()
@@ -32,15 +36,13 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
 class TraitementRequetesProtegeesParametres(TraitementRequetesPubliquesParametres):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
-        routing_key = method.routing_key
-        reponse = None
-        if routing_key == 'requete.' + ConstantesPlume.REQUETE_CHARGER_ANNONCES_RECENTES:
-            reponse = self.gestionnaire.get_annonces_recentes()
-        else:
-            super().traiter_requete(ch, method, properties, body, message_dict)
+        # routing_key = method.routing_key
+        # reponse = None
 
-        if reponse:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        super().traiter_requete(ch, method, properties, body, message_dict)
+
+        # if reponse:
+        #     self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class PlumeExchangeRouter(ExchangeRouter):
@@ -50,8 +52,15 @@ class PlumeExchangeRouter(ExchangeRouter):
         :return: Liste des echanges sur lesquels le document doit etre soumis
         """
         exchanges = set()
+
+        docs_publics = [
+            ConstantesPlume.LIBVAL_ANNONCES_RECENTES,
+            ConstantesPlume.LIBVAL_VITRINE_ACCUEIL,
+            ConstantesPlume.LIBVAL_BLOGPOSTS_RECENTS
+        ]
+
         mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-        if mg_libelle in [ConstantesPlume.LIBVAL_ANNONCES_RECENTES]:
+        if mg_libelle in docs_publics:
             exchanges.add(self._exchange_public)
             exchanges.add(self._exchange_prive)
             exchanges.add(self._exchange_protege)
