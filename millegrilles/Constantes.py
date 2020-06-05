@@ -1490,6 +1490,7 @@ class ConstantesServiceMonitor:
     # MODULE_TRANSMISSION = 'transmission'
     # MODULE_DOMAINES = 'domaines'
     MODULE_PRINCIPAL = 'principal'
+    MODULE_DOMAINES_DYNAMIQUES = 'domaines_dynamiques'
     MODULE_NGINX = 'nginx'
     MODULE_WEB_PROTEGE = 'web_protege'
     MODULE_WEB = 'web'

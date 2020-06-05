@@ -223,6 +223,10 @@ class GestionnaireModulesDocker:
             'nom': ConstantesServiceMonitor.MODULE_PYTHON,
             'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
         },
+        ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
+            'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+            'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        },
         ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
             'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
             'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
@@ -259,6 +263,7 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
         ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
         ConstantesServiceMonitor.MODULE_NGINX,
+        ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
     ]
 
     MODULES_REQUIS_DEPENDANT = [
@@ -2690,6 +2695,7 @@ class GestionnaireWeb:
 
         self.__init_complete = False
         self.__repertoire_modules = path.join('/var/opt/millegrilles', self.__idmg, 'mounts/nginx/conf.d/modules')
+        self.__repertoire_data = path.join('/var/opt/millegrilles', self.__idmg, 'mounts/nginx/data')
 
     def entretien(self):
         if not self.__init_complete:
@@ -2701,6 +2707,11 @@ class GestionnaireWeb:
         try:
             os.makedirs(self.__repertoire_modules, mode=0o770)
             self.__generer_fichiers_configuration()
+        except FileExistsError:
+            self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
+
+        try:
+            os.makedirs(self.__repertoire_data, mode=0o770)
         except FileExistsError:
             self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
@@ -2735,6 +2746,12 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
 
+        location_data_vitrine = """
+            location /vitrine/data {
+                alias /var/opt/millegrilles/%s/mounts/nginx/data;
+            }
+        """ % self.__idmg
+
         location_public_component = """
             location %s {
                 include /etc/nginx/conf.d/modules/proxypass.include;
@@ -2754,9 +2771,13 @@ class GestionnaireWeb:
             "/coupdoeil",
             "/posteur",
         ]
-        locations_content = \
-            '\n'.join([location_public_component % loc for loc in location_public_paths]) + '\n' + \
-            '\n'.join([location_priv_prot_component % loc for loc in location_priv_prot_paths])
+
+        locations_list = list()
+        locations_list.append(location_data_vitrine)
+        locations_list.extend([location_public_component % loc for loc in location_public_paths])
+        locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
+
+        locations_content = '\n'.join(locations_list)
 
         with open(path.join(self.__repertoire_modules, 'locations.include'), 'w') as fichier:
             fichier.write(locations_content)
