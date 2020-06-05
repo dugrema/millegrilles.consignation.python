@@ -1492,6 +1492,7 @@ class ConstantesServiceMonitor:
     MODULE_PRINCIPAL = 'principal'
     MODULE_NGINX = 'nginx'
     MODULE_WEB_PROTEGE = 'web_protege'
+    MODULE_WEB = 'web'
     MODULE_PYTHON = 'mg-python'
     MODULE_MONGOEXPRESS = 'mongoexpress'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'

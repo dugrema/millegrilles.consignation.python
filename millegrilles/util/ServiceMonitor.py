@@ -212,7 +212,7 @@ class GestionnaireModulesDocker:
             'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
         },
         ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
-            'nom': ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
+            'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
             'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
         },
         ConstantesServiceMonitor.MODULE_NGINX: {
@@ -255,10 +255,10 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_MONGO,
         ConstantesServiceMonitor.MODULE_TRANSACTION,
         ConstantesServiceMonitor.MODULE_MAITREDESCLES,
-        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
-        ConstantesServiceMonitor.MODULE_NGINX,
-        ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
         ConstantesServiceMonitor.MODULE_PRINCIPAL,
+        ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+        ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
+        ConstantesServiceMonitor.MODULE_NGINX,
     ]
 
     MODULES_REQUIS_DEPENDANT = [
@@ -385,7 +385,8 @@ class GestionnaireModulesDocker:
         liste_services = self.__docker.services.list(filters=filtre)
         dict_services = dict()
         for service in liste_services:
-            service_name = service.name.split('_')[1]
+            # Enlever prefix avec IDMG
+            service_name = '_'.join(service.name.split('_')[1:])
             dict_services[service_name] = service
 
         for service_name in self.__modules_requis:
@@ -2537,8 +2538,10 @@ class GestionnaireComptesMQ:
                     self.__logger.exception("MQ Connection Error")
             except HTTPError as httpe:
                 if httpe.response.status_code in [401]:
-                    self.__logger.error("Erreur connexion MQ")
-                    # raise httpe
+                    self.__logger.error("Erreur connexion MQ code 401, on tente de configurer compte admin")
+                    # Erreur authentification, tenter d'initialiser avec compte guest
+                    self.initialiser_motdepasse_admin()
+                    self.__entretien_comptes_mq()
                 else:
                     if self.__logger.isEnabledFor(logging.DEBUG):
                         self.__logger.exception("MQ HTTPError, code : %d" % httpe.response.status_code)
@@ -2685,15 +2688,6 @@ class GestionnaireWeb:
         self.__service_monitor = service_monitor
         self.__docker_client = service_monitor.gestionnaire_docker
 
-        self.__liste_fichiers = [
-            'modules_includes.conf',
-            'protege_dev.include',
-            'protege_server.include',
-            'proxypass_coupdoeil.include',
-            'proxypass_millegrilles.include',
-            'ssl_certs.conf.include',
-        ]
-
         self.__init_complete = False
         self.__repertoire_modules = path.join('/var/opt/millegrilles', self.__idmg, 'mounts/nginx/conf.d/modules')
 
@@ -2721,30 +2715,47 @@ class GestionnaireWeb:
             'nodename': nodename,
         }
 
-        modules_includes_content = "include /etc/nginx/conf.d/protege.conf.include;"
-        protege_server_content = "server_name {nodename}.local {nodename};".format(**params)
-        proxypass_millegrilles_content = "proxy_pass https://web:443;"
-        proxypass_coupdoeil_content = "proxy_pass https://web:443;"
+        server_content = """
+            resolver 127.0.0.11 valid=30s;
+            server_name {nodename}.local {nodename};
+        """.format(**params)
+        with open(path.join(self.__repertoire_modules, 'server_name.include'), 'w') as fichier:
+            fichier.write(server_content)
+
+        proxypass = "set $upstream https://web_protege:443; proxy_pass $upstream;"
+        with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
+            fichier.write(proxypass)
+
         ssl_certs_content = """
             ssl_certificate       /run/secrets/webcert.pem;
             ssl_certificate_key   /run/secrets/webkey.pem;
             ssl_stapling          on;
             ssl_stapling_verify   on;
         """
-
-        with open(path.join(self.__repertoire_modules, 'protege_dev.include'), 'w') as fichier:
-            fichier.write('# DUMMY FILE, requis par config')
-
-        with open(path.join(self.__repertoire_modules, 'modules_includes.conf'), 'w') as fichier:
-            fichier.write(modules_includes_content)
-        with open(path.join(self.__repertoire_modules, 'protege_server.include'), 'w') as fichier:
-            fichier.write(protege_server_content)
-        with open(path.join(self.__repertoire_modules, 'proxypass_millegrilles.include'), 'w') as fichier:
-            fichier.write(proxypass_millegrilles_content)
-        with open(path.join(self.__repertoire_modules, 'proxypass_coupdoeil.include'), 'w') as fichier:
-            fichier.write(proxypass_coupdoeil_content)
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
+
+        location_base_component = """
+            location %s {
+                include /etc/nginx/conf.d/modules/proxypass.include;
+                include /etc/nginx/conf.d/component_base.include;
+            }
+        """
+        location_paths = [
+            "/coupdoeil",
+            "/posteur",
+            "/vitrine",
+        ]
+        locations_content = '\n'.join([location_base_component % loc for loc in location_paths])
+        with open(path.join(self.__repertoire_modules, 'locations.include'), 'w') as fichier:
+            fichier.write(locations_content)
+
+        # Fichier qui relie la configuration de tous les modules
+        modules_includes_content = """
+            include /etc/nginx/conf.d/server.include;
+        """
+        with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
+            fichier.write(modules_includes_content)
 
         self.__redemarrer_nginx()
 
