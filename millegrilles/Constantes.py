@@ -1438,6 +1438,35 @@ class CommandesSurRelai:
     COMMANDE_MESSAGE_RELAI = 'commande.message.relai'  # Relai message de la MilleGrille d'origine
 
 
+class ConstantesGenerateurCertificat:
+
+    ROLE_MQ = 'mq'
+    ROLE_MONGO = 'mongo'
+    ROLE_DEPLOYEUR = 'deployeur'
+    ROLE_MAITREDESCLES = 'maitrecles'
+    ROLE_TRANSACTIONS = 'transaction'
+    ROLE_CEDULEUR = 'ceduleur'
+    ROLE_DOMAINES = 'domaines'
+    ROLE_FICHIERS = 'fichiers'
+    ROLE_MONGOEXPRESS = 'mongoxp'
+    ROLE_NAVIGATEUR = 'navigateur'
+    ROLE_WEB_PROTEGE = 'web_protege'
+    ROLE_WEB_PRIVE = 'web_prive'
+    ROLE_WEB_PUBLIC = 'web_public'
+    ROLE_NGINX = 'nginx'
+    ROLE_CONNECTEUR = 'connecteur'
+    ROLE_MONITOR = 'monitor'
+    ROLE_MONITOR_DEPENDANT = 'monitor_dependant'
+    ROLE_CONNECTEUR_TIERS = 'tiers'
+    ROLE_BACKUP = 'backup'
+    ROLE_HEBERGEMENT = 'hebergement'
+    ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
+    ROLE_HEBERGEMENT_DOMAINES = 'heb_domaines'
+    ROLE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
+    ROLE_HEBERGEMENT_FICHIERS = 'heb_fichiers'
+    ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
+
+
 class ConstantesServiceMonitor:
 
     ETAT_SYSTEME_INITIAL = '1.initial'
@@ -1446,6 +1475,8 @@ class ConstantesServiceMonitor:
     ETAT_SYSTEME_MODULES_PRET = '4.modules_prets'
     ETAT_SYSTEME_ACTIF = '5.systeme_actif'
     ETAT_SYSTEME_FERMETURE = '6.systeme_fermeture'
+
+    EXIT_REDEMARRAGE = 2
 
     DOCKER_LIBVAL_CONFIG = 'millegrille.configuration'
 
@@ -1460,7 +1491,7 @@ class ConstantesServiceMonitor:
     # MODULE_DOMAINES = 'domaines'
     MODULE_PRINCIPAL = 'principal'
     MODULE_NGINX = 'nginx'
-    MODULE_WEB = 'web'
+    MODULE_WEB_PROTEGE = 'web_protege'
     MODULE_PYTHON = 'mg-python'
     MODULE_MONGOEXPRESS = 'mongoexpress'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'

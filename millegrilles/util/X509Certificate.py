@@ -1,5 +1,5 @@
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat import primitives
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
@@ -15,7 +15,7 @@ from millegrilles import Constantes
 from millegrilles.SecuritePKI import ConstantesSecurityPki
 
 
-class ConstantesGenerateurCertificat:
+class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
 
     DUREE_CERT_ROOT = datetime.timedelta(days=3655)
     DUREE_CERT_BACKUP = datetime.timedelta(days=3655)
@@ -26,39 +26,12 @@ class ConstantesGenerateurCertificat:
     DUREE_CERT_HERBERGEMENT_XS = datetime.timedelta(days=90)
     ONE_DAY = datetime.timedelta(1, 0, 0)
 
-    ROLE_MQ = 'mq'
-    ROLE_MONGO = 'mongo'
-    ROLE_DEPLOYEUR = 'deployeur'
-    ROLE_MAITREDESCLES = 'maitrecles'
-    ROLE_TRANSACTIONS = 'transaction'
-    ROLE_CEDULEUR = 'ceduleur'
-    ROLE_DOMAINES = 'domaines'
-    ROLE_COUPDOEIL = 'coupdoeil'
-    ROLE_COUPDOEIL_NAVIGATEUR = 'coupdoeil.navigateur'
-    ROLE_FICHIERS = 'fichiers'
-    ROLE_VITRINE = 'vitrineapi'
-    ROLE_PUBLICATEUR = 'publicateur'
-    ROLE_MONGOEXPRESS = 'mongoxp'
-    ROLE_NGINX = 'vitrineweb'
-    ROLE_CONNECTEUR = 'connecteur'
-    ROLE_MONITOR = 'monitor'
-    ROLE_MONITOR_DEPENDANT = 'monitor_dependant'
-    ROLE_CONNECTEUR_TIERS = 'tiers'
-    ROLE_BACKUP = 'backup'
-    ROLE_HEBERGEMENT = 'hebergement'
-    ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
-    ROLE_HEBERGEMENT_DOMAINES = 'heb_domaines'
-    ROLE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'
-    ROLE_HEBERGEMENT_FICHIERS = 'heb_fichiers'
-    ROLE_HEBERGEMENT_COUPDOEIL = 'heb_coupdoeil'
-
-
     ROLES_ACCES_MONGO = [
-        ROLE_MONGO,
-        ROLE_TRANSACTIONS,
-        ROLE_DOMAINES,
-        ROLE_MONGOEXPRESS,
-        ROLE_MAITREDESCLES,
+        Constantes.ConstantesGenerateurCertificat.ROLE_MONGO,
+        Constantes.ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+        Constantes.ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        Constantes.ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
+        Constantes.ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
     ]
 
     # Custom OIDs
@@ -101,7 +74,7 @@ class EnveloppeCleCert:
             self.chaine.append(cert)
 
     def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
-        self.private_key = serialization.load_pem_private_key(
+        self.private_key = primitives.serialization.load_pem_private_key(
             private_key_bytes,
             password=password_bytes,
             backend=default_backend()
@@ -128,7 +101,7 @@ class EnveloppeCleCert:
         return False
 
     def key_from_pem_bytes(self, key_bytes, password_bytes=None):
-        self.private_key = serialization.load_pem_private_key(
+        self.private_key = primitives.serialization.load_pem_private_key(
             key_bytes,
             password=password_bytes,
             backend=default_backend()
@@ -204,20 +177,20 @@ class EnveloppeCleCert:
 
     @property
     def cert_bytes(self):
-        return self.cert.public_bytes(serialization.Encoding.PEM)
+        return self.cert.public_bytes(primitives.serialization.Encoding.PEM)
 
     @property
     def public_bytes(self):
         if self.cert:
             return self.cert_bytes
         elif self.private_key:
-            return self.private_key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+            return self.private_key.public_key().public_bytes(primitives.serialization.Encoding.PEM, primitives.serialization.PublicFormat.SubjectPublicKeyInfo)
 
         return None
 
     @property
     def csr_bytes(self):
-        return self.csr.public_bytes(serialization.Encoding.PEM)
+        return self.csr.public_bytes(primitives.serialization.Encoding.PEM)
 
     @property
     def akid(self):
@@ -267,15 +240,15 @@ class EnveloppeCleCert:
     def private_key_bytes(self):
         if self.password is not None:
             cle_privee_bytes = self.private_key.private_bytes(
-                serialization.Encoding.PEM,
-                serialization.PrivateFormat.PKCS8,
-                serialization.BestAvailableEncryption(self.password)
+                primitives.serialization.Encoding.PEM,
+                primitives.serialization.PrivateFormat.PKCS8,
+                primitives.serialization.BestAvailableEncryption(self.password)
             )
         else:
             cle_privee_bytes = self.private_key.private_bytes(
-                serialization.Encoding.PEM,
-                serialization.PrivateFormat.PKCS8,
-                serialization.NoEncryption()
+                primitives.serialization.Encoding.PEM,
+                primitives.serialization.PrivateFormat.PKCS8,
+                primitives.serialization.NoEncryption()
             )
 
         return cle_privee_bytes
@@ -353,7 +326,7 @@ class GenerateurCertificat:
     def signer(self, csr) -> x509.Certificate:
         raise NotImplementedError("Pas implemente")
 
-    def _get_keyusage(self, builder):
+    def _get_keyusage(self, builder, **kwargs):
         raise NotImplementedError("Pas implemente")
 
     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
@@ -435,7 +408,7 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         self.__domaines_publics = domaines_publics
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def _get_keyusage(self, builder):
+    def _get_keyusage(self, builder, **kwargs):
         builder = builder.add_extension(
             x509.BasicConstraints(ca=False, path_length=None),
             critical=True,
@@ -476,7 +449,7 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
 
         pem_bytes = cle_publique_pem.encode('utf-8')
 
-        public_key = serialization.load_pem_public_key(
+        public_key = primitives.serialization.load_pem_public_key(
             pem_bytes,
             backend=default_backend()
         )
@@ -543,7 +516,7 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
             raise Exception("Depasse limite profondeur")
 
         # Generer la chaine de certificats avec les intermediaires
-        return [c.public_bytes(serialization.Encoding.PEM).decode('utf-8') for c in chaine]
+        return [c.public_bytes(primitives.serialization.Encoding.PEM).decode('utf-8') for c in chaine]
 
 
 class GenerateurCertificateParRequest(GenerateurCertificat):
@@ -555,7 +528,15 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         self.__domaines_publics = domaines_publics
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def _get_keyusage(self, builder):
+    def _get_keyusage(self, builder, **kwargs):
+        """
+        Genere builder de certificat
+        :param builder:
+        :param kwargs: Parametres optionnels
+                       - csr: x509.CertificateSigningRequest
+                       - altnames=False : empeche le traitement automatique des altnames du csr
+        :return: Builder
+        """
         builder = builder.add_extension(
             x509.BasicConstraints(ca=False, path_length=None),
             critical=True,
@@ -576,7 +557,28 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             critical=False
         )
 
+        csr = kwargs.get('csr')
+        if csr:
+            traiter_alternames = kwargs.get('altnames')
+            if not traiter_alternames and traiter_alternames is not False:
+                altnames = self.extraire_altnames(csr)
+                if altnames:
+                    liste_dnsnames = [x509.DNSName(domaine) for domaine in altnames]
+                    builder = builder.add_extension(x509.SubjectAlternativeName(liste_dnsnames), critical=False)
+
         return builder
+
+    def extraire_altnames(self, csr: x509.CertificateSigningRequest):
+        # Extraire les extensions pour alt names
+        # Copier les extensions fournies dans la requete (exemple subject alt names)
+        domaines_publics = None
+        try:
+            subject_alt_names = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            domaines_publics = [d.value for d in subject_alt_names.value]
+        except x509.extensions.ExtensionNotFound:
+            pass
+
+        return domaines_publics
 
     def signer(self, csr: x509.CertificateSigningRequest) -> x509.Certificate:
         cert_autorite = self._autorite.cert
@@ -599,7 +601,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         )
 
         # Ajouter les acces specifiques a ce type de cert
-        builder = self._get_keyusage(builder)
+        builder = self._get_keyusage(builder, csr=csr)
 
         cle_autorite = self._autorite.private_key
         certificate = builder.sign(
@@ -639,7 +641,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
             raise Exception("Depasse limite profondeur")
 
         # Generer la chaine de certificats avec les intermediaires
-        return [c.public_bytes(serialization.Encoding.PEM).decode('utf-8') for c in chaine]
+        return [c.public_bytes(primitives.serialization.Encoding.PEM).decode('utf-8') for c in chaine]
 
 
 class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
@@ -670,7 +672,7 @@ class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
         return clecert
 
-    def _get_keyusage(self, builder):
+    def _get_keyusage(self, builder, **kwargs):
         builder = builder.add_extension(
             x509.BasicConstraints(ca=True, path_length=4),
             critical=True,
@@ -819,8 +821,8 @@ class GenererDeployeur(GenerateurNoeud):
     Deployeur de MilleGrilles
     """
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
@@ -839,43 +841,10 @@ class GenererDeployeur(GenerateurNoeud):
         return builder
 
 
-class GenererCeduleur(GenerateurNoeud):
-    """
-    Ceduleur de MilleGrilles
-    """
-
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-
-        exchanges_supportes = [
-            Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
-            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
-        ]
-
-        exchanges = (','.join(exchanges_supportes)).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_CEDULEUR).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-
 class GenererMaitredescles(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
@@ -896,8 +865,8 @@ class GenererMaitredescles(GenerateurNoeud):
 
 class GenererMaitredesclesCryptage(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
@@ -922,8 +891,8 @@ class GenererMaitredesclesCryptage(GenerateurNoeud):
 
 class GenererTransactions(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
@@ -944,8 +913,8 @@ class GenererTransactions(GenerateurNoeud):
 
 class GenererDomaines(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE).encode('utf-8')
@@ -969,8 +938,8 @@ class GenererConnecteur(GenerateurNoeud):
     Generateur de certificats pour le connecteur inter-MilleGrilles
     """
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s,%s' % (Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, Constantes.DEFAUT_MQ_EXCHANGE_PRIVE)).encode('utf-8')
@@ -994,8 +963,8 @@ class GenererMonitor(GenerateurNoeud):
     Generateur de certificats pour le monitor de noeud protege principal
     """
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
 
@@ -1025,8 +994,8 @@ class GenererMonitorDependant(GenerateurNoeud):
     Generateur de certificats pour le monitor de services
     """
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
 
@@ -1053,8 +1022,8 @@ class GenererMonitorDependant(GenerateurNoeud):
 
 class GenererMQ(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MQ).encode('utf-8')
@@ -1087,8 +1056,8 @@ class GenererMQ(GenerateurNoeud):
 
 class GenererMongo(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MONGO).encode('utf-8')
@@ -1120,10 +1089,10 @@ class GenererMongo(GenerateurNoeud):
         return builder
 
 
-class GenererCoupdoeil(GenerateurNoeud):
+class GenererWebProtege(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS).encode('utf-8')
@@ -1133,7 +1102,7 @@ class GenererCoupdoeil(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_COUPDOEIL).encode('utf-8')
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1159,10 +1128,84 @@ class GenererCoupdoeil(GenerateurNoeud):
         return builder
 
 
+class GenererWebPrive(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = Constantes.SECURITE_PRIVE.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'www'),
+            x509.DNSName(u'www-%s.local' % self._idmg),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+            x509.DNSName(u'coupdoeil-%s' % self._idmg),
+            x509.DNSName(u'coupdoeil-%s.local' % self._idmg),
+        ]
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+                liste_dns.append(x509.DNSName(u'coupdoeil.%s' % domaine))
+
+        # Ajouter noms DNS valides pour CoupDoeil
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
+class GenererWebPublic(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ConstantesGenerateurCertificat.ROLE_WEB_PUBLIC.encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'www'),
+            x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'%s.local' % self._common_name),
+        ]
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+
+        # Ajouter noms DNS valides pour CoupDoeil
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
 class GenererFichiers(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS).encode('utf-8')
@@ -1190,49 +1233,10 @@ class GenererFichiers(GenerateurNoeud):
         return builder
 
 
-class GenererVitrine(GenerateurNoeud):
-
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
-
-        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
-        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
-            critical=False
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_VITRINE).encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        liste_dns = [
-            x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._idmg),
-            x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
-            x509.DNSName(u'vitrine-%s' % self._idmg),
-            x509.DNSName(u'vitrine-%s.local' % self._idmg),
-        ]
-
-        if self._domaines_publics is not None:
-            for domaine in self._domaines_publics:
-                liste_dns.append(x509.DNSName(u'%s' % domaine))
-                liste_dns.append(x509.DNSName(u'vitrine.%s' % domaine))
-
-        # Ajouter noms DNS valides pour CoupDoeil
-        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
-
-        return builder
-
-
 class GenererMongoexpress(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ('%s' % ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS).encode('utf-8')
@@ -1261,8 +1265,8 @@ class GenererMongoexpress(GenerateurNoeud):
 
 class GenererNginx(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ('%s' % ConstantesGenerateurCertificat.ROLE_NGINX).encode('utf-8')
@@ -1296,8 +1300,8 @@ class GenererNginx(GenerateurNoeud):
 
 class GenererHebergementTransactions(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchange_list = [
@@ -1328,8 +1332,8 @@ class GenererHebergementTransactions(GenerateurNoeud):
 
 class GenererHebergementDomaines(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchange_list = [
@@ -1360,8 +1364,8 @@ class GenererHebergementDomaines(GenerateurNoeud):
 
 class GenererHebergementMaitredescles(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchange_list = [
@@ -1392,8 +1396,8 @@ class GenererHebergementMaitredescles(GenerateurNoeud):
 
 class GenererHebergementCoupdoeil(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchange_list = [
@@ -1421,8 +1425,8 @@ class GenererHebergementCoupdoeil(GenerateurNoeud):
 
 class GenererHebergementFichiers(GenerateurNoeud):
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
         exchange_list = [
@@ -1466,8 +1470,8 @@ class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
         super().__init__(idmg, dict_ca, autorite)
         self.__domaines = domaines
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ','.join(self.__domaines).encode('utf-8')
@@ -1505,8 +1509,8 @@ class GenerateurCertificatTiers(GenerateurCertificateParRequest):
 
         return builder
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
         return builder
 
 
@@ -1515,8 +1519,8 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
     def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
         super().__init__(idmg, dict_ca, autorite)
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = 'coupdoeil.navigateur'.encode('utf-8')
@@ -1536,8 +1540,8 @@ class GenerateurCertificatBackup(GenerateurCertificateParClePublique):
     def preparer_builder(self, cle_publique_pem: str, sujet: str, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_BACKUP) -> x509.CertificateBuilder:
         return super().preparer_builder(cle_publique_pem, sujet, duree_cert)
 
-    def _get_keyusage(self, builder):
-        builder = super()._get_keyusage(builder)
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ConstantesGenerateurCertificat.ROLE_BACKUP.encode('utf-8')
@@ -1577,7 +1581,7 @@ class GenerateurCertificatHebergementXS(GenerateurCertificateParRequest):
 
         return builder
 
-    def _get_keyusage(self, builder):
+    def _get_keyusage(self, builder, **kwargs):
         # Mettre pathlen=0 pour empecher de generer un CA avec le certificat XS (serait un probleme de securite).
         builder = builder.add_extension(
             x509.BasicConstraints(ca=True, path_length=0),
@@ -1615,15 +1619,15 @@ class RenouvelleurCertificat:
         self.__generer_password = generer_password
         self.__generateurs_par_role = {
             ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL: GenererCoupdoeil,
             ConstantesGenerateurCertificat.ROLE_MQ: GenererMQ,
             ConstantesGenerateurCertificat.ROLE_MONGO: GenererMongo,
             ConstantesGenerateurCertificat.ROLE_DOMAINES: GenererDomaines,
             ConstantesGenerateurCertificat.ROLE_TRANSACTIONS: GenererTransactions,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES: GenererMaitredescles,
-            ConstantesGenerateurCertificat.ROLE_VITRINE: GenererVitrine,
+            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE: GenererWebProtege,
+            ConstantesGenerateurCertificat.ROLE_WEB_PRIVE: GenererWebPrive,
+            ConstantesGenerateurCertificat.ROLE_WEB_PUBLIC: GenererWebPublic,
             ConstantesGenerateurCertificat.ROLE_DEPLOYEUR: GenererDeployeur,
-            ConstantesGenerateurCertificat.ROLE_CEDULEUR: GenererCeduleur,
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,

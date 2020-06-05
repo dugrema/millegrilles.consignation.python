@@ -357,6 +357,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         roles = [
             ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
+            ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
         ]
 
         filtre = {

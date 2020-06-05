@@ -16,10 +16,11 @@ from docker.errors import APIError
 from docker.types import Resources, RestartPolicy, ServiceMode, NetworkAttachmentConfig, ConfigReference, \
     SecretReference, EndpointSpec
 from base64 import b64encode, b64decode
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, ConnectionError
 from os import path
 from requests.exceptions import SSLError
-from pymongo.errors import OperationFailure, DuplicateKeyError
+from pymongo.errors import OperationFailure, DuplicateKeyError, ServerSelectionTimeoutError
+from urllib3.exceptions import MaxRetryError
 from json.decoder import JSONDecodeError
 from cryptography import x509
 from cryptography.hazmat import primitives
@@ -210,9 +211,9 @@ class GestionnaireModulesDocker:
             'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
             'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
         },
-        ConstantesServiceMonitor.MODULE_WEB: {
-            'nom': ConstantesServiceMonitor.MODULE_WEB,
-            'role': ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+        ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
+            'nom': ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
+            'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
         },
         ConstantesServiceMonitor.MODULE_NGINX: {
             'nom': ConstantesServiceMonitor.MODULE_NGINX,
@@ -256,7 +257,7 @@ class GestionnaireModulesDocker:
         ConstantesServiceMonitor.MODULE_MAITREDESCLES,
         ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
         ConstantesServiceMonitor.MODULE_NGINX,
-        ConstantesServiceMonitor.MODULE_WEB,
+        ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
         ConstantesServiceMonitor.MODULE_PRINCIPAL,
     ]
 
@@ -411,19 +412,26 @@ class GestionnaireModulesDocker:
         gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
 
         nom_image_docker = kwargs.get('nom') or service_name
-        image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
-
-        # Prendre un tag au hasard
-        image_tag = image.tags[0]
-
-        configuration = self.__formatter_configuration_service(service_name)
-
-        constraints = configuration.get('constraints')
-        if constraints:
-            self.__add_node_labels(constraints)
 
         try:
+            image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+
+            # Prendre un tag au hasard
+            image_tag = image.tags[0]
+
+            configuration = self.__formatter_configuration_service(service_name)
+
+            constraints = configuration.get('constraints')
+            if constraints:
+                self.__add_node_labels(constraints)
+
             self.__docker.services.create(image_tag, **configuration)
+        except KeyError as ke:
+            self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
+        except AttributeError as ae:
+            self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail erreur configuration service " + service_name)
         except APIError as apie:
             if apie.status_code == 409:
                 self.__logger.info("Service %s deja demarre" % service_name)
@@ -699,8 +707,8 @@ class GestionnaireModulesDocker:
                         liste_configs.append(ConfigReference(**config_reference))
 
                         dates_configs[config_name] = config_dict['date']
-                    except AttributeError:
-                        self.__logger.exception("Parametres de configuration manquants pour : %s" % config_name)
+                    except AttributeError as ae:
+                        self.__logger.error("Parametres de configuration manquants pour service %s : %s" % (config_name, str(ae)))
 
                 dict_config_docker['configs'] = liste_configs
 
@@ -812,6 +820,8 @@ class ServiceMonitor:
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
         signal.signal(signal.SIGTERM, self.fermer)
+
+        self.exit_code = 0
 
     def fermer(self, signum=None, frame=None):
         if signum:
@@ -981,7 +991,7 @@ class ServiceMonitor:
             # Modifier service docker du service monitor pour ajouter secrets
             self._gestionnaire_docker.configurer_monitor()
             self.fermer()  # Fermer le monitor, va forcer un redemarrage du service
-            raise Exception("Redemarrage")
+            raise ForcerRedemarrage("Redemarrage")
 
         # Generer certificats de module manquants ou expires, avec leur cle
         self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
@@ -1106,11 +1116,18 @@ class ServiceMonitorPrincipal(ServiceMonitor):
                 finally:
                     self._attente_event.wait(30)
 
+        except ForcerRedemarrage:
+            self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
+            self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
+
         except Exception:
             self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
 
         self.__logger.info("Fermeture du ServiceMonitor")
         self.fermer()
+
+        # Fermer le service monitor, retourne exit code pour shell script
+        sys.exit(self.exit_code)
 
     def preparer_gestionnaire_certificats(self):
         params = dict()
@@ -2273,11 +2290,14 @@ class ConnexionMiddleware:
         self.__contexte = ContexteRessourcesDocumentsMilleGrilles(
             configuration=self.__configuration, additionals=additionnals)
 
-        self.__contexte.initialiser(
-            init_document=True,
-            init_message=True,
-            connecter=True,
-        )
+        try:
+            self.__contexte.initialiser(
+                init_document=True,
+                init_message=True,
+                connecter=True,
+            )
+        except ServerSelectionTimeoutError:
+            self.__logger.warning("Erreur connexion mongo, ServerSelectionTimeoutError")
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
         self.__commandes_handler = TraitementMessagesMiddleware(self.__service_monitor.gestionnaire_commandes, self.__contexte)
@@ -2509,15 +2529,19 @@ class GestionnaireComptesMQ:
                     self.__logger.debug("MQ est pret")
                     mq_pret = True
                     break
+            except MaxRetryError:
+                self.__logger.warning("MQ Max Retry error, on va reessayer plus tard")
             except ConnectionError:
+                self.__logger.warning("MQ Connection error, on va reessayer plus tard")
                 if self.__logger.isEnabledFor(logging.DEBUG):
                     self.__logger.exception("MQ Connection Error")
             except HTTPError as httpe:
                 if httpe.response.status_code in [401]:
-                    raise httpe
+                    self.__logger.error("Erreur connexion MQ")
+                    # raise httpe
                 else:
                     if self.__logger.isEnabledFor(logging.DEBUG):
-                        self.__logger.exception("MQ HTTPError")
+                        self.__logger.exception("MQ HTTPError, code : %d" % httpe.response.status_code)
 
             self.__logger.debug("Attente MQ (%s/%s)" % (essai, nb_essais_max))
             self.__wait_event.wait(periode_attente)
@@ -3104,6 +3128,8 @@ class ImageNonTrouvee(Exception):
         super().__init__(t, obj)
         self.image = image
 
+class ForcerRedemarrage(Exception):
+    pass
 
 # Section main
 if __name__ == '__main__':
