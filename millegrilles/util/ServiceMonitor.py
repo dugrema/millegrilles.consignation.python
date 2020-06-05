@@ -2711,7 +2711,7 @@ class GestionnaireWeb:
             self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
         try:
-            os.makedirs(self.__repertoire_data, mode=0o770)
+            os.makedirs(self.__repertoire_data, mode=0o775)
         except FileExistsError:
             self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
