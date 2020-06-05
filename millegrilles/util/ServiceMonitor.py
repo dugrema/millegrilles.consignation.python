@@ -2735,18 +2735,29 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
 
-        location_base_component = """
+        location_public_component = """
             location %s {
                 include /etc/nginx/conf.d/modules/proxypass.include;
                 include /etc/nginx/conf.d/component_base.include;
             }
         """
-        location_paths = [
-            "/coupdoeil",
-            "/posteur",
+        location_priv_prot_component = """
+            location %s {
+                include /etc/nginx/conf.d/modules/proxypass.include;
+                include /etc/nginx/conf.d/component_base_auth.include;
+            }
+        """
+        location_public_paths = [
             "/vitrine",
         ]
-        locations_content = '\n'.join([location_base_component % loc for loc in location_paths])
+        location_priv_prot_paths = [
+            "/coupdoeil",
+            "/posteur",
+        ]
+        locations_content = \
+            '\n'.join([location_public_component % loc for loc in location_public_paths]) + '\n' + \
+            '\n'.join([location_priv_prot_component % loc for loc in location_priv_prot_paths])
+
         with open(path.join(self.__repertoire_modules, 'locations.include'), 'w') as fichier:
             fichier.write(locations_content)
 
