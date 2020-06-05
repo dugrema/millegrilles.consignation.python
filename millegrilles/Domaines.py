@@ -78,8 +78,7 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
         except InvalidSignature as erreur_signature:
             self.__logger.debug("Erreur signature message: \n%s" % str(message_dict))
             self.transmettre_reponse(
-                {'error': True, 'message': 'Signature invalide'},
-                None, properties.reply_to, properties.correlation_id
+                message_dict, {'error': True, 'message': 'Signature invalide'}, properties.reply_to, properties.correlation_id
             )
             raise erreur_signature
 

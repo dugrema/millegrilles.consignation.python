@@ -62,7 +62,12 @@ class ParametresExchangeRouter(ExchangeRouter):
         """
         exchanges = set()
         mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-        if mg_libelle in [ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC]:
+
+        libval_docs_relayes = [
+            ConstantesParametres.LIBVAL_CONFIGURATION_NOEUDPUBLIC
+        ]
+
+        if mg_libelle in libval_docs_relayes:
             exchanges.add(self._exchange_public)
             exchanges.add(self._exchange_prive)
             exchanges.add(self._exchange_protege)
@@ -269,7 +274,7 @@ class GestionnaireParametres(GestionnaireDomaineStandard):
         for noeud in curseur:
             noeuds_publics.append(noeud)
 
-        return noeuds_publics
+        return {'noeuds': noeuds_publics}
 
     def get_erreurs(self, requete):
         collection_erreurs = self.document_dao.get_collection(ConstantesParametres.COLLECTION_ERREURS)

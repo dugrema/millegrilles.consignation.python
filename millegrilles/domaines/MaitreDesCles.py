@@ -331,8 +331,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         Les cles publiques des backups sont utilisees pour re-encrypter les cles secretes.
         :return:
         """
-        resultats = message_dict['resultats']
-        certificats = resultats['certificats']
+        certificats = message_dict.get('certificats') or  message_dict['resultats']['certificats']
 
         verificateur_certificats = self.verificateur_certificats
         for fingerprint_hex, certificat in certificats.items():

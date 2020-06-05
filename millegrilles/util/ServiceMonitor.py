@@ -1515,9 +1515,9 @@ class GestionnaireCertificats:
 
     def recevoir_certificat(self, message: dict):
         self.__logger.info("Certificat recu :\n%s" % json.dumps(message, indent=2))
-        resultats = message['resultats']
+        chaines = message.get('chaines') or message['resultats']['chaines']
 
-        for info_chaine in resultats['chaines']:
+        for info_chaine in chaines['chaines']:
             pems = info_chaine['pems']
 
             # Identifier le role du certificat (OU)

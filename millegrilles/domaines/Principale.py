@@ -10,6 +10,22 @@ from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
 from millegrilles.Domaines import TraitementMessageDomaineRequete
 
 
+class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        reponse = None
+        if action == ConstantesPrincipale.REQUETE_PROFIL_MILLEGRILLE:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.LIBVAL_DOMAINES])
+        elif action == ConstantesPrincipale.REQUETE_PROFIL_USAGER:
+            reponse = self.gestionnaire.charger_documents([ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE, ConstantesPrincipale.LIBVAL_PROFIL_USAGER])
+
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
 class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
@@ -38,7 +54,13 @@ class PrincipaleExchangeRouter(ExchangeRouter):
         """
         exchanges = set()
         mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-        if mg_libelle in [ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE]:
+
+        libvals_relai = [
+            ConstantesPrincipale.LIBVAL_PROFIL_MILLEGRILLE,
+            ConstantesPrincipale.LIBVAL_PROFIL_USAGER,
+        ]
+
+        if mg_libelle in libvals_relai:
             exchanges.add(self._exchange_public)
             exchanges.add(self._exchange_prive)
             exchanges.add(self._exchange_protege)
@@ -56,6 +78,7 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
         self._logger = logging.getLogger("%s.GestionnaireRapports" % __name__)
 
         self.__handler_requetes = {
+            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
         }
 
