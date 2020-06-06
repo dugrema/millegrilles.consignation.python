@@ -42,9 +42,11 @@ class TraitementRequetesProtegeesAnnuaire(TraitementRequetesAnnuaire):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PUBLIQUE:
-            fiche_publique = self.gestionnaire.get_fiche_publique()
-            self.transmettre_reponse(message_dict, fiche_publique, properties.reply_to, properties.correlation_id)
+        action = routing_key.split('.')[-1]
+
+        reponse = None
+        if action == ConstantesAnnuaire.REQUETE_FICHE_PUBLIQUE:
+            reponse = self.gestionnaire.get_fiche_publique()
         elif routing_key == 'requete.' + ConstantesAnnuaire.REQUETE_FICHE_PRIVEE:
             fiche_privee = self.gestionnaire.get_fiche_privee()
 
@@ -58,9 +60,12 @@ class TraitementRequetesProtegeesAnnuaire(TraitementRequetesAnnuaire):
             for champ in champs_enlever:
                 del fiche_privee[champ]
 
-            self.transmettre_reponse(message_dict, fiche_privee, properties.reply_to, properties.correlation_id)
+            reponse = fiche_privee
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class GestionnaireAnnuaire(GestionnaireDomaineStandard):
