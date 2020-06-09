@@ -146,18 +146,32 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def transaction_associer_idmg(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
+            Constantes.CONFIG_IDMG: 'A_abcd1234EFGHI',
+            ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT: ['cert1', 'cert5'],
+            ConstantesMaitreDesComptes.CHAMP_CLE: 'Une cle chiffree 5',
+            ConstantesMaitreDesComptes.CHAMP_RESET_CERTIFICATS: False,
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_ASSOCIER_CERTIFICAT])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.requete_info_proprietaire()
         # self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
         # self.transaction_maj_motdepasse()
-        self.transaction_maj_motdepasse_proprietaire()
+        # self.transaction_maj_motdepasse_proprietaire()
         # self.transaction_supprimer_motdepasse()
         # self.transaction_ajouter_cle()
         # self.transaction_ajouter_cle_proprietaire()
         # self.transaction_supprimer_cles()
         # self.transaction_supprimer_usager()
+        self.transaction_associer_idmg()
 
 
 # --- MAIN ---

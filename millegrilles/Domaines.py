@@ -1232,7 +1232,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         self._logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
         self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
 
-    def filtrer_champs_document(self, document):
+    def filtrer_champs_document(self, document, retirer: list = None):
         """
         Enleve les champs internes (qui commencent pas un _), exception _mg-libelle
         :param document:
@@ -1241,7 +1241,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         document_filtre = dict()
 
         for key, value in document.items():
-            if not key.startswith('_') or key == Constantes.DOCUMENT_INFODOC_LIBELLE:
+            if not key.startswith('_') and key not in retirer or key == Constantes.DOCUMENT_INFODOC_LIBELLE:
                 document_filtre[key] = value
 
         return document_filtre

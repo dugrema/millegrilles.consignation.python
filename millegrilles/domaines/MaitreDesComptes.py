@@ -84,6 +84,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusSupprimerMotdepasse"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_SUPPRIMER_USAGER:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusSupprimerUsager"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_ASSOCIER_CERTIFICAT:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAssocierCertificat"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -122,7 +124,10 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         collection = self.document_dao.get_collection(self.get_nom_collection())
         document_usager = collection.find_one(filtre)
         if document_usager:
-            document_filtre = self.filtrer_champs_document(document_usager)
+            document_filtre = self.filtrer_champs_document(
+                document_usager,
+                retirer=[ConstantesMaitreDesComptes.CHAMP_CERTIFICATS]
+            )
             return document_filtre
         else:
             return {Constantes.EVENEMENT_REPONSE: False}
@@ -309,6 +314,41 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         return {Constantes.EVENEMENT_REPONSE: True}
 
+    def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+
+        set_ops = {}
+        document_idmg = {}
+        if chaine_certificats:
+            document_idmg[ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT] = chaine_certificats
+        if cle_intermediaire:
+            document_idmg[ConstantesMaitreDesComptes.CHAMP_CLE] = cle_intermediaire
+        if reset_certificats:
+            set_ops['certificats'] = {
+                idmg: document_idmg
+            }
+        else:
+            for key, value in document_idmg.items():
+                set_ops['certificats.%s.%s' % (idmg, key)] = value
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur suppression mot de passe, aucun document modifie")
+
+        return {Constantes.EVENEMENT_REPONSE: True}
+
+
 
 class ProcessusInscrireProprietaire(MGProcessusTransaction):
     """
@@ -398,5 +438,24 @@ class ProcessusSupprimerUsager(MGProcessusTransaction):
 
         nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         self.controleur.gestionnaire.supprimer_usager(nom_usager)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusAssocierCertificat(MGProcessusTransaction):
+    """
+    Associe un IDMG au compte. Ajoute optionnellement la cle intermediaire et la chaine de certificats.
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        idmg = transaction.get(Constantes.CONFIG_IDMG)
+        chaine_certificats = transaction.get(ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT)
+        cle_intermediaire = transaction.get(ConstantesMaitreDesComptes.CHAMP_CLE)
+        reset_certificats = transaction.get(ConstantesMaitreDesComptes.CHAMP_RESET_CERTIFICATS) or False
+
+        self.controleur.gestionnaire.associer_idmg(
+            nom_usager, idmg, chaine_certificats=chaine_certificats, cle_intermediaire=cle_intermediaire, reset_certificats=reset_certificats)
 
         self.set_etape_suivante()  #Termine

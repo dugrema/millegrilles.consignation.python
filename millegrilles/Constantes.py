@@ -1384,6 +1384,9 @@ class ConstantesMaitreDesComptes:
     CHAMP_CLES = 'cles'
     CHAMP_RESET_CLES = 'reset_cles'
     CHAMP_EST_PROPRIETAIRE = 'est_proprietaire'
+    CHAMP_CHAINE_CERTIFICAT = 'chaine_certificats'
+    CHAMP_RESET_CERTIFICATS = 'reset_certificats'
+    CHAMP_CERTIFICATS = 'certificats'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
@@ -1395,6 +1398,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_AJOUTER_CLE = 'ajouterCle'
     TRANSACTION_SUPPRIMER_CLES = 'supprimerCles'
     TRANSACTION_SUPPRIMER_USAGER = 'supprimerUsager'
+    TRANSACTION_ASSOCIER_CERTIFICAT = 'associerCertificat'
 
 
 class ConstantesHebergementTransactions:

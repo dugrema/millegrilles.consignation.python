@@ -455,7 +455,12 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             evenement_type = message['evenement_type']
             correlation_id = message.get('correlation_id')
 
-            if evenement_type == Constantes.EVENEMENT_RESUMER:
+            if evenement_type in [
+                Constantes.EVENEMENT_TRANSACTION_TRAITEE
+            ]:
+                # Rien a faire
+                pass
+            elif evenement_type == Constantes.EVENEMENT_RESUMER:
                 self.traiter_resumer(evenement_dict)
 
             elif evenement_type == Constantes.EVENEMENT_VERIFIER_RESUMER:
