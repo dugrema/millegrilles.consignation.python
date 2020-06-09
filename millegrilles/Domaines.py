@@ -1239,6 +1239,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         :return:
         """
         document_filtre = dict()
+        if not retirer:
+            retirer = list()
 
         for key, value in document.items():
             if not key.startswith('_') and key not in retirer or key == Constantes.DOCUMENT_INFODOC_LIBELLE:

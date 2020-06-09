@@ -123,11 +123,24 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         collection = self.document_dao.get_collection(self.get_nom_collection())
         document_usager = collection.find_one(filtre)
+
         if document_usager:
-            document_filtre = self.filtrer_champs_document(
-                document_usager,
-                retirer=[ConstantesMaitreDesComptes.CHAMP_CERTIFICATS]
-            )
+            champs_conserver = [
+                Constantes.DOCUMENT_INFODOC_LIBELLE,
+                ConstantesMaitreDesComptes.CHAMP_CLES,
+                ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE,
+                ConstantesMaitreDesComptes.CHAMP_NOM_USAGER,
+            ]
+            document_filtre = dict()
+            for key, value in document_usager.items():
+                if key in champs_conserver:
+                    document_filtre[key] = value
+
+            champs_certs = document_usager.get(ConstantesMaitreDesComptes.CHAMP_CERTIFICATS)
+            if champs_certs:
+                idmg_usager = [idmg for idmg in champs_certs.keys()]
+                document_filtre['liste_idmg'] = idmg_usager
+
             return document_filtre
         else:
             return {Constantes.EVENEMENT_REPONSE: False}
@@ -331,8 +344,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
                 idmg: document_idmg
             }
         else:
-            for key, value in document_idmg.items():
-                set_ops['certificats.%s.%s' % (idmg, key)] = value
+            set_ops['certificats.%s' % idmg] = document_idmg
 
         ops = {
             '$set': set_ops,

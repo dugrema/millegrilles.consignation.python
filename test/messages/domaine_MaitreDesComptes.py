@@ -149,9 +149,9 @@ class MessagesSample(BaseCallback):
     def transaction_associer_idmg(self):
         transaction = {
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'test',
-            Constantes.CONFIG_IDMG: 'A_abcd1234EFGHI',
-            ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT: ['cert1', 'cert5'],
-            ConstantesMaitreDesComptes.CHAMP_CLE: 'Une cle chiffree 5',
+            Constantes.CONFIG_IDMG: 'D_abcd1234EFGHI',
+            # ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT: ['cert1', 'cert5'],
+            # ConstantesMaitreDesComptes.CHAMP_CLE: 'Une cle chiffree 5',
             ConstantesMaitreDesComptes.CHAMP_RESET_CERTIFICATS: False,
         }
         domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_ASSOCIER_CERTIFICAT])
@@ -161,7 +161,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # self.requete_info_proprietaire()
-        # self.requete_profil_usager()
+        self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
         # self.transaction_maj_motdepasse()
@@ -171,7 +171,7 @@ class MessagesSample(BaseCallback):
         # self.transaction_ajouter_cle_proprietaire()
         # self.transaction_supprimer_cles()
         # self.transaction_supprimer_usager()
-        self.transaction_associer_idmg()
+        # self.transaction_associer_idmg()
 
 
 # --- MAIN ---
