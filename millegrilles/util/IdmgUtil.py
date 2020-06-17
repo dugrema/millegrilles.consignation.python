@@ -22,6 +22,9 @@ class IdmgUtil:
 
     def encoder_idmg(self, certificat_pem: str, version=VERSION_ACTIVE):
         cert_x509 = x509.load_pem_x509_certificate(certificat_pem.encode('utf-8'), default_backend())
+        self.encoder_idmg_cert(cert_x509, version)
+
+    def encoder_idmg_cert(self, cert_x509: x509, version=VERSION_ACTIVE):
         date_exp = cert_x509.not_valid_after
         date_exp_int = math.ceil(date_exp.timestamp() / 1000)
         valeur = base58.b58encode(cert_x509.fingerprint(hashes.SHA512_224()))

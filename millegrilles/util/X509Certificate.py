@@ -4,6 +4,7 @@ from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
+from millegrilles.util.IdmgUtil import IdmgUtil
 
 import datetime
 import secrets
@@ -225,7 +226,8 @@ class EnveloppeCleCert:
         Retourne le idmg du certificat.
         Calcule avec SHA-512/224 retourne en base58
         """
-        idmg = base58.b58encode(self.cert.fingerprint(hashes.SHA512_224())).decode('utf-8')
+        util = IdmgUtil()
+        idmg = util.encoder_idmg_cert(self.cert)
         return idmg
 
     @property
