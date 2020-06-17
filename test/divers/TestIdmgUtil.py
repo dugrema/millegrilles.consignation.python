@@ -69,7 +69,7 @@ class TestIdmgUtil:
 
     def encoder_cert1(self):
         self.idmg = self.util.encoder_idmg(CERT_1)
-        print('IDMG : %s' % self.idmg)
+        print('IDMG Cert 1 : %s' % self.idmg)
 
     def decoder_cert1(self):
         self.util.verifier_idmg(self.idmg, CERT_1)

@@ -2,6 +2,7 @@
 import base58
 import math
 import struct
+import binascii
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -22,12 +23,12 @@ class IdmgUtil:
 
     def encoder_idmg(self, certificat_pem: str, version=VERSION_ACTIVE):
         cert_x509 = x509.load_pem_x509_certificate(certificat_pem.encode('utf-8'), default_backend())
-        self.encoder_idmg_cert(cert_x509, version)
+        return self.encoder_idmg_cert(cert_x509, version)
 
     def encoder_idmg_cert(self, cert_x509: x509, version=VERSION_ACTIVE):
         date_exp = cert_x509.not_valid_after
         date_exp_int = math.ceil(date_exp.timestamp() / 1000)
-        valeur = base58.b58encode(cert_x509.fingerprint(hashes.SHA512_224()))
+        valeur = cert_x509.fingerprint(hashes.SHA512_224())
 
         valeur_combinee = struct.pack(IdmgUtil.VERSION_PACK[version], version, valeur, date_exp_int)
         valeur_base58 = base58.b58encode(valeur_combinee).decode('utf-8')
