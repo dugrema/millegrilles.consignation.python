@@ -9,7 +9,6 @@ import datetime
 import subprocess
 import tempfile
 import secrets
-import base58
 import shutil
 
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
@@ -22,6 +21,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, JSONHelper
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
+from millegrilles.util.IdmgUtil import IdmgUtil
 
 
 class EnveloppeCertificat:
@@ -89,7 +89,8 @@ class EnveloppeCertificat:
         Retourne le idmg du certificat.
         Calcule avec SHA-512/224 retourne en base58
         """
-        idmg = base58.b58encode(self._certificat.fingerprint(hashes.SHA512_224())).decode('utf-8')
+        util = IdmgUtil()
+        idmg = util.encoder_idmg_cert(self._certificat)
         return idmg
 
     @property
