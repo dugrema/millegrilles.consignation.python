@@ -1387,6 +1387,8 @@ class ConstantesMaitreDesComptes:
     CHAMP_CHAINE_CERTIFICAT = 'chaine_certificats'
     CHAMP_RESET_CERTIFICATS = 'reset_certificats'
     CHAMP_CERTIFICATS = 'certificats'
+    CHAMP_IDMGS = 'idmgs'
+    CHAMP_IDMG_COMPTE = 'idmgCompte'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
