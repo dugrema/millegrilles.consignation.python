@@ -1381,7 +1381,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_NOM_USAGER = 'nomUsager'
     CHAMP_MOTDEPASSE = 'motdepasse'
     CHAMP_CLE = 'cle'
-    CHAMP_CLES = 'cles'
+    CHAMP_CLES_U2F = 'u2f'
     CHAMP_RESET_CLES = 'reset_cles'
     CHAMP_EST_PROPRIETAIRE = 'est_proprietaire'
     CHAMP_CHAINE_CERTIFICAT = 'chaine_certificats'

@@ -127,7 +127,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if document_usager:
             champs_conserver = [
                 Constantes.DOCUMENT_INFODOC_LIBELLE,
-                ConstantesMaitreDesComptes.CHAMP_CLES,
+                ConstantesMaitreDesComptes.CHAMP_CLES_U2F,
                 ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE,
                 ConstantesMaitreDesComptes.CHAMP_NOM_USAGER,
                 ConstantesMaitreDesComptes.CHAMP_IDMGS,
@@ -177,7 +177,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
-            ConstantesMaitreDesComptes.CHAMP_CLES: [cle]
+            ConstantesMaitreDesComptes.CHAMP_CLES_U2F: [cle]
         }
 
         collection = self.document_dao.get_collection(self.get_nom_collection())
@@ -270,9 +270,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
     def ajouter_cle(self, cle: dict, nom_usager: str = None, est_proprietaire=False, reset_autres_cles=False,):
         if reset_autres_cles:
-            op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_CLES: [cle]}}
+            op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_CLES_U2F: [cle]}}
         else:
-            op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_CLES: cle}}
+            op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_CLES_U2F: cle}}
 
         if est_proprietaire:
             filtre = {
@@ -304,7 +304,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         ops = {
-            '$unset': {ConstantesMaitreDesComptes.CHAMP_CLES: True},
+            '$unset': {ConstantesMaitreDesComptes.CHAMP_CLES_U2F: True},
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             }
