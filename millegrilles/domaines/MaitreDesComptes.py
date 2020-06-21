@@ -86,6 +86,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusSupprimerUsager"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_ASSOCIER_CERTIFICAT:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAssocierCertificat"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_CLEUSAGERPRIVE:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajCleUsagerPrive"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -247,6 +249,34 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         if resultat.matched_count != 1:
             raise Exception("Erreur maj mot de passe, aucun document modifie")
 
+    def maj_cle_usagerprive(self, nom_usager: str, cle: str):
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+
+        info_usager = collection.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        })
+
+        idmg_compte = info_usager[ConstantesMaitreDesComptes.CHAMP_IDMG_COMPTE]
+
+        set_ops = {
+            'idmgs.%s.cleChiffreeCompte' % idmg_compte: cle
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur maj mot de passe, aucun document modifie")
+
     def suppression_motdepasse(self, nom_usager: str):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {
@@ -385,7 +415,7 @@ class ProcessusInscrireUsager(MGProcessusTransaction):
         self.set_etape_suivante()  #Termine
 
 
-class ProcessusMajMotdepasse(MGProcessusTransaction):
+class ProcessusMajMotdepasseProprietaire(MGProcessusTransaction):
     """
     Met a jour un mot de passe d'usager
     """
@@ -396,6 +426,20 @@ class ProcessusMajMotdepasse(MGProcessusTransaction):
         motdepasse = transaction[ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE]
         est_proprietaire = transaction.get(ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE) or False
         self.controleur.gestionnaire.maj_motdepasse(nom_usager, motdepasse, est_proprietaire)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusMajCleUsagerPrive(MGProcessusTransaction):
+    """
+    Met a jour la cle privee de l'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        cle = transaction[ConstantesMaitreDesComptes.CHAMP_CLE]
+        self.controleur.gestionnaire.maj_cle_usagerprive(nom_usager, cle)
 
         self.set_etape_suivante()  #Termine
 

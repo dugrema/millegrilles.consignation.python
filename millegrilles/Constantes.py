@@ -1396,6 +1396,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_INSCRIRE_PROPRIETAIRE = 'inscrireProprietaire'
     TRANSACTION_INSCRIRE_USAGER = 'inscrireUsager'
     TRANSACTION_MAJ_MOTDEPASSE = 'majMotdepasse'
+    TRANSACTION_MAJ_CLEUSAGERPRIVE = 'majCleUsagerPrive'
     TRANSACTION_SUPPRESSION_MOTDEPASSE = 'suppressionMotdepasse'
     TRANSACTION_AJOUTER_CLE = 'ajouterCle'
     TRANSACTION_SUPPRIMER_CLES = 'supprimerCles'
