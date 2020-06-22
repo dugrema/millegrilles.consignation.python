@@ -1404,6 +1404,41 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_ASSOCIER_CERTIFICAT = 'associerCertificat'
 
 
+class ConstantesMessagerie:
+
+    DOMAINE_NOM = 'Messagerie'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_MESSAGES_USAGERS_NOM = '%s/messagesUsager' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_COMPTES_USAGERS_NOM = '%s/comptesUsager' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = DOMAINE_NOM
+
+    REQUETE_CHARGER_COMPTE = 'chargerCompte'
+    REQUETE_SOMMAIRE_MESSAGES_PAR_IDMG = 'sommaireMessagesParIdmg'
+
+    TRANSACTION_INSCRIRE_COMPTE = 'inscrireCompte'
+    TRANSACTION_AJOUTER_IDMGS_COMPTE = 'ajouterIdmgsCompte'
+    TRANSACTION_ENVOYER_MESSAGE = 'envoyerMessage'
+    TRANSACTION_MARQUER_MESSAGE_LU = 'marquerMessageLu'
+    TRANSACTION_SUPPRIMER_MESSAGE = 'supprimerMessage'
+    TRANSACTION_MODIFIER_CONTACT = 'modifierContact'
+
+    LIBVAL_COMPTE_USAGER = 'compteUsager'
+    LIBVAL_MESSAGE_INSTANTANNE = 'message.instantanne'
+    LIBVAL_MESSAGE_COURRIEL = 'message.courriel'
+
+    CHAMP_NOM_USAGER = 'nom_usager'
+    CHAMP_IDMG_SOURCE = 'idmg_source'
+    CHAMP_IDMG_DESTINATION = 'idmg_destination'
+    CHAMP_DATE_ENVOI = 'date_envoi'
+    CHAMP_DATE_LECTURE = 'date_lecture'
+    CHAMP_IDMGS = 'idmgs'
+    CHAMP_CONTENU = 'contenu'
+    CHAMP_MESSAGE = 'message'
+    CHAMP_SUJET = 'sujet'
+
+
 class ConstantesHebergementTransactions:
 
     pass
