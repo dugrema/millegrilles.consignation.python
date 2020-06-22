@@ -94,12 +94,22 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def transaction_supprimer_message(self, uuid_message: str):
+        transaction = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_message,
+        }
+        domaine_action = '.'.join([ConstantesMessagerie.DOMAINE_NOM, ConstantesMessagerie.TRANSACTION_SUPPRIMER_MESSAGE])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.requete_compte_usager()
-        # self.requete_messages_usager()
+        self.requete_messages_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_envoyer_instantanne()
-        self.transaction_marquer_message_lu()
+        # self.transaction_marquer_message_lu()
+        # self.transaction_supprimer_message('1c6b139e-b4df-11ea-b31e-277b4a14dd4b')
 
 
 # --- MAIN ---

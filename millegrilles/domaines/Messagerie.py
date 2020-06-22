@@ -216,6 +216,16 @@ class GestionnaireMessagerie(GestionnaireDomaineStandard):
         if not resultat.upserted_id and resultat.matched_count == 0:
             raise Exception("Erreur inscription, aucun document modifie")
 
+    def supprimer_message(self, uuid_message: str):
+        collection_messages = self.document_dao.get_collection(self.get_nom_collection_messages_usagers())
+
+        filtre = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_message
+        }
+        resultat = collection_messages.delete_one(filtre)
+        if not resultat.deleted_count == 1:
+            raise Exception("Erreur suppression message, aucun document trouve pour uuid: %s", uuid_message)
+
 
 class ProcessusInscrireCompte(MGProcessusTransaction):
     """
@@ -243,6 +253,17 @@ class ProcessusMarquerMessageLu(MGProcessusTransaction):
     """
     def initiale(self):
         transaction = self.transaction
-        uuid_message = self.transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        uuid_message = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         self.controleur.gestionnaire.marquer_message_lu(uuid_message)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusSupprimerMessage(MGProcessusTransaction):
+    """
+    Envoit un nouveau message
+    """
+    def initiale(self):
+        transaction = self.transaction
+        uuid_message = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        self.controleur.gestionnaire.supprimer_message(uuid_message)
         self.set_etape_suivante()  # Termine
