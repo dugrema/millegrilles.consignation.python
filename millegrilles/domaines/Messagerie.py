@@ -226,6 +226,36 @@ class GestionnaireMessagerie(GestionnaireDomaineStandard):
         if not resultat.deleted_count == 1:
             raise Exception("Erreur suppression message, aucun document trouve pour uuid: %s", uuid_message)
 
+    def modifier_contact(self, transaction: dict):
+        collection_comptes = self.document_dao.get_collection(self.get_nom_collection_comptes_usagers())
+
+        label_contact = '%s.%s' % (ConstantesMessagerie.CHAMP_CONTACTS, transaction[ConstantesMessagerie.CHAMP_UUID_CONTACT])
+        operation_supprimer = transaction.get(ConstantesMessagerie.CHAMP_SUPPRIMER)
+
+        ops = {
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True,
+            },
+        }
+
+        if not operation_supprimer:
+            ops['$set'] = {
+                label_contact: {
+                    ConstantesMessagerie.CHAMP_NOM_CONTACT: transaction[ConstantesMessagerie.CHAMP_NOM_CONTACT],
+                    ConstantesMessagerie.CHAMP_IDMGS: transaction[ConstantesMessagerie.CHAMP_IDMGS],
+                }
+            }
+        else:
+            ops['$unset'] = {label_contact: True}
+
+        filtre = {
+            ConstantesMessagerie.CHAMP_NOM_USAGER: transaction[ConstantesMessagerie.CHAMP_NOM_USAGER]
+        }
+
+        resultat = collection_comptes.update_one(filtre, ops, upsert=True)
+        if not resultat.upserted_id and resultat.matched_count == 0:
+            raise Exception("Erreur maj contact, aucun document modifie")
+
 
 class ProcessusInscrireCompte(MGProcessusTransaction):
     """
@@ -249,7 +279,7 @@ class ProcessusEnvoyerMessage(MGProcessusTransaction):
 
 class ProcessusMarquerMessageLu(MGProcessusTransaction):
     """
-    Envoit un nouveau message
+    Marque un message lu
     """
     def initiale(self):
         transaction = self.transaction
@@ -260,10 +290,20 @@ class ProcessusMarquerMessageLu(MGProcessusTransaction):
 
 class ProcessusSupprimerMessage(MGProcessusTransaction):
     """
-    Envoit un nouveau message
+    Supprime un message
     """
     def initiale(self):
         transaction = self.transaction
         uuid_message = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         self.controleur.gestionnaire.supprimer_message(uuid_message)
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusModifierContact(MGProcessusTransaction):
+    """
+    Ajoute ou modifie un contact pour un usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+        self.controleur.gestionnaire.modifier_contact(transaction)
         self.set_etape_suivante()  # Termine

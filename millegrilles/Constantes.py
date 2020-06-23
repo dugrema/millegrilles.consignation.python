@@ -1437,6 +1437,11 @@ class ConstantesMessagerie:
     CHAMP_CONTENU = 'contenu'
     CHAMP_MESSAGE = 'message'
     CHAMP_SUJET = 'sujet'
+    CHAMP_CONTACT = 'contact'
+    CHAMP_CONTACTS = 'contacts'
+    CHAMP_NOM_CONTACT = 'nom_contact'
+    CHAMP_UUID_CONTACT = 'uuid_contact'
+    CHAMP_SUPPRIMER = 'supprimer'
 
 
 class ConstantesHebergementTransactions:
