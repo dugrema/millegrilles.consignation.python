@@ -4,7 +4,7 @@ import datetime
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMessagerie
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds,  \
-    TransactionTypeInconnuError
+    TransactionTypeInconnuError, ExchangeRouter
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
@@ -29,6 +29,21 @@ class TraitementRequetesMessageriePrivees(TraitementRequetesNoeuds):
             raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
 
         return reponse
+
+
+class MessagerieExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
+        if mg_libelle in [ConstantesMessagerie.LIBVAL_MESSAGE_COURRIEL, ConstantesMessagerie.LIBVAL_MESSAGE_INSTANTANNE]:
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
+
+        return list(exchanges)
 
 
 class GestionnaireMessagerie(GestionnaireDomaineStandard):
@@ -78,6 +93,12 @@ class GestionnaireMessagerie(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
         # self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
+
+        self.demarrer_watcher_collection(
+            ConstantesMessagerie.COLLECTION_MESSAGES_USAGERS_NOM,
+            ConstantesMessagerie.QUEUE_ROUTING_MAJ_MESSAGES,
+            MessagerieExchangeRouter(self._contexte)
+        )
 
     def identifier_processus(self, domaine_transaction):
 

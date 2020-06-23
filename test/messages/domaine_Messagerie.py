@@ -88,9 +88,9 @@ class MessagesSample(BaseCallback):
     def transaction_envoyer_instantanne(self):
         transaction = {
             Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
-            ConstantesMessagerie.CHAMP_IDMG_SOURCE: '29yHaJVXVZ5eCEsb7rK3iNrruDmYNh9Z2hWzNtz',
-            ConstantesMessagerie.CHAMP_IDMG_DESTINATION: 'XEFLEkH9vvK1zBEU8qHt2fauyfRr7CLbJEwpdTh5JWRM',
-            ConstantesMessagerie.CHAMP_MESSAGE: 'Mon message est un peu plus long que le dernier.'
+            ConstantesMessagerie.CHAMP_IDMG_SOURCE: 'XEFLEkH9vvK1zBEU8qHt2fauyfRr7CLbJEwpdTh5JWRM',
+            ConstantesMessagerie.CHAMP_IDMG_DESTINATION: '29yHaJVXVZ5eCEsb7rK3iNrruDmYNh9Z2hWzNtz',
+            ConstantesMessagerie.CHAMP_MESSAGE: 'Que oui, genial je diras.'
         }
         domaine_action = '.'.join([ConstantesMessagerie.DOMAINE_NOM, ConstantesMessagerie.TRANSACTION_ENVOYER_MESSAGE])
         enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
