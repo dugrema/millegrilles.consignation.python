@@ -1416,6 +1416,7 @@ class ConstantesMessagerie:
 
     REQUETE_CHARGER_COMPTE = 'chargerCompte'
     REQUETE_SOMMAIRE_MESSAGES_PAR_IDMG = 'sommaireMessagesParIdmg'
+    REQUETE_MESSAGES_USAGER_PAR_SOURCE = 'messagesUsagerParSource'
 
     TRANSACTION_INSCRIRE_COMPTE = 'inscrireCompte'
     TRANSACTION_AJOUTER_IDMGS_COMPTE = 'ajouterIdmgsCompte'
@@ -1434,6 +1435,8 @@ class ConstantesMessagerie:
     CHAMP_DATE_ENVOI = 'date_envoi'
     CHAMP_DATE_LECTURE = 'date_lecture'
     CHAMP_IDMGS = 'idmgs'
+    CHAMP_IDMGS_SOURCE = 'idmgs_source'
+    CHAMP_IDMGS_DESTINATION = 'idmgs_destination'
     CHAMP_CONTENU = 'contenu'
     CHAMP_MESSAGE = 'message'
     CHAMP_SUJET = 'sujet'

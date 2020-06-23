@@ -19,6 +19,11 @@ class TraitementRequetesMessageriePrivees(TraitementRequetesNoeuds):
             reponse = self.gestionnaire.charger_compte_usager(message_dict)
         elif action == ConstantesMessagerie.REQUETE_SOMMAIRE_MESSAGES_PAR_IDMG:
             reponse = self.gestionnaire.charger_messages_par_idmg(message_dict[ConstantesMessagerie.CHAMP_IDMGS])
+        elif action == ConstantesMessagerie.REQUETE_MESSAGES_USAGER_PAR_SOURCE:
+            reponse = self.gestionnaire.charger_messages_usager_par_source(
+                message_dict[ConstantesMessagerie.CHAMP_IDMGS_DESTINATION],
+                message_dict[ConstantesMessagerie.CHAMP_IDMGS_SOURCE]
+            )
         else:
             # Type de transaction inconnue, on lance une exception
             raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
@@ -167,6 +172,35 @@ class GestionnaireMessagerie(GestionnaireDomaineStandard):
         for m in curseur_messages:
             del m[Constantes.MONGO_DOC_ID]
             messages.append(m)
+
+        return messages
+
+    def charger_messages_usager_par_source(self, idmgs_usager: list, idmgs_source: list):
+        collection_messages = self.document_dao.get_collection(self.get_nom_collection_messages_usagers())
+        filtre = {
+            '$or': [
+                {
+                    ConstantesMessagerie.CHAMP_IDMG_DESTINATION: {'$in': idmgs_usager},
+                    ConstantesMessagerie.CHAMP_IDMG_SOURCE: {'$in': idmgs_source},
+                }, {
+                    ConstantesMessagerie.CHAMP_IDMG_DESTINATION: {'$in': idmgs_source},
+                    ConstantesMessagerie.CHAMP_IDMG_SOURCE: {'$in': idmgs_usager},
+                }
+            ]
+        }
+
+        tri = [
+            (ConstantesMessagerie.CHAMP_DATE_ENVOI, -1)
+        ]
+
+        curseur_messages = collection_messages.find(filtre).sort(tri).limit(30)
+        messages = list()
+        for m in curseur_messages:
+            del m[Constantes.MONGO_DOC_ID]
+            messages.append(m)
+
+        # Les messages sont tries en ordre descendant (date) - on remet en ordre
+        messages.reverse()
 
         return messages
 

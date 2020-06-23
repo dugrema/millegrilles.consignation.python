@@ -64,6 +64,17 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def requete_messages_usager_par_source(self):
+        requete = {
+            'idmgs_destination': ['29yHaJVXVZ5eCEsb7rK3iNrruDmYNh9Z2hWzNtz'],
+            'idmgs_source': ['XEFLEkH9vvK1zBEU8qHt2fauyfRr7CLbJEwpdTh5JWRM'],
+        }
+        domaine_action = '.'.join([ConstantesMessagerie.DOMAINE_NOM, ConstantesMessagerie.REQUETE_MESSAGES_USAGER_PAR_SOURCE])
+        enveloppe = self.generateur.transmettre_requete(requete, domaine_action, 'abcd-1234', self.queue_name)
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def transaction_inscrire_proprietaire(self):
         transaction = {
             ConstantesMessagerie.CHAMP_NOM_USAGER: 'mathieu@mg-dev4.maple.maceroc.com',
@@ -78,8 +89,8 @@ class MessagesSample(BaseCallback):
         transaction = {
             Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PRIVE,
             ConstantesMessagerie.CHAMP_IDMG_SOURCE: '29yHaJVXVZ5eCEsb7rK3iNrruDmYNh9Z2hWzNtz',
-            ConstantesMessagerie.CHAMP_IDMG_DESTINATION: '29yHaJVXVZ5eCEsb7rK3iNrruDmYNh9Z2hWzNtz',
-            ConstantesMessagerie.CHAMP_MESSAGE: 'Bian le bonjour, poutine!'
+            ConstantesMessagerie.CHAMP_IDMG_DESTINATION: 'XEFLEkH9vvK1zBEU8qHt2fauyfRr7CLbJEwpdTh5JWRM',
+            ConstantesMessagerie.CHAMP_MESSAGE: 'Mon message est un peu plus long que le dernier.'
         }
         domaine_action = '.'.join([ConstantesMessagerie.DOMAINE_NOM, ConstantesMessagerie.TRANSACTION_ENVOYER_MESSAGE])
         enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
@@ -130,11 +141,12 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # self.requete_compte_usager()
         # self.requete_messages_usager()
+        # self.requete_messages_usager_par_source()
         # self.transaction_inscrire_proprietaire()
-        # self.transaction_envoyer_instantanne()
+        self.transaction_envoyer_instantanne()
         # self.transaction_marquer_message_lu()
         # self.transaction_supprimer_message('1c6b139e-b4df-11ea-b31e-277b4a14dd4b')
-        self.transaction_modifier_contact()
+        # self.transaction_modifier_contact()
         # self.transaction_supprimer_contact('49bc0f0d-1e89-4961-8d04-fcd4a65beb83')
 
 
