@@ -42,7 +42,22 @@ class MessagerieExchangeRouter(ExchangeRouter):
         if mg_libelle in [ConstantesMessagerie.LIBVAL_MESSAGE_COURRIEL, ConstantesMessagerie.LIBVAL_MESSAGE_INSTANTANNE]:
             exchanges.add(self._exchange_prive)
             exchanges.add(self._exchange_protege)
+        elif mg_libelle in [ConstantesMessagerie.LIBVAL_COMPTE_USAGER]:
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
 
+        return list(exchanges)
+
+
+class ComptesExchangeRouter(ExchangeRouter):
+
+    def determiner_exchanges(self, document):
+        """
+        :return: Liste des echanges sur lesquels le document doit etre soumis
+        """
+        exchanges = set()
+        exchanges.add(self._exchange_prive)
+        exchanges.add(self._exchange_protege)
         return list(exchanges)
 
 
@@ -98,6 +113,11 @@ class GestionnaireMessagerie(GestionnaireDomaineStandard):
             ConstantesMessagerie.COLLECTION_MESSAGES_USAGERS_NOM,
             ConstantesMessagerie.QUEUE_ROUTING_MAJ_MESSAGES,
             MessagerieExchangeRouter(self._contexte)
+        )
+        self.demarrer_watcher_collection(
+            ConstantesMessagerie.COLLECTION_COMPTES_USAGERS_NOM,
+            ConstantesMessagerie.QUEUE_ROUTING_MAJ_COMPTES,
+            ComptesExchangeRouter(self._contexte)
         )
 
     def identifier_processus(self, domaine_transaction):

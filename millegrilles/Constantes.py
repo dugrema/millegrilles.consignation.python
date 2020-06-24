@@ -1414,6 +1414,7 @@ class ConstantesMessagerie:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_ROUTING_MAJ_MESSAGES = 'evenement.%s.messages' % DOMAINE_NOM
+    QUEUE_ROUTING_MAJ_COMPTES = 'evenement.%s.comptes' % DOMAINE_NOM
 
     REQUETE_CHARGER_COMPTE = 'chargerCompte'
     REQUETE_SOMMAIRE_MESSAGES_PAR_IDMG = 'sommaireMessagesParIdmg'
