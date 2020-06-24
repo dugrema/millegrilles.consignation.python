@@ -185,16 +185,28 @@ class GestionnaireMessagerie(GestionnaireDomaineStandard):
     def charger_messages_par_idmg(self, idmgs: list):
         collection_messages = self.document_dao.get_collection(self.get_nom_collection_messages_usagers())
         filtre = {
-            ConstantesMessagerie.CHAMP_IDMG_DESTINATION: {'$in': idmgs}
+            ConstantesMessagerie.CHAMP_IDMG_DESTINATION: {'$in': idmgs},
+            ConstantesMessagerie.CHAMP_DATE_LECTURE: {'$exists': False},
         }
 
-        curseur_messages = collection_messages.find(filtre)
-        messages = list()
-        for m in curseur_messages:
-            del m[Constantes.MONGO_DOC_ID]
-            messages.append(m)
+        curseur_messages = collection_messages.aggregate([
+            {'$match': filtre},
+            {
+                '$group': {
+                    '_id': '$idmg_source',
+                    'dernier_message': {'$max': '$date_envoi'},
+                    'messages_non_lus': {'$sum': 1},
+                }
+            }
+        ])
 
-        return messages
+        liste_idmgs = list()
+        for m in curseur_messages:
+            m['idmg_source'] = m['_id']
+            del m[Constantes.MONGO_DOC_ID]
+            liste_idmgs.append(m)
+
+        return liste_idmgs
 
     def charger_messages_usager_par_source(self, idmgs_usager: list, idmgs_source: list):
         collection_messages = self.document_dao.get_collection(self.get_nom_collection_messages_usagers())

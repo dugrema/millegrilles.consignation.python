@@ -1444,6 +1444,7 @@ class ConstantesMessagerie:
     CHAMP_CONTACT = 'contact'
     CHAMP_CONTACTS = 'contacts'
     CHAMP_NOM_CONTACT = 'nom_contact'
+    CHAMP_NOM_USAGER_CONTACT = 'nom_usager_contact'
     CHAMP_UUID_CONTACT = 'uuid_contact'
     CHAMP_SUPPRIMER = 'supprimer'
 
