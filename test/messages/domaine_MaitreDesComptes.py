@@ -159,9 +159,24 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def transaction_ajouter_certificat_navigateur(self):
+        transaction = {
+            'nomUsager': 'test3@mg-dev4.maple.maceroc.com',
+            'idmg': 'abcd1234',
+            'fingerprint': 'mon_fingerprint',
+            'cleChiffree': 'clePriveeNavigateurChiffreePem',
+            'certificat': 'certNavigateurPem',
+            'motdepassePartiel': 'motdepassePartielServeurBuffer',
+            'expiration': 12345678,
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_NAVIGATEUR])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.requete_info_proprietaire()
-        self.requete_profil_usager()
+        # self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
         # self.transaction_maj_motdepasse()
@@ -172,6 +187,7 @@ class MessagesSample(BaseCallback):
         # self.transaction_supprimer_cles()
         # self.transaction_supprimer_usager()
         # self.transaction_associer_idmg()
+        self.transaction_ajouter_certificat_navigateur()
 
 
 # --- MAIN ---

@@ -1402,6 +1402,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_SUPPRIMER_CLES = 'supprimerCles'
     TRANSACTION_SUPPRIMER_USAGER = 'supprimerUsager'
     TRANSACTION_ASSOCIER_CERTIFICAT = 'associerCertificat'
+    TRANSACTION_AJOUTER_NAVIGATEUR = 'ajouterNavigateur'
 
 
 class ConstantesMessagerie:

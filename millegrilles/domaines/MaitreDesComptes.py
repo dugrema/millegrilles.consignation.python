@@ -88,6 +88,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAssocierCertificat"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_CLEUSAGERPRIVE:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajCleUsagerPrive"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_NAVIGATEUR:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAjouterCertificatNavigateur"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -392,6 +394,37 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         return {Constantes.EVENEMENT_REPONSE: True}
 
+    def ajouter_certificat_navigateur(self, nom_usager, info_certificat: dict):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+
+        idmg = info_certificat['idmg']
+        fingerprint_navigateur = info_certificat['fingerprint']
+
+        set_ops = {}
+        set_ops['idmgs.%s.navigateurs.%s' % (idmg, fingerprint_navigateur)] = {
+            'cleChiffree': info_certificat['cleChiffree'],
+            'certificat': info_certificat['certificat'],
+            'motdepassePartiel': info_certificat['motdepassePartiel'],
+            'expiration': info_certificat['expiration'],
+        }
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+            }
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur suppression mot de passe, aucun document modifie")
+
+        return {Constantes.EVENEMENT_REPONSE: True}
+
 
 
 class ProcessusInscrireProprietaire(MGProcessusTransaction):
@@ -515,5 +548,19 @@ class ProcessusAssocierCertificat(MGProcessusTransaction):
 
         self.controleur.gestionnaire.associer_idmg(
             nom_usager, idmg, chaine_certificats=chaine_certificats, cle_intermediaire=cle_intermediaire, reset_certificats=reset_certificats)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusAjouterCertificatNavigateur(MGProcessusTransaction):
+    """
+    Associe un IDMG au compte. Ajoute optionnellement la cle intermediaire et la chaine de certificats.
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        nom_usager = transaction[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+
+        self.controleur.gestionnaire.ajouter_certificat_navigateur(nom_usager, transaction)
 
         self.set_etape_suivante()  #Termine
