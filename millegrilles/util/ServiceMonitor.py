@@ -2770,6 +2770,7 @@ class GestionnaireWeb:
         location_priv_prot_paths = [
             "/coupdoeil",
             "/posteur",
+            "/messagerie",
         ]
 
         locations_list = list()
