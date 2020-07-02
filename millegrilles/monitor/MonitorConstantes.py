@@ -1,3 +1,5 @@
+from typing import cast
+
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
@@ -98,3 +100,45 @@ MODULES_HEBERGEMENT = [
     # ConstantesServiceMonitor.MODULE_HEBERGEMENT_COUPDOEIL,
     # ConstantesServiceMonitor.MODULE_HEBERGEMENT_FICHIERS,
 ]
+
+
+def trouver_config(config_name: str, idmg_tronque: str, docker_client):
+    config_names = config_name.split(';')
+    configs = None
+    for config_name_val in config_names:
+        filtre = {'name': idmg_tronque + '.' + config_name_val}
+        configs = docker_client.configs.list(filters=filtre)
+        if len(configs) > 0:
+            break
+
+    # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
+    date_config: int = cast(int, None)
+    config_retenue = None
+    for config in configs:
+        nom_config = config.name
+        split_config = nom_config.split('.')
+        date_config_str = split_config[-1]
+        date_config_int = int(date_config_str)
+        if not date_config or date_config_int > date_config:
+            date_config = date_config_int
+            config_retenue = config
+
+    return {
+        'config_reference': {
+            'config_id': config_retenue.attrs['ID'],
+            'config_name': config_retenue.name,
+        },
+        'date': str(date_config),
+        'config': config_retenue,
+    }
+
+
+class ImageNonTrouvee(Exception):
+
+    def __init__(self, image, t=None, obj=None):
+        super().__init__(t, obj)
+        self.image = image
+
+
+class ForcerRedemarrage(Exception):
+    pass

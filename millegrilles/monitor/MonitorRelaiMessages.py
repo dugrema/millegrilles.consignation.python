@@ -471,6 +471,8 @@ class ConnexionMiddleware:
             )
         except ServerSelectionTimeoutError:
             self.__logger.warning("Erreur connexion mongo, ServerSelectionTimeoutError")
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail error connexion Mongo")
 
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
         self.__commandes_handler = TraitementMessagesMiddleware(self.__service_monitor.gestionnaire_commandes, self.__contexte)
