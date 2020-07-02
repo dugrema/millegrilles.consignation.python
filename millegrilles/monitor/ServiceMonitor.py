@@ -27,6 +27,7 @@ from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor import MonitorConstantes
+from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 
 
 class InitialiserServiceMonitor:
@@ -201,7 +202,8 @@ class ServiceMonitor:
         self._gestionnaire_docker: GestionnaireModulesDocker = cast(GestionnaireModulesDocker, None)
         self._gestionnaire_mq: GestionnaireComptesMQ = cast(GestionnaireComptesMQ, None)
         self._gestionnaire_commandes: GestionnaireCommandes = cast(GestionnaireCommandes, None)
-        self._gestionnaire_web : GestionnaireWeb = cast(GestionnaireWeb, None)
+        self._gestionnaire_web: GestionnaireWeb = cast(GestionnaireWeb, None)
+        self._gestionnaire_applications: GestionnaireApplications = cast(GestionnaireApplications, None)
 
         self.limiter_entretien = True
 
@@ -297,6 +299,13 @@ class ServiceMonitor:
             self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
 
         self._gestionnaire_commandes.start()
+
+    def preparer_gestionnaire_applications(self):
+        if not self._gestionnaire_applications:
+            self._gestionnaire_applications = GestionnaireApplications(
+                self,
+                self._gestionnaire_docker
+            )
 
     def _charger_configuration(self):
         # classe_configuration = self._classe_configuration()
@@ -413,6 +422,10 @@ class ServiceMonitor:
             self.limiter_entretien = False
 
     @property
+    def idmg(self):
+        return self._idmg
+
+    @property
     def idmg_tronque(self):
         return self._idmg[0:12]
 
@@ -461,6 +474,14 @@ class ServiceMonitor:
     def generateur_transactions(self):
         return self._connexion_middleware.generateur_transactions
 
+    @property
+    def gestionnaire_applications(self):
+        return self._gestionnaire_applications
+
+    @property
+    def docker(self):
+        return self._docker
+
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         raise NotImplementedError()
 
@@ -483,6 +504,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             self.configurer_millegrille()
             self.preparer_gestionnaire_comptesmq()
             self.preparer_gestionnaire_commandes()
+            self.preparer_gestionnaire_applications()
 
             while not self._fermeture_event.is_set():
                 self._attente_event.clear()

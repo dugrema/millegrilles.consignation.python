@@ -27,6 +27,7 @@ class GestionnaireModulesDocker:
         self.__event_stream = None
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
+        self.gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -151,12 +152,10 @@ class GestionnaireModulesDocker:
             # S'assurer que le certificat existe et est a date
             pass
 
-        gestionnaire_images = GestionnaireImagesDocker(self.__idmg, self.__docker)
-
         nom_image_docker = kwargs.get('nom') or service_name
 
         try:
-            image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+            image = self.gestionnaire_images.telecharger_image_docker(nom_image_docker)
 
             # Prendre un tag au hasard
             image_tag = image.tags[0]
@@ -285,6 +284,11 @@ class GestionnaireModulesDocker:
             'secret_name': secret_retenue.name,
             'date': date_secret,
         }
+
+    def telecharger_image(self, nom_image_docker):
+        image = self.gestionnaire_images.telecharger_image_docker(nom_image_docker)
+        image_tag = image.tags[0]
+        return image, image_tag
 
     def __trouver_secret_matchdate(self, secret_names, date_secrets: dict):
         for secret_name in secret_names.split(';'):
@@ -498,22 +502,17 @@ class GestionnaireImagesDocker:
 
     def __init__(self, idmg: str, docker_client: docker.DockerClient):
         self.__idmg = idmg
-        self.__docker = docker_client
+        self._docker = docker_client
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self.__versions_images: dict = cast(dict, None)
+        self._versions_images: dict = cast(dict, None)
 
     @property
     def tronquer_idmg(self):
         return self.__idmg[0:12]
 
     def charger_versions(self):
-        filtre = {'name': 'docker.versions'}
-        try:
-            self.__versions_images = json.loads(b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
-        except IndexError:
-            self.__logger.error(
-                "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")
+        raise NotImplementedError()
 
     def telecharger_images_docker(self):
         """
@@ -524,7 +523,7 @@ class GestionnaireImagesDocker:
 
         self.charger_versions()
 
-        for service in self.__versions_images['images'].keys():
+        for service in self._versions_images['images'].keys():
             # Il est possible de definir des registre specifiquement pour un service
             self.pull_image(service, images_non_trouvees)
 
@@ -551,8 +550,9 @@ class GestionnaireImagesDocker:
         return image
 
     def pull_image(self, service, images_non_trouvees):
-        registries = self.__versions_images['registries']
-        config = self.__versions_images['images'][service]
+        registries = self._versions_images.get('registries')
+        images_info = self._versions_images['images']
+        config = images_info[service]
         nom_image = config['image']
         tag = config['version']
 
@@ -589,7 +589,7 @@ class GestionnaireImagesDocker:
         image = None
         try:
             self.__logger.info("Telechargement image %s" % image_name)
-            image = self.__docker.images.pull(image_name, tag)
+            image = self._docker.images.pull(image_name, tag)
             self.__logger.debug("Image telechargee : %s" % str(image))
         except APIError as e:
             if e.status_code == 404:
@@ -609,7 +609,7 @@ class GestionnaireImagesDocker:
         """
         self.__logger.debug("Get image locale %s:%s" % (image_name, tag))
 
-        registries = self.__versions_images['registries'].copy()
+        registries = self._versions_images['registries'].copy()
         registries.extend(custom_registries)
         registries.append('')
         for registry in registries:
@@ -620,7 +620,7 @@ class GestionnaireImagesDocker:
                 nom_image_reg = '%s:%s' % (image_name, tag)
 
             try:
-                image = self.__docker.images.get(nom_image_reg)
+                image = self._docker.images.get(nom_image_reg)
                 self.__logger.info("Image locale %s:%s trouvee" % (image_name, tag))
                 return image
             except APIError:
@@ -629,7 +629,7 @@ class GestionnaireImagesDocker:
         return None
 
     def get_image_parconfig(self, config_key: str):
-        config_values = self.__versions_images['images'].get(config_key)
+        config_values = self._versions_images['images'].get(config_key)
         self.__logger.debug("Config values pour %s: %s" % (config_key, str(config_values)))
         custom_registries = list()
         if config_values.get('registries') is not None:
@@ -643,3 +643,20 @@ class GestionnaireImagesDocker:
             raise ImageNonTrouvee(config_key)
 
         return nom_image
+
+
+class GestionnaireImagesServices(GestionnaireImagesDocker):
+
+    def __init__(self, idmg: str, docker_client: docker.DockerClient):
+        super().__init__(idmg, docker_client)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+        self._versions_images: dict = cast(dict, None)
+
+    def charger_versions(self):
+        filtre = {'name': 'docker.versions'}
+        try:
+            self._versions_images = json.loads(b64decode(self._docker.configs.list(filters=filtre)[0].attrs['Spec']['Data']))
+        except IndexError:
+            self.__logger.error(
+                "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")

@@ -1,0 +1,73 @@
+{
+  "registries": [
+    "docker.maceroc.com",
+    "dugremat"
+  ],
+  "images": {
+    "shared.postgres": {
+      "registries": [
+        ""
+      ],
+      "image": "postgres",
+      "version": "12.3"
+    }
+  },
+  "dependances": [
+    {
+      "image": "shared.postgres",
+      "scripts": [
+        {
+          "commande": "psql -h postgres -U postgres -f /scripts/psql.redmine_init.sql"
+        }
+      ],
+      "config": {
+        "name": "postgres",
+        "env": [
+          "POSTGRES_PASSWORD_FILE=/run/secrets/postgres-passwd",
+          "POSTGRES_USER=",
+          "POSTGRES_USER=",
+          "POSTGRES_USER=",
+          "POSTGRES_USER=",
+          "POSTGRES_USER=",
+          "POSTGRES_USER=",
+          "POSTGRES_USER="
+        ],
+        "mounts": [
+          "${MOUNTS}/postgresql/data:/var/lib/postgresql/data:rw"
+        ],
+        "constraints": [
+          "node.labels.millegrilles.prive == true"
+        ],
+        "configs": [
+          {
+            "name": "pki.web.cert;pki.web_protege.cert",
+            "filename": "/run/secrets/webcert.pem"
+          }
+        ],
+        "secrets": [
+          {
+            "name": "passwd.postgres",
+            "filename": "postgres-passwd"
+          }
+        ],
+        "networks": [
+          {
+            "target": "mg_${IDMG}_net",
+            "aliases": ["postgres"]
+          }
+        ],
+        "labels": {
+          "millegrille": "${IDMG}"
+        },
+        "resources": {
+          "cpu_limit": 1000000000,
+          "mem_limit": 209715200
+        },
+        "mode": {
+          "mode": "replicated",
+          "replicas": 1
+        }
+      }
+    }
+  ]
+}

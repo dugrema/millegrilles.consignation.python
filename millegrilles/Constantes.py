@@ -1585,6 +1585,8 @@ class ConstantesServiceMonitor:
     COMMANDE_DESACTIVER_HEBERGEMENT = 'servicemonitor.desactiverHebergement'
     COMMANDE_AJOUTER_COMPTE = 'servicemonitor.ajouterCompte'
 
+    COMMANDE_INSTALLER_APPLICATION = 'servicemonitor.installerApplication'
+
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
     CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'
     CORRELATION_CERTIFICAT_SIGNE = 'certificatSigne'

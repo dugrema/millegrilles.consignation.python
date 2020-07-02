@@ -10,20 +10,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles import Constantes
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
 from millegrilles.util.X509Certificate import EnveloppeCleCert, ConstantesGenerateurCertificat
-
-
-class CommandeMonitor:
-
-    def __init__(self, contenu: dict):
-        self.__contenu = contenu
-
-    @property
-    def contenu(self):
-        return self.__contenu
-
-    @property
-    def nom_commande(self):
-        return self.__contenu['commande']
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor
 
 
 class GestionnaireCommandes:
@@ -126,6 +113,9 @@ class GestionnaireCommandes:
             self.activer_hebergement(contenu)
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT:
             self.desactiver_hebergement(contenu)
+
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION:
+            self._service_monitor.gestionnaire_applications.installer_application(commande)
 
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
 
