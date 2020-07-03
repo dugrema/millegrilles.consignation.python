@@ -4,6 +4,7 @@ import os
 from base64 import b64decode
 from threading import Event, Thread
 from typing import cast
+import datetime
 
 import docker
 from docker.errors import APIError
@@ -27,7 +28,6 @@ class GestionnaireModulesDocker:
         self.__event_stream = None
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
-        self.gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -146,7 +146,14 @@ class GestionnaireModulesDocker:
 
     def demarrer_service(self, service_name: str, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
-        configuration_service = MonitorConstantes.DICT_MODULES.get(service_name)
+
+        configuration_service = kwargs.get('config')
+        if not configuration_service:
+            configuration_service = MonitorConstantes.DICT_MODULES.get(service_name)
+
+        gestionnaire_images = kwargs.get('images')
+        if not gestionnaire_images:
+            gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
 
         if configuration_service:
             # S'assurer que le certificat existe et est a date
@@ -155,7 +162,7 @@ class GestionnaireModulesDocker:
         nom_image_docker = kwargs.get('nom') or service_name
 
         try:
-            image = self.gestionnaire_images.telecharger_image_docker(nom_image_docker)
+            image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
 
             # Prendre un tag au hasard
             image_tag = image.tags[0]
@@ -169,6 +176,8 @@ class GestionnaireModulesDocker:
             self.__docker.services.create(image_tag, **configuration)
         except KeyError as ke:
             self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail erreur chargement image")
         except AttributeError as ae:
             self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
             if self.__logger.isEnabledFor(logging.DEBUG):
@@ -250,7 +259,23 @@ class GestionnaireModulesDocker:
 
     def charger_config(self, config_name):
         filtre = {'name': config_name}
-        return b64decode(self.__docker.configs.list(filters=filtre)[0].attrs['Spec']['Data'])
+        configs = self.__docker.configs.list(filters=filtre)
+        return b64decode(configs[0].attrs['Spec']['Data'])
+
+    def sauvegarder_secret(self, secret_name: str, data: bytes, ajouter_date=False):
+        if ajouter_date:
+            date_courante = datetime.datetime.utcnow().strftime(MonitorConstantes.DOCKER_LABEL_TIME)
+            secret_name = secret_name + '.' + date_courante
+        self.__docker.secrets.create(name=secret_name, data=data, labels={'idmg': self.__idmg})
+
+    def sauvegarder_config(self, config_name, data: dict):
+        filtre = {'name': config_name}
+        configs = self.__docker.configs
+        config_existante = configs.list(filters=filtre)
+        if len(config_existante) == 1:
+            config_existante[0].remove()
+        data_string = json.dumps(data).encode('utf-8')
+        configs.create(name=config_name, data=data_string)
 
     def charger_config_recente(self, config_name):
         return self.__trouver_config(config_name)
@@ -284,11 +309,6 @@ class GestionnaireModulesDocker:
             'secret_name': secret_retenue.name,
             'date': date_secret,
         }
-
-    def telecharger_image(self, nom_image_docker):
-        image = self.gestionnaire_images.telecharger_image_docker(nom_image_docker)
-        image_tag = image.tags[0]
-        return image, image_tag
 
     def __trouver_secret_matchdate(self, secret_names, date_secrets: dict):
         for secret_name in secret_names.split(';'):

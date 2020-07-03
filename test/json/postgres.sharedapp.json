@@ -20,29 +20,19 @@
           "commande": "psql -h postgres -U postgres -f /scripts/psql.redmine_init.sql"
         }
       ],
+      "generer": {
+        "motsdepasse": [{"name": "passwd.postgres"}]
+      },
       "config": {
         "name": "postgres",
         "env": [
-          "POSTGRES_PASSWORD_FILE=/run/secrets/postgres-passwd",
-          "POSTGRES_USER=",
-          "POSTGRES_USER=",
-          "POSTGRES_USER=",
-          "POSTGRES_USER=",
-          "POSTGRES_USER=",
-          "POSTGRES_USER=",
-          "POSTGRES_USER="
+          "POSTGRES_PASSWORD_FILE=/run/secrets/postgres-passwd"
         ],
         "mounts": [
-          "${MOUNTS}/postgresql/data:/var/lib/postgresql/data:rw"
+          "${MOUNTS}/shared.postgres/data:/var/lib/postgresql/data:rw"
         ],
         "constraints": [
           "node.labels.millegrilles.prive == true"
-        ],
-        "configs": [
-          {
-            "name": "pki.web.cert;pki.web_protege.cert",
-            "filename": "/run/secrets/webcert.pem"
-          }
         ],
         "secrets": [
           {
