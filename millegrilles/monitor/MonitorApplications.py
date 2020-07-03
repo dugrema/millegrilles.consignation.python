@@ -111,7 +111,7 @@ class GestionnaireApplications:
 
             # Preparer les scripts dans un fichier .tar temporaire
             path_script = '/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/scripts.apps.tar'
-            commande_script = '/tmp/apps/script.shared.postgres.installation.sh'
+            commande_script = '/tmp/apps/script.redmine.postgres.installation.sh'
 
             self.__gestionnaire_modules_docker.executer_scripts(self.__wait_start_service_container_id, commande_script, path_script)
 
