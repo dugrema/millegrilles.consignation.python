@@ -513,6 +513,21 @@ class GestionnaireModulesDocker:
             labels.update(labels_ajoutes)
             node_info.update(node_spec)
 
+    def executer_scripts(self, container_id: str, commande: str, tar_path: str = None):
+        container = self.__docker.containers.get(container_id)
+
+        if tar_path:
+            # On copie l'archive tar et extrait dans le container
+            with open(tar_path, 'rb') as fichier:
+                container.put_archive('/tmp', fichier.read())
+
+        exit_code, output = container.exec_run(commande, stream=True)
+        for gen_output in output:
+            for line in gen_output.decode('utf-8').split('\n'):
+                self.__logger.info("Script output : %s" % line)
+
+
+
     @property
     def idmg_tronque(self):
         return self.__idmg[0:12]

@@ -28,6 +28,31 @@ class GestionnaireApplications:
 
         self.__gestionnaire_images_applications = GestionnaireImagesApplications(service_monitor.idmg, service_monitor.docker)
 
+        # Ecouter evenements dokcer
+        self.__gestionnaire_modules_docker.add_event_listener(self)
+
+        self.__wait_container_event = Event()
+        self.__wait_start_service_name = None
+        self.__wait_start_service_container_id = None
+
+    def event(self, event):
+        self.__logger.debug("Event docker APPS : %s", str(event))
+
+        if self.__wait_start_service_name:
+            event_json = json.loads(event.decode('utf-8'))
+
+            # Verifier si le container correspond au service
+            if event_json.get('Type') == 'container' and event_json.get('status') == 'start' and event_json.get('Action') == 'start':
+                actor = event_json.get('Actor')
+                if actor:
+                    attributes = actor.get('Attributes')
+                    if attributes:
+                        service_name = attributes.get('com.docker.swarm.service.name')
+                        if service_name == self.__wait_start_service_name:
+                            self.__logger.debug("Service %s demarre" % service_name)
+                            self.__wait_start_service_container_id = event_json['id']
+                            self.__wait_container_event.set()
+
     def installer_application(self, commande: CommandeMonitor):
         self.__logger.info("Installation application %s", str(commande))
 
@@ -68,12 +93,30 @@ class GestionnaireApplications:
                     motdepasse = b64encode(secrets.token_bytes(16))
                     self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse, ajouter_date=True)
 
+        # Preparer le demarrage du service, intercepter le demarrage du container
+        service_name = self.__service_monitor.idmg_tronque + '_' + config_elem['name']
+        self.__wait_start_service_name = service_name
+        self.__wait_container_event.clear()
+
         self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
                                                             config=config_elem,
                                                             images=self.__gestionnaire_images_applications)
 
-    def executer_scripts(self, container, script):
-        pass
+        self.__wait_container_event.wait(60)
+        self.__wait_start_service_name = None  # Reset ecoute de l'evenement
+
+        if self.__wait_container_event.is_set():
+            self.__logger.info("Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
+            self.__wait_container_event.clear()
+
+            # Preparer les scripts dans un fichier .tar temporaire
+            path_script = '/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/scripts.apps.tar'
+            commande_script = '/tmp/apps/script.shared.postgres.installation.sh'
+
+            self.__gestionnaire_modules_docker.executer_scripts(self.__wait_start_service_container_id, commande_script, path_script)
+
+        else:
+            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
 
 
 class GestionnaireImagesApplications(GestionnaireImagesDocker):
