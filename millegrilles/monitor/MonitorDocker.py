@@ -519,18 +519,25 @@ class GestionnaireModulesDocker:
         if tar_path:
             # On copie l'archive tar et extrait dans le container
             with open(tar_path, 'rb') as fichier:
-                container.put_archive('/tmp', fichier.read())
+                container.put_archive('/usr/local', fichier.read())
                 os.remove(tar_path)  # Cleanup fichier temporaire
 
         for info_commande in commandes:
             commande = info_commande['commande']
 
             exit_code, output = container.exec_run(commande, stream=True)
+            output_result = None
             for gen_output in output:
                 for line in gen_output.decode('utf-8').split('\n'):
                     self.__logger.info("Script output : %s" % line)
+                    if line and line != '\n':
+                        output_result = line
 
-
+            # La dernier ligne devrait etre le resultat avec code exit, en json
+            if output_result:
+                resultat = json.loads(output_result)
+                if resultat.get('exit') != 0:
+                    raise Exception("Erreur demarrage application, exit : %d" % resultat.get('exit'))
 
     @property
     def idmg_tronque(self):
