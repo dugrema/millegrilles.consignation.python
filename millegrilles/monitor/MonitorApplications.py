@@ -26,8 +26,6 @@ class GestionnaireApplications:
         self.__service_monitor = service_monitor
         self.__gestionnaire_modules_docker = gestionnaire_modules_docker
 
-        self.__gestionnaire_images_applications = GestionnaireImagesApplications(service_monitor.idmg, service_monitor.docker)
-
         # Ecouter evenements dokcer
         self.__gestionnaire_modules_docker.add_event_listener(self)
 
@@ -57,22 +55,32 @@ class GestionnaireApplications:
         self.__logger.info("Installation application %s", str(commande))
 
         nom_image_docker = commande.contenu['nom_application']
-        # self.__logger.info("Telecharger image docker %s" % nom_image_docker)
+        configuration_docker = commande.contenu['configuration']
+        tar_scripts = commande.contenu.get('scripts_tarfile')
+        self.preparer_installation(nom_image_docker, configuration_docker, tar_scripts)
 
-        self.__gestionnaire_images_applications.set_configuration(commande.contenu['configuration'])
+    def preparer_installation(self, nom_image_docker, configuration_docker, tar_scripts=None):
+        gestionnaire_images_applications = GestionnaireImagesApplications(
+            self.__service_monitor.idmg, self.__service_monitor.docker)
+        gestionnaire_images_applications.set_configuration(configuration_docker)
 
         config_name = self.__service_monitor.idmg_tronque + '.app.' + nom_image_docker
-        config_content = self.__gestionnaire_images_applications.config
-        self.__gestionnaire_modules_docker.sauvegarder_config(config_name, config_content)
 
-        self.installer_dependances(config_content['dependances'])
+        self.__gestionnaire_modules_docker.sauvegarder_config(config_name, configuration_docker)
 
-    def installer_dependances(self, dependances: list):
+        # Verifier le type de configuration : image ou dependance avec config
+
         # Installer toutes les dependances de l'application en ordre
-        for config_image in dependances:
-            self.installer_dependance(config_image)
+        for config_image in configuration_docker['dependances']:
+            if config_image.get('dependances'):
+                # Sous dependances presentes, c'est une sous-config
+                nom_image_docker = config_image['nom']
+                self.preparer_installation(nom_image_docker, config_image)
+            elif config_image.get('image'):
+                # C'est une image, on l'installe
+                self.installer_dependance(gestionnaire_images_applications, config_image, tar_scripts)
 
-    def installer_dependance(self, config_image):
+    def installer_dependance(self, gestionnaire_images_applications, config_image, tar_scripts=None):
         nom_image_docker = config_image['image']
         config_name = 'docker.cfg.' + nom_image_docker
         config_elem = config_image['config']
@@ -80,6 +88,7 @@ class GestionnaireApplications:
 
         # Generer valeurs au besoin
         valeurs_a_generer = config_image.get('generer')
+        mots_de_passe = dict()
         if valeurs_a_generer:
             liste_motsdepasse = valeurs_a_generer.get('motsdepasse')
             for motdepasse_config in liste_motsdepasse:
@@ -91,6 +100,8 @@ class GestionnaireApplications:
                 except AttributeError:
                     # Generer le mot de passe
                     motdepasse = b64encode(secrets.token_bytes(16))
+                    # Conserver mot de passe en memoire pour generer script, au besoin
+                    mots_de_passe[label_motdepasse] = motdepasse.decode('utf-8')
                     self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse, ajouter_date=True)
 
         # Preparer le demarrage du service, intercepter le demarrage du container
@@ -100,7 +111,7 @@ class GestionnaireApplications:
 
         self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
                                                             config=config_elem,
-                                                            images=self.__gestionnaire_images_applications)
+                                                            images=gestionnaire_images_applications)
 
         self.__wait_container_event.wait(60)
         self.__wait_start_service_name = None  # Reset ecoute de l'evenement
@@ -110,13 +121,15 @@ class GestionnaireApplications:
             self.__wait_container_event.clear()
 
             # Preparer les scripts dans un fichier .tar temporaire
-            path_script = '/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/scripts.apps.tar'
-            commande_script = '/tmp/apps/script.redmine.postgres.installation.sh'
-
-            self.__gestionnaire_modules_docker.executer_scripts(self.__wait_start_service_container_id, commande_script, path_script)
+            # path_script = '/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/scripts.apps.tar'
+            # commande_script = '/tmp/apps/script.redmine.postgres.installation.sh'
+            if config_image.get('installation'):
+                self.__gestionnaire_modules_docker.executer_scripts(
+                    self.__wait_start_service_container_id, config_image['installation'], tar_scripts)
 
         else:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
+            raise Exception("Image non installee : " + nom_image_docker)
 
 
 class GestionnaireImagesApplications(GestionnaireImagesDocker):
@@ -127,9 +140,8 @@ class GestionnaireImagesApplications(GestionnaireImagesDocker):
 
         self._versions_images: dict = cast(dict, None)
 
-    def set_configuration(self, fichier):
-        with open(fichier, 'r') as fichier:
-            self._versions_images = json.load(fichier)
+    def set_configuration(self, configuration):
+        self._versions_images = configuration
 
     def charger_versions(self):
         pass
