@@ -30,7 +30,7 @@ class GestionnaireModulesDocker:
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
 
-        fqdn = socket.gethostbyaddr(socket.gethostname())[0]
+        fqdn = self.hostname
 
         self.__mappings = {
             'IDMG': self.__idmg,
@@ -552,6 +552,11 @@ class GestionnaireModulesDocker:
     def nodename(self):
         nodename = self.__docker.info()['Name']
         return nodename
+
+    @property
+    def hostname(self):
+        fqdn = socket.gethostbyaddr(socket.gethostname())[0]
+        return fqdn
 
 
 class GestionnaireImagesDocker:

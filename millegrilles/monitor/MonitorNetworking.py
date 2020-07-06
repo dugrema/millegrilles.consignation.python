@@ -46,21 +46,44 @@ class GestionnaireWeb:
         :return:
         """
         nodename = self.__service_monitor.nodename
+        hostname = self.__docker_client.hostname
 
         params = {
             'nodename': nodename,
+            'hostname': hostname,
         }
 
-        server_content = """
-            resolver 127.0.0.11 valid=30s;
-            server_name {nodename}.local {nodename};
-        """.format(**params)
-        with open(path.join(self.__repertoire_modules, 'server_name.include'), 'w') as fichier:
-            fichier.write(server_content)
+        # server_content = """
+        #     resolver 127.0.0.11 valid=30s;
+        #     server_name {nodename}.local {nodename};
+        # """.format(**params)
+        # with open(path.join(self.__repertoire_modules, 'server_name.include'), 'w') as fichier:
+        #     fichier.write(server_content)
 
-        proxypass = "set $upstream https://web_protege:443; proxy_pass $upstream;"
+        error_pages = """
+            error_page 401 = @error401;
+            
+            # If the user is not logged in, redirect them to the login URL
+            location @error401 {
+              return 307 https://{hostname}/millegrilles;
+            }
+        """
+        error_pages = error_pages.replace('{hostname}', params['hostname'])
+        with open(path.join(self.__repertoire_modules, 'error_page.conf.include'), 'w') as fichier:
+            fichier.write(error_pages)
+
+        proxypass = """
+            set $upstream https://web_protege:443; 
+            proxy_pass $upstream;
+        """
         with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
             fichier.write(proxypass)
+
+        resolver = """
+            resolver 127.0.0.11 valid=30s;
+        """
+        with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
+            fichier.write(resolver)
 
         ssl_certs_content = """
             ssl_certificate       /run/secrets/webcert.pem;

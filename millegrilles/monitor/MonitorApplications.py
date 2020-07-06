@@ -97,13 +97,13 @@ class GestionnaireApplications:
                     conf = conf.replace('${%s}' % key, value)
 
             # Injecter le fichier dans le repertoire de nginx
-            path_nginx = '/var/opt/millegrilles/RHCMthvUc6T7Q4X9VHTRUHPzimNUjkMY3MtXBhG6utmD/mounts/nginx/conf.d/modules'
+            path_nginx = '/var/opt/millegrilles/%s/mounts/nginx/conf.d/modules' % self.__service_monitor.idmg
             nom_config = nginx_config['server_file']
             with open(path.join(path_nginx, nom_config), 'w') as fichier:
                 fichier.write(conf)
 
             # Redemarrer nginx
-            nom_service_nginx = self.__service_monitor.idmg_tronque + '_nginx'
+            nom_service_nginx = 'nginx'
             self.__gestionnaire_modules_docker.force_update_service(nom_service_nginx)
 
     def installer_dependance(self, gestionnaire_images_applications, config_image, tar_scripts=None):
