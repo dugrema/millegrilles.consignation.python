@@ -282,6 +282,13 @@ class GestionnaireModulesDocker:
         data_string = json.dumps(data).encode('utf-8')
         configs.create(name=config_name, data=data_string)
 
+    def supprimer_config(self, config_name):
+        filtre = {'name': config_name}
+        configs = self.__docker.configs
+        config_existante = configs.list(filters=filtre)
+        if len(config_existante) == 1:
+            config_existante[0].remove()
+
     def charger_config_recente(self, config_name):
         return self.__trouver_config(config_name)
 
