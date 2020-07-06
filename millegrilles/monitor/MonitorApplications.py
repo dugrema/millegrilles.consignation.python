@@ -7,6 +7,7 @@ import secrets
 from threading import Event
 from typing import cast
 from base64 import b64encode, b64decode
+from os import path
 
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
@@ -79,6 +80,31 @@ class GestionnaireApplications:
             elif config_image.get('image'):
                 # C'est une image, on l'installe
                 self.installer_dependance(gestionnaire_images_applications, config_image, tar_scripts)
+
+        nginx_config = configuration_docker.get('nginx')
+        if nginx_config:
+            conf = nginx_config['conf']
+
+            # Remplacer les variables de conf
+            app_domain = 'redmine.mg-dev4.maple.maceroc.com'
+            server_domain = 'mg-dev4.maple.maceroc.com'
+
+            conf = conf.replace("${APP_DOMAIN}", app_domain)
+            conf = conf.replace("${SERVER_DOMAIN}", server_domain)
+
+            if nginx_config.get('params'):
+                for key, value in nginx_config['params'].items():
+                    conf = conf.replace('${%s}' % key, value)
+
+            # Injecter le fichier dans le repertoire de nginx
+            path_nginx = '/var/opt/millegrilles/RHCMthvUc6T7Q4X9VHTRUHPzimNUjkMY3MtXBhG6utmD/mounts/nginx/conf.d/modules'
+            nom_config = nginx_config['server_file']
+            with open(path.join(path_nginx, nom_config), 'w') as fichier:
+                fichier.write(conf)
+
+            # Redemarrer nginx
+            nom_service_nginx = self.__service_monitor.idmg_tronque + '_nginx'
+            self.__gestionnaire_modules_docker.force_update_service(nom_service_nginx)
 
     def installer_dependance(self, gestionnaire_images_applications, config_image, tar_scripts=None):
         nom_image_docker = config_image['image']

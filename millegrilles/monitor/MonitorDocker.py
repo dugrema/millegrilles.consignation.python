@@ -1,12 +1,13 @@
 import json
 import logging
 import os
+import datetime
+import socket
+import docker
+
 from base64 import b64decode
 from threading import Event, Thread
 from typing import cast
-import datetime
-
-import docker
 from docker.errors import APIError
 from docker.types import SecretReference, NetworkAttachmentConfig, Resources, RestartPolicy, ServiceMode, \
     ConfigReference, EndpointSpec
@@ -29,12 +30,16 @@ class GestionnaireModulesDocker:
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
 
+        fqdn = socket.gethostbyaddr(socket.gethostname())[0]
+
         self.__mappings = {
             'IDMG': self.__idmg,
             'IDMGLOWER': self.__idmg.lower(),
             'IDMGTRUNCLOWER': self.idmg_tronque,
             'MONGO_INITDB_ROOT_USERNAME': 'admin',
             'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
+            'NODENAME': self.nodename,
+            'HOSTNAME': fqdn,
         }
 
         self.__event_listeners = list()
@@ -542,6 +547,11 @@ class GestionnaireModulesDocker:
     @property
     def idmg_tronque(self):
         return self.__idmg[0:12]
+
+    @property
+    def nodename(self):
+        nodename = self.__docker.info()['Name']
+        return nodename
 
 
 class GestionnaireImagesDocker:
