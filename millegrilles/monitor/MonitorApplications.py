@@ -164,6 +164,11 @@ class GestionnaireApplications:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
             raise Exception("Image non installee : " + nom_image_docker)
 
+        if config_image.get('etape_seulement'):
+            # C'est un service intermediaire pour l'installation/backup
+            # On supprime le service maintenant que la tache est terminee
+            self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
+
     def effectuer_desinstallation(self, nom_image_docker, configuration_docker):
 
         # Nettoyer fichiers de configurations
