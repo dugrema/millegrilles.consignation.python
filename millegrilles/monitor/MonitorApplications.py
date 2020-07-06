@@ -67,6 +67,14 @@ class GestionnaireApplications:
         configuration_docker = commande.contenu['configuration']
         self.effectuer_desinstallation(nom_image_docker, configuration_docker)
 
+    def backup_application(self, commande: CommandeMonitor):
+        self.__logger.info("Backup application %s", str(commande))
+
+        nom_image_docker = commande.contenu['nom_application']
+        configuration_docker = commande.contenu['configuration']
+        tar_scripts = commande.contenu.get('scripts_tarfile')
+        self.effectuer_backup(nom_image_docker, configuration_docker, tar_scripts)
+
     def preparer_installation(self, nom_image_docker, configuration_docker, tar_scripts=None):
         gestionnaire_images_applications = GestionnaireImagesApplications(
             self.__service_monitor.idmg, self.__service_monitor.docker)
@@ -205,6 +213,60 @@ class GestionnaireApplications:
 
             except IndexError:
                 pass  # OK, service absent
+
+    def effectuer_backup(self, nom_image_docker, configuration_docker, tar_scripts = None):
+
+        gestionnaire_images_applications = GestionnaireImagesApplications(
+            self.__service_monitor.idmg, self.__service_monitor.docker)
+        gestionnaire_images_applications.set_configuration(configuration_docker)
+
+        for config_image in configuration_docker['dependances']:
+            if config_image.get('dependances'):
+                # Sous dependances presentes, c'est une sous-config (recursif)
+                nom_image_docker = config_image['nom']
+                self.effectuer_backup(nom_image_docker, config_image)
+            elif config_image.get('image'):
+                # C'est une image, on l'installe
+                if config_image.get('backup'):
+                    self.backup_dependance(gestionnaire_images_applications, config_image, tar_scripts)
+
+    def backup_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts=None):
+        nom_image_docker = config_image['image']
+        backup_info = config_image['backup']
+        config_elem = config_image['config']
+
+        service_name = self.__service_monitor.idmg_tronque + '_' + config_elem['name']
+        self.__wait_start_service_name = service_name
+        self.__wait_container_event.clear()
+
+        self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
+                                                            config=config_elem,
+                                                            images=gestionnaire_images_applications)
+
+        self.__wait_container_event.wait(60)
+        self.__wait_start_service_name = None  # Reset ecoute de l'evenement
+        container_id = self.__wait_start_service_container_id
+        self.__wait_start_service_container_id = None
+
+        if self.__wait_container_event.is_set():
+            self.__logger.info("Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
+            self.__wait_container_event.clear()
+
+            try:
+                # Preparer les scripts dans un fichier .tar temporaire
+                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info, tar_scripts)
+
+                # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
+                for backup_elem in backup_info:
+                    self.__gestionnaire_modules_docker.save_archives(
+                        container_id, backup_elem['archives'], dest_prefix=config_elem['name'])
+            finally:
+                self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
+
+        else:
+            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
+            raise Exception("Image non installee : " + nom_image_docker)
+
 
 
 class GestionnaireImagesApplications(GestionnaireImagesDocker):

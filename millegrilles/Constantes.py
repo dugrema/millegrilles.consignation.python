@@ -1587,6 +1587,8 @@ class ConstantesServiceMonitor:
 
     COMMANDE_INSTALLER_APPLICATION = 'servicemonitor.installerApplication'
     COMMANDE_SUPPRIMER_APPLICATION = 'servicemonitor.supprimerApplication'
+    COMMANDE_BACKUP_APPLICATION = 'servicemonitor.backupApplication'
+    COMMANDE_RESTORE_APPLICATION = 'servicemonitor.restoreApplication'
 
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
     CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'

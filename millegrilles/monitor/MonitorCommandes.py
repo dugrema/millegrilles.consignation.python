@@ -120,6 +120,12 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION:
             self._service_monitor.gestionnaire_applications.supprimer_application(commande)
 
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION:
+            self._service_monitor.gestionnaire_applications.backup_application(commande)
+
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RESTORE_APPLICATION:
+            self._service_monitor.gestionnaire_applications.restore_application(commande)
+
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
 
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_PAR_ROLE:

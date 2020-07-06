@@ -551,6 +551,17 @@ class GestionnaireModulesDocker:
                 if resultat.get('exit') != 0:
                     raise Exception("Erreur demarrage application, exit : %d" % resultat.get('exit'))
 
+    def save_archives(self, container_id: str, paths: list, dest_path: str = '/tmp', dest_prefix: str = 'backup'):
+        container = self.__docker.containers.get(container_id)
+
+        archive_index = 0
+        for path_archive in paths:
+            archive_name = '%s.%d.tar' % (dest_prefix, archive_index)
+            tar_data, stat_data = container.get_archive(path_archive)
+            with open(os.path.join(dest_path, archive_name), 'wb') as output:
+                for chunk in tar_data:
+                    output.write(chunk)
+
     @property
     def idmg_tronque(self):
         return self.__idmg[0:12]
