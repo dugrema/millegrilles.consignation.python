@@ -525,16 +525,14 @@ class GestionnaireModulesDocker:
             labels.update(labels_ajoutes)
             node_info.update(node_spec)
 
-    def executer_scripts(self, container_id: str, info_commande: dict, tar_path: str = None):
+    def executer_scripts(self, container_id: str, commande: str, tar_path: str = None):
         container = self.__docker.containers.get(container_id)
 
         if tar_path:
             # On copie l'archive tar et extrait dans le container
             with open(tar_path, 'rb') as fichier:
-                container.put_archive('/usr/local', fichier.read())
+                container.put_archive('/usr/local', fichier)
                 os.remove(tar_path)  # Cleanup fichier temporaire
-
-        commande = info_commande['commande']
 
         exit_code, output = container.exec_run(commande, stream=True)
         output_result = None

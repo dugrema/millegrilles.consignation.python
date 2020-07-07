@@ -175,7 +175,7 @@ class GestionnaireApplications:
             # commande_script = '/tmp/apps/script.redmine.postgres.installation.sh'
             if config_image.get('installation'):
                 self.__gestionnaire_modules_docker.executer_scripts(
-                    self.__wait_start_service_container_id, config_image['installation'], tar_scripts)
+                    self.__wait_start_service_container_id, config_image['installation']['commande'], tar_scripts)
 
         else:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
@@ -263,11 +263,11 @@ class GestionnaireApplications:
 
             try:
                 # Preparer les scripts dans un fichier .tar temporaire
-                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info, tar_scripts)
+                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info['commande_backup'], tar_scripts)
 
                 # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
                 self.__gestionnaire_modules_docker.save_archives(
-                    container_id, backup_info['path_archive'], dest_prefix=config_elem['name'])
+                    container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
             finally:
                 self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 
@@ -294,7 +294,8 @@ class GestionnaireApplications:
         finally:
             # Cleanup scripts
             try:
-                remove(tar_scripts)
+                pass
+                # remove(tar_scripts)
             except FileNotFoundError:
                 pass  # OK
 
@@ -321,23 +322,22 @@ class GestionnaireApplications:
             self.__wait_container_event.clear()
 
             # Injecter le contenu du fichier .tar de backup
-            path_archive = config_image['backup']['path_archive']
+            path_archive = config_image['backup']['base_path']
+            # Le path archive inclus le repertoire injecte dans l'archive (e.g. /tmp/backup, on veut extraire sous /tmp)
+            path_archive = path.join('/', '/'.join(path_archive.split('/')[0:-1]))
+
             self.__gestionnaire_modules_docker.put_archives(container_id, tar_archive, path_archive)
 
             try:
-                # Preparer les scripts dans un fichier .tar temporaire
-                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info, tar_scripts)
-
-                # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
-                for backup_elem in backup_info:
-                    self.__gestionnaire_modules_docker.save_archives(
-                        container_id, backup_elem['archives'], dest_prefix=config_elem['name'])
+                # Executer la restauration
+                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info['commande_restore'], tar_scripts)
             finally:
                 self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 
         else:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
             raise Exception("Image non installee : " + nom_image_docker)
+
 
 class GestionnaireImagesApplications(GestionnaireImagesDocker):
 
