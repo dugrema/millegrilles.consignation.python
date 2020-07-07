@@ -525,7 +525,7 @@ class GestionnaireModulesDocker:
             labels.update(labels_ajoutes)
             node_info.update(node_spec)
 
-    def executer_scripts(self, container_id: str, commandes: list, tar_path: str = None):
+    def executer_scripts(self, container_id: str, info_commande: dict, tar_path: str = None):
         container = self.__docker.containers.get(container_id)
 
         if tar_path:
@@ -534,33 +534,37 @@ class GestionnaireModulesDocker:
                 container.put_archive('/usr/local', fichier.read())
                 os.remove(tar_path)  # Cleanup fichier temporaire
 
-        for info_commande in commandes:
-            commande = info_commande['commande']
+        commande = info_commande['commande']
 
-            exit_code, output = container.exec_run(commande, stream=True)
-            output_result = None
-            for gen_output in output:
-                for line in gen_output.decode('utf-8').split('\n'):
-                    self.__logger.info("Script output : %s" % line)
-                    if line and line != '\n':
-                        output_result = line
+        exit_code, output = container.exec_run(commande, stream=True)
+        output_result = None
+        for gen_output in output:
+            for line in gen_output.decode('utf-8').split('\n'):
+                self.__logger.info("Script output : %s" % line)
+                if line and line != '\n':
+                    output_result = line
 
-            # La dernier ligne devrait etre le resultat avec code exit, en json
-            if output_result:
-                resultat = json.loads(output_result)
-                if resultat.get('exit') != 0:
-                    raise Exception("Erreur demarrage application, exit : %d" % resultat.get('exit'))
+        # La dernier ligne devrait etre le resultat avec code exit, en json
+        if output_result:
+            resultat = json.loads(output_result)
+            if resultat.get('exit') != 0:
+                raise Exception("Erreur demarrage application, exit : %d" % resultat.get('exit'))
 
-    def save_archives(self, container_id: str, paths: list, dest_path: str = '/tmp', dest_prefix: str = 'backup'):
+    def put_archives(self, container_id: str, src_path: str, dst_path: str):
+        container = self.__docker.containers.get(container_id)
+
+        with open(src_path, 'rb') as fichier:
+            container.put_archive(dst_path, fichier)
+
+    def save_archives(self, container_id: str, src_path: str, dest_path: str = '/tmp', dest_prefix: str = 'backup'):
         container = self.__docker.containers.get(container_id)
 
         archive_index = 0
-        for path_archive in paths:
-            archive_name = '%s.%d.tar' % (dest_prefix, archive_index)
-            tar_data, stat_data = container.get_archive(path_archive)
-            with open(os.path.join(dest_path, archive_name), 'wb') as output:
-                for chunk in tar_data:
-                    output.write(chunk)
+        archive_name = '%s.%d.tar' % (dest_prefix, archive_index)
+        tar_data, stat_data = container.get_archive(src_path)
+        with open(os.path.join(dest_path, archive_name), 'wb') as output:
+            for chunk in tar_data:
+                output.write(chunk)
 
     @property
     def idmg_tronque(self):
