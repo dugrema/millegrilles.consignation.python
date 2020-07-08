@@ -110,11 +110,11 @@ class GestionnaireApplications:
             conf = nginx_config['conf']
 
             # Remplacer les variables de conf
-            app_domain = 'redmine.mg-dev4.maple.maceroc.com'
-            server_domain = 'mg-dev4.maple.maceroc.com'
+            server_domain = self.__gestionnaire_modules_docker.hostname
+            app_domain = nginx_config['subdomain'] + '.' + server_domain
 
-            conf = conf.replace("${APP_DOMAIN}", app_domain)
             conf = conf.replace("${SERVER_DOMAIN}", server_domain)
+            conf = conf.replace("${APP_DOMAIN}", app_domain)
 
             if nginx_config.get('params'):
                 for key, value in nginx_config['params'].items():
