@@ -263,7 +263,9 @@ class GestionnaireApplications:
 
             try:
                 # Preparer les scripts dans un fichier .tar temporaire
-                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info['commande_backup'], tar_scripts)
+                commande_backup = backup_info.get('commande_backup')
+                if commande_backup:
+                    self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
 
                 # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
                 self.__gestionnaire_modules_docker.save_archives(
@@ -330,7 +332,9 @@ class GestionnaireApplications:
 
             try:
                 # Executer la restauration
-                self.__gestionnaire_modules_docker.executer_scripts(container_id, backup_info['commande_restore'], tar_scripts)
+                commande_restore = backup_info.get('commande_restore')
+                if commande_restore:
+                    self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_restore, tar_scripts)
             finally:
                 self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 

@@ -174,11 +174,13 @@ class GestionnaireModulesDocker:
 
             configuration = self.__formatter_configuration_service(service_name)
 
+            command = configuration_service.get('command')
+
             constraints = configuration.get('constraints')
             if constraints:
                 self.__add_node_labels(constraints)
 
-            self.__docker.services.create(image_tag, **configuration)
+            self.__docker.services.create(image_tag, command=command, **configuration)
         except KeyError as ke:
             self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
             if self.__logger.isEnabledFor(logging.DEBUG):
