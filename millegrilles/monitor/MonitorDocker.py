@@ -189,11 +189,11 @@ class GestionnaireModulesDocker:
             self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail erreur configuration service " + service_name)
-        except APIError as apie:
-            if apie.status_code == 409:
-                self.__logger.info("Service %s deja demarre" % service_name)
-            else:
-                self.__logger.exception("Erreur demarrage service %s" % service_name)
+        # except APIError as apie:
+        #     if apie.status_code == 409:
+        #         self.__logger.info("Service %s deja demarre" % service_name)
+        #     else:
+        #         self.__logger.exception("Erreur demarrage service %s" % service_name)
 
     def supprimer_service(self, service_name: str):
         filter = {'name': self.idmg_tronque + '_' + service_name}

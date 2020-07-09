@@ -8,6 +8,7 @@ from threading import Event
 from typing import cast
 from base64 import b64encode, b64decode
 from os import path, remove
+from docker.errors import APIError
 
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
@@ -84,7 +85,7 @@ class GestionnaireApplications:
         tar_archive = commande.contenu['archive_tarfile']
         self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
 
-    def preparer_installation(self, nom_image_docker, configuration_docker, tar_scripts=None):
+    def preparer_installation(self, nom_image_docker, configuration_docker, tar_scripts=None, **kwargs):
         gestionnaire_images_applications = GestionnaireImagesApplications(
             self.__service_monitor.idmg, self.__service_monitor.docker)
         gestionnaire_images_applications.set_configuration(configuration_docker)
@@ -98,12 +99,19 @@ class GestionnaireApplications:
         # Installer toutes les dependances de l'application en ordre
         for config_image in configuration_docker['dependances']:
             if config_image.get('dependances'):
+                mode_shared = config_image.get('shared')
                 # Sous dependances presentes, c'est une sous-config
                 nom_image_docker = config_image['nom']
-                self.preparer_installation(nom_image_docker, config_image)
+                self.preparer_installation(nom_image_docker, config_image, shared=mode_shared)
             elif config_image.get('image'):
                 # C'est une image, on l'installe
-                self.installer_dependance(gestionnaire_images_applications, config_image, tar_scripts)
+                try:
+                    self.installer_dependance(gestionnaire_images_applications, config_image, tar_scripts)
+                except APIError as api:
+                    if api.status_code == 409 and kwargs.get('shared'):
+                        pass  # OK
+                    else:
+                        raise api
 
         nginx_config = configuration_docker.get('nginx')
         if nginx_config:
