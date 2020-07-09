@@ -3,6 +3,8 @@ import logging
 import docker
 import json
 import secrets
+import os
+import tempfile
 
 from threading import Event
 from typing import cast
@@ -58,8 +60,20 @@ class GestionnaireApplications:
 
         nom_image_docker = commande.contenu['nom_application']
         configuration_docker = commande.contenu['configuration']
-        tar_scripts = commande.contenu.get('scripts_tarfile')
+        tar_scripts = self.preparer_script_file(commande)
         self.preparer_installation(nom_image_docker, configuration_docker, tar_scripts)
+
+    def preparer_script_file(self, commande):
+        b64_script = commande.contenu.get('scripts_b64')
+        if b64_script:
+            tar_bytes = b64decode(b64_script)
+            file_handle, tar_scripts = tempfile.mkstemp(prefix='monitor-script-', suffix='.tar')
+            os.close(file_handle)
+            with open(tar_scripts, 'wb') as fichier:
+                fichier.write(tar_bytes)
+        else:
+            tar_scripts = commande.contenu.get('scripts_tarfile')
+        return tar_scripts
 
     def supprimer_application(self, commande: CommandeMonitor):
         self.__logger.info("Supprimer application %s", str(commande))
@@ -73,7 +87,7 @@ class GestionnaireApplications:
 
         nom_image_docker = commande.contenu['nom_application']
         configuration_docker = commande.contenu['configuration']
-        tar_scripts = commande.contenu.get('scripts_tarfile')
+        tar_scripts = self.preparer_script_file(commande)
         self.effectuer_backup(nom_image_docker, configuration_docker, tar_scripts)
 
     def restore_application(self, commande: CommandeMonitor):
@@ -81,7 +95,7 @@ class GestionnaireApplications:
 
         nom_image_docker = commande.contenu['nom_application']
         configuration_docker = commande.contenu['configuration']
-        tar_scripts = commande.contenu.get('scripts_tarfile')
+        tar_scripts = self.preparer_script_file(commande)
         tar_archive = commande.contenu['archive_tarfile']
         self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
 
