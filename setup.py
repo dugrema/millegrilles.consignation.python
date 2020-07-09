@@ -29,6 +29,7 @@ setup(
         'millegrilles.transaction',
         'millegrilles.util',
         'millegrilles.noeuds',
+        'millegrilles.monitor',
         'mgdomaines',
         'mgdomaines.appareils'
     ],
