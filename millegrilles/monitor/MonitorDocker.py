@@ -15,7 +15,7 @@ from docker.types import SecretReference, NetworkAttachmentConfig, Resources, Re
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
-from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee
+from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution
 
 
 class GestionnaireModulesDocker:
@@ -548,7 +548,10 @@ class GestionnaireModulesDocker:
         if output_result:
             resultat = json.loads(output_result)
             if resultat.get('exit') != 0:
-                raise Exception("Erreur demarrage application, exit : %d" % resultat.get('exit'))
+                raise ExceptionExecution(
+                    "Erreur demarrage application, exit : %d" % resultat.get('exit'),
+                    resultat=resultat
+                )
 
     def put_archives(self, container_id: str, src_path: str, dst_path: str):
         container = self.__docker.containers.get(container_id)
@@ -743,3 +746,4 @@ class GestionnaireImagesServices(GestionnaireImagesDocker):
         except IndexError:
             self.__logger.error(
                 "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")
+

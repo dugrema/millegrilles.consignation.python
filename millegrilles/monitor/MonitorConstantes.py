@@ -156,3 +156,14 @@ class ImageNonTrouvee(Exception):
 
 class ForcerRedemarrage(Exception):
     pass
+
+
+class ExceptionExecution(Exception):
+
+    def __init__(self, args, **kwargs):
+        super().__init__(args, kwargs)
+        self.__resultat = kwargs['resultat']
+
+    @property
+    def resultat(self):
+        return self.__resultat

@@ -12,7 +12,7 @@ from os import path, remove
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker
-from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution
 
 
 class GestionnaireApplications:
@@ -173,10 +173,15 @@ class GestionnaireApplications:
             # Preparer les scripts dans un fichier .tar temporaire
             # path_script = '/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/scripts.apps.tar'
             # commande_script = '/tmp/apps/script.redmine.postgres.installation.sh'
-            if config_image.get('installation'):
-                self.__gestionnaire_modules_docker.executer_scripts(
-                    self.__wait_start_service_container_id, config_image['installation']['commande'], tar_scripts)
-
+            config_installation = config_image.get('installation')
+            if config_installation:
+                try:
+                    self.__gestionnaire_modules_docker.executer_scripts(
+                        self.__wait_start_service_container_id, config_installation['commande'], tar_scripts)
+                except ExceptionExecution as ex:
+                    codes_ok = config_installation.get('exit_codes_ok')
+                    if not codes_ok or ex.resultat['exit'] not in codes_ok:
+                        raise ex
         else:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
             raise Exception("Image non installee : " + nom_image_docker)
