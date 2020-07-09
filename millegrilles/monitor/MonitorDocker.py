@@ -580,7 +580,9 @@ class GestionnaireModulesDocker:
 
     @property
     def hostname(self):
-        fqdn = socket.gethostbyaddr(socket.gethostname())[0]
+        fqdn = os.getenv('HOSTNAME_MONITOR')
+        if not fqdn:
+            fqdn = socket.gethostbyaddr(socket.gethostname())[0]
         return fqdn
 
 
