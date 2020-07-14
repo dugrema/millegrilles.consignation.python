@@ -28,6 +28,7 @@ from millegrilles.util.X509Certificate import EnveloppeCleCert, \
 from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
+from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 
 
 class InitialiserServiceMonitor:
@@ -205,6 +206,8 @@ class ServiceMonitor:
         self._gestionnaire_web: GestionnaireWeb = cast(GestionnaireWeb, None)
         self._gestionnaire_applications: GestionnaireApplications = cast(GestionnaireApplications, None)
 
+        self._web_api: ServerWebAPI = cast(ServerWebAPI, None)
+
         self.limiter_entretien = True
 
         self._nodename = self._docker.info()['Name']            # Node name de la connexion locale dans Docker
@@ -221,6 +224,13 @@ class ServiceMonitor:
         if not self._fermeture_event.is_set():
             self._fermeture_event.set()
             self._attente_event.set()
+
+            try:
+                self._web_api.server_close()
+            except Exception:
+                self.__logger.debug("Erreur fermeture web_api")
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.exception('Erreur fermeture Web API')
 
             try:
                 self._connexion_middleware.stop()
@@ -306,6 +316,10 @@ class ServiceMonitor:
                 self,
                 self._gestionnaire_docker
             )
+
+    def preprer_web_api(self):
+        self._web_api = ServerWebAPI()
+        self._web_api.start()
 
     def _charger_configuration(self):
         # classe_configuration = self._classe_configuration()
@@ -505,6 +519,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             self.preparer_gestionnaire_comptesmq()
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
+            self.preprer_web_api()
 
             while not self._fermeture_event.is_set():
                 self._attente_event.clear()
