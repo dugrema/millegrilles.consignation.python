@@ -344,6 +344,18 @@ class GenerateurCertificat:
 
         return builder
 
+    def preparer_empty_request(self) -> EnveloppeCleCert:
+        clecert = EnveloppeCleCert()
+        clecert.generer_private_key()
+
+        builder = x509.CertificateSigningRequestBuilder()
+        request = builder.sign(
+            clecert.private_key, hashes.SHA256(), default_backend()
+        )
+        clecert.set_csr(request)
+
+        return clecert
+
     def preparer_request(self, common_name, unit_name=None, alt_names: list = None) -> EnveloppeCleCert:
         clecert = EnveloppeCleCert()
         clecert.generer_private_key()

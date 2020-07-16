@@ -88,6 +88,9 @@ class GestionnaireModulesDocker:
         labels = {'millegrille': self.__idmg}
         self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
 
+    def initialiser_noeud(self):
+        pass
+
     def configurer_monitor(self):
         """
         Ajoute les element de configuration generes (e.g. secrets).
@@ -295,7 +298,7 @@ class GestionnaireModulesDocker:
         return self.__trouver_config(config_name)
 
     def __trouver_config(self, config_name):
-        return MonitorConstantes.trouver_config(config_name, self.__idmg[0:12], self.__docker)
+        return MonitorConstantes.trouver_config(config_name, self.__docker)
 
     def trouver_secret(self, secret_name):
         secret_names = secret_name.split(';')

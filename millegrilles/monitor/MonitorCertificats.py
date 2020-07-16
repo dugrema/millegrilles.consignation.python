@@ -18,7 +18,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 # from millegrilles.monitor.ServiceMonitor import DOCKER_LABEL_TIME, GestionnaireModulesDocker
 from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat, \
-    GenerateurInitial
+    GenerateurInitial, GenerateurCertificat
 from millegrilles.monitor import MonitorConstantes
 
 
@@ -73,11 +73,10 @@ class GestionnaireCertificats:
         if date is None:
             date = self._date
         params = {
-            'idmg_tronque': self.idmg_tronque,
             'name': name,
             'date': date,
         }
-        name_docker = '%(idmg_tronque)s.%(name)s.%(date)s' % params
+        name_docker = '%(name)s.%(date)s' % params
         return name_docker[0:64]  # Max 64 chars pour name docker
 
     def ajouter_config(self, name: str, data: bytes, date: str = None):
@@ -91,64 +90,82 @@ class GestionnaireCertificats:
 
     def __generer_private_key(self, generer_password=False, keysize=2048, public_exponent=65537):
         info_cle = dict()
+        clecert = EnveloppeCleCert()
+        clecert.generer_private_key(generer_password=generer_password)
         if generer_password:
-            info_cle['password'] = b64encode(secrets.token_bytes(16))
+            # info_cle['password'] = b64encode(secrets.token_bytes(16))
+            info_cle['password'] = clecert.password
 
-        info_cle['cle'] = asymmetric.rsa.generate_private_key(
-            public_exponent=public_exponent,
-            key_size=keysize,
-            backend=default_backend()
-        )
+        # info_cle['cle'] = asymmetric.rsa.generate_private_key(
+        #     public_exponent=public_exponent,
+        #     key_size=keysize,
+        #     backend=default_backend()
+        # )
+
+        info_cle['pem'] = clecert.private_key_bytes
+        info_cle['clecert'] = clecert
+        info_cle['cle'] = clecert.private_key
+
         return info_cle
 
-    def generer_csr(self, type_cle: str, insecure=False, inserer_cle=True):
+    def generer_csr(self, type_cle: str, insecure=False, inserer_cle=True, generer_password=False):
         # Generer cle privee
-        info_cle = self.__generer_private_key()
+        info_cle = self.__generer_private_key(generer_password=generer_password)
 
         # Generer CSR
         node_name = self._docker.info()['Name']
         builder = x509.CertificateSigningRequestBuilder()
-        name = x509.Name([
-            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self.idmg),
+
+        name_list = [
             x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, type_cle),
             x509.NameAttribute(x509.name.NameOID.COMMON_NAME, node_name)
-        ])
+        ]
+        if self.idmg:
+            name_list.insert(0, self.idmg)
+        name = x509.Name(name_list)
         builder = builder.subject_name(name)
+
         request = builder.sign(
             info_cle['cle'], hashes.SHA256(), default_backend()
         )
         request_pem = request.public_bytes(primitives.serialization.Encoding.PEM)
         info_cle['request'] = request_pem
-        cle_pem = info_cle['cle'].private_bytes(
-            primitives.serialization.Encoding.PEM,
-            primitives.serialization.PrivateFormat.PKCS8,
-            primitives.serialization.NoEncryption()
-        )
-        info_cle['cle_pem'] = cle_pem
+        info_cle['cle_pem'] = info_cle['pem']
+
         self.__logger.debug("Request CSR : %s" % request_pem)
 
-        try:
-            os.mkdir('/var/opt/millegrilles/pki', 0o755)
-        except FileExistsError:
-            pass
+        cle_pem = info_cle['cle_pem']
+        cle_passwd = info_cle['password']
 
-        with open('/var/opt/millegrilles/pki/pki.%s.csr.pem' % type_cle, 'wb') as fichier:
-            fichier.write(request_pem)
+        if inserer_cle:
+            label_key_inter = 'pki.%s.key' % type_cle
+            self.ajouter_secret(label_key_inter, data=cle_pem)
+            label_passwd_inter = 'pki.%s.passwd' % type_cle
+            self.ajouter_secret(label_passwd_inter, data=cle_passwd)
+            label_csr_inter = 'pki.%s.csr' % type_cle
+            self.ajouter_config(label_csr_inter, data=request_pem)
 
         if insecure:  # Mode insecure
+            try:
+                os.mkdir('/var/opt/millegrilles/pki', 0o755)
+            except FileExistsError:
+                pass
+
+            with open('/var/opt/millegrilles/pki/pki.%s.csr.pem' % type_cle, 'wb') as fichier:
+                fichier.write(request_pem)
+
             try:
                 os.mkdir(self.secret_path, 0o755)
             except FileExistsError:
                 pass
 
-            cle_pem = info_cle['cle_pem']
             key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
             with open(key_path, 'xb') as fichier:
                 fichier.write(cle_pem)
 
-        if inserer_cle:
-            label_key_monitor = 'pki.%s.key' % type_cle
-            self.ajouter_secret(label_key_monitor, data=cle_pem)
+            passwd_path = path.join(self.secret_path, 'pki.%s.passwd.pem' % type_cle)
+            with open(passwd_path, 'xb') as fichier:
+                fichier.write(cle_passwd)
 
         return info_cle
 
@@ -493,3 +510,21 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Sauvegarder information certificat monitor
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.private_key_bytes)
+
+
+class GestionnaireCertificatsInstallation(GestionnaireCertificats):
+
+    def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
+        super().__init__(docker_client, service_monitor, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def preparer_repertoires(self):
+        mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
+        os.makedirs(mounts, mode=0o770)
+
+        if self._mode_insecure:
+            try:
+                os.mkdir('/var/opt/millegrilles/secrets', 0o755)
+            except FileExistsError:
+                pass
+

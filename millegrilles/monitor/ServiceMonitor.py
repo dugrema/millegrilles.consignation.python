@@ -16,7 +16,7 @@ from base64 import b64decode
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats, \
-    GestionnaireCertificatsNoeudProtegeDependant, GestionnaireCertificatsNoeudProtegePrincipal
+    GestionnaireCertificatsNoeudProtegeDependant, GestionnaireCertificatsNoeudProtegePrincipal, GestionnaireCertificatsInstallation
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes, GestionnaireCommandesNoeudProtegeDependant
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
@@ -164,8 +164,8 @@ class InitialiserServiceMonitor:
             else:
                 raise ValueError("Noeud de type non reconnu")
         except docker.errors.NotFound:
-            self.__logger.info("Config millegrille.configuration n'existe pas, on initialise un noeud protege principal")
-            service_monitor_classe = ServiceMonitorPrincipal
+            self.__logger.info("Config millegrille.configuration n'existe pas, le noeud est demarre en mode d'installation")
+            service_monitor_classe = ServiceMonitorInstalleur
 
         return service_monitor_classe
 
@@ -317,7 +317,7 @@ class ServiceMonitor:
                 self._gestionnaire_docker
             )
 
-    def preprer_web_api(self):
+    def preparer_web_api(self):
         self._web_api = ServerWebAPI(self)
         self._web_api.start()
 
@@ -519,7 +519,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             self.preparer_gestionnaire_comptesmq()
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
-            self.preprer_web_api()
+            self.preparer_web_api()
 
             while not self._fermeture_event.is_set():
                 self._attente_event.clear()
@@ -807,6 +807,63 @@ class ServiceMonitorDependant(ServiceMonitor):
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         self.__connexion_principal.enregistrer_domaine(nom_domaine, exchanges_routing)
+
+
+class ServiceMonitorInstalleur(ServiceMonitor):
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        super().__init__(args, docker_client, configuration_json)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__event_attente = Event()
+
+        self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
+
+        self.csr_intermediaire = None
+
+    def fermer(self, signum=None, frame=None):
+        super().fermer(signum, frame)
+        self.__event_attente.set()
+
+    def trigger_event_attente(self):
+        self.__event_attente.set()
+
+    def _charger_configuration(self):
+        self._idmg = ''
+
+    def run(self):
+        self.__logger.debug("Execution installation du noeud")
+        self.__logger.info("Run configuration initiale, (mode insecure: %s)" % self._args.dev)
+        self._charger_configuration()
+
+        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event, list())
+        self._gestionnaire_docker.start_events()
+        self._gestionnaire_docker.add_event_listener(self)
+
+        self.__logger.info("Preparation CSR du noeud dependant terminee")
+        self.preparer_gestionnaire_certificats()
+
+        self.preparer_gestionnaire_commandes()
+
+        self.__logger.info("Web API - attence connexion sur port 8444")
+        self.preparer_web_api()
+
+    def preparer_gestionnaire_certificats(self):
+        params = dict()
+        if self._args.dev:
+            params['insecure'] = True
+        if self._args.secrets:
+            params['secrets'] = self._args.secrets
+        self._gestionnaire_certificats = GestionnaireCertificatsInstallation(self._docker, self, **params)
+
+        # Verifier si le CSR a deja ete genere, sinon le generer
+        try:
+            csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+            data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
+            self.csr_intermediaire = data_csr
+        except AttributeError:
+            # Creer CSR pour le service monitor
+            csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
+            self.csr_intermediaire = csr_info['request']
 
 
 # Section main

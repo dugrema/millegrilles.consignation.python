@@ -102,11 +102,11 @@ MODULES_HEBERGEMENT = [
 ]
 
 
-def trouver_config(config_name: str, idmg_tronque: str, docker_client):
+def trouver_config(config_name: str, docker_client):
     config_names = config_name.split(';')
     configs = None
     for config_name_val in config_names:
-        filtre = {'name': idmg_tronque + '.' + config_name_val}
+        filtre = {'name': config_name_val}
         configs = docker_client.configs.list(filters=filtre)
         if len(configs) > 0:
             break

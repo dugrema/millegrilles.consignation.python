@@ -20,11 +20,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         return self.server.service_monitor
 
     def do_GET(self):
-        path_fichier = self.path
-        if path_fichier.startswith('/static/'):
+        path_request = self.path.split('/')
+        if path_request[2] == 'static':
             super().do_GET()
-        elif path_fichier.startswith('/api/'):
-            self._traiter_api()
+        elif path_request[2] == 'api':
+            self._traiter_get_api()
         else:
             self.error_404()
 
@@ -41,19 +41,36 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     def error_404(self):
         self.send_error(404)
 
-    def _traiter_api(self):
+    def _traiter_get_api(self):
         path_fichier = self.path
         path_split = path_fichier.split('/')
-        if path_split[2] == 'infoMonitor':
+        if path_split[3] == 'infoMonitor':
             self.return_info_monitor()
+        elif path_split[3] == 'csr':
+            self.return_csr()
         else:
             self.error_404()
+
+    def _traiter_post_api(self):
+        path_fichier = self.path
+        path_split = path_fichier.split('/')
+        self.error_404()
 
     def return_info_monitor(self):
         dict_infomillegrille = dict()
         dict_infomillegrille['idmg'] = None
         dict_infomillegrille['url_prive'] = 'https://maple.maceroc.com'
         self.repondre_json(dict_infomillegrille)
+
+    def return_csr(self):
+        csr_intermediaire = self.service_monitor.csr_intermediaire
+        if csr_intermediaire:
+            self.send_response(200)
+            self.send_header("Content-type", "text/ascii")
+            self.end_headers()
+            self.wfile.write(self.service_monitor.csr_intermediaire)
+        else:
+            self.send_error(410)
 
     def repondre_json(self, dict_message: dict, status_code=200):
         info_bytes = json.dumps(dict_message).encode('utf-8')
