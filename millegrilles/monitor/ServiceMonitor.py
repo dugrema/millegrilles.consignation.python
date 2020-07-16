@@ -318,7 +318,7 @@ class ServiceMonitor:
             )
 
     def preprer_web_api(self):
-        self._web_api = ServerWebAPI()
+        self._web_api = ServerWebAPI(self)
         self._web_api.start()
 
     def _charger_configuration(self):

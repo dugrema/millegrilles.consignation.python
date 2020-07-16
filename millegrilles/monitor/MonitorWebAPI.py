@@ -1,5 +1,6 @@
 # Serveur web / API pour le monitor
 import logging
+import json
 
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
@@ -12,39 +13,62 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory='/tmp', **kwargs)
+        self.__service_monitor = None
 
-    # def do_GET(self):
-    #     path_fichier = self.path
-    #     if path_fichier.startswith('/static'):
-    #         super().do_GET()
-    #     else:
-    #         self.send_response(200)
-    #         self.send_header("Content-type", "text/html")
-    #         self.end_headers()
-    #
-    #         self.wfile.write(bytes("<html><head><title>https://pythonbasics.org</title></head>", "utf-8"))
-    #         self.wfile.write(bytes("<p>Request: %s</p>" % self.path, "utf-8"))
-    #         self.wfile.write(bytes("<body>", "utf-8"))
-    #         self.wfile.write(bytes("<p>This is an example web server.</p>", "utf-8"))
-    #         self.wfile.write(bytes("</body></html>", "utf-8"))
+    @property
+    def service_monitor(self):
+        return self.server.service_monitor
+
+    def do_GET(self):
+        path_fichier = self.path
+        if path_fichier.startswith('/static/'):
+            super().do_GET()
+        elif path_fichier.startswith('/api/'):
+            self._traiter_api()
+        else:
+            self.error_404()
 
     def do_POST(self):
         path_fichier = self.path
-        if path_fichier.startswith('/api'):
+        if path_fichier.startswith('/api/'):
             self.send_response(200)
             self.send_header("Content-type", "text/ascii")
             self.end_headers()
             self.wfile.write(bytes("OK", "utf-8"))
         else:
-            self.send_response(404)
-            self.end_headers()
+            self.error_404()
+
+    def error_404(self):
+        self.send_error(404)
+
+    def _traiter_api(self):
+        path_fichier = self.path
+        path_split = path_fichier.split('/')
+        if path_split[2] == 'infoMonitor':
+            self.return_info_monitor()
+        else:
+            self.error_404()
+
+    def return_info_monitor(self):
+        dict_infomillegrille = dict()
+        dict_infomillegrille['idmg'] = None
+        dict_infomillegrille['url_prive'] = 'https://maple.maceroc.com'
+        self.repondre_json(dict_infomillegrille)
+
+    def repondre_json(self, dict_message: dict, status_code=200):
+        info_bytes = json.dumps(dict_message).encode('utf-8')
+        self.send_response(status_code)
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(info_bytes)
 
 
 class ServerWebAPI:
 
-    def __init__(self):
+    def __init__(self, service_monitor):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__thread = Thread(name="WebApi", target=self.run)
+        self.__service_monitor = service_monitor
         self.webServer = None
 
     def start(self):
@@ -52,6 +76,7 @@ class ServerWebAPI:
 
     def run(self):
         self.webServer = HTTPServer((hostName, serverPort), ServerMonitorHttp)
+        self.webServer.service_monitor = self.__service_monitor
         self.__logger.info("Web API Server started http://%s:%s" % (hostName, serverPort))
 
         try:
