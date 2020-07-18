@@ -24,11 +24,14 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path_request = self.path.split('/')
-        if path_request[2] == 'static':
-            super().do_GET()
-        elif path_request[2] == 'api':
-            self._traiter_get_api()
-        else:
+        try:
+            if path_request[2] == 'static':
+                super().do_GET()
+            elif path_request[2] == 'api':
+                self._traiter_get_api()
+            else:
+                self.error_404()
+        except IndexError:
             self.error_404()
 
     def do_POST(self):

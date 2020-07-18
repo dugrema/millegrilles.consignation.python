@@ -868,7 +868,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Verifier si la cle du monitor existe, sinon la generer
         try:
             csr_config_docker = self._gestionnaire_docker.trouver_secret('pki.monitor.key')
-        except AttributeError:
+        except ValueError:
             # Creer CSR pour le service monitor
             csr_info = self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
             self.csr_intermediaire = csr_info['request']

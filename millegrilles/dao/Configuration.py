@@ -139,7 +139,7 @@ class TransactionConfiguration:
                 with open(self.pki_certfile, 'rb') as fichier:
                     pem = fichier.read()
                     certificat = default_backend().load_pem_x509_certificate(pem)
-                    organization = certificat.subject.get_attributes_for_oid(x509.name.NameOID.ORGANIZATION_NAME)
+                    organization = certificat.issuer.get_attributes_for_oid(x509.name.NameOID.ORGANIZATION_NAME)
                     if len(organization) > 0:
                         self._millegrille_config[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = organization[0].value
             except FileNotFoundError:
