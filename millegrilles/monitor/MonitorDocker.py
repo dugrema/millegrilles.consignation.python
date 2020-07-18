@@ -278,13 +278,21 @@ class GestionnaireModulesDocker:
             secret_name = secret_name + '.' + date_courante
         self.__docker.secrets.create(name=secret_name, data=data, labels={'idmg': self.__idmg})
 
-    def sauvegarder_config(self, config_name, data: dict):
+    def sauvegarder_config(self, config_name, data):
         filtre = {'name': config_name}
         configs = self.__docker.configs
         config_existante = configs.list(filters=filtre)
         if len(config_existante) == 1:
             config_existante[0].remove()
-        data_string = json.dumps(data).encode('utf-8')
+
+        if isinstance(data, dict):
+            data_string = json.dumps(data).encode('utf-8')
+        elif isinstance(data, str):
+            data_string = data.encode('utf-8')
+        elif isinstance(data, bytes):
+            data_string = data
+        else:
+            raise ValueError("Type data non supporte")
         configs.create(name=config_name, data=data_string)
 
     def supprimer_config(self, config_name):

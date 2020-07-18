@@ -117,20 +117,28 @@ def trouver_config(config_name: str, docker_client):
     for config in configs:
         nom_config = config.name
         split_config = nom_config.split('.')
-        date_config_str = split_config[-1]
-        date_config_int = int(date_config_str)
-        if not date_config or date_config_int > date_config:
-            date_config = date_config_int
+        if len(split_config) >= 4:
+            date_config_str = split_config[-1]
+            date_config_int = int(date_config_str)
+            if not date_config or date_config_int > date_config:
+                date_config = date_config_int
+                config_retenue = config
+        else:
             config_retenue = config
+            break
 
-    return {
+    reponse = {
         'config_reference': {
             'config_id': config_retenue.attrs['ID'],
             'config_name': config_retenue.name,
         },
-        'date': str(date_config),
         'config': config_retenue,
     }
+
+    if date_config:
+        reponse['date'] = str(date_config)
+
+    return reponse
 
 
 class CommandeMonitor:

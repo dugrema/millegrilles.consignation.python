@@ -59,9 +59,9 @@ class GestionnaireCertificats:
                 config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
 
                 millegrille_pem_config = self._docker.configs.get('pki.millegrille.cert')
-                json_millegrille = json.loads(b64decode(millegrille_pem_config.attrs['Spec']['Data']))
+                json_millegrille = b64decode(millegrille_pem_config.attrs['Spec']['Data'])
                 self._clecert_millegrille = EnveloppeCleCert()
-                self._clecert_millegrille.cert_from_pem_bytes(json_millegrille['pem'].encode('utf-8'))
+                self._clecert_millegrille.cert_from_pem_bytes(json_millegrille)
 
             except docker.errors.NotFound:
                 self.__logger.info("millegrille.configuration abstente : Nouvelle MilleGrille, noeud principal.")
@@ -173,7 +173,7 @@ class GestionnaireCertificats:
                 pass
 
             if cle_passwd:
-                passwd_path = path.join(self.secret_path, 'pki.%s.passwd.pem' % type_cle)
+                passwd_path = path.join(self.secret_path, 'pki.%s.passwd.txt' % type_cle)
                 try:
                     with open(passwd_path, 'xb') as fichier:
                         fichier.write(cle_passwd)
@@ -270,7 +270,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
         """
         passwd_mq = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
         self._passwd_mq = str(passwd_mq, 'utf-8')
-        label_passwd_mq = self.idmg_tronque + '.passwd.mq.' + self._date
+        label_passwd_mq = 'passwd.mq.' + self._date
         self._docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
 
         if self._mode_insecure:
@@ -406,7 +406,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         cert_pem = self._charger_certificat_docker('pki.intermediaire.cert')
         with open(path.join(secret_path, 'pki.intermediaire.key.pem'), 'rb') as fichiers:
             key_pem = fichiers.read()
-        with open(path.join(secret_path, 'pki.intermediaire.passwd.pem'), 'rb') as fichiers:
+        with open(path.join(secret_path, 'pki.intermediaire.passwd.txt'), 'rb') as fichiers:
             passwd_bytes = fichiers.read()
 
         clecert_intermediaire = EnveloppeCleCert()
@@ -426,10 +426,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
         self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor.key.pem'
 
-        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
-            self._passwd_mongo = fichiers.read()
-        with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
-            self._passwd_mq = fichiers.read()
+        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
+        #     self._passwd_mongo = fichiers.read()
+        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
+        #     self._passwd_mq = fichiers.read()
 
         # Charger le certificat de millegrille, chaine pour intermediaire
         self._charger_certificat_docker('pki.intermediaire.chain')
@@ -448,12 +448,6 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
     def preparer_repertoires(self):
         mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
         os.makedirs(mounts, mode=0o770)
-
-        mongo_data = path.join(mounts, 'mongo/data')
-        os.makedirs(mongo_data, mode=0o700)
-
-        mongo_scripts = path.join(mounts, 'consignation/torrents/downloads')
-        os.makedirs(mongo_scripts, mode=0o770)
 
     def generer_nouveau_idmg(self) -> str:
         """
@@ -517,13 +511,13 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Sauvegarder information certificat intermediaire
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self._clecert_millegrille.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD + '.pem'), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD + '.txt'), 'wb') as fichiers:
             fichiers.write(self._clecert_millegrille.password)
 
         # Sauvegarder information certificat intermediaire
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self._clecert_intermediaire.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem'), 'wb') as fichiers:
+        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt'), 'wb') as fichiers:
             fichiers.write(self._clecert_intermediaire.password)
 
         # Sauvegarder information certificat monitor
