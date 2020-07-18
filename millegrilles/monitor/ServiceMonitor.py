@@ -835,7 +835,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__logger.info("Run configuration initiale, (mode insecure: %s)" % self._args.dev)
         self._charger_configuration()
 
-        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event, list())
+        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event, list(), self)
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 

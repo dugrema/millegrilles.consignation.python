@@ -168,9 +168,12 @@ class GestionnaireModulesDocker:
 
         if configuration_service:
             # S'assurer que le certificat existe, est a date et que le compte est cree
-            cert_compte = configuration_service.get('certificat_compte')
-            if cert_compte:
-                self.creer_compte(cert_compte)
+            configuration_service_meta = self.charger_config_recente('docker.cfg.' + configuration_service['role'])
+            config_attrs = configuration_service_meta['config'].attrs
+            configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+            certificat_compte_cle = configuration_service_json.get('certificat_compte')
+            if certificat_compte_cle:
+                self.creer_compte(certificat_compte_cle)
 
         nom_image_docker = kwargs.get('nom') or service_name
 
@@ -203,8 +206,8 @@ class GestionnaireModulesDocker:
         #     else:
         #         self.__logger.exception("Erreur demarrage service %s" % service_name)
 
-    def creer_compte(self, cert_compte):
-        certificat_compte = self.charger_config_recente(cert_compte)
+    def creer_compte(self, label_cert_compte: str):
+        certificat_compte = self.charger_config_recente(label_cert_compte)
         certificat_compte_pem = b64decode(certificat_compte['config'].attrs['Spec']['Data'])
 
         commande_dict = {
