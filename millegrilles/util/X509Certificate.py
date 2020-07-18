@@ -1626,10 +1626,10 @@ class GenerateurCertificatHebergementXS(GenerateurCertificateParRequest):
 
 class RenouvelleurCertificat:
 
-    def __init__(self, idmg, dict_ca: dict, millegrille: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None, generer_password=False):
+    def __init__(self, idmg, dict_ca: dict, clecert_intermediaire: EnveloppeCleCert, ca_autorite: EnveloppeCleCert = None, generer_password=False):
         self.__idmg = idmg
         self.__dict_ca = dict_ca
-        self.__millegrille = millegrille
+        self.__clecert_intermediaire = clecert_intermediaire
         self.__generer_password = generer_password
         self.__generateurs_par_role = {
             ConstantesGenerateurCertificat.ROLE_FICHIERS: GenererFichiers,
@@ -1660,7 +1660,7 @@ class RenouvelleurCertificat:
         }
 
         # S'assurer que le dict contient reference aux CAs
-        self.__dict_ca[millegrille.skid] = millegrille.cert
+        self.__dict_ca[clecert_intermediaire.skid] = clecert_intermediaire.cert
         if ca_autorite:
             self.__dict_ca[ca_autorite.skid] = ca_autorite.cert
 
@@ -1712,7 +1712,7 @@ class RenouvelleurCertificat:
 
         generateur = self.__generateurs_par_role[role]
         generateur_instance = generateur(
-            self.__idmg, role, node_name, self.__dict_ca, self.__millegrille,
+            self.__idmg, role, node_name, self.__dict_ca, self.__clecert_intermediaire,
             domaines_publics=domaines_publics
         )
 
@@ -1730,7 +1730,7 @@ class RenouvelleurCertificat:
             raise ValueError("Signature invalide")
 
         if domaines is not None:
-            generateur = GenerateurCertificateNoeud(self.__idmg, domaines, self.__dict_ca, self.__millegrille)
+            generateur = GenerateurCertificateNoeud(self.__idmg, domaines, self.__dict_ca, self.__clecert_intermediaire)
             certificat = generateur.signer(csr)
             chaine = generateur.aligner_chaine(certificat)
             clecert = EnveloppeCleCert(cert=certificat)
@@ -1751,16 +1751,16 @@ class RenouvelleurCertificat:
         generateur = self.__generateurs_par_role[role]
         if issubclass(generateur, GenerateurNoeud):
             generateur_instance = generateur(
-                self.__idmg, role, common_name, self.__dict_ca, self.__millegrille, generer_password=self.__generer_password)
+                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire, generer_password=self.__generer_password)
         else:
             generateur_instance = generateur(
-                self.__idmg, role, common_name, self.__dict_ca, self.__millegrille)
+                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire)
 
         cert_dict = generateur_instance.generer()
         return cert_dict
 
     def signer_navigateur(self, public_key_pem: str, sujet: str):
-        generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__millegrille)
+        generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
         builder = generateur.preparer_builder(public_key_pem, sujet)
         certificat = generateur.signer(builder)
@@ -1772,7 +1772,7 @@ class RenouvelleurCertificat:
         return clecert
 
     def signer_backup(self, public_key_pem: str, sujet: str):
-        generateur = GenerateurCertificatBackup(self.__idmg, self.__dict_ca, self.__millegrille)
+        generateur = GenerateurCertificatBackup(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
         builder = generateur.preparer_builder(public_key_pem, sujet)
         certificat = generateur.signer(builder)
@@ -1784,7 +1784,7 @@ class RenouvelleurCertificat:
         return clecert
 
     def signer_connecteur_tiers(self, idmg_tiers: str, csr: str):
-        generateur = GenerateurCertificatTiers(self.__idmg, idmg_tiers, self.__dict_ca, self.__millegrille)
+        generateur = GenerateurCertificatTiers(self.__idmg, idmg_tiers, self.__dict_ca, self.__clecert_intermediaire)
         csr_instance = x509.load_pem_x509_csr(csr.encode('utf-8'), default_backend())
         certificat = generateur.signer(csr_instance)
         return certificat
@@ -1795,7 +1795,7 @@ class RenouvelleurCertificat:
         enveloppe_racine = generateur.autorite
         idmg = enveloppe_racine.idmg
 
-        generateur_xs = GenerateurCertificatHebergementXS(enveloppe_intermediaire, autorite=self.__millegrille)
+        generateur_xs = GenerateurCertificatHebergementXS(enveloppe_intermediaire, autorite=self.__clecert_intermediaire)
         certificat_xs = generateur_xs.signer()
         enveloppe_hebergement_xs = EnveloppeCleCert(cert=certificat_xs)
 
@@ -1806,7 +1806,7 @@ class RenouvelleurCertificat:
         cle_privee_racine = str(enveloppe_racine.private_key_bytes, 'utf-8')
         cle_privee_intermediaire = str(enveloppe_intermediaire.private_key_bytes, 'utf-8')
 
-        cert_hote = str(self.__millegrille.cert_bytes, 'utf-8')
+        cert_hote = str(self.__clecert_intermediaire.cert_bytes, 'utf-8')
         cert_racine = str(enveloppe_racine.cert_bytes, 'utf-8')
         cert_intermediaire = str(enveloppe_intermediaire.cert_bytes, 'utf-8')
         cert_hebergement = str(enveloppe_hebergement_xs.cert_bytes, 'utf-8')

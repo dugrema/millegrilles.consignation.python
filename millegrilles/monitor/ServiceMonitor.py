@@ -350,7 +350,7 @@ class ServiceMonitor:
         # MAJ date pour creation de certificats
         self._gestionnaire_certificats.maj_date()
 
-        prefixe_certificats = self.idmg_tronque + '.pki.'
+        prefixe_certificats = 'pki.'
         filtre = {'name': prefixe_certificats}
 
         # Generer tous les certificas qui peuvent etre utilises
@@ -363,10 +363,10 @@ class ServiceMonitor:
         for config in self._docker.configs.list(filters=filtre):
             self.__logger.debug("Config : %s", str(config))
             nom_config = config.name.split('.')
-            nom_role = nom_config[2]
-            if nom_config[3] == 'cert' and nom_role in roles.keys():
+            nom_role = nom_config[1]
+            if nom_config[2] == 'cert' and nom_role in roles.keys():
                 role_info = roles[nom_role]
-                self.__logger.debug("Verification cert %s date %s", nom_role, nom_config[4])
+                self.__logger.debug("Verification cert %s date %s", nom_role, nom_config[3])
                 pem = b64decode(config.attrs['Spec']['Data'])
                 clecert = EnveloppeCleCert()
                 clecert.cert_from_pem_bytes(pem)
@@ -924,14 +924,13 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         secret_monitor = gestionnaire_docker.trouver_secret('pki.monitor.key')
         gestionnaire_docker.sauvegarder_config(
             'pki.monitor.cert.' + str(secret_monitor['date']),
-            clecert_monitor.public_bytes
-        )
-        gestionnaire_docker.sauvegarder_config(
-            'pki.monitor.chain.' + str(secret_monitor['date']),
             '\n'.join(clecert_monitor.chaine)
         )
         # Supprimer le CSR
         gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
+
+        # Terminer configuration swarm docker
+        gestionnaire_docker.initialiser_noeud(idmg=idmg)
 
         # Sauvegarder configuration.millegrille
         configuration_millegrille = {

@@ -178,7 +178,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__renouvelleur_certificat = RenouvelleurCertificat(
             self.configuration.idmg,
             self.__dict_ca,
-            millegrille=self.__clecert_intermediaire
+            clecert_intermediaire=self.__clecert_intermediaire
         )
 
         # try:
@@ -1328,7 +1328,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Preparer le generateur de certicats. Toujours generer cles privees avec mots de passe.
         clecert_intermediaire = clecerts[fingerprint_intermediaire]
         renouvelleur_certificat_hebergement = RenouvelleurCertificat(
-            idmg, dict_ca, millegrille=clecert_intermediaire, generer_password=True)
+            idmg, dict_ca, clecert_intermediaire=clecert_intermediaire, generer_password=True)
 
         transaction_trousseau = {
             'idmg': idmg,

@@ -88,8 +88,10 @@ class GestionnaireModulesDocker:
         labels = {'millegrille': self.__idmg}
         self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
 
-    def initialiser_noeud(self):
-        pass
+    def initialiser_noeud(self, idmg=None):
+        if idmg:
+            self.idmg = idmg
+        self.initialiser_millegrille()
 
     def configurer_monitor(self):
         """
@@ -343,7 +345,7 @@ class GestionnaireModulesDocker:
             try:
                 date_secret = date_secrets[config_name]
 
-                nom_filtre = self.idmg_tronque + '.' + secret_name + '.' + date_secret
+                nom_filtre = secret_name + '.' + date_secret
                 filtre = {'name': nom_filtre}
                 secrets = self.__docker.secrets.list(filters=filtre)
 
@@ -466,7 +468,9 @@ class GestionnaireModulesDocker:
                         config_reference['mode'] = config.get('mode') or 0o444
                         liste_configs.append(ConfigReference(**config_reference))
 
-                        dates_configs[config_name] = config_dict['date']
+                        date_config = config_dict.get('date')
+                        if date_config:
+                            dates_configs[config_name] = date_config
                     except AttributeError as ae:
                         self.__logger.error("Parametres de configuration manquants pour service %s : %s" % (config_name, str(ae)))
 
@@ -579,6 +583,14 @@ class GestionnaireModulesDocker:
         with open(os.path.join(dest_path, archive_name), 'wb') as output:
             for chunk in tar_data:
                 output.write(chunk)
+
+    @property
+    def idmg(self):
+        return self.__idmg
+
+    @idmg.setter
+    def idmg(self, idmg):
+        self.__idmg = idmg
 
     @property
     def idmg_tronque(self):
