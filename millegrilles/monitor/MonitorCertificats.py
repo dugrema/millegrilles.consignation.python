@@ -153,14 +153,6 @@ class GestionnaireCertificats:
 
         if insecure:  # Mode insecure
             try:
-                os.mkdir('/var/opt/millegrilles/pki', 0o755)
-            except FileExistsError:
-                pass
-
-            with open('/var/opt/millegrilles/pki/pki.%s.csr.pem' % type_cle, 'wb') as fichier:
-                fichier.write(request_pem)
-
-            try:
                 os.mkdir(self.secret_path, 0o755)
             except FileExistsError:
                 pass

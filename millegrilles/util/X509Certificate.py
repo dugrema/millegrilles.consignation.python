@@ -101,6 +101,19 @@ class EnveloppeCleCert:
 
         return False
 
+    def csr_cert_correspondent(self):
+        if self.csr is not None and self.cert is not None:
+            # Verifier que le cert et la cle privee correspondent
+            public1 = self.csr.public_key().public_numbers()
+            public2 = self.cert.public_key().public_numbers()
+
+            n1 = public1.n
+            n2 = public2.n
+
+            return n1 == n2
+
+        return False
+
     def key_from_pem_bytes(self, key_bytes, password_bytes=None):
         self.private_key = primitives.serialization.load_pem_private_key(
             key_bytes,

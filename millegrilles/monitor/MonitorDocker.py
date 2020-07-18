@@ -319,6 +319,9 @@ class GestionnaireModulesDocker:
             if len(secrets) > 0:
                 break
 
+        if len(secrets) == 0:
+            raise ValueError("Secret non trouve : %s" % secret_name)
+
         # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
         date_secret: int = cast(int, None)
         secret_retenue = None

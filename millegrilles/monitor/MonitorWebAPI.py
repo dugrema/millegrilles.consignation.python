@@ -86,7 +86,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-type", "text/ascii")
             self.end_headers()
-            self.wfile.write(self.service_monitor.csr_intermediaire)
+            self.wfile.write(csr_intermediaire)
         else:
             self.send_error(410)
 

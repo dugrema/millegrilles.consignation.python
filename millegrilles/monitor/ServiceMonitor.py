@@ -881,11 +881,22 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
         gestionnaire_certs.generer_motsdepasse()
 
-        # Sauvegarder certificat de millegrille
-        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', params['certificatMillegrillePem'])
-
         # Faire correspondre et sauvegarder certificat de noeud
         secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
+            intermediaire_key_pem = fichier.read()
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt'), 'rb') as fichier:
+            intermediaire_passwd_pem = fichier.read()
+
+        clecert_intermediaire = EnveloppeCleCert()
+        clecert_intermediaire.from_pem_bytes(intermediaire_key_pem, params['certificatIntermediairePem'].encode('utf-8'), intermediaire_passwd_pem)
+        if not clecert_intermediaire.cle_correspondent():
+            raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+
+        # Comencer sauvegarde
+        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', params['certificatMillegrillePem'])
+
         gestionnaire_docker.sauvegarder_config(
             'pki.intermediaire.cert.' + str(secret_intermediaire['date']),
             params['certificatIntermediairePem']
@@ -899,14 +910,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         clecert_millegrille = EnveloppeCleCert()
         clecert_millegrille.cert_from_pem_bytes(params['certificatMillegrillePem'].encode('utf-8'))
         idmg = clecert_millegrille.idmg
-
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
-            intermediaire_key_pem = fichier.read()
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt'), 'rb') as fichier:
-            intermediaire_passwd_pem = fichier.read()
-
-        clecert_intermediaire = EnveloppeCleCert()
-        clecert_intermediaire.from_pem_bytes(intermediaire_key_pem, params['certificatIntermediairePem'].encode('utf-8'), intermediaire_passwd_pem)
 
         # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
         self._gestionnaire_certificats.idmg = idmg
