@@ -35,6 +35,7 @@ class GestionnaireCertificats:
 
         self.certificats = dict()
         self._clecert_millegrille: EnveloppeCleCert = cast(EnveloppeCleCert, None)
+        self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
         self.clecert_monitor: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
         self.secret_path = kwargs.get('secrets')
@@ -56,8 +57,12 @@ class GestionnaireCertificats:
             try:
                 config = self._docker.configs.get('millegrille.configuration')
                 config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
+
+                millegrille_pem_config = self._docker.configs.get('pki.millegrille.cert')
+                json_millegrille = json.loads(b64decode(millegrille_pem_config.attrs['Spec']['Data']))
                 self._clecert_millegrille = EnveloppeCleCert()
-                self._clecert_millegrille.cert_from_pem_bytes(config_json['pem'].encode('utf-8'))
+                self._clecert_millegrille.cert_from_pem_bytes(json_millegrille['pem'].encode('utf-8'))
+
             except docker.errors.NotFound:
                 self.__logger.info("millegrille.configuration abstente : Nouvelle MilleGrille, noeud principal.")
 
@@ -135,13 +140,14 @@ class GestionnaireCertificats:
         self.__logger.debug("Request CSR : %s" % request_pem)
 
         cle_pem = info_cle['cle_pem']
-        cle_passwd = info_cle['password']
+        cle_passwd = info_cle.get('password')
 
         if inserer_cle:
             label_key_inter = 'pki.%s.key' % type_cle
             self.ajouter_secret(label_key_inter, data=cle_pem)
-            label_passwd_inter = 'pki.%s.passwd' % type_cle
-            self.ajouter_secret(label_passwd_inter, data=cle_passwd)
+            if cle_passwd:
+                label_passwd_inter = 'pki.%s.passwd' % type_cle
+                self.ajouter_secret(label_passwd_inter, data=cle_passwd)
             label_csr_inter = 'pki.%s.csr' % type_cle
             self.ajouter_config(label_csr_inter, data=request_pem)
 
@@ -160,12 +166,19 @@ class GestionnaireCertificats:
                 pass
 
             key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
-            with open(key_path, 'xb') as fichier:
-                fichier.write(cle_pem)
+            try:
+                with open(key_path, 'xb') as fichier:
+                    fichier.write(cle_pem)
+            except FileExistsError:
+                pass
 
-            passwd_path = path.join(self.secret_path, 'pki.%s.passwd.pem' % type_cle)
-            with open(passwd_path, 'xb') as fichier:
-                fichier.write(cle_passwd)
+            if cle_passwd:
+                passwd_path = path.join(self.secret_path, 'pki.%s.passwd.pem' % type_cle)
+                try:
+                    with open(passwd_path, 'xb') as fichier:
+                        fichier.write(cle_passwd)
+                except FileExistsError:
+                    pass
 
         return info_cle
 
@@ -176,7 +189,7 @@ class GestionnaireCertificats:
         :param nom_certificat:
         :return: Contenu du certificat en PEM
         """
-        cert = MonitorConstantes.trouver_config(nom_certificat, self.idmg_tronque, self._docker)['config']
+        cert = MonitorConstantes.trouver_config(nom_certificat, self._docker)['config']
         cert_pem = b64decode(cert.attrs['Spec']['Data'])
         fp, fichier_cert = tempfile.mkstemp(dir='/tmp')
         try:
@@ -227,6 +240,12 @@ class GestionnaireCertificats:
         cle = self.__cles_memorisees[role]
         del self.__cles_memorisees[role]
         return cle
+
+    def set_clecert_millegrille(self, clecert_millegrille):
+        self._clecert_millegrille = clecert_millegrille
+
+    def set_clecert_intermediaire(self, clecert_intermediaire):
+        self._clecert_intermediaire = clecert_intermediaire
 
     def charger_certificats(self):
         raise NotImplementedError()
@@ -528,3 +547,7 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
             except FileExistsError:
                 pass
 
+    def signer_csr(self, csr: bytes):
+        generateur = RenouvelleurCertificat(self.idmg, dict(), self._clecert_intermediaire, ca_autorite=self._clecert_millegrille)
+        clecert = generateur.signer_csr(csr)
+        return clecert

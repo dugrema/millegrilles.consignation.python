@@ -1659,6 +1659,11 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_FICHIERS: GenererHebergementFichiers,
         }
 
+        # S'assurer que le dict contient reference aux CAs
+        self.__dict_ca[millegrille.skid] = millegrille.cert
+        if ca_autorite:
+            self.__dict_ca[ca_autorite.skid] = ca_autorite.cert
+
         self.__generateur_par_csr = GenerateurCertificateParRequest
 
         self.__generateur_millegrille = None

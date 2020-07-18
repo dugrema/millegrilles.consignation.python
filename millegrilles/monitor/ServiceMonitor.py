@@ -855,7 +855,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             params['secrets'] = self._args.secrets
         self._gestionnaire_certificats = GestionnaireCertificatsInstallation(self._docker, self, **params)
 
-        # Verifier si le CSR a deja ete genere, sinon le generer
+        # Verifier si le CSR intermediaire a deja ete genere, sinon le generer
         try:
             csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
             data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
@@ -865,6 +865,74 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
             self.csr_intermediaire = csr_info['request']
 
+        # Verifier si la cle du monitor existe, sinon la generer
+        try:
+            csr_config_docker = self._gestionnaire_docker.trouver_secret('pki.monitor.key')
+        except AttributeError:
+            # Creer CSR pour le service monitor
+            csr_info = self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
+            self.csr_intermediaire = csr_info['request']
+
+    def initialiser_noeud(self, commande):
+        params = commande.contenu
+        gestionnaire_docker = self.gestionnaire_docker
+
+        # Sauvegarder certificat de millegrille
+        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', {'pem': params['certificatMillegrillePem']})
+
+        # Faire correspondre et sauvegarder certificat de noeud
+        secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+        gestionnaire_docker.sauvegarder_config(
+            'pki.intermediaire.cert.' + str(secret_intermediaire['date']),
+            {'pem': params['certificatMillegrillePem']}
+        )
+        # Supprimer le CSR
+        gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
+
+        # Extraire IDMG
+        clecert_millegrille = EnveloppeCleCert()
+        clecert_millegrille.cert_from_pem_bytes(params['certificatMillegrillePem'].encode('utf-8'))
+        idmg = clecert_millegrille.idmg
+
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
+            intermediaire_key_pem = fichier.read()
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.pem'), 'rb') as fichier:
+            intermediaire_passwd_pem = fichier.read()
+        clecert_intermediaire = EnveloppeCleCert()
+        clecert_intermediaire.from_pem_bytes(intermediaire_key_pem, params['certificatIntermediairePem'].encode('utf-8'), intermediaire_passwd_pem)
+
+        # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
+        self._gestionnaire_certificats.idmg = idmg
+        self._gestionnaire_certificats.set_clecert_millegrille(clecert_millegrille)
+        self._gestionnaire_certificats.set_clecert_intermediaire(clecert_intermediaire)
+
+        # Generer nouveau certificat de monitor
+        # Charger CSR monitor
+        config_csr_monitor = self._gestionnaire_docker.charger_config_recente('pki.monitor.csr')
+        data_csr_monitor = b64decode(config_csr_monitor['config'].attrs['Spec']['Data'])
+        clecert_monitor = self._gestionnaire_certificats.signer_csr(data_csr_monitor)
+
+        # Sauvegarder certificat monitor
+        # Faire correspondre et sauvegarder certificat de noeud
+        secret_monitor = gestionnaire_docker.trouver_secret('pki.monitor.key')
+        gestionnaire_docker.sauvegarder_config(
+            'pki.monitor.cert.' + str(secret_monitor['date']),
+            {'pem': clecert_monitor.public_bytes.decode('utf-8')}
+        )
+        # Supprimer le CSR
+        gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
+
+        # Sauvegarder configuration.millegrille
+        configuration_millegrille = {
+            'securite': params['securite'],
+            'idmg': idmg,
+        }
+        gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
+
+        # Lancer l'installation avec les parametres recus
+        # Creer configuration NGINX, generer certificat LetsEncrypt
+
+        pass
 
 # Section main
 if __name__ == '__main__':

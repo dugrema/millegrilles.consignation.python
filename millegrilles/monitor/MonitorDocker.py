@@ -304,7 +304,7 @@ class GestionnaireModulesDocker:
         secret_names = secret_name.split(';')
         secrets = None
         for secret_name_val in secret_names:
-            filtre = {'name': self.idmg_tronque + '.' + secret_name_val}
+            filtre = {'name': secret_name_val}
             secrets = self.__docker.secrets.list(filters=filtre)
             if len(secrets) > 0:
                 break

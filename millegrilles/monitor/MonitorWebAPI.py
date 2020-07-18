@@ -5,6 +5,9 @@ import json
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 
+from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+
 hostName = "0.0.0.0"
 serverPort = 8080
 
@@ -29,12 +32,14 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.error_404()
 
     def do_POST(self):
-        path_fichier = self.path
-        if path_fichier.startswith('/api/'):
-            self.send_response(200)
-            self.send_header("Content-type", "text/ascii")
-            self.end_headers()
-            self.wfile.write(bytes("OK", "utf-8"))
+        path_fichier = self.path.split('/')
+
+        content_len = int(self.headers.get('content-length', 0))
+        post_body = self.rfile.read(content_len)
+        request_data = json.loads(post_body)
+
+        if path_fichier[2] == 'api':
+            self._traiter_post_api(request_data)
         else:
             self.error_404()
 
@@ -51,16 +56,29 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         else:
             self.error_404()
 
-    def _traiter_post_api(self):
+    def _traiter_post_api(self, request_data):
         path_fichier = self.path
         path_split = path_fichier.split('/')
-        self.error_404()
+        if path_split[3] == 'initialisation':
+            self.post_initialiser(request_data)
+        else:
+            self.error_404()
 
     def return_info_monitor(self):
         dict_infomillegrille = dict()
         dict_infomillegrille['idmg'] = None
         dict_infomillegrille['url_prive'] = 'https://maple.maceroc.com'
         self.repondre_json(dict_infomillegrille)
+
+    def post_initialiser(self, request_data):
+        logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        logger.debug("POST recu\n%s", json.dumps(request_data, indent=2))
+
+        request_data['commande'] = ConstantesServiceMonitor.COMMANDE_INITIALISER_NOEUD
+        commande = CommandeMonitor(request_data)
+        self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+
+        self.repondre_json(dict(), status_code=200)
 
     def return_csr(self):
         csr_intermediaire = self.service_monitor.csr_intermediaire
