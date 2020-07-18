@@ -394,7 +394,7 @@ class ServiceMonitor:
             self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIMAIRE.copy())
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIMAIRE.copy(), self)
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 
@@ -870,8 +870,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             csr_config_docker = self._gestionnaire_docker.trouver_secret('pki.monitor.key')
         except ValueError:
             # Creer CSR pour le service monitor
-            csr_info = self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
-            self.csr_intermediaire = csr_info['request']
+            self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
 
     def initialiser_noeud(self, commande):
         params = commande.contenu

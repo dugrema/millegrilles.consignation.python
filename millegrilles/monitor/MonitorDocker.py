@@ -15,12 +15,12 @@ from docker.types import SecretReference, NetworkAttachmentConfig, Resources, Re
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
-from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution
+from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, CommandeMonitor
 
 
 class GestionnaireModulesDocker:
 
-    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list):
+    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list, service_monitor):
         self.__idmg = idmg
         self.__docker = docker_client
         self.configuration_json = None
@@ -29,6 +29,7 @@ class GestionnaireModulesDocker:
         self.__event_stream = None
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
+        self.__service_monitor = service_monitor
 
         fqdn = self.hostname
 
@@ -166,8 +167,10 @@ class GestionnaireModulesDocker:
             gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
 
         if configuration_service:
-            # S'assurer que le certificat existe et est a date
-            pass
+            # S'assurer que le certificat existe, est a date et que le compte est cree
+            cert_compte = configuration_service.get('certificat_compte')
+            if cert_compte:
+                self.creer_compte(cert_compte)
 
         nom_image_docker = kwargs.get('nom') or service_name
 
@@ -199,6 +202,19 @@ class GestionnaireModulesDocker:
         #         self.__logger.info("Service %s deja demarre" % service_name)
         #     else:
         #         self.__logger.exception("Erreur demarrage service %s" % service_name)
+
+    def creer_compte(self, cert_compte):
+        certificat_compte = self.charger_config_recente(cert_compte)
+        certificat_compte_pem = b64decode(certificat_compte['config'].attrs['Spec']['Data'])
+
+        commande_dict = {
+            'commande': Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+            'contenu': {
+                Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM: certificat_compte_pem.decode('utf-8'),
+            }
+        }
+        commande = CommandeMonitor(commande_dict)
+        self.__service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
     def supprimer_service(self, service_name: str):
         filter = {'name': self.idmg_tronque + '_' + service_name}
@@ -267,6 +283,18 @@ class GestionnaireModulesDocker:
         if len(running) == 0:
             # Redemarrer
             self.__logger.info("Redemarrer service %s", service.name)
+
+            # S'assurer que le compte du service existe
+            task_name = service.name.split('_')[1]
+            configuration_service_meta = MonitorConstantes.DICT_MODULES.get(task_name)
+            if configuration_service_meta:
+                configuration_service = self.charger_config_recente('docker.cfg.' + configuration_service_meta['role'])
+                config_attrs = configuration_service['config'].attrs
+                configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+                certificat_compte_cle = configuration_service_json.get('certificat_compte')
+                if certificat_compte_cle:
+                    self.creer_compte(certificat_compte_cle)
+
             service.force_update()
 
     def charger_config(self, config_name):
