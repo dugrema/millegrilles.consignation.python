@@ -1003,16 +1003,33 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
 
         # Aller chercher le certificat SSL de LetsEncrypt
-        domaine_noeud = 'mg-dev4.maple.maceroc.com'
+        domaine_noeud = params['url']  # 'mg-dev4.maple.maceroc.com'
+        mode_test = True
 
-        methode_validation = '--test --dns dns_cloudns'
-        params_environnement = [
-            "CLOUDNS_SUB_AUTH_ID=1409",
-            "CLOUDNS_AUTH_PASSWORD=XXXXXXX"
-        ]
+        params_environnement = list()
+        if params.get('mode_validation') == 'cloudns':
+            methode_validation = '--dns dns_cloudns'
+            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['acme.subid'])
+            params_environnement.append("CLOUDNS_AUTH_PASSWORD=" + params['acme.password'])
+        else:
+            methode_validation = '--webroot /usr/share/nginx/html'
+
+        configuration_acme = {
+            'domain': domaine_noeud,
+            'methode': {
+                'commande': methode_validation,
+                'mode_test': True,
+                'params_environnement': params_environnement,
+            }
+        }
+        self._gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
+
+        commande_acme = methode_validation
+        if mode_test:
+            commande_acme = '--test ' + methode_validation
 
         acme_container_id = self._gestionnaire_docker.trouver_container_pour_service('acme')
-        commande_acme = "acme.sh --issue %s -d %s" % (methode_validation, domaine_noeud)
+        commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
         resultat_acme, output_acme = self._gestionnaire_docker.executer_script_blind(
             acme_container_id,
             commande_acme,
