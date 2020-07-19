@@ -835,7 +835,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__logger.info("Run configuration initiale, (mode insecure: %s)" % self._args.dev)
         self._charger_configuration()
 
-        self._gestionnaire_docker = GestionnaireModulesDocker(self._idmg, self._docker, self._fermeture_event, list(), self)
+        self._gestionnaire_docker = GestionnaireModulesDocker(
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(), self)
+
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 
@@ -846,6 +848,36 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         self.__logger.info("Web API - attence connexion sur port 8444")
         self.preparer_web_api()
+
+        while not self.__event_attente.is_set():
+            self._run_entretien()
+            self.__event_attente.wait(10)
+
+    def _run_entretien(self):
+        """
+        Mode d'operation de base du monitor, lorsque toute la configuration est completee.
+        :return:
+        """
+        self.__logger.info("Debut boucle d'entretien du service monitor")
+
+        while not self._fermeture_event.is_set():
+            self._attente_event.clear()
+
+            try:
+                self.__logger.debug("Cycle entretien ServiceMonitor")
+                self.verifier_load()
+
+                if not self.limiter_entretien:
+                    # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
+                    self._gestionnaire_docker.entretien_services()
+
+                self.__logger.debug("Fin cycle entretien ServiceMonitor")
+            except Exception:
+                self.__logger.exception("ServiceMonitor: erreur generique")
+            finally:
+                self._attente_event.wait(30)
+
+        self.__logger.info("Fin execution de la boucle d'entretien du service monitor")
 
     def preparer_gestionnaire_certificats(self):
         params = dict()

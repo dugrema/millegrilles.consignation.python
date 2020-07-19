@@ -10,6 +10,9 @@ DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
 
 DICT_MODULES = {
+    ConstantesServiceMonitor.MODULE_ACME: {
+        'nom': ConstantesServiceMonitor.MODULE_ACME
+    },
     ConstantesServiceMonitor.MODULE_MQ: {
         'nom': ConstantesServiceMonitor.MODULE_MQ,
         'role': ConstantesGenerateurCertificat.ROLE_MQ,
@@ -73,7 +76,14 @@ DICT_MODULES = {
 }
 
 # Liste de modules requis. L'ordre est important
+MODULES_REQUIS_INSTALLATION = [
+    ConstantesServiceMonitor.MODULE_ACME,
+    # ConstantesServiceMonitor.MODULE_NGINX,
+]
+
 MODULES_REQUIS_PRIMAIRE = [
+    ConstantesServiceMonitor.MODULE_ACME,
+    ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_MQ,
     ConstantesServiceMonitor.MODULE_MONGO,
     ConstantesServiceMonitor.MODULE_TRANSACTION,
@@ -81,7 +91,6 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_PRINCIPAL,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
-    ConstantesServiceMonitor.MODULE_NGINX,
     ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
 ]
 

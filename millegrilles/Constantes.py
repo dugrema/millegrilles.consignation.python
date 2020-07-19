@@ -1534,6 +1534,7 @@ class ConstantesServiceMonitor:
 
     DOCKER_LIBVAL_CONFIG = 'millegrille.configuration'
 
+    MODULE_ACME = 'acme'
     MODULE_MQ = 'mq'
     MODULE_MONGO = 'mongo'
     MODULE_TRANSACTION = 'transaction'

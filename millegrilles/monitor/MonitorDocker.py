@@ -134,12 +134,14 @@ class GestionnaireModulesDocker:
         Verifie si les services sont actifs, les demarre au besoin.
         :return:
         """
-        filtre = {'name': self.idmg_tronque + '_'}
-        liste_services = self.__docker.services.list(filters=filtre)
+        # filtre = {'name': self.idmg_tronque + '_'}
+        # liste_services = self.__docker.services.list(filters=filtre)
+        liste_services = self.__docker.services.list()
         dict_services = dict()
         for service in liste_services:
             # Enlever prefix avec IDMG
-            service_name = '_'.join(service.name.split('_')[1:])
+            # service_name = '_'.join(service.name.split('_')[1:])
+            service_name = service.name
             dict_services[service_name] = service
 
         for service_name in self.__modules_requis:
@@ -168,15 +170,18 @@ class GestionnaireModulesDocker:
 
         if configuration_service:
             # S'assurer que le certificat existe, est a date et que le compte est cree
-            configuration_service_meta = self.charger_config_recente('docker.cfg.' + configuration_service['role'])
-            config_attrs = configuration_service_meta['config'].attrs
-            configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
-            certificat_compte_cle = configuration_service_json.get('certificat_compte')
-            if certificat_compte_cle:
-                self.creer_compte(certificat_compte_cle)
+            cle_config_service = configuration_service.get('role') or configuration_service.get('nom')
+            if cle_config_service:
+                configuration_service_meta = self.charger_config_recente('docker.cfg.' + cle_config_service)
+                config_attrs = configuration_service_meta['config'].attrs
+                configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+                certificat_compte_cle = configuration_service_json.get('certificat_compte')
+                if certificat_compte_cle:
+                    self.creer_compte(certificat_compte_cle)
 
         nom_image_docker = kwargs.get('nom') or service_name
 
+        configuration = dict()
         try:
             image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
 
@@ -195,16 +200,18 @@ class GestionnaireModulesDocker:
         except KeyError as ke:
             self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
             if self.__logger.isEnabledFor(logging.DEBUG):
-                self.__logger.exception("Detail erreur chargement image")
+                self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
         except AttributeError as ae:
             self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail erreur configuration service " + service_name)
-        # except APIError as apie:
-        #     if apie.status_code == 409:
-        #         self.__logger.info("Service %s deja demarre" % service_name)
-        #     else:
-        #         self.__logger.exception("Erreur demarrage service %s" % service_name)
+        except APIError as apie:
+            self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
+            raise apie
+            # if apie.status_code == 409:
+            #     self.__logger.info("Service %s deja demarre" % service_name)
+            # else:
+            #     self.__logger.exception("Erreur demarrage service %s" % service_name)
 
     def creer_compte(self, label_cert_compte: str):
         certificat_compte = self.charger_config_recente(label_cert_compte)
@@ -418,7 +425,7 @@ class GestionnaireModulesDocker:
 
         try:
             # Name
-            dict_config_docker['name'] = self.idmg_tronque + '_' + config_service['name']
+            dict_config_docker['name'] = config_service['name']
 
             hostname = config_service.get('hostname')
             if hostname:
