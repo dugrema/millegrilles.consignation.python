@@ -10,17 +10,14 @@ class GestionnaireWeb:
     """
     S'occupe de la configuration des applications web, specifiquement nginx (via conf.d/modules)
     """
-
-    #def __init__(self, idmg: str, service_monitor: Union[ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal]):
-    def __init__(self, idmg: str, service_monitor):
+    def __init__(self, service_monitor):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        self.__idmg = idmg
         self.__service_monitor = service_monitor
         self.__docker_client = service_monitor.gestionnaire_docker
 
         self.__init_complete = False
-        self.__repertoire_modules = path.join('/var/opt/millegrilles', self.__idmg, 'mounts/nginx/conf.d/modules')
-        self.__repertoire_data = path.join('/var/opt/millegrilles', self.__idmg, 'mounts/nginx/data')
+        self.__repertoire_modules = path.join('/var/opt/millegrilles/nginx/modules')
+        self.__repertoire_data = path.join('/var/opt/millegrilles/nginx/data')
 
     def entretien(self):
         if not self.__init_complete:
@@ -94,11 +91,17 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
 
+        location_redirect_installation = """
+            location = / {
+              return 302 https://$http_host/installation;
+            }
+        """
+
         location_data_vitrine = """
             location /vitrine/data {
-                alias /var/opt/millegrilles/%s/mounts/nginx/data;
+                alias /var/opt/millegrilles/nginx/data;
             }
-        """ % self.__idmg
+        """
 
         location_public_component = """
             location %s {
@@ -122,6 +125,7 @@ class GestionnaireWeb:
         ]
 
         locations_list = list()
+        locations_list.append(location_redirect_installation)
         locations_list.append(location_data_vitrine)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
         locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
@@ -145,4 +149,7 @@ class GestionnaireWeb:
         Redemarre le service nginx
         :return:
         """
-        self.__service_monitor.gestionnaire_docker.force_update_service('nginx')
+        try:
+            self.__service_monitor.gestionnaire_docker.force_update_service('nginx')
+        except AttributeError:
+            self.__logger.warning("Redemarrage nginx - Aucuns services configures")

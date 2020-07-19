@@ -18,7 +18,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 # from millegrilles.monitor.ServiceMonitor import DOCKER_LABEL_TIME, GestionnaireModulesDocker
 from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat, \
-    GenerateurInitial, GenerateurCertificat
+    GenerateurInitial, GenerateurCertificat, GenerateurCertificatNginxSelfsigned
 from millegrilles.monitor import MonitorConstantes
 
 
@@ -536,4 +536,27 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
     def signer_csr(self, csr: bytes):
         generateur = RenouvelleurCertificat(self.idmg, dict(), self._clecert_intermediaire, ca_autorite=self._clecert_millegrille)
         clecert = generateur.signer_csr(csr)
+        return clecert
+
+    def generer_certificat_nginx_selfsigned(self, insecure=False):
+        """
+        Utilise pour genere un certificat self-signed initial pour nginx
+        :return:
+        """
+        generateur = GenerateurCertificatNginxSelfsigned()
+        clecert = generateur.generer('nanana')
+
+        cle_pem_bytes = clecert.private_key_bytes
+
+        self.ajouter_secret('pki.nginx.key', data=cle_pem_bytes)
+        self.ajouter_config('pki.nginx.cert', data=clecert.public_bytes)
+
+        if insecure:  # Mode insecure
+            key_path = path.join(self.secret_path, 'pki.nginx.key.pem')
+            try:
+                with open(key_path, 'xb') as fichier:
+                    fichier.write(cle_pem_bytes)
+            except FileExistsError:
+                pass
+
         return clecert

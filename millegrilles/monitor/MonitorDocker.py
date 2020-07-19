@@ -41,6 +41,7 @@ class GestionnaireModulesDocker:
             'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
             'NODENAME': self.nodename,
             'HOSTNAME': fqdn,
+            'NGINX_CONFIG_VOLUME': '/var/opt/millegrilles/nginx/modules',
         }
 
         self.__event_listeners = list()
@@ -85,9 +86,16 @@ class GestionnaireModulesDocker:
 
     def initialiser_millegrille(self):
         # Creer reseau pour cette millegrille
-        network_name = 'mg_' + self.__idmg + '_net'
-        labels = {'millegrille': self.__idmg}
-        self.__docker.networks.create(name=network_name, labels=labels, scope="swarm", driver="overlay")
+        network_name = 'millegrille_net'
+        self.__docker.networks.create(name=network_name, scope="swarm", driver="overlay")
+
+        # Creer repertoire generique /millegrilles
+        # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
+        path_millegrilles = os.path.join(Constantes.DEFAUT_VAR_MILLEGRILLES)
+        try:
+            os.mkdir(path_millegrilles, mode=0o770)
+        except FileExistsError:
+            self.__logger.debug("Repertoire %s existe, ok" % path_millegrilles)
 
     def initialiser_noeud(self, idmg=None):
         if idmg:
@@ -269,7 +277,7 @@ class GestionnaireModulesDocker:
                 self.__hebergement_actif = False
 
     def force_update_service(self, service_name):
-        filter = {'name': self.idmg_tronque + '_' + service_name}
+        filter = {service_name}
         service_list = self.__docker.services.list(filters=filter)
         service_list[0].force_update()
 

@@ -411,7 +411,7 @@ class ServiceMonitor:
         self.__entretien_certificats()
 
         # Initialiser gestionnaire web
-        self._gestionnaire_web = GestionnaireWeb(self._idmg, self)
+        self._gestionnaire_web = GestionnaireWeb(self)
 
     def _entretien_modules(self):
         if not self.limiter_entretien:
@@ -838,6 +838,15 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self._gestionnaire_docker = GestionnaireModulesDocker(
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(), self)
 
+        try:
+            self._gestionnaire_docker.initialiser_noeud()
+        except APIError:
+            self.__logger.info("Docker.initialiser_noeud: Noeud deja initialise")
+
+        # Initialiser gestionnaire web
+        self._gestionnaire_web = GestionnaireWeb(self)
+        self._gestionnaire_web.entretien()
+
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 
@@ -887,6 +896,13 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             params['secrets'] = self._args.secrets
         self._gestionnaire_certificats = GestionnaireCertificatsInstallation(self._docker, self, **params)
 
+        # Verifier si le certificat nginx existe deja - generer un cert self-signed au besoin
+        try:
+            docker_cert_nginx = self._gestionnaire_docker.charger_config_recente('pki.nginx.cert')
+        except AttributeError:
+            # Certificat absent, on genere un certificat et cle nginx
+            self._gestionnaire_certificats.generer_certificat_nginx_selfsigned()
+
         # Verifier si le CSR intermediaire a deja ete genere, sinon le generer
         try:
             csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
@@ -899,7 +915,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Verifier si la cle du monitor existe, sinon la generer
         try:
-            csr_config_docker = self._gestionnaire_docker.trouver_secret('pki.monitor.key')
+            self._gestionnaire_docker.trouver_secret('pki.monitor.key')
         except ValueError:
             # Creer CSR pour le service monitor
             self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)

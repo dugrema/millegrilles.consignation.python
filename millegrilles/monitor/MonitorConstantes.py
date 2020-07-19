@@ -78,7 +78,7 @@ DICT_MODULES = {
 # Liste de modules requis. L'ordre est important
 MODULES_REQUIS_INSTALLATION = [
     ConstantesServiceMonitor.MODULE_ACME,
-    # ConstantesServiceMonitor.MODULE_NGINX,
+    ConstantesServiceMonitor.MODULE_NGINX,
 ]
 
 MODULES_REQUIS_PRIMAIRE = [

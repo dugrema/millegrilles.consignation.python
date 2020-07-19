@@ -671,6 +671,62 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         return [c.public_bytes(primitives.serialization.Encoding.PEM).decode('utf-8') for c in chaine]
 
 
+class GenerateurCertificatNginxSelfsigned:
+    """
+    Genere un certificat self-signed pour Nginx pour l'installation d'un nouveau noeud.
+    """
+
+    def generer(self, server_name: str):
+        clecert = EnveloppeCleCert()
+        clecert.generer_private_key(generer_password=False, keysize=2048)
+
+        duree_cert_installation = datetime.timedelta(days=1)  # Une journee pour l'installation
+
+        public_key = clecert.private_key.public_key()
+        builder = x509.CertificateBuilder()
+        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
+        builder = builder.not_valid_after(datetime.datetime.today() + duree_cert_installation)
+        builder = builder.serial_number(x509.random_serial_number())
+        builder = builder.public_key(public_key)
+
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(public_key),
+            critical=False
+        )
+
+        name = x509.Name([
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, u'MilleGrille'),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, server_name),
+        ])
+        builder = builder.subject_name(name)
+        builder = builder.issuer_name(name)
+
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+
+        ski = x509.SubjectKeyIdentifier.from_public_key(clecert.private_key.public_key())
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier(
+                ski.digest,
+                None,
+                None
+            ),
+            critical=False
+        )
+
+        certificate = builder.sign(
+            private_key=clecert.private_key,
+            algorithm=hashes.SHA512(),
+            backend=default_backend()
+        )
+
+        clecert.set_cert(certificate)
+
+        return clecert
+
+
 class GenerateurCertificatMilleGrille(GenerateurCertificateParRequest):
 
     def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
