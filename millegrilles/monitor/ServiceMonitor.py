@@ -855,6 +855,13 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         self.preparer_gestionnaire_commandes()
 
+        # Entretien initial pour s'assurer d'avoir les services de base
+        try:
+            self._gestionnaire_docker.entretien_services()
+        except AttributeError as ae:
+            self.__logger.exception("Erreur creation services, docker config non chargee")
+            raise ae
+
         self.__logger.info("Web API - attence connexion sur port 8444")
         self.preparer_web_api()
 
@@ -991,8 +998,12 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Lancer l'installation avec les parametres recus
         # Creer configuration NGINX, generer certificat LetsEncrypt
+        self._gestionnaire_docker.supprimer_service('nginx')  # Forcer reconfiguration nginx
 
-        pass
+        # Redemarrer / reconfigurer le monitor
+        self.__logger.info("Configuration completee, redemarrer le monitor")
+        self.fermer()
+
 
 # Section main
 if __name__ == '__main__':

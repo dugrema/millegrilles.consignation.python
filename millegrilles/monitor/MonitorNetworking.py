@@ -142,9 +142,9 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
             fichier.write(modules_includes_content)
 
-        self.__redemarrer_nginx()
+        self.redemarrer_nginx()
 
-    def __redemarrer_nginx(self):
+    def redemarrer_nginx(self):
         """
         Redemarre le service nginx
         :return:

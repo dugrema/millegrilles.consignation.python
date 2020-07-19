@@ -86,8 +86,14 @@ class GestionnaireModulesDocker:
 
     def initialiser_millegrille(self):
         # Creer reseau pour cette millegrille
-        network_name = 'millegrille_net'
-        self.__docker.networks.create(name=network_name, scope="swarm", driver="overlay")
+        try:
+            network_name = 'millegrille_net'
+            self.__docker.networks.create(name=network_name, scope="swarm", driver="overlay")
+        except APIError as apie:
+            if apie.status_code == 409:
+                self.__logger.info("Reseau %s deja cree", network_name)
+            else:
+                raise apie
 
         # Creer repertoire generique /millegrilles
         # S'assurer que le repertoire d'hebergement de la MilleGrille est cree
@@ -235,7 +241,7 @@ class GestionnaireModulesDocker:
         self.__service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
     def supprimer_service(self, service_name: str):
-        filter = {'name': self.idmg_tronque + '_' + service_name}
+        filter = {'name': service_name}
         service_list = self.__docker.services.list(filters=filter)
         service_list[0].remove()
 
@@ -303,7 +309,7 @@ class GestionnaireModulesDocker:
             self.__logger.info("Redemarrer service %s", service.name)
 
             # S'assurer que le compte du service existe
-            task_name = service.name.split('_')[1]
+            task_name = service.name
             configuration_service_meta = MonitorConstantes.DICT_MODULES.get(task_name)
             if configuration_service_meta:
                 configuration_service = self.charger_config_recente('docker.cfg.' + configuration_service_meta['role'])
