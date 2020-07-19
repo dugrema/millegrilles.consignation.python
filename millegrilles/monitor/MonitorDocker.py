@@ -20,7 +20,7 @@ from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExe
 
 class GestionnaireModulesDocker:
 
-    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list, service_monitor):
+    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list, service_monitor, **kwargs):
         self.__idmg = idmg
         self.__docker = docker_client
         self.configuration_json = None
@@ -30,6 +30,8 @@ class GestionnaireModulesDocker:
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
         self.__service_monitor = service_monitor
+
+        self.__insecure = kwargs.get('insecure') or False
 
         fqdn = self.hostname
 
@@ -42,7 +44,14 @@ class GestionnaireModulesDocker:
             'NODENAME': self.nodename,
             'HOSTNAME': fqdn,
             'NGINX_CONFIG_VOLUME': '/var/opt/millegrilles/nginx/modules',
+            'NGINX_HTML_VOLUME': '/var/opt/millegrilles/nginx/html',
+            'NGINX_DATA_VOLUME': '/var/opt/millegrilles/nginx/data',
         }
+
+        if self.__insecure:
+            self.__mappings['NGINX_CONFIG_VOLUME'] = '/var/opt/millegrilles/nginx/modules'
+            self.__mappings['NGINX_HTML_VOLUME'] = '/var/opt/millegrilles/nginx/html'
+            self.__mappings['NGINX_DATA_VOLUME'] = '/var/opt/millegrilles/nginx/data'
 
         self.__event_listeners = list()
 

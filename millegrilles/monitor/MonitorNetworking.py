@@ -18,6 +18,7 @@ class GestionnaireWeb:
         self.__init_complete = False
         self.__repertoire_modules = path.join('/var/opt/millegrilles/nginx/modules')
         self.__repertoire_data = path.join('/var/opt/millegrilles/nginx/data')
+        self.__repertoire_html = path.join('/var/opt/millegrilles/nginx/html')
 
     def entretien(self):
         if not self.__init_complete:
@@ -32,10 +33,13 @@ class GestionnaireWeb:
         except FileExistsError:
             self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
-        try:
-            os.makedirs(self.__repertoire_data, mode=0o775)
-        except FileExistsError:
-            self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
+        reps = [self.__repertoire_data, self.__repertoire_html]
+        for rep in reps:
+            try:
+                os.makedirs(rep, mode=0o775)
+            except FileExistsError:
+                self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
+
 
     def __generer_fichiers_configuration(self):
         """

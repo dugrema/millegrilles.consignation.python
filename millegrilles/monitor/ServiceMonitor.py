@@ -394,7 +394,8 @@ class ServiceMonitor:
             self._idmg = self._gestionnaire_certificats.generer_nouveau_idmg()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIMAIRE.copy(), self)
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIMAIRE.copy(),
+            self, insecure=self._args.dev)
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 
@@ -596,7 +597,8 @@ class ServiceMonitorDependant(ServiceMonitor):
         self.__logger.debug("Execution noeud dependant")
         self._charger_configuration()
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_DEPENDANT.copy())
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_DEPENDANT.copy(),
+            self, insecure=self._args.dev)
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
         self.preparer_gestionnaire_certificats()
@@ -836,7 +838,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self._charger_configuration()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(), self)
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
+            self, insecure=self._args.dev
+        )
 
         try:
             self._gestionnaire_docker.initialiser_noeud()
