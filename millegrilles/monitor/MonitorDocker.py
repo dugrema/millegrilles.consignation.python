@@ -336,10 +336,12 @@ class GestionnaireModulesDocker:
         return b64decode(configs[0].attrs['Spec']['Data'])
 
     def sauvegarder_secret(self, secret_name: str, data: bytes, ajouter_date=False):
+        date_courante = None
         if ajouter_date:
             date_courante = datetime.datetime.utcnow().strftime(MonitorConstantes.DOCKER_LABEL_TIME)
             secret_name = secret_name + '.' + date_courante
         self.__docker.secrets.create(name=secret_name, data=data, labels={'idmg': self.__idmg})
+        return secret_name, date_courante
 
     def sauvegarder_config(self, config_name, data):
         filtre = {'name': config_name}
@@ -606,7 +608,12 @@ class GestionnaireModulesDocker:
             labels.update(labels_ajoutes)
             node_info.update(node_spec)
 
-    def executer_scripts(self, container_id: str, commande: str, tar_path: str = None):
+    def trouver_container_pour_service(self, nom_service):
+        containers_service = self.__docker.containers.list(filters={'name': nom_service})
+        container_trouve = containers_service[0]
+        return container_trouve.id
+
+    def executer_scripts(self, container_id: str, commande: str, tar_path: str = None, environment: list = None):
         container = self.__docker.containers.get(container_id)
 
         if tar_path:
@@ -615,7 +622,7 @@ class GestionnaireModulesDocker:
                 container.put_archive('/usr/local', fichier)
                 os.remove(tar_path)  # Cleanup fichier temporaire
 
-        exit_code, output = container.exec_run(commande, stream=True)
+        exit_code, output = container.exec_run(commande, stream=True, environment=environment)
         output_result = None
         for gen_output in output:
             for line in gen_output.decode('utf-8').split('\n'):
@@ -632,6 +639,11 @@ class GestionnaireModulesDocker:
                     resultat=resultat
                 )
 
+    def executer_script_blind(self, container_id: str, commande: str, environment: list = None):
+        container = self.__docker.containers.get(container_id)
+        exit_code, output = container.exec_run(commande, stream=False, environment=environment)
+        return exit_code, output
+
     def put_archives(self, container_id: str, src_path: str, dst_path: str):
         container = self.__docker.containers.get(container_id)
 
@@ -647,6 +659,14 @@ class GestionnaireModulesDocker:
         with open(os.path.join(dest_path, archive_name), 'wb') as output:
             for chunk in tar_data:
                 output.write(chunk)
+
+    def get_archive_bytes(self, container_id, src_path) -> bytes:
+        container = self.__docker.containers.get(container_id)
+        tar_data, stat_data = container.get_archive(src_path)
+        array_data = bytes()
+        for chunk in tar_data:
+            array_data = array_data + chunk
+        return array_data
 
     @property
     def idmg(self):

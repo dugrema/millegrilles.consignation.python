@@ -7,6 +7,8 @@ import json
 import datetime
 import os
 import psutil
+import tarfile
+import io
 
 from typing import cast
 from threading import Event, BrokenBarrierError
@@ -999,6 +1001,38 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             'idmg': idmg,
         }
         gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
+
+        # Aller chercher le certificat SSL de LetsEncrypt
+        domaine_noeud = 'mg-dev4.maple.maceroc.com'
+
+        methode_validation = '--test --dns dns_cloudns'
+        params_environnement = [
+            "CLOUDNS_SUB_AUTH_ID=1409",
+            "CLOUDNS_AUTH_PASSWORD=XXXXXXX"
+        ]
+
+        acme_container_id = self._gestionnaire_docker.trouver_container_pour_service('acme')
+        commande_acme = "acme.sh --issue %s -d %s" % (methode_validation, domaine_noeud)
+        resultat_acme, output_acme = self._gestionnaire_docker.executer_script_blind(
+            acme_container_id,
+            commande_acme,
+            environment=params_environnement
+        )
+        if resultat_acme != 0:
+            self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
+            #raise Exception("Erreur creation certificat avec ACME")
+        cert_bytes = self._gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
+        io_buffer = io.BytesIO(cert_bytes)
+        with tarfile.open(fileobj=io_buffer) as tar_content:
+            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
+            key_bytes = tar_content.extractfile(member_key).read()
+            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
+            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
+
+        # Inserer certificat, cle dans docker
+        secret_name, date_secret = self._gestionnaire_docker.sauvegarder_secret(
+            'pki.web.key', key_bytes, ajouter_date=True)
+        self._gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
 
         # Lancer l'installation avec les parametres recus
         # Creer configuration NGINX, generer certificat LetsEncrypt
