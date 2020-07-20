@@ -668,6 +668,27 @@ class GestionnaireModulesDocker:
             array_data = array_data + chunk
         return array_data
 
+    def get_liste_services(self):
+        services = self.__docker.services.list()
+
+        # Mapper services et etat
+        dict_services = dict()
+        for service in services:
+            info_service = {
+                'creation_service': service.attrs['CreatedAt'],
+                'maj_service': service.attrs['UpdatedAt'],
+            }
+
+            tasks = [task for task in service.tasks() if task['DesiredState'] == 'running']
+            if len(tasks) > 0:
+                task = tasks[-1]
+                info_service['etat'] = task['Status']['State']
+                info_service['message_tache'] = task['Status']['Message']
+
+            dict_services[service.name] = info_service
+
+        return dict_services
+
     @property
     def idmg(self):
         return self.__idmg

@@ -702,7 +702,7 @@ class GenerateurCertificatNginxSelfsigned:
         builder = builder.issuer_name(name)
 
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=False, path_length=None),
+            x509.BasicConstraints(ca=True, path_length=0),
             critical=True,
         )
 

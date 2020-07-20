@@ -1582,6 +1582,7 @@ class ConstantesServiceMonitor:
     DOCKER_CONFIG_MONITOR_KEY = DOCKER_CONFIG_NAME_MONITOR + KEY_SUFFIX
     DOCKER_CONFIG_MONITOR_DEPENDANT_KEY = DOCKER_CONFIG_NAME_MONITOR_DEPENDANT + KEY_SUFFIX
 
+    COMMANDE_CONFIGURER_DOMAINE = 'servicemonitor.configurerDomaine'
     COMMANDE_INITIALISER_NOEUD = 'servicemonitor.initialiserNoeud'
 
     COMMANDE_ACTIVER_HEBERGEMENT = 'servicemonitor.activerHebergement'

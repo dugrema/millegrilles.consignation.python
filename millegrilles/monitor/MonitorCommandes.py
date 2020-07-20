@@ -126,6 +126,9 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RESTORE_APPLICATION:
             self._service_monitor.gestionnaire_applications.restore_application(commande)
 
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_DOMAINE:
+            self._service_monitor.initialiser_domaine(commande)
+
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INITIALISER_NOEUD:
             self._service_monitor.initialiser_noeud(commande)
 

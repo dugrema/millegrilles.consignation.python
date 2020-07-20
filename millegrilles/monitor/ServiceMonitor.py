@@ -933,6 +933,67 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             # Creer CSR pour le service monitor
             self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
 
+    def initialiser_domaine(self, commande):
+        params = commande.contenu
+        gestionnaire_docker = self.gestionnaire_docker
+
+        # Aller chercher le certificat SSL de LetsEncrypt
+        domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
+        mode_test = True
+
+        params_environnement = list()
+        params_secrets = list()
+        if params.get('mode_validation') == 'cloudns':
+            methode_validation = '--dns dns_cloudns'
+            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['acme.subid'])
+            params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['acme.password'])
+        else:
+            methode_validation = '--webroot /usr/share/nginx/html'
+
+        configuration_acme = {
+            'domain': domaine_noeud,
+            'methode': {
+                'commande': methode_validation,
+                'mode_test': True,
+                'params_environnement': params_environnement,
+            }
+        }
+        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
+
+        commande_acme = methode_validation
+        if mode_test:
+            commande_acme = '--test ' + methode_validation
+
+        params_combines = list(params_environnement)
+        params_combines.extend(params_secrets)
+
+        acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
+        commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
+        resultat_acme, output_acme = gestionnaire_docker.executer_script_blind(
+            acme_container_id,
+            commande_acme,
+            environment=params_combines
+        )
+        if resultat_acme != 0:
+            self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
+            #raise Exception("Erreur creation certificat avec ACME")
+        cert_bytes = self._gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
+        io_buffer = io.BytesIO(cert_bytes)
+        with tarfile.open(fileobj=io_buffer) as tar_content:
+            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
+            key_bytes = tar_content.extractfile(member_key).read()
+            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
+            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
+
+        # Inserer certificat, cle dans docker
+        secret_name, date_secret = self._gestionnaire_docker.sauvegarder_secret(
+            'pki.web.key', key_bytes, ajouter_date=True)
+        self._gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
+
+        # Lancer l'installation avec les parametres recus
+        # Creer configuration NGINX, generer certificat LetsEncrypt
+        self._gestionnaire_docker.supprimer_service('nginx')  # Forcer reconfiguration nginx
+
     def initialiser_noeud(self, commande):
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
@@ -1001,59 +1062,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             'idmg': idmg,
         }
         gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
-
-        # Aller chercher le certificat SSL de LetsEncrypt
-        domaine_noeud = params['url']  # 'mg-dev4.maple.maceroc.com'
-        mode_test = True
-
-        params_environnement = list()
-        if params.get('mode_validation') == 'cloudns':
-            methode_validation = '--dns dns_cloudns'
-            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['acme.subid'])
-            params_environnement.append("CLOUDNS_AUTH_PASSWORD=" + params['acme.password'])
-        else:
-            methode_validation = '--webroot /usr/share/nginx/html'
-
-        configuration_acme = {
-            'domain': domaine_noeud,
-            'methode': {
-                'commande': methode_validation,
-                'mode_test': True,
-                'params_environnement': params_environnement,
-            }
-        }
-        self._gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
-
-        commande_acme = methode_validation
-        if mode_test:
-            commande_acme = '--test ' + methode_validation
-
-        acme_container_id = self._gestionnaire_docker.trouver_container_pour_service('acme')
-        commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
-        resultat_acme, output_acme = self._gestionnaire_docker.executer_script_blind(
-            acme_container_id,
-            commande_acme,
-            environment=params_environnement
-        )
-        if resultat_acme != 0:
-            self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
-            #raise Exception("Erreur creation certificat avec ACME")
-        cert_bytes = self._gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
-        io_buffer = io.BytesIO(cert_bytes)
-        with tarfile.open(fileobj=io_buffer) as tar_content:
-            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
-            key_bytes = tar_content.extractfile(member_key).read()
-            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
-            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
-
-        # Inserer certificat, cle dans docker
-        secret_name, date_secret = self._gestionnaire_docker.sauvegarder_secret(
-            'pki.web.key', key_bytes, ajouter_date=True)
-        self._gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
-
-        # Lancer l'installation avec les parametres recus
-        # Creer configuration NGINX, generer certificat LetsEncrypt
-        self._gestionnaire_docker.supprimer_service('nginx')  # Forcer reconfiguration nginx
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
