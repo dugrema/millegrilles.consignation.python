@@ -80,6 +80,13 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
             fichier.write(proxypass)
 
+        proxypass_installation = """
+            set $upstream https://mg-dev4.maple.maceroc.com:8444;
+            proxy_pass $upstream;
+        """
+        with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
+            fichier.write(proxypass_installation)
+
         resolver = """
             resolver 127.0.0.11 valid=30s;
         """
@@ -119,6 +126,12 @@ class GestionnaireWeb:
                 include /etc/nginx/conf.d/component_base_auth.include;
             }
         """
+        location_installation_component = """
+            location %s {
+                include /etc/nginx/conf.d/modules/proxypass_installation.include;
+                include /etc/nginx/conf.d/component_base.include;
+            }
+        """
         location_public_paths = [
             "/vitrine",
         ]
@@ -127,12 +140,16 @@ class GestionnaireWeb:
             "/posteur",
             "/messagerie",
         ]
+        location_installation_paths = [
+            "/installation",
+        ]
 
         locations_list = list()
         locations_list.append(location_redirect_installation)
         locations_list.append(location_data_vitrine)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
         locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
+        locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
 
         locations_content = '\n'.join(locations_list)
 
