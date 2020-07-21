@@ -40,7 +40,6 @@ class GestionnaireWeb:
             except FileExistsError:
                 self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
-
     def __generer_fichiers_configuration(self):
         """
         Genere et conserve la configuration courante
@@ -172,5 +171,15 @@ class GestionnaireWeb:
         """
         try:
             self.__service_monitor.gestionnaire_docker.force_update_service('nginx')
+        except AttributeError:
+            self.__logger.warning("Redemarrage nginx - Aucuns services configures")
+
+    def redeployer_nginx(self):
+        """
+        Met a jour la configuration de nginx (e.g. nouveau certificat web)
+        :return:
+        """
+        try:
+            self.__service_monitor.gestionnaire_docker.demarrer_service('nginx')
         except AttributeError:
             self.__logger.warning("Redemarrage nginx - Aucuns services configures")

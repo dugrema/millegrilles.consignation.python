@@ -990,9 +990,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             'pki.web.key', key_bytes, ajouter_date=True)
         self._gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
 
-        # Lancer l'installation avec les parametres recus
-        # Creer configuration NGINX, generer certificat LetsEncrypt
-        self._gestionnaire_docker.supprimer_service('nginx')  # Forcer reconfiguration nginx
+        # Forcer reconfiguration nginx
+        self._gestionnaire_docker.maj_service('nginx')
 
     def initialiser_noeud(self, commande):
         params = commande.contenu

@@ -236,6 +236,31 @@ class GestionnaireModulesDocker:
             # else:
             #     self.__logger.exception("Erreur demarrage service %s" % service_name)
 
+    def maj_service(self, service_name: str, **kwargs):
+        service_inst = self.__docker.services.list(filters={'name': service_name})[0]
+
+        configuration_service = kwargs.get('config')
+        if not configuration_service:
+            configuration_service = MonitorConstantes.DICT_MODULES.get(service_name)
+
+        gestionnaire_images = kwargs.get('images')
+        if not gestionnaire_images:
+            gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
+
+        nom_image_docker = kwargs.get('nom') or service_name
+        image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+
+        # Prendre un tag au hasard
+        image_tag = image.tags[0]
+
+        configuration = self.__formatter_configuration_service(service_name)
+        command = configuration_service.get('command')
+        constraints = configuration.get('constraints')
+        if constraints:
+            self.__add_node_labels(constraints)
+
+        service_inst.update(**configuration)
+
     def creer_compte(self, label_cert_compte: str):
         certificat_compte = self.charger_config_recente(label_cert_compte)
         certificat_compte_pem = b64decode(certificat_compte['config'].attrs['Spec']['Data'])
