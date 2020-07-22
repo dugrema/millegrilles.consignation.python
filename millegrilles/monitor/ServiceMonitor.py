@@ -96,6 +96,11 @@ class InitialiserServiceMonitor:
             help="Path du repertoire data de toutes les MilleGrilles"
         )
 
+        parser.add_argument(
+            '--webroot', type=str, required=False, default='/var/opt/millegrilles/installation',
+            help="Path du webroot de l'installeur"
+        )
+
         self.__args = parser.parse_args()
 
         # Appliquer args
@@ -320,7 +325,7 @@ class ServiceMonitor:
             )
 
     def preparer_web_api(self):
-        self._web_api = ServerWebAPI(self)
+        self._web_api = ServerWebAPI(self, webroot=self._args.webroot)
         self._web_api.start()
 
     def _charger_configuration(self):

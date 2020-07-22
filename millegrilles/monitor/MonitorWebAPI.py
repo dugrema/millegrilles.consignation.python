@@ -16,7 +16,8 @@ serverPort = 8080
 class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory='/tmp', **kwargs)
+        server = args[2]
+        super().__init__(*args, directory=server.webroot, **kwargs)
 
     @property
     def service_monitor(self):
@@ -25,12 +26,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     def do_GET(self):
         path_request = self.path.split('/')
         try:
-            if path_request[2] == 'static':
-                super().do_GET()
-            elif path_request[2] == 'api':
+            if path_request[2] == 'api':
                 self._traiter_get_api()
             else:
-                self.error_404()
+                self.path = '/' + '/'.join(path_request[2:])
+                super().do_GET()
         except IndexError:
             self.error_404()
 
@@ -161,10 +161,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
 class ServerWebAPI:
 
-    def __init__(self, service_monitor):
+    def __init__(self, service_monitor, webroot='/var/opt/millegrilles/installeur'):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__thread = Thread(name="WebApi", target=self.run)
         self.__service_monitor = service_monitor
+        self.__webroot = webroot
         self.webServer = None
 
     def start(self):
@@ -173,6 +174,7 @@ class ServerWebAPI:
     def run(self):
         self.webServer = HTTPServer((hostName, serverPort), ServerMonitorHttp)
         self.webServer.service_monitor = self.__service_monitor
+        self.webServer.webroot = self.__webroot
         self.__logger.info("Web API Server started http://%s:%s" % (hostName, serverPort))
 
         try:
@@ -213,3 +215,4 @@ def get_ip(hostname):
         finally:
             s.close()
     return IP
+
