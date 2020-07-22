@@ -414,7 +414,7 @@ class ServiceMonitor:
         self.__entretien_certificats()
 
         # Initialiser gestionnaire web
-        self._gestionnaire_web = GestionnaireWeb(self)
+        self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
 
     def _entretien_modules(self):
         if not self.limiter_entretien:
@@ -850,7 +850,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.__logger.info("Docker.initialiser_noeud: Noeud deja initialise")
 
         # Initialiser gestionnaire web
-        self._gestionnaire_web = GestionnaireWeb(self)
+        self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
         self._gestionnaire_web.entretien()
 
         self._gestionnaire_docker.start_events()
@@ -939,14 +939,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Aller chercher le certificat SSL de LetsEncrypt
         domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
-        mode_test = True
+        mode_test = self._args.dev or params.get('modeTest')
 
         params_environnement = list()
         params_secrets = list()
-        if params.get('mode_validation') == 'cloudns':
+        if params.get('modeCreation') == 'dns_cloudns':
             methode_validation = '--dns dns_cloudns'
-            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['acme.subid'])
-            params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['acme.password'])
+            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['cloudnsSubid'])
+            params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['cloudnsPassword'])
         else:
             methode_validation = '--webroot /usr/share/nginx/html'
 
@@ -1061,6 +1061,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             'idmg': idmg,
         }
         gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
+
+        # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
+        # Redemarrage est implicite (fait a la fin de la prep)
+        self._gestionnaire_web.regenerer_configuration(mode_installe=True)
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")

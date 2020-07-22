@@ -10,9 +10,10 @@ class GestionnaireWeb:
     """
     S'occupe de la configuration des applications web, specifiquement nginx (via conf.d/modules)
     """
-    def __init__(self, service_monitor):
+    def __init__(self, service_monitor, mode_dev=False):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__service_monitor = service_monitor
+        self.__mode_dev = mode_dev
         self.__docker_client = service_monitor.gestionnaire_docker
 
         self.__init_complete = False
@@ -24,6 +25,9 @@ class GestionnaireWeb:
         if not self.__init_complete:
             self.__creer_repertoires()
             self.__init_complete = True
+
+    def regenerer_configuration(self, mode_installe):
+        self.__generer_fichiers_configuration(mode_installe=mode_installe)
 
     def __creer_repertoires(self):
         # Verifier si les repertoires existent
@@ -40,7 +44,7 @@ class GestionnaireWeb:
             except FileExistsError:
                 self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
 
-    def __generer_fichiers_configuration(self):
+    def __generer_fichiers_configuration(self, mode_installe=False):
         """
         Genere et conserve la configuration courante
         :return:
@@ -79,10 +83,14 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
             fichier.write(proxypass)
 
+        domaine_installeur = 'monitor'
+        if self.__mode_dev:
+            domaine_installeur = self.__service_monitor.nodename
+
         proxypass_installation = """
-            set $upstream https://mg-dev4.maple.maceroc.com:8444;
+            set $upstream https://%s:8444;
             proxy_pass $upstream;
-        """
+        """ % domaine_installeur
         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
             fichier.write(proxypass_installation)
 
@@ -101,11 +109,17 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
 
+        if self.__service_monitor.idmg or mode_installe:
+            redirect_defaut = 'millegrilles'
+        else:
+            # Nouvelle installation, defaut vers installeur
+            redirect_defaut = 'installation'
+
         location_redirect_installation = """
             location = / {
-              return 302 https://$http_host/installation;
+              return 302 https://$http_host/%s;
             }
-        """
+        """ % redirect_defaut
 
         location_data_vitrine = """
             location /vitrine/data {
