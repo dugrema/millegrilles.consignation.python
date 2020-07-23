@@ -941,12 +941,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
             nouveau_secrets_monitor_ajoutes = True
 
+        # if nouveau_secrets_monitor_ajoutes:
         if nouveau_secrets_monitor_ajoutes and not self._args.dev:
             # Besoin reconfigurer le service pour ajouter les secrets et redemarrer
+            self._gestionnaire_docker.configurer_monitor()
 
             # Redemarrer / reconfigurer le monitor
             self.__logger.info("Configuration completee, redemarrer le monitor")
-            self.fermer()
+            raise ForcerRedemarrage("Redemarrage")
 
     def initialiser_domaine(self, commande):
         params = commande.contenu

@@ -127,30 +127,33 @@ class GestionnaireModulesDocker:
             'passwd.mq': ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE,
             'passwd.mongoxpweb': ConstantesServiceMonitor.FICHIER_MONGOXPWEB_MOTDEPASSE,
             ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem',
-            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.pem',
+            ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt',
             ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY: ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem',
         }
 
         liste_secrets = list()
         for nom_secret, nom_fichier in noms_secrets.items():
             self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
-            secret_reference = self.trouver_secret(nom_secret)
-            secret_reference['filename'] = nom_fichier
-            secret_reference['uid'] = 0
-            secret_reference['gid'] = 0
-            secret_reference['mode'] = 0o444
+            try:
+                secret_reference = self.trouver_secret(nom_secret)
+                secret_reference['filename'] = nom_fichier
+                secret_reference['uid'] = 0
+                secret_reference['gid'] = 0
+                secret_reference['mode'] = 0o444
 
-            del secret_reference['date']
+                del secret_reference['date']
 
-            liste_secrets.append(SecretReference(**secret_reference))
+                liste_secrets.append(SecretReference(**secret_reference))
+            except ValueError as ve:
+                self.__logger.warning(str(ve))
 
-        network = NetworkAttachmentConfig(target='mg_%s_net' % self.__idmg)
+        # network = NetworkAttachmentConfig(target='mg_net' % self.__idmg)
 
         # Ajouter secrets au service monitor
         filtre = {'name': 'service_monitor'}
         services_list = self.__docker.services.list(filters=filtre)
         service_monitor = services_list[0]
-        service_monitor.update(secrets=liste_secrets, networks=[network])
+        service_monitor.update(secrets=liste_secrets)
 
     def entretien_services(self):
         """
