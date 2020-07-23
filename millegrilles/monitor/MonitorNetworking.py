@@ -87,10 +87,17 @@ class GestionnaireWeb:
         if self.__mode_dev:
             domaine_installeur = self.__service_monitor.nodename
 
-        proxypass_installation = """
-            set $upstream https://%s:8444;
-            proxy_pass $upstream;
-        """ % domaine_installeur
+        if self.__mode_dev:
+            proxypass_installation = """
+                set $upstream https://%s:8444;
+                proxy_pass $upstream;
+            """ % domaine_installeur
+        else:
+            proxypass_installation = """
+                set $upstream http://%s:8080;
+                proxy_pass $upstream;
+            """ % domaine_installeur
+
         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
             fichier.write(proxypass_installation)
 
