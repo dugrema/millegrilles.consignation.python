@@ -3,6 +3,7 @@ import logging
 import json
 import socket
 
+from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 
@@ -26,7 +27,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     def do_GET(self):
         path_request = self.path.split('/')
         try:
-            if path_request[2] == 'api':
+            if self.path == '/installation':
+                self.send_response(HTTPStatus.TEMPORARY_REDIRECT)
+                self.send_header("Location", '/installation/')
+                self.end_headers()
+            elif path_request[2] == 'api':
                 self._traiter_get_api()
             else:
                 self.path = '/' + '/'.join(path_request[2:])
