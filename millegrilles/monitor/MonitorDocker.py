@@ -150,7 +150,7 @@ class GestionnaireModulesDocker:
         # network = NetworkAttachmentConfig(target='mg_net' % self.__idmg)
 
         # Ajouter secrets au service monitor
-        filtre = {'name': 'service_monitor'}
+        filtre = {'name': 'monitor'}
         services_list = self.__docker.services.list(filters=filtre)
         service_monitor = services_list[0]
         service_monitor.update(secrets=liste_secrets)

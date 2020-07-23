@@ -975,7 +975,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
                 'params_environnement': params_environnement,
             }
         }
-        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
 
         commande_acme = methode_validation
         if mode_test:
@@ -994,7 +993,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         if resultat_acme != 0:
             self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
             #raise Exception("Erreur creation certificat avec ACME")
-        cert_bytes = self._gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
+        cert_bytes = gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
         io_buffer = io.BytesIO(cert_bytes)
         with tarfile.open(fileobj=io_buffer) as tar_content:
             member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
@@ -1003,12 +1002,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             fullchain_bytes = tar_content.extractfile(member_fullchain).read()
 
         # Inserer certificat, cle dans docker
-        secret_name, date_secret = self._gestionnaire_docker.sauvegarder_secret(
+        secret_name, date_secret = gestionnaire_docker.sauvegarder_secret(
             'pki.web.key', key_bytes, ajouter_date=True)
-        self._gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
+
+        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
+        gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
 
         # Forcer reconfiguration nginx
-        self._gestionnaire_docker.maj_service('nginx')
+        gestionnaire_docker.maj_service('nginx')
 
     def initialiser_noeud(self, commande):
         params = commande.contenu
@@ -1085,7 +1086,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
-        self.fermer()
+        gestionnaire_docker.configurer_monitor()
+
+        if not self._args.dev:
+            raise ForcerRedemarrage("Redemarrage")
 
 
 # Section main
