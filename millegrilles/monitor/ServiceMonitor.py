@@ -914,6 +914,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             params['secrets'] = self._args.secrets
         self._gestionnaire_certificats = GestionnaireCertificatsInstallation(self._docker, self, **params)
 
+        nouveau_secrets_monitor_ajoutes = False  # Flag qui va indiquer si de nouveaux secrets sont ajoutes
+
         # Verifier si le certificat nginx existe deja - generer un cert self-signed au besoin
         try:
             docker_cert_nginx = self._gestionnaire_docker.charger_config_recente('pki.nginx.cert')
@@ -937,6 +939,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         except ValueError:
             # Creer CSR pour le service monitor
             self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
+            nouveau_secrets_monitor_ajoutes = True
+
+        if nouveau_secrets_monitor_ajoutes and not self._args.dev:
+            # Besoin reconfigurer le service pour ajouter les secrets et redemarrer
+
+            # Redemarrer / reconfigurer le monitor
+            self.__logger.info("Configuration completee, redemarrer le monitor")
+            self.fermer()
 
     def initialiser_domaine(self, commande):
         params = commande.contenu
