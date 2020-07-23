@@ -55,6 +55,9 @@ class GestionnaireModulesDocker:
 
         self.__event_listeners = list()
 
+        self.__intervalle_entretien_comptes = datetime.timedelta(minutes=5)
+        self.__derniere_creation_comptes = datetime.datetime.utcnow() - self.__intervalle_entretien_comptes + datetime.timedelta(seconds=15)
+
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def start_events(self):
@@ -170,6 +173,7 @@ class GestionnaireModulesDocker:
             service_name = service.name
             dict_services[service_name] = service
 
+        entretien_compte_complete = False
         for service_name in self.__modules_requis:
             params = MonitorConstantes.DICT_MODULES[service_name]
             service = dict_services.get(service_name)
@@ -182,6 +186,13 @@ class GestionnaireModulesDocker:
             else:
                 # Verifier etat service
                 self.verifier_etat_service(service)
+
+                if self.__derniere_creation_comptes < datetime.datetime.utcnow() - self.__intervalle_entretien_comptes:
+                    self.creer_comptes_service(service)
+                    entretien_compte_complete = True
+
+        if entretien_compte_complete:
+            self.__derniere_creation_comptes = datetime.datetime.utcnow()
 
     def demarrer_service(self, service_name: str, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
@@ -324,7 +335,7 @@ class GestionnaireModulesDocker:
         service_list = self.__docker.services.list(filters=filter)
         service_list[0].force_update()
 
-    def verifier_etat_service(self, service):
+    def creer_comptes_service(self, service):
         # S'assurer que le compte MQ est cree
         container_spec = service.attrs['Spec']['TaskTemplate']['ContainerSpec']
         configs = container_spec.get('Configs')
@@ -336,6 +347,7 @@ class GestionnaireModulesDocker:
                     # Commande pour creer le compte (commande idempotente)
                     self.creer_compte(config_name)
 
+    def verifier_etat_service(self, service):
         # S'assurer que le compte MQ existe
         update_state = None
         update_status = service.attrs.get('UpdateStatus')
