@@ -325,6 +325,18 @@ class GestionnaireModulesDocker:
         service_list[0].force_update()
 
     def verifier_etat_service(self, service):
+        # S'assurer que le compte MQ est cree
+        container_spec = service.attrs['Spec']['TaskTemplate']['ContainerSpec']
+        configs = container_spec.get('Configs')
+        if configs:
+            for config in configs:
+                config_name = config['ConfigName']
+                config_name_split = config_name.split('.')
+                if len(config_name_split) >= 3 and config_name_split[0] == 'pki' and config_name_split[2] == 'cert':
+                    # Commande pour creer le compte (commande idempotente)
+                    self.creer_compte(config_name)
+
+        # S'assurer que le compte MQ existe
         update_state = None
         update_status = service.attrs.get('UpdateStatus')
         if update_status is not None:

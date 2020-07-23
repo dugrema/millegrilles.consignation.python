@@ -1088,8 +1088,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__logger.info("Configuration completee, redemarrer le monitor")
         gestionnaire_docker.configurer_monitor()
 
-        if not self._args.dev:
-            raise ForcerRedemarrage("Redemarrage")
+        raise ForcerRedemarrage("Redemarrage")
 
 
 # Section main
