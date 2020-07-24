@@ -1117,7 +1117,7 @@ class MGProcessus:
                     self._requete['requete'],
                     self._requete['domaine'],
                     str(self.document_processus['_id']),
-                    '%s.processus' % self.controleur.gestionnaire.get_nom_queue()
+                    '%s.evenements' % self.controleur.gestionnaire.get_nom_queue()
                 )
 
             # Verifier s'il faut transmettre un message pour continuer le processus ou s'il est complete.

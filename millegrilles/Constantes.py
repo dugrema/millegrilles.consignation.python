@@ -276,6 +276,7 @@ class ConstantesDomaines:
 
     COMMANDE_REGENERER = 'regenerer'
     COMMANDE_GLOBAL_REGENERER = 'commande.global.regenerer'
+    COMMANDE_BACKUP = 'backup'
 
 
 class ConstantesPrincipale:
@@ -1550,7 +1551,7 @@ class ConstantesServiceMonitor:
     MODULE_WEB_PROTEGE = 'web_protege'
     MODULE_WEB = 'web'
     MODULE_PYTHON = 'mg-python'
-    MODULE_MONGOEXPRESS = 'mongoexpress'
+    MODULE_MONGOEXPRESS = 'mongoxp'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     # MODULE_HEBERGEMENT_DOMAINES = 'heb_domaines'
     # MODULE_HEBERGEMENT_MAITREDESCLES = 'heb_maitrecles'

@@ -1655,4 +1655,4 @@ class BackupHoraire(MGProcessus):
 
         self.set_etape_suivante()  # Termine
 
-        return {}
+        return dict()

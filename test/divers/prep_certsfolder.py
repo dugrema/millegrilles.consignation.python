@@ -6,7 +6,7 @@ print("Working directory : " + str(os.getcwd()))
 
 for file in os.listdir(folder):
     name_split = file.split('.')
-    name_short = '.'.join(name_split[1:-1])
+    name_short = '.'.join(name_split[0:-1])
 
     try:
         # os.symlink('%s/%s' % (folder, file), '%s/%s' % (folder, name_short))

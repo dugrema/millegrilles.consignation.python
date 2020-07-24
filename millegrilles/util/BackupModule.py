@@ -83,7 +83,7 @@ class HandlerBackupDomaine:
                 # Preparer URL de connexion a consignationfichiers
                 url_consignationfichiers = 'https://%s:%s' % (
                     self._contexte.configuration.serveur_consignationfichiers_host,
-                    self._contexte.configuration.serveur_consignationfichiers_port,
+                    self._contexte.configuration.serveur_consignationfichiers_port
                 )
 
                 with open(path_fichier_transactions, 'rb') as transactions_fichier:

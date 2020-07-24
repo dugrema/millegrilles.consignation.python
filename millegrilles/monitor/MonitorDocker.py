@@ -227,7 +227,7 @@ class GestionnaireModulesDocker:
 
             configuration = self.__formatter_configuration_service(service_name)
 
-            command = kwargs.get('commande') or configuration_service.get('command')
+            command = configuration_service.get('command')
 
             constraints = configuration.get('constraints')
             if constraints:
