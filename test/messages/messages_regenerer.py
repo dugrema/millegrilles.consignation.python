@@ -60,16 +60,16 @@ class MessagesSample(BaseCallback):
 
     def commande_regenerer(self):
         domaines = [
-            'commande.millegrilles.domaines.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.millegrilles.domaines.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.millegrilles.domaines.Taches.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Taches.%s' % ConstantesDomaines.COMMANDE_REGENERER,
         ]
 
         commande = {

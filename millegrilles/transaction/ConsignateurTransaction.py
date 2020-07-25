@@ -125,15 +125,16 @@ class ConsignateurTransactionCallback(BaseCallback):
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
+        routing_key_split = routing_key.split('.')
         exchange = method.exchange
-        if routing_key.startswith('transaction.'):
+        if routing_key_split[0] == 'transaction':
             try:
                 self.__compteur = self.__compteur + 1
                 self._logger.debug("Nouvelle transaction %d: %s" % (self.__compteur, str(message_dict['en-tete']['domaine'])))
                 self.traiter_nouvelle_transaction(message_dict, exchange, properties)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
-        elif routing_key.endswith('restaurer'):
+        elif routing_key_split[0] == 'commande' and routing_key_split[-1] == 'restaurerTransaction':
             try:
                 self._logger.debug(
                     "Transaction restauree %s" % str(message_dict['en-tete']['domaine']))
@@ -141,7 +142,7 @@ class ConsignateurTransactionCallback(BaseCallback):
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
         else:
-            raise ValueError("Type d'operation inconnue: %s" % str(message_dict))
+            raise ValueError("Type d'operation inconnue %s: %s" % (routing_key, str(message_dict)))
 
     def traiter_nouvelle_transaction(self, message_dict, exchange, properties):
         try:

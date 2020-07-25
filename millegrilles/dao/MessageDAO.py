@@ -428,6 +428,7 @@ class PikaDAO:
 
         setupHandler = PikaSetupHandler()
         exchange_protege = self.configuration.exchange_protege
+        exchange_secure = self.configuration.exchange_secure
 
         # Q nouvelle.transactions, existe sur tous les exchanges
         # Ajouter TTL de 30 secondes pour certaines Q
@@ -443,13 +444,23 @@ class PikaDAO:
 
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
+            exchange_secure,
+            self.queuename_nouvelles_transactions(),
+            [
+                Constantes.TRANSACTION_ROUTING_RESTAURER_COMMUN,
+            ],
+            queue_durable=True,
+            arguments={'x-queue-mode': 'lazy'},
+        ))
+
+        setupHandler.add_configuration(PikaSetupCallbackHandler(
+            self.__channel_consumer,
             Constantes.SECURITE_SECURE,
             self.queuename_evenements_transactions(),
             [
                 Constantes.TRANSACTION_ROUTING_EVENEMENT,
                 Constantes.TRANSACTION_ROUTING_EVENEMENTRESET,
                 Constantes.TRANSACTION_ROUTING_EVENEMENTTOKEN,
-                Constantes.TRANSACTION_ROUTING_RESTAURER,
             ],
             queue_durable=True
         ))
