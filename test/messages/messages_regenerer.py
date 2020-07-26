@@ -65,7 +65,7 @@ class MessagesSample(BaseCallback):
             # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
@@ -78,7 +78,6 @@ class MessagesSample(BaseCallback):
             enveloppe_val = self.generateur.transmettre_commande(
                 commande, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
             print("Commande regenerer domaine %s : %s" % (domaine, enveloppe_val))
-
 
     def executer(self):
         sample.commande_regenerer()

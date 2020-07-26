@@ -79,7 +79,7 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_grosfichiers()
 
             self.prerarerStagingRestauration()
-
+            # self.restore_domaine('Annuaire')
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
 
