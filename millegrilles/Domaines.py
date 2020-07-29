@@ -1198,7 +1198,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         domaine_commande = 'commande.%s.transactionReset' % self.get_nom_domaine()
 
-        self._contexte.message_dao.transmettre_message(evenement, domaine_commande)
+        # self._contexte.message_dao.transmettre_message(evenement, domaine_commande)
+        self._contexte.generateur_transactions.emettre_message(evenement, domaine_commande, exchanges=[Constantes.SECURITE_SECURE])
 
     def executer_backup_horaire(self, declencheur: dict):
         heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)

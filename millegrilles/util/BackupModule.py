@@ -31,7 +31,7 @@ class HandlerBackupDomaine:
 
     def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str, entete_backup_precedent: dict):
         debut_backup = heure
-        niveau_securite = Constantes.SECURITE_PRIVE  # TODO : supporter differents niveaux
+        niveau_securite = Constantes.SECURITE_PRIVE  # A FAIRE : supporter differents niveaux
 
         self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup, niveau_securite)
 
@@ -101,12 +101,15 @@ class HandlerBackupDomaine:
                             'catalogue': (nom_fichier_catalogue, catalogue_fichier, 'application/x-xz'),
                         }
 
+                        certfile = self._contexte.configuration.mq_certfile
+                        keyfile = self._contexte.configuration.mq_keyfile
+
                         r = requests.put(
                             '%s/backup/domaine/%s' % (url_consignationfichiers, nom_fichier_catalogue),
                             data=data,
                             files=files,
                             verify=self._contexte.configuration.mq_cafile,
-                            cert=(self._contexte.configuration.mq_certfile, self._contexte.configuration.mq_keyfile)
+                            cert=(certfile, keyfile)
                         )
 
                 if r.status_code == 200:
@@ -405,7 +408,9 @@ class HandlerBackupDomaine:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection_mongo,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_HORAIRE_COMPLETE,
         }
-        self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+        domaine_action = 'evenement.%s.transactionEvenement' % self._nom_domaine
+        # self._contexte.message_dao.transmettre_message(evenement, domaine_action)
+        self._contexte.generateur_transactions.emettre_message(evenement, domaine_action, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE])
 
     def marquer_transactions_invalides(self, nom_collection_mongo: str, uuid_transactions: list):
         """
@@ -704,7 +709,7 @@ class HandlerBackupDomaine:
         evenement_contenu = {
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
             ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
-            Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: heure.timestamp(),
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: int(heure.timestamp()),
             ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
         }
         if info:
