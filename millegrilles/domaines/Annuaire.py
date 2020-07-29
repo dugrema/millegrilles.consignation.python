@@ -1,6 +1,6 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesAnnuaire
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees, ExchangeRouter
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.util.X509Certificate import PemHelpers
 from millegrilles.SecuritePKI import EnveloppeCertificat
@@ -11,7 +11,7 @@ import datetime
 import logging
 
 
-class TraitementRequetesAnnuaire(TraitementMessageDomaineRequete):
+class TraitementRequetesAnnuaire(TraitementRequetesProtegees):
 
     def _preparerFiche(self, fiche):
         # Filtrer les champs MongoDB et MilleGrilles qui ne sont pas natifs a la fiche

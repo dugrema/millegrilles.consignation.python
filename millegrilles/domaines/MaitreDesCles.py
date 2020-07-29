@@ -4,7 +4,7 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite, ConstantesSecurityPki
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, \
-    TraitementMessageDomaineRequete, TraitementCommandesProtegees, TraitementCommandesSecures
+    TraitementMessageDomaineRequete, TraitementRequetesProtegees, TraitementCommandesProtegees, TraitementCommandesSecures
 from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
 from millegrilles.dao.MessageDAO import CertificatInconnu
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
@@ -65,7 +65,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
         )
 
 
-class TraitementRequetesProtegees(TraitementRequetesNoeuds):
+class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         domaine_routing_key = method.routing_key.replace('requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM, '')
@@ -157,8 +157,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         # Queue message handlers
         self.__handler_requetes = {
-            Constantes.SECURITE_SECURE: TraitementRequetesProtegees(self),
-            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_SECURE: TraitementRequetesMaitreDesClesProtegees(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesMaitreDesClesProtegees(self),
             Constantes.SECURITE_PRIVE: TraitementRequetesNoeuds(self),
             Constantes.SECURITE_PUBLIC: TraitementRequetesNoeuds(self),
         }

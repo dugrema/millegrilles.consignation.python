@@ -3,12 +3,12 @@ import datetime
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds, TraitementCommandesProtegees, \
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesNoeuds, TraitementRequetesProtegees, TraitementCommandesProtegees, \
     TransactionTypeInconnuError
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
-class TraitementRequetesProtegees(TraitementRequetesNoeuds):
+class TraitementRequetesProtegees(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         # Verifier quel processus demarrer. On match la valeur dans la routing key.
@@ -20,8 +20,9 @@ class TraitementRequetesProtegees(TraitementRequetesNoeuds):
         elif action == ConstantesMaitreDesComptes.REQUETE_INFO_PROPRIETAIRE:
             reponse = self.gestionnaire.get_info_proprietaire()
         else:
+            return super().traiter_requete(ch, method, properties, body, message_dict)
             # Type de transaction inconnue, on lance une exception
-            raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+            # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
 
         return reponse
 

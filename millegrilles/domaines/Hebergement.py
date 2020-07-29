@@ -4,14 +4,14 @@ import datetime
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesHebergement
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete, \
     TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessus, MGProcessusTransaction
 from millegrilles.Domaines import ExchangeRouter
 from millegrilles.util import X509Certificate
 
 
-class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegees(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key

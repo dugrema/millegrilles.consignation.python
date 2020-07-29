@@ -111,8 +111,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.commande_regenerer()
-        sample.trigger_backup_reset_global()
-        # sample.trigger_backup_global()
+        # sample.trigger_backup_reset_global()
+        sample.trigger_backup_global()
 
 
 # --- MAIN ---

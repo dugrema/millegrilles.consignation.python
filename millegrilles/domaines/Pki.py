@@ -3,7 +3,7 @@
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
 from millegrilles.Erreurs import ErreurModeRegeneration
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, MGPProcesseurTraitementEvenements
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees, MGPProcesseurTraitementEvenements
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
@@ -28,7 +28,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
-class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
 
     def __init__(self, gestionnaire_domaine):
         super().__init__(gestionnaire_domaine)
@@ -81,7 +81,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self._pki_document_helper = None
         self.__traitement_certificats = None
 
-        handler_requetes_protegees = TraitementRequetesProtegees(self)
+        handler_requetes_protegees = TraitementRequetesProtegeesPki(self)
         handler_requetes_publiques = TraitementRequetesPubliques(self)
 
         self.__handler_requetes_noeuds = {

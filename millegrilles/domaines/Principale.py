@@ -7,7 +7,7 @@ from millegrilles.Constantes import ConstantesPrincipale
 from millegrilles.Domaines import GestionnaireDomaineStandard, ExchangeRouter
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGProcessusTransaction, ErreurMAJProcessus
-from millegrilles.Domaines import TraitementMessageDomaineRequete
+from millegrilles.Domaines import TraitementMessageDomaineRequete, TraitementRequetesProtegees
 
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
@@ -26,7 +26,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
-class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegeesPrincipale(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
@@ -79,7 +79,7 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         self.__handler_requetes = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
-            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesPrincipale(self),
         }
 
     def configurer(self):

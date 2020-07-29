@@ -3,11 +3,11 @@ import datetime
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
-class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+class TraitementRequetesBackupProtegees(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
@@ -16,7 +16,7 @@ class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
         if domaine_routing_key == ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE:
             reponse = self.gestionnaire.requete_backup_dernier_horaire(message_dict)
         else:
-            raise ValueError("Requete inconnue " + routing_key)
+            return super().traiter_requete(ch, method, properties, body, message_dict)
 
         if reponse is not None:
             self.gestionnaire.generateur_transactions.transmettre_reponse(
@@ -41,7 +41,7 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
-            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesBackupProtegees(self),
         }
 
     def configurer(self):

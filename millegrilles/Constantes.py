@@ -279,6 +279,9 @@ class ConstantesDomaines:
     COMMANDE_GLOBAL_REGENERER = 'commande.global.regenerer'
     COMMANDE_BACKUP = 'backup'
 
+    REQUETE_GLOBAL_PREFIX = 'requete.global'
+    REQUETE_STATS_TRANSACTIONS = 'requeteStatsTransactions'
+
 
 class ConstantesPrincipale:
     """ Constantes pour le domaine de l'interface principale """

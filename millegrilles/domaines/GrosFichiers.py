@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
     RegenerateurDeDocuments, GroupeurTransactionsARegenerer
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
@@ -32,7 +32,7 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
             raise Exception("Requete publique non supportee " + routing_key)
 
 
-class TraitementRequetesProtegeesGrosFichiers(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key

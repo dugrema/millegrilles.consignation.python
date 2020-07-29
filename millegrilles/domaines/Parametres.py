@@ -7,7 +7,7 @@ from typing import cast
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter, \
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees, ExchangeRouter, \
     TraitementCommandesProtegees, TraitementCommandesSecures
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -26,7 +26,7 @@ class TraitementRequetesPubliquesParametres(TraitementMessageDomaineRequete):
             raise Exception("Requete publique non supportee " + routing_key)
 
 
-class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegeesParametres(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key

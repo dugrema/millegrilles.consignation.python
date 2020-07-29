@@ -8,7 +8,7 @@ from pymongo.errors import OperationFailure
 
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
-from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees
 from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter, TraitementCommandesSecures
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
@@ -29,7 +29,7 @@ class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete
         self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
-class TraitementRequetesProtegeesSenseursPassifs(TraitementMessageDomaineRequete):
+class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key

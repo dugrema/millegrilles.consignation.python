@@ -864,6 +864,35 @@ class GestionnaireDomaine:
             except Exception as e:
                 self._logger.info("Erreur fermeture watcher: %s" % str(e))
 
+    def rapport_stats_transactions(self):
+        """
+        :return: Rapport des stats sur les transactions de ce domaine/sous-domaine
+        """
+
+        collection_domaine = self.document_dao.get_collection(self.get_nom_domaine())
+
+        match = {
+            '$match': {
+                '_evenements.transaction_complete': True,
+            }
+        }
+        group = {'$group': {
+            '_id': None,
+            'transactions_count': {'$sum': 1},
+            'transactions_backup_count': {'$sum': {'$cond': {'if': {'$eq': ['$_evenements.backup_flag', True]}, 'then': 1, 'else': 0}}}
+        }}
+
+        curseur_agg = collection_domaine.aggregate([match, group])
+        resultat = curseur_agg.__iter__().next()
+        del resultat['_id']
+
+        reponse = {
+            'domaine': self.get_nom_domaine(),
+        }
+        reponse.update(resultat)
+
+        return reponse
+
     @property
     def configuration(self):
         return self._contexte.configuration
@@ -972,6 +1001,28 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
         return resultat
 
 
+class TraitementRequetesProtegees(TraitementMessageDomaineRequete):
+
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def traiter_requete(self, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        commande = routing_key.split('.')[-1]
+        nom_domaine = self.gestionnaire.get_collection_transaction_nom()
+
+        reponse = None
+        if commande == ConstantesDomaines.REQUETE_STATS_TRANSACTIONS:
+            reponse = self.gestionnaire.rapport_stats_transactions()
+        else:
+            return super().traiter_requete(ch, method, properties, body, message_dict)
+
+        # Genere message reponse
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
 class GestionnaireDomaineStandard(GestionnaireDomaine):
     """
     Implementation des Q standards pour les domaines.
@@ -1051,6 +1102,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 'nom': '%s.requete.%s' % (self.get_nom_domaine(), securite),
                 'routing': [
                     'requete.%s.#.*' % self.get_nom_domaine(),
+                    ConstantesDomaines.REQUETE_GLOBAL_PREFIX + '.*',
                 ],
                 'exchange': securite,
                 'ttl': 20000,
