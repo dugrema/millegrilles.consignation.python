@@ -79,9 +79,40 @@ class MessagesSample(BaseCallback):
                 declencheur, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
             print("Commande regenerer domaine %s : %s" % (domaine, enveloppe_val))
 
+    def trigger_backup_global(self):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_horaire'
+        )
+
+    def trigger_backup_reset_global(self):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_reset'
+        )
 
     def executer(self):
-        sample.commande_regenerer()
+        # sample.commande_regenerer()
+        sample.trigger_backup_global()
+        # sample.trigger_backup_reset_global()
 
 
 # --- MAIN ---

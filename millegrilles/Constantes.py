@@ -1304,6 +1304,11 @@ class ConstantesBackup:
 
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
 
+    EVENEMENT_BACKUP_HORAIRE_DEBUT = 'backupHoraireDebut'
+    EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET = 'backupHoraireCataloguePret'
+    EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME = 'backupHoraireUploadConfirme'
+    EVENEMENT_BACKUP_HORAIRE_TERMINE = 'backupHoraireTermine'
+
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
     LIBVAL_CATALOGUE_MENSUEL = 'catalogue.mensuel'

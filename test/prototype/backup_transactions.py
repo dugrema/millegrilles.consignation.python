@@ -78,7 +78,7 @@ class MessagesSample(BaseCallback):
             # self.backup_domaine_senseurpassifs()
             # self.backup_domaine_grosfichiers()
 
-            self.prerarerStagingRestauration()
+            # self.prerarerStagingRestauration()
             # self.restore_domaine('Annuaire')
             # self.restore_domaine(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
             # self.restore_domaine(ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM)
@@ -89,7 +89,7 @@ class MessagesSample(BaseCallback):
             # self.creer_backup_quoditien(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
             # Declenchement global
-            # self.trigger_backup_global()
+            self.trigger_backup_global()
 
             # self.reset_evenements()
         finally:

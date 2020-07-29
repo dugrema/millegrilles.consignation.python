@@ -8,7 +8,7 @@ from typing import cast
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesParametres
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, ExchangeRouter, \
-    TraitementMessageDomaineCommande, TraitementCommandesSecures
+    TraitementCommandesProtegees, TraitementCommandesSecures
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine, TraitementMessageCallback
 from millegrilles.MGProcessus import MGProcessusTransaction
 
@@ -40,7 +40,7 @@ class TraitementRequetesProtegeesParametres(TraitementMessageDomaineRequete):
             super().traiter_requete(ch, method, properties, body, message_dict)
 
 
-class TraitementParametresDomaineCommandeProtegees(TraitementMessageDomaineCommande):
+class TraitementParametresDomaineCommandeProtegees(TraitementCommandesProtegees):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         routing_key = method.routing_key
@@ -49,7 +49,7 @@ class TraitementParametresDomaineCommandeProtegees(TraitementMessageDomaineComma
         if action == ConstantesParametres.COMMANDE_SUPPRIMER_ERREUR:
             reponse = self.gestionnaire.supprimer_erreurs(message_dict)
         else:
-            raise ValueError("Action inconnu pour Parametres : %s" % action)
+            reponse = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
         return reponse
 

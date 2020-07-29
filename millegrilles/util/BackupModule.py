@@ -30,6 +30,11 @@ class HandlerBackupDomaine:
         self._nom_collection_documents = nom_collection_documents
 
     def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str, entete_backup_precedent: dict):
+        debut_backup = heure
+        niveau_securite = Constantes.SECURITE_PRIVE  # TODO : supporter differents niveaux
+
+        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup, niveau_securite)
+
         curseur = self._effectuer_requete_domaine(heure)
 
         # Utilise pour creer une chaine entre backups horaires
@@ -57,12 +62,15 @@ class HandlerBackupDomaine:
                 self._contexte.idmg,
                 heure_anterieure,
                 prefixe_fichier,
-                Constantes.SECURITE_PRIVE,
+                niveau_securite,
                 chainage_backup_precedent
             )
 
             catalogue_backup = dependances_backup.get('catalogue')
             if catalogue_backup is not None:
+                self.transmettre_evenement_backup(
+                    ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, debut_backup, niveau_securite)
+
                 hachage_entete = self.calculer_hash_entetebackup(catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE])
                 uuid_transaction_catalogue = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
@@ -102,6 +110,9 @@ class HandlerBackupDomaine:
                         )
 
                 if r.status_code == 200:
+                    self.transmettre_evenement_backup(
+                        ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME, debut_backup, niveau_securite)
+
                     reponse_json = json.loads(r.text)
                     self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
 
@@ -156,6 +167,8 @@ class HandlerBackupDomaine:
                         len(liste_uuids_invalides), self._nom_collection_transactions, str(heure_anterieure))
                 )
                 self.marquer_transactions_invalides(self._nom_collection_transactions, liste_uuids_invalides)
+
+        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, niveau_securite)
 
         self.transmettre_trigger_jour_precedent(heure_plusvieille)
 
@@ -686,6 +699,22 @@ class HandlerBackupDomaine:
 
     def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
         pass
+
+    def transmettre_evenement_backup(self, evenement: str, heure: datetime.datetime, niveau_securite: str, info: dict = None):
+        evenement_contenu = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
+            ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: heure.timestamp(),
+            ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
+        }
+        if info:
+            evenement_contenu['info'] = info
+
+        domaine = 'evenement.%s.%s' % (self._nom_domaine, evenement)
+
+        self._contexte.generateur_transactions.emettre_message(
+            evenement_contenu, domaine, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
+        )
 
     def transmettre_trigger_jour_precedent(self, heure_plusvieille):
         """

@@ -1061,7 +1061,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             queues_config.append({
                 'nom': '%s.commande.%s' % (self.get_nom_queue(), securite),
                 'routing': [
-                    'commande.%s.#.*' % self.get_nom_domaine()
+                    'commande.%s.#.*' % self.get_nom_domaine(),
+                    'commande.global.*'
                 ],
                 'exchange': securite,
                 'ttl': 20000,
@@ -1194,7 +1195,10 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             Constantes.EVENEMENT_MESSAGE_UNSET: unset_champs,
             Constantes.EVENEMENT_MESSAGE_EVENEMENTS: champs,
         }
-        self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENTRESET)
+
+        domaine_commande = 'commande.%s.transactionReset' % self.get_nom_domaine()
+
+        self._contexte.message_dao.transmettre_message(evenement, domaine_commande)
 
     def executer_backup_horaire(self, declencheur: dict):
         heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
