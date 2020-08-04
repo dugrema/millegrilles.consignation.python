@@ -15,5 +15,5 @@
   "MG_PKI_KEY_MILLEGRILLE": "/home/mathieu/mgdev/certs/pki.millegrille.key",
   "MG_PKI_CERT_MILLEGRILLE": "/home/mathieu/mgdev/certs/pki.millegrille.cert",
   "MG_CONSIGNATIONFICHIERS_HOST": "mg-dev3",
-  "MG_CONSIGNATIONFICHIERS_PORT": 3003
+  "MG_CONSIGNATIONFICHIERS_PORT": 3021
 }

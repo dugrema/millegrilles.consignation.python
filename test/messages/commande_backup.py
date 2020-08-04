@@ -79,6 +79,18 @@ class MessagesSample(BaseCallback):
                 declencheur, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
             print("Commande regenerer domaine %s : %s" % (domaine, enveloppe_val))
 
+    def requete_backup_dernierhoraire(self):
+        requete = {
+            # 'securite': '2.prive',
+            'domaine': 'Pki',
+        }
+        self._contexte.generateur_transactions.transmettre_requete(
+            requete,
+            ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE,
+            reply_to=self.queue_name,
+            correlation_id='requete'
+        )
+
     def trigger_backup_global(self):
         timestamp_courant = datetime.datetime.utcnow()
 
@@ -110,6 +122,7 @@ class MessagesSample(BaseCallback):
         )
 
     def executer(self):
+        # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
         sample.trigger_backup_global()

@@ -60,8 +60,6 @@ class MessagesSample(BaseCallback):
         timestamp_courant = datetime.datetime.utcnow()
 
         commande_backup_quotidien = {
-            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_requete(
             commande_backup_quotidien,

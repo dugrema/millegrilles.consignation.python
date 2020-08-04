@@ -116,13 +116,14 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         :return:
         """
 
-        securite = requete[ConstantesBackup.LIBELLE_SECURITE]
+        securite = requete.get(ConstantesBackup.LIBELLE_SECURITE)
         domaine = requete[ConstantesBackup.LIBELLE_DOMAINE]
 
         filtre = {
             ConstantesBackup.LIBELLE_DOMAINE: domaine,
-            ConstantesBackup.LIBELLE_SECURITE: securite,
         }
+        if securite:
+            filtre[ConstantesBackup.LIBELLE_SECURITE] = securite
         sort = [
             (ConstantesBackup.LIBELLE_HEURE, -1),
         ]

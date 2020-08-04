@@ -9,5 +9,5 @@
   "MG_MONGO_SSL_CA_CERTS": "/home/mathieu/mgdev/certs/pki.millegrille.cert",
   "MG_PKI_SECRETS": "/home/mathieu/mgdev/certs",
   "MG_CONSIGNATIONFICHIERS_HOST": "mg-dev4",
-  "MG_CONSIGNATIONFICHIERS_PORT": 3003
+  "MG_CONSIGNATIONFICHIERS_PORT": 3021
 }
