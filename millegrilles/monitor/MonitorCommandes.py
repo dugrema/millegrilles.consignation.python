@@ -11,7 +11,7 @@ from millegrilles import Constantes
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
 from millegrilles.util.X509Certificate import EnveloppeCleCert, ConstantesGenerateurCertificat
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
-
+from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
 
 class GestionnaireCommandes:
     """
@@ -85,6 +85,9 @@ class GestionnaireCommandes:
                     self.__logger.debug("Executer commande %s", commande.nom_commande)
                     try:
                         self._executer_commande(commande)
+                    except ForcerRedemarrage:
+                        self.__logger.warning("Commande redemarrage recu, on arrete le monitor")
+                        self._service_monitor.arreter()
                     except Exception:
                         self.__logger.exception("Erreur execution commande")
             except IndexError:
