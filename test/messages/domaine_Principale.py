@@ -129,11 +129,25 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_infoproprietaire(self):
+        requete_cert = {}
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert,
+            'requete.MaitreDesComptes.infoProprietaire',
+            'abcd-1234',
+            self.queue_name,
+            securite=Constantes.SECURITE_PROTEGE,
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # sample.transmettre_maj_profil_usager()
         # sample.transmettre_maj_profil_millegrille()
 
-        sample.requete_authinfo()
+        # sample.requete_authinfo()
+        sample.requete_infoproprietaire()
 
 
 # --- MAIN ---

@@ -8,7 +8,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
-class TraitementRequetesProtegees(TraitementRequetesProtegees):
+class TraitementRequetesProtegeesMaitreComptes(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         # Verifier quel processus demarrer. On match la valeur dans la routing key.
@@ -23,6 +23,10 @@ class TraitementRequetesProtegees(TraitementRequetesProtegees):
             return super().traiter_requete(ch, method, properties, body, message_dict)
             # Type de transaction inconnue, on lance une exception
             # raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
+
+        # Genere message reponse
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
         return reponse
 
@@ -51,8 +55,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
         self.__handler_requetes = {
-            Constantes.SECURITE_SECURE: TraitementRequetesProtegees(self),
-            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegees(self),
+            Constantes.SECURITE_SECURE: TraitementRequetesProtegeesMaitreComptes(self),
+            Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesMaitreComptes(self),
         }
 
         self.__handler_commandes = {
