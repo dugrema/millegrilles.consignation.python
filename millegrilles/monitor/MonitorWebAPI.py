@@ -10,6 +10,8 @@ from threading import Thread
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
 
+from millegrilles.util.IpUtils import get_ip
+
 hostName = "0.0.0.0"
 serverPort = 8080
 
@@ -192,32 +194,4 @@ class ServerWebAPI:
     def server_close(self):
         self.__logger.info("Demande fermeture Web API")
         self.webServer.shutdown()
-
-
-def get_ip(hostname):
-
-    IP = socket.gethostbyname(hostname)
-    if IP.startswith('127.') or IP.startswith('172.'):
-        # On n'a pas trouve l'adresse, essayer d'ouvrir un socket pour laisser
-        # la table de routage trouver la destination.
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            # Si on est sur le meme hote (hostname == localhost == 127.0.0.1), essayer de connecter a "l'exterieur"
-            # Noter que l'adresse est dummy
-            s.connect(('10.255.255.255', 1))
-            IP = s.getsockname()[0]
-
-            if IP.startswith('127') or IP.startswith('172'):
-                # On n'a toujours pas l'adresse, pas bon signe. Derniere chance, revient presque au meme que le 1er test.
-                s.close()
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect((hostname, 1))
-                IP = s.getsockname()[0]
-
-        except Exception:
-            IP = 'ND'
-        finally:
-            s.close()
-    return IP
 

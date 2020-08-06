@@ -287,6 +287,10 @@ class ServiceMonitor:
         try:
             self._connexion_middleware.initialiser()
             self._connexion_middleware.start()
+        except TypeError as te:
+            self.__logger.exception("Erreur fatale configuration MQ, abandonner")
+            self.fermer()
+            raise te
         except BrokenBarrierError:
             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
             self._connexion_middleware.stop()

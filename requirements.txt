@@ -1,18 +1,19 @@
-certifi
+certifi>=2020.6.20
 pika==0.12.0
-pytz==2018.7
-feedparser==5.2.1
-cryptography==2.7
-urllib3==1.25.3
-torf>=2.1.0
-psutil
-base58
+pytz>=2020.1
+feedparser>=5.2.1
+cryptography>=3.0
+urllib3>=1.25.10
+torf>=3.0.2
+psutil>=5.7.2
+base58>=2.0.1
 
-pymongo>=3.7.1,<4.0
+pymongo>=3.11.0,<4.0
 
-cssutils>=1.0,<2.0
-diff-match-patch>=20181111.0,<20181112.0
-openpyxl
-requests
+cssutils>=1.0.2,<2.0
+diff-match-patch>=20200713
+openpyxl>=3.0.4
+requests>=2.24.0
 
-docker
+docker>=4.2.2
+zeroconf>=0.28.0
