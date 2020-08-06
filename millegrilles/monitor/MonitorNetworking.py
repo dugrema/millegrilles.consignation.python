@@ -87,7 +87,7 @@ class GestionnaireWeb:
         if self.__mode_dev:
             domaine_installeur = self.__service_monitor.nodename
 
-        if self.__mode_dev:
+        if not self.__mode_dev:
             proxypass_installation = """
                 set $upstream https://%s:8444;
                 proxy_pass $upstream;

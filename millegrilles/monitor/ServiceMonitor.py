@@ -18,7 +18,8 @@ from base64 import b64decode
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats, \
-    GestionnaireCertificatsNoeudProtegeDependant, GestionnaireCertificatsNoeudProtegePrincipal, GestionnaireCertificatsInstallation
+    GestionnaireCertificatsNoeudProtegeDependant, GestionnaireCertificatsNoeudProtegePrincipal, \
+    GestionnaireCertificatsInstallation, GestionnaireCertificatsNoeudPrive
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes, GestionnaireCommandesNoeudProtegeDependant
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
@@ -31,7 +32,7 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
-
+from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
 
 class InitialiserServiceMonitor:
 
@@ -163,7 +164,7 @@ class InitialiserServiceMonitor:
                 service_monitor_classe = ServiceMonitorDependant
             elif securite == '3.protege' and specialisation == 'extension':
                 self.__logger.error("Noeud d'extension, non supporte")
-                raise ValueError("Noeud de type non reconnu")
+                service_monitor_classe = ServiceMonitorExtension
             elif securite == '3.protege' and specialisation == 'principal':
                 service_monitor_classe = ServiceMonitorPrincipal
             elif securite == '3.protege':
@@ -212,6 +213,7 @@ class ServiceMonitor:
         self._gestionnaire_commandes: GestionnaireCommandes = cast(GestionnaireCommandes, None)
         self._gestionnaire_web: GestionnaireWeb = cast(GestionnaireWeb, None)
         self._gestionnaire_applications: GestionnaireApplications = cast(GestionnaireApplications, None)
+        self._gestionnaire_mdns: MdnsGestionnaire = cast(MdnsGestionnaire, None)
 
         self._web_api: ServerWebAPI = cast(ServerWebAPI, None)
 
@@ -231,6 +233,13 @@ class ServiceMonitor:
         if not self._fermeture_event.is_set():
             self._fermeture_event.set()
             self._attente_event.set()
+            try:
+                self._gestionnaire_mdns.fermer()
+            except Exception as mdnse:
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.exception('Erreur fermeture mdns')
+                else:
+                    self.__logger.info("Erreur fermeture mdns : %s", str(mdnse))
 
             try:
                 self._web_api.server_close()
@@ -331,6 +340,9 @@ class ServiceMonitor:
     def preparer_web_api(self):
         self._web_api = ServerWebAPI(self, webroot=self._args.webroot)
         self._web_api.start()
+
+    def preparer_mdns(self):
+        self._gestionnaire_mdns = MdnsGestionnaire(self)
 
     def _charger_configuration(self):
         # classe_configuration = self._classe_configuration()
@@ -528,6 +540,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             self._charger_configuration()
             self.preparer_gestionnaire_certificats()
             self.configurer_millegrille()
+            self.preparer_mdns()
             self.preparer_gestionnaire_comptesmq()
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
@@ -580,6 +593,11 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
 
         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
+
+    def preparer_mdns(self):
+        super().preparer_mdns()
+        self._gestionnaire_mdns.ajouter_service('millegrilles', '_amqps._tcp.local.', 5673)
+        self._gestionnaire_mdns.ajouter_service('millegrilles', '_https._tcp.local.', 443)
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         pass  # Rien a faire pour le monitor principal
@@ -853,6 +871,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self, insecure=self._args.dev
         )
 
+        self.preparer_mdns()
+
         try:
             self._gestionnaire_docker.initialiser_noeud()
         except APIError:
@@ -1093,6 +1113,79 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.configurer_monitor()
 
         raise ForcerRedemarrage("Redemarrage")
+
+    def preparer_mdns(self):
+        self.__logger.info("Initialisation mdns http sur port 80")
+        super().preparer_mdns()
+        self._gestionnaire_mdns.ajouter_service('millegrilles', '_http._tcp.local.', 80)
+
+
+class ServiceMonitorExtension(ServiceMonitor):
+    """
+    Monitor pour le noeud d'extension
+    """
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        super().__init__(args, docker_client, configuration_json)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def run(self):
+        self.__logger.info("Demarrage du ServiceMonitor")
+
+        try:
+            self._charger_configuration()
+            self.preparer_gestionnaire_certificats()
+            self.configurer_millegrille()
+            self.preparer_gestionnaire_commandes()
+            self.preparer_web_api()
+
+            while not self._fermeture_event.is_set():
+                self._attente_event.clear()
+
+                try:
+                    self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                    self.verifier_load()
+
+                    self._entretien_modules()
+
+                    if not self._connexion_middleware:
+                        try:
+                            self.connecter_middleware()
+                        except BrokenBarrierError:
+                            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+
+                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                except Exception:
+                    self.__logger.exception("ServiceMonitor: erreur generique")
+                finally:
+                    self._attente_event.wait(30)
+
+        except ForcerRedemarrage:
+            self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
+            self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
+
+        except Exception:
+            self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
+
+        self.__logger.info("Fermeture du ServiceMonitor")
+        self.fermer()
+
+        # Fermer le service monitor, retourne exit code pour shell script
+        sys.exit(self.exit_code)
+
+    def preparer_gestionnaire_certificats(self):
+        params = dict()
+        if self._args.dev:
+            params['insecure'] = True
+        if self._args.secrets:
+            params['secrets'] = self._args.secrets
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudPrive(self._docker, self, **params)
+
+    def preparer_gestionnaire_commandes(self):
+        self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
+
+        super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
 
 
 # Section main

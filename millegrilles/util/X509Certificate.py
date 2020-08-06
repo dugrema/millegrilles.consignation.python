@@ -318,7 +318,7 @@ class EnveloppeCleCert:
         """
         subject = self.subject_rfc4514_string()
         subject_list = subject.split(',')
-        subject_list.reverse()
+        # subject_list.reverse()  # Plus necessaire depuis upgrade deps
         return ','.join(subject_list)
 
 
