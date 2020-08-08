@@ -87,7 +87,7 @@ class GestionnaireCommandes:
                         self._executer_commande(commande)
                     except ForcerRedemarrage:
                         self.__logger.warning("Commande redemarrage recu, on arrete le monitor")
-                        self._service_monitor.arreter()
+                        self._service_monitor.fermer()
                     except Exception:
                         self.__logger.exception("Erreur execution commande")
             except IndexError:
