@@ -1,9 +1,11 @@
 import json
 import logging
 import os
+
+from os import path
 from json.decoder import JSONDecodeError
 from threading import Event, Thread
-# from typing import Union
+from typing import Optional
 
 from pymongo.errors import DuplicateKeyError
 
@@ -12,6 +14,7 @@ from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, Gestio
 from millegrilles.util.X509Certificate import EnveloppeCleCert, ConstantesGenerateurCertificat
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
+
 
 class GestionnaireCommandes:
     """
@@ -31,6 +34,7 @@ class GestionnaireCommandes:
         self.__thread_commandes: Thread
 
         self.__socket_fifo = None
+        self.__pipe_acteur: Optional[PipeActeur] = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -40,6 +44,7 @@ class GestionnaireCommandes:
 
         self.__thread_fifo.start()
         self.__thread_commandes.start()
+        self.__pipe_acteur = PipeActeur()  # Demarre une thread implicitement
 
     def stop(self):
         self.__action_event.set()
@@ -47,6 +52,8 @@ class GestionnaireCommandes:
 
         if self.__socket_fifo:
             self.__socket_fifo.close()
+
+        self.__pipe_acteur.fermer()
 
         os.remove(self._path_fifo)
 
@@ -135,6 +142,9 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INITIALISER_NOEUD:
             self._service_monitor.initialiser_noeud(commande)
 
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_GET_INFORMATION_NOEUD:
+            self._service_monitor.transmettre_info_acteur(commande)
+
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
 
             # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_PAR_ROLE:
@@ -197,6 +207,14 @@ class GestionnaireCommandes:
     def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
         self._service_monitor.rediriger_messages_downstream(nom_domaine, exchanges_routing)
 
+    def transmettre_vers_acteur(self, commande: dict):
+        """
+        Relai une commande vers l'acteur systeme
+        :param commande:
+        :return:
+        """
+        self.__pipe_acteur.transmettre_commande(commande)
+
 
 class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):
 
@@ -235,3 +253,53 @@ class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):
 
         # Continuer le demarrage du service monitor
         self._service_monitor.trigger_event_attente()
+
+
+class PipeActeur:
+
+    def __init__(self, path_socket='/var/opt/millegrilles/acteur.socket'):
+        self.__path_socket = path_socket
+        self.__event_stop = Event()
+        self.__event_action = Event()
+
+        self.__commandes = list()
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__thread = Thread(name='acteur.pipe', target=self.run)
+
+        self.__thread.start()
+
+    def fermer(self):
+        if not self.__event_stop.set():
+            self.__event_stop.set()
+            self.__event_action.set()
+
+    def transmettre_commande(self, commande: dict):
+        self.__commandes.append(commande)
+        self.__event_action.set()
+
+    def _emit_socket(self, commande_str: str):
+        if path.exists(self.__path_socket):
+            with open(self.__path_socket, 'w') as pipe:
+                pipe.write(commande_str)
+        else:
+            raise FileNotFoundError(self.__path_socket)
+
+    def run(self):
+        while not self.__event_stop.is_set():
+            self.__event_action.clear()
+
+            try:
+                while not self.__event_stop.is_set() and len(self.__commandes) > 0:
+                    commande = self.__commandes.pop(0)
+
+                    # Transmettre la commande sur socket monitor
+                    commande_str = json.dumps(commande)
+                    self._emit_socket(commande_str)
+                    self.__event_stop.wait(0.5)  # Donner le temps au monitor d'extraire la commande
+            except FileNotFoundError:
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.exception("Pipe n'est pas encore cree, on flush toutes les commandes")
+                self.__commandes.clear()
+
+            self.__event_action.wait(10)

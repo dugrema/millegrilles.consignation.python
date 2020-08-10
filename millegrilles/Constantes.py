@@ -1604,6 +1604,9 @@ class ConstantesServiceMonitor:
     COMMANDE_BACKUP_APPLICATION = 'servicemonitor.backupApplication'
     COMMANDE_RESTORE_APPLICATION = 'servicemonitor.restoreApplication'
 
+    # Commande de l'acteur systeme du noeud
+    COMMANDE_ACTEUR_GET_INFORMATION_NOEUD = 'acteur.getInformationNoeud'
+
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
     CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'
     CORRELATION_CERTIFICAT_SIGNE = 'certificatSigne'

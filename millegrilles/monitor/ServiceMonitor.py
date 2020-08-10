@@ -1119,6 +1119,17 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         super().preparer_mdns()
         self._gestionnaire_mdns.ajouter_service('millegrilles', '_http._tcp.local.', 80)
 
+    def transmettre_info_acteur(self, commande):
+        """
+        Transmet les information du noeud vers l'acteur
+        :param commande:
+        :return:
+        """
+        information_systeme = {
+            'commande': 'set_info',
+            'noeud_id': 'abcd1234'
+        }
+        self._gestionnaire_commandes.transmettre_vers_acteur(information_systeme)
 
 class ServiceMonitorExtension(ServiceMonitor):
     """
