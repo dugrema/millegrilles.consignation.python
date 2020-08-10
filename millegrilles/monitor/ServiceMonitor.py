@@ -10,7 +10,7 @@ import psutil
 import tarfile
 import io
 
-from typing import cast
+from typing import cast, Optional
 from threading import Event, BrokenBarrierError
 from docker.errors import APIError
 from base64 import b64decode
@@ -33,6 +33,7 @@ from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
+
 
 class InitialiserServiceMonitor:
 
@@ -200,6 +201,7 @@ class ServiceMonitor:
 
         self._securite: str = cast(str, None)                   # Niveau de securite de la swarm docker
         self._connexion_middleware: ConnexionMiddleware = cast(ConnexionMiddleware, None)  # Connexion a MQ, MongoDB
+        self._noeud_id: Optional[str] = None                    # UUID du noeud
         self._idmg: str = cast(str, None)                       # IDMG de la MilleGrille hote
 
         self._socket_fifo = None  # Socket FIFO pour les commandes
@@ -347,6 +349,14 @@ class ServiceMonitor:
     def _charger_configuration(self):
         # classe_configuration = self._classe_configuration()
         try:
+            # Charger l'identificateur de noeud
+            configuration_docker = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_CONFIG_NOEUD_ID)
+            data = b64decode(configuration_docker.attrs['Spec']['Data'])
+            self._noeud_id = data.decode('utf-8')
+        except docker.errors.NotFound as he:
+            self.__logger.debug("Configuration %s n'existe pas" % ConstantesServiceMonitor.DOCKER_CONFIG_NOEUD_ID)
+
+        try:
             configuration_docker = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
             data = b64decode(configuration_docker.attrs['Spec']['Data'])
             configuration_json = json.loads(data)
@@ -355,8 +365,7 @@ class ServiceMonitor:
 
             self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
         except docker.errors.NotFound as he:
-            # La configuration n'existe pas
-            pass
+            self.__logger.debug("Configuration %s n'existe pas" % ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
 
     def _classe_configuration(self):
         """
@@ -460,6 +469,10 @@ class ServiceMonitor:
             self.limiter_entretien = False
 
     @property
+    def noeud_id(self) -> str:
+        return self._noeud_id
+
+    @property
     def idmg(self):
         return self._idmg
 
@@ -487,6 +500,25 @@ class ServiceMonitor:
         # Sauvegarder information pour CSR, cle
         label_cert_millegrille = self.idmg_tronque + '.pki.millegrille.cert.' + date_courante
         self._docker.configs.create(name=label_cert_millegrille, data=json.dumps(self._configuration_json['pem']))
+
+    def transmettre_info_acteur(self, commande):
+        """
+        Transmet les information du noeud vers l'acteur
+        :param commande:
+        :return:
+        """
+        information_systeme = self._get_info_noeud()
+        information_systeme['commande'] = 'set_info'
+        self._gestionnaire_commandes.transmettre_vers_acteur(information_systeme)
+
+    def _get_info_noeud(self):
+        information_systeme = {
+            'noeud_id': 'abcd1234'
+        }
+        if self._idmg:
+            information_systeme['idmg'] = self._idmg
+
+        return information_systeme
 
     @property
     def gestionnaire_mq(self):
@@ -519,6 +551,9 @@ class ServiceMonitor:
     @property
     def docker(self):
         return self._docker
+
+    def set_noeud_id(self, noeud_id: str):
+        self._noeud_id = noeud_id
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         raise NotImplementedError()
@@ -859,6 +894,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__event_attente.set()
 
     def _charger_configuration(self):
+        super()._charger_configuration()
         self._idmg = ''
 
     def run(self):
@@ -1119,17 +1155,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         super().preparer_mdns()
         self._gestionnaire_mdns.ajouter_service('millegrilles', '_http._tcp.local.', 80)
 
-    def transmettre_info_acteur(self, commande):
-        """
-        Transmet les information du noeud vers l'acteur
-        :param commande:
-        :return:
-        """
-        information_systeme = {
-            'commande': 'set_info',
-            'noeud_id': 'abcd1234'
-        }
-        self._gestionnaire_commandes.transmettre_vers_acteur(information_systeme)
+    def _get_info_noeud(self):
+        information_systeme = super()._get_info_noeud()
+        information_systeme['csr'] = self.csr_intermediaire.decode('utf-8')
+        return information_systeme
 
 class ServiceMonitorExtension(ServiceMonitor):
     """

@@ -5,6 +5,7 @@ import datetime
 import socket
 import docker
 
+from uuid import uuid4
 from base64 import b64decode
 from threading import Event, Thread
 from typing import cast
@@ -118,6 +119,9 @@ class GestionnaireModulesDocker:
     def initialiser_noeud(self, idmg=None):
         if idmg:
             self.idmg = idmg
+        noeud_id = str(uuid4())
+        self.sauvegarder_config(ConstantesServiceMonitor.DOCKER_CONFIG_NOEUD_ID, noeud_id)
+        self.__service_monitor.set_noeud_id(noeud_id)
         self.initialiser_millegrille()
 
     def configurer_monitor(self):
