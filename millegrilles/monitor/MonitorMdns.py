@@ -11,14 +11,14 @@ class MdnsGestionnaire:
 
     def __init__(self, monitor):
         self.__monitor = monitor
-        self.__service = MdnsService(monitor)
+        # self.__service = MdnsService(monitor)
         self.__browser = MdnsBrowser(monitor)
 
-    def ajouter_service(self, nom_service: str, type_service: str, port: int, properties: dict = None):
-        self.__service.ajouter_service(nom_service, type_service, port, properties)
+    # def ajouter_service(self, nom_service: str, type_service: str, port: int, properties: dict = None):
+    #     self.__service.ajouter_service(nom_service, type_service, port, properties)
 
     def fermer(self):
-        self.__service.fermer()
+        # self.__service.fermer()
         self.__browser.fermer()
 
 

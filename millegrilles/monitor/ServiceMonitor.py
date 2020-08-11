@@ -631,8 +631,8 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
     def preparer_mdns(self):
         super().preparer_mdns()
-        self._gestionnaire_mdns.ajouter_service('millegrilles', '_amqps._tcp.local.', 5673)
-        self._gestionnaire_mdns.ajouter_service('millegrilles', '_https._tcp.local.', 443)
+        # self._gestionnaire_mdns.ajouter_service('millegrilles', '_amqps._tcp.local.', 5673)
+        # self._gestionnaire_mdns.ajouter_service('millegrilles', '_https._tcp.local.', 443)
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         pass  # Rien a faire pour le monitor principal
