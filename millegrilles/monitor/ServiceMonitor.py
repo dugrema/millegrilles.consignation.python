@@ -1153,7 +1153,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
     def preparer_mdns(self):
         self.__logger.info("Initialisation mdns http sur port 80")
         super().preparer_mdns()
-        self._gestionnaire_mdns.ajouter_service('millegrilles', '_http._tcp.local.', 80)
+        # self._gestionnaire_mdns.ajouter_service('millegrilles', '_http._tcp.local.', 80)
 
     def _get_info_noeud(self):
         information_systeme = super()._get_info_noeud()
