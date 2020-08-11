@@ -513,7 +513,7 @@ class ServiceMonitor:
 
     def _get_info_noeud(self):
         information_systeme = {
-            'noeud_id': 'abcd1234'
+            'noeud_id': self.noeud_id
         }
         if self._idmg:
             information_systeme['idmg'] = self._idmg
