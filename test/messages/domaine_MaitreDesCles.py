@@ -412,7 +412,7 @@ class MessagesSample(BaseCallback):
         public_key = clecert.private_key.public_key()
         builder = x509.CertificateSigningRequestBuilder()
         name = x509.Name([
-            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, '3aeGLdmMbA1BrmRYwpPgNAZKH2WGWmSedBjKSxw'),
+            # x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, '3aeGLdmMbA1BrmRYwpPgNAZKH2WGWmSedBjKSxw'),
             x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, 'prive'),
             x509.NameAttribute(x509.name.NameOID.COMMON_NAME, str(uuid4()))
         ])

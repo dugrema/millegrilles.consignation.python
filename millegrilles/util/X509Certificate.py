@@ -348,7 +348,19 @@ class GenerateurCertificat:
                                    duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD) -> x509.CertificateBuilder:
 
         builder = x509.CertificateBuilder()
-        builder = builder.subject_name(csr_request.subject)
+
+        subject = csr_request.subject
+        idmg_certificat = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
+        if not idmg_certificat:
+            role = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
+            cn = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+            subject = x509.Name([
+                x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
+                x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, role),
+                x509.NameAttribute(x509.name.NameOID.COMMON_NAME, cn)
+            ])
+
+        builder = builder.subject_name(subject)
         builder = builder.issuer_name(autorite_cert.subject)
         builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
         builder = builder.not_valid_after(datetime.datetime.today() + duree_cert)
