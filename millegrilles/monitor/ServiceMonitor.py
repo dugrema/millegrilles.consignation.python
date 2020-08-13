@@ -497,7 +497,7 @@ class ServiceMonitor:
 
     def _preparer_csr(self):
         date_courante = datetime.datetime.utcnow().strftime(MonitorConstantes.DOCKER_LABEL_TIME)
-        # Sauvegarder information pour CSR, cle
+        # Sauvegarder information pour cert, cle
         label_cert_millegrille = self.idmg_tronque + '.pki.millegrille.cert.' + date_courante
         self._docker.configs.create(name=label_cert_millegrille, data=json.dumps(self._configuration_json['pem']))
 

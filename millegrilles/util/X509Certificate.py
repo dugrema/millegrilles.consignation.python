@@ -345,20 +345,30 @@ class GenerateurCertificat:
         raise NotImplementedError("Pas implemente")
 
     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
-                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD) -> x509.CertificateBuilder:
+                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD,
+                                   role: str = None) -> x509.CertificateBuilder:
 
         builder = x509.CertificateBuilder()
 
         subject = csr_request.subject
         idmg_certificat = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
-        if not idmg_certificat:
-            role = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
-            cn = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
-            subject = x509.Name([
-                x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
-                x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, role),
-                x509.NameAttribute(x509.name.NameOID.COMMON_NAME, cn)
-            ])
+        if idmg_certificat:
+            idmg_certificat = idmg_certificat[0].value
+        else:
+            idmg_certificat = self._idmg
+
+        role_csr = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATIONAL_UNIT_NAME)
+        if role_csr:
+            role_csr = role_csr[0].value
+        else:
+            role_csr = role
+
+        cn = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+        subject = x509.Name([
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, idmg_certificat),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, role_csr),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, cn)
+        ])
 
         builder = builder.subject_name(subject)
         builder = builder.issuer_name(autorite_cert.subject)
@@ -619,10 +629,10 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
         return domaines_publics
 
-    def signer(self, csr: x509.CertificateSigningRequest) -> x509.Certificate:
+    def signer(self, csr: x509.CertificateSigningRequest, role: str = None) -> x509.Certificate:
         cert_autorite = self._autorite.cert
         builder = self._preparer_builder_from_csr(
-            csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD)
+            csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD, role=role)
 
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
@@ -1792,12 +1802,12 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def signer_csr(self, csr_bytes: bytes):
+    def signer_csr(self, csr_bytes: bytes, role: str = None):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
         sujet_dict = dict()
         for elem in csr.subject:
             sujet_dict[elem.oid._name] = elem.value
-        role = sujet_dict['organizationalUnitName']
+        role = sujet_dict.get('organizationalUnitName') or role
         common_name = sujet_dict['commonName']
 
         return self.renouveller_avec_csr(role, common_name, csr_bytes)
@@ -1820,7 +1830,7 @@ class RenouvelleurCertificat:
             domaines_publics=domaines_publics
         )
 
-        certificat = generateur_instance.signer(csr)
+        certificat = generateur_instance.signer(csr, role)
         chaine = generateur_instance.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)

@@ -914,7 +914,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             pems = list()
             chaines = list()
             for pem in message_dict['liste_csr']:
-                clecert = self.__renouvelleur_certificat.signer_csr(pem.encode('utf-8'))
+                clecert = self.__renouvelleur_certificat.signer_csr(pem.encode('utf-8'), role=message_dict.get('role'))
                 pems.append(str(clecert.cert_bytes, 'utf-8'))
 
                 chaine = {

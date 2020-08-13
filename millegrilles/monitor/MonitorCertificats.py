@@ -119,12 +119,13 @@ class GestionnaireCertificats:
         info_cle = self.__generer_private_key(generer_password=generer_password)
 
         # Generer CSR
-        node_name = self._docker.info()['Name']
+        # node_name = self._docker.info()['Name']
+        noeud_id = self._service_monitor.noeud_id
         builder = x509.CertificateSigningRequestBuilder()
 
         name_list = [
             x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, type_cle),
-            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, node_name)
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, noeud_id)
         ]
         if self.idmg:
             name_list.insert(0, self.idmg)

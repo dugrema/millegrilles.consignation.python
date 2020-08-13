@@ -413,7 +413,7 @@ class MessagesSample(BaseCallback):
         builder = x509.CertificateSigningRequestBuilder()
         name = x509.Name([
             # x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, '3aeGLdmMbA1BrmRYwpPgNAZKH2WGWmSedBjKSxw'),
-            x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, 'prive'),
+            #x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, 'prive'),
             x509.NameAttribute(x509.name.NameOID.COMMON_NAME, str(uuid4()))
         ])
         builder = builder.subject_name(name)
@@ -424,6 +424,7 @@ class MessagesSample(BaseCallback):
 
         commande = {
             'liste_csr': [request_pem.decode('utf-8')],
+            'role': 'prive'
         }
         enveloppe_requete = self.generateur.transmettre_commande(
             commande,
