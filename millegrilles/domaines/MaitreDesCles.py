@@ -904,7 +904,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         roles_permis = [
             ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+            ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE,
         ]
         roles_cert = enveloppe_cert.get_roles
         if enveloppe_cert.subject_organization_name == self.configuration.idmg and \

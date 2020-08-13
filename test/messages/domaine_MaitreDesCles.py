@@ -18,6 +18,7 @@ from cryptography.hazmat import primitives
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from base64 import b64encode
+from uuid import uuid4
 
 
 contexte = ContexteRessourcesMilleGrilles()
@@ -81,6 +82,10 @@ class MessagesSample(BaseCallback):
             self.cert_maitredescles_recu.set()
         else:
             self.event_recu.set()
+            if message_dict['resultats'].get('certificats_pem'):
+                for cert in message_dict['resultats'].get('certificats_pem'):
+                    print(cert)
+
             print(json.dumps(message_dict, indent=4))
 
     def requete_cert_maitredescles(self):
@@ -400,6 +405,36 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def commande_signer_csr_noeud_prive(self):
+        clecert = EnveloppeCleCert()
+        clecert.generer_private_key(keysize=2048)
+
+        public_key = clecert.private_key.public_key()
+        builder = x509.CertificateSigningRequestBuilder()
+        name = x509.Name([
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, '3aeGLdmMbA1BrmRYwpPgNAZKH2WGWmSedBjKSxw'),
+            x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, 'prive'),
+            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, str(uuid4()))
+        ])
+        builder = builder.subject_name(name)
+        request = builder.sign(
+            clecert.private_key, hashes.SHA256(), default_backend()
+        )
+        request_pem = request.public_bytes(primitives.serialization.Encoding.PEM)
+
+        commande = {
+            'liste_csr': [request_pem.decode('utf-8')],
+        }
+        enveloppe_requete = self.generateur.transmettre_commande(
+            commande,
+            'commande.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # self.event_recu.wait(5)
         # self.event_recu.clear()
@@ -421,7 +456,8 @@ class MessagesSample(BaseCallback):
         # self.commande_signer_cle_backup()
         # self.commande_restaurer_backup_cle()
         # self.commande_creer_cles_millegrille_hebergee()
-        self.commande_signer_csr()
+        # self.commande_signer_csr()
+        self.commande_signer_csr_noeud_prive()
 
 
 # --- MAIN ---

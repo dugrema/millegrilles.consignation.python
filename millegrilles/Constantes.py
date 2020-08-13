@@ -1523,6 +1523,7 @@ class ConstantesGenerateurCertificat:
     ROLE_MONITOR_DEPENDANT = 'monitor_dependant'
     ROLE_CONNECTEUR_TIERS = 'tiers'
     ROLE_BACKUP = 'backup'
+    ROLE_NOEUD_PRIVE = 'prive'
     ROLE_HEBERGEMENT = 'hebergement'
     ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
     ROLE_HEBERGEMENT_DOMAINES = 'heb_domaines'
