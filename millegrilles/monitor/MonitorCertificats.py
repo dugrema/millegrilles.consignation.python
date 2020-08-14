@@ -114,7 +114,7 @@ class GestionnaireCertificats:
 
         return info_cle
 
-    def generer_csr(self, type_cle: str, insecure=False, inserer_cle=True, generer_password=False):
+    def generer_csr(self, type_cle: str = None, insecure=False, inserer_cle=True, generer_password=False):
         # Generer cle privee
         info_cle = self.__generer_private_key(generer_password=generer_password)
 
@@ -123,10 +123,11 @@ class GestionnaireCertificats:
         noeud_id = self._service_monitor.noeud_id
         builder = x509.CertificateSigningRequestBuilder()
 
-        name_list = [
-            x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, type_cle),
-            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, noeud_id)
-        ]
+        name_list = list()
+        if type_cle:
+            name_list.append(x509.NameAttribute(x509.name.NameOID.ORGANIZATIONAL_UNIT_NAME, type_cle))
+        name_list.append(x509.NameAttribute(x509.name.NameOID.COMMON_NAME, noeud_id))
+
         if self.idmg:
             name_list.insert(0, self.idmg)
         name = x509.Name(name_list)
