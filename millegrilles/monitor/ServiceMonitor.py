@@ -1031,7 +1031,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             'domain': domaine_noeud,
             'methode': {
                 'commande': methode_validation,
-                'mode_test': True,
+                'mode_test': mode_test,
                 'params_environnement': params_environnement,
             }
         }
