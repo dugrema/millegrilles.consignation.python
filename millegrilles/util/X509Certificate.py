@@ -357,11 +357,10 @@ class GenerateurCertificat:
         else:
             idmg_certificat = self._idmg
 
-        role_csr = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATIONAL_UNIT_NAME)
-        if role_csr:
-            role_csr = role_csr[0].value
-        else:
+        if role:
             role_csr = role
+        else:
+            role_csr = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATIONAL_UNIT_NAME)[0].value
 
         cn = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
         subject = x509.Name([
