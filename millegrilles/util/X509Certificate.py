@@ -1807,7 +1807,9 @@ class RenouvelleurCertificat:
         sujet_dict = dict()
         for elem in csr.subject:
             sujet_dict[elem.oid._name] = elem.value
-        role = sujet_dict.get('organizationalUnitName') or role
+
+        # Le role demande dans le CSR peut etre modifie par le parametre role dans la commande
+        role = role or sujet_dict.get('organizationalUnitName')
         common_name = sujet_dict['commonName']
 
         return self.renouveller_avec_csr(role, common_name, csr_bytes)

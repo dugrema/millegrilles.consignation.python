@@ -990,8 +990,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.csr_intermediaire = data_csr
         except AttributeError:
             # Creer CSR pour le service monitor
-            # csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
-            csr_info = self._gestionnaire_certificats.generer_csr(insecure=self._args.dev, generer_password=True)
+            csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
             self.csr_intermediaire = csr_info['request']
 
         # Verifier si la cle du monitor existe, sinon la generer
