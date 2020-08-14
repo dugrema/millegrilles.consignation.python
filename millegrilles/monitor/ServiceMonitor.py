@@ -983,14 +983,15 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             # Certificat absent, on genere un certificat et cle nginx
             self._gestionnaire_certificats.generer_certificat_nginx_selfsigned()
 
-        # Verifier si le CSR intermediaire a deja ete genere, sinon le generer
+        # Verifier si le CSR a deja ete genere, sinon le generer
         try:
             csr_config_docker = self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
             data_csr = b64decode(csr_config_docker['config'].attrs['Spec']['Data'])
             self.csr_intermediaire = data_csr
         except AttributeError:
             # Creer CSR pour le service monitor
-            csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
+            # csr_info = self._gestionnaire_certificats.generer_csr('intermediaire', insecure=self._args.dev, generer_password=True)
+            csr_info = self._gestionnaire_certificats.generer_csr(insecure=self._args.dev, generer_password=True)
             self.csr_intermediaire = csr_info['request']
 
         # Verifier si la cle du monitor existe, sinon la generer
