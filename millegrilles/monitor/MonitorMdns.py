@@ -3,6 +3,7 @@ from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf, IPVersion, ServiceLi
 from typing import Optional
 import socket
 import logging
+import json
 
 from millegrilles.util.IpUtils import get_local_ips
 
@@ -144,37 +145,65 @@ class MdnsListener(ServiceListener):
         info = zeroconf.get_service_info(type, name)
         texte_dict = info.properties
 
-        idmg = texte_dict[b'idmg'].decode('utf-8')
-        info_service = self.service_par_idmg.get(idmg)
+        try:
+            idmg = texte_dict[b'idmg'].decode('utf-8')
+            info_service = self.service_par_idmg.get(idmg)
 
-        if info_service:
-            service_name = info.name
-            del info_service[service_name]
+            if info_service:
+                service_name = info.name
+                del info_service[service_name]
+        except KeyError:
+            pass
 
     def add_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
         self.__logger.debug("Service %s added, service info: %s" % (name, info))
-        self._maj_entree(zeroconf, type, name)
+
+        if info:
+            self._maj_entree(zeroconf, type, name, info)
 
     def update_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
         self.__logger.debug("Service %s updated, service info: %s" % (name, info))
-        self._maj_entree(zeroconf, type, name)
 
-    def _maj_entree(self, zeroconf, type, name):
-        info = zeroconf.get_service_info(type, name)
+        if info:
+            self._maj_entree(zeroconf, type, name, info)
+
+    def _maj_entree(self, zeroconf, type, name, info):
         texte_dict = info.properties
+        idmg_b = texte_dict.get(b'idmg')
+        est_millegrilles = texte_dict.get(b'millegrilles')
 
-        idmg = texte_dict[b'idmg'].decode('utf-8')
-        info_service = self.service_par_idmg.get(idmg)
-        if not info_service:
-            info_service = dict()
-            self.service_par_idmg[idmg] = info_service
-
-        service_name = info.name
-        info_service[service_name] = info
-
-        server = info.server
-        port = info.port
+        # Verifier que ce n'est pas une adresse locale (avahi n'en tien pas compte)
         addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
-        self.__logger.debug("Entree monitor, idmg: %s, name: %s, server: %s, addresses: %s, port: %d" % (idmg, service_name, server, addresses, port))
+        addresses = [addr for addr in addresses if not addr.startswith('127.') and not addr.startswith('172.')]
+
+        if not idmg_b and est_millegrilles:
+            idmg_b = b'nouveau'
+
+        if len(addresses) and idmg_b:
+            idmg = idmg_b.decode('utf-8')
+            info_service = self.service_par_idmg.get(idmg)
+            if not info_service:
+                info_service = dict()
+                self.service_par_idmg[idmg] = info_service
+
+            service_name = info.name
+            server = info.server
+            port = info.port
+
+            information_service = {
+                'idmg': idmg,
+                'name': service_name,
+                'type': type,
+                'server': server,
+                'port': port,
+                'addresses': addresses,
+            }
+
+            info_service[service_name] = information_service
+
+            # addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
+            self.__logger.debug("Entree monitor, idmg: %s, name: %s, server: %s, addresses: %s, port: %d" % (idmg, service_name, server, addresses, port))
+
+            print("Liste services totales:\n%s" % json.dumps(self.service_par_idmg, indent=2))
