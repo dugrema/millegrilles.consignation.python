@@ -1,5 +1,5 @@
 # Module mdns pour exposer services et recevoir events de presence
-from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf, IPVersion
+from zeroconf import ServiceInfo, ServiceBrowser, Zeroconf, IPVersion, ServiceListener
 from typing import Optional
 import socket
 import logging
@@ -16,6 +16,15 @@ class MdnsGestionnaire:
 
     # def ajouter_service(self, nom_service: str, type_service: str, port: int, properties: dict = None):
     #     self.__service.ajouter_service(nom_service, type_service, port, properties)
+
+    def get_service(self, idmg: str, nom_service: str):
+        service_info = None
+
+        idmg_info = self.__browser.listener.service_par_idmg.get(idmg)
+        if idmg_info:
+            service_info = idmg_info.get(nom_service)
+
+        return service_info
 
     def fermer(self):
         # self.__service.fermer()
@@ -102,47 +111,74 @@ class MdnsService:
 class MdnsBrowser:
 
     def __init__(self, monitor):
-        # Activer zeroconf avec IPv4 et IPv6 (all)
-        self.zeroconf = Zeroconf(ip_version=IPVersion.All)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.zeroconf: Optional[Zeroconf] = None
 
         service_types = [
-            '_mgmonitor._tcp.local.',
-            '_amqps._tcp.local.',
+            '_mghttps._tcp.local.',
+            '_mgamqps._tcp.local.',
         ]
-
         self.listener = MdnsListener(monitor)
-        self.browser = ServiceBrowser(self.zeroconf, service_types, self.listener)
+
+        # Activer zeroconf avec IPv4 et IPv6 (all)
+        try:
+            self.zeroconf = Zeroconf(ip_version=IPVersion.All)
+            self.browser = ServiceBrowser(self.zeroconf, service_types, listener=self.listener)
+        except OSError:
+            self.__logger.warning("Erreur chargement mdns avec IPv4 et IPv6, tenter de charger avec IPv4 uniquement")
+            self.zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+            self.browser = ServiceBrowser(self.zeroconf, service_types, listener=self.listener)
 
     def fermer(self):
         self.zeroconf.unregister_all_services()
         self.zeroconf.close()
 
 
-class MdnsListener:
+class MdnsListener(ServiceListener):
 
     def __init__(self, monitor):
         self.monitor = monitor
+        self.service_par_idmg = dict()
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def remove_service(self, zeroconf, type, name):
-        print("Service %s removed" % (name,))
+        self.__logger.debug("Service %s removed" % (name,))
+
+        info = zeroconf.get_service_info(type, name)
+        texte_dict = info.properties
+
+        idmg = texte_dict[b'idmg'].decode('utf-8')
+        info_service = self.service_par_idmg.get(idmg)
+
+        if info_service:
+            service_name = info.name
+            del info_service[service_name]
 
     def add_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
-        print("Service %s added, service info: %s" % (name, info))
-        if name.startswith('millegrilles.monitor'):
-            self.traiter_monitor(zeroconf, type, name)
+        self.__logger.debug("Service %s added, service info: %s" % (name, info))
+        self._maj_entree(zeroconf, type, name)
 
     def update_service(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
-        print("Service %s updated, service info: %s" % (name, info))
-        if name.startswith('millegrilles.monitor'):
-            self.traiter_monitor(zeroconf, type, name)
+        self.__logger.debug("Service %s updated, service info: %s" % (name, info))
+        self._maj_entree(zeroconf, type, name)
 
-    def traiter_monitor(self, zeroconf, type, name):
+    def _maj_entree(self, zeroconf, type, name):
         info = zeroconf.get_service_info(type, name)
         texte_dict = info.properties
+
         idmg = texte_dict[b'idmg'].decode('utf-8')
+        info_service = self.service_par_idmg.get(idmg)
+        if not info_service:
+            info_service = dict()
+            self.service_par_idmg[idmg] = info_service
+
+        service_name = info.name
+        info_service[service_name] = info
+
         server = info.server
         port = info.port
         addresses = [socket.inet_ntoa(addr) for addr in info.addresses]
-        print("Entree monitor, idmg: %s, server: %s, addresses: %s, port: %d" % (idmg, server, addresses, port))
+        self.__logger.debug("Entree monitor, idmg: %s, name: %s, server: %s, addresses: %s, port: %d" % (idmg, service_name, server, addresses, port))
