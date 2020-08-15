@@ -167,7 +167,8 @@ class GestionnaireCommandes:
         certificat.cert_from_pem_bytes(cert_pem.encode('utf-8'))
         try:
             gestionnaire_mongo: GestionnaireComptesMongo = self._service_monitor.gestionnaire_mongo
-            gestionnaire_mongo.creer_compte(certificat)
+            if gestionnaire_mongo:
+                gestionnaire_mongo.creer_compte(certificat)
         except DuplicateKeyError:
             self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq

@@ -24,7 +24,7 @@ from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes, Gestion
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker
-from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, ConnexionMiddleware
+from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, ConnexionMiddleware, ConnexionMiddlewarePrive
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat
@@ -524,10 +524,6 @@ class ServiceMonitor:
         return self._gestionnaire_mq
 
     @property
-    def gestionnaire_mongo(self):
-        return self._connexion_middleware.get_gestionnaire_comptes_mongo
-
-    @property
     def gestionnaire_docker(self) -> GestionnaireModulesDocker:
         return self._gestionnaire_docker
 
@@ -642,6 +638,10 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         pass  # Rien a faire pour le monitor principal
+
+    @property
+    def gestionnaire_mongo(self):
+        return self._connexion_middleware.get_gestionnaire_comptes_mongo
 
 
 class ServiceMonitorDependant(ServiceMonitor):
@@ -890,12 +890,45 @@ class ServiceMonitorPrive(ServiceMonitor):
         super().__init__(args, docker_client, configuration_json)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def _entretien_modules(self):
+        if not self.limiter_entretien:
+            # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
+            self._gestionnaire_docker.entretien_services()
+
+            # Entretien web
+            self._gestionnaire_web.entretien()
+
+    def connecter_middleware(self):
+        """
+        Genere un contexte et se connecte a MQ et MongoDB.
+        Lance une thread distincte pour s'occuper des messages.
+        :return:
+        """
+        configuration = TransactionConfiguration()
+
+        self._connexion_middleware = ConnexionMiddlewarePrive(
+            configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+            secrets=self._args.secrets, gestionnaire_mdns=self._gestionnaire_mdns)
+
+        try:
+            self._connexion_middleware.initialiser()
+            self._connexion_middleware.start()
+        except TypeError as te:
+            self.__logger.exception("Erreur fatale configuration MQ, abandonner")
+            self.fermer()
+            raise te
+        except BrokenBarrierError:
+            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+            self._connexion_middleware.stop()
+            self._connexion_middleware = None
+
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
 
         try:
             self._charger_configuration()
             self.configurer_millegrille()
+            self.preparer_gestionnaire_certificats()
             self.preparer_mdns()
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
@@ -953,6 +986,15 @@ class ServiceMonitorPrive(ServiceMonitor):
     def preparer_gestionnaire_commandes(self):
         self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
+
+    def preparer_gestionnaire_certificats(self):
+        params = dict()
+        if self._args.dev:
+            params['insecure'] = True
+        if self._args.secrets:
+            params['secrets'] = self._args.secrets
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudPrive(self._docker, self, **params)
+        self._gestionnaire_certificats.charger_certificats()
 
     def preparer_mdns(self):
         super().preparer_mdns()

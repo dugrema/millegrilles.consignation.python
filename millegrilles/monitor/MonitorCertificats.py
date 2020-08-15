@@ -258,6 +258,31 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
         super().__init__(docker_client, service_monitor, **kwargs)
         self._passwd_mq: str = cast(str, None)
 
+    def charger_certificats(self):
+        secret_path = path.abspath(self.secret_path)
+        os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
+
+        # Charger information certificat monitor
+        cert_pem = self._charger_certificat_docker('pki.monitor.cert')
+        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'rb') as fichiers:
+            key_pem = fichiers.read()
+        clecert_monitor = EnveloppeCleCert()
+        clecert_monitor.from_pem_bytes(key_pem, cert_pem)
+        self.clecert_monitor = clecert_monitor
+
+        # Conserver reference au cert monitor pour middleware
+        self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
+        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor.key.pem'
+
+        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
+        #     self._passwd_mongo = fichiers.read()
+        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
+        #     self._passwd_mq = fichiers.read()
+
+        # Charger le certificat de millegrille
+        self._charger_certificat_docker('pki.millegrille.cert')
+
+
     def generer_motsdepasse(self):
         """
         Genere les mots de passes pour composants internes de middleware

@@ -14,14 +14,15 @@ class MdnsGestionnaire:
         self.__monitor = monitor
         self.__browser = MdnsBrowser(monitor)
 
-    def get_service(self, idmg: str, nom_service: str):
-        service_info = None
-
+    def get_service(self, idmg: str, type_service: str = None) -> list:
         idmg_info = self.__browser.listener.service_par_idmg.get(idmg)
         if idmg_info:
-            service_info = idmg_info.get(nom_service)
+            if type_service:
+                return [serv for serv in idmg_info.values() if serv['type'].startswith(type_service)]
+            else:
+                return idmg_info.values()
 
-        return service_info
+        return list()
 
     def fermer(self):
         # self.__service.fermer()

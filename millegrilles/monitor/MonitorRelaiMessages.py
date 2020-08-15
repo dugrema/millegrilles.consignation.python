@@ -366,106 +366,59 @@ class ConnexionMiddleware:
 
     def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
                  service_monitor, certificats: dict, **kwargs):
-        self.__configuration = configuration
-        self.__docker = client_docker
-        self.__service_monitor = service_monitor
-        self.__certificats = certificats
+        self._configuration = configuration
+        self._docker = client_docker
+        self._service_monitor = service_monitor
+        self._certificats = certificats
 
-        self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
-        self.__file_mongo_passwd: str = kwargs.get('mongo_passwd_file') or ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE
-        self.__monitor_keycert_file: str
+        self._path_secrets: str = kwargs.get('secrets') or '/run/secrets'
+        self._monitor_keycert_file: str
 
-        self.__connexion_relai: ConnexionPrincipal = cast(ConnexionPrincipal, None)
+        self._connexion_relai: ConnexionPrincipal = cast(ConnexionPrincipal, None)
 
-        self.__contexte: ContexteRessourcesDocumentsMilleGrilles = cast(ContexteRessourcesDocumentsMilleGrilles, None)
-        self.__thread: Thread = cast(Thread, None)
-        self.__channel = None
+        self._contexte: ContexteRessourcesDocumentsMilleGrilles = cast(ContexteRessourcesDocumentsMilleGrilles, None)
+        self._thread: Thread = cast(Thread, None)
+        self._channel = None
 
-        self.__fermeture_event = Event()
+        self._fermeture_event = Event()
 
-        self.__mongo = GestionnaireComptesMongo(connexion_middleware=self)
-
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-        self.__certificat_event_handler: GestionnaireEvenementsCertificat
+        self._certificat_event_handler: GestionnaireEvenementsCertificat
         self.__commandes_handler: TraitementMessagesMiddleware = cast(TraitementMessagesMiddleware, None)
         self.__transfert_local_handler: TransfertMessages = cast(TransfertMessages, None)
 
         self.__monitor_cert_file: str
 
-        self.__comptes_middleware_ok = False
-        self.__comptes_mq_ok = False
-        self.__prochaine_verification_comptes_noeuds = datetime.datetime.utcnow().timestamp()
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._comptes_middleware_ok = False
+        self._comptes_mq_ok = False
+        self._prochaine_verification_comptes_noeuds = datetime.datetime.utcnow().timestamp()
+        self._gestionnaire_mdns = kwargs.get('gestionnaire_mdns')
 
     def start(self):
         self.__logger.info("Demarrage ConnexionMiddleware")
         # Connecter
 
         # Demarrer thread
-        self.__thread = Thread(target=self.run, name="mw", daemon=True)
-        self.__thread.start()
+        self._thread = Thread(target=self.run, name="mw", daemon=True)
+        self._thread.start()
 
     def stop(self):
-        self.__fermeture_event.set()
+        self._fermeture_event.set()
 
         try:
-            self.__contexte.message_dao.deconnecter()
-            self.__contexte.document_dao.deconnecter()
+            self._contexte.message_dao.deconnecter()
+            self._contexte.document_dao.deconnecter()
         except Exception:
             pass
 
-    def initialiser(self):
-
-        mongo_passwd_file = path.join(self.__path_secrets, self.__file_mongo_passwd)
-        with open(mongo_passwd_file, 'r') as fichier:
-            mongo_passwd = fichier.read()
-
-        ca_certs_file = self.__certificats['pki.millegrille.cert']
-        monitor_cert_file = self.__certificats[GestionnaireCertificats.MONITOR_CERT_PATH]
-        monitor_key_file = path.join(self.__path_secrets, self.__certificats[GestionnaireCertificats.MONITOR_KEY_FILE])
-
-        # Preparer fichier keycert pour mongo
-        keycert, monitor_keycert_file = tempfile.mkstemp(dir='/tmp')
-        with open(monitor_key_file, 'rb') as fichier:
-            os.write(keycert, fichier.read())
-        with open(monitor_cert_file, 'rb') as fichier:
-            cert_content = fichier.read()
-            os.write(keycert, cert_content)
-            split_cert = PemHelpers.split_certificats(str(cert_content, 'utf-8'))
-        self.__monitor_keycert_file = monitor_keycert_file
-        os.close(keycert)
-
-        # Creer chaine de certs CA a partir du certificat de monitor (doit inclure cert millegrille)
-        ca_certs_content = '\n'.join(split_cert[1:])
-        fp, ca_file_mq = tempfile.mkstemp(dir='/tmp')
-        os.write(fp, ca_certs_content.encode('utf-8'))
-        os.close(fp)
-
-        node_name = self.__docker.info()['Name']
-
-        additionnals = [{
-            'MG_MQ_HOST': node_name,
-            'MG_MQ_PORT': 5673,
-            'MG_MQ_CA_CERTS': ca_file_mq,
-            'MG_MQ_CERTFILE': monitor_cert_file,
-            'MG_MQ_KEYFILE': monitor_key_file,
-            'MG_MQ_SSL': 'on',
-            'MG_MQ_AUTH_CERT': 'on',
-            'MG_MONGO_HOST': node_name,
-            'MG_MONGO_USERNAME': 'admin',
-            'MG_MONGO_PASSWORD': mongo_passwd,
-            'MG_MONGO_AUTHSOURCE': 'admin',
-            'MG_MONGO_SSL': 'on',
-            'MG_MONGO_SSL_CA_CERTS': ca_certs_file,
-            'MG_MONGO_SSL_CERTFILE': monitor_keycert_file,
-        }]
-
-        self.__contexte = ContexteRessourcesDocumentsMilleGrilles(
-            configuration=self.__configuration, additionals=additionnals)
+    def initialiser(self, init_document=True):
+        additionnals = self._contexte_additionnals()
+        self._contexte = ContexteRessourcesDocumentsMilleGrilles(
+            configuration=self._configuration, additionals=additionnals)
 
         try:
-            self.__contexte.initialiser(
-                init_document=True,
+            self._contexte.initialiser(
+                init_document=init_document,
                 init_message=True,
                 connecter=True,
             )
@@ -474,17 +427,40 @@ class ConnexionMiddleware:
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail error connexion Mongo")
 
-        self.__certificat_event_handler = GestionnaireEvenementsCertificat(self.__contexte)
-        self.__commandes_handler = TraitementMessagesMiddleware(self.__service_monitor.gestionnaire_commandes, self.__contexte)
+        self._certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
+        self.__commandes_handler = TraitementMessagesMiddleware(self._service_monitor.gestionnaire_commandes, self._contexte)
 
-        self.__contexte.message_dao.register_channel_listener(self)
-        self.__contexte.message_dao.register_channel_listener(self.__commandes_handler)
+        self._contexte.message_dao.register_channel_listener(self)
+        self._contexte.message_dao.register_channel_listener(self.__commandes_handler)
+
+    def _contexte_additionnals(self) -> list:
+        ca_certs_file = self._certificats['pki.millegrille.cert']
+        monitor_cert_file = self._certificats[GestionnaireCertificats.MONITOR_CERT_PATH]
+        monitor_key_file = path.join(self._path_secrets, self._certificats[GestionnaireCertificats.MONITOR_KEY_FILE])
+
+        mq_info = self.get_mq_info()
+
+        additionnals = [{
+            'MG_MQ_HOST': mq_info['host'],
+            'MG_MQ_PORT': mq_info['port'],
+            'MG_MQ_CA_CERTS': ca_certs_file,
+            'MG_MQ_CERTFILE': monitor_cert_file,
+            'MG_MQ_KEYFILE': monitor_key_file,
+            'MG_MQ_SSL': 'on',
+            'MG_MQ_AUTH_CERT': 'on',
+        }]
+
+        return additionnals
+
+    def get_mq_info(self):
+        node_name = self._docker.info()['Name']
+        return {'host': node_name, 'port': 5673}
 
     def set_relai(self, connexion_relai: ConnexionPrincipal):
         if not self.__transfert_local_handler:
             self.__transfert_local_handler = TransfertMessages(
-                self.__contexte, connexion_relai.relayer_message, self.__service_monitor.nodename)
-            self.__contexte.message_dao.register_channel_listener(self.__transfert_local_handler)
+                self._contexte, connexion_relai.relayer_message, self._service_monitor.nodename)
+            self._contexte.message_dao.register_channel_listener(self.__transfert_local_handler)
 
     def relayer_message(self, message_dict, routing_key, exchange, reply_to=None, correlation_id=None):
         """
@@ -497,7 +473,7 @@ class ConnexionMiddleware:
         :param correlation_id:
         :return:
         """
-        headers = {'noeud_source': self.__service_monitor.nodename}
+        headers = {'noeud_source': self._service_monitor.nodename}
 
         if reply_to == TransfertMessages.LOCAL_Q_PLACEHOLDER:
             # Ajouter la Q de transfert locale pour recevoir la reponse a relayer
@@ -508,19 +484,19 @@ class ConnexionMiddleware:
     def on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)
         channel.add_on_close_callback(self.on_channel_close)
-        self.__channel = channel
-        self.__certificat_event_handler.initialiser()
+        self._channel = channel
+        self._certificat_event_handler.initialiser()
 
     def on_channel_close(self, channel=None, code=None, reason=None):
-        self.__channel = None
+        self._channel = None
         self.__logger.warning("MQ Channel ferme")
-        if not self.__fermeture_event.is_set():
+        if not self._fermeture_event.is_set():
             try:
-                self.__contexte.message_dao.enter_error_state()
+                self._contexte.message_dao.enter_error_state()
             except Exception:
                 # Erreur d'activation du error state, la connexion ne peut pas etre reactivee
                 self.__logger.exception("Erreur fermeture channel")
-                self.__fermeture_event.set()  # S'assurer que la fermeture est en cours
+                self._fermeture_event.set()  # S'assurer que la fermeture est en cours
 
     def __on_return(self, channel, method, properties, body):
         pass
@@ -528,24 +504,23 @@ class ConnexionMiddleware:
     def run(self):
         self.__logger.info("Thread middleware demarree")
 
-        while not self.__fermeture_event.is_set():
+        while not self._fermeture_event.is_set():
             try:
-                self.__mongo.entretien()
                 self.__entretien_comptes()
-                self.__entretien()
+                self._entretien()
             except Exception:
                 self.__logger.exception("Exception generique")
             finally:
-                self.__fermeture_event.wait(30)
+                self._fermeture_event.wait(30)
 
         self.__logger.info("Fin thread middleware")
 
     def __entretien_comptes(self):
 
-        if not self.__comptes_middleware_ok or not self.__comptes_mq_ok:
+        if not self._comptes_middleware_ok or not self._comptes_mq_ok:
             comptes_mq_ok = True  # Va etre mis a false si un compte n'esp pas ajoute correctement
             try:
-                idmg = self.__configuration.idmg
+                idmg = self._configuration.idmg
                 igmd_tronque = idmg[0:12]
                 roles_comptes = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
                 roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
@@ -557,7 +532,7 @@ class ConnexionMiddleware:
                 ]
                 for role in roles_comptes:
                     filtre = {'name': role}
-                    configs = self.__docker.configs.list(filters=filtre)
+                    configs = self._docker.configs.list(filters=filtre)
 
                     if len(configs) > 0:
                         dict_configs = dict()
@@ -584,19 +559,19 @@ class ConnexionMiddleware:
                                 self.__logger.debug("Compte mongo (deja) cree : %s", nom_config)
 
                         try:
-                            gestionnaire_mq: GestionnaireComptesMQ = self.__service_monitor.gestionnaire_mq
+                            gestionnaire_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
                             gestionnaire_mq.ajouter_compte(clecert)
                         except ValueError:
                             comptes_mq_ok = False
 
-                self.__comptes_middleware_ok = True
+                self._comptes_middleware_ok = True
 
             except Exception:
                 self.__logger.exception("Erreur enregistrement comptes")
 
-            self.__comptes_mq_ok = comptes_mq_ok
+            self._comptes_mq_ok = comptes_mq_ok
 
-    def __entretien(self):
+    def _entretien(self):
         ts_courant = datetime.datetime.utcnow().timestamp()
 
         # Transmettre requete pour avoir l'etat de l'hebergement
@@ -606,17 +581,17 @@ class ConnexionMiddleware:
             correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE
         )
 
-        if self.__prochaine_verification_comptes_noeuds < ts_courant:
+        if self._prochaine_verification_comptes_noeuds < ts_courant:
             self.generateur_transactions.transmettre_requete(
                 dict(),
                 Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
                 correlation_id = ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
                 reply_to=self.__commandes_handler.queue_name,
             )
-            self.__prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
+            self._prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
 
     def ajouter_commande(self, commande):
-        gestionnaire_commandes: GestionnaireCommandes = self.__service_monitor.gestionnaire_commandes
+        gestionnaire_commandes: GestionnaireCommandes = self._service_monitor.gestionnaire_commandes
         gestionnaire_commandes.ajouter_commande(commande)
 
     def rediriger_messages_domaine(self, nom_domaine: str, exchanges_routing: dict):
@@ -624,16 +599,118 @@ class ConnexionMiddleware:
 
     @property
     def document_dao(self) -> MongoDAO:
-        return self.__contexte.document_dao
+        return self._contexte.document_dao
 
     @property
     def configuration(self) -> TransactionConfiguration:
-        return self.__configuration
+        return self._configuration
+
+    @property
+    def generateur_transactions(self):
+        return self._contexte.generateur_transactions
+
+
+class ConnexionMiddlewarePrive(ConnexionMiddleware):
+    """
+    Connexion au middleware de la MilleGrille en service pour un noeud prive
+    """
+
+    def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
+                 service_monitor, certificats: dict, **kwargs):
+        super().__init__(configuration, client_docker, service_monitor, certificats, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initialiser(self, init_document=False):
+        super().initialiser(init_document=init_document)
+
+    def get_mq_info(self):
+        node_name = self._docker.info()['Name']
+
+        gestionnaire_mdns = self._gestionnaire_mdns
+
+        self.__logger.debug("Attente de 5 secondes pour recevoir evenements mdns")
+        self._fermeture_event.wait(5)  # Donner 5 secondes pour recevoir information mdns
+
+        services = gestionnaire_mdns.get_service(self._service_monitor.idmg, '_mgamqps._tcp')
+
+        service_retenu = services[0]
+        host = service_retenu['addresses'][0]
+        port = service_retenu['port']
+
+        return {'host': host, 'port': port}
+
+
+class ConnexionMiddlewareProtege(ConnexionMiddleware):
+    """
+    Connexion au middleware de la MilleGrille en service, incluant Mongo (noeud protege)
+    """
+
+    def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
+                 service_monitor, certificats: dict, **kwargs):
+        super().__init__(configuration, client_docker, service_monitor, certificats, **kwargs)
+
+        self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
+        self.__file_mongo_passwd: str = kwargs.get('mongo_passwd_file') or ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE
+
+        self.__contexte: ContexteRessourcesDocumentsMilleGrilles = cast(ContexteRessourcesDocumentsMilleGrilles, None)
+
+        self.__fermeture_event = Event()
+
+        self.__mongo = GestionnaireComptesMongo(connexion_middleware=self)
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.__prochaine_verification_comptes_noeuds = datetime.datetime.utcnow().timestamp()
+
+    def initialiser(self):
+        super().initialiser()
+
+    def _entretien(self):
+        self.__mongo.entretien()
+        super()._entretien()
+
+    def _contexte_additionnals(self) -> list:
+        additionnals = super()._contexte_additionnals()
+
+        ca_certs_file = self._certificats['pki.millegrille.cert']
+        monitor_cert_file = self._certificats[GestionnaireCertificats.MONITOR_CERT_PATH]
+        monitor_key_file = path.join(self._path_secrets, self._certificats[GestionnaireCertificats.MONITOR_KEY_FILE])
+
+        # Preparer fichier keycert pour mongo
+        keycert, monitor_keycert_file = tempfile.mkstemp(dir='/tmp')
+        with open(monitor_key_file, 'rb') as fichier:
+            os.write(keycert, fichier.read())
+        with open(monitor_cert_file, 'rb') as fichier:
+            cert_content = fichier.read()
+            os.write(keycert, cert_content)
+            split_cert = PemHelpers.split_certificats(str(cert_content, 'utf-8'))
+        self._monitor_keycert_file = monitor_keycert_file
+        os.close(keycert)
+
+        # Creer chaine de certs CA a partir du certificat de monitor (doit inclure cert millegrille)
+        ca_certs_content = '\n'.join(split_cert[1:])
+        fp, ca_file_mq = tempfile.mkstemp(dir='/tmp')
+        os.write(fp, ca_certs_content.encode('utf-8'))
+        os.close(fp)
+
+        mongo_passwd_file = path.join(self.__path_secrets, self.__file_mongo_passwd)
+        with open(mongo_passwd_file, 'r') as fichier:
+            mongo_passwd = fichier.read()
+
+        node_name = self._docker.info()['Name']
+
+        additionnals.append({
+            'MG_MONGO_HOST': node_name,
+            'MG_MONGO_USERNAME': 'admin',
+            'MG_MONGO_PASSWORD': mongo_passwd,
+            'MG_MONGO_AUTHSOURCE': 'admin',
+            'MG_MONGO_SSL': 'on',
+            'MG_MONGO_SSL_CA_CERTS': ca_certs_file,
+            'MG_MONGO_SSL_CERTFILE': monitor_keycert_file,
+        })
+
+        return additionnals
 
     @property
     def get_gestionnaire_comptes_mongo(self):
         return self.__mongo
-
-    @property
-    def generateur_transactions(self):
-        return self.__contexte.generateur_transactions
