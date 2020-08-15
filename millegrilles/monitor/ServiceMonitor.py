@@ -508,6 +508,12 @@ class ServiceMonitor:
         information_systeme = {
             'noeud_id': self.noeud_id
         }
+        securite = self._securite
+        if securite:
+            information_systeme['securite'] = securite
+            if securite == Constantes.SECURITE_PROTEGE:
+                information_systeme['mq_port'] = self._connexion_middleware.configuration.mq_port
+
         if self._idmg:
             information_systeme['idmg'] = self._idmg
 

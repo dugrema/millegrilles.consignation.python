@@ -17,3 +17,4 @@ requests>=2.24.0
 
 docker>=4.2.2
 zeroconf>=0.28.0
+bson>=0.5.10

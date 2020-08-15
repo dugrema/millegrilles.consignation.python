@@ -106,8 +106,8 @@ class MdnsBrowser:
         self.zeroconf = Zeroconf(ip_version=IPVersion.All)
 
         service_types = [
-            '_mgmonitor._tcp.local.',
-            '_amqps._tcp.local.',
+            '_mghttps._tcp.local.',
+            '_mgamqps._tcp.local.',
         ]
 
         self.listener = MdnsListener(monitor)
