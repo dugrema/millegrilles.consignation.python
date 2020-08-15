@@ -21,7 +21,14 @@ from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExe
 
 class GestionnaireModulesDocker:
 
-    def __init__(self, idmg: str, docker_client: docker.DockerClient, fermeture_event: Event, modules_requis: list, service_monitor, **kwargs):
+    def __init__(self,
+                 idmg: str,
+                 docker_client: docker.DockerClient,
+                 fermeture_event: Event,
+                 modules_requis: list,
+                 service_monitor,
+                 configuration_services=MonitorConstantes.DICT_MODULES_PROTEGES,
+                 **kwargs):
         self.__idmg = idmg
         self.__docker = docker_client
         self.configuration_json = None
@@ -31,6 +38,7 @@ class GestionnaireModulesDocker:
         self.__modules_requis = modules_requis
         self.__hebergement_actif = False
         self.__service_monitor = service_monitor
+        self.__configuration_services = configuration_services
 
         self.__insecure = kwargs.get('insecure') or False
 
@@ -41,7 +49,7 @@ class GestionnaireModulesDocker:
             'IDMGLOWER': self.__idmg.lower(),
             'IDMGTRUNCLOWER': self.idmg_tronque,
             'MONGO_INITDB_ROOT_USERNAME': 'admin',
-            'MOUNTS': '/var/opt/millegrilles/%s/mounts' % self.__idmg,
+            'MOUNTS': '/var/opt/millegrilles/mounts',
             'NODENAME': self.nodename,
             'HOSTNAME': fqdn,
             'NGINX_CONFIG_VOLUME': '/var/opt/millegrilles/nginx/modules',
@@ -99,12 +107,12 @@ class GestionnaireModulesDocker:
 
     def initialiser_millegrille(self):
         # Creer reseau pour cette millegrille
+        network_name = 'millegrille_net'
         try:
-            network_name = 'millegrille_net'
             self.__docker.networks.create(name=network_name, scope="swarm", driver="overlay")
         except APIError as apie:
             if apie.status_code == 409:
-                self.__logger.info("Reseau %s deja cree", network_name)
+                self.__logger.info("Reseau %s deja cree" % network_name)
             else:
                 raise apie
 
@@ -182,7 +190,7 @@ class GestionnaireModulesDocker:
 
         entretien_compte_complete = False
         for service_name in self.__modules_requis:
-            params = MonitorConstantes.DICT_MODULES[service_name]
+            params = self.get_configuration_services()[service_name]
             service = dict_services.get(service_name)
             if not service:
                 try:
@@ -206,7 +214,7 @@ class GestionnaireModulesDocker:
 
         configuration_service = kwargs.get('config')
         if not configuration_service:
-            configuration_service = MonitorConstantes.DICT_MODULES.get(service_name)
+            configuration_service = MonitorConstantes.DICT_MODULES_PROTEGES.get(service_name)
 
         gestionnaire_images = kwargs.get('images')
         if not gestionnaire_images:
@@ -262,7 +270,7 @@ class GestionnaireModulesDocker:
 
         configuration_service = kwargs.get('config')
         if not configuration_service:
-            configuration_service = MonitorConstantes.DICT_MODULES.get(service_name)
+            configuration_service = MonitorConstantes.DICT_MODULES_PROTEGES.get(service_name)
 
         gestionnaire_images = kwargs.get('images')
         if not gestionnaire_images:
@@ -319,7 +327,7 @@ class GestionnaireModulesDocker:
             self.__modules_requis = list(modules_requis)
 
             for service_name in MonitorConstantes.MODULES_HEBERGEMENT:
-                module_config = MonitorConstantes.DICT_MODULES[service_name]
+                module_config = MonitorConstantes.DICT_MODULES_PROTEGES[service_name]
                 self.demarrer_service(service_name, **module_config)
 
             self.__hebergement_actif = True
@@ -378,7 +386,7 @@ class GestionnaireModulesDocker:
 
             # S'assurer que le compte du service existe
             task_name = service.name
-            configuration_service_meta = MonitorConstantes.DICT_MODULES.get(task_name)
+            configuration_service_meta = MonitorConstantes.DICT_MODULES_PROTEGES.get(task_name)
             if configuration_service_meta:
                 configuration_service = self.charger_config_recente('docker.cfg.' + configuration_service_meta['role'])
                 config_attrs = configuration_service['config'].attrs
@@ -771,6 +779,9 @@ class GestionnaireModulesDocker:
         if not fqdn:
             fqdn = socket.gethostbyaddr(socket.gethostname())[0]
         return fqdn
+
+    def get_configuration_services(self):
+        return self.__configuration_services
 
 
 class GestionnaireImagesDocker:

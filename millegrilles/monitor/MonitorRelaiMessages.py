@@ -547,7 +547,7 @@ class ConnexionMiddleware:
             try:
                 idmg = self.__configuration.idmg
                 igmd_tronque = idmg[0:12]
-                roles_comptes = [info['role'] for info in MonitorConstantes.DICT_MODULES.values() if info.get('role')]
+                roles_comptes = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
                 roles_comptes = ['%s.pki.%s.cert' % (igmd_tronque, role) for role in roles_comptes]
 
                 roles_mongo = [

@@ -160,7 +160,7 @@ class InitialiserServiceMonitor:
                 raise ValueError("Noeud de type non reconnu")
             elif securite == Constantes.SECURITE_PRIVE:
                 self.__logger.error("Noeud prive, non supporte")
-                raise ValueError("Noeud de type non reconnu")
+                service_monitor_classe = ServiceMonitorPrive
             elif securite == Constantes.SECURITE_PROTEGE and specialisation == 'dependant':
                 service_monitor_classe = ServiceMonitorDependant
             elif securite == Constantes.SECURITE_PROTEGE and specialisation == 'principal':
@@ -371,7 +371,7 @@ class ServiceMonitor:
         """
         raise NotImplementedError()
 
-    def __entretien_certificats(self):
+    def _entretien_certificats(self):
         """
         Effectue l'entretien des certificats : genere certificats manquants ou expires avec leur cle
         :return:
@@ -384,7 +384,7 @@ class ServiceMonitor:
 
         # Generer tous les certificas qui peuvent etre utilises
         roles = dict()
-        for role in [info['role'] for info in MonitorConstantes.DICT_MODULES.values() if info.get('role')]:
+        for role in [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]:
             roles[role] = dict()
 
         # Charger la configuration existante
@@ -435,10 +435,6 @@ class ServiceMonitor:
             self._gestionnaire_docker.configurer_monitor()
             self.fermer()  # Fermer le monitor, va forcer un redemarrage du service
             raise ForcerRedemarrage("Redemarrage")
-
-        # Generer certificats de module manquants ou expires, avec leur cle
-        self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
-        self.__entretien_certificats()
 
         # Initialiser gestionnaire web
         self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
@@ -612,6 +608,13 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
         # Fermer le service monitor, retourne exit code pour shell script
         sys.exit(self.exit_code)
+
+    def configurer_millegrille(self):
+        super().configurer_millegrille()
+
+        # Generer certificats de module manquants ou expires, avec leur cle
+        self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
+        self._entretien_certificats()
 
     def preparer_gestionnaire_certificats(self):
         params = dict()
@@ -872,6 +875,83 @@ class ServiceMonitorDependant(ServiceMonitor):
         self.__connexion_principal.enregistrer_domaine(nom_domaine, exchanges_routing)
 
 
+class ServiceMonitorPrive(ServiceMonitor):
+    """
+    ServiceMonitor pour noeud prive
+    """
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        super().__init__(args, docker_client, configuration_json)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def run(self):
+        self.__logger.info("Demarrage du ServiceMonitor")
+
+        try:
+            self._charger_configuration()
+            self.configurer_millegrille()
+            self.preparer_mdns()
+            self.preparer_gestionnaire_commandes()
+            self.preparer_gestionnaire_applications()
+            self.preparer_web_api()
+
+            while not self._fermeture_event.is_set():
+                self._attente_event.clear()
+
+                try:
+                    self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                    self.verifier_load()
+
+                    self._entretien_modules()
+
+                    if not self._connexion_middleware:
+                        try:
+                            self.connecter_middleware()
+                        except BrokenBarrierError:
+                            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+
+                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                except Exception:
+                    self.__logger.exception("ServiceMonitor: erreur generique")
+                finally:
+                    self._attente_event.wait(30)
+
+        except ForcerRedemarrage:
+            self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
+            self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
+
+        except Exception:
+            self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
+
+        self.__logger.info("Fermeture du ServiceMonitor")
+        self.fermer()
+
+        # Fermer le service monitor, retourne exit code pour shell script
+        sys.exit(self.exit_code)
+
+    def configurer_millegrille(self):
+        self._gestionnaire_docker = GestionnaireModulesDocker(
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
+            self,
+            configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
+            insecure=self._args.dev
+        )
+
+        self._gestionnaire_docker.start_events()
+        self._gestionnaire_docker.add_event_listener(self)
+
+        # Initialiser gestionnaire web
+        self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
+
+    def preparer_gestionnaire_commandes(self):
+        self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
+        super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
+
+    def preparer_mdns(self):
+        super().preparer_mdns()
+
+
 class ServiceMonitorInstalleur(ServiceMonitor):
 
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
@@ -900,8 +980,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self._charger_configuration()
 
         self._gestionnaire_docker = GestionnaireModulesDocker(
-            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
-            self, insecure=self._args.dev
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(), self,
+            configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
+            insecure=self._args.dev
         )
 
         self.preparer_mdns()
@@ -1118,7 +1199,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
             self._gestionnaire_certificats.idmg = idmg
             self._gestionnaire_certificats.set_clecert_millegrille(clecert_millegrille)
-            self._gestionnaire_certificats.set_clecert_intermediaire(certificat_pem)
+            self._gestionnaire_certificats.set_clecert_intermediaire(clecert_recu)
 
             # Generer nouveau certificat de monitor
             # Charger CSR monitor

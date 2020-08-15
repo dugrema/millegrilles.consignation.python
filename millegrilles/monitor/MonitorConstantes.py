@@ -8,10 +8,23 @@ PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
 PATH_PKI = '/var/opt/millegrilles/pki'
 DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
-
-DICT_MODULES = {
+DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME
+    },
+    ConstantesServiceMonitor.MODULE_NGINX: {
+        'nom': ConstantesServiceMonitor.MODULE_NGINX,
+        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
+    },
+}
+
+DICT_MODULES_PROTEGES = {
+    ConstantesServiceMonitor.MODULE_ACME: {
+        'nom': ConstantesServiceMonitor.MODULE_ACME
+    },
+    ConstantesServiceMonitor.MODULE_NGINX: {
+        'nom': ConstantesServiceMonitor.MODULE_NGINX,
+        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
     },
     ConstantesServiceMonitor.MODULE_MQ: {
         'nom': ConstantesServiceMonitor.MODULE_MQ,
@@ -36,10 +49,6 @@ DICT_MODULES = {
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
         'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
         'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-    },
-    ConstantesServiceMonitor.MODULE_NGINX: {
-        'nom': ConstantesServiceMonitor.MODULE_NGINX,
-        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
     },
     ConstantesServiceMonitor.MODULE_PRINCIPAL: {
         'nom': ConstantesServiceMonitor.MODULE_PYTHON,
@@ -100,7 +109,7 @@ MODULES_REQUIS_DEPENDANT = [
     ConstantesServiceMonitor.MODULE_TRANSACTION,
 ]
 
-CERTIFICATS_REQUIS_DEPENDANT = [info['role'] for info in DICT_MODULES.values() if info.get('role')]
+CERTIFICATS_REQUIS_DEPENDANT = [info['role'] for info in DICT_MODULES_PROTEGES.values() if info.get('role')]
 
 MODULES_HEBERGEMENT = [
     # ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS,

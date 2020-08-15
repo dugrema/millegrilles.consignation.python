@@ -87,6 +87,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         ip_address = get_ip(nodename)
         dict_infomillegrille['fqdn_detecte'] = nodename
         dict_infomillegrille['ip_detectee'] = ip_address
+        dict_infomillegrille['noeud_id'] = self.service_monitor.noeud_id
 
         idmg = self.service_monitor.idmg
         if idmg:
