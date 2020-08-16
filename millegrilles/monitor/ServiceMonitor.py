@@ -506,6 +506,22 @@ class ServiceMonitor:
 
         return information_systeme
 
+    def get_info_connexion_mq(self):
+        info_mq = dict()
+        try:
+            info_mq['MQ_HOST'] = self._connexion_middleware.configuration.mq_host
+            info_mq['MQ_PORT'] = self._connexion_middleware.configuration.mq_port
+        except:
+            # Connexion middleware pas chargee, on tente d'utiliser mdns
+            self._attente_event.wait(2)
+            services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
+            if len(services) > 0:
+                service = services[0]
+                info_mq['MQ_HOST'] = service['addresses'][0]
+                info_mq['MQ_PORT'] = service['port']
+
+        return info_mq
+
     @property
     def gestionnaire_mq(self):
         return self._gestionnaire_mq
@@ -951,10 +967,10 @@ class ServiceMonitorPrive(ServiceMonitor):
         self.__logger.info("Demarrage du ServiceMonitor")
 
         try:
+            self.preparer_mdns()
             self._charger_configuration()
             self.configurer_millegrille()
             self.preparer_gestionnaire_certificats()
-            self.preparer_mdns()
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
             self.preparer_web_api()

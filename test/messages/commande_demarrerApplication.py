@@ -31,10 +31,14 @@ sample_app_1 = {
             "config": {
                 "name": "nginx_dummy",
                 "environment": [
-                    "MG_MQ_URL=amqps://mq:5673",
+                    "MG_IDMG=${IDMG}",
+                    "MG_MQ_HOST=${MQ_HOST}",
+                    "MG_MQ_PORT=${MQ_PORT}",
+                    "MG_MQ_SSL=on",
+                    "MG_MQ_AUTH_CERT=on",
                     "MG_MQ_CERTFILE=/run/secrets/cert.pem",
                     "MG_MQ_KEYFILE=/run/secrets/key.pem",
-                    "MG_MQ_CAFILE=/run/secrets/millegrille.cert.pem",
+                    "MG_MQ_CAFILE=/run/secrets/millegrille.cert.pem"
                 ],
                 "mounts": [
                     {
@@ -43,7 +47,7 @@ sample_app_1 = {
                         'type': 'bind'
                     }
                 ],
-                "network": "millegrille_net",
+                "network": "test",
                 "devices": [
                     "/dev/sda:/dev/sda:rwm"
                 ]

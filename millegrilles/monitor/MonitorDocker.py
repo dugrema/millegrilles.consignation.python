@@ -55,6 +55,8 @@ class GestionnaireModulesDocker:
             'NGINX_CONFIG_VOLUME': '/var/opt/millegrilles/nginx/modules',
             'NGINX_HTML_VOLUME': '/var/opt/millegrilles/nginx/html',
             'NGINX_DATA_VOLUME': '/var/opt/millegrilles/nginx/data',
+            'MQ_HOST': '',
+            'MQ_PORT': '',
         }
 
         if self.__insecure:
@@ -124,6 +126,11 @@ class GestionnaireModulesDocker:
         except FileExistsError:
             self.__logger.debug("Repertoire %s existe, ok" % path_millegrilles)
 
+        try:
+            self.charger_params_dynamiques()
+        except Exception as e:
+            self.__logger.warning("Erreur chargement params dynamiques pour docker : %s" % str(e))
+
     def initialiser_noeud(self, idmg=None):
         if idmg:
             self.idmg = idmg
@@ -178,6 +185,11 @@ class GestionnaireModulesDocker:
         Verifie si les services sont actifs, les demarre au besoin.
         :return:
         """
+        try:
+            self.charger_params_dynamiques()
+        except Exception as e:
+            self.__logger.warning("Erreur chargement params dynamiques pour docker : %s" % str(e))
+
         # filtre = {'name': self.idmg_tronque + '_'}
         # liste_services = self.__docker.services.list(filters=filtre)
         liste_services = self.__docker.services.list()
@@ -211,6 +223,10 @@ class GestionnaireModulesDocker:
 
         if entretien_compte_complete:
             self.__derniere_creation_comptes = datetime.datetime.utcnow()
+
+    def charger_params_dynamiques(self):
+        info_mq = self.__service_monitor.get_info_connexion_mq()
+        self.__mappings.update(info_mq)
 
     def demarrer_service(self, service_name: str, **kwargs):
         self.__logger.info("Demarrage service %s", service_name)
@@ -537,7 +553,7 @@ class GestionnaireModulesDocker:
     def __mapping(self, valeur: str):
         for cle, valeur_mappee in self.__mappings.items():
             cle = cle.upper()
-            valeur = valeur.replace('${%s}' % cle, valeur_mappee)
+            valeur = valeur.replace('${%s}' % cle, str(valeur_mappee))
 
         return valeur
 
