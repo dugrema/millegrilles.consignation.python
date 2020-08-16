@@ -1595,17 +1595,17 @@ class ConstantesServiceMonitor:
     DOCKER_CONFIG_MONITOR_DEPENDANT_KEY = DOCKER_CONFIG_NAME_MONITOR_DEPENDANT + KEY_SUFFIX
     DOCKER_CONFIG_NOEUD_ID = 'millegrilles.noeud.id'
 
-    COMMANDE_CONFIGURER_DOMAINE = 'servicemonitor.configurerDomaine'
-    COMMANDE_INITIALISER_NOEUD = 'servicemonitor.initialiserNoeud'
+    COMMANDE_CONFIGURER_DOMAINE = 'configurerDomaine'
+    COMMANDE_INITIALISER_NOEUD = 'initialiserNoeud'
 
-    COMMANDE_ACTIVER_HEBERGEMENT = 'servicemonitor.activerHebergement'
-    COMMANDE_DESACTIVER_HEBERGEMENT = 'servicemonitor.desactiverHebergement'
-    COMMANDE_AJOUTER_COMPTE = 'servicemonitor.ajouterCompte'
+    COMMANDE_ACTIVER_HEBERGEMENT = 'activerHebergement'
+    COMMANDE_DESACTIVER_HEBERGEMENT = 'desactiverHebergement'
+    COMMANDE_AJOUTER_COMPTE = 'ajouterCompte'
 
-    COMMANDE_INSTALLER_APPLICATION = 'servicemonitor.installerApplication'
-    COMMANDE_SUPPRIMER_APPLICATION = 'servicemonitor.supprimerApplication'
-    COMMANDE_BACKUP_APPLICATION = 'servicemonitor.backupApplication'
-    COMMANDE_RESTORE_APPLICATION = 'servicemonitor.restoreApplication'
+    COMMANDE_INSTALLER_APPLICATION = 'installerApplication'
+    COMMANDE_SUPPRIMER_APPLICATION = 'supprimerApplication'
+    COMMANDE_BACKUP_APPLICATION = 'backupApplication'
+    COMMANDE_RESTORE_APPLICATION = 'restoreApplication'
 
     # Commande de l'acteur systeme du noeud
     COMMANDE_ACTEUR_GET_INFORMATION_NOEUD = 'acteur.getInformationNoeud'

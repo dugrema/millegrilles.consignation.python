@@ -46,8 +46,9 @@ class TraitementMessagesMiddleware(BaseCallback):
         self.__logger.debug("Message recu : %s" % message_dict)
 
         if routing_key.startswith('commande.'):
+            action = routing_key.split('.')[-1]
             contenu = {
-                'commande': routing_key.replace('commande.', ''),
+                'commande': action,
                 'exchange': exchange,
                 'properties': properties,
                 'contenu': message_dict,
