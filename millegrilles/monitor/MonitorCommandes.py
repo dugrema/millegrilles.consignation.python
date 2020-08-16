@@ -171,6 +171,8 @@ class GestionnaireCommandes:
                 gestionnaire_mongo.creer_compte(certificat)
         except DuplicateKeyError:
             self.__logger.info("Compte mongo deja cree : " + certificat.subject_rfc4514_string_mq())
+        except KeyError as kerr:
+            self.__logger.debug("Certificat ignore " + str(kerr))
         gestionnaire_comptes_mq: GestionnaireComptesMQ = self._service_monitor.gestionnaire_mq
         gestionnaire_comptes_mq.ajouter_compte(certificat)
         # Transmettre reponse d'ajout de compte, au besoin

@@ -24,7 +24,7 @@ from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes, Gestion
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker
-from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, ConnexionMiddleware, ConnexionMiddlewarePrive
+from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, ConnexionMiddleware, ConnexionMiddlewarePrive, ConnexionMiddlewareProtege
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat
@@ -196,23 +196,23 @@ class ServiceMonitor:
         self._docker: docker.DockerClient = docker_client       # Client docker
         self._configuration_json = configuration_json           # millegrille.configuration dans docker
 
-        self._securite: str = cast(str, None)                   # Niveau de securite de la swarm docker
-        self._connexion_middleware: ConnexionMiddleware = cast(ConnexionMiddleware, None)  # Connexion a MQ, MongoDB
+        self._securite: Optional[str] = None                    # Niveau de securite de la swarm docker
+        self._connexion_middleware: Optional[ConnexionMiddleware] = None  # Connexion a MQ, MongoDB
         self._noeud_id: Optional[str] = None                    # UUID du noeud
-        self._idmg: str = cast(str, None)                       # IDMG de la MilleGrille hote
+        self._idmg: Optional[str] = None                        # IDMG de la MilleGrille hote
 
         self._socket_fifo = None  # Socket FIFO pour les commandes
 
         self._fermeture_event = Event()
         self._attente_event = Event()
 
-        self._gestionnaire_certificats: GestionnaireCertificats = cast(GestionnaireCertificats, None)
-        self._gestionnaire_docker: GestionnaireModulesDocker = cast(GestionnaireModulesDocker, None)
-        self._gestionnaire_mq: GestionnaireComptesMQ = cast(GestionnaireComptesMQ, None)
-        self._gestionnaire_commandes: GestionnaireCommandes = cast(GestionnaireCommandes, None)
-        self._gestionnaire_web: GestionnaireWeb = cast(GestionnaireWeb, None)
-        self._gestionnaire_applications: GestionnaireApplications = cast(GestionnaireApplications, None)
-        self._gestionnaire_mdns: MdnsGestionnaire = cast(MdnsGestionnaire, None)
+        self._gestionnaire_certificats: Optional[GestionnaireCertificats] = None
+        self._gestionnaire_docker: Optional[GestionnaireModulesDocker] = None
+        self._gestionnaire_mq: Optional[GestionnaireComptesMQ] = None
+        self._gestionnaire_commandes: Optional[GestionnaireCommandes] = None
+        self._gestionnaire_web: Optional[GestionnaireWeb] = None
+        self._gestionnaire_applications: Optional[GestionnaireApplications] = None
+        self._gestionnaire_mdns: Optional[MdnsGestionnaire] = None
 
         self._web_api: ServerWebAPI = cast(ServerWebAPI, None)
 
@@ -286,23 +286,7 @@ class ServiceMonitor:
         Lance une thread distincte pour s'occuper des messages.
         :return:
         """
-        configuration = TransactionConfiguration()
-
-        self._connexion_middleware = ConnexionMiddleware(
-            configuration, self._docker, self, self._gestionnaire_certificats.certificats,
-            secrets=self._args.secrets)
-
-        try:
-            self._connexion_middleware.initialiser()
-            self._connexion_middleware.start()
-        except TypeError as te:
-            self.__logger.exception("Erreur fatale configuration MQ, abandonner")
-            self.fermer()
-            raise te
-        except BrokenBarrierError:
-            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
-            self._connexion_middleware.stop()
-            self._connexion_middleware = None
+        raise NotImplementedError()
 
     def preparer_gestionnaire_certificats(self):
         raise NotImplementedError()
@@ -617,6 +601,30 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         # Generer certificats de module manquants ou expires, avec leur cle
         self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
         self._entretien_certificats()
+
+    def connecter_middleware(self):
+        """
+        Genere un contexte et se connecte a MQ et MongoDB.
+        Lance une thread distincte pour s'occuper des messages.
+        :return:
+        """
+        configuration = TransactionConfiguration()
+
+        self._connexion_middleware = ConnexionMiddlewareProtege(
+            configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+            secrets=self._args.secrets)
+
+        try:
+            self._connexion_middleware.initialiser()
+            self._connexion_middleware.start()
+        except TypeError as te:
+            self.__logger.exception("Erreur fatale configuration MQ, abandonner")
+            self.fermer()
+            raise te
+        except BrokenBarrierError:
+            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+            self._connexion_middleware.stop()
+            self._connexion_middleware = None
 
     def preparer_gestionnaire_certificats(self):
         params = dict()
