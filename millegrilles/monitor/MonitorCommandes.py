@@ -12,8 +12,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles import Constantes
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
 from millegrilles.util.X509Certificate import EnveloppeCleCert, ConstantesGenerateurCertificat
-from millegrilles.monitor.MonitorConstantes import CommandeMonitor
-from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ForcerRedemarrage
 
 
 class GestionnaireCommandes:

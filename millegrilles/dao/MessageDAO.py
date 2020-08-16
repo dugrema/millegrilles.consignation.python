@@ -6,6 +6,7 @@ import traceback
 import logging
 import ssl
 
+from typing import Optional
 from threading import Lock, RLock, Event, Thread, Barrier
 from pika.credentials import PlainCredentials, ExternalCredentials
 from pika.exceptions import AMQPConnectionError
@@ -355,6 +356,8 @@ class PikaDAO:
         self.lock_transmettre_message = RLock()
         self.lock_initialiser_connections = Barrier(2)  # S'assurer d'avoir consumer et publisher
 
+        self._exchange_default = configuration.exchange_defaut
+
         self._attendre_channel = Event()
         self.configuration = configuration
 
@@ -561,7 +564,20 @@ class PikaDAO:
     :param message_dict: Dictionnaire du contenu du message qui sera encode en JSON
     '''
 
-    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None, correlation_id=None, channel=None):
+    def transmettre_message(
+            self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None,
+            correlation_id=None, channel=None, exchange: str = None):
+
+        if not exchange:
+            exchanges = [self._exchange_default]
+        elif exchange == 'broadcast':
+            exchanges = [Constantes.SECURITE_PUBLIC]
+            if self._exchange_default in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
+                exchanges.append(Constantes.SECURITE_PRIVE)
+            if self._exchange_default in [Constantes.SECURITE_PROTEGE]:
+                exchanges.append(Constantes.SECURITE_PROTEGE)
+        else:
+            exchanges = [exchange]
 
         if self.__connexionmq_consumer is None or self.__connexionmq_consumer.is_closed:
             raise ExceptionConnectionFermee("La connexion Pika n'est pas ouverte")
@@ -582,13 +598,14 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
-            channel.basic_publish(
-                exchange=Constantes.SECURITE_PROTEGE,
-                routing_key=routing_key,
-                body=message_utf8,
-                properties=properties,
-                mandatory=True)
-            self.__stop_event.wait(0.01)  # Throttle
+            for cet_exchange in exchanges:
+                channel.basic_publish(
+                    exchange=cet_exchange,
+                    routing_key=routing_key,
+                    body=message_utf8,
+                    properties=properties,
+                    mandatory=True)
+                self.__stop_event.wait(0.01)  # Throttle
 
         if channel is self.__channel_publisher:
             # Utiliser pubdog pour la connexion publishing par defaut
@@ -768,7 +785,7 @@ class PikaDAO:
             delivery_mode_v=2, reply_to=reply_to, correlation_id=correlation_id, channel=channel)
 
     def transmettre_commande(self, document_commande, routing_key, channel=None, encoding=MongoJSONEncoder,
-                             exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, reply_to=None, correlation_id=None):
+                             exchange=None, reply_to=None, correlation_id=None):
         """
         Sert a transmettre une commande vers un noeud
         :param document_commande:
@@ -780,6 +797,9 @@ class PikaDAO:
         :param correlation_id:
         :return:
         """
+        if exchange is None:
+            exchange = self._exchange_default
+
         if channel is None:
             channel = self.__channel_publisher
 
@@ -810,8 +830,17 @@ class PikaDAO:
     def transmettre_demande_certificat(self, fingerprint):
         routing_key = 'requete.certificat.%s' % fingerprint
         # Utiliser delivery mode 2 (persistent) pour les notifications
-        self.transmettre_message({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
-        self.transmettre_message_noeuds({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
+
+        exchanges = [Constantes.SECURITE_PUBLIC]
+        if self._exchange_default in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
+            exchanges.append(Constantes.SECURITE_PRIVE)
+        if self._exchange_default in [Constantes.SECURITE_PROTEGE]:
+            exchanges.append(Constantes.SECURITE_PROTEGE)
+
+        for exchange in exchanges:
+            self.transmettre_message_exchange({'fingerprint': fingerprint}, routing_key, exchange=exchange, delivery_mode_v=2)
+
+        # self.transmettre_message_noeuds({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
 
     ''' 
     Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
@@ -859,15 +888,19 @@ class PikaDAO:
             ind_routing_key = '.%s' % ind_routing_key
         routing_key = 'ceduleur.minute%s' % ind_routing_key
 
+        exchanges = [
+            Constantes.SECURITE_SECURE,
+            Constantes.SECURITE_PROTEGE,
+            Constantes.SECURITE_PRIVE,
+            Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
+        ]
+
         with self.lock_transmettre_message:
-            self.__channel_publisher.basic_publish(
-                exchange=self.configuration.exchange_middleware,
-                routing_key=routing_key,
-                body=message_utf8)
-            self.__channel_consumer.basic_publish(
-                exchange=self.configuration.exchange_noeuds,
-                routing_key=routing_key,
-                body=message_utf8)
+            for exchange in exchanges:
+                self.__channel_publisher.basic_publish(
+                    exchange=exchange,
+                    routing_key=routing_key,
+                    body=message_utf8)
 
     '''
     Transmet un declencheur pour une etape de processus MilleGrilles.

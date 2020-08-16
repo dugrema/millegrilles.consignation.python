@@ -84,7 +84,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         # Ajouter les routing keys
         for routing_key in routing_keys:
             self.__channel.queue_bind(
-                exchange=self.configuration.exchange_middleware,
+                exchange=self.configuration.exchange_defaut,
                 queue=self.queue_name,
                 routing_key=routing_key,
                 callback=None
@@ -574,19 +574,23 @@ class ConnexionMiddleware:
     def _entretien(self):
         ts_courant = datetime.datetime.utcnow().timestamp()
 
+        exchange = self.exchange
+
         # Transmettre requete pour avoir l'etat de l'hebergement
         self.generateur_transactions.transmettre_requete(
             dict(), Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
             reply_to=self.__commandes_handler.queue_name,
-            correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE
+            correlation_id=ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE,
+            securite=exchange
         )
 
         if self._prochaine_verification_comptes_noeuds < ts_courant:
             self.generateur_transactions.transmettre_requete(
                 dict(),
                 Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
-                correlation_id = ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
+                correlation_id=ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
                 reply_to=self.__commandes_handler.queue_name,
+                securite=exchange
             )
             self._prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
 
@@ -608,6 +612,10 @@ class ConnexionMiddleware:
     @property
     def generateur_transactions(self):
         return self._contexte.generateur_transactions
+
+    @property
+    def exchange(self):
+        return self._service_monitor.securite
 
 
 class ConnexionMiddlewarePrive(ConnexionMiddleware):
@@ -638,6 +646,15 @@ class ConnexionMiddlewarePrive(ConnexionMiddleware):
         port = service_retenu['port']
 
         return {'host': host, 'port': port}
+
+    def _contexte_additionnals(self) -> list:
+        additionnals = super()._contexte_additionnals()
+
+        additionnals.append({
+            'MG_' + Constantes.CONFIG_MQ_EXCHANGE_DEFAUT.upper(): Constantes.SECURITE_PRIVE,
+        })
+
+        return additionnals
 
 
 class ConnexionMiddlewareProtege(ConnexionMiddleware):

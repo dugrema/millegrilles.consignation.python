@@ -35,6 +35,7 @@ class TransactionConfiguration:
             Constantes.CONFIG_MQ_EXCHANGE_NOEUDS: Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
             Constantes.CONFIG_MQ_EXCHANGE_PRIVE: Constantes.DEFAUT_MQ_EXCHANGE_PRIVE,
             Constantes.CONFIG_MQ_EXCHANGE_PUBLIC: Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC,
+            Constantes.CONFIG_MQ_EXCHANGE_DEFAUT: Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
             Constantes.CONFIG_MQ_USER: Constantes.DEFAUT_MQ_USER,
             Constantes.CONFIG_MQ_PASSWORD: None,
             Constantes.CONFIG_MQ_SSL: 'on',  # Options on, off.
@@ -363,6 +364,10 @@ class TransactionConfiguration:
     @property
     def exchange_public(self):
         return Constantes.SECURITE_PUBLIC
+
+    @property
+    def exchange_defaut(self):
+        return self._mq_config[Constantes.CONFIG_MQ_EXCHANGE_DEFAUT]
 
     @property
     def queue_generateur_documents(self):

@@ -1009,7 +1009,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         nom_queue = queue.method.queue
         self.__queue_reponse = nom_queue
 
-        exchange = self.contexte.configuration.exchange_noeuds
+        exchange = self.contexte.configuration.exchange_defaut
 
         self.__logger.debug("Transmission certificat PKI a l'initialisation")
         enveloppe = self.transmettre_certificat()
@@ -1034,10 +1034,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
         routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
         self.contexte.message_dao.transmettre_message(
-            message_evenement, routing, channel=self.__channel
-        )
-        self.contexte.message_dao.transmettre_message_noeuds(
-            message_evenement, routing
+            message_evenement, routing, channel=self.__channel, exchange='broadcast'
         )
 
         return enveloppe

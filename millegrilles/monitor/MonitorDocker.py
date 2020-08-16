@@ -188,7 +188,7 @@ class GestionnaireModulesDocker:
             service_name = service.name
             dict_services[service_name] = service
 
-        entretien_compte_complete = False
+        entretien_compte_complete = True
         for service_name in self.__modules_requis:
             params = self.get_configuration_services()[service_name]
             service = dict_services.get(service_name)
@@ -197,14 +197,17 @@ class GestionnaireModulesDocker:
                     self.demarrer_service(service_name, **params)
                 except IndexError:
                     self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
+                entretien_compte_complete = False
                 break  # On demarre un seul service a la fois, on attend qu'il soit pret
             else:
                 # Verifier etat service
                 self.verifier_etat_service(service)
 
                 if self.__derniere_creation_comptes < datetime.datetime.utcnow() - self.__intervalle_entretien_comptes:
-                    self.creer_comptes_service(service)
-                    entretien_compte_complete = True
+                    try:
+                        self.creer_comptes_service(service)
+                    except:
+                        entretien_compte_complete = False
 
         if entretien_compte_complete:
             self.__derniere_creation_comptes = datetime.datetime.utcnow()
@@ -292,16 +295,8 @@ class GestionnaireModulesDocker:
 
     def creer_compte(self, label_cert_compte: str):
         certificat_compte = self.charger_config_recente(label_cert_compte)
-        certificat_compte_pem = b64decode(certificat_compte['config'].attrs['Spec']['Data'])
-
-        commande_dict = {
-            'commande': Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
-            'contenu': {
-                Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM: certificat_compte_pem.decode('utf-8'),
-            }
-        }
-        commande = CommandeMonitor(commande_dict)
-        self.__service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+        certificat_compte_pem = b64decode(certificat_compte['config'].attrs['Spec']['Data']).decode('utf-8')
+        self.__service_monitor.ajouter_compte(certificat_compte_pem)
 
     def supprimer_service(self, service_name: str):
         filter = {'name': service_name}

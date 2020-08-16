@@ -33,7 +33,7 @@ from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
-
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor
 
 class InitialiserServiceMonitor:
 
@@ -461,6 +461,9 @@ class ServiceMonitor:
         else:
             self.limiter_entretien = False
 
+    def ajouter_compte(self, certificat: str):
+        raise NotImplementedError()
+
     @property
     def noeud_id(self) -> str:
         return self._noeud_id
@@ -553,6 +556,10 @@ class ServiceMonitor:
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         raise NotImplementedError()
 
+    @property
+    def securite(self):
+        return self._securite or Constantes.SECURITE_PRIVE
+
 
 class ServiceMonitorPrincipal(ServiceMonitor):
     """
@@ -638,6 +645,16 @@ class ServiceMonitorPrincipal(ServiceMonitor):
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         pass  # Rien a faire pour le monitor principal
+
+    def ajouter_compte(self, certificat: str):
+        commande_dict = {
+            'commande': Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+            'contenu': {
+                Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM: certificat,
+            }
+        }
+        commande = CommandeMonitor(commande_dict)
+        self.gestionnaire_commandes.ajouter_commande(commande)
 
     @property
     def gestionnaire_mongo(self):
@@ -998,6 +1015,9 @@ class ServiceMonitorPrive(ServiceMonitor):
 
     def preparer_mdns(self):
         super().preparer_mdns()
+
+    def ajouter_compte(self, certificat: str):
+        self.__logger.debug("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
 
 
 class ServiceMonitorInstalleur(ServiceMonitor):
