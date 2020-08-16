@@ -28,8 +28,9 @@ from millegrilles.monitor import MonitorConstantes
 
 class TraitementMessagesMiddleware(BaseCallback):
 
-    def __init__(self, gestionnaire_commandes, contexte):
+    def __init__(self, noeud_id: str, gestionnaire_commandes, contexte):
         super().__init__(contexte)
+        self._noeud_id = noeud_id
         self.__gestionnaire_commandes = gestionnaire_commandes
         self.__channel = None
         self.queue_name = None
@@ -74,7 +75,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
 
         routing_keys = [
-            'commande.servicemonitor.#',
+            'commande.servicemonitor.%s.#' % self._noeud_id,
             'commande.servicemonitor.ajouterCompte',
             'commande.servicemonitor.activerHebergement',
             'commande.servicemonitor.desactiverHebergement',
@@ -428,7 +429,7 @@ class ConnexionMiddleware:
                 self.__logger.exception("Detail error connexion Mongo")
 
         self._certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
-        self.__commandes_handler = TraitementMessagesMiddleware(self._service_monitor.gestionnaire_commandes, self._contexte)
+        self.__commandes_handler = TraitementMessagesMiddleware(self._service_monitor.noeud_id, self._service_monitor.gestionnaire_commandes, self._contexte)
 
         self._contexte.message_dao.register_channel_listener(self)
         self._contexte.message_dao.register_channel_listener(self.__commandes_handler)
