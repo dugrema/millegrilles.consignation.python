@@ -13,6 +13,45 @@ from threading import Event, Thread
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
 
+sample_app_1 = {
+    "nom": "test_container",
+    "registries": [
+        ""
+    ],
+    "images": {
+        "nginx": {
+            "image": "nginx",
+            "version": "latest"
+        }
+    },
+    "dependances": [
+        {
+            "image": "nginx",
+            "container_mode": True,
+            "config": {
+                "name": "nginx_dummy",
+                "environment": [
+                    "MG_MQ_URL=amqps://mq:5673",
+                    "MG_MQ_CERTFILE=/run/secrets/cert.pem",
+                    "MG_MQ_KEYFILE=/run/secrets/key.pem",
+                    "MG_MQ_CAFILE=/run/secrets/millegrille.cert.pem",
+                ],
+                "mounts": [
+                    {
+                        'target': '/home/mathieu',
+                        'source': '/home/mathieu',
+                        'type': 'bind'
+                    }
+                ],
+                "network": "millegrille_net",
+                "devices": [
+                    "/dev/sda:/dev/sda:rwm"
+                ]
+            }
+        }
+    ]
+}
+
 
 class MessagesSample(BaseCallback):
 
@@ -52,7 +91,8 @@ class MessagesSample(BaseCallback):
 
     def installer_application_prive_dummy(self):
         commande = {
-            'fingerprint': 'fe4e7c9b64a4f2f31b7f8c54102573d14c8894d0'
+            'nom_application': 'con_dummy',
+            'configuration': sample_app_1,
         }
         domaineAction = 'commande.servicemonitor.79b2f503-5f93-4019-b9e0-fc14686fc695.' + Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION
 
@@ -70,7 +110,7 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
-        self.demarrer_application_prive_dummy()
+        self.installer_application_prive_dummy()
 
 
 # --- MAIN ---

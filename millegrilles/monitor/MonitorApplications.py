@@ -35,12 +35,13 @@ class GestionnaireApplications:
 
         self.__wait_container_event = Event()
         self.__wait_start_service_name = None
+        self.__wait_start_container_name = None
         self.__wait_start_service_container_id = None
 
     def event(self, event):
-        self.__logger.debug("Event docker APPS : %s", str(event))
+        # self.__logger.debug("Event docker APPS : %s", str(event))
 
-        if self.__wait_start_service_name:
+        if self.__wait_start_service_name or self.__wait_start_container_name:
             event_json = json.loads(event.decode('utf-8'))
 
             # Verifier si le container correspond au service
@@ -50,18 +51,23 @@ class GestionnaireApplications:
                     attributes = actor.get('Attributes')
                     if attributes:
                         service_name = attributes.get('com.docker.swarm.service.name')
-                        if service_name == self.__wait_start_service_name:
+                        if service_name and service_name == self.__wait_start_service_name:
                             self.__logger.debug("Service %s demarre" % service_name)
+                            self.__wait_start_service_container_id = event_json['id']
+                            self.__wait_container_event.set()
+                        container_name = attributes.get('name')
+                        if container_name and container_name == self.__wait_start_container_name:
+                            self.__logger.debug("Container %s demarre" % container_name)
                             self.__wait_start_service_container_id = event_json['id']
                             self.__wait_container_event.set()
 
     def installer_application(self, commande: CommandeMonitor):
         self.__logger.info("Installation application %s", str(commande))
 
-        nom_image_docker = commande.contenu['nom_application']
+        nom_application = commande.contenu['nom_application']
         configuration_docker = commande.contenu['configuration']
         tar_scripts = self.preparer_script_file(commande)
-        self.preparer_installation(nom_image_docker, configuration_docker, tar_scripts)
+        self.preparer_installation(nom_application, configuration_docker, tar_scripts)
 
     def preparer_script_file(self, commande):
         b64_script = commande.contenu.get('scripts_b64')
@@ -99,16 +105,14 @@ class GestionnaireApplications:
         tar_archive = commande.contenu['archive_tarfile']
         self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
 
-    def preparer_installation(self, nom_image_docker, configuration_docker, tar_scripts=None, **kwargs):
+    def preparer_installation(self, nom_application, configuration_docker, tar_scripts=None, **kwargs):
         gestionnaire_images_applications = GestionnaireImagesApplications(
             self.__service_monitor.idmg, self.__service_monitor.docker)
         gestionnaire_images_applications.set_configuration(configuration_docker)
 
-        config_name = self.__service_monitor.idmg_tronque + '.app.' + nom_image_docker
+        config_name = 'app.cfg.' + nom_application
 
         self.__gestionnaire_modules_docker.sauvegarder_config(config_name, configuration_docker)
-
-        # Verifier le type de configuration : image ou dependance avec config
 
         # Installer toutes les dependances de l'application en ordre
         for config_image in configuration_docker['dependances']:
@@ -153,8 +157,8 @@ class GestionnaireApplications:
             self.__gestionnaire_modules_docker.force_update_service(nom_service_nginx)
 
     def installer_dependance(self, gestionnaire_images_applications, config_image, tar_scripts=None):
-        nom_image_docker = config_image['image']
-        config_name = 'docker.cfg.' + nom_image_docker
+        nom_container_docker = config_image['config']['name']
+        config_name = 'docker.cfg.' + nom_container_docker
         config_elem = config_image['config']
         self.__gestionnaire_modules_docker.sauvegarder_config(config_name, config_elem)
 
@@ -177,16 +181,26 @@ class GestionnaireApplications:
                     self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse, ajouter_date=True)
 
         # Preparer le demarrage du service, intercepter le demarrage du container
-        service_name = self.__service_monitor.idmg_tronque + '_' + config_elem['name']
-        self.__wait_start_service_name = service_name
+        module_name = config_elem['name']
         self.__wait_container_event.clear()
+        nom_image_docker = config_image['image']
+        try:
+            if config_image.get('container_mode'):
+                self.__wait_start_container_name = nom_container_docker
+                self.__gestionnaire_modules_docker.demarrer_container(nom_container_docker,
+                                                                      nom_image=nom_image_docker,
+                                                                      config=config_elem,
+                                                                      images=gestionnaire_images_applications)
+            else:
+                self.__wait_start_service_name = module_name
+                self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
+                                                                    config=config_elem,
+                                                                    images=gestionnaire_images_applications)
 
-        self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
-                                                            config=config_elem,
-                                                            images=gestionnaire_images_applications)
-
-        self.__wait_container_event.wait(60)
-        self.__wait_start_service_name = None  # Reset ecoute de l'evenement
+            self.__wait_container_event.wait(60)
+        finally:
+            self.__wait_start_service_name = None  # Reset ecoute de l'evenement
+            self.__wait_start_container_name = None  # Reset ecoute de l'evenement
 
         if self.__wait_container_event.is_set():
             self.__logger.info("Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
@@ -205,8 +219,8 @@ class GestionnaireApplications:
                     if not codes_ok or ex.resultat['exit'] not in codes_ok:
                         raise ex
         else:
-            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
-            raise Exception("Image non installee : " + nom_image_docker)
+            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_container_docker)
+            raise Exception("Image non installee : " + nom_container_docker)
 
         if config_image.get('etape_seulement'):
             # C'est un service intermediaire pour l'installation/backup

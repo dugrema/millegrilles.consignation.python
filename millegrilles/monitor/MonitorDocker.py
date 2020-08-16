@@ -11,7 +11,7 @@ from threading import Event, Thread
 from typing import cast
 from docker.errors import APIError
 from docker.types import SecretReference, NetworkAttachmentConfig, Resources, RestartPolicy, ServiceMode, \
-    ConfigReference, EndpointSpec
+    ConfigReference, EndpointSpec, Mount
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -109,7 +109,7 @@ class GestionnaireModulesDocker:
         # Creer reseau pour cette millegrille
         network_name = 'millegrille_net'
         try:
-            self.__docker.networks.create(name=network_name, scope="swarm", driver="overlay")
+            self.__docker.networks.create(name=network_name, scope="swarm", driver="overlay", attachable=True)
         except APIError as apie:
             if apie.status_code == 409:
                 self.__logger.info("Reseau %s deja cree" % network_name)
@@ -267,6 +267,49 @@ class GestionnaireModulesDocker:
             #     self.__logger.info("Service %s deja demarre" % service_name)
             # else:
             #     self.__logger.exception("Erreur demarrage service %s" % service_name)
+
+    def demarrer_container(self, container_name: str, config: dict, **kwargs):
+        self.__logger.info("Demarrage container %s", container_name)
+
+        gestionnaire_images = kwargs.get('images')
+        if not gestionnaire_images:
+            gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
+
+        # S'assurer que le certificat existe, est a date et que le compte est cree
+        cle_config_service = config.get('role') or config.get('nom')
+        if cle_config_service:
+            configuration_service_meta = self.charger_config_recente('docker.cfg.' + cle_config_service)
+            config_attrs = configuration_service_meta['config'].attrs
+            configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+            certificat_compte_cle = configuration_service_json.get('certificat_compte')
+            if certificat_compte_cle:
+                self.creer_compte(certificat_compte_cle)
+
+        nom_image_docker = kwargs.get('nom_image') or config.get('image') or container_name
+
+        configuration = dict()
+        try:
+            image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+
+            # Prendre un tag au hasard
+            image_tag = image.tags[0]
+
+            configuration = self.__formatter_configuration_container(container_name, config)
+
+            command = config.get('command')
+
+            self.__docker.containers.run(image_tag, command=command, **configuration)
+        except KeyError as ke:
+            self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
+        except AttributeError as ae:
+            self.__logger.error("Erreur configuration service %s : %s" % (container_name, str(ae)))
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail erreur configuration service " + container_name)
+        except APIError as apie:
+            self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
+            raise apie
 
     def maj_service(self, service_name: str, **kwargs):
         service_inst = self.__docker.services.list(filters={'name': service_name})[0]
@@ -506,7 +549,18 @@ class GestionnaireModulesDocker:
 
         return dict_config_docker
 
-    def __remplacer_variables(self, nom_service, config_service):
+    def __formatter_configuration_container(self, container_name, config: dict = None):
+        config_container = config or json.loads(self.charger_config('docker.cfg.' + container_name))
+        self.__logger.debug("Configuration container %s : %s", container_name, str(config_container))
+
+        dict_config_docker = self.__remplacer_variables(container_name, config_container, mode_container=True)
+
+        dict_config_docker['detach'] = True
+        dict_config_docker['auto_remove'] = True
+
+        return dict_config_docker
+
+    def __remplacer_variables(self, nom_service, config_service, mode_container=False):
         self.__logger.debug("Remplacer variables %s" % nom_service)
         dict_config_docker = dict()
 
@@ -544,6 +598,12 @@ class GestionnaireModulesDocker:
                 # Mapping des variables
                 config_env = [self.__mapping(valeur) for valeur in config_env]
                 dict_config_docker['env'] = config_env
+
+            config_env = config_service.get('environment')
+            if config_env:
+                # Mapping des variables
+                config_env = [self.__mapping(valeur) for valeur in config_env]
+                dict_config_docker['environment'] = config_env
 
             # Constraints
             config_constraints = config_service.get('constraints')
@@ -647,7 +707,23 @@ class GestionnaireModulesDocker:
             # Mounts
             config_mounts = config_service.get('mounts')
             if config_mounts:
-                dict_config_docker['mounts'] = [self.__mapping(mount) for mount in config_mounts]
+                if not mode_container:
+                    dict_config_docker['mounts'] = [self.__mapping(mount) for mount in config_mounts]
+                else:
+                    self.__logger.warning("Mounts : Format des containers, ignorer pour l'instant")
+                    mounts = list()
+                    for mount in config_mounts:
+                        mount_obj = Mount(mount['target'], mount['source'], mount['type'])
+                        mounts.append(mount_obj)
+                    dict_config_docker['mounts'] = mounts
+
+            devices = config_service.get('devices')
+            if devices:
+                dict_config_docker['devices'] = devices
+
+            network = config_service.get('network')
+            if devices:
+                dict_config_docker['network'] = network
 
         except TypeError as te:
             self.__logger.error("Erreur mapping %s", nom_service)

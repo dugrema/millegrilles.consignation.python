@@ -51,8 +51,8 @@ class TraitementMessagesMiddleware(BaseCallback):
                 'commande': action,
                 'exchange': exchange,
                 'properties': properties,
-                'contenu': message_dict,
             }
+            contenu.update(message_dict)
             commande = CommandeMonitor(contenu=contenu)
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
