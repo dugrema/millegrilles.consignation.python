@@ -231,7 +231,8 @@ class GenerateurTransaction:
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
 
         if exchanges is None:
-            self._contexte.message_dao.transmettre_message_noeuds(
+            # Utilise l'exchange par defaut
+            self._contexte.message_dao.transmettre_message(
                 message_dict=enveloppe, routing_key=routing_key,
                 reply_to=reply_to, correlation_id=correlation_id, headers=headers
             )
