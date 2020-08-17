@@ -566,7 +566,7 @@ class PikaDAO:
 
     def transmettre_message(
             self, message_dict, routing_key, delivery_mode_v=1, encoding=json.JSONEncoder, reply_to=None,
-            correlation_id=None, channel=None, exchange: str = None):
+            correlation_id=None, channel=None, exchange: str = None, headers: dict = None):
 
         if not exchange:
             exchanges = [self._exchange_default]
@@ -595,6 +595,8 @@ class PikaDAO:
             properties.reply_to = reply_to
         if correlation_id is not None:
             properties.correlation_id = correlation_id
+        if headers:
+            properties.headers = headers
 
         message_utf8 = self.json_helper.dict_vers_json(message_dict, encoding)
         with self.lock_transmettre_message:
