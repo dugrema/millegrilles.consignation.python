@@ -36,11 +36,9 @@ if __name__ == '__main__':
 # NGINX
 #
 # modules_include.conf
-# ssl_client_certificate / etc / nginx / conf.d / modules / pki.millegrille.cert;
-# ssl_verify_client
-# optional;
-# ssl_verify_depth
-# 1;
+# ssl_client_certificate/etc/nginx/conf.d/modules/pki.millegrille.cert;
+# ssl_verify_client optional;
+# ssl_verify_depth 1;
 #
 # include / etc / nginx / conf.d / server.include;
 
