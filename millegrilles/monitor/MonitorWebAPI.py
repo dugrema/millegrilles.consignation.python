@@ -33,11 +33,15 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                 self.send_response(HTTPStatus.TEMPORARY_REDIRECT)
                 self.send_header("Location", '/installation/')
                 self.end_headers()
-            elif path_request[2] == 'api':
-                self._traiter_get_api()
-            else:
-                self.path = '/' + '/'.join(path_request[2:])
-                super().do_GET()
+            elif path_request[1] == 'installation':
+                if path_request[2] == 'api':
+                    self._traiter_get_api()
+                else:
+                    self.path = '/' + '/'.join(path_request[2:])
+                    super().do_GET()
+            elif path_request[1] == 'administration':
+                # Path qui requiert un certificat client SSL
+                self._traiter_administration()
         except IndexError:
             self.error_404()
 
@@ -165,6 +169,12 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
         self.wfile.write(info_bytes)
+
+    def _traiter_administration(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/ascii")
+        self.end_headers()
+        self.wfile.write(b"Allo toi")
 
 
 class ServerWebAPI:
