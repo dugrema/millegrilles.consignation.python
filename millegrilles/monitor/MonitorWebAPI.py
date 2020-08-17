@@ -6,6 +6,7 @@ import socket
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
+from json.decoder import JSONDecodeError
 
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
@@ -41,7 +42,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                     super().do_GET()
             elif path_request[1] == 'administration':
                 # Path qui requiert un certificat client SSL
-                self._traiter_administration()
+                self._traiter_administration_GET()
         except IndexError:
             self.error_404()
 
@@ -50,12 +51,18 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
         content_len = int(self.headers.get('content-length', 0))
         post_body = self.rfile.read(content_len)
-        request_data = json.loads(post_body)
+        try:
+            request_data = json.loads(post_body)
+        except JSONDecodeError:
+            request_data = None
 
-        if path_fichier[2] == 'api':
-            self._traiter_post_api(request_data)
-        else:
-            self.error_404()
+        if path_fichier[1] == 'installation':
+            if path_fichier[2] == 'api':
+                self._traiter_post_api(request_data)
+            else:
+                self.error_404()
+        elif path_fichier[1] == 'administration':
+            self._traiter_administration_POST()
 
     def error_404(self):
         self.send_error(404)
@@ -170,12 +177,52 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(info_bytes)
 
-    def _traiter_administration(self):
+    def _traiter_administration_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/ascii")
         self.end_headers()
         self.wfile.write(b"Allo toi")
 
+    def _traiter_administration_POST(self):
+        path_fichier = self.path
+        path_split = path_fichier.split('/')
+
+        print(str(self.headers))
+
+        # S'assurer que la verification du certificat client est OK
+        reponse = None
+        if self.headers.get('VERIFIED') == 'SUCCESS':
+            # reponse = b'OK!!! Certificat valide'
+            if path_split[2] == 'ajouterCompte':
+                self.ajouter_compte()
+            else:
+                self.send_error(404)
+
+        else:
+            reponse = b'Begone, thot!'
+            self.send_response(403)
+
+        self.send_header("Content-type", "text/ascii")
+        self.end_headers()
+
+    def ajouter_compte(self):
+        issuer_dn = self.headers.get('X-Client-Issuer-DN')
+        issuer_info = dict()
+        for elem in issuer_dn.split(','):
+            key, value = elem.split('=')
+            issuer_info[key] = value
+        idmg_issuer = issuer_info['O']
+        headers = self.headers
+        if idmg_issuer == self.service_monitor.idmg:
+            cert_pem = self.headers.get('X-Client-Cert-RAW')
+            cert_payload = self.headers.get_payload()
+            cert_pem = cert_pem + '\n' + cert_payload
+            self.service_monitor.ajouter_compte(cert_pem)
+            self.send_response(200)
+        else:
+            self.send_response(401)
+
+        self.end_headers()
 
 class ServerWebAPI:
 
