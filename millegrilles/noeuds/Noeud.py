@@ -351,10 +351,9 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
         self._logger.debug("Message a transmettre: %s" % str(message))
 
-        uuid_transaction = self.soumettre_transaction(
+        uuid_transaction = self.emettre_message(
             message,
-            SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            version=version
+            'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE
         )
 
         return uuid_transaction

@@ -216,10 +216,12 @@ class GenerateurTransaction:
         return uuid_transaction
 
     def emettre_message(
-            self, message_dict, routing_key, exchanges: list = None, reply_to=None, correlation_id=None, headers: dict = None):
+            self, message_dict, routing_key, exchanges: list = None, reply_to=None, correlation_id=None,
+            headers: dict = None,
+            version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
 
         if not message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION):
-            enveloppe = self.preparer_enveloppe(message_dict)
+            enveloppe = self.preparer_enveloppe(message_dict, version=version)
         else:
             # Transmettre le message brut (c'est deja une enveloppe)
             enveloppe = message_dict
