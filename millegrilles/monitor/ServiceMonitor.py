@@ -1242,6 +1242,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.maj_service('nginx')
 
     def initialiser_noeud(self, commande):
+        self.__logger.debug("Commande initialiser noeud : %s" % str(commande))
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
 
