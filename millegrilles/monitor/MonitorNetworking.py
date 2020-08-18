@@ -112,6 +112,10 @@ class GestionnaireWeb:
             ssl_certificate_key   /run/secrets/webkey.pem;
             ssl_stapling          on;
             ssl_stapling_verify   on;
+            
+            ssl_client_certificate /usr/share/certs/millegrille.cert.pem;
+            ssl_verify_client      optional;
+            ssl_verify_depth       1;
         """
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
@@ -165,21 +169,16 @@ class GestionnaireWeb:
             "/administration",
         ]
 
-        location_administration = """
-            location /administration {
-                include /etc/nginx/conf.d/modules/proxypass_installation.include;
-                include /etc/nginx/conf.d/component_base.include;
-
-                proxy_set_header VERIFIED $ssl_client_verify;
-                proxy_set_header X-Client-Issuer-DN $ssl_client_i_dn;
-                proxy_set_header X-Client-Cert-RAW $ssl_client_raw_cert;
-                proxy_set_header DN $ssl_client_s_dn;
+        certificats = """
+            location /certs {
+              root /usr/share/nginx/files;
             }
         """
 
         locations_list = list()
         locations_list.append(location_redirect_installation)
         locations_list.append(location_data_vitrine)
+        locations_list.append(certificats)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
         locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])

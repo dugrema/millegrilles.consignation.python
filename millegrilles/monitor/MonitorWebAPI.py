@@ -20,6 +20,7 @@ serverPort = 8080
 class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         server = args[2]
         super().__init__(*args, directory=server.webroot, **kwargs)
 
@@ -178,26 +179,30 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.wfile.write(info_bytes)
 
     def _traiter_administration_GET(self):
+        if not self.headers.get('VERIFIED') == 'SUCCESS':
+            self.__logger.debug("/administration Access refuse, SSL invalide")
+            self.send_error(401)
+            return
+
         self.send_response(200)
         self.send_header("Content-type", "text/ascii")
         self.end_headers()
-        self.wfile.write(b"Allo toi")
+        self.wfile.write(b"GET ADMINISTRATION, pas implemente")
 
     def _traiter_administration_POST(self):
+        if not self.headers.get('VERIFIED') == 'SUCCESS':
+            self.__logger.debug("/administration Access refuse, SSL invalide")
+            self.send_error(401)
+            return
+
         path_fichier = self.path
         path_split = path_fichier.split('/')
 
-        print(str(self.headers))
-
         # S'assurer que la verification du certificat client est OK
-        if self.headers.get('VERIFIED') == 'SUCCESS':
-            if path_split[2] == 'ajouterCompte':
-                self.ajouter_compte()
-            else:
-                self.send_error(404)
-
+        if path_split[2] == 'ajouterCompte':
+            self.ajouter_compte()
         else:
-            self.send_error(401)
+            self.send_error(404)
 
     def ajouter_compte(self):
         issuer_dn = self.headers.get('X-Client-Issuer-DN')
