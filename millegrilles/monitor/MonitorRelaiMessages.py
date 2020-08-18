@@ -643,6 +643,10 @@ class ConnexionMiddlewarePrive(ConnexionMiddleware):
 
         services = gestionnaire_mdns.get_service(self._service_monitor.idmg, '_mgamqps._tcp')
 
+        self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
+        for service in services:
+            self.__logger.debug("Service port %d, addresses : %s" % (service['port'], str(service['addresses'])))
+
         service_retenu = services[0]
         host = service_retenu['addresses'][0]
         port = service_retenu['port']
