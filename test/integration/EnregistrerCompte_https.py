@@ -1,10 +1,13 @@
 import requests
 
-#path_certificat = '/home/mathieu/mgdev/certs/pki.monitor.cert'
-#path_cle = '/home/mathieu/mgdev/certs/pki.monitor.key'
+# path_certificat = '/home/mathieu/mgdev/certs/pki.monitor.cert'
+# path_cle = '/home/mathieu/mgdev/certs/pki.monitor.key'
 
-path_certificat = '/home/mathieu/mgdev/prive.cert.pem'
-path_cle = '/home/mathieu/mgdev/prive.key.pem'
+path_certificat = '/home/mathieu/mgdev/certs/pki.web_protege.cert'
+path_cle = '/home/mathieu/mgdev/certs/pki.web_protege.key'
+
+#path_certificat = '/home/mathieu/mgdev/prive.cert.pem'
+#path_cle = '/home/mathieu/mgdev/prive.key.pem'
 
 # path_certificat = '/home/mathieu/mgdev/monitor_JP.pem'
 # path_cle = '/home/mathieu/mgdev/monitor_JP.key'

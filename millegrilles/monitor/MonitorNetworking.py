@@ -113,7 +113,7 @@ class GestionnaireWeb:
             ssl_stapling          on;
             ssl_stapling_verify   on;
             
-            ssl_client_certificate /usr/share/certs/millegrille.cert.pem;
+            ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
             ssl_verify_client      optional;
             ssl_verify_depth       1;
         """
