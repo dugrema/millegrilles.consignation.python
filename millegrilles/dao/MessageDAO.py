@@ -129,6 +129,7 @@ class ConnexionWrapper:
                 parameters=parametres,
                 on_open_callback=self.__on_connection_open,
                 on_close_callback=self.__on_connection_close,
+                on_open_error_callback=self.__on_open_error,
             )
             self.__thread_ioloop = Thread(name='MQ-IOloop', target=self.__run_ioloop, daemon=True)
             self.__thread_ioloop.start()  # Va faire un hook avec la nouvelle connexion MQ immediatement
@@ -233,6 +234,20 @@ class ConnexionWrapper:
             for listener in self.__liste_listeners_channels:
                 self.__ouvrir_channel_listener(listener)
 
+    def __on_open_error(self, connection, exception):
+        code_erreur = exception.args[0]
+        if code_erreur == 403:
+            # Acces refuse, on tente de transmettre notre certificat pour creer le compte
+            compte_ok = self._creer_compte_mq()
+            if compte_ok:
+                self._logger.debug("Compte MQ cree sur serveur")
+            self.enter_error_state()
+        else:
+            if self._logger.isEnabledFor(logging.DEBUG):
+                self._logger.exception("Erreur de connexion MQ")
+            else:
+                self._logger.error("Erreur de connexion MQ : %s", str(exception))
+
     def __on_channel_open(self, channel):
         self.__channel = channel
         channel.basic_qos(prefetch_count=1)
@@ -322,6 +337,41 @@ class ConnexionWrapper:
             # Attendre prochain evenement de publish
             self.__publish_confirm_event.clear()
             self.__publish_confirm_event.wait(600)
+
+    def _creer_compte_mq(self):
+        """
+        Creer un compte sur MQ via https (monitor).
+        :return:
+        """
+
+        # Le monitor peut etre trouve via quelques hostnames :
+        #  nginx : de l'interne, est le proxy web qui est mappe vers le monitor
+        #  mq_host : de l'exterieur, est le serveur mq qui est sur le meme swarm docker que nginx
+        hosts = ['nginx', self.configuration.mq_host]
+        port = 443
+        path = 'administration/ajouterCompte'
+
+        cle_cert = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
+        try:
+            import requests
+            for host in hosts:
+                try:
+                    path_complet = 'https://%s:%d/%s' % (host, port, path)
+                    reponse = requests.post(path_complet, cert=cle_cert, verify=False)
+                    if reponse.status_code == 200:
+                        return True
+                    if reponse.status_code != 200:
+                        self._logger.error("Erreur creation compte MQ via https, code : %d", reponse.status_code)
+                except requests.exceptions.SSLError as e:
+                    self._logger.exception("Erreur connexion https pour compte MQ")
+                except requests.exceptions.ConnectionError:
+                    # Erreur connexion au serveur, tenter le prochain host
+                    pass
+        except ImportError:
+            self._logger.warning("requests non disponible, on ne peut pas tenter d'ajouter le compte MQ")
+
+        return False
+
 
     @property
     def channel(self):
