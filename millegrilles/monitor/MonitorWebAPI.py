@@ -190,20 +190,14 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         print(str(self.headers))
 
         # S'assurer que la verification du certificat client est OK
-        reponse = None
         if self.headers.get('VERIFIED') == 'SUCCESS':
-            # reponse = b'OK!!! Certificat valide'
             if path_split[2] == 'ajouterCompte':
                 self.ajouter_compte()
             else:
                 self.send_error(404)
 
         else:
-            reponse = b'Begone, thot!'
-            self.send_response(403)
-
-        self.send_header("Content-type", "text/ascii")
-        self.end_headers()
+            self.send_error(401)
 
     def ajouter_compte(self):
         issuer_dn = self.headers.get('X-Client-Issuer-DN')
@@ -214,15 +208,17 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         idmg_issuer = issuer_info['O']
         headers = self.headers
         if idmg_issuer == self.service_monitor.idmg:
-            cert_pem = self.headers.get('X-Client-Cert-RAW')
-            cert_payload = self.headers.get_payload()
-            cert_pem = cert_pem + '\n' + cert_payload
+            cert_pem = self.headers.get('X-Client-Cert')
+            cert_pem = cert_pem.replace('\t', '')
+            # cert_payload = self.headers.get_payload()
+            # cert_pem = cert_pem + '\n' + cert_payload
             self.service_monitor.ajouter_compte(cert_pem)
             self.send_response(200)
         else:
-            self.send_response(401)
+            self.send_response(403)
 
         self.end_headers()
+        self.wfile.write(b"")
 
 class ServerWebAPI:
 

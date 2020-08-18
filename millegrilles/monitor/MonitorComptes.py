@@ -117,19 +117,29 @@ class GestionnaireComptesMQ:
             responses.append(self._admin_api.create_user(subject))
             responses.append(self._admin_api.create_user_permission(subject, idmg))
 
-            liste_exchanges_restants = [
+            liste_inclure = {Constantes.SECURITE_PUBLIC}  # PUblic toujours inclus
+            if Constantes.SECURITE_PROTEGE in exchanges:
+                # pour l'echange protege, on inclus aussi l'echange prive (et public)
+                liste_inclure.add(Constantes.SECURITE_PRIVE)
+            if Constantes.SECURITE_SECURE in exchanges:
+                # pour l'echange secure, on inclus aussi tous les autres echanges
+                liste_inclure.add(Constantes.SECURITE_PRIVE)
+                liste_inclure.add(Constantes.SECURITE_PROTEGE)
+            liste_inclure.update(exchanges)
+
+            liste_exchanges_exclure = [
                 Constantes.SECURITE_PUBLIC,
                 Constantes.SECURITE_PRIVE,
                 Constantes.SECURITE_PROTEGE,
                 Constantes.SECURITE_SECURE
             ]
 
-            for exchange in exchanges:
-                liste_exchanges_restants.remove(exchange)
+            for exchange in liste_inclure:
+                liste_exchanges_exclure.remove(exchange)  # Retire de la liste d'exchanges a exclure
                 responses.append(self._admin_api.create_user_topic(subject, idmg, exchange))
 
-            # Bloquer les exchanges restants
-            for exchange in liste_exchanges_restants:
+            # Bloquer les exchanges a exclure
+            for exchange in liste_exchanges_exclure:
                 responses.append(self._admin_api.create_user_topic(subject, idmg, exchange, write='', read=''))
 
             if any([response.status_code not in [201, 204] for response in responses]):
