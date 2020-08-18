@@ -177,8 +177,11 @@ class GestionnaireModulesDocker:
         # Ajouter secrets au service monitor
         filtre = {'name': 'monitor'}
         services_list = self.__docker.services.list(filters=filtre)
-        service_monitor = services_list[0]
-        service_monitor.update(secrets=liste_secrets)
+        try:
+            service_monitor = services_list[0]
+            service_monitor.update(secrets=liste_secrets)
+        except IndexError:
+            self.__logger.error("Erreur configuration service monitor avec nouvelles valeurs (OK si dev)")
 
     def entretien_services(self):
         """
