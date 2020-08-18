@@ -1353,6 +1353,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__logger.info("Configuration completee, redemarrer le monitor")
         gestionnaire_docker.configurer_monitor()
 
+        # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
+        gestionnaire_docker.maj_service('nginx')
+
         raise ForcerRedemarrage("Redemarrage")
 
     def preparer_mdns(self):
