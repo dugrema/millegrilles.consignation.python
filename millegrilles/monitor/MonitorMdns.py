@@ -14,6 +14,8 @@ class MdnsGestionnaire:
         self.__monitor = monitor
         self.__browser = MdnsBrowser(monitor)
 
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def get_service(self, idmg: str, type_service: str = None) -> list:
         idmg_info = self.__browser.listener.service_par_idmg.get(idmg)
         if idmg_info:
@@ -21,6 +23,8 @@ class MdnsGestionnaire:
                 return [serv for serv in idmg_info.values() if serv['type'].startswith(type_service)]
             else:
                 return idmg_info.values()
+        else:
+            self.__logger.debug("Aucun service mdns pour idmg : %s" % idmg)
 
         return list()
 
