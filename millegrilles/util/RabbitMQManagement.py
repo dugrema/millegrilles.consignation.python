@@ -159,9 +159,13 @@ class RabbitMQAPI:
     def create_user_topic(self, name, vhost, exchange, write=None, read=None):
         data = {
             'exchange': exchange,
-            'write': write or '.*',
-            'read': read or '.*',
+            'write': '',
+            'read': '',
         }
+        if write != '':
+            data['write'] = write or '.*'
+        if read != '':
+            data['read'] = read or '.*'
         return self._api_put(
             '/api/topic-permissions/{0}/{1}'.format(
                 urllib.parse.quote_plus(vhost),

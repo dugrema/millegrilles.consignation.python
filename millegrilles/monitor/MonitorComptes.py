@@ -117,8 +117,20 @@ class GestionnaireComptesMQ:
             responses.append(self._admin_api.create_user(subject))
             responses.append(self._admin_api.create_user_permission(subject, idmg))
 
+            liste_exchanges_restants = [
+                Constantes.SECURITE_PUBLIC,
+                Constantes.SECURITE_PRIVE,
+                Constantes.SECURITE_PROTEGE,
+                Constantes.SECURITE_SECURE
+            ]
+
             for exchange in exchanges:
+                liste_exchanges_restants.remove(exchange)
                 responses.append(self._admin_api.create_user_topic(subject, idmg, exchange))
+
+            # Bloquer les exchanges restants
+            for exchange in liste_exchanges_restants:
+                responses.append(self._admin_api.create_user_topic(subject, idmg, exchange, write='', read=''))
 
             if any([response.status_code not in [201, 204] for response in responses]):
                 raise ValueError("Erreur ajout compte", subject)
