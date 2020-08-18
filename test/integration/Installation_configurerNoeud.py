@@ -3,7 +3,7 @@ import requests
 
 from millegrilles.util.X509Certificate import GenerateurInitial, GenererNoeudPrive, EnveloppeCleCert, RenouvelleurCertificat
 
-serveur = "mg-dev4.maple.maceroc.com"
+serveur = "192.168.2.131"
 
 
 def generer_cert_millegrille():
@@ -131,7 +131,7 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
         }
 
         resultat = requests.post(
-            'https://mg-dev4.maple.maceroc.com/installation/api/initialisation',
+            'https://%s/installation/api/initialisation' % serveur,
             json=message,
             verify=False
         )
