@@ -51,7 +51,9 @@ sample_app_1 = {
                 #"devices": [
                 #    "/dev/sda:/dev/sda:rwm"
                 #],
-                "privileged": True
+                "privileged": True,
+                # "restart_policy": {"Name": "always", "MaximumRetryCount": 10}
+                "restart_policy": {"Name": "on-failure", "MaximumRetryCount": 3}
             }
         }
     ]

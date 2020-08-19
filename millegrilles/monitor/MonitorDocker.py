@@ -587,7 +587,7 @@ class GestionnaireModulesDocker:
         dict_config_docker = self.__remplacer_variables(container_name, config_container, mode_container=True)
 
         dict_config_docker['detach'] = True
-        dict_config_docker['auto_remove'] = True
+        # dict_config_docker['auto_remove'] = True
         labels = dict_config_docker.get('labels')
         if not labels:
             labels = dict()
@@ -622,7 +622,10 @@ class GestionnaireModulesDocker:
             # Restart Policy
             config_restart_policy = config_service.get('restart_policy')
             if config_restart_policy:
-                dict_config_docker['restart_policy'] = RestartPolicy(**config_restart_policy)
+                if mode_container:
+                    dict_config_docker['restart_policy'] = config_restart_policy
+                else:
+                    dict_config_docker['restart_policy'] = RestartPolicy(**config_restart_policy)
 
             # Service Mode
             config_service_mode = config_service.get('mode')

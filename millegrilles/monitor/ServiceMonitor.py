@@ -522,6 +522,23 @@ class ServiceMonitor:
 
         return info_mq
 
+    def preparer_secrets(self):
+        """
+        Expose les certs/cle prive dans le volume secrets pour les containers
+        :return:
+        """
+        volume_secrets = '/var/opt/millegrilles/secrets'
+        fichiers = [
+            (os.path.join(volume_secrets, 'cle.pem'), self._connexion_middleware.configuration.mq_keyfile),
+            (os.path.join(volume_secrets, 'cert.pem'), self._connexion_middleware.configuration.mq_certfile),
+            (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._connexion_middleware.configuration.mq_cafile)
+        ]
+
+        for fichier in fichiers:
+            with open(fichier[0], 'w') as cle_out:
+                with open(fichier[1], 'r') as cle_in:
+                    cle_out.write(cle_in.read())
+
     @property
     def gestionnaire_mq(self):
         return self._gestionnaire_mq
@@ -596,6 +613,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
                     if not self._connexion_middleware:
                         try:
                             self.connecter_middleware()
+                            # self.preparer_secrets()  # Pour noeud protege, ne pas extrait la cle
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
@@ -988,6 +1006,7 @@ class ServiceMonitorPrive(ServiceMonitor):
                     if not self._connexion_middleware:
                         try:
                             self.connecter_middleware()
+                            self.preparer_secrets()
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
