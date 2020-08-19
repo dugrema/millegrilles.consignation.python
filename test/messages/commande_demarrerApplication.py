@@ -47,10 +47,11 @@ sample_app_1 = {
                         'type': 'bind'
                     }
                 ],
-                "network": "test",
-                "devices": [
-                    "/dev/sda:/dev/sda:rwm"
-                ]
+                "network": "millegrille_net",
+                #"devices": [
+                #    "/dev/sda:/dev/sda:rwm"
+                #],
+                "privileged": True
             }
         }
     ]
@@ -98,7 +99,7 @@ class MessagesSample(BaseCallback):
             'nom_application': 'con_dummy',
             'configuration': sample_app_1,
         }
-        domaineAction = 'commande.servicemonitor.79b2f503-5f93-4019-b9e0-fc14686fc695.' + Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION
+        domaineAction = 'commande.servicemonitor.45ab689e-8ff5-45c6-a6d4-ae0a56ed9f78.' + Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION
 
         enveloppe = self.generateur.transmettre_commande(
             commande,

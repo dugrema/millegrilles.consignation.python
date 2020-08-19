@@ -740,6 +740,10 @@ class GestionnaireModulesDocker:
             if devices:
                 dict_config_docker['devices'] = devices
 
+            privileged = config_service.get('privileged')
+            if privileged:
+                dict_config_docker['privileged'] = True
+
             network = config_service.get('network')
             if devices:
                 dict_config_docker['network'] = network
