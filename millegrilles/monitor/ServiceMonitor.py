@@ -527,7 +527,7 @@ class ServiceMonitor:
         Expose les certs/cle prive dans le volume secrets pour les containers
         :return:
         """
-        volume_secrets = '/var/opt/millegrilles/secrets'
+        volume_secrets = self.path_secrets
         fichiers = [
             (os.path.join(volume_secrets, 'cle.pem'), self._connexion_middleware.configuration.mq_keyfile),
             (os.path.join(volume_secrets, 'cert.pem'), self._connexion_middleware.configuration.mq_certfile),

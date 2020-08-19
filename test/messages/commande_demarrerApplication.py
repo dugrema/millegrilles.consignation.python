@@ -197,8 +197,8 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
-        self.installer_application_protege_dummy()
-        # self.supprimer_application_protege_dummy()
+        # self.installer_application_protege_dummy()
+        self.supprimer_application_protege_dummy()
         # self.installer_application_senseurspassifs()
 
 
