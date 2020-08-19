@@ -1275,13 +1275,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
         cert_subject = clecert_recu.formatter_subject()
-        self.__logger.debug("Certificat recu : %s", str(cert_subject))
-        if cert_subject['organizationName'] != idmg:
-            raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
 
         # Verifier le type de certificat - il determine le type de noeud:
         # intermediaire = noeud protege, prive = noeud prive, public = noeud public
+        self.__logger.debug("Certificat recu : %s", str(cert_subject))
         subject_clecert_recu = clecert_recu.formatter_subject()
+        if subject_clecert_recu['organizationName'] != idmg:
+            raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
+
         type_certificat_recu = subject_clecert_recu['organizationalUnitName']
 
         # Comencer sauvegarde

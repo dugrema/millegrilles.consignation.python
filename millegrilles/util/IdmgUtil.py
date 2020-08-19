@@ -27,7 +27,7 @@ class IdmgUtil:
 
     def encoder_idmg_cert(self, cert_x509: x509, version=VERSION_ACTIVE):
         date_exp = cert_x509.not_valid_after
-        date_exp_int = math.ceil(float(date_exp.timestamp()) / 1000.0)
+        date_exp_int = int(math.ceil(float(date_exp.timestamp()) / 1000.0))
         valeur = cert_x509.fingerprint(hashes.SHA512_224())
 
         valeur_combinee = struct.pack(IdmgUtil.VERSION_PACK[version], version, valeur, date_exp_int)
