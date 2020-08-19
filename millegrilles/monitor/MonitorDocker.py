@@ -593,6 +593,26 @@ class GestionnaireModulesDocker:
             labels = dict()
             dict_config_docker['labels'] = labels
 
+        # Injecter le mount avec les secrets
+        mounts = dict_config_docker.get('mounts')
+        if not mounts:
+            mounts = list()
+            dict_config_docker['mounts'] = mounts
+
+        path_secrets = self.__service_monitor.path_secrets
+        if path_secrets:
+            mounts.append({
+                'target': '/run/secrets',
+                'source': path_secrets,
+                'type': 'bind'
+            })
+        else:
+            mounts.append({
+                'target': '/run/secrets',
+                'source': 'millegrille-secrets',
+                'type': 'volume'
+            })
+
         labels['mode_container'] = 'true'
 
         return dict_config_docker

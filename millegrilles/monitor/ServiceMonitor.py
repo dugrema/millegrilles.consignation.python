@@ -577,6 +577,10 @@ class ServiceMonitor:
     def securite(self):
         return self._securite or Constantes.SECURITE_PRIVE
 
+    @property
+    def path_secrets(self):
+        return self._args.secrets
+
 
 class ServiceMonitorPrincipal(ServiceMonitor):
     """
