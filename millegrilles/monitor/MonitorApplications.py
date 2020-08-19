@@ -230,21 +230,6 @@ class GestionnaireApplications:
     def effectuer_desinstallation(self, nom_image_docker, configuration_docker):
 
         # Nettoyer fichiers de configurations
-        nginx_config = configuration_docker.get('nginx')
-        if nginx_config:
-            # Injecter le fichier dans le repertoire de nginx
-            try:
-                path_nginx = '/var/opt/millegrilles/%s/mounts/nginx/conf.d/modules' % self.__service_monitor.idmg
-                nom_config = nginx_config['server_file']
-                remove(path.join(path_nginx, nom_config))
-
-                # Redemarrer nginx
-                nom_service_nginx = 'nginx'
-                self.__gestionnaire_modules_docker.force_update_service(nom_service_nginx)
-            except FileNotFoundError:
-                pass  # OK
-
-        # Supprimer les dependances (a l'envers, recursif)
         liste_config = list(configuration_docker['dependances'])
         liste_config.reverse()
         for config_image in liste_config:
@@ -254,12 +239,16 @@ class GestionnaireApplications:
                     nom_image_docker = config_image['nom']
                     self.effectuer_desinstallation(nom_image_docker, config_image)
                 elif config_image.get('image'):
-                    # C'est une image, on l'installe
                     nom_service = config_image['config']['name']
-                    self.__gestionnaire_modules_docker.supprimer_service(nom_service)
+                    if config_image.get('container_mode'):
+                        # Arreter le container - il se supprime automatiquement
+                        self.__gestionnaire_modules_docker.supprimer_container(nom_service)
+                    else:
+                        # Supprimer le service
+                        self.__gestionnaire_modules_docker.supprimer_service(nom_service)
 
-                    config_name = self.__service_monitor.idmg_tronque + '.app.' + nom_image_docker
-                    self.__gestionnaire_modules_docker.supprimer_config(config_name)
+                        config_name = self.__service_monitor.idmg_tronque + '.app.' + nom_image_docker
+                        self.__gestionnaire_modules_docker.supprimer_config(config_name)
 
             except IndexError:
                 pass  # OK, service absent

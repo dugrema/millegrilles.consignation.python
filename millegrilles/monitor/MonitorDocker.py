@@ -365,6 +365,18 @@ class GestionnaireModulesDocker:
         service_list = self.__docker.services.list(filters=filter)
         service_list[0].remove()
 
+    def supprimer_container(self, container_name: str):
+        filter = {'name': container_name}
+        container_list = self.__docker.containers.list(filters=filter)
+        container = container_list[0]
+        container.stop()
+        try:
+            exit_code = container.wait()
+            container.remove()  # Si le container ne s'est pas auto-supprime, on l'enleve
+        except docker.errors.NotFound:
+            # Ok, container s'est auto-supprime
+            pass
+
     def activer_hebergement(self):
         """
         Active les modules d'hebergement (si pas deja fait).
@@ -576,6 +588,12 @@ class GestionnaireModulesDocker:
 
         dict_config_docker['detach'] = True
         dict_config_docker['auto_remove'] = True
+        labels = dict_config_docker.get('labels')
+        if not labels:
+            labels = dict()
+            dict_config_docker['labels'] = labels
+
+        labels['mode_container'] = 'true'
 
         return dict_config_docker
 
