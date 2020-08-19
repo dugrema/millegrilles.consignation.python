@@ -529,7 +529,7 @@ class ServiceMonitor:
         """
         volume_secrets = self.path_secrets
         fichiers = [
-            (os.path.join(volume_secrets, 'cle.pem'), self._connexion_middleware.configuration.mq_keyfile),
+            (os.path.join(volume_secrets, 'key.pem'), self._connexion_middleware.configuration.mq_keyfile),
             (os.path.join(volume_secrets, 'cert.pem'), self._connexion_middleware.configuration.mq_certfile),
             (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._connexion_middleware.configuration.mq_cafile)
         ]

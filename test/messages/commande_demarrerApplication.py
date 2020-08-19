@@ -194,12 +194,31 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def supprimer_application_senseurspassifs(self):
+        commande = {
+            'nom_application': 'senseurspassifs',
+            'configuration': senseurspassifs_app,
+        }
+        domaineAction = 'commande.servicemonitor.45ab689e-8ff5-45c6-a6d4-ae0a56ed9f78.' + Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PRIVE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
         # self.installer_application_protege_dummy()
-        self.supprimer_application_protege_dummy()
-        # self.installer_application_senseurspassifs()
+        # self.supprimer_application_protege_dummy()
+        self.installer_application_senseurspassifs()
+        # self.supprimer_application_senseurspassifs()
 
 
 # --- MAIN ---
