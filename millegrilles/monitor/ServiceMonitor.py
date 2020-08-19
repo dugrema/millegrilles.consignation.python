@@ -1264,6 +1264,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         chaine = params['chainePem']
 
         # Extraire IDMG
+        self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
         clecert_millegrille = EnveloppeCleCert()
         clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
         idmg = clecert_millegrille.idmg
@@ -1275,7 +1276,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         cert_subject = clecert_recu.formatter_subject()
         self.__logger.debug("Certificat recu : %s", str(cert_subject))
-        if cert_subject['organization'] != idmg:
+        if cert_subject['organizationName'] != idmg:
             raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
 
         # Verifier le type de certificat - il determine le type de noeud:
