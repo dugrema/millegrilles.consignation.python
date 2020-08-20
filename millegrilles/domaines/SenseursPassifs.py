@@ -89,7 +89,7 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         doc_senseur = collection.find_one(filter)
 
         if not doc_senseur:
-            self.ajouter_senseur(lecture)
+            self.ajouter_senseur(lecture, exchange)
             # Creer un document sommaire qui va etre insere
             doc_senseur = {
                 SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
@@ -112,8 +112,14 @@ class TraitementMessageLecture(TraitementMessageDomaine):
 
         collection.update(filter, ops, upsert=True)
 
-    def ajouter_senseur(self, lecture: dict):
-        pass
+    def ajouter_senseur(self, lecture: dict, securite: str):
+        transaction = {
+            SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: lecture[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID],
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: lecture[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR],
+            Constantes.DOCUMENT_INFODOC_SECURITE: securite,
+        }
+        domaine_action = SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR
+        self.gestionnaire.generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
 
 class SenseursPassifsExchangeRouter(ExchangeRouter):
