@@ -586,12 +586,12 @@ class PikaDAO:
             bindings.add('reponse.%s' % nom_queue)
             with self.lock_transmettre_message:
                 for routing_key in bindings:
-                    self.__channel_publisher.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
+                    self.__channel_consumer.queue_bind(queue=nom_queue, exchange=exchange_in, routing_key=routing_key, callback=None)
                 tag_queue = self.__channel_consumer.basic_consume(callback_in, queue=nom_queue, no_ack=False)
                 self._logger.debug("Tag queue: %s" % tag_queue)
 
-                self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
-                self.__channel_publisher.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
+        self._logger.info("Declarer Q exclusive pour routing %s" % str(routing))
+        self.__channel_consumer.queue_declare(queue='', exclusive=True, callback=callback_inscrire)
 
     def demarrer_lecture_nouvelles_transactions(self, callback):
         queue_name = self.configuration.queue_nouvelles_transactions

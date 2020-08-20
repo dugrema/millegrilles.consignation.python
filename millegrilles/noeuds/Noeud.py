@@ -15,7 +15,7 @@ from threading import Event, Thread
 from typing import Optional
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
+from millegrilles.dao.MessageDAO import ExceptionConnectionFermee, BaseCallback
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.SecuritePKI import GestionnaireEvenementsCertificat
@@ -64,7 +64,10 @@ class DemarreurNoeud(Daemon):
         self._stop_event = Event()
         self._stop_event.set()  # Set initiale, faire clear pour activer le processus
 
+        self._message_handler: Optional[MessageCallback] = None
         self._backlog_messages = []  # Utilise pour stocker les message qui n'ont pas ete transmis
+
+        self._thread_transactions: Optional[Thread] = None  # Thread de traitement du buffer, tranmission de transactions
 
     def print_help(self):
         self._parser.print_help()
@@ -137,6 +140,7 @@ class DemarreurNoeud(Daemon):
 
     def stop(self):
         Daemon.stop(self)
+        self._stop_event.set()
 
     def restart(self):
         Daemon.restart(self)
@@ -147,9 +151,19 @@ class DemarreurNoeud(Daemon):
         self.__channel = channel
         self.__certificat_event_handler.initialiser()
 
+        self._message_handler = MessageCallback(self.contexte, self)
+        # self.contexte.message_dao.enregistrer_callback(queue='', callback=self._message_handler.callbackAvecAck)
+        self.contexte.message_dao.inscrire_topic(
+            self.contexte.configuration.exchange_defaut,
+            ['ceduleur.#'],
+            self._message_handler.callbackAvecAck
+        )
+
     def on_channel_close(self):
         self.__channel = None
         self._logger.info("MQ Channel ferme")
+        if not self._stop_event:
+            self._contexte.message_dao.enter_error_state()
 
     def run(self):
         self._logger.info("Demarrage Daemon")
@@ -243,6 +257,13 @@ class DemarreurNoeud(Daemon):
             # Erreur, la connexion semble fermee. On va tenter une reconnexion
             self._backlog_messages.append(dict_lecture)
             self.contexte.message_dao.enter_error_state()
+
+    def produire_transactions(self):
+        if not self._thread_transactions or not self._thread_transactions.is_alive():
+            # Demarrer une thread pour produire les fichiers de transactions et les soumettre
+            self._thread_transactions = Thread(
+                name="transactions", target=self._producteur_transaction.generer_transactions)
+            self._thread_transactions.start()
 
     ''' Verifie s'il y a un backlog, tente de reconnecter au message_dao et transmettre au besoin. '''
     def traiter_backlog_messages(self):
@@ -544,6 +565,30 @@ class LineReader:
             return line
         else:
             raise StopIteration()
+
+
+class MessageCallback(BaseCallback):
+
+    def __init__(self, contexte, noeud: DemarreurNoeud):
+        super().__init__(contexte)
+        self._noeud = noeud
+        self.__channel = None
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    # Methode pour recevoir le callback pour les nouvelles transactions.
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        # routing_key_split = routing_key.split('.')
+        # exchange = method.exchange
+
+        if routing_key.startswith('ceduleur'):
+            indicateurs = message_dict['indicateurs']
+            if 'heure' in indicateurs:
+                self._noeud.produire_transactions()
+        else:
+            self.__logger.error("Message de type inconnu : %s" % routing_key)
 
 
 if __name__ == "__main__":
