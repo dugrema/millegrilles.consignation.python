@@ -59,7 +59,7 @@ class GenerateurTransaction:
     def soumettre_transaction(self, message_dict, domaine_action=None,
                               reply_to=None, correlation_id=None,
                               version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                              idmg_destination: str = None):
+                              idmg_destination: str = None, retourner_enveloppe=False):
         """
         Transmet un message. La connexion doit etre ouverte.
 
@@ -83,7 +83,10 @@ class GenerateurTransaction:
 
         self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id)
 
-        return uuid_transaction
+        if retourner_enveloppe:
+            return enveloppe
+        else:
+            return uuid_transaction
 
     def restaurer_transaction(self, transaction: str):
         self._contexte.message_dao.transmettre_message_direct(transaction, Constantes.TRANSACTION_ROUTING_RESTAURER)
