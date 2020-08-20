@@ -192,7 +192,7 @@ class RequeteMongo(BaseCallback):
 
         # Remplacer les ID de senseurs et appareils par leur nom
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
             SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: {'$in': list(senseurs.keys())}
         }
         try:

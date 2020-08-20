@@ -366,7 +366,7 @@ class GestionnaireDomaine:
         self.__contexte = contexte
         self.demarreur_processus = None
         self.json_helper = JSONHelper()
-        self._logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
+        self.__logger = logging.getLogger("%s.GestionnaireDomaine" % __name__)
         self._watchers = list()
         self.channel_mq = None
         self._arret_en_cours = False
@@ -408,12 +408,12 @@ class GestionnaireDomaine:
 
     def demarrer(self):
         """ Demarrer une thread pour ce gestionnaire """
-        self._logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
+        self.__logger.debug("Debut thread gestionnaire %s" % self.__class__.__name__)
         # self.configurer()  # Deja fait durant l'initialisation
-        self._logger.info("On enregistre la queue %s" % self.get_nom_queue())
+        self.__logger.info("On enregistre la queue %s" % self.get_nom_queue())
 
         self._contexte.message_dao.register_channel_listener(self)
-        self._logger.info("Attente Q et routes prets")
+        self.__logger.info("Attente Q et routes prets")
         self.wait_Q_ready.wait(30)  # Donner 30 seconde a MQ
 
         # Verifier si la collection de transactions est prete
@@ -424,17 +424,17 @@ class GestionnaireDomaine:
             self.__confirmation_setup_transaction = self.verifier_collection_transactions()
             if not self.__confirmation_setup_transaction:
                 self.wait_Q_ready.clear()
-                self._logger.error("Erreur initialisation collection Transaction pour %s" % self.get_nom_domaine())
+                self.__logger.error("Erreur initialisation collection Transaction pour %s" % self.get_nom_domaine())
 
         if not self.wait_Q_ready.is_set():
             self.__Q_wait_broken = datetime.datetime.utcnow()
             if self.nb_routes_a_config > 0:
-                self._logger.error("Les routes de Q du domaine ne sont pas configures correctement, il reste %d a configurer" % self.nb_routes_a_config)
+                self.__logger.error("Les routes de Q du domaine ne sont pas configures correctement, il reste %d a configurer" % self.nb_routes_a_config)
             else:
-                self._logger.warning('wait_Q_read pas set, on va forcer error state sur la connexion pour recuperer')
+                self.__logger.warning('wait_Q_read pas set, on va forcer error state sur la connexion pour recuperer')
             self.message_dao.enter_error_state()
         else:
-            self._logger.info("Q et routes prets")
+            self.__logger.info("Q et routes prets")
 
             # Verifier si on doit upgrader les documents avant de commencer a ecouter
             doit_regenerer = self.verifier_version_transactions(self.version_domaine)
@@ -556,7 +556,7 @@ class GestionnaireDomaine:
             if queue_config.get('durable'):
                 durable = True
 
-            self._logger.info("Declarer Q %s" % queue_config['nom'])
+            self.__logger.info("Declarer Q %s" % queue_config['nom'])
             channel.queue_declare(
                 queue=queue_config['nom'],
                 durable=durable,
@@ -587,7 +587,7 @@ class GestionnaireDomaine:
         if queue is None:
             tags = channel.consumer_tags
             for tag in tags:
-                self._logger.debug("Removing ctag %s" % tag)
+                self.__logger.debug("Removing ctag %s" % tag)
                 with self.message_dao.lock_transmettre_message:
                     channel.basic_cancel(consumer_tag=tag, nowait=True)
         else:
@@ -618,7 +618,7 @@ class GestionnaireDomaine:
 
         try:
             for transaction in transactions_incompletes:
-                self._logger.debug("Transaction incomplete: %s" % transaction)
+                self.__logger.debug("Transaction incomplete: %s" % transaction)
                 id_document = transaction[Constantes.MONGO_DOC_ID]
                 en_tete = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
                 uuid_transaction = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -626,7 +626,7 @@ class GestionnaireDomaine:
                 self.generateur_transactions.transmettre_evenement_persistance(
                     id_document, uuid_transaction, domaine, None)
         except OperationFailure as of:
-            self._logger.error("Collection %s, erreur requete avec hint: %s.\n%s" % (
+            self.__logger.error("Collection %s, erreur requete avec hint: %s.\n%s" % (
                 self.get_collection_transaction_nom(), str(hint), str(of)))
 
     def on_channel_close(self, channel=None, code=None, reason=None):
@@ -635,7 +635,7 @@ class GestionnaireDomaine:
         :param channel:
         :return:
         """
-        self._logger.info("Channel ferme: %s, %s" %(code, reason))
+        self.__logger.info("Channel ferme: %s, %s" % (code, reason))
         self.channel_mq = None
 
     def inscrire_basicconsume(self, queue, callback):
@@ -650,7 +650,7 @@ class GestionnaireDomaine:
         else:
             nom_queue = queue.method.queue
 
-        self._logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
+        self.__logger.info("Queue prete, on enregistre basic_consume %s" % nom_queue)
         with self.message_dao.lock_transmettre_message:
             ctag = self.channel_mq.basic_consume(callback, queue=nom_queue, no_ack=False)
 
@@ -691,7 +691,7 @@ class GestionnaireDomaine:
         pass
 
     def regenerer_documents(self, stop_consuming=True):
-        self._logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
+        self.__logger.info("Regeneration des documents de %s" % self.get_nom_domaine())
 
         # Desactiver temporairement toutes les threads de watchers
         try:
@@ -705,7 +705,7 @@ class GestionnaireDomaine:
             for watcher in self._watchers:
                 watcher.start()
 
-        self._logger.info("Fin regeneration des documents de %s" % self.get_nom_domaine())
+        self.__logger.info("Fin regeneration des documents de %s" % self.get_nom_domaine())
 
         return {'complet': True}
 
@@ -737,13 +737,13 @@ class GestionnaireDomaine:
         document_configuration = collection_domaine.find_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.LIBVAL_CONFIGURATION}
         )
-        self._logger.debug("Document config domaine: %s" % document_configuration)
+        self.__logger.debug("Document config domaine: %s" % document_configuration)
 
         doit_regenerer = True
         if document_configuration is not None:
             version_collection = document_configuration.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION)
             if version_collection is None:
-                self._logger.warning(
+                self.__logger.warning(
                     "La collection a une version inconnue a celle du code Python (V%d), on regenere les documents" %
                     version_domaine
                 )
@@ -755,7 +755,7 @@ class GestionnaireDomaine:
                 )
                 raise Exception(message_erreur)
             else:
-                self._logger.warning(
+                self.__logger.warning(
                     "La collection a une version inferieure (V%d) a celle du code Python (V%d), on regenere les documents" %
                     (version_collection, version_domaine)
                 )
@@ -777,7 +777,7 @@ class GestionnaireDomaine:
             {Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle}
         )
         if document_configuration is None:
-            self._logger.info("On insere le document %s pour domaine Principale" % mg_libelle)
+            self.__logger.info("On insere le document %s pour domaine Principale" % mg_libelle)
 
             # Preparation document de configuration pour le domaine
             configuration_initiale = doc_defaut.copy()
@@ -792,7 +792,7 @@ class GestionnaireDomaine:
             domaine_transaction = '%s.%s' % (self.get_nom_domaine(), Constantes.TRANSACTION_ROUTING_DOCINITIAL)
             self.generateur_transactions.soumettre_transaction(nouveau_doc, domaine_transaction)
         else:
-            self._logger.debug("Document de %s pour %s: %s" % (
+            self.__logger.debug("Document de %s pour %s: %s" % (
                 mg_libelle, str(document_configuration), self.__class__.__name__
             ))
 
@@ -855,14 +855,14 @@ class GestionnaireDomaine:
         return collection_transactions.find_one({libelle_token: token_resumer})
 
     def arreter(self):
-        self._logger.warning("Arret de GestionnaireDomaine")
+        self.__logger.warning("Arret de GestionnaireDomaine")
         self.arreter_traitement_messages()
         self._stop_event.set()
         for watcher in self._watchers:
             try:
                 watcher.stop()
             except Exception as e:
-                self._logger.info("Erreur fermeture watcher: %s" % str(e))
+                self.__logger.info("Erreur fermeture watcher: %s" % str(e))
 
     def rapport_stats_transactions(self):
         """
@@ -1048,12 +1048,12 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             Constantes.SECURITE_PROTEGE: TraitementCommandesProtegees(self),
         }
 
-        self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
+        self.__logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
     def configurer(self):
         super().configurer()
 
-        self._logger.debug("Type gestionnaire : " + self.__class__.__name__)
+        self.__logger.debug("Type gestionnaire : " + self.__class__.__name__)
 
         collection_domaine = self.document_dao.get_collection(self.get_nom_collection())
         # Index noeud, _mg-libelle
@@ -1152,7 +1152,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         """ Appele par __handler_cedule lors de la reception d'un message sur la Q .ceduleur du domaine """
 
         indicateurs = evenement['indicateurs']
-        self._logger.debug("Cedule webPoll: %s" % str(indicateurs))
+        self.__logger.debug("Cedule webPoll: %s" % str(indicateurs))
 
         # Faire la liste des cedules a declencher
         if 'heure' in indicateurs:
@@ -1219,7 +1219,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         domaine = self.get_nom_domaine()
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
 
-        self._logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure_demandee)))
+        self.__logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure_demandee)))
         routing = domaine
         nom_module = 'millegrilles_Domaines'
         nom_classe = 'BackupHoraire'
@@ -1233,7 +1233,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         self.demarrer_processus(processus, parametres)
 
     def reset_backup(self, message_dict):
-        self._logger.debug("Reset backup transactions pour domaine " + self.get_nom_domaine())
+        self.__logger.debug("Reset backup transactions pour domaine " + self.get_nom_domaine())
 
         unset_champs = list()
         for champ in [
@@ -1264,28 +1264,28 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         backup_precedent = declencheur.get(ConstantesBackup.LIBELLE_BACKUP_PRECEDENT)
-        self._logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
+        self.__logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
         self.handler_backup.backup_domaine(heure, domaine)
 
     def declencher_backup_quotidien(self, declencheur: dict):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self._logger.info("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
+        self.__logger.info("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
         self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour)
 
     def declencher_backup_mensuel(self, declencheur: dict):
         mois = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_MOIS], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self._logger.info("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
+        self.__logger.info("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
         self.__handler_backup.creer_backup_mensuel(self.get_nom_domaine(), mois)
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self._logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
+        self.__logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
         self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
 
     def filtrer_champs_document(self, document, retirer: list = None):

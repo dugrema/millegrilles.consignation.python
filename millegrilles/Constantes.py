@@ -1225,22 +1225,17 @@ class SenseursPassifsConstantes:
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_STAGING_NOM = '%s/staging' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
     QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
 
-    LIBELLE_DOCUMENT_SENSEUR = 'senseur.individuel'
-    LIBELLE_DOCUMENT_NOEUD = 'noeud.individuel'
-    LIBELLE_DOCUMENT_GROUPE = 'groupe.senseurs'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE = 'senseur.rapport.gq'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_QUOTIDIEN = 'senseur.rapport.gh'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE = 'senseur.rapport.annee'
-    LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE = 'senseur.rapport.semaine'
+    LIBVAL_DOCUMENT_SENSEUR = 'senseur'
+    LIBVAL_DOCUMENT_NOEUD = 'noeud'
     LIBVAL_CONFIGURATION = 'configuration'
     LIBVAL_VITRINE_DASHBOARD = 'vitrine.dashboard'
-
-    LIBELLE_NOEUDS = 'noeuds'
+    LIBVAL_NOEUDS = 'noeuds'
 
     TRANSACTION_NOEUD = 'noeud'
     TRANSACTION_ID_SENSEUR = 'uuid_senseur'
@@ -1269,7 +1264,7 @@ class SenseursPassifsConstantes:
 
     DOCUMENT_DEFAUT_VITRINE_DASHBOARD = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_VITRINE_DASHBOARD,
-        LIBELLE_NOEUDS: dict(),
+        LIBVAL_NOEUDS: dict(),
     }
 
 

@@ -43,19 +43,17 @@ class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
 class TraitementCommandeSenseursPassifs(TraitementCommandesSecures):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
-        # routing_key = method.routing_key
-        #
-        # resultat = None
-        # if Falserouting_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE:
-        #     CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
-        # elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL:
-        #     CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
-        # elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_DECLENCHER_RAPPORTS:
-        #     resultat = CommandeDeclencherRapports(self.gestionnaire, message_dict).declencher()
-        # else:
-        #     resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+        routing_key = method.routing_key
 
-        resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+        resultat = None
+        if routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE:
+            CommandeGenererRapportHebdomadaire(self.gestionnaire, message_dict).generer()
+        elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL:
+            CommandeGenererRapportAnnuel(self.gestionnaire, message_dict).generer()
+        elif routing_key == 'commande.' + SenseursPassifsConstantes.COMMANDE_DECLENCHER_RAPPORTS:
+            resultat = CommandeDeclencherRapports(self.gestionnaire, message_dict).declencher()
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
         return resultat
 
@@ -70,8 +68,8 @@ class SenseursPassifsExchangeRouter(ExchangeRouter):
         mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
         if mg_libelle in [SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD, SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR]:
             exchanges.add(self._exchange_public)
-            # exchanges.add(self._exchange_prive)
-            # exchanges.add(self._exchange_protege)
+            exchanges.add(self._exchange_prive)
+            exchanges.add(self._exchange_protege)
         else:
             exchanges.add(self._exchange_protege)
 
@@ -87,7 +85,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         self.__traitement_requetes = None
         self._traitement_backlog_lectures = None
 
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self._logger = logging.getLogger("%s.GestionnaireSenseursPassifs" % __name__)
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesSenseursPassifs(self),
@@ -102,7 +100,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
         # Configuration des callbacks pour traiter les messages
         self.__traitement_lecture = TraitementMessageLecture(self)
+        # self.__traiter_transaction = self._traitement_lecture.callbackAvecAck   # Transfert methode
+
         self.__traitement_requetes = TraitementMessageRequete(self)
+        # self.__traiter_requete_noeud = self._traitement_requetes.callbackAvecAck  # Transfert methode
+        # self.__traiter_requete_inter = self._traitement_requetes.callbackAvecAck  # Transfert methode
 
         # Index collection domaine
         collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
@@ -192,14 +194,14 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         try:
             self.traiter_cedule_minute(evenement)
         except Exception as e:
-            self.__logger.exception("Erreur traitement cedule minute: %s" % str(e))
+            self._logger.exception("Erreur traitement cedule minute: %s" % str(e))
 
         # Verifier si les indicateurs sont pour notre timezone
         if 'heure' in indicateurs:
             try:
                 self.traiter_cedule_heure(evenement)
             except Exception as he:
-                self.__logger.exception("Erreur traitement cedule horaire: %s" % str(he))
+                self._logger.exception("Erreur traitement cedule horaire: %s" % str(he))
 
             # Verifier si on a l'indicateur jour pour notre TZ (pas interesse par minuit UTC)
             if 'Canada/Eastern' in indicateurs:
@@ -207,7 +209,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
                     try:
                         self.traiter_cedule_quotidienne(evenement)
                     except Exception as de:
-                        self.__logger.exception("Erreur traitement cedule quotidienne: %s" % str(de))
+                        self._logger.exception("Erreur traitement cedule quotidienne: %s" % str(de))
 
     def traiter_cedule_minute(self, evenement):
         pass
@@ -283,16 +285,110 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             commande, 'commande.millegrilles.domaines.SenseursPassifs.declencherRapports',
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE)
 
+
+class TraitementMessageLecture(TraitementMessageDomaine):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire)
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        evenement = message_dict.get(Constantes.EVENEMENT_MESSAGE_EVENEMENT)
+
+        if routing_key.split('.')[0:2] == ['processus', 'domaine']:
+            # Chaining vers le gestionnaire de processus du domaine
+            self._gestionnaire.traitement_evenements.traiter_message(ch, method, properties, body)
+
+        elif evenement == Constantes.EVENEMENT_TRANSACTION_PERSISTEE:
+            # Verifier quel processus demarrer.
+            routing_key_sansprefixe = routing_key.replace(
+                'destinataire.domaine.',
+                ''
+            )
+            processus = self.gestionnaire.identifier_processus(routing_key_sansprefixe)
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+        elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreHoraireRapport"
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+        elif evenement == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreQuotidienneRapport"
+            self._gestionnaire.demarrer_processus(processus, message_dict)
+        elif evenement == Constantes.EVENEMENT_CEDULEUR:
+            self._gestionnaire.traiter_cedule(message_dict)
+        else:
+            # Type d'evenement inconnu, on lance une exception
+            raise ValueError("Type d'evenement inconnu: routing=%s, evenement=%s" % (routing_key, str(evenement)))
+
+
+class TraitementMessageRequete(TraitementMessageDomaine):
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        exchange = method.exchange
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+        self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
+        resultats = list()
+        for requete in message_dict['requetes']:
+            resultat = self.executer_requete(requete)
+            resultats.append(resultat)
+
+        # Genere message reponse
+        self.transmettre_reponse(message_dict, resultats, properties.reply_to, properties.correlation_id)
+
+    def executer_requete(self, requete):
+        self._logger.debug("Requete: %s" % str(requete))
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        filtre = requete.get('filtre')
+        projection = requete.get('projection')
+        sort_params = requete.get('sort')
+
+        if projection is None:
+            curseur = collection.find(filtre)
+        else:
+            curseur = collection.find(filtre, projection)
+
+        if sort_params is not None:
+            curseur.sort(sort_params)
+
+        resultats = list()
+        for resultat in curseur:
+            resultats.append(resultat)
+
+        self._logger.debug("Resultats: %s" % str(resultats))
+
+        return resultats
+
+    def transmettre_reponse(self, requete, resultats, reply_to, correlation_id):
+        # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
+        message_resultat = {
+            'resultats': resultats,
+            'uuid-requete': requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+        }
+        self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, reply_to, correlation_id)
+
+
+# Classe qui gere le document pour un noeud. Supporte une mise a jour incrementale des donnees.
+class ProducteurDocumentNoeud:
+
+    def __init__(self, document_dao):
+        self._document_dao = document_dao
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    '''
+    Mise a jour du document de noeud par une transaction senseur passif
+    
+    :param id_document_senseur: _id du document du senseur.
+    '''
     def maj_document_noeud_senseurpassif(self, id_document_senseur):
-        """
-        Mise a jour du document de noeud par une transaction senseur passif
 
-        :param id_document_senseur: _id du document du senseur.
-        :return:
-        """
-
-        collection_documents = self._contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document_senseur = collection_documents.find_one(ObjectId(id_document_senseur))
+        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
 
         noeud = document_senseur['noeud']
         no_senseur = document_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
@@ -319,7 +415,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             '$set': donnees_senseur
         }
 
-        collection_documents.update_one(filter=filtre, update=update, upsert=True)
+        collection_senseurs.update_one(filter=filtre, update=update, upsert=True)
 
         # S'assurer de nettoyer le senseur s'il etait dans un autre noeud
         filtre = {
@@ -333,7 +429,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
                 senseur_label: 1,
             }
         }
-        collection_documents.update_many(filtre, update)
+        collection_senseurs.update_many(filtre, update)
         self.__logger.debug("Requete update noeuds :\n%s\n%s" % (filtre, update))
 
 

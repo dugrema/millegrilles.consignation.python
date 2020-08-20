@@ -132,7 +132,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
     def traiter_cedule(self, message):
         timestamp_message = message['timestamp']['UTC']
         if timestamp_message[4] % 6 == 0:
-            self._logger.debug("Executer entretien annuaire (6 heures)")
+            self.__logger.debug("Executer entretien annuaire (6 heures)")
             # Declencher la verification des actions sur taches
 
     def identifier_processus(self, domaine_transaction):
@@ -232,7 +232,7 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         """
         Valide la signature de la fiche en utilisant les certificats racine, intermediaire et _certificat_.
         """
-        self._logger.warning("ATTENTION! valider_signature_fiche PAS IMPLEMENTE")
+        self.__logger.warning("ATTENTION! valider_signature_fiche PAS IMPLEMENTE")
         return True
 
     def get_fiche_privee(self):
@@ -259,11 +259,11 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         idmg_originateur = demande_inscription[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE][Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
 
         if idmg_sollicite == self.configuration.idmg:
-            self._logger.debug("Demande de la MilleGrille %s pour se connecter localement" % idmg_originateur)
+            self.__logger.debug("Demande de la MilleGrille %s pour se connecter localement" % idmg_originateur)
             champ_demande = ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_RECUES
             idmg_distant = idmg_originateur
         else:
-            self._logger.debug("Sauvegarder demande d'inscription vers %s" % idmg_sollicite)
+            self.__logger.debug("Sauvegarder demande d'inscription vers %s" % idmg_sollicite)
             champ_demande = ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_TRANSMISES
             idmg_distant = idmg_sollicite
 
@@ -313,11 +313,11 @@ class GestionnaireAnnuaire(GestionnaireDomaineStandard):
         set_ops = {}
 
         if idmg_sollicite == self.configuration.idmg:
-            self._logger.debug("Inscription de la MilleGrille %s pour se connecter localement" % idmg_originateur)
+            self.__logger.debug("Inscription de la MilleGrille %s pour se connecter localement" % idmg_originateur)
             champ_inscription = ConstantesAnnuaire.LIBELLE_DOC_INSCRIPTIONS_TIERS_VERS_LOCAL
             idmg_distant = idmg_originateur
         else:
-            self._logger.debug("Sauvegarder inscription vers %s" % idmg_sollicite)
+            self.__logger.debug("Sauvegarder inscription vers %s" % idmg_sollicite)
             champ_inscription = ConstantesAnnuaire.LIBELLE_DOC_INSCRIPTIONS_LOCAL_VERS_TIERS
             idmg_distant = idmg_sollicite
 

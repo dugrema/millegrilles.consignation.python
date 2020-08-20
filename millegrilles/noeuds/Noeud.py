@@ -11,6 +11,7 @@ import datetime
 import os
 import json
 import lzma
+import signal
 
 from threading import Event, Thread
 from typing import Optional
@@ -69,6 +70,8 @@ class DemarreurNoeud(Daemon):
         self._backlog_messages = []  # Utilise pour stocker les message qui n'ont pas ete transmis
 
         self._thread_transactions: Optional[Thread] = None  # Thread de traitement du buffer, tranmission de transactions
+
+        self._noeud_id = os.environ['NOEUD_ID']
 
     def print_help(self):
         self._parser.print_help()
@@ -141,10 +144,12 @@ class DemarreurNoeud(Daemon):
 
     def stop(self):
         Daemon.stop(self)
-        self._stop_event.set()
 
     def restart(self):
         Daemon.restart(self)
+
+    def exit_gracefully(self, signum=None, frame=None):
+        self.fermer()
 
     def on_channel_open(self, channel):
         channel.basic_qos(prefetch_count=1)
@@ -160,7 +165,7 @@ class DemarreurNoeud(Daemon):
             self._message_handler.callbackAvecAck
         )
 
-    def on_channel_close(self):
+    def on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
         self._logger.info("MQ Channel ferme")
         if not self._stop_event:
@@ -191,7 +196,8 @@ class DemarreurNoeud(Daemon):
         self._contexte.initialiser(connecter=doit_connecter)
         self._contexte.message_dao.register_channel_listener(self)
 
-        self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte, data_path=self._args.data)
+        self._producteur_transaction = ProducteurTransactionSenseursPassifs(
+            self._contexte, noeud_id=self._noeud_id, data_path=self._args.data)
 
         # Verifier les parametres
         self._intervalle_entretien = self._args.maint
@@ -239,7 +245,7 @@ class DemarreurNoeud(Daemon):
 
     def inclure_dummysenseurs(self):
         self._logger.info("Activer dummysenseurs")
-        self._dummysenseurs = DummySenseurs(no_senseur="7a2764fa-c457-4f25-af0d-0fc915439b21")
+        self._dummysenseurs = DummySenseurs(no_senseur="7a2764fa-c457-4f25-af0d-0fc915439b21", noeud_id=self._noeud_id)
         self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
@@ -299,13 +305,12 @@ class DemarreurNoeud(Daemon):
         return self._contexte
 
 
-# Thermometre AM2302 connecte sur une pin GPIO
-# Dependances:
-#   - Adafruit package Adafruit_DHT
+# Simulation de l'output d'un AM2302
 class DummySenseurs:
 
-    def __init__(self, no_senseur, intervalle_lectures=5):
+    def __init__(self, no_senseur, noeud_id, intervalle_lectures=5):
         self._no_senseur = no_senseur
+        self._noeud_id = noeud_id
         self._intervalle_lectures = intervalle_lectures
         self._callback_soumettre = None
         self._stop_event = Event()
@@ -318,14 +323,21 @@ class DummySenseurs:
         humidite = random.randrange(0, 1000) / 10
         temperature = random.randrange(-500, 500) / 10
 
+        timestamp = int(datetime.datetime.now().timestamp())
         dict_message = {
             'uuid_senseur': self._no_senseur,
-            'timestamp': int(datetime.datetime.now().timestamp()),
-            'senseurs': [{
-                'type': 'am2302',
-                'temperature': round(temperature, 1),
-                'humidite': round(humidite, 1)
-            }]
+            'senseurs': {
+                'dummy/temperature': {
+                    'valeur': round(temperature, 1),
+                    'timestamp': timestamp,
+                    'type': 'temperature',
+                },
+                'dummy/humidite': {
+                    'valeur': round(humidite, 1),
+                    'timestamp': timestamp,
+                    'type': 'humidite',
+                }
+            }
         }
 
         self._callback_soumettre(dict_message)
@@ -354,9 +366,9 @@ class DummySenseurs:
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
     """ Producteur de transactions pour les SenseursPassifs. """
 
-    def __init__(self, contexte, noeud=socket.gethostname(), data_path='/var/opt/millegrilles/data'):
+    def __init__(self, contexte, noeud_id, data_path='/var/opt/millegrilles/data'):
         super().__init__(contexte)
-        self._noeud = noeud.replace('.', '-')
+        self.noeud_id = noeud_id
         self._data_path = data_path
         self._path_buffer: Optional[str] = None
         self._fp_buffer: Optional[int] = None
@@ -417,44 +429,41 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                         continue
 
                     # Traiter les transactions qui ne sont pas pour l'heure en cours
-                    timestamp = evenement_dict['timestamp']
-                    if timestamp < heure_courante_ts:
-                        timestamp_dt = datetime.datetime.fromtimestamp(timestamp)
-                        timestamp_heure = datetime.datetime(year=timestamp_dt.year, month=timestamp_dt.month,
-                                                            day=timestamp_dt.day, hour=timestamp_dt.hour)
+                    uuid_senseur = evenement_dict['uuid_senseur']
+                    senseurs = evenement_dict['senseurs']
 
-                        uuid_senseur = evenement_dict['uuid_senseur']
-                        senseurs = evenement_dict['senseurs']
+                    for type, lecture in senseurs.items():
+                        timestamp = lecture['timestamp']
+                        if timestamp < heure_courante_ts:
+                            timestamp_dt = datetime.datetime.fromtimestamp(timestamp)
+                            timestamp_heure = datetime.datetime(year=timestamp_dt.year, month=timestamp_dt.month,
+                                                                day=timestamp_dt.day, hour=timestamp_dt.hour)
 
-                        for lecture in senseurs:
-                            type = lecture.get('type') or ''
-                            types_lectures = [t for t in lecture.keys() if t not in ['type']]
+                            cle = '/'.join([uuid_senseur, type, str(int(timestamp_heure.timestamp()))])
 
-                            for tl in types_lectures:
-                                cle = '/'.join([uuid_senseur, type, tl, str(int(timestamp_heure.timestamp()))])
-
-                                lectures = appareils_heure_dict.get(cle)
-                                valeur = lecture[tl]
-                                if not lectures:
-                                    lectures = {
-                                        'timestamp': timestamp_heure,
-                                        'timestamp_max': timestamp,
-                                        'timestamp_min': timestamp,
-                                        'lectures': list(),
-                                        'avg': None,
-                                        'max': valeur,
-                                        'min': valeur,
-                                    }
-                                    appareils_heure_dict[cle] = lectures
-
-                                lectures['timestamp_max'] = timestamp
-                                lectures['lectures'].append({"timestamp": timestamp, "valeur": valeur})
-                                if lectures['max'] < valeur:
-                                    lectures['max'] = valeur
-                                if lectures['min'] > valeur:
-                                    lectures['min'] = valeur
-
+                            lectures = appareils_heure_dict.get(cle)
+                            valeur = lecture['valeur']
+                            if not lectures:
+                                lectures = {
+                                    'timestamp': timestamp_heure,
+                                    'timestamp_max': timestamp,
+                                    'timestamp_min': timestamp,
+                                    'lectures': list(),
+                                    'avg': None,
+                                    'max': valeur,
+                                    'min': valeur,
+                                    'type': valeur['type']
+                                }
                                 appareils_heure_dict[cle] = lectures
+
+                            lectures['timestamp_max'] = timestamp
+                            lectures['lectures'].append({"timestamp": timestamp, "valeur": valeur})
+                            if lectures['max'] < valeur:
+                                lectures['max'] = valeur
+                            if lectures['min'] > valeur:
+                                lectures['min'] = valeur
+
+                            appareils_heure_dict[cle] = lectures
                     else:
                         # Le fichier contient des evenements de l'heure courante, on ne le supprime pas
                         conserver_fichier.append(nom_fichier)
@@ -520,13 +529,10 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         if message.get(SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR) is None:
             raise ValueError("L'identificateur du senseur (%s) doit etre fourni." %
                              SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR)
-        if message.get(SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE) is None:
-            raise ValueError("Le temps de la lecture (%s) doit etre fourni." %
-                             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE)
 
         # Ajouter le noeud s'il n'a pas ete fourni
-        if message.get(SenseursPassifsConstantes.TRANSACTION_NOEUD) is None:
-            message[SenseursPassifsConstantes.TRANSACTION_NOEUD] = self._noeud
+        if message.get('noeud_id') is None:
+            message['noeud_id'] = self.noeud_id
 
         self._logger.debug("Message a transmettre: %s" % str(message))
 
@@ -601,4 +607,6 @@ class MessageCallback(BaseCallback):
 
 if __name__ == "__main__":
     demarreur = DemarreurNoeud()
+    signal.signal(signal.SIGINT, demarreur.exit_gracefully)
+    signal.signal(signal.SIGTERM, demarreur.exit_gracefully)
     main()
