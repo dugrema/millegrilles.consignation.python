@@ -10,6 +10,7 @@ import sys
 import datetime
 import os
 import json
+import lzma
 
 from threading import Event, Thread
 from typing import Optional
@@ -457,8 +458,11 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                         conserver_fichier.append(nom_fichier)
 
         # Calculer la moyenne de chaque transaction et soumettre les transactions
-        transactions = list()
         for key, app in appareils_heure_dict.items():
+
+            # Trier les lectures en ordre de timestamp
+            app['lectures'] = sorted(app['lectures'], key=lambda this_lecture: this_lecture['timestamp'])
+
             somme_valeurs = 0.0
             nb_valeurs = 0
             for lecture in app['lectures']:
@@ -475,14 +479,6 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
             # Remplacer instance timestamp pour int (pour sauvegarder en json)
             app['timestamp'] = int(timestamp.timestamp())
 
-            uuid_senseur = key.split('/')[0]
-            type_senseur = key.split('/')[1]
-            type_lecture = key.split('/')[2]
-            nom_fichier_transaction = os.path.join(
-                self._data_path,
-                'transaction_%s_%s_%s_%s.json' % (uuid_senseur, type_senseur, type_lecture, timestamp_fmt)
-            )
-
             # Transmettre les transactions
             transaction = self.soumettre_transaction(
                 app,
@@ -490,8 +486,18 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                 retourner_enveloppe=True
             )
 
-            with open(nom_fichier_transaction, 'w') as fichier_transaction:
-                json.dump(transaction, fichier_transaction)
+            uuid_senseur = key.split('/')[0]
+            type_senseur = key.split('/')[1]
+            type_lecture = key.split('/')[2]
+            nom_fichier_transaction = os.path.join(
+                self._data_path,
+                'transaction_%s_%s_%s_%s.json.xz' % (uuid_senseur, type_senseur, type_lecture, timestamp_fmt)
+            )
+
+            # Conserver la transaction format json compressee avec lzma (.xz)
+            with lzma.open(nom_fichier_transaction, 'w') as fichier_transaction:
+                json_dump = json.dumps(transaction, sort_keys=True)
+                fichier_transaction.write(json_dump.encode('utf-8'))
 
         # Supprimer les fichiers d'evenement
         for fichier in fichiers:
