@@ -218,7 +218,7 @@ class GenerateurTransaction:
     def emettre_message(
             self, message_dict, routing_key, exchanges: list = None, reply_to=None, correlation_id=None,
             headers: dict = None,
-            version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
+            version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6, retourner_enveloppe=False):
 
         if not message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION):
             enveloppe = self.preparer_enveloppe(message_dict, version=version)
@@ -244,7 +244,10 @@ class GenerateurTransaction:
                     reply_to=reply_to, correlation_id=correlation_id, headers=headers
                 )
 
-        return uuid_transaction
+        if retourner_enveloppe:
+            return enveloppe
+        else:
+            return uuid_transaction
 
     def relayer_transaction(self, enveloppe):
 

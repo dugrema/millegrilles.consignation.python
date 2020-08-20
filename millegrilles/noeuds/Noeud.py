@@ -4,11 +4,15 @@
 import traceback
 import argparse
 import logging
-import time
+import random
 import socket
 import sys
+import datetime
+import os
+import json
 
 from threading import Event, Thread
+from typing import Optional
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ExceptionConnectionFermee
@@ -49,7 +53,7 @@ class DemarreurNoeud(Daemon):
         self._dummysenseurs = None
 
         self._contexte = ContexteRessourcesMilleGrilles()
-        self._producteur_transaction = None
+        self._producteur_transaction: Optional[ProducteurTransactionSenseursPassifs] = None
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
         self.__channel = None
 
@@ -82,6 +86,10 @@ class DemarreurNoeud(Daemon):
         self._parser.add_argument(
             '--apcupsd_pipe', type=str, nargs=1, required=False,
             help="Path pour le pipe d'evenements pour les scripts apcupsd."
+        )
+        self._parser.add_argument(
+            '--data', type=str, nargs=1, required=False, default="/var/opt/millegrilles/data",
+            help="Path du journal des transactions, buffer evenements"
         )
         self._parser.add_argument(
             '--maint', type=int, nargs=1, default=60,
@@ -165,7 +173,7 @@ class DemarreurNoeud(Daemon):
         self._contexte.initialiser(connecter=doit_connecter)
         self._contexte.message_dao.register_channel_listener(self)
 
-        self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte)
+        self._producteur_transaction = ProducteurTransactionSenseursPassifs(self._contexte, data_path=self._args.data)
 
         # Verifier les parametres
         self._intervalle_entretien = self._args.maint
@@ -213,7 +221,7 @@ class DemarreurNoeud(Daemon):
 
     def inclure_dummysenseurs(self):
         self._logger.info("Activer dummysenseurs")
-        self._dummysenseurs = DummySenseurs(no_senseur=1)
+        self._dummysenseurs = DummySenseurs(no_senseur="7a2764fa-c457-4f25-af0d-0fc915439b21")
         self._dummysenseurs.start(self.transmettre_lecture_callback)
         self._chargement_reussi = True
 
@@ -271,7 +279,7 @@ class DemarreurNoeud(Daemon):
 #   - Adafruit package Adafruit_DHT
 class DummySenseurs:
 
-    def __init__(self, no_senseur, intervalle_lectures=50):
+    def __init__(self, no_senseur, intervalle_lectures=5):
         self._no_senseur = no_senseur
         self._intervalle_lectures = intervalle_lectures
         self._callback_soumettre = None
@@ -281,25 +289,18 @@ class DummySenseurs:
         self._stop_event.set()
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self._valeurs = [
-            {'humidite': 40, 'temperature': 17},
-            {'humidite': 42, 'temperature': 16},
-            {'humidite': 43, 'temperature': 15},
-            {'humidite': 44, 'temperature': 14},
-            {'humidite': 50, 'temperature': 13.5},
-        ]
-
     def lire(self):
-        lecture = self._valeurs[0]
-        humidite = lecture['humidite']
-        temperature = lecture['temperature']
+        humidite = random.randrange(0, 1000) / 10
+        temperature = random.randrange(-500, 500) / 10
 
         dict_message = {
-            'version': 6,
-            'senseur': self._no_senseur,
-            'temps_lecture': int(time.time()),
-            'temperature': round(temperature, 1),
-            'humidite': round(humidite, 1)
+            'uuid_senseur': self._no_senseur,
+            'timestamp': int(datetime.datetime.now().timestamp()),
+            'senseurs': [{
+                'type': 'am2302',
+                'temperature': round(temperature, 1),
+                'humidite': round(humidite, 1)
+            }]
         }
 
         self._callback_soumettre(dict_message)
@@ -320,7 +321,7 @@ class DummySenseurs:
             try:
                 self.lire()
             except:
-                self._logger.exception("DummySenseurs: Erreur lecture AM2302")
+                self._logger.exception("DummySenseurs: Erreur lecture")
             finally:
                 self._stop_event.wait(self._intervalle_lectures)
 
@@ -328,13 +329,114 @@ class DummySenseurs:
 class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
     """ Producteur de transactions pour les SenseursPassifs. """
 
-    def __init__(self, contexte, noeud=socket.gethostname()):
+    def __init__(self, contexte, noeud=socket.gethostname(), data_path='/var/opt/millegrilles/data'):
         super().__init__(contexte)
         self._noeud = noeud.replace('.', '-')
+        self._data_path = data_path
+        self._path_buffer: Optional[str] = None
+        self._fp_buffer: Optional[int] = None
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
-    def transmettre_lecture_senseur(self, dict_lecture, version=4):
+    def ouvrir_buffer(self):
+        """
+        Ouvre nouveau fichier de buffer
+        :return: Liste des fichiers precedemment existants
+        """
+        files = [os.path.join(self._data_path, f) for f in os.listdir(self._data_path) if f.endswith('.jsonl')]
+
+        date_formatted = datetime.datetime.utcnow().strftime('%Y%m%d%H%M')
+        self._path_buffer = os.path.join(self._data_path, 'evenements.%s.jsonl' % date_formatted)
+        self._fp_buffer = os.open(self._path_buffer, os.O_CREAT | os.O_WRONLY, mode=0o755)
+
+        return files
+
+    def generer_transactions(self):
+        # Faire une rotation du fichier de buffer
+        if self._fp_buffer:
+            os.close(self._fp_buffer)
+
+        fichiers_existants = self.ouvrir_buffer()  # Ouvre un nouveau fichier de buffer
+
+        # Traiter le fichier de buffer precedent
+        self.traiter_evenements_buffer(fichiers_existants)
+
+    def traiter_evenements_buffer(self, fichiers):
+        # Grouper les transactions par appareil / heure
+        # cle : uuid_senseur/appareil/heure_epoch
+        # valeur : { lectures: [{ timestamp: epoch, valeur: int/float }], avg, max, min, timestamp_max, timestamp_min }
+        appareils_heure_dict = dict()
+
+        for nom_fichier in fichiers:
+            self._logger.debug("Traitement fichier %s", nom_fichier)
+            with open(nom_fichier, 'r') as fichier:
+                # evenement = fichier.readline()
+                line_reader = LineReader(fichier)
+                for evenement in line_reader:
+                    if not evenement or not evenement.strip():
+                        # Ligne vide
+                        continue
+                    self._logger.debug(evenement)
+                    try:
+                        evenement_dict = json.loads(evenement)
+                    except json.decoder.JSONDecodeError:
+                        self._logger.exception("Erreur decodage evenement:\n%s" % evenement)
+                        continue
+
+                    timestamp = evenement_dict['timestamp']
+                    timestamp_dt = datetime.datetime.fromtimestamp(timestamp)
+                    timestamp_heure = datetime.datetime(year=timestamp_dt.year, month=timestamp_dt.month,
+                                                        day=timestamp_dt.day, hour=timestamp_dt.hour)
+
+                    uuid_senseur = evenement_dict['uuid_senseur']
+                    senseurs = evenement_dict['senseurs']
+
+                    for lecture in senseurs:
+                        type = lecture.get('type') or ''
+                        types_lectures = [t for t in lecture.keys() if t not in ['type']]
+
+                        for tl in types_lectures:
+                            cle = '/'.join([uuid_senseur, type, tl, str(int(timestamp_heure.timestamp()))])
+
+                            lectures = appareils_heure_dict.get(cle)
+                            valeur = lecture[tl]
+                            if not lectures:
+                                lectures = {
+                                    'timestamp_max': timestamp,
+                                    'timestamp_min': timestamp,
+                                    'lectures': list(),
+                                    'avg': None,
+                                    'max': valeur,
+                                    'min': valeur,
+                                }
+                                appareils_heure_dict[cle] = lectures
+
+                            lectures['timestamp_max'] = timestamp
+                            lectures['lectures'].append({"timestamp": timestamp, "valeur": valeur})
+                            if lectures['max'] < valeur:
+                                lectures['max'] = valeur
+                            if lectures['min'] > valeur:
+                                lectures['min'] = valeur
+
+                            appareils_heure_dict[cle] = lectures
+
+        # Calculer la moyenne de chaque transaction
+        for app in appareils_heure_dict.values():
+            somme_valeurs = 0.0
+            nb_valeurs = 0
+            for lecture in app['lectures']:
+                nb_valeurs += 1
+                somme_valeurs += lecture['valeur']
+
+            moyenne = round(somme_valeurs / nb_valeurs, 2)
+            app['avg'] = moyenne
+
+        pass
+
+    def transmettre_lecture_senseur(self, dict_lecture, version=6):
         # Preparer le dictionnaire a transmettre pour la lecture
+        if not self._path_buffer:
+            self.generer_transactions()
+
         message = dict_lecture.copy()
 
         # Verifier valeurs qui doivent etre presentes
@@ -351,12 +453,17 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
         self._logger.debug("Message a transmettre: %s" % str(message))
 
-        uuid_transaction = self.emettre_message(
+        enveloppe = self.emettre_message(
             message,
-            'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE
+            'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
+            retourner_enveloppe=True
         )
 
-        return uuid_transaction
+        # Sauvegarder l'enveloppe dans le buffer d'evenements
+        evenement = json.dumps(enveloppe).encode('utf-8') + b'\n'
+        os.write(self._fp_buffer, evenement)
+
+        return enveloppe
 
 # **** MAIN ****
 def main():
@@ -370,6 +477,25 @@ def main():
         print("!!! ******************************")
         demarreur.print_help()
         sys.exit(1)
+
+
+class LineReader:
+
+    def __init__(self, fichier):
+        self._fichier = fichier
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        line = self._fichier.readline()
+        if line:
+            return line
+        else:
+            raise StopIteration()
 
 
 if __name__ == "__main__":

@@ -78,6 +78,7 @@ senseurspassifs_app = {
             "injecter_clecert": "/run/secrets",
             "config": {
                 "command": ["python3", "-m", "mgraspberry.raspberrypi.Demarreur",  "--rf24master",  "--dummy", "nofork"],
+                # "command": ["sleep", "10000"],
                 "name": "senseurspassifs_rpi",
                 "environment": [
                     "MG_IDMG=${IDMG}",
@@ -87,7 +88,7 @@ senseurspassifs_app = {
                     "MG_MQ_AUTH_CERT=on",
                     "MG_MQ_CERTFILE=/run/secrets/cert.pem",
                     "MG_MQ_KEYFILE=/run/secrets/key.pem",
-                    "MG_MQ_CAFILE=/run/secrets/millegrille.cert.pem"
+                    "MG_MQ_CA_CERTS=/run/secrets/millegrille.cert.pem"
                 ],
                 "mounts": [
                     {
@@ -181,7 +182,7 @@ class MessagesSample(BaseCallback):
             'nom_application': 'senseurspassifs',
             'configuration': senseurspassifs_app,
         }
-        domaineAction = 'commande.servicemonitor.45ab689e-8ff5-45c6-a6d4-ae0a56ed9f78.' + Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION
+        domaineAction = 'commande.servicemonitor.47330762-98a6-4bb2-9172-115cfea92a8d.' + Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -199,7 +200,7 @@ class MessagesSample(BaseCallback):
             'nom_application': 'senseurspassifs',
             'configuration': senseurspassifs_app,
         }
-        domaineAction = 'commande.servicemonitor.45ab689e-8ff5-45c6-a6d4-ae0a56ed9f78.' + Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION
+        domaineAction = 'commande.servicemonitor.47330762-98a6-4bb2-9172-115cfea92a8d.' + Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
