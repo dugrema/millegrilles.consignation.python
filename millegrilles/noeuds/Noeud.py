@@ -391,6 +391,8 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         # valeur : { lectures: [{ timestamp: epoch, valeur: int/float }], avg, max, min, timestamp_max, timestamp_min }
         appareils_heure_dict = dict()
 
+        Event().wait(5)  # Attendre 5 secondes, s'assure qu'on passe a l'heure suivante si on est proche
+
         heure_courante = datetime.datetime.utcnow()
         heure_courante = datetime.datetime(year=heure_courante.year, month=heure_courante.month,
                                            day=heure_courante.day, hour=heure_courante.hour)
