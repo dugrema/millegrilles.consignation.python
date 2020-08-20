@@ -1,5 +1,6 @@
 # Module avec les classes de donnees, processus et gestionnaire de sous domaine millegrilles.domaines.SenseursPassifs
 import logging
+import json
 
 from typing import Optional
 
@@ -60,8 +61,52 @@ class TraitementMessageLecture(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire_domaine):
         super().__init__(gestionnaire_domaine)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def traiter_message(self, ch, method, properties, body):
+        lecture = json.loads(body.decode('utf-8'))
+        self.traiter_lecture(lecture, method.exchange)
+
+    def traiter_lecture(self, lecture: dict, exchange: str):
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug("Lecture recue : %s" % json.dumps(lecture, indent=2))
+
+        noeud_id = lecture[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+        uuid_senseur = lecture[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+        senseurs = lecture['senseurs']
+
+        # Charger le document du senseur
+        collection = self.gestionnaire.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        filter = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+        }
+        doc_senseur = collection.find_one(filter)
+
+        if not doc_senseur:
+            self.ajouter_senseur(lecture)
+            # Creer un document sommaire qui va etre insere
+            doc_senseur = {
+                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+                'senseurs': dict()
+            }
+
+        # Verifier quels senseurs on met a jour
+        senseurs_actuels = doc_senseur['senseurs']
+        set_ops = dict()
+        for cle, donnees in senseurs.items():
+            donnees_actuelles = senseurs_actuels.get(cle)
+            if donnees_actuelles is None or donnees_actuelles['timestamp'] < donnees['timestamp']:
+                set_ops['senseurs.' + cle] = donnees
+
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': filter,
+        }
+
+        collection.update(filter, ops, upsert=True)
+
+    def ajouter_senseur(self, lecture: dict):
         pass
 
 
