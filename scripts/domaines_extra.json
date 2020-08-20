@@ -1,8 +1,8 @@
 {
   "domaines": [
     {
-      "module": "millegrilles.domaines.Messagerie",
-      "classe": "GestionnaireMessagerie"
+      "module": "millegrilles.domaines.SenseursPassifs",
+      "classe": "GestionnaireSenseursPassifs"
     }
   ]
 }

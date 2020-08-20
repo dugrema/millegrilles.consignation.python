@@ -1,20 +1,16 @@
 # Module avec les classes de donnees, processus et gestionnaire de sous domaine millegrilles.domaines.SenseursPassifs
-import datetime
 import logging
-import tempfile
-import os
 
-from pymongo.errors import OperationFailure
+from typing import Optional
 
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
-from millegrilles.Domaines import GestionnaireDomaine, GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees
-from millegrilles.Domaines import GroupeurTransactionsARegenerer, RegenerateurDeDocuments, ExchangeRouter, TraitementCommandesSecures
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees
+from millegrilles.Domaines import ExchangeRouter, TraitementCommandesSecures
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
-from openpyxl import Workbook
 
 
 class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete):
@@ -60,6 +56,15 @@ class TraitementCommandeSenseursPassifs(TraitementCommandesSecures):
         return resultat
 
 
+class TraitementMessageLecture(TraitementMessageDomaine):
+
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+
+    def traiter_message(self, ch, method, properties, body):
+        pass
+
+
 class SenseursPassifsExchangeRouter(ExchangeRouter):
 
     def determiner_exchanges(self, document):
@@ -85,6 +90,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         super().__init__(contexte)
         self.__traitement_lecture = None
         self.__traitement_requetes = None
+        self._traitement_evenements_lecture: Optional[TraitementMessageLecture] = None
         self._traitement_backlog_lectures = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -94,41 +100,19 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesSenseursPassifs(self)
         }
 
+        self._traitement_evenements_lecture = TraitementMessageLecture(self)
+
         self.__handler_commandes_noeuds = super().get_handler_commandes()
         self.__handler_commandes_noeuds[Constantes.SECURITE_SECURE] = TraitementCommandeSenseursPassifs(self)
 
     def configurer(self):
         super().configurer()
 
-        # Configuration des callbacks pour traiter les messages
-        self.__traitement_lecture = TraitementMessageLecture(self)
-        self.__traitement_requetes = TraitementMessageRequete(self)
-
-        # Index collection domaine
-        collection_domaine = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        # Index noeud, _mg-libelle
-        collection_domaine.create_index(
-            [
-                (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
-                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
-            ],
-            name='noeud-mglibelle'
-        )
-        # Index senseur, noeud, _mg-libelle
-        collection_domaine.create_index(
-            [
-                (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
-                (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
-                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
-                ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
-            ],
-            name='senseur-noeud-mglibelle'
-        )
         # Ajouter les index dans la collection de transactions
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         collection_transactions.create_index(
             [
-                ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
+                (SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
                 ('%s.%s' %
                  (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
                  1),
@@ -138,16 +122,38 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         )
         collection_transactions.create_index(
             [
-                ('%s' % SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
-                ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+                (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
                 ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
                 ('%s.%s' %
                  (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
                  1),
-                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
             ],
-            name='senseur-noeud-date-domaine-mglibelle'
+            name='senseur-noeud-date-domaine'
         )
+
+    def get_queue_configuration(self):
+        configuration = super().get_queue_configuration()
+
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'evenements_lectures'),
+            'routing': [
+                'evenement.%s.#.lecture' % self.get_nom_domaine(),
+            ],
+            'exchange': self.configuration.exchange_protege,
+            'ttl': 60000,
+            'callback': self._traitement_evenements_lecture.callbackAvecAck
+        })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'evenements_lectures'),
+            'routing': [
+                'evenement.%s.#.lecture' % self.get_nom_domaine(),
+            ],
+            'exchange': self.configuration.exchange_prive,
+            'ttl': 60000,
+            'callback': self._traitement_evenements_lecture.callbackAvecAck
+        })
+
+        return configuration
 
     def demarrer(self):
         super().demarrer()
@@ -189,11 +195,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
         indicateurs = evenement['indicateurs']
 
-        try:
-            self.traiter_cedule_minute(evenement)
-        except Exception as e:
-            self.__logger.exception("Erreur traitement cedule minute: %s" % str(e))
-
         # Verifier si les indicateurs sont pour notre timezone
         if 'heure' in indicateurs:
             try:
@@ -209,24 +210,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
                     except Exception as de:
                         self.__logger.exception("Erreur traitement cedule quotidienne: %s" % str(de))
 
-    def traiter_cedule_minute(self, evenement):
+    def traiter_cedule_heure(self, evenement):
+        # Declencher l'aggregation horaire des lectures de senseurs (derniere semaine)
         pass
 
-    def traiter_cedule_heure(self, evenement):
-
-        # Declencher l'aggregation horaire des lectures de senseurs (derniere semaine)
-        self.declencher_rapports('semaine')
-
     def traiter_cedule_quotidienne(self, evenement):
-
         # Declencher l'aggregation quotidienne des lectures de senseur (derniere annee)
-        self.declencher_rapports('annee')
-
-    '''
-     Transmet un message via l'echange MilleGrilles pour un domaine specifique
-    
-     :param domaine: Domaine millegrilles    
-     '''
+        pass
 
     def get_nom_collection(self):
         return SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM
@@ -253,17 +243,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
     def transmettre_declencheur_domaine(self, domaine, dict_message):
         routing_key = 'destinataire.domaine.%s' % domaine
         self.message_dao.transmettre_message(dict_message, routing_key)
-
-    def creer_regenerateur_documents(self):
-        return RegenerateurSenseursPassifs(self)
-
-    # def get_handler_transaction(self):
-    #     return TraitementRapportsSenseursPassifs(self)
-
-    def regenerer_rapports_sur_cedule(self):
-        """ Permet de regenerer les documents de rapports sur cedule lors du demarrage du domaine """
-        self.declencher_rapports('semaine')
-        self.declencher_rapports('annee')
 
     def get_vitrine_dashboard(self):
         """
@@ -344,7 +323,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
     '''
 
     def maj_document_vitrine_dashboard(self, id_document_senseur):
-        collection_senseurs = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        collection_senseurs = self._contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document_senseur = collection_senseurs.find_one(ObjectId(id_document_senseur))
 
         noeud = document_senseur['noeud']
@@ -389,359 +368,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             collection_senseurs.update_one(filter=filtre, update=update)
 
 
-# Classe qui produit et maintient un document de metadonnees et de lectures pour un SenseurPassif.
-class ProducteurDocumentSenseurPassif:
-
-    def __init__(self, document_dao):
-        self._document_dao = document_dao
-        self._logger = logging.getLogger("%s.ProducteurDocumentSenseurPassif" % __name__)
-
-        self._regroupement_elem_numeriques = [
-            'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
-        ]
-        self._accumulateurs = ['max', 'min', 'avg']
-
-    ''' 
-    Extrait l'information d'une lecture de senseur passif pour creer ou mettre a jour le document du senseur.
-
-    :param transaction: Document de la transaction.
-    :return: L'identificateur mongo _id du document de senseur qui a ete cree/modifie.
-    '''
-
-    def maj_document_senseur(self, transaction):
-
-        # Verifier si toutes les cles sont presentes
-        operations = TransactionOperations()
-        copie_transaction = operations.enlever_champsmeta(transaction)
-
-        noeud = copie_transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD]
-        id_appareil = copie_transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-        date_lecture_epoch = copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
-
-        # Transformer les donnees en format natif (plus facile a utiliser plus tard)
-        date_lecture = datetime.datetime.utcfromtimestamp(date_lecture_epoch)  # Mettre en format date standard
-        copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = date_lecture
-
-        # Extraire les donnees de la liste "senseurs" pour les utiliser plus facilement
-        senseurs = copie_transaction.get('senseurs')
-
-        if senseurs is not None:
-            for senseur in copie_transaction.get('senseurs'):
-                if senseur.get('type') == 'batterie':
-                    copie_transaction['bat_mv'] = senseur['millivolt']
-                    copie_transaction['bat_reserve'] = senseur['reserve']
-                elif senseur.get('type') == 'antenne':
-                    del senseur['type']
-                    copie_transaction['antenne'] = senseur
-                elif senseur.get('type') is not None:
-                    if senseur.get('type') == 'onewire/temperature':
-                        # 1W: copier avec l'adresse unique du senseur comme cle d'affichage
-                        cle = 'affichage.1W%s' % senseur['adresse']
-                    else:
-                        # Pour les types sans adresses uniques, on fait juste copier le type
-                        cle = 'affichage.%s' % senseur['type']
-
-                    for elem, valeur in senseur.items():
-                        if elem not in ['type', 'adresse'] and valeur is not None:
-                            cle_elem = '%s.%s' % (cle, elem)
-                            copie_transaction[cle_elem] = valeur
-
-                            cle_date = '%s.timestamp' % (cle)
-                            copie_transaction[cle_date] = date_lecture
-
-        # Preparer le critere de selection de la lecture. Utilise pour trouver le document courant et pour l'historique
-        selection = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: id_appareil,
-            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$lt': date_lecture}
-        }
-
-        # Effectuer une maj sur la date de derniere modification.
-        # Inserer les champs par defaut lors de la creation du document.
-        operation = {
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$setOnInsert': {Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR}
-        }
-
-        # Si location existe, s'assurer de l'ajouter uniquement lors de l'insertion (possible de changer manuellement)
-        if copie_transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION) is not None:
-            operation['$setOnInsert'][SenseursPassifsConstantes.TRANSACTION_LOCATION] = \
-                copie_transaction.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
-            del copie_transaction[SenseursPassifsConstantes.TRANSACTION_LOCATION]
-
-        # Mettre a jour les informations du document en copiant ceux de la transaction
-        operation['$set'] = copie_transaction
-
-        self._logger.debug("Donnees senseur passif: selection=%s, operation=%s" % (str(selection), str(operation)))
-
-        collection = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document_senseur = collection.find_one_and_update(
-            filter=selection, update=operation, upsert=False, fields={"_id": 1})
-
-        # Verifier si un document a ete modifie.
-        if document_senseur is None:
-            # Aucun document n'a ete modifie. Verifier si c'est parce qu'il n'existe pas. Sinon, le match a echoue
-            # parce qu'une lecture plus recente a deja ete enregistree (c'est OK)
-            selection_sansdate = selection.copy()
-            del selection_sansdate[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
-            document_senseur = collection.find_one(filter=selection_sansdate)
-
-            if document_senseur is None:
-                # Executer la meme operation avec upsert=True pour inserer un nouveau document
-                resultat_update = collection.update_one(filter=selection, update=operation, upsert=True)
-                document_senseur = {'_id': resultat_update.upserted_id}
-                self._logger.info("_id du nouveau document: %s" % str(resultat_update.upserted_id))
-            else:
-                self._logger.debug("Document existant non MAJ: %s" % str(document_senseur))
-                document_senseur = None
-        else:
-            self._logger.debug("MAJ update: %s" % str(document_senseur))
-
-        return document_senseur
-
-    def _requete_aggregation_senseurs(
-            self,
-            uuid_senseur: str = None,
-            niveau_regroupement: str = 'hour',
-            temps_fin_rapport: datetime.datetime = datetime.datetime.utcnow(),
-            range_rapport: datetime.timedelta = datetime.timedelta(days=7)
-    ):
-        """
-        Effectue une requete d'aggregation des transactions de senseurs passifs.
-        :param uuid_senseur: Senseur a utiliser (None == tous)
-        :param niveau_regroupement: hour ou day
-        :param temps_fin_rapport: datetime de fin du rapport. Defaut = now
-        :param range_rapport: timedelta qui represente l'intervalle du rapport
-        :return: Un curseur d'aggregation
-        """
-        collection_transactions = self._document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-
-        # LIBELLE_DOCUMENT_SENSEUR_RAPPORT_HORAIRE
-        temps_fin_rapport.replace(minute=0, second=0)  # Debut de l'heure courante est la fin du rapport
-        if niveau_regroupement == 'day':
-            temps_fin_rapport.replace(hour=0)  # Minuit
-
-        temps_debut_rapport = temps_fin_rapport - range_rapport
-
-        filtre_rapport = {
-            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
-                '$gte': temps_debut_rapport.timestamp(),
-                '$lt': temps_fin_rapport.timestamp(),
-            },
-            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE): SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-        }
-        if uuid_senseur is not None:
-            filtre_rapport[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR] = uuid_senseur
-
-        regroupement_periode = {
-            'year': {'$year': '$_evenements._estampille'},
-            'month': {'$month': '$_evenements._estampille'},
-        }
-        if niveau_regroupement == 'day':
-            regroupement_periode['day'] = {'$dayOfMonth': '$_evenements._estampille'}
-        elif niveau_regroupement == 'hour':
-            regroupement_periode['day'] = {'$dayOfMonth': '$_evenements._estampille'}
-            regroupement_periode['hour'] = {'$hour': '$_evenements._estampille'}
-
-        regroupement = {
-            '_id': {
-                'uuid_senseur': '$uuid_senseur',
-                'appareil_type': '$senseurs.type',
-                'appareil_adresse': '$senseurs.adresse',
-                'timestamp': {
-                    '$dateFromParts': regroupement_periode
-                },
-            },
-        }
-
-        for elem_regroupement in self._regroupement_elem_numeriques:
-            for accumulateur in self._accumulateurs:
-                key = '%s_%s' % (elem_regroupement, accumulateur)
-                regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
-
-        operation = [
-            {'$match': filtre_rapport},
-            {'$unwind': '$senseurs'},
-            {'$group': regroupement},
-        ]
-
-        # S'assurer d'utiliser l'index sur l'estampille - permet au match de filtrer par date
-        hint = {'_evenements._estampille': -1}
-
-        resultat = collection_transactions.aggregate(operation, hint=hint)
-
-        return resultat
-
-    def parse_resultat_aggregation(self, curseur):
-
-        # Key=uuid_senseur, Value=[{appareil_type, appareil_adresse, timestamp, accums...}, ...]
-        resultats_par_senseur = dict()
-
-        for ligne_rapport in curseur:
-            # self._logger.info(str(ligne_rapport))
-            resultats_appareil = resultats_par_senseur.get(ligne_rapport['_id']['uuid_senseur'])
-            if resultats_appareil is None:
-                resultats_appareil = dict()
-                resultats_par_senseur[ligne_rapport['_id']['uuid_senseur']] = resultats_appareil
-
-            # Reorganiser valeurs pour insertion dans document de rapport
-            cle_appareil = ligne_rapport['_id']['appareil_type']
-            if cle_appareil == 'onewire/temperature':
-                adresse = ligne_rapport['_id'].get('appareil_adresse')
-                cle_appareil = '1W%s' % adresse
-
-            liste_valeurs = resultats_appareil.get(cle_appareil)
-            if liste_valeurs is None:
-                liste_valeurs = list()
-                resultats_appareil[cle_appareil] = liste_valeurs
-
-            ligne_formattee = dict()
-            liste_valeurs.append(ligne_formattee)
-
-            ligne_formattee['timestamp'] = ligne_rapport['_id']['timestamp']
-
-            for elem_regroupement in self._regroupement_elem_numeriques:
-                for accumulateur in self._accumulateurs:
-                    key = '%s_%s' % (elem_regroupement, accumulateur)
-                    valeur = ligne_rapport[key]
-                    if valeur is not None:
-                        ligne_formattee[key] = valeur
-
-        return resultats_par_senseur
-
-    def remplacer_resultats_rapport(self, resultats: dict, infodoc_libelle, nombre_resultats_limite: int = 366):
-
-        collection_documents = self._document_dao.get_collection(
-            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-
-        for uuid_senseur, appareils in resultats.items():
-            self._logger.debug("Inserer resultats dans document %s" % uuid_senseur)
-            set_operation = dict()
-            for appareil, valeurs in appareils.items():
-                # Ajouter les valeurs en ordre croissant de timestamp.
-                valeurs = sorted(valeurs, key=lambda valeur: valeur['timestamp'])
-
-                # Garder les "nombre_resultats_limite" plus recents
-                valeurs = valeurs[- nombre_resultats_limite:]
-
-                set_operation['appareils.%s' % appareil] = valeurs
-
-            self._logger.debug('Operation push: %s' % str(set_operation))
-
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
-                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-            }
-
-            set_on_insert = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
-                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-            }
-
-            operations = {
-                '$setOnInsert': set_on_insert,
-                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-                '$set': set_operation,
-            }
-
-            collection_documents.update_one(filter=filtre, update=operations, upsert=True)
-
-    def inserer_resultats_rapport(self, resultats: dict, infodoc_libelle, nombre_resultats_limite: int = 366):
-
-        collection_documents = self._document_dao.get_collection(
-            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-
-        for uuid_senseur, appareils in resultats.items():
-            self._logger.info("Inserer resultats dans document %s" % uuid_senseur)
-            push_operation = dict()
-            for appareil, valeurs in appareils.items():
-                # Ajouter les valeurs en ordre croissant de timestamp.
-                # Garder les "nombre_resultats_limite" plus recents (~1 semaine)
-                push_operation['appareils.%s' % appareil] = {
-                    '$each': valeurs,
-                    '$sort': {SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: 1},
-                    '$slice': - nombre_resultats_limite,
-                }
-
-            self._logger.info('Operation push: %s' % str(push_operation))
-
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
-                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-            }
-
-            set_on_insert = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: infodoc_libelle,
-                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-            }
-
-            operations = {
-                '$setOnInsert': set_on_insert,
-                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-                '$push': push_operation
-            }
-
-            collection_documents.update_one(filter=filtre, update=operations, upsert=True)
-
-    def generer_fenetre_horaire(self):
-        curseur_aggregation = self._requete_aggregation_senseurs(
-            niveau_regroupement='hour',
-            range_rapport=datetime.timedelta(days=7)
-        )
-
-        resultats = self.parse_resultat_aggregation(curseur_aggregation)
-
-        self.remplacer_resultats_rapport(
-            resultats,
-            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
-            nombre_resultats_limite=170
-        )
-
-    def ajouter_derniereheure_fenetre_horaire(self):
-        curseur_aggregation = self._requete_aggregation_senseurs(
-            niveau_regroupement='hour',
-            range_rapport=datetime.timedelta(hours=1)
-        )
-
-        resultats = self.parse_resultat_aggregation(curseur_aggregation)
-
-        self.inserer_resultats_rapport(
-            resultats,
-            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
-            nombre_resultats_limite=170
-        )
-
-    def generer_fenetre_quotidienne(self):
-        curseur_aggregation = self._requete_aggregation_senseurs(
-            niveau_regroupement='day',
-            range_rapport=datetime.timedelta(days=366)
-        )
-
-        resultats = self.parse_resultat_aggregation(curseur_aggregation)
-
-        self.remplacer_resultats_rapport(
-            resultats,
-            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
-            nombre_resultats_limite=366
-        )
-
-    def ajouter_dernierjour_fenetre_quotidienne(self):
-        curseur_aggregation = self._requete_aggregation_senseurs(
-            niveau_regroupement='day',
-            range_rapport=datetime.timedelta(days=1)
-        )
-
-        resultats = self.parse_resultat_aggregation(curseur_aggregation)
-
-        self.inserer_resultats_rapport(
-            resultats,
-            SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
-            nombre_resultats_limite=366
-        )
-
-
 class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
     """
     Processus pour enregistrer une transaction d'un senseur passif
@@ -756,28 +382,10 @@ class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
         Enregistrer l'information de la transaction dans le document du senseur
         :return:
         """
-
         doc_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
         self._logger.debug("Document processus: %s" % self._document_processus)
         self._logger.debug("Document transaction: %s" % doc_transaction)
-
-        producteur_document = ProducteurDocumentSenseurPassif(self._controleur.document_dao)
-        document_senseur = producteur_document.maj_document_senseur(doc_transaction)
-
-        parametres = None
-        if document_senseur and document_senseur.get("_id") is not None:
-            # Mettre a jour le noeud
-            id_document_senseur = document_senseur["_id"]
-
-            producteur_document_noeud = ProducteurDocumentNoeud(self._controleur.document_dao)
-            producteur_document_noeud.maj_document_noeud_senseurpassif(id_document_senseur)
-
-            # Mettre a jour le dashboard de vitrine
-            producteur_document_noeud.maj_document_vitrine_dashboard(id_document_senseur)
-
-        self.set_etape_suivante()   # Etape finale par defaut
-
-        return parametres
+        self.set_etape_suivante()  # Termine
 
     def get_collection_transaction_nom(self):
         return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
@@ -796,12 +404,6 @@ class ProcessusMAJSenseurPassif(MGProcessusTransaction):
         """
         Appliquer les modifications au noeud
         """
-        id_document_senseur = self._document_processus['parametres']['id_document_senseur']
-        producteur_document = ProducteurDocumentNoeud(self._controleur.document_dao)
-        producteur_document.maj_document_noeud_senseurpassif(id_document_senseur)
-
-        # Mettre a jour le dashboard de vitrine
-        producteur_document.maj_document_vitrine_dashboard(id_document_senseur)
         self.set_etape_suivante()  # Termine
 
     def get_collection_transaction_nom(self):
@@ -809,59 +411,6 @@ class ProcessusMAJSenseurPassif(MGProcessusTransaction):
 
     def get_collection_processus_nom(self):
         return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusChangementAttributSenseur(ProcessusMAJSenseurPassif):
-    """
-    Processus de modification d'un attribut de senseur par un usager
-    Format de la transaction:
-    {
-        senseur: NO_SENSEUR,
-        noeud: NOM_NOEUD,
-        attribut1: valeur1,
-        attribut2: valeur2,
-        ...
-        attributN: valeurN,
-    }
-    """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Mettre a jour le document de senseur """
-
-        document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
-            "uuid_senseur": document_transaction['uuid_senseur'],
-        }
-        valeurs_modifiees = dict()
-        for cle in document_transaction:
-            if not cle.startswith('_') and cle not in ['uuid_senseur']:
-                # Remplacer les / en . (probleme de sauvegarde de la transaction originale si on utilise des .
-                cleModifiee = cle.replace('/', '.').replace("'", "")
-                valeurs_modifiees[cleModifiee] = document_transaction[cle]
-
-        valeurs = {
-            '$set': valeurs_modifiees,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
-
-        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
-        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document = collection_transactions.find_one_and_update(filtre, valeurs)
-
-        if document is None:
-            message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self._logger.error(message_erreur)
-            raise AssertionError(message_erreur)
-
-        self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
-
-        # Retourner l'id du document pour mettre a jour le noeud
-        return {'id_document_senseur': document['_id']}
 
 
 class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
@@ -959,546 +508,3 @@ class ProcessusMajManuelle(ProcessusMAJSenseurPassif):
 
         # Retourner l'id du document pour mettre a jour le noeud
         return {'id_document_senseur': document['_id']}
-
-
-class GenerateurRapportSenseursHelper:
-    """
-    Classe qui genere des statistiques sur les senseurs.
-    """
-
-    def __init__(self):
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def extraire_requete(self, transaction):
-        regroupement_periode = {
-            'year': {'$year': '$_evenements._estampille'},
-            'month': {'$month': '$_evenements._estampille'},
-            'day': {'$dayOfMonth': '$_evenements._estampille'},
-            'hour': {'$hour': '$_evenements._estampille'},
-        }
-        if transaction.get('groupe_temps') == 'days':
-            del regroupement_periode['hour']
-
-        regroupement_elem_numeriques = [
-            'temperature', 'humidite', 'pression', 'millivolt', 'reserve'
-        ]
-        if transaction.get('mesures'):
-            regroupement_elem_numeriques = transaction['mesures']
-
-        accumulateurs = ['max', 'min', 'avg']
-        if transaction.get('accumulateurs'):
-            accumulateurs = transaction['accumulateurs']
-
-        regroupement = {
-            '_id': {
-                'uuid_senseur': '$uuid_senseur',
-                'appareil_type': '$senseurs.type',
-                'appareil_adresse': '$senseurs.adresse',
-                'timestamp': {
-                    '$dateFromParts': regroupement_periode
-                },
-            },
-        }
-
-        # Combiner les types de lectures (temp, hum) avec operation (avg, min, max)
-        for elem_regroupement in regroupement_elem_numeriques:
-            for accumulateur in accumulateurs:
-                key = '%s_%s' % (elem_regroupement, accumulateur)
-                regroupement[key] = {'$%s' % accumulateur: '$senseurs.%s' % elem_regroupement}
-
-        temps_fin_rapport = datetime.datetime.utcnow()
-        periode_rapport = datetime.timedelta(days=90)
-        temps_debut_rapport = temps_fin_rapport - periode_rapport
-
-        periode_transaction = transaction.get('periode')
-        try:
-            if periode_transaction is not None:
-                temps_debut_rapport = datetime.datetime.fromtimestamp(periode_transaction['debut'])
-                temps_fin_rapport = datetime.datetime.fromtimestamp(periode_transaction['fin'])
-        except Exception:
-            self.__logger.exception("Erreur parametres intervalle du rapport, on prend 90 derniers jours")
-
-        filtre = {
-            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            # 'uuid_senseur': {'$in': ['731bf65cf35811e9b135b827eb9064af']},
-            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {
-                '$gte': temps_debut_rapport.timestamp(),
-                '$lt': temps_fin_rapport.timestamp(),
-            },
-        }
-
-        if transaction.get('senseurs'):
-            filtre[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR] = {'$in': transaction['senseurs']}
-
-        operation = [
-            {'$match': filtre},
-            {'$unwind': '$senseurs'},
-            {'$group': regroupement},
-        ]
-
-        return operation
-
-    def extraire_donnees(self, curseur):
-        colonnes = set()
-        rangees = dict()
-        for resultat in curseur:
-            id_result = resultat['_id']
-            if id_result.get('appareil_adresse') is not None:
-                colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_adresse']
-            elif id_result.get('appareil_type') is not None:
-                colonne = id_result['uuid_senseur'] + '/' + id_result['appareil_type']
-
-            timestamp = id_result['timestamp']
-            rangee = rangees.get(timestamp)
-            if rangee is None:
-                rangee = dict()
-                rangees[timestamp] = rangee
-
-            for donnee in resultat.keys():
-                if donnee != '_id' and resultat.get(donnee) is not None:
-                    colonne_donnee = colonne + '/' + donnee
-                    colonnes.add(colonne_donnee)
-                    rangee[colonne_donnee] = resultat[donnee]
-
-        colonnes = sorted(colonnes)
-
-        for timestamp in sorted(rangees.keys()):
-            ligne = "Timestamp %s : " % (timestamp)
-            rangee = rangees[timestamp]
-            for colonne in colonnes:
-                if rangee.get(colonne) is not None:
-                    ligne = ligne + ', ' + colonne + "=" + str(rangee[colonne])
-
-        return rangees, colonnes
-
-    def formatter_mongo(self, rangees):
-        """
-        Prend le format ou chaque rangee est une date et extrait les senseurs avec leurs lectures
-        :param rangees:
-        :return:
-        """
-
-        # Grouper les lectures par appareil, faire la liste en ordre de timestamp (deja triee)
-        appareils = dict()
-        for date_donnee in sorted(rangees.keys()):
-            rangee = rangees[date_donnee]
-
-            # rangee est une date avec tous les appareils et mesures
-            for nom_lect, valeur in rangee.items():
-                # Extraire la mesure avec la valeur
-                uuid_senseur, nom_app, mesure = nom_lect.split('/')
-                lectures = appareils.get(nom_app)
-                if lectures is None:
-                    # Fabriquer une nouvelle liste de lectures en ordre chronologique pour cet appareil
-                    lectures = list()
-                    appareils[nom_app] = lectures
-                    lectures.append({'timestamp': date_donnee})
-
-                # Toujours ajouter a la derniere valeur dans la liste, jusqu'a changement de date
-                derniere_lecture = lectures[-1]
-                if derniere_lecture['timestamp'] != date_donnee:
-                    # On a une nouvelle rangee (nouvelle date)
-                    derniere_lecture = {'timestamp': date_donnee}
-                    lectures.append(derniere_lecture)
-
-                derniere_lecture[mesure] = valeur
-
-        self.__logger.debug("Resultat reorganisation:\n%s" % appareils)
-        return appareils
-
-
-class CommandeGenererRapportHebdomadaire:
-    """
-    Genere un rapport hebdomadaire (par heure) pour un senseur et tous ses appareils
-    """
-    def __init__(self, gestionnaire, commande):
-        self.__gestionnaire = gestionnaire
-        self.__commande = commande
-        self.__helper = GenerateurRapportSenseursHelper()
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def generer(self):
-        uuid_senseur = self.__commande['senseurs'][0]
-        requete_aggregation = self.__helper.extraire_requete(self.__commande)
-        hint = {'_evenements._estampille': -1}
-
-        # Executer la requete sur la collection de noms
-        collection = self.__gestionnaire.document_dao.get_collection(self.__gestionnaire.get_collection_transaction_nom())
-        curseur_resultat = collection.aggregate(requete_aggregation)  # , hint=hint)
-
-        # Extraire les donnees
-        rangees, colonnes = self.__helper.extraire_donnees(curseur_resultat)
-        self.__logger.debug("Rapport:\n%s\n%s" % (colonnes, rangees))
-
-        appareils = self.__helper.formatter_mongo(rangees)
-        self.sauvegarder(uuid_senseur, appareils)
-
-        return None
-
-    def sauvegarder(self, uuid_senseur, appareils):
-        collection = self.__gestionnaire.document_dao.get_collection(
-            self.__gestionnaire.get_nom_collection())
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-        }
-
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_SEMAINE,
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-        }
-
-        operations = {
-            '$setOnInsert': set_on_insert,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$set': {'appareils': appareils}
-        }
-
-        self.__logger.debug("Requete update rapport semaine:\n%s" % operations)
-
-        collection.update_one(filtre, operations, upsert=True)
-
-
-class CommandeGenererRapportAnnuel:
-    """
-    Genere un rapport annuel (par jour) pour un senseur et tous ses appareils
-    """
-    def __init__(self, gestionnaire, commande):
-        self.__gestionnaire = gestionnaire
-        self.__commande = commande
-        self.__helper = GenerateurRapportSenseursHelper()
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def generer(self):
-        uuid_senseur = self.__commande['senseurs'][0]
-
-        # Ajouter days pour regroupement
-        commande_days = self.__commande.copy()
-        commande_days['groupe_temps'] = 'days'
-
-        requete_aggregation = self.__helper.extraire_requete(commande_days)
-        hint = {'_evenements._estampille': -1}
-
-        # Executer la requete sur la collection de noms
-        collection = self.__gestionnaire.document_dao.get_collection(self.__gestionnaire.get_collection_transaction_nom())
-        try:
-            curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
-        except OperationFailure:
-            self.__logger.exception("Erreur operation aggregation, tenter de recuperer sans le hint")
-            curseur_resultat = collection.aggregate(requete_aggregation)
-
-        # Extraire les donnees
-        rangees, colonnes = self.__helper.extraire_donnees(curseur_resultat)
-        self.__logger.debug("Rapport:\n%s\n%s" % (colonnes, rangees))
-
-        appareils = self.__helper.formatter_mongo(rangees)
-        self.sauvegarder(uuid_senseur, appareils)
-
-        return None
-
-    def sauvegarder(self, uuid_senseur, appareils):
-        collection = self.__gestionnaire.document_dao.get_collection(
-            self.__gestionnaire.get_nom_collection())
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-        }
-
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBELLE_DOCUMENT_SENSEUR_RAPPORT_ANNEE,
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
-        }
-
-        operations = {
-            '$setOnInsert': set_on_insert,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$set': {'appareils': appareils}
-        }
-
-        self.__logger.debug("Requete update rapport semaine:\n%s" % operations)
-
-        collection.update_one(filtre, operations, upsert=True)
-
-
-class CommandeDeclencherRapports:
-    """ Commande qui declenche la generation des rapports """
-
-    def __init__(self, gestionnaire, commande):
-        self.__gestionnaire = gestionnaire
-        self.__commande = commande
-        self.__helper = GenerateurRapportSenseursHelper()
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def declencher(self):
-        type_rapport = self.__commande['type_rapport']
-        if type_rapport == 'semaine':
-            domaine = 'commande.%s' % SenseursPassifsConstantes.COMMANDE_RAPPORT_HEBDOMADAIRE
-        elif type_rapport == 'annee':
-            domaine = 'commande.%s' % SenseursPassifsConstantes.COMMANDE_RAPPORT_ANNUEL
-        else:
-            raise Exception("Type de rapport inconnu : " + type_rapport)
-
-        # Faire la liste de tous les senseurs individuels
-        collection = self.__gestionnaire.document_dao.get_collection(
-            self.__gestionnaire.get_nom_collection())
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR
-        }
-        projection = {
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: True,
-        }
-
-        resultats = collection.find(filtre, projection)
-        generateur_transactions = self.__gestionnaire.generateur_transactions
-        for senseur in resultats:
-            commande = {
-                'senseurs': [senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]]
-            }
-            generateur_transactions.transmettre_commande(
-                commande, domaine, exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE)
-
-
-class ProcessusGenererRapportSenseurs(MGProcessusTransaction):
-    """
-    Processus de creation d'un rapport (Excel) a partir de donnees de senseurs
-    """
-    def __init__(self, controleur, evenement, transaction_mapper=None):
-        super().__init__(controleur, evenement, transaction_mapper)
-        self.helper = GenerateurRapportSenseursHelper()
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def initiale(self):
-        # Definir parametres du rapport
-        transaction = self.transaction
-
-        requete_aggregation = self.helper.extraire_requete(transaction)
-        hint = {'_evenements._estampille': -1}
-
-        # Executer la requete sur la collection de noms
-        collection = self.controleur.document_dao.get_collection(self.get_collection_transaction_nom())
-        curseur_resultat = collection.aggregate(requete_aggregation, hint=hint)
-
-        # Extraire les donnees
-        rangees, colonnes = self.helper.extraire_donnees(curseur_resultat)
-
-        # Generer Workbook
-        fichier_temporaire = self.generer_workbook(rangees, colonnes)
-        self.__logger.info("Fichier Excel temporaire %s" % fichier_temporaire)
-        timestamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M")
-        etiquettes = ['rapport', 'senseurspassifs']
-        try:
-            with open(fichier_temporaire, 'rb') as fichier:
-                # Sauvegarder le fichier dans consignationfichiers
-                fuuid = self.sauvegarder_consignationfichiers(
-                    fichier,
-                    'Rapport_SenseursPassifs_%s.xlsx' % timestamp,
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    etiquettes=etiquettes,
-                )
-        finally:
-            # os.remove(fichier_temporaire)
-            pass
-
-        self.set_etape_suivante()  # Termine
-
-        return {
-            'fuuid': fuuid,
-        }
-
-    def generer_workbook(self, rangees, colonnes):
-        wb = Workbook()
-        feuille = wb.active
-        feuille.title = "Rapport"
-
-        colonnes = sorted(colonnes)
-        senseurs = dict()
-        for colonne in colonnes:
-            senseur, appareil, mesure = colonne.split('/')
-            groupe_appareils = senseurs.get(senseur)
-            if groupe_appareils is None:
-                groupe_appareils = dict()
-                senseurs[senseur] = groupe_appareils
-            groupe_mesures = groupe_appareils.get(appareil)
-            if groupe_mesures is None:
-                groupe_mesures = list()
-                groupe_appareils[appareil] = groupe_mesures
-            groupe_mesures.append(mesure)
-
-        # Remplacer les ID de senseurs et appareils par leur nom
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
-            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: {'$in': list(senseurs.keys())}
-        }
-        try:
-            collection = self.get_collection_documents()
-            curseur_senseurs = collection.find(filtre)
-            for senseur_db in curseur_senseurs:
-                id_senseur = senseur_db[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
-                colonnes_senseur = senseurs[id_senseur]
-                location_senseur = senseur_db.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
-                if location_senseur is not None:
-                    # Remplacer le nom du senseur dans la colonne
-                    senseurs[location_senseur] = colonnes_senseur
-                    del senseurs[id_senseur]
-                    for appareil in colonnes_senseur.keys():
-                        mesures = colonnes_senseur[appareil]
-                        affichage_appareils = senseur_db.get('affichage')
-                        if affichage_appareils is not None:
-                            appareil_db = affichage_appareils.get(appareil)
-                            if appareil_db is not None:
-                                location_appareil = appareil_db.get(SenseursPassifsConstantes.TRANSACTION_LOCATION)
-                                if location_appareil is not None:
-                                    colonnes_senseur[location_appareil] = mesures
-                                    del colonnes_senseur[appareil]
-        except Exception:
-            # Erreur de formattage de l'entete, n'empeche pas de produire le rapport
-            self.__logger.exception("Erreur mapping nom senseurs pour rapport, le rapport va quand meme etre produit")
-
-        # Generer les 3 niveaux d'entete
-        no_colonne = 2
-        for senseur in sorted(senseurs.keys()):
-            appareils = senseurs[senseur]
-            feuille.cell(column=no_colonne, row=1, value=senseur)
-            for appareil in sorted(appareils.keys()):
-                feuille.cell(column=no_colonne, row=2, value=appareil)
-                mesures = appareils[appareil]
-                for mesure in mesures:
-                    feuille.cell(column=no_colonne, row=3, value=mesure)
-                    no_colonne = no_colonne + 1
-
-        ligne = 3
-        for timestamp in sorted(rangees.keys()):
-            no_colonne = 1
-            ligne = ligne + 1
-            feuille.cell(column=1, row=ligne, value=timestamp)
-
-            rangee = rangees[timestamp]
-            for colonne in colonnes:
-                no_colonne = no_colonne + 1
-                valeur = rangee.get(colonne)
-                if valeur is not None:
-                    feuille.cell(column=no_colonne, row=ligne, value=valeur)
-                    if 'temperature' in colonne or 'pression' in colonne:
-                        feuille.cell(column=no_colonne, row=ligne).number_format = '0.0'
-                    else:
-                        feuille.cell(column=no_colonne, row=ligne).number_format = '0'
-
-        # Creer un fichier temporaire
-        fichier_excel = tempfile.mkstemp()[1]
-
-        try:
-            wb.save(fichier_excel)
-        except Exception as e:
-            self.__logger.exception("Erreur sauvegarde workbook Excel")
-            os.remove(fichier_excel)
-            raise e
-
-        return fichier_excel
-
-
-class RegenerateurSenseursPassifs(RegenerateurDeDocuments):
-    """
-    Efface et regenere les documents de SenseursPassifs. Optimise pour utiliser lectures recentes.
-    """
-
-    def creer_generateur_transactions(self):
-        return GroupeurRegenererTransactionsSenseursPassif(self._gestionnaire_domaine)
-
-
-class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer):
-    """
-    Classe qui permet de grouper les transactions d'un domaine pour regenerer les documents.
-    Groupe toutes les transactions dans un seul groupe, en ordre de transaction_traitee.
-    """
-
-    def __init__(self, gestionnaire_domaine: GestionnaireDomaine):
-        super().__init__(gestionnaire_domaine)
-
-        self.__complete = False
-
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def __preparer_curseur_lectures(self):
-        idmg = self.gestionnaire.configuration.idmg
-
-        match_query = {
-            '_evenements.transaction_complete': True,
-            'en-tete.domaine': SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE,
-            '_evenements.%s.transaction_traitee' % idmg: {'$exists': True},
-            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$exists': True},
-        }
-        group_query = {
-            '_id': {
-                SenseursPassifsConstantes.TRANSACTION_NOEUD: '$' + SenseursPassifsConstantes.TRANSACTION_NOEUD,
-                SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: '$' + SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR,
-            },
-            SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$max': '$' + SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE}
-        }
-
-        collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
-        collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
-        curseur = collection_transaction.aggregate([
-            {'$match': match_query},
-            {'$group': group_query}
-        ])
-
-        return curseur
-
-    def __preparer_curseur_autres(self):
-        idmg = self.gestionnaire.configuration.idmg
-
-        match_query = {
-            '_evenements.transaction_complete': True,
-            '_evenements.%s.transaction_traitee' % idmg: {'$exists': True},
-            'en-tete.domaine': {'$not': {'$in': [
-                'millegrilles.domaines.SenseursPassifs.lecture',
-                'millegrilles.domaines.SenseursPassifs.genererRapport'
-            ]}}
-        }
-        sort_query = [
-            ('_evenements.%s.transaction_traitee' % idmg, 1)
-        ]
-
-        collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
-        collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
-
-        return collection_transaction.find(match_query).sort(sort_query)
-
-    def __charger_lecture(self, senseur_lecture):
-        collection_transaction_nom = self.gestionnaire.get_collection_transaction_nom()
-        collection_transaction = self.gestionnaire.document_dao.get_collection(collection_transaction_nom)
-
-        senseur_dict = senseur_lecture['_id']
-        senseur_dict[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE] = senseur_lecture[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
-        transaction = collection_transaction.find_one(senseur_dict)
-
-        return transaction
-
-    def __iter__(self):
-        return self.__next__()
-
-    def __next__(self):
-        """
-        Retourne un curseur Mongo avec les transactions a executer en ordre.
-        :return:
-        """
-        if self.__complete:
-            raise StopIteration()
-
-        curseur_aggregation = self.__preparer_curseur_lectures()
-        for senseur_lecture in curseur_aggregation:
-            transaction = self.__charger_lecture(senseur_lecture)
-            yield transaction
-
-        curseur_autres = self.__preparer_curseur_autres()
-        for transaction in curseur_autres:
-            yield transaction
-
-        self.__complete = True
-
-        return

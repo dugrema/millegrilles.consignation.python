@@ -111,7 +111,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         # Index noeud, _mg-libelle
         collection_domaine.create_index(
             [
-                (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+                (SenseursPassifsConstantes.TRANSACTION_NOEUD_ID, 1),
                 (Constantes.DOCUMENT_INFODOC_LIBELLE, 1)
             ],
             name='noeud-mglibelle'
@@ -120,7 +120,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         collection_domaine.create_index(
             [
                 (SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
-                (SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+                (SenseursPassifsConstantes.TRANSACTION_NOEUD_ID, 1),
                 (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
                 ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
             ],
@@ -141,7 +141,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         collection_transactions.create_index(
             [
                 ('%s' % SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR, 1),
-                ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD, 1),
+                ('%s' % SenseursPassifsConstantes.TRANSACTION_NOEUD_ID, 1),
                 ('%s' % SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE, 2),
                 ('%s.%s' %
                  (Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE),
@@ -510,7 +510,7 @@ class ProducteurDocumentSenseurPassif:
         operations = TransactionOperations()
         copie_transaction = operations.enlever_champsmeta(transaction)
 
-        noeud = copie_transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD]
+        noeud = copie_transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
         id_appareil = copie_transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
         date_lecture_epoch = copie_transaction[SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE]
 
@@ -1530,7 +1530,7 @@ class GroupeurRegenererTransactionsSenseursPassif(GroupeurTransactionsARegenerer
         }
         group_query = {
             '_id': {
-                SenseursPassifsConstantes.TRANSACTION_NOEUD: '$' + SenseursPassifsConstantes.TRANSACTION_NOEUD,
+                SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: '$' + SenseursPassifsConstantes.TRANSACTION_NOEUD_ID,
                 SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: '$' + SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR,
             },
             SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE: {'$max': '$' + SenseursPassifsConstantes.TRANSACTION_DATE_LECTURE}

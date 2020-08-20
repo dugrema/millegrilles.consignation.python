@@ -1237,7 +1237,7 @@ class SenseursPassifsConstantes:
     LIBVAL_VITRINE_DASHBOARD = 'vitrine.dashboard'
     LIBVAL_NOEUDS = 'noeuds'
 
-    TRANSACTION_NOEUD = 'noeud'
+    TRANSACTION_NOEUD_ID = 'noeud_id'
     TRANSACTION_ID_SENSEUR = 'uuid_senseur'
     TRANSACTION_DATE_LECTURE = 'timestamp'
     TRANSACTION_LOCATION = 'location'

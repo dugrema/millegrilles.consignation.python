@@ -1076,7 +1076,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             name='dernieremodification'
         )
 
-    def get_queue_configuration(self):
+    def get_queue_configuration(self) -> list:
         """
         :return: Liste de configuration pour les Q du domaine
         """
