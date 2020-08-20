@@ -430,6 +430,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
                     # Traiter les transactions qui ne sont pas pour l'heure en cours
                     uuid_senseur = evenement_dict['uuid_senseur']
+                    noeud_id = evenement_dict['noeud_id']
                     senseurs = evenement_dict['senseurs']
 
                     for type, lecture in senseurs.items():
@@ -452,7 +453,9 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                                     'avg': None,
                                     'max': valeur,
                                     'min': valeur,
-                                    'type': valeur['type']
+                                    'type': lecture['type'],
+                                    'uuid_senseur': uuid_senseur,
+                                    'noeud_id': noeud_id,
                                 }
                                 appareils_heure_dict[cle] = lectures
 
