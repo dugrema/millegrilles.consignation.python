@@ -75,8 +75,13 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         uuid_senseur = lecture[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
         senseurs = lecture['senseurs']
 
+        # Conserver dans staging
+        staging = self.gestionnaire.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_STAGING_NOM)
+        staging.insert(lecture)
+
         # Charger le document du senseur
         collection = self.gestionnaire.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
         filter = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
             SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
@@ -97,7 +102,8 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         for cle, donnees in senseurs.items():
             donnees_actuelles = senseurs_actuels.get(cle)
             if donnees_actuelles is None or donnees_actuelles['timestamp'] < donnees['timestamp']:
-                set_ops['senseurs.' + cle] = donnees
+                for key, value in donnees.items():
+                    set_ops['senseurs.' + cle + '.' + key] = value
 
         ops = {
             '$set': set_ops,
