@@ -454,6 +454,9 @@ class ProcessusTransactionSenseursPassifsLecture(ProcessusSenseursPassifs):
         self.__logger.debug("Document processus: %s" % self._document_processus)
         self.__logger.debug("Document transaction: %s" % transaction)
 
+        self.__logger.debug("Nettoyer staging transaction senseur %s" % transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR])
+        self.nettoyer_staging(transaction)
+
         document_senseur = self.charger_document_senseur(transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR])
         if document_senseur is None:
             securite = Constantes.SECURITE_PROTEGE
@@ -506,6 +509,23 @@ class ProcessusTransactionSenseursPassifsLecture(ProcessusSenseursPassifs):
             # Emettre sur exchange prive
             self.generateur_transactions.emettre_message(
                 evenement, domaine_action, exchanges=[Constantes.SECURITE_PRIVE])
+
+    def nettoyer_staging(self, transaction):
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_STAGING_NOM)
+        noeud_id = transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+        uuid_senseur = transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+        senseur = transaction['senseur']
+        timestamp_min = transaction['timestamp_min']
+        timestamp_max = transaction['timestamp_max']
+        filtre = {
+            SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: noeud_id,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+            'senseurs.%s.timestamp' % senseur: {
+                '$lte': timestamp_max,
+                '$gte': timestamp_min,
+            }
+        }
+        collection.delete_many(filtre)
 
 
 class ProcessusMajSenseur(ProcessusSenseursPassifs):
