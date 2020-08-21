@@ -912,7 +912,14 @@ class GestionnaireModulesDocker:
     def hostname(self):
         fqdn = os.getenv('HOSTNAME_MONITOR')
         if not fqdn:
-            fqdn = socket.gethostbyaddr(socket.gethostname())[0]
+            # Tenter de charger le domaine configure avec acme pour correspondre au certificat public
+            try:
+                config_acme = self.charger_config('acme.configuration')
+                config_dict = json.loads(config_acme.decode('utf-8'))
+                fqdn = config_dict['domain']
+            except IndexError as e:
+                # On n'a pas de configuration publique (infrastructure), on retourne le nom local du serveur
+                fqdn = socket.gethostbyaddr(socket.gethostname())[0]
         return fqdn
 
     def get_configuration_services(self):
