@@ -291,6 +291,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
         elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajSenseur"
+        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_MAJ_NOEUD:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajNoeud"
         elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusSupprimerSenseur"
         else:
@@ -500,7 +502,7 @@ class ProcessusTransactionSenseursPassifsLecture(ProcessusSenseursPassifs):
             }
         }
 
-        domaine_action = 'evenement.SenseursPassifs.lecture'
+        domaine_action = 'evenement.' + SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR
         if securite is None or securite == Constantes.SECURITE_PROTEGE:
             # Emettre sur exchange protege
             self.generateur_transactions.emettre_message(
@@ -564,13 +566,85 @@ class ProcessusMajSenseur(ProcessusSenseursPassifs):
             '$setOnInsert': set_on_insert,
         }
 
-        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document = collection_transactions.update_one(filtre, ops, upsert=True)
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        resultat_update = collection.update_one(filtre, ops, upsert=True)
 
-        if document is None:
-            message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self.__logger.error(message_erreur)
-            raise AssertionError(message_erreur)
+        if resultat_update.upserted_id is None and resultat_update.matched_count == 0:
+            raise Exception("Erreur mise a jour document senseur id %s" % uuid_senseur)
+
+        # S'assurer que le document de noeud existe
+        self.verifier_noeud(transaction_filtree)
+
+        # self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
+        self.set_etape_suivante()  # Termine
+
+    def verifier_noeud(self, transaction):
+        """
+        S'assurer que le document de noeud existe
+        :param transaction:
+        :return:
+        """
+        noeud_id = transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+        securite = transaction['securite']
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD,
+            SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: noeud_id,
+        }
+
+        document_noeud = collection.find_one(filtre)
+
+        if document_noeud is None:
+            # Transmettre transaction de noeud
+            transaction = {
+                SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: noeud_id,
+                Constantes.DOCUMENT_INFODOC_SECURITE: securite,
+            }
+            domaine_action = SenseursPassifsConstantes.TRANSACTION_MAJ_NOEUD
+            self.generateur_transactions.soumettre_transaction(transaction, domaine_action)
+
+
+class ProcessusMajNoeud(ProcessusSenseursPassifs):
+    """ Processus de modification d'un noeud """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """ Mettre a jour le document de noeud """
+
+        transaction_filtree = self.transaction_filtree
+
+        noeud_id = transaction_filtree[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD,
+            SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: noeud_id,
+        }
+
+        set_ops = dict()
+        for key, value in transaction_filtree.items():
+            if key not in filtre.keys():
+                set_ops[key] = value
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
+        }
+        set_on_insert.update(filtre)
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': set_on_insert,
+        }
+
+        collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        resultat_update = collection_transactions.update_one(filtre, ops, upsert=True)
+
+        if resultat_update.upserted_id is None and resultat_update.matched_count == 0:
+            raise Exception("Erreur mise a jour document noeud id %s" % noeud_id)
 
         # self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
         self.set_etape_suivante()  # Termine
