@@ -1,6 +1,7 @@
 # Module avec les classes de donnees, processus et gestionnaire de sous domaine millegrilles.domaines.SenseursPassifs
 import logging
 import json
+import datetime
 
 from typing import Optional
 
@@ -105,12 +106,19 @@ class TraitementMessageLecture(TraitementMessageDomaine):
                 for key, value in donnees.items():
                     set_ops['senseurs.' + cle + '.' + key] = value
 
-        ops = {
-            '$set': set_ops,
-            '$setOnInsert': filter,
-        }
+        if len(set_ops.keys()) > 0:
+            set_on_insert = {
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
+            }
+            set_on_insert.update(filter)
+            ops = {
+                '$set': set_ops,
+                '$setOnInsert': set_on_insert,
+            }
 
-        collection.update(filter, ops, upsert=True)
+            collection.update(filter, ops, upsert=True)
+        else:
+            self.__logger.debug("Evenement avec donnees plus vieilles que lectures dans les documents")
 
     def ajouter_senseur(self, lecture: dict, securite: str):
         transaction = {
@@ -224,9 +232,9 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             SenseursPassifsConstantes.DOCUMENT_DEFAUT_VITRINE_DASHBOARD
         )
 
-        self.demarrer_watcher_collection(
-            SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS,
-            SenseursPassifsExchangeRouter(self._contexte))
+        # self.demarrer_watcher_collection(
+        #     SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS,
+        #     SenseursPassifsExchangeRouter(self._contexte))
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
@@ -281,16 +289,10 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
-        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_CHANG_ATTRIBUT_SENSEUR:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusChangementAttributSenseur"
+        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR:
+            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajSenseur"
         elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR:
             processus = "millegrilles_domaines_SenseursPassifs:ProcessusSupprimerSenseur"
-        elif domaine_transaction == SenseursPassifsConstantes.EVENEMENT_MAJ_HORAIRE:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreHoraireRapport"
-        elif domaine_transaction == SenseursPassifsConstantes.EVENEMENT_MAJ_QUOTIDIENNE:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajFenetreQuotidienneRapport"
-        elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_GENERER_RAPPORT:
-            processus = "millegrilles_domaines_SenseursPassifs:ProcessusGenererRapportSenseurs"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -425,143 +427,130 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             collection_senseurs.update_one(filter=filtre, update=update)
 
 
-class ProcessusTransactionSenseursPassifsLecture(MGProcessusTransaction):
+class ProcessusSenseursPassifs(MGProcessusTransaction):
+
+    def get_collection_transaction_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+
+    def get_collection_processus_nom(self):
+        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
+
+
+class ProcessusTransactionSenseursPassifsLecture(ProcessusSenseursPassifs):
     """
     Processus pour enregistrer une transaction d'un senseur passif
     """
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
-        self._logger = logging.getLogger('%s.ProcessusTransactionSenseursPassifsLecture' % __name__)
+        self.__logger = logging.getLogger('%s.ProcessusTransactionSenseursPassifsLecture' % __name__)
 
     def initiale(self):
         """
         Enregistrer l'information de la transaction dans le document du senseur
         :return:
         """
-        doc_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        self._logger.debug("Document processus: %s" % self._document_processus)
-        self._logger.debug("Document transaction: %s" % doc_transaction)
+        transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        self.__logger.debug("Document processus: %s" % self._document_processus)
+        self.__logger.debug("Document transaction: %s" % transaction)
+
+        document_senseur = self.charger_document_senseur(transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR])
+        if document_senseur is None:
+            securite = Constantes.SECURITE_PROTEGE
+        else:
+            senseur_info = document_senseur['senseurs'].get(transaction['senseur'])
+            if senseur_info is not None and senseur_info.get('securite'):
+                securite = senseur_info.get('securite')
+            else:
+                securite = document_senseur.get('securite') or Constantes.SECURITE_PROTEGE
+
+        # Emettre evenement de lecture pour la derniere lecture de la transaction
+        # Permettre de mettre a jour le document de senseur, creer documents manquants, etc.
+        self.emettre_evenement_transaction(transaction, securite)
+
         self.set_etape_suivante()  # Termine
 
-    def get_collection_transaction_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
+    def charger_document_senseur(self, uuid_senseur) -> dict:
+        collection = self.get_collection_documents()
+        doc = collection.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+        })
+        return doc
 
-    def get_collection_processus_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
+    def emettre_evenement_transaction(self, transaction, securite):
+
+        lecture = transaction['lectures'][-1]  # Prendre derniere/plus recente lecture
+        nom_senseur = transaction['senseur']
+        timestamp = transaction['timestamp']
+        type_lecture = transaction['type']
+
+        evenement = {
+            SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID],
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: transaction[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR],
+            "senseurs": {
+                nom_senseur: {
+                    'timestamp': timestamp,
+                    'type': type_lecture,
+                    'valeur': lecture['valeur'],
+                }
+            }
+        }
+
+        domaine_action = 'evenement.SenseursPassifs.lecture'
+        if securite is None or securite == Constantes.SECURITE_PROTEGE:
+            # Emettre sur exchange protege
+            self.generateur_transactions.emettre_message(
+                evenement, domaine_action, exchanges=[Constantes.SECURITE_PROTEGE])
+        else:
+            # Emettre sur exchange prive
+            self.generateur_transactions.emettre_message(
+                evenement, domaine_action, exchanges=[Constantes.SECURITE_PRIVE])
 
 
-# Processus pour mettre a jour un document de noeud suite a une transaction de senseur passif
-class ProcessusMAJSenseurPassif(MGProcessusTransaction):
+class ProcessusMajSenseur(ProcessusSenseursPassifs):
+    """ Processus de modification d'un senseur """
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
-
-    def modifier_noeud(self):
-        """
-        Appliquer les modifications au noeud
-        """
-        self.set_etape_suivante()  # Termine
-
-    def get_collection_transaction_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM
-
-    def get_collection_processus_nom(self):
-        return SenseursPassifsConstantes.COLLECTION_PROCESSUS_NOM
-
-
-class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
-    """
-    Processus de suppression d'une liste de senseur d'un meme noeud.
-    Format de la transaction:
-    {
-        noeud: NOM_NOEUD,
-        senseurs: [NO_SENSEUR1, NO_SENSEUR2, ... NO_SENSEURN]
-    }
-    """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def initiale(self):
         """ Mettre a jour le document de senseur """
 
-        document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-        collection_documents = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        # transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
+        transaction_filtree = self.transaction_filtree
 
-        liste_cles = dict()
-        for senseur in document_transaction['senseurs']:
-            senseur_cle = 'dict_senseurs.%s' % senseur
-            liste_cles[senseur_cle] = 1
+        uuid_senseur = transaction_filtree[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
 
-        # Supprimer du noeud
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD,
-            "noeud": document_transaction['noeud'],
-        }
-        valeurs = {
-            '$unset': liste_cles,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
+            SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
         }
 
-        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
-        document = collection_documents.find_one_and_update(filtre, valeurs)
+        set_ops = dict()
+        for key, value in transaction_filtree.items():
+            if key not in filtre.keys():
+                set_ops[key] = value
 
-        if document is None:
-            message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self._logger.error(message_erreur)
-            raise AssertionError(message_erreur)
-
-        liste_cles = dict()
-        for senseur in document_transaction['senseurs']:
-            senseur_cle = 'noeuds.%s.%s' % (document_transaction['noeud'], senseur)
-            liste_cles[senseur_cle] = 1
-
-        # Supprimer du dashboard vitrine
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD,
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
         }
-        valeurs = {
-            '$unset': liste_cles,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        set_on_insert.update(filtre)
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$setOnInsert': set_on_insert,
         }
 
-        self._logger.debug("Application supression sur dashboard vitrine: %s = %s" % (str(filtre), str(valeurs)))
-        document = collection_documents.find_one_and_update(filtre, valeurs)
-
-        self.set_etape_suivante()  # Termine
-
-        # Retourner l'id du document pour mettre a jour le noeud
-        return {'id_document_noeud': document['_id']}
-
-
-class ProcessusMajManuelle(ProcessusMAJSenseurPassif):
-    """ Processus de modification d'un senseur par un usager """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        """ Mettre a jour le document de senseur """
-
-        document_transaction = self.charger_transaction(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
-
-        filtre = document_transaction['filtre']
-        valeurs = {
-            '$set': document_transaction['set'],
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
-
-        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        document = collection_transactions.find_one_and_update(filtre, valeurs)
+        document = collection_transactions.update_one(filtre, ops, upsert=True)
 
         if document is None:
             message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self._logger.error(message_erreur)
+            self.__logger.error(message_erreur)
             raise AssertionError(message_erreur)
 
-        self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
-
-        # Retourner l'id du document pour mettre a jour le noeud
-        return {'id_document_senseur': document['_id']}
+        # self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
+        self.set_etape_suivante()  # Termine

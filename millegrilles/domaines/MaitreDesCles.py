@@ -1514,7 +1514,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         domaine_routing = ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
-        self._logger.debug("Transmission nouvelle transaction cle recues pour GrosFichier")
+        self.__logger.debug("Transmission nouvelle transaction cle recues pour GrosFichier")
         generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
 
         self.set_etape_suivante()  # Termine
@@ -1624,7 +1624,7 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
         self.__logger.debug("Operations: %s" % str({'filtre': cles_document, 'operation': operations_mongo}))
 
         resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
-        self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+        self.__logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
 
         self.set_etape_suivante()  # Termine
 
@@ -1681,7 +1681,7 @@ class ProcessusMAJMotdepasse(MGProcessusTransaction):
         self.__logger.debug("Operations: %s" % str({'filtre': filtre_document, 'operation': operations_mongo}))
 
         resultat_update = collection_documents.update_one(filter=filtre_document, update=operations_mongo, upsert=True)
-        self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+        self.__logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
 
         if transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SYNCHRONISER):
             uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -1711,7 +1711,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
         cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
         cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
-        self._logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
+        self.__logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
 
         self.set_etape_suivante(ProcessusNouvelleCleDocument.generer_transaction_cles_backup.__name__)
 
@@ -1752,7 +1752,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
             self.parametres['domaine'], ConstantesMaitreDesCles.TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES)
 
         # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
-        self._logger.debug("Transmission nouvelle transaction cle recues pour %s" % domaine_routing)
+        self.__logger.debug("Transmission nouvelle transaction cle recues pour %s" % domaine_routing)
         generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
 
         self.set_etape_suivante()  # Termine
@@ -2012,7 +2012,7 @@ class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-        self._logger.warning("Declasser grosfichier, transmettre cle secrete decryptee pour %s" % transaction['fuuid'])
+        self.__logger.warning("Declasser grosfichier, transmettre cle secrete decryptee pour %s" % transaction['fuuid'])
 
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
@@ -2021,7 +2021,7 @@ class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
         # Aucune exception lancee, la signature de transaction est valide et provient d'un certificat autorise et connu
 
         acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
-        self._logger.debug(
+        self.__logger.debug(
             "Verification signature requete cle grosfichier. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
 
         fuuid = transaction['fuuid']

@@ -616,7 +616,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         fingerprint = transaction['fingerprint']
-        self._logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
+        self.__logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
 
         # Verifier si on a deja les certificats
         collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
@@ -674,8 +674,8 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
                 self.generateur_transactions.transmettre_commande(commande_publier_certificat, 'commande.publicateur.publierCertificat')
 
         except Exception as e:
-            self._logger.warn("Certificat invalide: %s" % fingerprint)
-            self._logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
+            self.__logger.warn("Certificat invalide: %s" % fingerprint)
+            self.__logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
 
         if valide:
             helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
@@ -702,7 +702,7 @@ class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         fingerprint = transaction['fingerprint']
-        self._logger.debug("Chargement certificat web, nouveau fingerprint %s" % fingerprint)
+        self.__logger.debug("Chargement certificat web, nouveau fingerprint %s" % fingerprint)
 
         certificat_web = transaction[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
         enveloppe_cert = EnveloppeCertificat(certificat_pem=certificat_web)
@@ -798,8 +798,8 @@ class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
                     verificateur.verifier_chaine(enveloppe)
                     liste_valide.append(fingerprint)
             except Exception as e:
-                self._logger.warn("Certificat invalide: %s" % fingerprint)
-                self._logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
+                self.__logger.warn("Certificat invalide: %s" % fingerprint)
+                self.__logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
 
             if fingerprint not in liste_valide:
                 liste_invalide.append(fingerprint)

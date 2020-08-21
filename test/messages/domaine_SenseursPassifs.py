@@ -19,6 +19,49 @@ contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
 
 
+SAMPLE_TRANSACTION_1 = {
+    "_signature": "UlJjL37P/AiCylFfVdCB6O9pUZin8rGXj98MmMXT6zsxLtYb2iTfsEl2ZhvBVrPFc2FVcNKu42ddm5Rj0r1J+sJWmHQ+roJgxl3MLRTfU5Ze535gJtrLJkBJMV/Cj3x59mUgfITkgSYEA1s6KHhWfpNz8p97I/F5yb1xsRkkAGLD0jRFVYmyRs/ly1NQhVwFD93QSnyQFlCDxtSoZGbKWUjhRdGVPrUYvzzJKIjF5A+xnaQKmpxMyTHErtwaWWdGEwmpVVoYy0OqLmccFD++A3IP4bF80cQT28up4zIqYaHDMAZ4LeIqypVURl4QEAbQiX0Quxfo1zCCSBRbC9nRJw==",
+    "avg": 1.31,
+    "en-tete": {
+        "certificat": "a9f1e440b4abb7b0d96016bdbce4350a757eb298",
+        "domaine": "SenseursPassifs.lecture",
+        "estampille": 1597967118,
+        "hachage-contenu": "hj/wUh7pITZEgwAcDlurWPpWPBLld8eBEOQHbRNX+6M=",
+        "idmg": "a7zqgVFc6LtqSerLA2asNBZspgkM35fbhn4DZcRH3H43",
+        "uuid-transaction": "3427be78-e33f-11ea-95a1-5f9f064cecea",
+        "version": 6
+    },
+    "lectures": [{
+        "timestamp": 1597950486,
+        "valeur": 31.4
+    }, {
+        "timestamp": 1597950491,
+        "valeur": 5.3
+    }, {
+        "timestamp": 1597953581,
+        "valeur": -0.4
+    }, {
+        "timestamp": 1597953586,
+        "valeur": 38.9
+    }, {
+        "timestamp": 1597953591,
+        "valeur": 42.2
+    }, {
+        "timestamp": 1597953596,
+        "valeur": -49.3
+    }
+    ],
+    "max": 49.9,
+    "min": -49.6,
+    "noeud_id": "001a12f5-e89d-4ff8-b6ac-f2ee269b9516",
+    "timestamp": 1597950000,
+    "timestamp_max": 1597953596,
+    "timestamp_min": 1597950491,
+    "type": "temperature",
+    "uuid_senseur": "7a2764fa-c457-4f25-af0d-0fc915439b21"
+}
+
+
 class MessagesSample(BaseCallback):
 
     def __init__(self):
@@ -57,185 +100,48 @@ class MessagesSample(BaseCallback):
         print("Properties : " + str(properties))
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
-    def transaction_nouvelle_version_metadata(self):
+    def transmettre_transaction_lecture(self):
         transaction = {
-            "fuuid": self.fichier_fuuid,
-            "securite": "2.prive",
-            "nom": "ExplorationGrosFichiers10.txt",
-            "taille": 5478,
-            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
-            "mimetype": "test/plain",
-            "reception": {
-                "methode": "coupdoeil",
-                "noeud": "public1.maple.mdugre.info"
-            },
+            "avg": 1.31,
+            "lectures": [{
+                "timestamp": 1597950486,
+                "valeur": 31.4
+            }, {
+                "timestamp": 1597950491,
+                "valeur": 5.3
+            }, {
+                "timestamp": 1597953581,
+                "valeur": -0.4
+            }, {
+                "timestamp": 1597953586,
+                "valeur": 38.9
+            }, {
+                "timestamp": 1597953591,
+                "valeur": 42.2
+            }, {
+                "timestamp": 1597953596,
+                "valeur": -49.3
+            }
+            ],
+            "max": 49.9,
+            "min": -49.6,
+            "noeud_id": "001a12f5-e89d-4ff8-b6ac-f2ee269b9516",
+            "senseur": "dummy/temperature",
+            "timestamp": 1597950000,
+            "timestamp_max": 1597953596,
+            "timestamp_min": 1597950491,
+            "type": "temperature",
+            "uuid_senseur": "7a2764fa-c457-4f25-af0d-0fc915439b21"
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata',
+            transaction, 'SenseursPassifs.lecture',
             reply_to=self.queue_name, correlation_id='efgh')
 
         print("Envoi metadata: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transmettre_lecture(self):
-        temps_lecture = datetime.datetime.now()
-        # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
-
-        senseurs = [
-            # {
-            #     "humidite": 31.6,
-            #     "temperature": 26,
-            #     "type": "am2302",
-            # },
-            # {
-            #     "humidite": 20,
-            #     "temperature": 27,
-            #     "type": "th",
-            # },
-            {
-                "pression": 99.7,
-                "temperature": 38,
-                "type": "tp",
-            },
-            {
-                "temperature": 52.1,
-                "type": "onewire/temperature",
-                "adresse": '2854ab799711030c'
-            },
-            {
-                "temperature": 32.1,
-                "type": "onewire/temperature",
-                "adresse": '3854ab799711030c'
-            },
-            {
-                "temperature": -24.9,
-                "type": "onewire/temperature",
-                "adresse": '4854ab799711030c'
-            },
-            {
-                "temperature": None,
-                "type": "tpvide",
-            },
-            {
-                "temperature": None,
-                "type": "battery",
-            },
-            {
-                "alerte": 0,
-                "millivolt": 4047,
-                "reserve": 92,
-                "type": "batterie"
-            }
-
-        ]
-
-        message_dict = dict()
-        message_dict['uuid_senseur'] = '514951f2f43211e99259b827eb53ee51'
-        message_dict['noeud'] = 'domaine_SenseursPassifs2'
-        message_dict['timestamp'] = int(temps_lecture.timestamp())
-        message_dict['senseurs'] = senseurs
-
-        enveloppe_val = self.generateur.soumettre_transaction(
-            message_dict, 'millegrilles.domaines.SenseursPassifs.lecture',
-            reply_to=self.queue_name, correlation_id='efgh')
-
-        print("Sent: %s" % enveloppe_val)
-
-    def changer_nom(self):
-        temps_lecture = datetime.datetime.now()
-        # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
-
-        message_dict = {
-            'senseur': 5,
-            'noeud': 'domaine_SenseursPassifs',
-            'location': "Bazaar"
-        }
-
-        enveloppe_val = self.generateur.soumettre_transaction(
-            message_dict,
-            'millegrilles.domaines.SenseursPassifs.changementAttributSenseur',
-            reply_to=self.queue_name,
-            correlation_id='efgh'
-        )
-
-        print("Sent: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def supprimer_senseur(self):
-        temps_lecture = datetime.datetime.now()
-        # temps_lecture_ajuste = temps_lecture + datetime.timedelta(hours=4)
-
-        message_dict = {
-            'senseurs': [6, 7],
-            'noeud': 'domaine_SenseursPassifs',
-        }
-
-        enveloppe_val = self.generateur.soumettre_transaction(
-            message_dict,
-            'millegrilles.domaines.SenseursPassifs.suppressionSenseur',
-            reply_to=self.queue_name,
-            correlation_id='efgh'
-        )
-
-        print("Sent: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def requete_profil_usager(self):
-        requete_profil = {
-            'filtre': {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPrincipale.LIBVAL_PROFIL_USAGER,
-            }
-        }
-        requetes = {'requetes': [requete_profil]}
-        enveloppe_requete = self.generateur.transmettre_requete(
-            requetes, 'millegrilles.domaines.Principale', reply_to=self.queue_name, correlation_id='abcd-1234')
-
-        print("Envoi requete: %s" % enveloppe_requete)
-        return enveloppe_requete
-
-    def commande_generer_rapport_hebdomadaire(self):
-        commande = {
-            'senseurs': ['731bf65cf35811e9b135b827eb9064af'],
-        }
-        enveloppe_requete = self.generateur.transmettre_commande(
-            commande, 'commande.millegrilles.domaines.SenseursPassifs.rapportHebdomadaire',
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            reply_to=self.queue_name, correlation_id='abcd-1234')
-
-        print("Envoi commande: %s" % enveloppe_requete)
-        return enveloppe_requete
-
-    def commande_generer_rapport_annuel(self):
-        commande = {
-            'senseurs': ['731bf65cf35811e9b135b827eb9064af'],
-        }
-        enveloppe_requete = self.generateur.transmettre_commande(
-            commande, 'commande.millegrilles.domaines.SenseursPassifs.rapportAnnuel',
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            reply_to=self.queue_name, correlation_id='abcd-1234')
-
-        print("Envoi commande: %s" % enveloppe_requete)
-        return enveloppe_requete
-
-    def commande_declencher_rapports(self):
-        commande = {
-            'type_rapport': 'semaine',
-        }
-        self.generateur.transmettre_commande(
-            commande, 'commande.millegrilles.domaines.SenseursPassifs.declencherRapports',
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            reply_to=self.queue_name, correlation_id='abcd-1234')
-
-        commande = {
-            'type_rapport': 'annee',
-        }
-        self.generateur.transmettre_commande(
-            commande, 'commande.millegrilles.domaines.SenseursPassifs.declencherRapports',
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE,
-            reply_to=self.queue_name, correlation_id='abcd-1234')
-
     def executer(self):
-        sample.transmettre_lecture()
+        sample.transmettre_transaction_lecture()
 
 
 # --- MAIN ---

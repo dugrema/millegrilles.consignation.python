@@ -152,7 +152,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
 
     def initiale(self):
         parametres = self.parametres
-        self._logger.debug('Rapport RSS processing, parametres: %s' % parametres)
+        self.__logger.debug('Rapport RSS processing, parametres: %s' % parametres)
         doc_transaction = self.charger_transaction(RapportsConstantes.COLLECTION_TRANSACTIONS_NOM)
 
         # Faire le rapport
@@ -194,7 +194,7 @@ class ProcessusSommaireRSS(MGProcessusTransaction):
         collection_rapports = self.document_dao.get_collection(RapportsConstantes.COLLECTION_DOCUMENTS_NOM)
         collection_rapports.update_one(filtre, operations, upsert=True)
 
-        self._logger.debug("Previsions: %s" % str(operation_set))
+        self.__logger.debug("Previsions: %s" % str(operation_set))
 
         self.set_etape_suivante()
 

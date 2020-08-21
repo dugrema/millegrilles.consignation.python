@@ -986,7 +986,7 @@ class MGProcessus:
         self._tokens_connectes = None
         self._messages_a_transmettre = list()
 
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     '''
     Utilise le message pour identifier l'etape courante qui doit etre executee. 
@@ -1130,14 +1130,14 @@ class MGProcessus:
                 # self._logger.debug("Continuer %s" % self.parametres['_id-transaction'])
                 self.transmettre_message_etape_suivante(resultat)
             elif self._ajouter_token_attente is not None:
-                self._logger.debug("Verifier si continuer/resumer %s" % self.parametres.get('_id-transaction'))
+                self.__logger.debug("Verifier si continuer/resumer %s" % self.parametres.get('_id-transaction'))
                 self.transmettre_message_verifier_resumer()
 
             # Verifier s'il faut avertir d'autres processus que le traitement de l'etape est complete
             if self._evenement.get('resumer_token') is not None:
                 info_tokens_resume = self._evenement['resumer_token']
                 id_document_processus = info_tokens_resume.get('processus')
-                self._logger.debug("Transmission message terminer processus resumer tokens %s" % id_document_processus)
+                self.__logger.debug("Transmission message terminer processus resumer tokens %s" % id_document_processus)
                 self._controleur.transmettre_message_continuer(
                     id_document_processus,
                     {'processus': id_document_processus, 'tokens': info_tokens_resume.get('tokens')}
@@ -1158,7 +1158,7 @@ class MGProcessus:
                 raise eei
 
         except ErreurOptimisticLocking:
-            self._logger.info("Echec optimistic locking, on abandonne le travail pour cette thread")
+            self.__logger.info("Echec optimistic locking, on abandonne le travail pour cette thread")
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
@@ -1234,7 +1234,7 @@ class MGProcessus:
                     transaction_resumer = controleur.consommer_transaction_resumer(token)
                     if transaction_resumer:
                         uuid_transaction_resumer = transaction_resumer[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-                        self._logger.debug("Resumer transaction apres attente : %s" % uuid_transaction_resumer)
+                        self.__logger.debug("Resumer transaction apres attente : %s" % uuid_transaction_resumer)
                         controleur.traiter_transaction_wrapper(transaction_resumer)
 
             # if self._ajouter_token_resumer is not None:
@@ -1347,24 +1347,24 @@ class MGProcessus:
         :param token:
         :return:
         """
-        self._logger.debug("Charger transaction par token %s" % token)
+        self.__logger.debug("Charger transaction par token %s" % token)
         tokens = self._document_processus.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_TOKEN_CONNECTES)
         if tokens is not None:
             id_processus_connecte = tokens.get(token)
-            self._logger.debug("id processus connecte %s" % id_processus_connecte)
+            self.__logger.debug("id processus connecte %s" % id_processus_connecte)
             if id_processus_connecte is not None:
-                self._logger.debug("Chargement de la transaction connectee via processus %s: %s" % (
+                self.__logger.debug("Chargement de la transaction connectee via processus %s: %s" % (
                     token, str(id_processus_connecte)))
                 nom_collection_processus = self.get_collection_processus_nom()
                 collection_processus = self.controleur.document_dao.get_collection(nom_collection_processus)
                 processus_connecte = collection_processus.find_one({'_id': id_processus_connecte})
 
-                self._logger.debug("Chargement processus connecte: %s" % str(processus_connecte))
+                self.__logger.debug("Chargement processus connecte: %s" % str(processus_connecte))
 
                 # Obtenir l'_id de la transaction
                 id_transaction_connectee = processus_connecte[
                     Constantes.PROCESSUS_DOCUMENT_LIBELLE_PARAMETRES][Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
-                self._logger.debug("ID Transaction connectee: %d" % id_transaction_connectee)
+                self.__logger.debug("ID Transaction connectee: %d" % id_transaction_connectee)
                 id_transaction_connectee = ObjectId(id_transaction_connectee)
 
                 nom_collection_transaction = self.get_collection_transaction_nom()

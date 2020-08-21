@@ -1571,7 +1571,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         transaction = self.charger_transaction()
 
         # Vierifier si le document de fichier existe deja
-        self._logger.debug("Fichier existe, on ajoute une version")
+        self.__logger.debug("Fichier existe, on ajoute une version")
 
         fuuid = transaction['fuuid']
         document_uuid = transaction.get('documentuuid')  # Represente la collection, si present
@@ -1920,7 +1920,7 @@ class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite
 
         # Eliminer doublons
         etiquettes = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
-        self._logger.error("Etiquettes: %s" % etiquettes)
+        self.__logger.error("Etiquettes: %s" % etiquettes)
 
         self._controleur.gestionnaire.maj_etiquettes(uuid_fichier, ConstantesGrosFichiers.LIBVAL_FICHIER, etiquettes)
 
@@ -2144,7 +2144,7 @@ class ProcessusTransactionFigerCollection(ProcessusGrosFichiersActivite):
         # Creer le URL pour le tracker torrent
         commande['trackers'] = self.__url_trackers()
 
-        self._logger.info("Commande creation torrent:\n%s" % str(commande))
+        self.__logger.info("Commande creation torrent:\n%s" % str(commande))
         self.ajouter_commande_a_transmettre('commande.torrent.creerNouveau', commande)
 
         token_attente_torrent = 'collection_figee_torrent:%s' % parametres['uuid_collection_figee']

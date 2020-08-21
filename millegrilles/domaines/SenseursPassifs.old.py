@@ -945,13 +945,13 @@ class ProcessusChangementAttributSenseur(ProcessusMAJSenseurPassif):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
+        self.__logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document = collection_transactions.find_one_and_update(filtre, valeurs)
 
         if document is None:
             message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self._logger.error(message_erreur)
+            self.__logger.error(message_erreur)
             raise AssertionError(message_erreur)
 
         self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
@@ -994,12 +994,12 @@ class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
+        self.__logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
         document = collection_documents.find_one_and_update(filtre, valeurs)
 
         if document is None:
             message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self._logger.error(message_erreur)
+            self.__logger.error(message_erreur)
             raise AssertionError(message_erreur)
 
         liste_cles = dict()
@@ -1016,7 +1016,7 @@ class ProcessusSupprimerSenseur(ProcessusMAJSenseurPassif):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        self._logger.debug("Application supression sur dashboard vitrine: %s = %s" % (str(filtre), str(valeurs)))
+        self.__logger.debug("Application supression sur dashboard vitrine: %s = %s" % (str(filtre), str(valeurs)))
         document = collection_documents.find_one_and_update(filtre, valeurs)
 
         self.set_etape_suivante()  # Termine
@@ -1042,13 +1042,13 @@ class ProcessusMajManuelle(ProcessusMAJSenseurPassif):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        self._logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
+        self.__logger.debug("Application des changements de la transaction: %s = %s" % (str(filtre), str(valeurs)))
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
         document = collection_transactions.find_one_and_update(filtre, valeurs)
 
         if document is None:
             message_erreur = "Mise a jour echoue sur document SenseurPassif %s" % str(filtre)
-            self._logger.error(message_erreur)
+            self.__logger.error(message_erreur)
             raise AssertionError(message_erreur)
 
         self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
