@@ -5,7 +5,7 @@ import traceback
 import argparse
 import logging
 import random
-import socket
+import shutil
 import sys
 import datetime
 import os
@@ -28,6 +28,7 @@ from millegrilles.util.Daemon import Daemon
 
 
 FORMAT_TIMESTAMP_FICHIER = '%Y%m%d%H%M'
+FORMAT_TIMESTAMP_MOIS = '%Y%m'
 
 
 class DemarreurNoeud(Daemon):
@@ -490,6 +491,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
             # Sauvegarder la transaction
             timestamp = app['timestamp']
             timestamp_fmt = timestamp.strftime(FORMAT_TIMESTAMP_FICHIER)
+            timestamp_mois = timestamp.strftime(FORMAT_TIMESTAMP_MOIS)
 
             # Remplacer instance timestamp pour int (pour sauvegarder en json)
             app['timestamp'] = int(timestamp.timestamp())
@@ -504,8 +506,14 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
             uuid_senseur = key.split('/')[0]
             type_senseur = key.split('/')[1]
             type_lecture = key.split('/')[2]
+            try:
+                os.mkdir(os.path.join(self._data_path, timestamp_mois), 0o755)
+            except FileExistsError:
+                pass  # Ok
+
             nom_fichier_transaction = os.path.join(
                 self._data_path,
+                timestamp_mois,
                 'transaction_%s_%s_%s_%s.json.xz' % (uuid_senseur, type_senseur, type_lecture, timestamp_fmt)
             )
 
