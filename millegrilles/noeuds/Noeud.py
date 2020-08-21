@@ -5,13 +5,14 @@ import traceback
 import argparse
 import logging
 import random
-import shutil
+import threading
 import sys
 import datetime
 import os
 import json
 import lzma
 import signal
+import time
 
 from threading import Event, Thread
 from typing import Optional
@@ -150,6 +151,7 @@ class DemarreurNoeud(Daemon):
         Daemon.restart(self)
 
     def exit_gracefully(self, signum=None, frame=None):
+        self._logger.info("Fermer noeud, signal: %d" % signum)
         self.fermer()
 
     def on_channel_open(self, channel):
@@ -176,8 +178,12 @@ class DemarreurNoeud(Daemon):
         self._logger.info("Demarrage Daemon")
         self.setup_modules()
 
+        code_retour = 0
+
         if self._chargement_reussi:
             self._stop_event.clear()  # Permettre de bloquer sur le stop_event.
+        else:
+            code_retour = 2  # Erreur connexion a MQ
 
         while not self._stop_event.is_set():
             # Faire verifications de fonctionnement, watchdog, etc...
@@ -189,6 +195,12 @@ class DemarreurNoeud(Daemon):
             # Sleep
             self._stop_event.wait(self._intervalle_entretien)
         self._logger.info("Fin execution Daemon")
+
+        self._logger.info("Main terminee, finalisation et sortie.")
+        try:
+            self.__finalisation()
+        finally:
+            sys.exit(code_retour)
 
     def setup_modules(self):
         # Charger la configuration et les DAOs
@@ -270,7 +282,7 @@ class DemarreurNoeud(Daemon):
         if not self._thread_transactions or not self._thread_transactions.is_alive():
             # Demarrer une thread pour produire les fichiers de transactions et les soumettre
             self._thread_transactions = Thread(
-                name="transactions", target=self._producteur_transaction.generer_transactions)
+                name="transactions", target=self._producteur_transaction.generer_transactions, daemon=True)
             self._thread_transactions.start()
 
     ''' Verifie s'il y a un backlog, tente de reconnecter au message_dao et transmettre au besoin. '''
@@ -300,6 +312,21 @@ class DemarreurNoeud(Daemon):
                 self._logger.warning("Erreur traitement backlog, on push le message: %s" % str(e))
                 self._backlog_messages.append(message)
                 traceback.print_exc()
+
+    def __finalisation(self):
+        time.sleep(0.2)
+
+        if threading.active_count() > 1:
+            ok_threads = ['MainThread', 'pymongo_kill_cursors_thread']
+            for thread in threading.enumerate():
+                if thread.name not in ok_threads:
+                    self._logger.error("Thread ouverte apres demande de fermeture: %s" % thread.name)
+
+            time.sleep(5)
+            for thread in threading.enumerate():
+                if thread.name not in ok_threads:
+                    if not thread.isDaemon():
+                        self._logger.warning("Non-daemon thread encore ouverte apres demande de fermeture: %s" % thread.name)
 
     @property
     def contexte(self):
@@ -348,7 +375,7 @@ class DummySenseurs:
         self._stop_event.clear()
 
         # Demarrer thread
-        self._thread = Thread(target=self.run)
+        self._thread = Thread(name="DummySenseurs", target=self.run, daemon=True)
         self._thread.start()
 
     def fermer(self):
@@ -559,6 +586,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         os.write(self._fp_buffer, evenement)
 
         return enveloppe
+
 
 # **** MAIN ****
 def main():
