@@ -332,6 +332,24 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def supprimer_application_blynk(self):
+        commande = {
+            'nom_application': 'blynk',
+            'configuration': blynk_app,
+        }
+        domaineAction = 'commande.servicemonitor.%s.%s' % (uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
@@ -340,6 +358,7 @@ class MessagesSample(BaseCallback):
         # self.installer_application_senseurspassifs()
         # self.supprimer_application_senseurspassifs()
         self.installer_application_blynk()
+        # self.supprimer_application_blynk()
 
 
 # --- MAIN ---

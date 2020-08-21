@@ -483,8 +483,10 @@ class GestionnaireModulesDocker:
         filtre = {'name': config_name}
         configs = self.__docker.configs
         config_existante = configs.list(filters=filtre)
-        if len(config_existante) == 1:
-            config_existante[0].remove()
+        if len(config_existante) > 0:
+            for conf in config_existante:
+                if conf.name == config_name:
+                    conf.remove()
 
         if isinstance(data, dict):
             data_string = json.dumps(data).encode('utf-8')
