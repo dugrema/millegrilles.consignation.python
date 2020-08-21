@@ -48,12 +48,112 @@ sample_app_1 = {
                     }
                 ],
                 "network": "millegrille_net",
-                #"devices": [
+                # "devices": [
                 #    "/dev/sda:/dev/sda:rwm"
-                #],
+                # ],
                 "privileged": True,
                 # "restart_policy": {"Name": "always", "MaximumRetryCount": 10}
                 "restart_policy": {"Name": "on-failure", "MaximumRetryCount": 3}
+            }
+        }
+    ]
+}
+
+blynk_app = {
+    "nom": "blynk",
+    "registries": [
+        "docker.maceroc.com",
+        "dugremat"
+    ],
+    "images": {
+        "blynk": {
+            "image": "mg_blynk",
+            "version": "0.41.10_2"
+        },
+        "blynk_client": {
+            "registries": [""],
+            "image": "alpine",
+            "version": "latest"
+        }
+    },
+    "dependances": [
+        {
+            "image": "blynk",
+            "config": {
+                "name": "blynk",
+                "constraints": [
+                    "node.labels.millegrilles.app.blynk == true"
+                ],
+                "env": [
+                    "SERVER_SSL_KEY=/run/secrets/webkey.pem",
+                    "SERVER_SSL_CERT=/run/secrets/webcert.pem"
+                ],
+                "configs": [
+                    {
+                        "name": "pki.nginx.cert",
+                        "filename": "/run/secrets/webcert.pem"
+                    }
+                ],
+                "secrets": [
+                    {
+                        "name": "pki.nginx.key",
+                        "filename": "webkey.pem"
+                    }
+                ],
+                "mounts": [
+                    "blynk_data:/blynk/data:rw"
+                ],
+                "endpoint_spec": {
+                    "mode": "vip",
+                    "ports": [{
+                        "published_port": 9444,
+                        "target_port": 9443,
+                        "protocol": "tcp",
+                        "publish_mode": "host"
+                    }]
+                },
+                "networks": [{
+                    "target": "millegrille_net"
+                }],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "resources": {
+                    "cpu_limit": 1000000000,
+                    "mem_limit": 100000000
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                }
+            }
+        },
+        {
+            "image": "blynk_client",
+            "command": "/bin/sleep 10000",
+            "etape_seulement": True,
+            "backup": {
+                "base_path": "/tmp/backup"
+            },
+            "config": {
+                "name": "blynk_client",
+                "constraints": [
+                    "node.labels.millegrilles.app.blynk == true"
+                ],
+                "mounts": [
+                    "blynk_data:/tmp/backup/data:rw"
+                ],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "resources": {
+                    "cpu_limit": 1000000000,
+                    "mem_limit": 50000000
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                }
             }
         }
     ]
@@ -77,7 +177,7 @@ senseurspassifs_app = {
             "container_mode": True,
             "injecter_clecert": "/run/secrets",
             "config": {
-                "command": ["python3", "-m", "mgraspberry.raspberrypi.Demarreur",  "--rf24master",  "--dummy", "nofork"],
+                "command": ["python3", "-m", "mgraspberry.raspberrypi.Demarreur", "--rf24master", "--dummy", "nofork"],
                 # "command": ["sleep", "10000"],
                 "name": "senseurspassifs_rpi",
                 "environment": [
@@ -104,6 +204,7 @@ senseurspassifs_app = {
     ]
 }
 
+uuid_service_monitor = 'ba2d8f29-35fd-4f37-acd0-6b4034b0fe23'
 
 class MessagesSample(BaseCallback):
 
@@ -213,13 +314,32 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def installer_application_blynk(self):
+        commande = {
+            'nom_application': 'blynk',
+            'configuration': blynk_app,
+        }
+        domaineAction = 'commande.servicemonitor.%s.%s' % (uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
         # self.installer_application_protege_dummy()
         # self.supprimer_application_protege_dummy()
-        self.installer_application_senseurspassifs()
+        # self.installer_application_senseurspassifs()
         # self.supprimer_application_senseurspassifs()
+        self.installer_application_blynk()
 
 
 # --- MAIN ---

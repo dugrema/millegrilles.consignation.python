@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
-from millegrilles.util.IdmgUtil import IdmgUtil
+from ipaddress import IPv4Address, IPv6Address
 
 import datetime
 import secrets
@@ -13,6 +13,7 @@ import logging
 import base58
 
 from millegrilles import Constantes
+from millegrilles.util.IdmgUtil import IdmgUtil
 from millegrilles.SecuritePKI import ConstantesSecurityPki
 
 
@@ -1090,6 +1091,14 @@ class GenererMonitor(GenerateurNoeud):
             critical=False
         )
 
+        liste_dns = [
+            x509.DNSName(u'%s' % self._common_name),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
         return builder
 
 
@@ -1138,9 +1147,7 @@ class GenererMQ(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'mq'),
-            x509.DNSName(u'mq-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
         ]
 
         # Ajouter la liste des domaines publics recus du CSR
@@ -1150,7 +1157,6 @@ class GenererMQ(GenerateurNoeud):
         # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
         if self._common_name != 'mg-%s' % self._idmg:
             liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         # Ajouter noms DNS valides pour MQ
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -1172,15 +1178,12 @@ class GenererMongo(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'mongo'),
-            x509.DNSName(u'mongo-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
         ]
 
         # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
         if self._common_name != 'mg-%s' % self._idmg:
             liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         if self._domaines_publics is not None:
             for domaine in self._domaines_publics:
@@ -1214,17 +1217,13 @@ class GenererWebProtege(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
             x509.DNSName(u'coupdoeil-%s' % self._idmg),
-            x509.DNSName(u'coupdoeil-%s.local' % self._idmg),
         ]
 
         if self._domaines_publics is not None:
             for domaine in self._domaines_publics:
                 liste_dns.append(x509.DNSName(u'%s' % domaine))
-                liste_dns.append(x509.DNSName(u'coupdoeil.%s' % domaine))
 
         # Ajouter noms DNS valides pour CoupDoeil
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -1253,17 +1252,13 @@ class GenererWebPrive(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
             x509.DNSName(u'coupdoeil-%s' % self._idmg),
-            x509.DNSName(u'coupdoeil-%s.local' % self._idmg),
         ]
 
         if self._domaines_publics is not None:
             for domaine in self._domaines_publics:
                 liste_dns.append(x509.DNSName(u'%s' % domaine))
-                liste_dns.append(x509.DNSName(u'coupdoeil.%s' % domaine))
 
         # Ajouter noms DNS valides pour CoupDoeil
         builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
@@ -1293,7 +1288,6 @@ class GenererWebPublic(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'www'),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
         ]
 
         if self._domaines_publics is not None:
@@ -1328,7 +1322,6 @@ class GenererFichiers(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'fichiers'),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
         ]
 
         # Ajouter noms DNS valides pour MQ
@@ -1351,9 +1344,7 @@ class GenererMongoexpress(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'mongoxp'),
-            x509.DNSName(u'mongoxp-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
         ]
 
         # # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
@@ -1381,15 +1372,14 @@ class GenererNginx(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'www'),
-            x509.DNSName(u'www-%s.local' % self._idmg),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
         ]
 
         # Si le CN == mg-idmg, on n'a pas besoin d'ajouter cette combinaison (identique)
         if self._common_name != 'mg-%s' % self._idmg:
             liste_dns.append(x509.DNSName(u'mg-%s' % self._idmg))
-            liste_dns.append(x509.DNSName(u'mg-%s.local' % self._idmg))
 
         if self._domaines_publics is not None:
             for domaine in self._domaines_publics:
@@ -1581,7 +1571,6 @@ class GenererHebergementFichiers(GenerateurNoeud):
             x509.DNSName(u'heb_fichiers'),
             x509.DNSName(u'fichiers'),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'%s.local' % self._common_name),
         ]
 
         # Ajouter noms DNS valides pour MQ
