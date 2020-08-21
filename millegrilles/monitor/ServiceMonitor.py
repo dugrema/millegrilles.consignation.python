@@ -35,6 +35,7 @@ from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
 
+
 class InitialiserServiceMonitor:
 
     def __init__(self):
@@ -447,6 +448,25 @@ class ServiceMonitor:
 
     def ajouter_compte(self, certificat: str):
         raise NotImplementedError()
+
+    def regenerer_certificat(self, role: str, common_name: str, nomcle: str = None):
+        """
+        Verifie si le certificat existe et est valide - le regenere au besoin
+        :param role:
+        :param common_name:
+        :return:
+        """
+        if nomcle is None:
+            nomcle = role
+
+        certificat_courant = None
+        try:
+            certificat_courant = self.gestionnaire_docker.charger_config_recente('pki.%s.cert' % nomcle)
+        except AttributeError:
+            pass
+        if certificat_courant is None:
+            # Le certificat n'existe pas, on va le creer
+            clecert = self._gestionnaire_certificats.generer_clecert_module(role, common_name, nomcle)
 
     @property
     def noeud_id(self) -> str:

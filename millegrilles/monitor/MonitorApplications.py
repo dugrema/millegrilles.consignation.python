@@ -14,8 +14,9 @@ from docker.errors import APIError
 
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes
-from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker
+from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, PkiCleNonTrouvee
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution
+from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
 
 class GestionnaireApplications:
@@ -180,27 +181,16 @@ class GestionnaireApplications:
                     mots_de_passe[label_motdepasse] = motdepasse.decode('utf-8')
                     self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse, ajouter_date=True)
 
-        # Preparer le demarrage du service, intercepter le demarrage du container
-        module_name = config_elem['name']
-        self.__wait_container_event.clear()
-        nom_image_docker = config_image['image']
         try:
-            if config_image.get('container_mode'):
-                self.__wait_start_container_name = nom_container_docker
-                self.__gestionnaire_modules_docker.demarrer_container(nom_container_docker,
-                                                                      nom_image=nom_image_docker,
-                                                                      config=config_elem,
-                                                                      images=gestionnaire_images_applications)
-            else:
-                self.__wait_start_service_name = module_name
-                self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
-                                                                    config=config_elem,
-                                                                    images=gestionnaire_images_applications)
-
-            self.__wait_container_event.wait(60)
-        finally:
-            self.__wait_start_service_name = None  # Reset ecoute de l'evenement
-            self.__wait_start_container_name = None  # Reset ecoute de l'evenement
+            self.demarrer_application(config_elem, config_image, gestionnaire_images_applications, nom_container_docker)
+        except PkiCleNonTrouvee:
+            # La cle n'a pas ete trouvee, tenter de generer la cle/certificat et reessayer
+            self.__service_monitor.regenerer_certificat(
+                ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE,
+                nom_container_docker,
+                nomcle=nom_container_docker or config_elem['name']
+            )
+            self.demarrer_application(config_elem, config_image, gestionnaire_images_applications, nom_container_docker)
 
         if self.__wait_container_event.is_set():
             self.__logger.info("Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
@@ -226,6 +216,29 @@ class GestionnaireApplications:
             # C'est un service intermediaire pour l'installation/backup
             # On supprime le service maintenant que la tache est terminee
             self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
+
+    def demarrer_application(self, config_elem, config_image, gestionnaire_images_applications, nom_container_docker):
+        # Preparer le demarrage du service, intercepter le demarrage du container
+        module_name = config_elem['name']
+        self.__wait_container_event.clear()
+        nom_image_docker = config_image['image']
+        try:
+            if config_image.get('container_mode'):
+                self.__wait_start_container_name = nom_container_docker
+                self.__gestionnaire_modules_docker.demarrer_container(nom_container_docker,
+                                                                      nom_image=nom_image_docker,
+                                                                      config=config_elem,
+                                                                      images=gestionnaire_images_applications)
+            else:
+                self.__wait_start_service_name = module_name
+                self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
+                                                                    config=config_elem,
+                                                                    images=gestionnaire_images_applications)
+
+            self.__wait_container_event.wait(60)
+        finally:
+            self.__wait_start_service_name = None  # Reset ecoute de l'evenement
+            self.__wait_start_container_name = None  # Reset ecoute de l'evenement
 
     def effectuer_desinstallation(self, nom_image_docker, configuration_docker):
 

@@ -1414,6 +1414,41 @@ class GenererNoeudPrive(GenerateurNoeud):
         return builder
 
 
+class GenererApplicationPrivee(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_exchanges = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = (','.join([Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]).encode('utf-8'))
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_exchanges, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'%s' % self._common_name),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
 class GenererHebergementTransactions(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
@@ -1751,6 +1786,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
             ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT: GenererMonitorDependant,
             ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE: GenererNoeudPrive,
+            ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE: GenererApplicationPrivee,
 
             # Hebergement
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,

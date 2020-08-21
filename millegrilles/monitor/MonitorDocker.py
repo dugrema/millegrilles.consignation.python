@@ -519,7 +519,7 @@ class GestionnaireModulesDocker:
                 break
 
         if len(secrets) == 0:
-            raise ValueError("Secret non trouve : %s" % secret_name)
+            raise PkiCleNonTrouvee("Secret non trouve : %s" % secret_name)
 
         # Trouver la configuration la plus recente (par date). La meme date va etre utilise pour un secret, au besoin
         date_secret: int = cast(int, None)
@@ -1089,3 +1089,6 @@ class GestionnaireImagesServices(GestionnaireImagesDocker):
             self.__logger.error(
                 "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")
 
+
+class PkiCleNonTrouvee(Exception):
+    pass

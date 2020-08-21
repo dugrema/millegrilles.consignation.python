@@ -90,13 +90,13 @@ blynk_app = {
                 ],
                 "configs": [
                     {
-                        "name": "pki.nginx.cert",
+                        "name": "pki.blynk.cert",
                         "filename": "/run/secrets/webcert.pem"
                     }
                 ],
                 "secrets": [
                     {
-                        "name": "pki.nginx.key",
+                        "name": "pki.blynk.key",
                         "filename": "webkey.pem"
                     }
                 ],
@@ -106,7 +106,7 @@ blynk_app = {
                 "endpoint_spec": {
                     "mode": "vip",
                     "ports": [{
-                        "published_port": 9444,
+                        "published_port": 9443,
                         "target_port": 9443,
                         "protocol": "tcp",
                         "publish_mode": "host"
@@ -204,7 +204,7 @@ senseurspassifs_app = {
     ]
 }
 
-uuid_service_monitor = 'ba2d8f29-35fd-4f37-acd0-6b4034b0fe23'
+uuid_service_monitor = 'e94d95ba-d193-46bf-ad0d-6abc8e21fcd4'
 
 class MessagesSample(BaseCallback):
 

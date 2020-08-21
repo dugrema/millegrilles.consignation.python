@@ -400,7 +400,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
         self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
-    def generer_clecert_module(self, role: str, common_name: str) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None) -> EnveloppeCleCert:
+        if nomcle is None:
+            nomcle = role
+
         clecert = self.__renouvelleur.renouveller_par_role(role, common_name)
         chaine = list(clecert.chaine)
         chaine_certs = '\n'.join(chaine)
@@ -413,8 +416,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             secret_str.extend(clecert.chaine)
             secret = '\n'.join(secret_str).encode('utf-8')
 
-        self.ajouter_secret('pki.%s.key' % role, secret)
-        self.ajouter_config('pki.%s.cert' % role, chaine_certs.encode('utf-8'))
+        self.ajouter_secret('pki.%s.key' % nomcle, secret)
+        self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'))
 
         return clecert
 
