@@ -453,6 +453,7 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                                     'avg': None,
                                     'max': valeur,
                                     'min': valeur,
+                                    'senseur': type,
                                     'type': lecture['type'],
                                     'uuid_senseur': uuid_senseur,
                                     'noeud_id': noeud_id,
@@ -467,9 +468,9 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                                 lectures['min'] = valeur
 
                             appareils_heure_dict[cle] = lectures
-                    else:
-                        # Le fichier contient des evenements de l'heure courante, on ne le supprime pas
-                        conserver_fichier.append(nom_fichier)
+                        else:
+                            # Le fichier contient des evenements de l'heure courante, on ne le supprime pas
+                            conserver_fichier.append(nom_fichier)
 
         # Calculer la moyenne de chaque transaction et soumettre les transactions
         for key, app in appareils_heure_dict.items():
