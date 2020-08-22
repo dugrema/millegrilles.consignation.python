@@ -153,9 +153,21 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def transmettre_maj_senseur(self):
+        transaction = {
+            "uuid_senseur": "7a2764fa-c457-4f25-af0d-0fc915439b21",
+            "securite": "2.prive",
+            "senseurs": {"dummy/humidite": {"blynk_vpin": None}},
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def executer(self):
         # sample.transmettre_transaction_lecture()
-        sample.transmettre_maj_noeud()
+        # sample.transmettre_maj_noeud()
+        sample.transmettre_maj_senseur()
 
 
 # --- MAIN ---

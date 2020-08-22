@@ -573,6 +573,18 @@ class ProcessusMajSenseur(ProcessusSenseursPassifs):
             if key not in filtre.keys():
                 set_ops[key] = value
 
+        # Formatter les modifications de la collection de senseurs au besoin
+        senseurs = set_ops.get('senseurs')
+        if senseurs:
+            del set_ops['senseurs']  # Applatir toutes operations sur senseurs
+            senseurs = dict(senseurs)
+            # Derouler toutes les collections sous forme de cle (e.g. 'senseurs.dummy.valeur'}
+            for cle1, valeur1 in senseurs.items():
+                if isinstance(valeur1, dict):
+                    for cle2, valeur2 in valeur1.items():
+                        cle_totale = '.'.join(['senseurs', cle1, cle2])
+                        set_ops[cle_totale] = valeur2
+
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
         }

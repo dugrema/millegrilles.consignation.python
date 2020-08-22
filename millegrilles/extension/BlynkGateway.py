@@ -201,7 +201,8 @@ class GatewayBlynk:
         self.configurer_gateway(noeud_doc)
 
     def maj_senseur(self, message_dict: dict):
-        pass
+        uuid_senseur = message_dict[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+
 
     @property
     def contexte(self):
