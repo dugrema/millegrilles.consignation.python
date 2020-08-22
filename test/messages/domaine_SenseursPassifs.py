@@ -157,7 +157,7 @@ class MessagesSample(BaseCallback):
         transaction = {
             "uuid_senseur": "7a2764fa-c457-4f25-af0d-0fc915439b21",
             "securite": "2.prive",
-            "senseurs": {"dummy/humidite": {"blynk_vpin": None}},
+            "senseurs": {"dummy/humidite": {"blynk_vpin": 2}},
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR,
