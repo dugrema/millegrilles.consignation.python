@@ -202,7 +202,57 @@ class GatewayBlynk:
 
     def maj_senseur(self, message_dict: dict):
         uuid_senseur = message_dict[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
+        noeud_id = message_dict.get('noeud_id')
+        senseurs = message_dict.get('senseurs')
 
+        if senseurs:
+            # Faire copie du mapping pour eviter erreurs de mutation
+            copie_devicemapping = dict(self._senseur_devicevpin)
+
+            # S'assurer d'avoir le noeudid, le charger de la base de donnees au besoin
+            if noeud_id is None:
+                collection = self._contexte.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+                senseur_doc = collection.find_one({
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
+                    SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
+                })
+                noeud_id = senseur_doc[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+
+            blynk_gateway = self._blynk_devices.get(noeud_id)
+
+            for type_senseur, valeur in senseurs.items():
+                vpin = valeur.get('blynk_vpin')
+
+                cle_senseur = '/'.join([uuid_senseur, type_senseur])
+                mapping_senseur = copie_devicemapping.get(cle_senseur)
+
+                if vpin and mapping_senseur:
+                    # Verifier s'il y a un changement de vpin
+                    if vpin != mapping_senseur.get('vpin'):
+                        # Changement de vpin
+                        mapping_senseur = {
+                            'vpin': vpin,
+                            'noeud_id': noeud_id
+                        }
+                        copie_devicemapping[cle_senseur] = mapping_senseur
+                        if blynk_gateway:
+                            blynk_gateway.enregistrer_read(vpin)
+                elif mapping_senseur:
+                    # Desactiver vpin pour senseur
+                    del copie_devicemapping[cle_senseur]
+                    blynk_gateway.desactiver_vpin(mapping_senseur.get('vpin'))
+                elif vpin:
+                    # Creer mapping pour vpin
+                    mapping_senseur = {
+                        'vpin': vpin,
+                        'noeud_id': noeud_id
+                    }
+                    copie_devicemapping[cle_senseur] = mapping_senseur
+                    if blynk_gateway:
+                        blynk_gateway.enregistrer_read(vpin)
+
+            # Appliquer changements au mapping
+            self._senseur_devicevpin = copie_devicemapping
 
     @property
     def contexte(self):
@@ -258,6 +308,11 @@ class GatewayNoeud:
         self.__cache_valeurs[str(v_pin)] = val
         if self._blynk.connected():
             self._blynk.virtual_write(v_pin, val)
+
+    def desactiver_vpin(self, v_pin):
+        del self.__cache_valeurs[str(v_pin)]
+        if self._blynk.connected():
+            self._blynk.virtual_write(v_pin, ' ')
 
     def enregistrer_read(self, v_pin):
         blynk = self._blynk
