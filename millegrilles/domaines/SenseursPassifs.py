@@ -170,8 +170,18 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         self.__handler_commandes_noeuds = super().get_handler_commandes()
         self.__handler_commandes_noeuds[Constantes.SECURITE_SECURE] = TraitementCommandeSenseursPassifs(self)
 
+        self.__gateway_blynk = None
+
     def configurer(self):
         super().configurer()
+
+        # Section hook pour Blynk (optionnel)
+        try:
+            from millegrilles.extension.BlynkGateway import GatewayBlynk
+            self.__gateway_blynk = GatewayBlynk(self._contexte)
+            self.__gateway_blynk.configurer()
+        except ImportError:
+            self.__gateway_blynk = False
 
         # Ajouter les index dans la collection de transactions
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_TRANSACTIONS_NOM)
@@ -232,9 +242,17 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             SenseursPassifsConstantes.DOCUMENT_DEFAUT_VITRINE_DASHBOARD
         )
 
+        if self.__gateway_blynk:
+            self.__gateway_blynk.start()
+
         # self.demarrer_watcher_collection(
         #     SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS,
         #     SenseursPassifsExchangeRouter(self._contexte))
+
+    def arreter(self):
+        super().arreter()
+        if self.__gateway_blynk:
+            self.__gateway_blynk.fermer()
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
@@ -648,3 +666,4 @@ class ProcessusMajNoeud(ProcessusSenseursPassifs):
 
         # self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
         self.set_etape_suivante()  # Termine
+
