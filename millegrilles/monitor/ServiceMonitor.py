@@ -1215,13 +1215,20 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             nouveau_secrets_monitor_ajoutes = True
 
         # if nouveau_secrets_monitor_ajoutes:
-        if nouveau_secrets_monitor_ajoutes and not self._args.dev:
-            # Besoin reconfigurer le service pour ajouter les secrets et redemarrer
-            self._gestionnaire_docker.configurer_monitor()
+        if nouveau_secrets_monitor_ajoutes:
+            try:
+                # Besoin reconfigurer le service pour ajouter les secrets et redemarrer
+                self._gestionnaire_docker.configurer_monitor()
 
-            # Redemarrer / reconfigurer le monitor
-            self.__logger.info("Configuration completee, redemarrer le monitor")
-            raise ForcerRedemarrage("Redemarrage")
+                # Redemarrer / reconfigurer le monitor
+                self.__logger.info("Configuration completee, redemarrer le monitor")
+                if not self._args.dev:
+                    raise ForcerRedemarrage("Redemarrage")
+            except ValueError as ve:
+                if not self._args.dev:
+                    raise ve
+                else:
+                    self.__logger.warning("Erreur valeur monitor : %s" % ve)
 
     def initialiser_domaine(self, commande):
         params = commande.contenu
@@ -1419,6 +1426,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         information_systeme = super()._get_info_noeud()
         information_systeme['csr'] = self.csr_intermediaire.decode('utf-8')
         return information_systeme
+
 
 class ServiceMonitorExtension(ServiceMonitor):
     """

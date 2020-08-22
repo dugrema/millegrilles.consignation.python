@@ -158,8 +158,8 @@ class GestionnaireModulesDocker:
 
         liste_secrets = list()
         for nom_secret, nom_fichier in noms_secrets.items():
-            self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
             try:
+                self.__logger.debug("Preparer secret %s pour service monitor", nom_secret)
                 secret_reference = self.trouver_secret(nom_secret)
                 secret_reference['filename'] = nom_fichier
                 secret_reference['uid'] = 0
@@ -169,8 +169,8 @@ class GestionnaireModulesDocker:
                 del secret_reference['date']
 
                 liste_secrets.append(SecretReference(**secret_reference))
-            except ValueError as ve:
-                self.__logger.warning(str(ve))
+            except PkiCleNonTrouvee:
+                self.__logger.warning("Erreur chargement secret %s" % nom_secret)
 
         # network = NetworkAttachmentConfig(target='mg_net' % self.__idmg)
 
