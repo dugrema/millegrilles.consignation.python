@@ -121,7 +121,7 @@ class GatewayBlynk:
             # S'assurer que le gateway existe et est configure
             if blynk_gateway is not None:
                 # Verifier si la configuration a changee
-                blynk_gateway.update_config(blynk_auth, blynk_host, blynk_port)
+                blynk_gateway.update_config(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile)
             else:
                 blynk_gateway = GatewayNoeud(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile)
 
