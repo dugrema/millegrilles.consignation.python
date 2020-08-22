@@ -33,7 +33,7 @@ from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
-from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTrouvee
 
 
 class InitialiserServiceMonitor:
@@ -1209,7 +1209,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Verifier si la cle du monitor existe, sinon la generer
         try:
             self._gestionnaire_docker.trouver_secret('pki.monitor.key')
-        except ValueError:
+        except PkiCleNonTrouvee:
             # Creer CSR pour le service monitor
             self._gestionnaire_certificats.generer_csr('monitor', insecure=self._args.dev, generer_password=False)
             nouveau_secrets_monitor_ajoutes = True
@@ -1495,3 +1495,4 @@ if __name__ == '__main__':
 
     # ServiceMonitor().run()
     InitialiserServiceMonitor().demarrer()
+

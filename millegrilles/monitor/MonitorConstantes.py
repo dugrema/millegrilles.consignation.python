@@ -193,3 +193,7 @@ class ExceptionExecution(Exception):
     @property
     def resultat(self):
         return self.__resultat
+
+
+class PkiCleNonTrouvee(Exception):
+    pass

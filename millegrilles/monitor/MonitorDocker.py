@@ -16,7 +16,7 @@ from docker.types import SecretReference, NetworkAttachmentConfig, Resources, Re
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
-from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, CommandeMonitor
+from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
 
 
 class GestionnaireModulesDocker:
@@ -1090,7 +1090,3 @@ class GestionnaireImagesServices(GestionnaireImagesDocker):
         except IndexError:
             self.__logger.error(
                 "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")
-
-
-class PkiCleNonTrouvee(Exception):
-    pass
