@@ -10,8 +10,8 @@ import json
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles import Constantes
-from millegrilles.domaines.Principale import ConstantesPrincipale
+from millegrilles.domaines.SenseursPassifs import SenseursPassifsConstantes
+
 from threading import Thread, Event
 
 
@@ -140,8 +140,22 @@ class MessagesSample(BaseCallback):
         print("Envoi metadata: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transmettre_maj_noeud(self):
+        transaction = {
+            "noeud_id": "001a12f5-e89d-4ff8-b6ac-f2ee269b9516",
+            "securite": "2.prive",
+            "blynk_host": "blynk",
+            "blynk_port": 9443,
+            "blynk_auth": "p2ADaQx9Q6lH88jN4NK8ILdprD104xMf"
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, SenseursPassifsConstantes.TRANSACTION_MAJ_NOEUD,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def executer(self):
-        sample.transmettre_transaction_lecture()
+        # sample.transmettre_transaction_lecture()
+        sample.transmettre_maj_noeud()
 
 
 # --- MAIN ---
