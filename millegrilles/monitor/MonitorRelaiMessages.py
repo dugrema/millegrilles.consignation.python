@@ -578,6 +578,9 @@ class ConnexionMiddleware:
 
         exchange = self.exchange
 
+        # Emettre message de presence du monitor
+        self.emettre_presence()
+
         # Transmettre requete pour avoir l'etat de l'hebergement
         self.generateur_transactions.transmettre_requete(
             dict(), Constantes.ConstantesHebergement.REQUETE_MILLEGRILLES_ACTIVES,
@@ -595,6 +598,14 @@ class ConnexionMiddleware:
                 securite=exchange
             )
             self._prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
+
+    def emettre_presence(self):
+        message_presence = {
+            'noeud_id': self._service_monitor.noeud_id,
+            'securite': self._service_monitor.securite,
+        }
+        domaine_action = Constantes.ConstantesTopologie.EVENEMENT_PRESENCE_MONITOR
+        self.generateur_transactions.emettre_message(message_presence, domaine_action)
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self._service_monitor.gestionnaire_commandes

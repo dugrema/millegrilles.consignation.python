@@ -1643,7 +1643,10 @@ class ConstantesTopologie:
     LIBVAL_NOEUD = 'noeud'
 
     TRANSACTION_DOMAINE = '%s.domaine' % DOMAINE_NOM
-    TRANSACTION_NOEUD = '%s.noeud' % DOMAINE_NOM
+    TRANSACTION_MONITOR = '%s.monitor' % DOMAINE_NOM
+
+    EVENEMENT_PRESENCE_DOMAINE = 'evenement.presence.domaine'
+    EVENEMENT_PRESENCE_MONITOR = 'evenement.presence.monitor'
 
 
 class ConstantesCatalogueApplications:

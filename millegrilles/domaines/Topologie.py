@@ -203,17 +203,13 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         return ConstantesTopologie.COLLECTION_DOCUMENTS_NOM
 
     def identifier_processus(self, domaine_transaction):
-        # if domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_LECTURE:
-        #     processus = "millegrilles_domaines_SenseursPassifs:ProcessusTransactionSenseursPassifsLecture"
-        # elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR:
-        #     processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajSenseur"
-        # elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_MAJ_NOEUD:
-        #     processus = "millegrilles_domaines_SenseursPassifs:ProcessusMajNoeud"
-        # elif domaine_transaction == SenseursPassifsConstantes.TRANSACTION_DOMAINE_SUPPRESSION_SENSEUR:
-        #     processus = "millegrilles_domaines_SenseursPassifs:ProcessusSupprimerSenseur"
-        # else:
-        #     # Type de transaction inconnue, on lance une exception
-        processus = super().identifier_processus(domaine_transaction)
+        if domaine_transaction == ConstantesTopologie.TRANSACTION_DOMAINE:
+            processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterDomaine"
+        elif domaine_transaction == ConstantesTopologie.TRANSACTION_MONITOR:
+            processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterMonitor"
+        else:
+            # Type de transaction inconnue, on lance une exception
+            processus = super().identifier_processus(domaine_transaction)
 
         return processus
 
@@ -251,7 +247,7 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         }
         self.generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
-    def sauvegarder_transaction_domaine(self, transaction):
+    def traiter_transaction_domaine(self, transaction):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
 
         filter = {
@@ -272,7 +268,58 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         collection.update_one(filter, ops, upsert=True)
 
     def enregistrer_presence_monitor(self, exchange: str, evenement: dict):
-        pass
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+
+        set_ops = {
+            # 'noeud_id': evenement['noeud_id'],
+        }
+
+        filter = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'noeud_id': evenement['noeud_id'],
+        }
+
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        on_insert.update(filter)
+
+        ops = {
+            # '$set': set_ops,
+            '$setOnInsert': on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        resultat = collection.update_one(filter, ops, upsert=True)
+        if resultat.upserted_id is not None:
+            # Creer une transaction pour generer le domaine
+            self.soumettre_transaction_monitor(exchange, evenement)
+
+    def soumettre_transaction_monitor(self, exchange, evenement):
+        domaine_action = ConstantesTopologie.TRANSACTION_MONITOR
+        transaction = {
+            'noeud_id': evenement['noeud_id'],
+        }
+        self.generateur_transactions.soumettre_transaction(transaction, domaine_action)
+
+    def traiter_transaction_monitor(self, transaction):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+
+        filter = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'noeud_id': transaction['noeud_id'],
+        }
+
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        on_insert.update(filter)
+
+        ops = {
+            '$setOnInsert': on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection.update_one(filter, ops, upsert=True)
 
 
 class ProcessusTopologie(MGProcessusTransaction):
@@ -284,10 +331,7 @@ class ProcessusTopologie(MGProcessusTransaction):
         return ConstantesTopologie.COLLECTION_PROCESSUS_NOM
 
 
-class ProcessusTransactionAjouterNoeud(ProcessusTopologie):
-    """
-    Processus pour enregistrer une transaction d'un senseur passif
-    """
+class ProcessusTransactionAjouterDomaine(ProcessusTopologie):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -302,5 +346,22 @@ class ProcessusTransactionAjouterNoeud(ProcessusTopologie):
         self.__logger.debug("Document processus: %s" % self._document_processus)
         self.__logger.debug("Document transaction: %s" % transaction)
 
+        self._controleur.gestionnaire.traiter_transaction_domaine(transaction)
+
         self.set_etape_suivante()  # Terminer
 
+
+class ProcessusTransactionAjouterMonitor(ProcessusTopologie):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        self.__logger.debug("Document processus: %s" % self._document_processus)
+        self.__logger.debug("Document transaction: %s" % transaction)
+
+        self._controleur.gestionnaire.traiter_transaction_monitor(transaction)
+
+        self.set_etape_suivante()  # Terminer
