@@ -507,6 +507,8 @@ class GestionnaireDomaine:
                 exchanges_routing[exchange] = list(routing_set)
 
             info_domaine = {
+                'idmg': self.__contexte.idmg,
+                'noeud_id': self.__contexte.configuration.noeud_id,
                 'domaine': self.get_nom_domaine(),
                 'sous_domaines': None,
                 'exchanges_routing': exchanges_routing,

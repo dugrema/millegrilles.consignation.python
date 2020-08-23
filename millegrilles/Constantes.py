@@ -77,6 +77,7 @@ MONGO_DOC_ID = '_id'
 
 # Configuration MilleGrilles
 CONFIG_IDMG = 'idmg'
+CONFIG_NOEUD_ID = 'noeud_id'
 
 # Domaines
 CONFIG_DOMAINES_CONFIGURATION = 'domaines_json'
@@ -1637,6 +1638,12 @@ class ConstantesTopologie:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
+
+    LIBVAL_DOMAINE = 'domaine'
+    LIBVAL_NOEUD = 'noeud'
+
+    TRANSACTION_DOMAINE = '%s.domaine' % DOMAINE_NOM
+    TRANSACTION_NOEUD = '%s.noeud' % DOMAINE_NOM
 
 
 class ConstantesCatalogueApplications:

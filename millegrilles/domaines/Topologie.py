@@ -221,17 +221,55 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
 
         set_ops = {
+            'noeud_id': evenement['noeud_id'],
         }
-        on_insert = {
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+
+        filter = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_DOMAINE,
             'domaine': evenement['domaine'],
         }
+
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        on_insert.update(filter)
+
         ops = {
             '$set': set_ops,
             '$setOnInsert': on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
+        resultat = collection.update_one(filter, ops, upsert=True)
+        if resultat.upserted_id is not None:
+            # Creer une transaction pour generer le domaine
+            self.soumettre_transaction_domaine(exchange, evenement)
 
+    def soumettre_transaction_domaine(self, exchange, evenement):
+        domaine_action = ConstantesTopologie.TRANSACTION_DOMAINE
+        transaction = {
+            'domaine': evenement['domaine'],
+        }
+        self.generateur_transactions.soumettre_transaction(transaction, domaine_action)
+
+    def sauvegarder_transaction_domaine(self, transaction):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+
+        filter = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_DOMAINE,
+            'domaine': transaction['domaine'],
+        }
+
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        on_insert.update(filter)
+
+        ops = {
+            '$setOnInsert': on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection.update_one(filter, ops, upsert=True)
 
     def enregistrer_presence_monitor(self, exchange: str, evenement: dict):
         pass

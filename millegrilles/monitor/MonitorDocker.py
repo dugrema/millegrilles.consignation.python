@@ -661,8 +661,8 @@ class GestionnaireModulesDocker:
                 config_env = [self.__mapping(valeur) for valeur in config_env]
             else:
                 config_env = list()
-            config_env.append("NOEUD_ID=" + self.__service_monitor.noeud_id)
-            config_env.append("IDMG=" + self.__service_monitor.idmg)
+            config_env.append("MG_NOEUD_ID=" + self.__service_monitor.noeud_id)
+            config_env.append("MG_IDMG=" + self.__service_monitor.idmg)
             dict_config_docker['env'] = config_env
 
             config_env = config_service.get('environment')
