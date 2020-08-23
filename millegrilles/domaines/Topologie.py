@@ -270,11 +270,22 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
     def enregistrer_presence_monitor(self, exchange: str, evenement: dict):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
 
+        securite = evenement.get('securite')
+        if securite in [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]:
+            # Evenement de presence d'un sous-noeud, le parent est le noeud protege courant
+            parent_id = self.configuration.noeud_id
+        elif securite in [Constantes.SECURITE_PROTEGE]:
+            # Noeud protege, le parent est responsable de determiner la topologie (si un parent existe)
+            parent_id = None
+        else:
+            parent_id = None
+
         set_ops = {
-            # 'noeud_id': evenement['noeud_id'],
+            'parent_noeud_id': parent_id,
+            'securite': securite,
         }
 
-        filter = {
+        filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
             'noeud_id': evenement['noeud_id'],
         }
@@ -282,14 +293,14 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
-        on_insert.update(filter)
+        on_insert.update(filtre)
 
         ops = {
-            # '$set': set_ops,
+            '$set': set_ops,
             '$setOnInsert': on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
-        resultat = collection.update_one(filter, ops, upsert=True)
+        resultat = collection.update_one(filtre, ops, upsert=True)
         if resultat.upserted_id is not None:
             # Creer une transaction pour generer le domaine
             self.soumettre_transaction_monitor(exchange, evenement)
