@@ -44,14 +44,27 @@ class TraitementCommandeTopologie(TraitementCommandesProtegees):
         return resultat
 
 
-class TraitementEvenementsProteges(TraitementMessageDomaine):
+class TraitementEvenementsPresence(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire_domaine):
         super().__init__(gestionnaire_domaine)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def callbackAvecAck(self, ch, method, properties, body):
+        super().callbackAvecAck(ch, method, properties, body)
+
     def traiter_message(self, ch, method, properties, body):
+        domaine_action = method.routing_key
+        action = domaine_action.split('.')[-1]
+        exchange = method.exchange
         lecture = json.loads(body.decode('utf-8'))
+
+        if action == 'monitor':
+            self.gestionnaire.enregistrer_presence_monitor(exchange, lecture)
+        elif action == 'domaine':
+            self.gestionnaire.enregistrer_presence_domaine(exchange, lecture)
+        else:
+            self.__logger.warning("Type d'annonce de presence inconnu: %s" % domaine_action)
 
 
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
@@ -69,7 +82,7 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesTopologie(self)
         }
 
-        self._traitement_evenements = TraitementEvenementsProteges(self)
+        self.__traitement_presence = TraitementEvenementsPresence(self)
 
         self.__handler_commandes = super().get_handler_commandes()
         self.__handler_commandes[Constantes.SECURITE_PROTEGE] = TraitementCommandeTopologie(self)
@@ -93,15 +106,42 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
     def get_queue_configuration(self):
         configuration = super().get_queue_configuration()
 
-        # configuration.append({
-        #     'nom': '%s.%s' % (self.get_nom_queue(), 'evenements_lectures'),
-        #     'routing': [
-        #         'evenement.%s.#.lecture' % self.get_nom_domaine(),
-        #     ],
-        #     'exchange': self.configuration.exchange_protege,
-        #     'ttl': 60000,
-        #     'callback': self._traitement_evenements_lecture.callbackAvecAck
-        # })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
+            'routing': [
+                'evenement.presence.domaine',
+            ],
+            'exchange': self.configuration.exchange_secure,
+            'ttl': 15000,
+            'callback': self.__traitement_presence.callbackAvecAck
+        })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
+            'routing': [
+                'evenement.presence.monitor',
+            ],
+            'exchange': self.configuration.exchange_protege,
+            'ttl': 15000,
+            'callback': self.__traitement_presence.callbackAvecAck
+        })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
+            'routing': [
+                'evenement.presence.monitor',
+            ],
+            'exchange': self.configuration.exchange_prive,
+            'ttl': 15000,
+            'callback': self.__traitement_presence.callbackAvecAck
+        })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
+            'routing': [
+                'evenement.presence.monitor',
+            ],
+            'exchange': self.configuration.exchange_public,
+            'ttl': 15000,
+            'callback': self.__traitement_presence.callbackAvecAck
+        })
 
         return configuration
 
@@ -176,6 +216,25 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         processus = super().identifier_processus(domaine_transaction)
 
         return processus
+
+    def enregistrer_presence_domaine(self, exchange: str, evenement: dict):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+
+        set_ops = {
+        }
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            'domaine': evenement['domaine'],
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+
+    def enregistrer_presence_monitor(self, exchange: str, evenement: dict):
+        pass
 
 
 class ProcessusTopologie(MGProcessusTransaction):
