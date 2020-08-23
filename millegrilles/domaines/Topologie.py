@@ -284,6 +284,10 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             'parent_noeud_id': parent_id,
             'securite': securite,
         }
+        for champ in ['fqdn_detecte', 'ip_detectee', 'services', 'containers']:
+            valeur = evenement.get(champ)
+            if valeur:
+                set_ops[champ] = valeur
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,

@@ -34,6 +34,7 @@ from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTrouvee
+from millegrilles.util.IpUtils import get_ip
 
 
 class InitialiserServiceMonitor:
@@ -327,6 +328,39 @@ class ServiceMonitor:
 
     def preparer_mdns(self):
         self._gestionnaire_mdns = MdnsGestionnaire(self)
+
+    def get_info_monitor(self, inclure_services=False):
+        dict_infomillegrille = dict()
+
+        nodename = self.nodename
+        ip_address = get_ip(nodename)
+        dict_infomillegrille['fqdn_detecte'] = nodename
+        dict_infomillegrille['ip_detectee'] = ip_address
+        dict_infomillegrille['noeud_id'] = self.noeud_id
+
+        idmg = self.idmg
+        if idmg:
+            dict_infomillegrille['idmg'] = idmg
+
+        gestionnaire_docker = self.gestionnaire_docker
+
+        try:
+            configuration_acme = json.loads(gestionnaire_docker.charger_config('acme.configuration'))
+            dict_infomillegrille['domaine'] = configuration_acme['domain']
+        except IndexError:
+            pass
+
+        try:
+            configuration_millegrille = json.loads(gestionnaire_docker.charger_config('millegrille.configuration'))
+            dict_infomillegrille['securite'] = configuration_millegrille['securite']
+        except IndexError:
+            pass
+
+        if inclure_services:
+            dict_infomillegrille['services'] = gestionnaire_docker.get_liste_services()
+            dict_infomillegrille['containers'] = gestionnaire_docker.get_liste_containers()
+
+        return dict_infomillegrille
 
     def _charger_configuration(self):
         # classe_configuration = self._classe_configuration()

@@ -882,10 +882,22 @@ class GestionnaireModulesDocker:
         # Mapper services et etat
         dict_services = dict()
         for service in services:
+            attrs = service.attrs
+            spec = attrs['Spec']
             info_service = {
                 'creation_service': service.attrs['CreatedAt'],
                 'maj_service': service.attrs['UpdatedAt'],
             }
+            labels = spec.get('Labels')
+            if labels:
+                info_service['labels'] = labels
+            mode = spec.get('Mode')
+            if mode:
+                replicated = mode.get('Replicated')
+                if replicated:
+                    replicas = replicated.get('Replicas')
+                    if replicas:
+                        info_service['replicas'] = replicas
 
             tasks = [task for task in service.tasks() if task['DesiredState'] == 'running']
             if len(tasks) > 0:
@@ -896,6 +908,28 @@ class GestionnaireModulesDocker:
             dict_services[service.name] = info_service
 
         return dict_services
+
+    def get_liste_containers(self):
+        containers = self.__docker.containers.list()
+
+        # Mapper services et etat
+        dict_containers = dict()
+        for container in containers:
+            attrs = container.attrs
+            info_container = {
+                'creation': attrs['Created'],
+                'restart_count': attrs['RestartCount'],
+            }
+
+            state = attrs['State']
+            info_container['etat'] = state['Status']
+            info_container['running'] = state['Running']
+            info_container['dead'] = state['Dead']
+            info_container['finished_at'] = state['FinishedAt']
+
+            dict_containers[attrs['Name']] = info_container
+
+        return dict_containers
 
     @property
     def idmg(self):

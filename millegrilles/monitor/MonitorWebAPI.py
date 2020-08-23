@@ -93,32 +93,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.error_404()
 
     def return_info_monitor(self):
-        dict_infomillegrille = dict()
-
-        nodename = self.service_monitor.nodename
-        ip_address = get_ip(nodename)
-        dict_infomillegrille['fqdn_detecte'] = nodename
-        dict_infomillegrille['ip_detectee'] = ip_address
-        dict_infomillegrille['noeud_id'] = self.service_monitor.noeud_id
-
-        idmg = self.service_monitor.idmg
-        if idmg:
-            dict_infomillegrille['idmg'] = idmg
-
-        gestionnaire_docker = self.service_monitor.gestionnaire_docker
-
-        try:
-            configuration_acme = json.loads(gestionnaire_docker.charger_config('acme.configuration'))
-            dict_infomillegrille['domaine'] = configuration_acme['domain']
-        except IndexError:
-            pass
-
-        try:
-            configuration_millegrille = json.loads(gestionnaire_docker.charger_config('millegrille.configuration'))
-            dict_infomillegrille['securite'] = configuration_millegrille['securite']
-        except IndexError:
-            pass
-
+        dict_infomillegrille = self.service_monitor.get_info_monitor()
         self.repondre_json(dict_infomillegrille)
 
     def return_services_installes(self):

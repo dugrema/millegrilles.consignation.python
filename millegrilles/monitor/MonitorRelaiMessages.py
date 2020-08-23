@@ -600,12 +600,12 @@ class ConnexionMiddleware:
             self._prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
 
     def emettre_presence(self):
-        message_presence = {
-            'noeud_id': self._service_monitor.noeud_id,
-            'securite': self._service_monitor.securite,
-        }
+        info_monitor = dict(self._service_monitor.get_info_monitor(inclure_services=True))
+        info_monitor['noeud_id'] = self._service_monitor.noeud_id
+        info_monitor['securite'] = self._service_monitor.securite
         domaine_action = Constantes.ConstantesTopologie.EVENEMENT_PRESENCE_MONITOR
-        self.generateur_transactions.emettre_message(message_presence, domaine_action)
+
+        self.generateur_transactions.emettre_message(info_monitor, domaine_action)
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self._service_monitor.gestionnaire_commandes
