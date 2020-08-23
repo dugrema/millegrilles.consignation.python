@@ -1656,3 +1656,14 @@ class ConstantesCatalogueApplications:
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
+
+    LIBVAL_DOMAINE = 'domaine'
+    LIBVAL_APPLICATION = 'application'
+
+    TRANSACTION_MAJ_DOMAINE = '%s.majDomaine' % DOMAINE_NOM
+    TRANSACTION_MAJ_APPLICATION = '%s.majApplication' % DOMAINE_NOM
+
+    REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM
+    REQUETE_LISTE_APPLICATIONS = '%s.listeApplications' % DOMAINE_NOM
+    REQUETE_INFO_DOMAINE = '%s.infoDomaine' % DOMAINE_NOM
+    REQUETE_INFO_APPLICATION = '%s.infoApplication' % DOMAINE_NOM

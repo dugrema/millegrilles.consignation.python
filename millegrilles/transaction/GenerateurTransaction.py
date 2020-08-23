@@ -124,7 +124,7 @@ class GenerateurTransaction:
         """
 
         if not securite:
-            securite = self._contexte.exchange_defaut
+            securite = self._contexte.configuration.exchange_defaut
 
         if reply_to is None:
             reply_to = self._contexte.message_dao.queue_reponse

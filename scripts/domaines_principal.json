@@ -18,6 +18,12 @@
     },{
       "module": "millegrilles.domaines.Annuaire",
       "classe": "GestionnaireAnnuaire"
+    },{
+      "module": "millegrilles.domaines.Topologie",
+      "classe": "GestionnaireTopologie"
+    },{
+      "module": "millegrilles.domaines.CatalogueApplications",
+      "classe": "GestionnaireCatalogueApplications"
     }
   ]
 }
