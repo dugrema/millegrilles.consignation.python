@@ -17,11 +17,19 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        # if routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
-        #     reponse = self.gestionnaire.get_vitrine_dashboard()
-        #     self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
-        # else:
-        #     super().traiter_requete(ch, method, properties, body, message_dict)
+        if routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_DOMAINES:
+            reponse = {'liste': self.gestionnaire.get_liste_domaines()}
+        elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_NOEUDS:
+            reponse = {'liste': self.gestionnaire.get_liste_noeuds()}
+        elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_DOMAINE:
+            reponse = self.gestionnaire.get_info_domaine(message_dict)
+        elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_NOEUD:
+            reponse = self.gestionnaire.get_info_noeud(message_dict)
+        else:
+            super().traiter_requete(ch, method, properties, body, message_dict)
+            return
+
+        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementCommandeTopologie(TraitementCommandesProtegees):
@@ -335,6 +343,81 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         }
 
         collection.update_one(filter, ops, upsert=True)
+
+    def get_liste_domaines(self):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_DOMAINE,
+        }
+        projection = {
+            'domaine': 1,
+            'noeud_id': 1,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+        }
+        domaines = list()
+        for domaine in collection.find(filtre, projection):
+            info_domaine = dict()
+            for key, value in domaine.items():
+                if key not in ['_id']:
+                    info_domaine[key] = value
+            domaines.append(info_domaine)
+
+        return domaines
+
+    def get_liste_noeuds(self):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD
+        }
+        projection = {
+            'noeud_id': 1,
+            'parent_noeud_id': 1,
+            'securite': 1,
+            'fqdn_detecte': 1,
+            'ip_detectee': 1,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+        }
+
+        noeuds = list()
+        for noeud in collection.find(filtre, projection):
+            info_noeud = dict()
+            for key, value in noeud.items():
+                if key not in ['_id']:
+                    info_noeud[key] = value
+            noeuds.append(info_noeud)
+
+        return noeuds
+
+    def get_info_domaine(self, params: dict):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_DOMAINE,
+            'domaine': params['domaine']
+        }
+
+        info_domaine = collection.find_one(filtre)
+
+        domaine = dict()
+        for key, value in info_domaine.items():
+            if key not in ['_id']:
+                domaine[key] = value
+
+        return domaine
+
+    def get_info_noeud(self, params: dict):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'noeud_id': params['noeud_id']
+        }
+        info_noeud = collection.find_one(filtre)
+
+        noeud = dict()
+        for key, value in info_noeud.items():
+            if key not in ['_id']:
+                noeud[key] = value
+
+        return noeud
 
 
 class ProcessusTopologie(MGProcessusTransaction):

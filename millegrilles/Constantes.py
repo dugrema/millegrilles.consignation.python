@@ -1648,6 +1648,11 @@ class ConstantesTopologie:
     EVENEMENT_PRESENCE_DOMAINE = 'evenement.presence.domaine'
     EVENEMENT_PRESENCE_MONITOR = 'evenement.presence.monitor'
 
+    REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM
+    REQUETE_LISTE_NOEUDS = '%s.listeNoeuds' % DOMAINE_NOM
+    REQUETE_INFO_DOMAINE = '%s.infoDomaine' % DOMAINE_NOM
+    REQUETE_INFO_NOEUD = '%s.infoNoeud' % DOMAINE_NOM
+
 
 class ConstantesCatalogueApplications:
 
