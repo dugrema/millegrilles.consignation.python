@@ -1,8 +1,12 @@
 {
   "domaines": [
     {
-      "module": "millegrilles.domaines.SenseursPassifs",
-      "classe": "GestionnaireSenseursPassifs"
+      "module": "millegrilles.domaines.Topologie",
+      "classe": "GestionnaireTopologie"
+    },
+    {
+      "module": "millegrilles.domaines.CatalogueApplications",
+      "classe": "GestionnaireCatalogueApplications"
     }
   ]
 }
