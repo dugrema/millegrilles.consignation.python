@@ -14,7 +14,7 @@ from cryptography.exceptions import InvalidSignature
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesDomaines
-from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, CertificatInconnu
+from millegrilles.dao.MessageDAO import JSONHelper, TraitementMessageDomaine, CertificatInconnu, TraitementMessageCallback
 from millegrilles.MGProcessus import MGPProcessusDemarreur, MGPProcesseurTraitementEvenements, MGPProcesseurRegeneration, MGProcessus
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -169,6 +169,25 @@ class TraitementMessageCedule(TraitementMessageDomaine):
         self.gestionnaire.traiter_cedule(message)
 
 
+class TraitementMessagesDomainesDynamiques(TraitementMessageCallback):
+
+    def __init__(self, message_dao, configuration, gestionnaire_domaines):
+        super().__init__(message_dao, configuration)
+        self._gestionnaire_domaines = gestionnaire_domaines
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+        domaine_action = routing_key.split('.')[-1]
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        if domaine_action == ConstantesDomaines.COMMANDE_DOMAINE_DEMARRER:
+            self._gestionnaire_domaines.demarrer_domaine(message_dict)
+        elif domaine_action == ConstantesDomaines.COMMANDE_DOMAINE_ARRETER:
+            self._gestionnaire_domaines.arreter_domaine(message_dict)
+        else:
+            raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
+
+
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     """
     Classe qui agit comme gestionnaire centralise de plusieurs domaines MilleGrilles.
@@ -178,6 +197,8 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     def __init__(self):
         super().__init__()
         self.__domaines_dynamiques = False
+
+        self.__traitement_evenements = None
 
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
         self._gestionnaires = []
@@ -294,6 +315,15 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
     def activer_gestion_dynamique(self):
         self.__domaines_dynamiques = True
 
+        self.__traitement_evenements = TraitementMessagesDomainesDynamiques(
+            self.contexte.message_dao, self.contexte.configuration, self)
+        domaine_actions = [
+            'commande.domaines.' + ConstantesDomaines.COMMANDE_DOMAINE_DEMARRER,
+            'commande.domaines.' + ConstantesDomaines.COMMANDE_DOMAINE_ARRETER,
+        ]
+        self.contexte.message_dao.inscrire_topic(
+            Constantes.SECURITE_PROTEGE, domaine_actions, self.__traitement_evenements.callbackAvecAck)
+
         # Charger les domaines dynamiques pour ce noeud
         noeud_id = self.contexte.configuration.noeud_id
 
@@ -335,7 +365,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
         self.charger_domaines()
 
-        if len(self._gestionnaires) > 0:
+        if len(self._gestionnaires) > 0 or self.__domaines_dynamiques:
             self.demarrer_execution_domaines()
         else:
             self._stop_event.set()
@@ -389,6 +419,43 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             self._logger.setLevel(logging.INFO)
             logging.getLogger('mgdomaines').setLevel(logging.INFO)
 
+    def demarrer_domaine(self, commande: dict):
+        module = commande['module']
+        classe = commande['classe']
+
+        gestionnaire, classe = self.trouver_gestionnaire(module, classe)
+        if not gestionnaire:
+            self._logger.info("Demarrage domaine %s (%s)" % (classe, module))
+            gestionnaire = classe(self.contexte)
+            gestionnaire.configurer()
+
+            # Demarrer le gestionnaire a l'aide d'une thread temporaire
+            thread = Thread(name="demarrer_domaine", target=gestionnaire.demarrer, daemon=True)
+            thread.start()
+
+            self._gestionnaires.append(gestionnaire)
+
+    def arreter_domaine(self, commande: dict):
+        module = commande['module']
+        classe = commande['classe']
+
+        gestionnaire, classe = self.trouver_gestionnaire(module, classe)
+        if gestionnaire:
+            self._logger.info("Arret domaine %s (%s)" % (classe, module))
+            gestionnaire.arreter()
+            self._gestionnaires.remove(gestionnaire)
+
+    def trouver_gestionnaire(self, module: str, classe: str):
+        # Charger classe pour comparer directement l'instance
+        classe = self.importer_classe_gestionnaire(module, classe)
+
+        for gestionnaire in self._gestionnaires:
+            if isinstance(gestionnaire, classe):
+                # Instance match, on retourne ce gestionnaire
+                return gestionnaire, classe
+
+        return None, classe
+
 
 class GestionnaireDomaine:
     """ Le gestionnaire de domaine est une superclasse qui definit le cycle de vie d'un domaine. """
@@ -406,6 +473,7 @@ class GestionnaireDomaine:
         self._stop_event = Event()
         self.wait_Q_ready = Event()  # Utilise pour attendre configuration complete des Q
         self.wait_Q_ready_lock = Lock()
+        self.wait_Q_ready_delay: int = 30
         self.nb_routes_a_config = 0
         self.__Q_wait_broken = None  # Mis utc a date si on a un timeout pour l'attente de __wait_mq_ready
 
@@ -446,8 +514,8 @@ class GestionnaireDomaine:
         self.__logger.info("On enregistre la queue %s" % self.get_nom_queue())
 
         self._contexte.message_dao.register_channel_listener(self)
-        self.__logger.info("Attente Q et routes prets")
-        self.wait_Q_ready.wait(30)  # Donner 30 seconde a MQ
+        self.__logger.info("Attente de la Q et des routes sur nouveau listener MQ pour %s" % self.__class__.__name__)
+        self.wait_Q_ready.wait(self.wait_Q_ready_delay)  # Donner 30 seconde a MQ
 
         # Verifier si la collection de transactions est prete
         self.__confirmation_setup_transaction = self.verifier_collection_transactions()

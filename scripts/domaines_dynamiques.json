@@ -1,11 +1,3 @@
 {
-  "domaines": [
-    {
-      "module": "millegrilles.domaines.Plume",
-      "classe": "GestionnairePlume"
-    },{
-      "module": "millegrilles.domaines.Messagerie",
-      "classe": "GestionnaireMessagerie"
-    }
-  ]
+  "domaines": []
 }

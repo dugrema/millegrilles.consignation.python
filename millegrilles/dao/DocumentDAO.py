@@ -104,6 +104,7 @@ class MongoDAO:
     def commande(self, commande, params=None):
         self._client.admin.command(commande, params)
 
+
 class MongoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.datetime):

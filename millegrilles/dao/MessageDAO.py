@@ -152,7 +152,8 @@ class ConnexionWrapper:
         self.__thread_ioloop = None
 
     def register_channel_listener(self, listener):
-        self._logger.info("Enregistrer listener pour channel %s" % listener.__class__.__name__)
+        nom_listener = listener.__class__.__name__
+        self._logger.info("Enregistrer listener pour channel %s" % nom_listener)
         if self.__liste_listeners_channels is None:
             self.__liste_listeners_channels = list()
         self.__liste_listeners_channels.append(listener)
@@ -160,6 +161,7 @@ class ConnexionWrapper:
 
         # On verifie si on peut ouvrir le channel immediatement
         if self.__connexionmq is not None and not self.__connexionmq.is_closed and not self._in_error:
+            self._logger.info("Ouverture channel pour listener %s" % nom_listener)
             self.__ouvrir_channel_listener(listener)
 
     def enlever_channel_listener(self, listener):

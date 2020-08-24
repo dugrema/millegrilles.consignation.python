@@ -281,6 +281,8 @@ class ConstantesDomaines:
     COMMANDE_REGENERER = 'regenerer'
     COMMANDE_GLOBAL_REGENERER = 'commande.global.regenerer'
     COMMANDE_BACKUP = 'backup'
+    COMMANDE_DOMAINE_DEMARRER = 'demarrer'
+    COMMANDE_DOMAINE_ARRETER = 'arreter'
 
     REQUETE_GLOBAL_PREFIX = 'requete.global'
     REQUETE_STATS_TRANSACTIONS = 'requeteStatsTransactions'
