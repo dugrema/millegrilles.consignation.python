@@ -1647,6 +1647,8 @@ class ConstantesTopologie:
 
     TRANSACTION_DOMAINE = '%s.domaine' % DOMAINE_NOM
     TRANSACTION_MONITOR = '%s.monitor' % DOMAINE_NOM
+    TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE = '%s.ajouterDomaineDynamique' % DOMAINE_NOM
+    TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE = '%s.supprimerDomaineDynamique' % DOMAINE_NOM
 
     EVENEMENT_PRESENCE_DOMAINE = 'evenement.presence.domaine'
     EVENEMENT_PRESENCE_MONITOR = 'evenement.presence.monitor'

@@ -328,7 +328,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         noeud_id = self.contexte.configuration.noeud_id
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.ConstantesTopologie.LIBVAL_DOMAINE,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.ConstantesTopologie.LIBVAL_NOEUD,
             'noeud_id': noeud_id,
         }
         collection = self.contexte.document_dao.get_collection(Constantes.ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
@@ -336,8 +336,12 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
         domaines_actifs = list()
         if configuration_noeud:
-            domaines = configuration_noeud.get('domaines')
-            if domaines:
+            try:
+                for key, value in configuration_noeud.get('domaines').items():
+                    config = dict(value)
+                    config['nom'] = key
+                    domaines_actifs.append(config)
+            except AttributeError:
                 pass
 
         return domaines_actifs
@@ -420,10 +424,11 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             logging.getLogger('mgdomaines').setLevel(logging.INFO)
 
     def demarrer_domaine(self, commande: dict):
+        nom = commande['nom']
         module = commande['module']
-        classe = commande['classe']
+        nom_classe = commande['classe']
 
-        gestionnaire, classe = self.trouver_gestionnaire(module, classe)
+        gestionnaire, classe = self.trouver_gestionnaire(module, nom_classe)
         if not gestionnaire:
             self._logger.info("Demarrage domaine %s (%s)" % (classe, module))
             gestionnaire = classe(self.contexte)
@@ -435,15 +440,36 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
             self._gestionnaires.append(gestionnaire)
 
-    def arreter_domaine(self, commande: dict):
-        module = commande['module']
-        classe = commande['classe']
+            # Transmettre transaction pour confirmer le demarrage
+            transaction = {
+                "noeud_id": self._contexte.configuration.noeud_id,
+                "nom": nom,
+                "module": module,
+                "classe": nom_classe
+            }
+            domaine_action = Constantes.ConstantesTopologie.TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE
+            self._contexte.generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
-        gestionnaire, classe = self.trouver_gestionnaire(module, classe)
+    def arreter_domaine(self, commande: dict):
+        nom = commande['nom']
+        module = commande['module']
+        nom_classe = commande['classe']
+
+        gestionnaire, classe = self.trouver_gestionnaire(module, nom_classe)
         if gestionnaire:
             self._logger.info("Arret domaine %s (%s)" % (classe, module))
             gestionnaire.arreter()
             self._gestionnaires.remove(gestionnaire)
+
+            # Transmettre transaction pour confirmer la suppression
+            transaction = {
+                "noeud_id": self._contexte.configuration.noeud_id,
+                "nom": nom,
+                "module": module,
+                "classe": nom_classe
+            }
+            domaine_action = Constantes.ConstantesTopologie.TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE
+            self._contexte.generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
     def trouver_gestionnaire(self, module: str, classe: str):
         # Charger classe pour comparer directement l'instance

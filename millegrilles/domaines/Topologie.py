@@ -215,6 +215,10 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterDomaine"
         elif domaine_transaction == ConstantesTopologie.TRANSACTION_MONITOR:
             processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterMonitor"
+        elif domaine_transaction == ConstantesTopologie.TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE:
+            processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterDomaineDynamique"
+        elif domaine_transaction == ConstantesTopologie.TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE:
+            processus = "millegrilles_domaines_Topologie:ProcessusTransactionSupprimerDomaineDynamique"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -344,6 +348,56 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
 
         collection.update_one(filter, ops, upsert=True)
 
+    def ajouter_domaine_dynamique(self, transaction: dict):
+        noeud_id = transaction['noeud_id']
+        nom = transaction['nom']
+
+        set_ops = {
+            'domaines.%s.module' % nom: transaction['module'],
+            'domaines.%s.classe' % nom: transaction['classe'],
+        }
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'noeud_id': noeud_id,
+        }
+
+        on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        on_insert.update(filtre)
+
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        resultat = collection.update_one(filtre, ops, upsert=True)
+        if resultat.upserted_id is not None:
+            # Creer une transaction pour generer le domaine
+            self.soumettre_transaction_monitor(Constantes.SECURITE_PROTEGE, transaction)
+
+    def supprimer_domaine_dynamique(self, transaction: dict):
+        noeud_id = transaction['noeud_id']
+        nom = transaction['nom']
+
+        unset_ops = {
+            'domaines.%s' % nom: 1
+        }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'noeud_id': noeud_id,
+        }
+        ops = {
+            '$unset': unset_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        collection.update_one(filtre, ops)
+
     def get_liste_domaines(self):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
         filtre = {
@@ -461,5 +515,37 @@ class ProcessusTransactionAjouterMonitor(ProcessusTopologie):
         self.__logger.debug("Document transaction: %s" % transaction)
 
         self._controleur.gestionnaire.traiter_transaction_monitor(transaction)
+
+        self.set_etape_suivante()  # Terminer
+
+
+class ProcessusTransactionAjouterDomaineDynamique(ProcessusTopologie):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        self.__logger.debug("Document processus: %s" % self._document_processus)
+        self.__logger.debug("Document transaction: %s" % transaction)
+
+        self._controleur.gestionnaire.ajouter_domaine_dynamique(transaction)
+
+        self.set_etape_suivante()  # Terminer
+
+
+class ProcessusTransactionSupprimerDomaineDynamique(ProcessusTopologie):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        self.__logger.debug("Document processus: %s" % self._document_processus)
+        self.__logger.debug("Document transaction: %s" % transaction)
+
+        self._controleur.gestionnaire.supprimer_domaine_dynamique(transaction)
 
         self.set_etape_suivante()  # Terminer

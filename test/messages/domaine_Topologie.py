@@ -87,11 +87,37 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def transaction_ajouter_domaine(self):
+        requete = {
+            'noeud_id': '5ee16193-49a3-443f-ae4e-894a65de647d',
+            "nom": "SenseursPassifs",
+            "module": "millegrilles.domaines.SenseursPassifs",
+            "classe": "GestionnaireSenseursPassifs"
+        }
+        domaine_action = ConstantesTopologie.TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE
+        enveloppe_val = self.generateur.soumettre_transaction(
+            requete, domaine_action,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
+    def transaction_supprimer_domaine(self):
+        requete = {
+            'noeud_id': '5ee16193-49a3-443f-ae4e-894a65de647d',
+            "nom": "SenseursPassifs",
+        }
+        domaine_action = ConstantesTopologie.TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE
+        enveloppe_val = self.generateur.soumettre_transaction(
+            requete, domaine_action,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def executer(self):
         # sample.requete_liste_domaines()
         # sample.requete_liste_noeuds()
         # sample.requete_info_domaine()
-        sample.requete_info_noeud()
+        # sample.requete_info_noeud()
+        # sample.transaction_ajouter_domaine()
+        sample.transaction_supprimer_domaine()
 
 # --- MAIN ---
 sample = MessagesSample()
