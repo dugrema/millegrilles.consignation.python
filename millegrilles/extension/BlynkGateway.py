@@ -26,7 +26,9 @@ class GatewayBlynk:
     def __init__(self, contexte: ContexteRessourcesDocumentsMilleGrilles):
         self._contexte = contexte
 
-        self.__channel = None
+        self._channel_mq = None
+        self._queue = None
+        self._ctag = None
 
         self._blynk_devices = dict()
         self._senseur_devicevpin = dict()  # Mapping de cle:uuid_senseur vers le value:{noeud_id, vpin} correspondant
@@ -81,25 +83,58 @@ class GatewayBlynk:
 
         # Enregistrer MQ
         self._traitement_messages = TraitementMessages(self._contexte, self)
+        self._contexte.message_dao.enregistrer_channel_listener(self)
 
+    def on_channel_open(self, channel):
+        """
+        Callback pour l"ouverture ou la reouverture du channel MQ
+        :param channel:
+        :return:
+        """
+        if self._channel_mq is not None:
+            # Fermer le vieux channel
+            try:
+                self._channel_mq.close()
+            finally:
+                self._channel_mq = None
+
+        self._channel_mq = channel
+        channel.basic_qos(prefetch_count=10)
+
+        args = {
+            'x-message-ttl': 15000,
+        }
+        channel.queue_declare(
+            queue='',
+            callback=self.creer_routing,
+            arguments=args,
+        )
+
+    def creer_routing(self, queue):
+        self._queue = queue.method.queue
+
+        securite_list = [
+            Constantes.SECURITE_PRIVE,
+            Constantes.SECURITE_PROTEGE,
+        ]
         routing = [
             'evenement.SenseursPassifs.#.lecture',
             'transaction.SenseursPassifs.#.majNoeud',
             'transaction.SenseursPassifs.#.majSenseur',
         ]
 
-        self.contexte.message_dao.inscrire_topic(
-            self.contexte.configuration.exchange_prive,
-            routing,
-            self._traitement_messages.callbackAvecAck
-        )
+        channel = self._channel_mq
 
-        # Tenter de s'inscrire a l'echange protege
-        self.contexte.message_dao.inscrire_topic(
-            self.contexte.configuration.exchange_protege,
-            routing,
-            self._traitement_messages.callbackAvecAck
-        )
+        for securite in securite_list:
+            for rk in routing:
+                channel.queue_bind(
+                    exchange=securite,
+                    queue=self._queue,
+                    routing_key=rk,
+                    callback=None
+                )
+
+        self._ctag = channel.basic_consume(self._traitement_messages.callbackAvecAck, queue=self._queue, no_ack=False)
 
     def configurer_gateway(self, noeud_doc: dict):
         """
@@ -156,6 +191,10 @@ class GatewayBlynk:
 
     def fermer(self):
         self.__stop_event.set()
+        try:
+            self._channel_mq.close()
+        except Exception:
+            self.__logger.exception("Erreur fermeture channel MQ de Blynk")
 
     def run(self):
         while not self.__stop_event.is_set():
@@ -174,7 +213,9 @@ class GatewayBlynk:
             try:
                 blynk.disconnect()
             except:
-                self.__logger.info("Erreur dexonnexion %s" % noeud_id)
+                self.__logger.info("Erreur deconnexion %s" % noeud_id)
+
+        self.__logger.info("Fermeture Blynk gateway")
 
     def transmettre_lecture(self, uuid_senseur, type_senseur, valeur):
         cle = '/'.join([uuid_senseur, type_senseur])

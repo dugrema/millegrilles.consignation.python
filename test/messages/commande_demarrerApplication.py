@@ -357,8 +357,8 @@ class MessagesSample(BaseCallback):
         # self.supprimer_application_protege_dummy()
         # self.installer_application_senseurspassifs()
         # self.supprimer_application_senseurspassifs()
-        self.installer_application_blynk()
-        # self.supprimer_application_blynk()
+        # self.installer_application_blynk()
+        self.supprimer_application_blynk()
 
 
 # --- MAIN ---
