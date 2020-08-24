@@ -204,7 +204,7 @@ senseurspassifs_app = {
     ]
 }
 
-uuid_service_monitor = 'e94d95ba-d193-46bf-ad0d-6abc8e21fcd4'
+uuid_service_monitor = '5ee16193-49a3-443f-ae4e-894a65de647d'
 
 class MessagesSample(BaseCallback):
 

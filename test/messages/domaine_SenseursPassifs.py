@@ -146,7 +146,7 @@ class MessagesSample(BaseCallback):
             "securite": "2.prive",
             "blynk_host": "blynk",
             "blynk_port": 9443,
-            "blynk_auth": "p2ADaQx9Q6lH88jN4NK8ILdprD104xMf"
+            "blynk_auth": "ciyZXHGed6Z31xtszjDpsifqPxobzEJ4"
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, SenseursPassifsConstantes.TRANSACTION_MAJ_NOEUD,
@@ -157,7 +157,10 @@ class MessagesSample(BaseCallback):
         transaction = {
             "uuid_senseur": "7a2764fa-c457-4f25-af0d-0fc915439b21",
             "securite": "2.prive",
-            "senseurs": {"dummy/humidite": {"blynk_vpin": 2}},
+            "senseurs": {
+                "dummy/temperature": {"blynk_vpin": 1},
+                "dummy/humidite": {"blynk_vpin": 2},
+            },
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, SenseursPassifsConstantes.TRANSACTION_MAJ_SENSEUR,
