@@ -167,12 +167,12 @@ class GestionnaireApplications:
         if valeurs_a_generer:
             liste_motsdepasse = valeurs_a_generer.get('motsdepasse')
             for motdepasse_config in liste_motsdepasse:
-                label_motdepasse = self.__service_monitor.idmg_tronque + '.' + motdepasse_config['name']
+                label_motdepasse = motdepasse_config['name']
 
                 # Verifier si le mot de passe existe deja
                 try:
                     secret_passwd = self.__gestionnaire_modules_docker.trouver_secret(motdepasse_config['name'])
-                except AttributeError:
+                except PkiCleNonTrouvee:
                     # Generer le mot de passe
                     motdepasse = b64encode(secrets.token_bytes(16))
                     # Conserver mot de passe en memoire pour generer script, au besoin

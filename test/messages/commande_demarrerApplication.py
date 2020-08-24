@@ -204,7 +204,148 @@ senseurspassifs_app = {
     ]
 }
 
+redmine = {
+    "nom": "redmine.mariadb",
+    "registries": [
+        "docker.maceroc.com",
+        "dugremat"
+    ],
+    "images": {
+        "mariadb": {
+            "registries": [
+                ""
+            ],
+            "image": "mariadb",
+            "version": "10.5"
+        },
+        "redmine": {
+            "image": "mg_redmine",
+            "version": "4.1_0"
+        }
+    },
+    "dependances": [
+        {
+            "docker_config_file": "docker.mariadb.sharedapp.json",
+            "shared": True
+        },
+        {
+            "image": "mariadb",
+            "etape_seulement": True,
+            "installation": {
+                "commande": "/usr/local/scripts/script.redmine.mariadb.installation.sh",
+                "fichiers": [
+                    "script.redmine.mariadb.installation.sh"
+                ],
+                "exit_codes_ok": [1]
+            },
+            "backup": {
+                "commande_backup": "/usr/local/scripts/script.redmine.mariadb.backup.sh",
+                "commande_restore": "/usr/local/scripts/script.redmine.mariadb.restore.sh",
+                "fichiers": [
+                    "script.redmine.mariadb.backup.sh",
+                    "script.redmine.mariadb.restore.sh"
+                ],
+                "base_path": "/tmp/backup"
+            },
+            "generer": {
+                "motsdepasse": [
+                    {"name": "passwd.redmine"},
+                    {"name": "passwd.mariadb"}
+                ]
+            },
+            "config": {
+                "name": "mariadb_redmine_client",
+                "args": ["sleep", "10000"],
+                "env": [
+                    "PATH_SCRIPTS=/usr/local/scripts",
+                    "REDMINE_DB_PASSWORD_FILE=/run/secrets/redmine-passwd",
+                    "MARIADB_PASSWORD_FILE=/run/secrets/mariadb-passwd"
+                ],
+                "constraints": [
+                    "node.labels.millegrilles.app.redmine == true"
+                ],
+                "mounts": [
+                    "redmine_files:/tmp/backup/files:rw",
+                    "redmine_scripts:/usr/local/scripts:rw"
+                ],
+                "secrets": [
+                    {
+                        "name": "passwd.redmine",
+                        "filename": "redmine-passwd"
+                    }, {
+                        "name": "passwd.mariadb",
+                        "filename": "mariadb-passwd"
+                    }
+                ],
+                "networks": [{
+                    "target": "millegrille_net"
+                }],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "resources": {
+                    "cpu_limit": 1000000000,
+                    "mem_limit": 50000000
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                }
+            }
+        },
+        {
+            "image": "redmine",
+            "config": {
+                "name": "redmine",
+                "env": [
+                    "REDMINE_DB_PASSWORD_FILE=/run/secrets/redmine-passwd",
+                    "REDMINE_DB_MYSQL=mariadb",
+                    "REDMINE_DB_USERNAME=redmine",
+                    "REDMINE_DB_DATABASE=redmine"
+                ],
+                "mounts": [
+                    "redmine_files:/usr/src/redmine/files:rw"
+                ],
+                "constraints": [
+                    "node.labels.millegrilles.app.redmine == true"
+                ],
+                "secrets": [
+                    {
+                        "name": "passwd.redmine",
+                        "filename": "redmine-passwd"
+                    }
+                ],
+                "networks": [
+                    {
+                        "target": "millegrille_net",
+                        "aliases": ["redmine"]
+                    }
+                ],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "resources": {
+                    "cpu_limit": 1000000000,
+                    "mem_limit": 209715200
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                }
+            }
+        }
+    ],
+    "nginx": {
+        "server_file": "nginx.redmine.mariadb.conf",
+        "subdomain": "redmine",
+        "params": {
+            "PROXY_PASS_BACKEND": "http://redmine:3000"
+        }
+    }
+}
+
 uuid_service_monitor = '5ee16193-49a3-443f-ae4e-894a65de647d'
+
 
 class MessagesSample(BaseCallback):
 
@@ -319,7 +460,8 @@ class MessagesSample(BaseCallback):
             'nom_application': 'blynk',
             'configuration': blynk_app,
         }
-        domaineAction = 'commande.servicemonitor.%s.%s' % (uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
+        domaineAction = 'commande.servicemonitor.%s.%s' % (
+        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -337,7 +479,46 @@ class MessagesSample(BaseCallback):
             'nom_application': 'blynk',
             'configuration': blynk_app,
         }
-        domaineAction = 'commande.servicemonitor.%s.%s' % (uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
+        domaineAction = 'commande.servicemonitor.%s.%s' % (
+        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def installer_application_redmine(self):
+        commande = {
+            'nom_application': 'redmine',
+            'configuration': redmine,
+        }
+        domaineAction = 'commande.servicemonitor.%s.%s' % (
+        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def supprimer_application_redmine(self):
+        commande = {
+            'nom_application': 'redmine',
+            'configuration': redmine,
+        }
+        domaineAction = 'commande.servicemonitor.%s.%s' % (
+        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -358,7 +539,9 @@ class MessagesSample(BaseCallback):
         # self.installer_application_senseurspassifs()
         # self.supprimer_application_senseurspassifs()
         # self.installer_application_blynk()
-        self.supprimer_application_blynk()
+        # self.supprimer_application_blynk()
+        self.installer_application_redmine()
+        # self.supprimer_application_redmine()
 
 
 # --- MAIN ---
