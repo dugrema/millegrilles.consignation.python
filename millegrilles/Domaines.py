@@ -177,6 +177,8 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
 
     def __init__(self):
         super().__init__()
+        self.__domaines_dynamiques = False
+
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
         self._gestionnaires = []
         self._stop_event = Event()
@@ -270,6 +272,16 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
                 )
                 liste_classes_gestionnaires.append(classe)
 
+        if self.contexte.configuration.domaines_dynamiques:
+            # Activer la gestion dynamique des domaines.
+            domaines_actifs = self.activer_gestion_dynamique()
+            for domaine in domaines_actifs:
+                classe = self.importer_classe_gestionnaire(
+                    domaine['module'],
+                    domaine['classe']
+                )
+                liste_classes_gestionnaires.append(classe)
+
         self._logger.info("%d classes de gestionnaires a charger" % len(liste_classes_gestionnaires))
 
         # On prepare et configure une instance de chaque gestionnaire
@@ -278,6 +290,27 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
             instance = classe_gestionnaire(self.contexte)
             instance.configurer()  # Executer la configuration du gestionnaire de domaine
             self._gestionnaires.append(instance)
+
+    def activer_gestion_dynamique(self):
+        self.__domaines_dynamiques = True
+
+        # Charger les domaines dynamiques pour ce noeud
+        noeud_id = self.contexte.configuration.noeud_id
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.ConstantesTopologie.LIBVAL_DOMAINE,
+            'noeud_id': noeud_id,
+        }
+        collection = self.contexte.document_dao.get_collection(Constantes.ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        configuration_noeud = collection.find_one(filtre)
+
+        domaines_actifs = list()
+        if configuration_noeud:
+            domaines = configuration_noeud.get('domaines')
+            if domaines:
+                pass
+
+        return domaines_actifs
 
     def importer_classe_gestionnaire(self, nom_module, nom_classe):
         self._logger.info("Nom package: %s, Classe: %s" % (nom_module, nom_classe))

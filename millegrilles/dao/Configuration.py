@@ -75,7 +75,8 @@ class TransactionConfiguration:
         }
 
         self._domaines_config = {
-            Constantes.CONFIG_DOMAINES_CONFIGURATION: None
+            Constantes.CONFIG_DOMAINES_CONFIGURATION: None,
+            Constantes.CONFIG_DOMAINES_DYNAMIQUES: None,
         }
 
         # Configuration specifique a la MilleGrille
@@ -385,6 +386,10 @@ class TransactionConfiguration:
     @property
     def domaines_json(self):
         return self._domaines_config[Constantes.CONFIG_DOMAINES_CONFIGURATION]
+
+    @property
+    def domaines_dynamiques(self):
+        return self._domaines_config[Constantes.CONFIG_DOMAINES_DYNAMIQUES]
 
     @property
     def email_host(self):
