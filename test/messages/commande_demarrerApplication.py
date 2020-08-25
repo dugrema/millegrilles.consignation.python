@@ -344,7 +344,122 @@ redmine = {
     }
 }
 
-uuid_service_monitor = '5ee16193-49a3-443f-ae4e-894a65de647d'
+mongoexpress = {
+    "nom": "mongoexpress",
+    "version": "1.31.0",
+    "registries": [
+        "docker.maceroc.com",
+        "dugremat"
+    ],
+    "images": {
+        "mongoexpress": {
+            "image": "mg_mongo_express",
+            "version": "0.49_5"
+        }
+    },
+    "dependances": [
+        {
+            "image": "mongoexpress",
+            "config": {
+                "name": "mongoexpress",
+                "certificat_compte": "pki.mongoxp.cert",
+                "env": [
+                    "ME_CONFIG_BASICAUTH_USERNAME=mongo",
+                    "ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_INITDB_ROOT_USERNAME}",
+                    "MONGODB_ADMINPASSWORD_FILE=/run/secrets/mongo.password.txt",
+                    "ME_CONFIG_BASICAUTH_PASSWORD_FILE=/run/secrets/web.password.txt",
+                    "VCAP_APP_PORT=443",
+                    "ME_CONFIG_SITE_SSL_ENABLED='true'",
+                    "ME_CONFIG_SITE_SSL_CRT_PATH=/run/secrets/web.cert.pem",
+                    "ME_CONFIG_SITE_SSL_KEY_PATH=/run/secrets/web.key.pem",
+                    "ME_CONFIG_MONGODB_SERVER=mongo",
+                    "ME_CONFIG_MONGODB_SSL=true",
+                    "ME_CONFIG_MONGODB_KEY=/run/secrets/key.pem",
+                    "ME_CONFIG_MONGODB_CERT=/run/secrets/cert.pem",
+                    "ME_CONFIG_MONGODB_CACERT=/run/secrets/millegrille.cert.pem",
+                    "ME_CONFIG_MONGODB_SSLVALIDATE='true'"
+                ],
+                "constraints": [
+                    "node.labels.millegrilles.database == true"
+                ],
+                "configs": [
+                    {
+                        "name": "pki.mongoxp.cert",
+                        "filename": "/run/secrets/cert.pem"
+                    },
+                    {
+                        "name": "pki.mongoxp.cert",
+                        "filename": "/run/secrets/web.cert.pem"
+                    },
+                    {
+                        "name": "pki.millegrille.cert",
+                        "filename": "/run/secrets/millegrille.cert.pem"
+                    }
+                ],
+                "secrets": [
+                    {
+                        "match_config": True,
+                        "name": "pki.mongoxp.key",
+                        "filename": "key.pem"
+                    },
+                    {
+                        "match_config": True,
+                        "name": "pki.mongoxp.key",
+                        "filename": "web.key.pem"
+                    },
+                    {
+                        "name": "passwd.mongo",
+                        "filename": "mongo.password.txt"
+                    },
+                    {
+                        "name": "passwd.mongoxpweb",
+                        "filename": "web.password.txt"
+                    }
+                ],
+                "container_labels": {
+                    "ipv6.mapper.network": "mg_ipv6"
+                },
+                "endpoint_spec": {
+                    "mode": "vip",
+                    "ports": [
+                        {
+                            "published_port": 10443,
+                            "target_port": 443,
+                            "protocol": "tcp",
+                            "publish_mode": "host"
+                        }
+                    ]
+                },
+                "networks": [
+                    {
+                        "target": "millegrille_net",
+                        "aliases": [
+                            "mongoexpress"
+                        ]
+                    }
+                ],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "resources": {
+                    "cpu_limit": 500000000,
+                    "mem_limit": 73741824
+                },
+                "restart_policy": {
+                    "condition": "on-failure",
+                    "delay": 60000000000,
+                    "max_attempts": 5
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                }
+            }
+        }
+    ]
+}
+
+uuid_service_monitor = '6f1f11c8-d70d-45ef-b13c-2965b73c71b2'
 
 
 class MessagesSample(BaseCallback):
@@ -461,7 +576,7 @@ class MessagesSample(BaseCallback):
             'configuration': blynk_app,
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
-        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
+            uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -480,7 +595,7 @@ class MessagesSample(BaseCallback):
             'configuration': blynk_app,
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
-        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
+            uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -499,7 +614,7 @@ class MessagesSample(BaseCallback):
             'configuration': redmine,
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
-        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
+            uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -518,7 +633,45 @@ class MessagesSample(BaseCallback):
             'configuration': redmine,
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
-        uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
+            uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def installer_application_mongoexpress(self):
+        commande = {
+            'nom_application': 'mongoexpress',
+            'configuration': mongoexpress,
+        }
+        domaineAction = 'commande.servicemonitor.%s.%s' % (
+            uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION)
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
+    def supprimer_application_mongoexpress(self):
+        commande = {
+            'nom_application': 'mongoexpress',
+            'configuration': mongoexpress,
+        }
+        domaineAction = 'commande.servicemonitor.%s.%s' % (
+            uuid_service_monitor, Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION)
 
         enveloppe = self.generateur.transmettre_commande(
             commande,
@@ -540,8 +693,10 @@ class MessagesSample(BaseCallback):
         # self.supprimer_application_senseurspassifs()
         # self.installer_application_blynk()
         # self.supprimer_application_blynk()
-        self.installer_application_redmine()
+        # self.installer_application_redmine()
         # self.supprimer_application_redmine()
+        self.installer_application_mongoexpress()
+        # self.supprimer_application_mongoexpress()
 
 
 # --- MAIN ---

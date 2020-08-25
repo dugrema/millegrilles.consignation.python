@@ -61,6 +61,14 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+
+        # Verifier si la requete est pour un certificat
+        if routing_key and routing_key.startswith('requete.certificat.'):
+            fingerprint = routing_key.split('.')[-1]
+            self.__logger.debug("Requete certificat %s sur exchange %s" % (fingerprint, method.exchange))
+            # self.message_dao.transmettre_demande_certificat(fingerprint)
+            return
 
         try:
             self.gestionnaire.verificateur_transaction.verifier(message_dict)
@@ -74,6 +82,11 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
                 message_dict, {'error': True, 'message': 'Signature invalide'}, properties.reply_to, properties.correlation_id
             )
             raise erreur_signature
+        except KeyError as ke:
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Erreur traitement message routing : %s" % method.routing_key)
+            else:
+                self.__logger.info("Erreur traitement message (routing: %s): %s" % (method.routing_key, str(ke)))
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         resultats = list()

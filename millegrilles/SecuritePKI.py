@@ -565,21 +565,35 @@ class VerificateurTransaction(UtilCertificats):
             enveloppe_certificat = self._identifier_certificat(dict_message)
         except CertificatInconnu as ci:
             # Le certificat est inconnu. Verifier si le message contient une fiche (privee ou publique)
-            fiche = dict_message.get('fiche_privee')
-            certs_signataires = dict_message.get('certificat_fullchain_signataire')
-            if fiche is not None:
-                self._logger.info("Message avec une fichier privee, on charge les certificats")
-                self._charger_fiche(fiche, certs_signataires)
-                enveloppe_certificat = self._identifier_certificat(dict_message)
+            # ou des certificats inline
+            certificats_inline = transaction.get('_certificats')
+            if certificats_inline:
+                # Charger les nouveaux certificats associes au message
+                for cert in certificats_inline:
+                    # Emettre le certificat sur MQ
+                    enveloppe_temp = EnveloppeCertificat(certificat_pem=cert)
+                    self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
+
+                enveloppe_temp = EnveloppeCertificat(certificat_pem=certificats_inline[0])
+
+                # Tenter de valider le certificat immediatement, peut echouer si la chaine n'a pas ete traitee
+                enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(enveloppe=enveloppe_temp)
             else:
-                self._logger.info("Certificat inconnu, requete MQ pour trouver %s" % ci.fingerprint)
-                routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
-                # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
-                self.contexte.generateur_transactions.emettre_commande_noeuds(
-                    dict(),
-                    routing,
-                )
-                raise ci  # On re-souleve l'erreur
+                fiche = dict_message.get('fiche_privee')
+                certs_signataires = dict_message.get('certificat_fullchain_signataire')
+                if fiche is not None:
+                    self._logger.info("Message avec une fichier privee, on charge les certificats")
+                    self._charger_fiche(fiche, certs_signataires)
+                    enveloppe_certificat = self._identifier_certificat(dict_message)
+                else:
+                    self._logger.info("Certificat inconnu, requete MQ pour trouver %s" % ci.fingerprint)
+                    routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
+                    # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
+                    self.contexte.generateur_transactions.emettre_commande_noeuds(
+                        dict(),
+                        routing,
+                    )
+                    raise ci  # On re-souleve l'erreur
 
         self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
 
@@ -634,6 +648,7 @@ class VerificateurTransaction(UtilCertificats):
         verificateur_certificats = self._contexte.verificateur_certificats
 
         enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+
         return enveloppe_certificat
 
     def _charger_fiche(self, fiche, certs_signataires: list = None):

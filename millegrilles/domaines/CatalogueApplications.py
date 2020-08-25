@@ -3,120 +3,12 @@ import logging
 import json
 import datetime
 
-from typing import Optional
-
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesCatalogueApplications
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees
 from millegrilles.Domaines import TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-
-CONFIGURATION_INITIALE_DOMAINE_SENSEURSPASSIFS = {
-    "nom": "SenseursPassifs",
-    "module": "millegrilles.domaines.SenseursPassifs",
-    "classe": "GestionnaireSenseursPassifs"
-}
-
-CONFIGURATION_INITIALE_APPLICATION_BLYNK = {
-    "nom": "blynk",
-    "registries": [
-        "docker.maceroc.com",
-        "dugremat"
-    ],
-    "images": {
-        "blynk": {
-            "image": "mg_blynk",
-            "version": "0.41.10_2"
-        },
-        "blynk_client": {
-            "registries": [""],
-            "image": "alpine",
-            "version": "latest"
-        }
-    },
-    "dependances": [
-        {
-            "image": "blynk",
-            "config": {
-                "name": "blynk",
-                "constraints": [
-                    "node.labels.millegrilles.app.blynk == true"
-                ],
-                "env": [
-                    "SERVER_SSL_KEY=/run/secrets/webkey.pem",
-                    "SERVER_SSL_CERT=/run/secrets/webcert.pem"
-                ],
-                "configs": [
-                    {
-                        "name": "pki.web.cert;pki.nginx.cert",
-                        "filename": "/run/secrets/webcert.pem"
-                    }
-                ],
-                "secrets": [
-                    {
-                        "name": "pki.web.key;pki.nginx.key",
-                        "filename": "webkey.pem"
-                    }
-                ],
-                "mounts": [
-                    "blynk_data:/blynk/data:rw"
-                ],
-                "endpoint_spec": {
-                    "mode": "vip",
-                    "ports": [{
-                        "published_port": 9443,
-                        "target_port": 9443,
-                        "protocol": "tcp",
-                        "publish_mode": "host"
-                    }]
-                },
-                "networks": [{
-                    "target": "mg_${IDMG}_net"
-                }],
-                "labels": {
-                    "millegrille": "${IDMG}"
-                },
-                "resources": {
-                    "cpu_limit": 1000000000,
-                    "mem_limit": 100000000
-                },
-                "mode": {
-                    "mode": "replicated",
-                    "replicas": 1
-                }
-            }
-        },
-        {
-            "image": "blynk_client",
-            "command": "/bin/sleep 10000",
-            "etape_seulement": True,
-            "backup": {
-                "base_path": "/tmp/backup"
-            },
-            "config": {
-                "name": "blynk_client",
-                "constraints": [
-                    "node.labels.millegrilles.app.blynk == true"
-                ],
-                "mounts": [
-                    "blynk_data:/tmp/backup/data:rw"
-                ],
-                "labels": {
-                    "millegrille": "${IDMG}"
-                },
-                "resources": {
-                    "cpu_limit": 1000000000,
-                    "mem_limit": 50000000
-                },
-                "mode": {
-                    "mode": "replicated",
-                    "replicas": 1
-                }
-            }
-        }
-    ]
-}
 
 
 class TraitementRequetesProtegeesCatalogueApplications(TraitementRequetesProtegees):
@@ -223,9 +115,6 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
 
-        # Verifier si les documents existent, inserer via transaction au besoin
-        self._inserer_catalogues_initiaux()
-
     def arreter(self):
         super().arreter()
 
@@ -294,43 +183,6 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
             processus = super().identifier_processus(domaine_transaction)
 
         return processus
-
-    def _inserer_catalogues_initiaux(self):
-        collection = self.document_dao.get_collection(ConstantesCatalogueApplications.COLLECTION_DOCUMENTS_NOM)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                ConstantesCatalogueApplications.LIBVAL_DOMAINE, ConstantesCatalogueApplications.LIBVAL_APPLICATION]},
-        }
-        curseur_docs = collection.find(filtre)
-
-        domaines = {
-            'SenseursPassifs': CONFIGURATION_INITIALE_DOMAINE_SENSEURSPASSIFS,
-        }
-        applications = {
-            'blynk': CONFIGURATION_INITIALE_APPLICATION_BLYNK,
-        }
-
-        for doc in curseur_docs:
-            libval = doc[Constantes.DOCUMENT_INFODOC_LIBELLE]
-            if libval == ConstantesCatalogueApplications.LIBVAL_APPLICATION:
-                nom_application = doc['nom']
-                if applications.get(nom_application):
-                    # Enlever de la liste, deja configure
-                    del applications[nom_application]
-            elif libval == ConstantesCatalogueApplications.LIBVAL_DOMAINE:
-                nom_domaine = doc['nom']
-                if domaines.get(nom_domaine):
-                    # Enlever de la liste, deja configure
-                    del domaines[nom_domaine]
-
-        # Creer transactions pour applications et domaines restants
-        for domaine in domaines.values():
-            domaine_action = ConstantesCatalogueApplications.TRANSACTION_MAJ_DOMAINE
-            self.generateur_transactions.soumettre_transaction(domaine, domaine_action)
-
-        for app in applications.values():
-            domaine_action = ConstantesCatalogueApplications.TRANSACTION_MAJ_APPLICATION
-            self.generateur_transactions.soumettre_transaction(app, domaine_action)
 
     def traiter_transaction_maj_domaine(self, transaction):
         collection = self.document_dao.get_collection(ConstantesCatalogueApplications.COLLECTION_DOCUMENTS_NOM)
