@@ -1672,6 +1672,10 @@ class ConstantesCatalogueApplications:
 
     TRANSACTION_MAJ_DOMAINE = '%s.majDomaine' % DOMAINE_NOM
     TRANSACTION_MAJ_APPLICATION = '%s.majApplication' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_APPLICATION = '%s.catalogueApplication' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_DOMAINE = '%s.catalogueDomaine' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_APPLICATIONS = '%s.catalogueApplications' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_DOMAINES = '%s.catalogueDomaines' % DOMAINE_NOM
 
     REQUETE_LISTE_DOMAINES = '%s.listeDomaines' % DOMAINE_NOM
     REQUETE_LISTE_APPLICATIONS = '%s.listeApplications' % DOMAINE_NOM

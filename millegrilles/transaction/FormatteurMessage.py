@@ -22,11 +22,19 @@ class FormatteurMessageMilleGrilles:
         self.__signateur_transactions = signateur_transactions
         self.__contresignateur_transactions = contresignateur_transactions
 
+        with open(signateur_transactions.configuration.mq_certfile) as certs:
+            cert = self.__signateur_transactions.certificat
+            self.__chaine_certificats = [
+
+            ]
+
+
     def signer_message(self,
                        message: dict,
                        domaine: str = None,
                        version: int = Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                       idmg_destination: str = None) -> (dict, str):
+                       idmg_destination: str = None,
+                       ajouter_chaine_certs = False) -> (dict, str):
         """
         Formatte un message en ajoutant l'entete et en le signant.
 
@@ -56,6 +64,10 @@ class FormatteurMessageMilleGrilles:
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_contenu(enveloppe)
         message_signe = self.__signateur_transactions.signer(enveloppe)
+
+        if ajouter_chaine_certs:
+            # Ajouter un element _certificats = [cert, inter, millegrilles]
+            message_signe['_certificats'] = self.__signateur_transactions.chaine_certs
 
         return message_signe, uuid_transaction
 

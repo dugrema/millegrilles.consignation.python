@@ -11,6 +11,7 @@ import tempfile
 import secrets
 import shutil
 
+from typing import Optional
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -244,6 +245,8 @@ class EnveloppeCertificat:
 
 class UtilCertificats:
 
+    END_CERTIFICATE = '-----END CERTIFICATE-----'
+
     def __init__(self, contexte):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self._contexte = contexte
@@ -253,6 +256,7 @@ class UtilCertificats:
         self._certificat = None
         self._cle = None
         self._enveloppe = None
+        self._chaine: Optional[list] = None
 
     def initialiser(self):
         self._charger_cle_privee()
@@ -319,8 +323,11 @@ class UtilCertificats:
 
     def _charger_pem(self, certfile_path):
         with open(certfile_path, "rb") as certfile:
+            pem_bytes = certfile.read()
+            pem_str = pem_bytes.decode('utf-8')
+            self._chaine = self.__get_chaine_certificats(pem_str)
             certificat = x509.load_pem_x509_certificate(
-                certfile.read(),
+                pem_bytes,
                 backend=default_backend()
             )
 
@@ -408,6 +415,14 @@ class UtilCertificats:
     @property
     def certificat(self):
         return self._certificat
+
+    @property
+    def chaine_certs(self):
+        return self._chaine
+
+    def __get_chaine_certificats(self, pem_str: str):
+        chaine_certs = [c + UtilCertificats.END_CERTIFICATE for c in pem_str.split(UtilCertificats.END_CERTIFICATE)]
+        return chaine_certs[0:-1]
 
     @property
     def enveloppe_certificat_courant(self) -> EnveloppeCertificat:
