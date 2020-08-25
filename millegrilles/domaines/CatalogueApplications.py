@@ -187,6 +187,8 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
         self.__handler_commandes = super().get_handler_commandes()
         self.__handler_commandes[Constantes.SECURITE_PROTEGE] = TraitementCommandeCatalogueApplications(self)
 
+        self.__demande_catalogues_completee = False
+
     def configurer(self):
         super().configurer()
 
@@ -252,6 +254,13 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
         :return:
         """
         super().traiter_cedule(evenement)
+
+        indicateurs = evenement['indicateurs']
+        if not self.__demande_catalogues_completee or 'Canada/Eastern' in indicateurs and 'jour' in indicateurs:
+            # Faire une demande des catalogues locaux au service monitor
+            domaineAction = 'commande.servicemonitor.' + Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES
+            self._contexte.generateur_transactions.transmettre_commande(dict(), domaineAction)
+            self.__demande_catalogues_completee = True
 
         # indicateurs = evenement['indicateurs']
         #
