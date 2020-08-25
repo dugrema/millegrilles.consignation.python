@@ -200,6 +200,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"")
 
+
 class ServerWebAPI:
 
     def __init__(self, service_monitor, webroot='/var/opt/millegrilles/installeur'):

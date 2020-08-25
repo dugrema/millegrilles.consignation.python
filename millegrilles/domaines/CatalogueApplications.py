@@ -276,6 +276,8 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesCatalogueApplications.TRANSACTION_MAJ_DOMAINE:
             processus = "millegrilles_domaines_CatalogueApplications:ProcessusTransactionMajDomaine"
+        elif domaine_transaction == ConstantesCatalogueApplications.TRANSACTION_CATALOGUE_DOMAINES:
+            processus = "millegrilles_domaines_CatalogueApplications:ProcessusTransactionMajDomaines"
         elif domaine_transaction == ConstantesCatalogueApplications.TRANSACTION_MAJ_APPLICATION:
             processus = "millegrilles_domaines_CatalogueApplications:ProcessusTransactionMajApplication"
         else:
@@ -458,6 +460,31 @@ class ProcessusTransactionMajDomaine(ProcessusCatalogueApplications):
         self.__logger.debug("Document transaction: %s" % transaction)
 
         self.controleur.gestionnaire.traiter_transaction_maj_domaine(transaction)
+
+        self.set_etape_suivante()  # Terminer
+
+
+class ProcessusTransactionMajDomaines(ProcessusCatalogueApplications):
+    """
+    Processus pour enregistrer une transaction
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.transaction_filtree
+        self.__logger.debug("Document processus: %s" % self._document_processus)
+        self.__logger.debug("Document transaction: %s" % transaction)
+
+        for nom_domaine, configuration in transaction['domaines'].items():
+            info_domaine = {
+                'nom': nom_domaine,
+                'module': configuration['module'],
+                'classe': configuration['classe'],
+            }
+            self.controleur.gestionnaire.traiter_transaction_maj_domaine(info_domaine)
 
         self.set_etape_suivante()  # Terminer
 

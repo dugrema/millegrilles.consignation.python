@@ -81,6 +81,7 @@ class TraitementMessagesMiddleware(BaseCallback):
             'commande.servicemonitor.activerHebergement',
             'commande.servicemonitor.desactiverHebergement',
             'evenement.presence.domaine',
+            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
         ]
 
         # Ajouter les routing keys
@@ -322,6 +323,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
             'commande.servicemonitordependant.#',
             'commande.servicemonitor.activerHebergement',
             'commande.servicemonitor.desactiverHebergement',
+            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
         ]
 
         for key in routing_keys:

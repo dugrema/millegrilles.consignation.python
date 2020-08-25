@@ -144,11 +144,8 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_GET_INFORMATION_NOEUD:
             self._service_monitor.transmettre_info_acteur(commande)
 
-            # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_WEB:
-
-            # ConstantesMonitor.COMMANDE_MAJ_CERTIFICATS_PAR_ROLE:
-
-            # ConstantesMonitor.COMMANDE_FERMER_MILLEGRILLES:
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
+            self._service_monitor.transmettre_catalogue_local()
 
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)

@@ -1609,6 +1609,7 @@ class ConstantesServiceMonitor:
     COMMANDE_SUPPRIMER_APPLICATION = 'supprimerApplication'
     COMMANDE_BACKUP_APPLICATION = 'backupApplication'
     COMMANDE_RESTORE_APPLICATION = 'restoreApplication'
+    COMMANDE_TRANSMETTRE_CATALOGUES = 'transmettreCatalogues'
 
     # Commande de l'acteur systeme du noeud
     COMMANDE_ACTEUR_GET_INFORMATION_NOEUD = 'acteur.getInformationNoeud'

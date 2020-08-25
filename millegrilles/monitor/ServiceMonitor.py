@@ -9,6 +9,7 @@ import os
 import psutil
 import tarfile
 import io
+import lzma
 
 from typing import cast, Optional
 from threading import Event, BrokenBarrierError
@@ -592,6 +593,19 @@ class ServiceMonitor:
             with open(fichier[0], 'w') as cle_out:
                 with open(fichier[1], 'r') as cle_in:
                     cle_out.write(cle_in.read())
+
+    def transmettre_catalogue_local(self):
+        """
+        Charger tous les fichiers de catalogue locaux et transmettre sur MQ.
+        :return:
+        """
+        webroot = self._args.webroot
+        path_catalogues = os.path.join(webroot, 'catalogues')
+
+        with lzma.open(os.path.join(path_catalogues, 'catalogue.domaines.json.xz'), 'rt') as fichier:
+            catalogue_domaines = json.load(fichier)
+        domaine_action = 'transaction.' + catalogue_domaines[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        self._connexion_middleware.generateur_transactions.emettre_message(catalogue_domaines, domaine_action)
 
     @property
     def gestionnaire_mq(self):
