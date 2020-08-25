@@ -353,6 +353,14 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesCatalogueApplications.LIBVAL_APPLICATION,
             'nom': transaction['nom'],
         }
+
+        version_courante = collection.find_one(filtre, projection={'version': 1})
+        nouvelle_version = transaction.get('version')
+        if version_courante:
+            maj_document = verifier_version_plusrecente(version_courante['version'], nouvelle_version)
+            if not maj_document:
+                return
+
         on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
@@ -506,3 +514,30 @@ class ProcessusTransactionMajApplication(ProcessusCatalogueApplications):
         self.controleur.gestionnaire.traiter_transaction_maj_application(transaction)
 
         self.set_etape_suivante()  # Terminer
+
+
+def verifier_version_plusrecente(version_originale, nouvelle_version):
+    """
+    :param version_originale: Version courante
+    :param nouvelle_version: Version du nouveau document/fichier
+    :return: True si la nouvelle_version est plus grande que la version originale
+    """
+
+    split_originale = version_originale.split('.')
+    split_nouvelle = nouvelle_version.split('.')
+
+    for mark in range(0, max(len(split_nouvelle), len(split_originale))):
+        try:
+            valeur_originale = split_originale[mark]
+        except IndexError:
+            return False
+
+        try:
+            valeur_nouvelle = split_nouvelle[mark]
+        except IndexError:
+            return True
+
+        if valeur_nouvelle == valeur_originale:
+            continue
+        else:
+            return valeur_nouvelle > valeur_originale
