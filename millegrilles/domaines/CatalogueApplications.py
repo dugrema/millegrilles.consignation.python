@@ -278,7 +278,7 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_CatalogueApplications:ProcessusTransactionMajDomaine"
         elif domaine_transaction == ConstantesCatalogueApplications.TRANSACTION_CATALOGUE_DOMAINES:
             processus = "millegrilles_domaines_CatalogueApplications:ProcessusTransactionMajDomaines"
-        elif domaine_transaction == ConstantesCatalogueApplications.TRANSACTION_MAJ_APPLICATION:
+        elif domaine_transaction == ConstantesCatalogueApplications.TRANSACTION_CATALOGUE_APPLICATION:
             processus = "millegrilles_domaines_CatalogueApplications:ProcessusTransactionMajApplication"
         else:
             # Type de transaction inconnue, on lance une exception

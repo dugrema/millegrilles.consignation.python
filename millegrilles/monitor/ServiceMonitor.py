@@ -607,6 +607,16 @@ class ServiceMonitor:
         domaine_action = 'transaction.' + catalogue_domaines[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         self._connexion_middleware.generateur_transactions.emettre_message(catalogue_domaines, domaine_action)
 
+        path_applications = os.path.join(webroot, 'catalogues', 'applications')
+        liste_fichiers_apps = os.listdir(path_applications)
+        info_apps = [os.path.join(path_applications, f) for f in liste_fichiers_apps if f.endswith('.json.xz')]
+        for app_path in info_apps:
+            with lzma.open(app_path, 'rt') as fichier:
+                app_transaction = json.load(fichier)
+            domaine_action = 'transaction.' + catalogue_domaines[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            self._connexion_middleware.generateur_transactions.emettre_message(app_transaction, domaine_action)
+
     @property
     def gestionnaire_mq(self):
         return self._gestionnaire_mq
