@@ -657,7 +657,7 @@ class GestionnaireDomaine:
             self.__message_presence = info_domaine
         routing = 'evenement.presence.domaine'
         self.generateur_transactions.emettre_message(
-            self.__message_presence, routing, exchanges=[Constantes.SECURITE_SECURE],
+            self.__message_presence, routing, exchanges=[Constantes.SECURITE_PROTEGE],
             reply_to=self.get_nom_domaine() + '.evenements', correlation_id='presence.domaine',
         )
 

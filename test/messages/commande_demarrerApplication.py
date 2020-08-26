@@ -468,7 +468,7 @@ mongoexpress = {
     ]
 }
 
-uuid_service_monitor = 'f9f3e995-f52c-4718-8e5c-a1efd101f402'
+uuid_service_monitor = '43eee47d-fc23-4cf5-b359-70069cf06600'
 
 
 class MessagesSample(BaseCallback):
@@ -700,11 +700,11 @@ class MessagesSample(BaseCallback):
         # self.supprimer_application_protege_dummy()
         # self.installer_application_senseurspassifs()
         # self.supprimer_application_senseurspassifs()
-        self.installer_application_blynk()
+        # self.installer_application_blynk()
         # self.supprimer_application_blynk()
         # self.installer_application_redmine()
         # self.supprimer_application_redmine()
-        # self.installer_application_mongoexpress()
+        self.installer_application_mongoexpress()
         # self.supprimer_application_mongoexpress()
 
 
