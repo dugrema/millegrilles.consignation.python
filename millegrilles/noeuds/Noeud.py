@@ -407,6 +407,11 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         Ouvre nouveau fichier de buffer
         :return: Liste des fichiers precedemment existants
         """
+        try:
+            os.mkdir(self._data_path)
+        except FileExistsError:
+            pass
+
         files = [os.path.join(self._data_path, f) for f in os.listdir(self._data_path) if f.endswith('.jsonl')]
 
         date_formatted = datetime.datetime.utcnow().strftime(FORMAT_TIMESTAMP_FICHIER)

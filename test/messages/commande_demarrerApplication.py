@@ -60,10 +60,92 @@ sample_app_1 = {
 }
 
 blynk_app = {
+    "_mg-libelle": "application",
     "nom": "blynk",
-    "registries": [
-        "docker.maceroc.com",
-        "dugremat"
+    "dependances": [
+        {
+            "config": {
+                "configs": [
+                    {
+                        "filename": "/run/secrets/webcert.pem",
+                        "name": "pki.blynk.cert"
+                    }
+                ],
+                "constraints": [
+                    "node.labels.millegrilles.app.blynk == true"
+                ],
+                "endpoint_spec": {
+                    "mode": "vip",
+                    "ports": [
+                        {
+                            "protocol": "tcp",
+                            "publish_mode": "host",
+                            "published_port": 9443,
+                            "target_port": 9443
+                        }
+                    ]
+                },
+                "env": [
+                    "SERVER_SSL_KEY=/run/secrets/webkey.pem",
+                    "SERVER_SSL_CERT=/run/secrets/webcert.pem"
+                ],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                },
+                "mounts": [
+                    "blynk_data:/blynk/data:rw"
+                ],
+                "name": "blynk",
+                "networks": [
+                    {
+                        "target": "millegrille_net"
+                    }
+                ],
+                "resources": {
+                    "cpu_limit": 1000000000,
+                    "mem_limit": 100000000
+                },
+                "secrets": [
+                    {
+                        "filename": "webkey.pem",
+                        "name": "pki.blynk.key"
+                    }
+                ]
+            },
+            "image": "blynk"
+        },
+        {
+            "backup": {
+                "base_path": "/tmp/backup"
+            },
+            "command": "/bin/sleep 10000",
+            "config": {
+                "constraints": [
+                    "node.labels.millegrilles.app.blynk == true"
+                ],
+                "labels": {
+                    "millegrille": "${IDMG}"
+                },
+                "mode": {
+                    "mode": "replicated",
+                    "replicas": 1
+                },
+                "mounts": [
+                    "blynk_data:/tmp/backup/data:rw"
+                ],
+                "name": "blynk_client",
+                "resources": {
+                    "cpu_limit": 1000000000,
+                    "mem_limit": 50000000
+                }
+            },
+            "etape_seulement": True,
+            "image": "blynk_client"
+        }
     ],
     "images": {
         "blynk": {
@@ -71,92 +153,19 @@ blynk_app = {
             "version": "0.41.10_2"
         },
         "blynk_client": {
-            "registries": [""],
             "image": "alpine",
+            "registries": [
+                ""
+            ],
             "version": "latest"
         }
     },
-    "dependances": [
-        {
-            "image": "blynk",
-            "config": {
-                "name": "blynk",
-                "constraints": [
-                    "node.labels.millegrilles.app.blynk == true"
-                ],
-                "env": [
-                    "SERVER_SSL_KEY=/run/secrets/webkey.pem",
-                    "SERVER_SSL_CERT=/run/secrets/webcert.pem"
-                ],
-                "configs": [
-                    {
-                        "name": "pki.blynk.cert",
-                        "filename": "/run/secrets/webcert.pem"
-                    }
-                ],
-                "secrets": [
-                    {
-                        "name": "pki.blynk.key",
-                        "filename": "webkey.pem"
-                    }
-                ],
-                "mounts": [
-                    "blynk_data:/blynk/data:rw"
-                ],
-                "endpoint_spec": {
-                    "mode": "vip",
-                    "ports": [{
-                        "published_port": 9443,
-                        "target_port": 9443,
-                        "protocol": "tcp",
-                        "publish_mode": "host"
-                    }]
-                },
-                "networks": [{
-                    "target": "millegrille_net"
-                }],
-                "labels": {
-                    "millegrille": "${IDMG}"
-                },
-                "resources": {
-                    "cpu_limit": 1000000000,
-                    "mem_limit": 100000000
-                },
-                "mode": {
-                    "mode": "replicated",
-                    "replicas": 1
-                }
-            }
-        },
-        {
-            "image": "blynk_client",
-            "command": "/bin/sleep 10000",
-            "etape_seulement": True,
-            "backup": {
-                "base_path": "/tmp/backup"
-            },
-            "config": {
-                "name": "blynk_client",
-                "constraints": [
-                    "node.labels.millegrilles.app.blynk == true"
-                ],
-                "mounts": [
-                    "blynk_data:/tmp/backup/data:rw"
-                ],
-                "labels": {
-                    "millegrille": "${IDMG}"
-                },
-                "resources": {
-                    "cpu_limit": 1000000000,
-                    "mem_limit": 50000000
-                },
-                "mode": {
-                    "mode": "replicated",
-                    "replicas": 1
-                }
-            }
-        }
-    ]
+    "registries": [
+        "docker.maceroc.com",
+        "dugremat"
+    ],
+    "tar_xz": "/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4Cf/AaxdABcL3ASAUDIm7h19G/PyyzPs7Pg38OrWe2QHFu00IEHrF1qmlEYhqLLXsM6riaBq2dq1ZHmAZ49yqJ4IzoZDhkbRvRjin/zABfQ7awUmkMfbBmC18uP+MBzQJ4s5Sv5B1C9KNdLC6v1zoob/N89uL8kUuXY2VKi/98yuh6HYTHSpfbMFKaSt/lsUAQNJ1XkvZ0JLRmFGlOl72bwwInYg1x7ZdbY1mZ+5Rxed23S5KanOt4qvxYZ3etSJD+gLGN6+VIxUwcPKN0fl+loNhJCsfxXbplLi9PARg/4onJsxp5oTJ9zmLdoXj7y2+l0nv0cOEN+nINFQWbzRa/VR6F7JFuDjumqW6aoZeJlAHuIzOpUthRIp0tQqK1u8pODTjJnuzF10crsdNHGw96pZ2ciOalnap8PNvXKkn+vVgLpwEzPoCgEyf6kBzART5LBQXRQilDXOQelddNpppyLeMZvCXcMmLhqCLzgMFuyfIvfVKthF5U+01hROjoQflLfcHfsaQjgm9tEOhGw0mhUpM/VVGHhBgs8B5Z78RCzpSy2ZXSFGUep4efdxCeCBLGQAABVTB+VPbVkRAAHIA4BQAABfqqv4scRn+wIAAAAABFla",
+    "version": "1.31.0"
 }
 
 senseurspassifs_app = {
@@ -459,7 +468,7 @@ mongoexpress = {
     ]
 }
 
-uuid_service_monitor = '6f1f11c8-d70d-45ef-b13c-2965b73c71b2'
+uuid_service_monitor = 'f9f3e995-f52c-4718-8e5c-a1efd101f402'
 
 
 class MessagesSample(BaseCallback):
@@ -691,11 +700,11 @@ class MessagesSample(BaseCallback):
         # self.supprimer_application_protege_dummy()
         # self.installer_application_senseurspassifs()
         # self.supprimer_application_senseurspassifs()
-        # self.installer_application_blynk()
+        self.installer_application_blynk()
         # self.supprimer_application_blynk()
         # self.installer_application_redmine()
         # self.supprimer_application_redmine()
-        self.installer_application_mongoexpress()
+        # self.installer_application_mongoexpress()
         # self.supprimer_application_mongoexpress()
 
 
