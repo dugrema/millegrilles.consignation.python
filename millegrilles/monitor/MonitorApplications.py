@@ -68,6 +68,9 @@ class GestionnaireApplications:
         tar_scripts = self.preparer_script_file(commande)
         self.preparer_installation(nom_application, configuration_docker, tar_scripts)
 
+        # Transmettre maj
+        self.__service_monitor.emettre_presence()
+
     def preparer_script_file(self, commande):
         b64_script = commande.contenu.get('scripts_b64')
         if b64_script:
@@ -84,8 +87,10 @@ class GestionnaireApplications:
         self.__logger.info("Supprimer application %s", str(commande))
 
         nom_application = commande.contenu['nom_application']
-        configuration_docker = commande.contenu['configuration']
         self.effectuer_desinstallation(nom_application)
+
+        # Transmettre maj
+        self.__service_monitor.emettre_presence()
 
     def backup_application(self, commande: CommandeMonitor):
         self.__logger.info("Backup application %s", str(commande))

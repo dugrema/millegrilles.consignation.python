@@ -617,6 +617,13 @@ class ServiceMonitor:
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
             self._connexion_middleware.generateur_transactions.emettre_message(app_transaction, domaine_action)
 
+    def emettre_presence(self):
+        """
+        Emet la presence du monitor avec information docker (containers, services) a jour.
+        :return:
+        """
+        self._connexion_middleware.emettre_presence()
+
     @property
     def gestionnaire_mq(self):
         return self._gestionnaire_mq
