@@ -18,6 +18,8 @@ from threading import Thread, Event
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
 
+NOEUD_ID = '43eee47d-fc23-4cf5-b359-70069cf06600'
+
 
 class MessagesSample(BaseCallback):
 
@@ -71,6 +73,17 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def requete_liste_noeud_detail(self):
+        requete = {
+            'noeud_id': NOEUD_ID,
+            'all_info': True,
+        }
+        domaine_action = ConstantesTopologie.REQUETE_LISTE_NOEUDS
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, domaine_action,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def requete_info_domaine(self):
         requete = {'domaine': 'CatalogueApplications'}
         domaine_action = ConstantesTopologie.REQUETE_INFO_DOMAINE
@@ -113,9 +126,10 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_liste_domaines()
-        # sample.requete_liste_noeuds()
+        sample.requete_liste_noeuds()
+        # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
-        sample.requete_info_noeud()
+        # sample.requete_info_noeud()
         # sample.transaction_ajouter_domaine()
         # sample.transaction_supprimer_domaine()
 

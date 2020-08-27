@@ -20,7 +20,7 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
         if routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_DOMAINES:
             reponse = {'resultats': self.gestionnaire.get_liste_domaines()}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_NOEUDS:
-            reponse = {'resultats': self.gestionnaire.get_liste_noeuds()}
+            reponse = {'resultats': self.gestionnaire.get_liste_noeuds(message_dict)}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_DOMAINE:
             reponse = self.gestionnaire.get_info_domaine(message_dict)
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_NOEUD:
@@ -418,19 +418,24 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
 
         return domaines
 
-    def get_liste_noeuds(self):
+    def get_liste_noeuds(self, params: dict):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD
         }
-        projection = {
-            'noeud_id': 1,
-            'parent_noeud_id': 1,
-            'securite': 1,
-            'fqdn_detecte': 1,
-            'ip_detectee': 1,
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
-        }
+        if params.get('noeud_id'):
+            filtre['noeud_id'] = params['noeud_id']
+
+        projection = None
+        if not params.get('all_info'):
+            projection = {
+                'noeud_id': 1,
+                'parent_noeud_id': 1,
+                'securite': 1,
+                'fqdn_detecte': 1,
+                'ip_detectee': 1,
+                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+            }
 
         noeuds = list()
         for noeud in collection.find(filtre, projection):
