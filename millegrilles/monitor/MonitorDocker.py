@@ -262,7 +262,7 @@ class GestionnaireModulesDocker:
             # Prendre un tag au hasard
             image_tag = image.tags[0]
 
-            configuration = self.__formatter_configuration_service(service_name)
+            configuration = self.__formatter_configuration_service(service_name, application=service_name)
 
             command = configuration_service.get('command')
 
@@ -574,11 +574,11 @@ class GestionnaireModulesDocker:
 
         return valeur
 
-    def __formatter_configuration_service(self, service_name):
+    def __formatter_configuration_service(self, service_name, **kwargs):
         config_service = json.loads(self.charger_config('docker.cfg.' + service_name))
         self.__logger.debug("Configuration service %s : %s", service_name, str(config_service))
 
-        dict_config_docker = self.__remplacer_variables(service_name, config_service)
+        dict_config_docker = self.__remplacer_variables(service_name, config_service, **kwargs)
 
         return dict_config_docker
 
@@ -619,7 +619,7 @@ class GestionnaireModulesDocker:
 
         return dict_config_docker
 
-    def __remplacer_variables(self, nom_service, config_service, mode_container=False):
+    def __remplacer_variables(self, nom_service, config_service, mode_container=False, **kwargs):
         self.__logger.debug("Remplacer variables %s" % nom_service)
         dict_config_docker = dict()
 
@@ -678,11 +678,15 @@ class GestionnaireModulesDocker:
 
             # Service labels
             config_labels = config_service.get('labels')
+            updated_labels = dict()
             if config_labels:
-                updated_labels = dict()
                 for key, value in config_labels.items():
                     value = self.__mapping(value)
                     updated_labels[key] = value
+                dict_config_docker['labels'] = updated_labels
+
+            if kwargs.get('application'):
+                updated_labels['application'] = kwargs.get('application')
                 dict_config_docker['labels'] = updated_labels
 
             # Container labels
@@ -820,6 +824,17 @@ class GestionnaireModulesDocker:
         containers_service = self.__docker.containers.list(filters={'name': nom_service})
         container_trouve = containers_service[0]
         return container_trouve.id
+
+    def trouver_application(self, nom_application):
+        containers = self.__docker.containers.list(filters={'label': 'application=' + nom_application})
+        services = self.__docker.services.list(filters={'label': 'application=' + nom_application})
+
+        resultat = {
+            'containers': containers,
+            'services': services,
+        }
+
+        return resultat
 
     def executer_scripts(self, container_id: str, commande: str, tar_path: str = None, environment: list = None):
         container = self.__docker.containers.get(container_id)

@@ -18,9 +18,9 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_DOMAINES:
-            reponse = {'liste': self.gestionnaire.get_liste_domaines()}
+            reponse = {'resultats': self.gestionnaire.get_liste_domaines()}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_NOEUDS:
-            reponse = {'liste': self.gestionnaire.get_liste_noeuds()}
+            reponse = {'resultats': self.gestionnaire.get_liste_noeuds()}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_DOMAINE:
             reponse = self.gestionnaire.get_info_domaine(message_dict)
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_NOEUD:

@@ -83,9 +83,9 @@ class GestionnaireApplications:
     def supprimer_application(self, commande: CommandeMonitor):
         self.__logger.info("Supprimer application %s", str(commande))
 
-        nom_image_docker = commande.contenu['nom_application']
+        nom_application = commande.contenu['nom_application']
         configuration_docker = commande.contenu['configuration']
-        self.effectuer_desinstallation(nom_image_docker, configuration_docker)
+        self.effectuer_desinstallation(nom_application)
 
     def backup_application(self, commande: CommandeMonitor):
         self.__logger.info("Backup application %s", str(commande))
@@ -238,31 +238,19 @@ class GestionnaireApplications:
             self.__wait_start_service_name = None  # Reset ecoute de l'evenement
             self.__wait_start_container_name = None  # Reset ecoute de l'evenement
 
-    def effectuer_desinstallation(self, nom_image_docker, configuration_docker):
+    def effectuer_desinstallation(self, nom_image_docker):
 
-        # Nettoyer fichiers de configurations
-        liste_config = list(configuration_docker['dependances'])
-        liste_config.reverse()
-        for config_image in liste_config:
+        # Trouver le service/container en faisant la recherche des labels
+        dict_app = self.__gestionnaire_modules_docker.trouver_application(nom_image_docker)
+        for container in dict_app['containers']:
+            container.stop()
             try:
-                if config_image.get('dependances'):
-                    # Sous dependances presentes, c'est une sous-config. Appel recursif.
-                    nom_image_docker = config_image['nom']
-                    self.effectuer_desinstallation(nom_image_docker, config_image)
-                elif config_image.get('image'):
-                    nom_service = config_image['config']['name']
-                    if config_image.get('container_mode'):
-                        # Arreter le container - il se supprime automatiquement
-                        self.__gestionnaire_modules_docker.supprimer_container(nom_service)
-                    else:
-                        # Supprimer le service
-                        self.__gestionnaire_modules_docker.supprimer_service(nom_service)
+                container.remove()
+            except:
+                pass  # Ok, container devrait se supprimer automatiquement
 
-                        config_name = self.__service_monitor.idmg_tronque + '.app.' + nom_image_docker
-                        self.__gestionnaire_modules_docker.supprimer_config(config_name)
-
-            except IndexError:
-                pass  # OK, service absent
+        for service in dict_app['services']:
+            service.remove()
 
     def effectuer_backup(self, nom_image_docker, configuration_docker, tar_scripts=None):
 
