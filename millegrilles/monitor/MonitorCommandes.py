@@ -195,14 +195,6 @@ class GestionnaireCommandes:
         else:
             self.desactiver_hebergement(resultats)
 
-    def traiter_reponse_comptes_noeuds(self, message):
-        self.__logger.debug("Reponse comptes noeuds: %s" % str(message))
-        resultats = message['resultats']
-
-        for cert in resultats:
-            pem = cert[Constantes.ConstantesPki.LIBELLE_CERTIFICAT_PEM]
-            self._ajouter_compte_pem(pem, message)
-
     def inscrire_domaine(self, nom_domaine: str, exchanges_routing: dict):
         self._service_monitor.rediriger_messages_downstream(nom_domaine, exchanges_routing)
 

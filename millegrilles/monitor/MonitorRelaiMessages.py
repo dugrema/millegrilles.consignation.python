@@ -59,8 +59,6 @@ class TraitementMessagesMiddleware(BaseCallback):
             self.traiter_presence_domaine(message_dict)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
-        elif correlation_id == ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS:
-            self.__gestionnaire_commandes.traiter_reponse_comptes_noeuds(message_dict)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 

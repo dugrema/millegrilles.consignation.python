@@ -47,8 +47,6 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
                 reponse = self.gestionnaire.get_certificat(fingerprint, properties, demander_si_inconnu=False)
             elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
                 reponse = self.gestionnaire.get_certificats_backup()
-            elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS:
-                reponse = {'liste': self.gestionnaire.get_liste_certificats_noeuds()}
             elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERTS_CA:
                 reponse = self.gestionnaire.get_liste_certificats_ca()
             else:
