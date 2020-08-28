@@ -369,12 +369,14 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         nom = transaction['nom']
 
         set_ops = {
-            'domaines.%s.module' % nom: transaction['module'],
-            'domaines.%s.classe' % nom: transaction['classe'],
+            'domaine': nom,
+            'module': transaction['module'],
+            'classe': transaction['classe'],
+            'actif': True,
         }
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_DOMAINE,
             'noeud_id': noeud_id,
         }
 
@@ -391,23 +393,24 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
 
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
         resultat = collection.update_one(filtre, ops, upsert=True)
-        if resultat.upserted_id is not None:
-            # Creer une transaction pour generer le domaine
-            self.soumettre_transaction_monitor(Constantes.SECURITE_PROTEGE, transaction)
+
+        # Creer une transaction pour generer/maj le domaine
+        self.soumettre_transaction_monitor(Constantes.SECURITE_PROTEGE, transaction)
 
     def supprimer_domaine_dynamique(self, transaction: dict):
         noeud_id = transaction['noeud_id']
         nom = transaction['nom']
 
-        unset_ops = {
-            'domaines.%s' % nom: 1
+        set_ops = {
+            'actif': False,
         }
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_DOMAINE,
             'noeud_id': noeud_id,
+            'nom': nom,
         }
         ops = {
-            '$unset': unset_ops,
+            '$set': set_ops,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 

@@ -341,21 +341,21 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         noeud_id = self.contexte.configuration.noeud_id
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.ConstantesTopologie.LIBVAL_NOEUD,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: Constantes.ConstantesTopologie.LIBVAL_DOMAINE,
             'noeud_id': noeud_id,
+            'actif': True,
         }
         collection = self.contexte.document_dao.get_collection(Constantes.ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
-        configuration_noeud = collection.find_one(filtre)
+        configuration_noeud = collection.find(filtre)
 
         domaines_actifs = list()
-        if configuration_noeud:
-            try:
-                for key, value in configuration_noeud.get('domaines').items():
-                    config = dict(value)
-                    config['nom'] = key
-                    domaines_actifs.append(config)
-            except AttributeError:
-                pass
+        try:
+            for config in configuration_noeud:
+                config = dict(config)
+                config['nom'] = config['domaine']
+                domaines_actifs.append(config)
+        except AttributeError:
+            pass
 
         return domaines_actifs
 

@@ -16,9 +16,9 @@ class TraitementRequetesProtegeesCatalogueApplications(TraitementRequetesProtege
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         if routing_key == 'requete.' + ConstantesCatalogueApplications.REQUETE_LISTE_DOMAINES:
-            reponse = {'liste': self.gestionnaire.get_liste_domaines()}
+            reponse = {'resultats': self.gestionnaire.get_liste_domaines()}
         elif routing_key == 'requete.' + ConstantesCatalogueApplications.REQUETE_LISTE_APPLICATIONS:
-            reponse = {'liste': self.gestionnaire.get_liste_applications()}
+            reponse = {'resultats': self.gestionnaire.get_liste_applications()}
         elif routing_key == 'requete.' + ConstantesCatalogueApplications.REQUETE_INFO_DOMAINE:
             reponse = self.gestionnaire.get_domaine(message_dict)
         elif routing_key == 'requete.' + ConstantesCatalogueApplications.REQUETE_INFO_APPLICATION:
@@ -247,14 +247,12 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
         """
         collection = self.document_dao.get_collection(ConstantesCatalogueApplications.COLLECTION_DOCUMENTS_NOM)
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesCatalogueApplications.LIBVAL_DOMAINE}
-        projection = {'nom': 1}
+        projection = {'nom': 1, 'classe': 1, 'module': 1}
 
         domaines = list()
         for domaine in collection.find(filtre, projection):
-            info = {
-                'nom': domaine['nom']
-            }
-            domaines.append(info)
+            del domaine['_id']
+            domaines.append(domaine)
 
         return domaines
 
