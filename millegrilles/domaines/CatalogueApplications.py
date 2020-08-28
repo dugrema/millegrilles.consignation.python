@@ -401,4 +401,4 @@ def verifier_version_plusrecente(version_originale, nouvelle_version):
         if valeur_nouvelle == valeur_originale:
             continue
         else:
-            return valeur_nouvelle > valeur_originale
+            return int(valeur_nouvelle) > int(valeur_originale)
