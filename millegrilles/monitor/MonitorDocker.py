@@ -253,7 +253,7 @@ class GestionnaireModulesDocker:
                 if certificat_compte_cle:
                     self.creer_compte(certificat_compte_cle)
 
-        nom_image_docker = kwargs.get('nom') or service_name
+        nom_image_docker = kwargs.get('nom_image') or service_name
 
         configuration = dict()
         try:
@@ -280,12 +280,14 @@ class GestionnaireModulesDocker:
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail erreur configuration service " + service_name)
         except APIError as apie:
-            self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
-            raise apie
-            # if apie.status_code == 409:
-            #     self.__logger.info("Service %s deja demarre" % service_name)
-            # else:
-            #     self.__logger.exception("Erreur demarrage service %s" % service_name)
+            # self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
+            # raise apie
+            if apie.status_code == 409:
+                self.__logger.info("Service %s deja demarre" % service_name)
+                return True
+            else:
+                self.__logger.exception("Erreur demarrage service %s" % service_name)
+                raise apie
 
     def demarrer_container(self, container_name: str, config: dict, **kwargs):
         self.__logger.info("Demarrage container %s", container_name)
@@ -415,7 +417,7 @@ class GestionnaireModulesDocker:
                 self.__hebergement_actif = False
 
     def force_update_service(self, service_name):
-        filter = {service_name}
+        filter = {'name': service_name}
         service_list = self.__docker.services.list(filters=filter)
         service_list[0].force_update()
 
@@ -842,7 +844,7 @@ class GestionnaireModulesDocker:
         if tar_path:
             # On copie l'archive tar et extrait dans le container
             with open(tar_path, 'rb') as fichier:
-                container.put_archive('/usr/local', fichier)
+                container.put_archive('/usr/local/scripts', fichier)
                 os.remove(tar_path)  # Cleanup fichier temporaire
 
         exit_code, output = container.exec_run(commande, stream=True, environment=environment)

@@ -5,11 +5,14 @@ import json
 import secrets
 import os
 import tempfile
+import tarfile
+import io
 
+from typing import Optional
 from threading import Event
 from typing import cast
 from base64 import b64encode, b64decode
-from os import path, remove
+from os import path
 from docker.errors import APIError
 
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker
@@ -72,13 +75,15 @@ class GestionnaireApplications:
         self.__service_monitor.emettre_presence()
 
     def preparer_script_file(self, commande):
-        b64_script = commande.contenu.get('scripts_b64')
-        if b64_script:
-            tar_bytes = b64decode(b64_script)
-            file_handle, tar_scripts = tempfile.mkstemp(prefix='monitor-script-', suffix='.tar')
-            os.close(file_handle)
-            with open(tar_scripts, 'wb') as fichier:
-                fichier.write(tar_bytes)
+        configuration = commande.contenu.get('configuration')
+        if configuration and configuration.get('tar_xz'):
+            b64_script = configuration['tar_xz']
+            if b64_script:
+                tar_bytes = b64decode(b64_script)
+                file_handle, tar_scripts = tempfile.mkstemp(prefix='monitor-script-', suffix='.tar')
+                os.close(file_handle)
+                with open(tar_scripts, 'wb') as fichier:
+                    fichier.write(tar_bytes)
         else:
             tar_scripts = commande.contenu.get('scripts_tarfile')
         return tar_scripts
@@ -137,13 +142,23 @@ class GestionnaireApplications:
 
         nginx_config = configuration_docker.get('nginx')
         if nginx_config:
-            conf = nginx_config['conf']
+            server_file = nginx_config.get('server_file')
+            conf: Optional[str] = None
+            if server_file:
+                # Charger le fichier a partir de l'archive tar
+                server_file_obj = io.BytesIO(b64decode(configuration_docker['tar_xz']))
+                tar_content = tarfile.open(fileobj=server_file_obj)
+                conf_file_member = tar_content.getmember(server_file)
+                conf = tar_content.extractfile(conf_file_member).read().decode('utf-8')
+
+                server_file_obj = None
+                tar_content = None
 
             # Remplacer les variables de conf
             server_domain = self.__gestionnaire_modules_docker.hostname
-            app_domain = nginx_config['subdomain'] + '.' + server_domain
+            app_domain = '.'.join([nginx_config['subdomain'], server_domain])
 
-            conf = conf.replace("${SERVER_DOMAIN}", server_domain)
+            conf = conf.replace("${HOSTNAME}", server_domain)
             conf = conf.replace("${APP_DOMAIN}", app_domain)
 
             if nginx_config.get('params'):
@@ -151,9 +166,8 @@ class GestionnaireApplications:
                     conf = conf.replace('${%s}' % key, value)
 
             # Injecter le fichier dans le repertoire de nginx
-            path_nginx = '/var/opt/millegrilles/%s/mounts/nginx/conf.d/modules' % self.__service_monitor.idmg
-            nom_config = nginx_config['server_file']
-            with open(path.join(path_nginx, nom_config), 'w') as fichier:
+            path_nginx = '/var/opt/millegrilles/nginx/modules'
+            with open(path.join(path_nginx, server_file), 'w') as fichier:
                 fichier.write(conf)
 
             # Redemarrer nginx
@@ -213,7 +227,7 @@ class GestionnaireApplications:
                         raise ex
         else:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_container_docker)
-            raise Exception("Image non installee : " + nom_container_docker)
+            raise Exception("Container non installe : " + nom_container_docker)
 
         if config_image.get('etape_seulement'):
             # C'est un service intermediaire pour l'installation/backup
@@ -234,9 +248,11 @@ class GestionnaireApplications:
                                                                       images=gestionnaire_images_applications)
             else:
                 self.__wait_start_service_name = module_name
-                self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
+                self.__gestionnaire_modules_docker.demarrer_service(module_name,
                                                                     config=config_elem,
-                                                                    images=gestionnaire_images_applications)
+                                                                    images=gestionnaire_images_applications,
+                                                                    nom_image=nom_image_docker,
+                                                                    nom_container=nom_container_docker)
 
             self.__wait_container_event.wait(60)
         finally:
