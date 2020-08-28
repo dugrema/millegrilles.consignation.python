@@ -93,8 +93,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.commander_arreter_messagerie()
-        sample.commander_demarrer_senseurspassifs()
-        # sample.commander_arreter_senseurspassifs()
+        # sample.commander_demarrer_senseurspassifs()
+        sample.commander_arreter_senseurspassifs()
 
 # --- MAIN ---
 sample = MessagesSample()

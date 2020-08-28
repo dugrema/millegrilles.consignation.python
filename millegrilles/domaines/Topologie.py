@@ -296,7 +296,7 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             'parent_noeud_id': parent_id,
             'securite': securite,
         }
-        for champ in ['fqdn_detecte', 'ip_detectee', 'services', 'containers']:
+        for champ in ['fqdn_detecte', 'ip_detectee', 'services', 'containers', 'domaine']:
             valeur = evenement.get(champ)
             if valeur:
                 set_ops[champ] = valeur

@@ -589,16 +589,6 @@ class ConnexionMiddleware:
             securite=exchange
         )
 
-        if self._prochaine_verification_comptes_noeuds < ts_courant:
-            self.generateur_transactions.transmettre_requete(
-                dict(),
-                Constantes.ConstantesPki.DOMAINE_NOM + '.' + Constantes.ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
-                correlation_id=ConstantesServiceMonitor.CORRELATION_LISTE_COMPTES_NOEUDS,
-                reply_to=self.__commandes_handler.queue_name,
-                securite=exchange
-            )
-            self._prochaine_verification_comptes_noeuds = (datetime.datetime.utcnow() + datetime.timedelta(minutes=5)).timestamp()
-
     def emettre_presence(self):
         info_monitor = dict(self._service_monitor.get_info_monitor(inclure_services=True))
         info_monitor['noeud_id'] = self._service_monitor.noeud_id
