@@ -4,6 +4,7 @@ import datetime
 import traceback
 import psutil
 import gc
+import json
 
 from bson.objectid import ObjectId
 from threading import Thread, Event
@@ -216,7 +217,16 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         }
         collection_erreurs = self.contexte.document_dao.get_collection(Constantes.COLLECTION_TRANSACTION_STAGING)
-        collection_erreurs.insert_one(document_staging)
+        try:
+            collection_erreurs.insert_one(document_staging)
+        except:
+            self._logger.exception("Erreur sauvegarde transaction invalide")
+            try:
+                document_staging['transaction'] = json.dumps(dict_message, indent=2)
+            except:
+                document_staging['transaction'] = 'erreur sauvegarde'
+            document_staging[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = dict_message.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
+            collection_erreurs.insert_one(document_staging)
 
     def sauvegarder_nouvelle_transaction(self, enveloppe_transaction, exchange):
 

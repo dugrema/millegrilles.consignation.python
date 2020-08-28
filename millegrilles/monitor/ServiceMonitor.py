@@ -613,7 +613,7 @@ class ServiceMonitor:
         for app_path in info_apps:
             with lzma.open(app_path, 'rt') as fichier:
                 app_transaction = json.load(fichier)
-            domaine_action = 'transaction.' + catalogue_domaines[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            domaine_action = 'transaction.' + app_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
             self._connexion_middleware.generateur_transactions.emettre_message(app_transaction, domaine_action)
 

@@ -301,6 +301,22 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             if valeur:
                 set_ops[champ] = valeur
 
+        # Detecter les applications
+        elems_docker = dict()
+        if evenement.get('containers'):
+            elems_docker.update(evenement.get('containers'))
+        if evenement.get('services'):
+            elems_docker.update(evenement.get('services'))
+
+        applications = dict()
+        for nom, config in elems_docker.items():
+            labels = config.get('labels')
+            if labels and labels.get('application'):
+                nom_application = labels.get('application')
+                applications[nom_application] = labels
+
+        set_ops['applications'] = applications
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
             'noeud_id': evenement['noeud_id'],

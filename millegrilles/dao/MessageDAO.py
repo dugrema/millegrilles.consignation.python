@@ -542,7 +542,7 @@ class PikaDAO:
 
         setupHandler.add_configuration(PikaSetupCallbackHandler(
             self.__channel_consumer,
-            Constantes.SECURITE_SECURE,
+            Constantes.SECURITE_PROTEGE,
             Constantes.DEFAUT_QUEUE_ENTRETIEN_TRANSACTIONS,
             [
                 Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES,
