@@ -279,15 +279,15 @@ class GestionnaireModulesDocker:
             self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
             if self.__logger.isEnabledFor(logging.DEBUG):
                 self.__logger.exception("Detail erreur configuration service " + service_name)
-        except APIError as apie:
-            # self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
-            # raise apie
-            if apie.status_code == 409:
-                self.__logger.info("Service %s deja demarre" % service_name)
-                return True
-            else:
-                self.__logger.exception("Erreur demarrage service %s" % service_name)
-                raise apie
+        #except APIError as apie:
+        #    # self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
+        #    # raise apie
+        #    if apie.status_code == 409:
+        #        self.__logger.info("Service %s deja demarre" % service_name)
+        #        return True
+        #    else:
+        #        self.__logger.exception("Erreur demarrage service %s" % service_name)
+        #        raise apie
 
     def demarrer_container(self, container_name: str, config: dict, **kwargs):
         self.__logger.info("Demarrage container %s", container_name)
@@ -844,7 +844,7 @@ class GestionnaireModulesDocker:
         if tar_path:
             # On copie l'archive tar et extrait dans le container
             with open(tar_path, 'rb') as fichier:
-                container.put_archive('/usr/local/scripts', fichier)
+                container.put_archive('/tmp', fichier)
                 os.remove(tar_path)  # Cleanup fichier temporaire
 
         exit_code, output = container.exec_run(commande, stream=True, environment=environment)

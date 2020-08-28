@@ -255,6 +255,13 @@ class GestionnaireApplications:
                                                                     nom_container=nom_container_docker)
 
             self.__wait_container_event.wait(60)
+        except APIError as apie:
+            if apie.status_code == 409:
+                self.__logger.info("Service %s deja demarre" % self.__wait_start_service_name)
+                self.__wait_container_event.set()
+            else:
+                self.__logger.exception("Erreur demarrage service %s" % self.__wait_start_service_name)
+                raise apie
         finally:
             self.__wait_start_service_name = None  # Reset ecoute de l'evenement
             self.__wait_start_container_name = None  # Reset ecoute de l'evenement
