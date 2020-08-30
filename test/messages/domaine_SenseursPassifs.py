@@ -143,9 +143,10 @@ class MessagesSample(BaseCallback):
     def transmettre_maj_noeud(self):
         transaction = {
             "noeud_id": "f9f3e995-f52c-4718-8e5c-a1efd101f402",
+            # "securite": "2.prive",
             "securite": "2.prive",
             "blynk_host": "blynk",
-            "blynk_port": 9443,
+            "blynk_port": 9444,
             "blynk_auth": "ciyZXHGed6Z31xtszjDpsifqPxobzEJ4"
         }
         enveloppe_val = self.generateur.soumettre_transaction(
