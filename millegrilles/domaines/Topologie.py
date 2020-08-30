@@ -23,6 +23,8 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_liste_noeuds(message_dict)}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_DOMAINE:
             reponse = self.gestionnaire.get_info_domaine(message_dict)
+        elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES:
+            reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict)}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_NOEUD:
             reponse = self.gestionnaire.get_info_noeud(message_dict)
         else:
@@ -465,6 +467,36 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             noeuds.append(info_noeud)
 
         return noeuds
+
+    def get_liste_applications_deployees(self, params: dict):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD
+        }
+        projection = {
+            'applications': 1
+        }
+
+        securite = params.get('securite')
+        securite_demande = 2
+        if securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
+            securite_demande = 3
+
+        liste_applications = list()
+        for noeud in collection.find(filtre, projection):
+            applications = noeud.get('applications')
+            if applications:
+                for nom_application, info in applications.items():
+                    url = info.get('url')
+                    securite_int = int(info['securite'].split('.')[0])
+                    if url and securite_int <= securite_demande:
+                        liste_applications.append({
+                            'application': info.get('application'),
+                            'url': url,
+                            'securite': info.get('securite')
+                        })
+
+        return liste_applications
 
     def get_info_domaine(self, params: dict):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)

@@ -1659,6 +1659,7 @@ class ConstantesTopologie:
     REQUETE_LISTE_NOEUDS = '%s.listeNoeuds' % DOMAINE_NOM
     REQUETE_INFO_DOMAINE = '%s.infoDomaine' % DOMAINE_NOM
     REQUETE_INFO_NOEUD = '%s.infoNoeud' % DOMAINE_NOM
+    REQUETE_LISTE_APPLICATIONS_DEPLOYEES = '%s.listeApplicationsDeployees' % DOMAINE_NOM
 
 
 class ConstantesCatalogueApplications:

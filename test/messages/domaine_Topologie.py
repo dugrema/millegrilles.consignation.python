@@ -73,6 +73,14 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def requete_liste_applications(self):
+        requete = {'securite': '3.protege'}
+        domaine_action = ConstantesTopologie.REQUETE_LISTE_APPLICATIONS_DEPLOYEES
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, domaine_action,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def requete_liste_noeud_detail(self):
         requete = {
             'noeud_id': NOEUD_ID,
@@ -126,7 +134,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_liste_domaines()
-        sample.requete_liste_noeuds()
+        # sample.requete_liste_noeuds()
+        sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
         # sample.requete_info_noeud()
