@@ -1253,6 +1253,8 @@ class SenseursPassifsConstantes:
     SENSEUR_REGLES_NOTIFICATIONS = 'regles_notifications'
 
     REQUETE_VITRINE_DASHBOARD = '%s.dashboard' % DOMAINE_NOM
+    REQUETE_LISTE_NOEUDS = 'listeNoeuds'
+    REQUETE_LISTE_SENSEURS_NOEUD = 'listeSenseursPourNoeud'
 
     COMMANDE_RAPPORT_HEBDOMADAIRE = '%s.rapportHebdomadaire' % DOMAINE_NOM
     COMMANDE_RAPPORT_ANNUEL = '%s.rapportAnnuel' % DOMAINE_NOM

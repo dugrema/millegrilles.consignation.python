@@ -19,7 +19,10 @@ class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
+        action = routing_key.split('.')[-1]
+        if action == SenseursPassifsConstantes.REQUETE_LISTE_NOEUDS:
+            reponse = {'resultats': self.gestionnaire.get_liste_noeuds()}
+        elif routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
             reponse = self.gestionnaire.get_vitrine_dashboard()
         else:
             raise Exception("Requete publique non supportee " + routing_key)
@@ -31,11 +34,18 @@ class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
+        action = routing_key.split('.')[-1]
+        if action == SenseursPassifsConstantes.REQUETE_LISTE_NOEUDS:
+            reponse = {'resultats': self.gestionnaire.get_liste_noeuds()}
+        elif action == SenseursPassifsConstantes.REQUETE_LISTE_SENSEURS_NOEUD:
+            reponse = {'resultats': self.gestionnaire.get_liste_senseurs_noeud(message_dict)}
+        elif routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
             reponse = self.gestionnaire.get_vitrine_dashboard()
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+            return
+
+        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementCommandeSenseursPassifs(TraitementCommandesSecures):
@@ -89,7 +99,7 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         }
         doc_senseur = collection.find_one(filter)
 
-        if not doc_senseur:
+        if not doc_senseur or doc_senseur.get('noeud_id') is None:
             self.ajouter_senseur(lecture, exchange)
             # Creer un document sommaire qui va etre insere
             doc_senseur = {
@@ -332,6 +342,52 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD
         })
         return document_dashboard
+
+    def get_liste_noeuds(self):
+        """
+        :return: Le document dashboard de vitrine
+        """
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD
+        }
+        projection = {
+            'noeud_id': 1,
+            Constantes.DOCUMENT_INFODOC_SECURITE: 1,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+            'descriptif': 1,
+        }
+
+        noeuds = list()
+        for noeud in collection.find(filtre, projection):
+            del noeud['_id']
+            noeuds.append(noeud)
+
+        return noeuds
+
+    def get_liste_senseurs_noeud(self, params: dict):
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
+            'noeud_id': params['noeud_id'],
+        }
+        projection = {
+            'noeud_id': 1,
+            Constantes.DOCUMENT_INFODOC_SECURITE: 1,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
+            'uuid_senseur': 1,
+            'senseurs': 1,
+            'descriptif': 1,
+        }
+
+        seneurs = list()
+        for senseur in collection.find(filtre, projection):
+            del senseur['_id']
+            seneurs.append(senseur)
+
+        return seneurs
 
     def declencher_rapports(self, type_rapport):
         commande = {

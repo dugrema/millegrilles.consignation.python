@@ -142,7 +142,7 @@ class MessagesSample(BaseCallback):
 
     def transmettre_maj_noeud(self):
         transaction = {
-            "noeud_id": "001a12f5-e89d-4ff8-b6ac-f2ee269b9516",
+            "noeud_id": "f9f3e995-f52c-4718-8e5c-a1efd101f402",
             "securite": "2.prive",
             "blynk_host": "blynk",
             "blynk_port": 9443,
@@ -167,10 +167,26 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def requete_liste_noeuds(self):
+        transaction = {}
+        enveloppe_val = self.generateur.transmettre_requete(
+            transaction, 'SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_LISTE_NOEUDS,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
+    def requete_liste_senseurs_noeud(self):
+        transaction = {'noeud_id': 'f9f3e995-f52c-4718-8e5c-a1efd101f402'}
+        enveloppe_val = self.generateur.transmettre_requete(
+            transaction, 'SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_LISTE_SENSEURS_NOEUD,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def executer(self):
         # sample.transmettre_transaction_lecture()
-        # sample.transmettre_maj_noeud()
-        sample.transmettre_maj_senseur()
+        sample.transmettre_maj_noeud()
+        # sample.transmettre_maj_senseur()
+        # sample.requete_liste_noeuds()
+        # sample.requete_liste_senseurs_noeud()
 
 
 # --- MAIN ---
