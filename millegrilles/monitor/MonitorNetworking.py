@@ -195,7 +195,10 @@ class GestionnaireWeb:
         with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
             fichier.write(modules_includes_content)
 
-        self.redemarrer_nginx()
+        try:
+            self.redemarrer_nginx()
+        except IndexError:
+            pass  # OK, nginx n'est juste pas configure (pas de service, probablement en cours d'initialisation)
 
     def redemarrer_nginx(self):
         """

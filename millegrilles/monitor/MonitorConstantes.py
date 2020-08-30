@@ -20,47 +20,53 @@ DICT_MODULES_PRIVES = {
 
 DICT_MODULES_PROTEGES = {
     ConstantesServiceMonitor.MODULE_ACME: {
-        'nom': ConstantesServiceMonitor.MODULE_ACME
+        'nom': ConstantesServiceMonitor.MODULE_ACME,
+        'nom_image': ConstantesServiceMonitor.MODULE_ACME
     },
     ConstantesServiceMonitor.MODULE_NGINX: {
         'nom': ConstantesServiceMonitor.MODULE_NGINX,
+        'nom_image': ConstantesServiceMonitor.MODULE_NGINX,
         'role': ConstantesGenerateurCertificat.ROLE_NGINX,
     },
     ConstantesServiceMonitor.MODULE_MQ: {
         'nom': ConstantesServiceMonitor.MODULE_MQ,
+        'nom_image': ConstantesServiceMonitor.MODULE_MQ,
         'role': ConstantesGenerateurCertificat.ROLE_MQ,
     },
     ConstantesServiceMonitor.MODULE_MONGO: {
         'nom': ConstantesServiceMonitor.MODULE_MONGO,
+        'nom_image': ConstantesServiceMonitor.MODULE_MONGO,
         'role': ConstantesGenerateurCertificat.ROLE_MONGO,
     },
     ConstantesServiceMonitor.MODULE_TRANSACTION: {
         'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
     },
     ConstantesServiceMonitor.MODULE_MAITREDESCLES: {
         'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
     },
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS: {
         'nom': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
+        'nom_image': ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
         'role': ConstantesGenerateurCertificat.ROLE_FICHIERS,
     },
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE: {
         'nom': ConstantesServiceMonitor.MODULE_WEB,  # Module web generique
+        'nom_image': ConstantesServiceMonitor.MODULE_WEB,
         'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
     },
     ConstantesServiceMonitor.MODULE_PRINCIPAL: {
         'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
     },
     ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
         'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    },
-    ConstantesServiceMonitor.MODULE_MONGOEXPRESS: {
-        'nom': ConstantesServiceMonitor.MODULE_MONGOEXPRESS,
-        'role': ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS,
     },
     # ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
     #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
