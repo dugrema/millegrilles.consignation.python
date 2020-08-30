@@ -112,7 +112,7 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         set_ops = dict()
         for cle, donnees in senseurs.items():
             donnees_actuelles = senseurs_actuels.get(cle)
-            if donnees_actuelles is None or donnees_actuelles['timestamp'] < donnees['timestamp']:
+            if donnees_actuelles is None or donnees_actuelles.get('timestamp') is None or donnees_actuelles['timestamp'] < donnees['timestamp']:
                 for key, value in donnees.items():
                     set_ops['senseurs.' + cle + '.' + key] = value
 
