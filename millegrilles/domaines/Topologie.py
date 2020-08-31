@@ -488,13 +488,15 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             if applications:
                 for nom_application, info in applications.items():
                     url = info.get('url')
-                    securite_int = int(info['securite'].split('.')[0])
-                    if url and securite_int <= securite_demande:
-                        liste_applications.append({
-                            'application': info.get('application'),
-                            'url': url,
-                            'securite': info.get('securite')
-                        })
+                    securite = info.get('securite')
+                    if url and securite:
+                        securite_int = int(info['securite'].split('.')[0])
+                        if url and securite_int <= securite_demande:
+                            liste_applications.append({
+                                'application': info.get('application'),
+                                'url': url,
+                                'securite': info.get('securite')
+                            })
 
         return liste_applications
 
