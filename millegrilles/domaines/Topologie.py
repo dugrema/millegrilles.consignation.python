@@ -128,6 +128,24 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         configuration.append({
             'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
             'routing': [
+                'evenement.presence.domaine',
+            ],
+            'exchange': self.configuration.exchange_protege,
+            'ttl': 15000,
+            'callback': self.__traitement_presence.callbackAvecAck
+        })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
+            'routing': [
+                'evenement.presence.domaine',
+            ],
+            'exchange': self.configuration.exchange_prive,
+            'ttl': 15000,
+            'callback': self.__traitement_presence.callbackAvecAck
+        })
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'presence'),
+            'routing': [
                 'evenement.presence.monitor',
             ],
             'exchange': self.configuration.exchange_protege,
