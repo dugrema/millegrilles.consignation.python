@@ -85,6 +85,8 @@ class GatewayBlynk:
         self._traitement_messages = TraitementMessages(self._contexte, self)
         self._contexte.message_dao.enregistrer_channel_listener(self)
 
+        self.__logger.info("Configuration Blynk Gateway completee")
+
     def on_channel_open(self, channel):
         """
         Callback pour l"ouverture ou la reouverture du channel MQ

@@ -191,6 +191,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             self.__gateway_blynk = GatewayBlynk(self._contexte)
             self.__gateway_blynk.configurer()
         except ImportError:
+            self.__logger.exception("Erreur d'import du gateway Blynk. Blynk n'est pas disponible")
             self.__gateway_blynk = False
 
         # Ajouter les index dans la collection de transactions
