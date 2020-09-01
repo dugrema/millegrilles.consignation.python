@@ -56,10 +56,11 @@ class GatewayBlynk:
         for noeud in noeuds:
             self.configurer_gateway(noeud)
 
-        # Charger les VPINs des senseurs
+        # Charger les VPINs des senseurs  -
+        # note, on ignore la securite du senseur - la presence d'un VPIN le rend prive
         filtre_senseurs = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR,
-            Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]},
+            # Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': [Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE]},
         }
         senseurs_device = collection.find(filtre_senseurs)
         for doc_senseur in senseurs_device:
