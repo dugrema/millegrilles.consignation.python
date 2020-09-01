@@ -163,6 +163,7 @@ class GestionnaireWeb:
             "/coupdoeil",
             "/posteur",
             "/messagerie",
+            "/senseurspassifs",
         ]
         location_installation_paths = [
             "/installation",
