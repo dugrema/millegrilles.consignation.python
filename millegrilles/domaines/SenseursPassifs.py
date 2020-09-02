@@ -99,7 +99,7 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         }
         doc_senseur = collection.find_one(filter)
 
-        if not doc_senseur or doc_senseur.get('noeud_id') is None:
+        if not doc_senseur or doc_senseur.get('noeud_id') is None or doc_senseur['noeud_id'] != noeud_id:
             self.ajouter_senseur(lecture, exchange)
             # Creer un document sommaire qui va etre insere
             doc_senseur = {
