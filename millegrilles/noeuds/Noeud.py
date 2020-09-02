@@ -55,7 +55,6 @@ class DemarreurNoeud(Daemon):
         self._args = None
 
         self._intervalle_entretien = None
-        self._max_backlog = None
         self._apcupsd = None
         self._dummysenseurs = None
 
@@ -69,7 +68,6 @@ class DemarreurNoeud(Daemon):
         self._stop_event.set()  # Set initiale, faire clear pour activer le processus
 
         self._message_handler: Optional[MessageCallback] = None
-        self._backlog_messages = []  # Utilise pour stocker les message qui n'ont pas ete transmis
 
         self._thread_transactions: Optional[Thread] = None  # Thread de traitement du buffer, tranmission de transactions
 
@@ -263,20 +261,7 @@ class DemarreurNoeud(Daemon):
         self._chargement_reussi = True
 
     def transmettre_lecture_callback(self, dict_lecture):
-        try:
-            if not self.contexte.message_dao.in_error:
-                self._producteur_transaction.transmettre_lecture_senseur(dict_lecture, version=5)
-            else:
-                self._logger.info("Message ajoute au backlog: %s" % str(dict_lecture))
-                if len(self._backlog_messages) < self._max_backlog:
-                    self._backlog_messages.append(dict_lecture)
-                else:
-                    self._logger.warning("Backlog > 1000, message perdu: %s" % str(dict_lecture))
-
-        except ExceptionConnectionFermee as e:
-            # Erreur, la connexion semble fermee. On va tenter une reconnexion
-            self._backlog_messages.append(dict_lecture)
-            self.contexte.message_dao.enter_error_state()
+        self._producteur_transaction.transmettre_lecture_senseur(dict_lecture, version=5)
 
     def produire_transactions(self):
         if not self._thread_transactions or not self._thread_transactions.is_alive():
@@ -285,33 +270,8 @@ class DemarreurNoeud(Daemon):
                 name="transactions", target=self._producteur_transaction.generer_transactions, daemon=True)
             self._thread_transactions.start()
 
-    ''' Verifie s'il y a un backlog, tente de reconnecter au message_dao et transmettre au besoin. '''
     def traiter_backlog_messages(self):
-        if len(self._backlog_messages) > 0:
-            # Tenter de reconnecter a RabbitMQ
-            # if self.contexte.message_dao.in_error:
-            #     try:
-            #         self.contexte.message_dao.connecter()
-            #     except:
-            #         self._logger.exception("Erreur connexion MQ")
-
-            # La seule facon de confirmer la connexion et d'envoyer un message
-            # On tente de passer le backlog en remettant le message dans la liste en cas d'echec
-            message = self._backlog_messages[0]  # Tenter transmettre un message, mais le garder en cas d'echec
-            try:
-                self._producteur_transaction.transmettre_lecture_senseur(message)
-                # Succes (pas d'exception lancee), on enleve le premier message du backlog
-                self._backlog_messages.pop()
-
-                # Transmettre le reste des messages
-                while len(self._backlog_messages) > 0:
-                    message = self._backlog_messages.pop()
-                    self._producteur_transaction.transmettre_lecture_senseur(message)
-                self._logger.info("Traitement backlog complete")
-            except Exception as e:
-                self._logger.warning("Erreur traitement backlog, on push le message: %s" % str(e))
-                self._backlog_messages.append(message)
-                traceback.print_exc()
+        pass
 
     def __finalisation(self):
         time.sleep(0.2)
