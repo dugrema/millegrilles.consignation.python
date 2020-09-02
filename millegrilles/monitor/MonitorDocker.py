@@ -308,6 +308,8 @@ class GestionnaireModulesDocker:
 
         nom_image_docker = kwargs.get('nom_image') or config.get('image') or container_name
 
+        self.__logger.debug("Deploiement image %s, config: %s" % (nom_image_docker, config))
+
         configuration = dict()
         try:
             image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
@@ -316,6 +318,8 @@ class GestionnaireModulesDocker:
             image_tag = image.tags[0]
 
             configuration = self.__formatter_configuration_container(container_name, config)
+
+            self.__logger.debug("Configuration du container: %s" % configuration)
 
             command = config.get('command')
 
