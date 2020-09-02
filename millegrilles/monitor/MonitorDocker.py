@@ -657,21 +657,23 @@ class GestionnaireModulesDocker:
                 dict_config_docker['mode'] = ServiceMode(**config_service_mode)
 
             # Variables d'environnement, inclus mapping
-            config_env = config_service.get('env')
+            # Ne pas ajouter pour le mode container (plutot utiliser 'environment')
+            nom_elem_environment = 'env'
+            if mode_container:
+                nom_elem_environment = 'environment'
+
+            config_env = config_service.get(nom_elem_environment)
             if config_env:
                 # Mapping des variables
                 config_env = [self.__mapping(valeur) for valeur in config_env]
             else:
                 config_env = list()
+
+            # Toujours ajouter l'id du noeud et le IDMG
             config_env.append("MG_NOEUD_ID=" + self.__service_monitor.noeud_id)
             config_env.append("MG_IDMG=" + self.__service_monitor.idmg)
-            dict_config_docker['env'] = config_env
 
-            config_env = config_service.get('environment')
-            if config_env:
-                # Mapping des variables
-                config_env = [self.__mapping(valeur) for valeur in config_env]
-                dict_config_docker['environment'] = config_env
+            dict_config_docker[nom_elem_environment] = config_env
 
             # Constraints
             config_constraints = config_service.get('constraints')
