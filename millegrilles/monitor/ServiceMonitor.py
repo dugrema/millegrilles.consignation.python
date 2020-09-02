@@ -33,7 +33,6 @@ from millegrilles.dao.Configuration import TransactionConfiguration
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
-from millegrilles.monitor.MonitorMdns import MdnsGestionnaire
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTrouvee
 from millegrilles.util.IpUtils import get_ip
 
@@ -215,7 +214,6 @@ class ServiceMonitor:
         self._gestionnaire_commandes: Optional[GestionnaireCommandes] = None
         self._gestionnaire_web: Optional[GestionnaireWeb] = None
         self._gestionnaire_applications: Optional[GestionnaireApplications] = None
-        self._gestionnaire_mdns: Optional[MdnsGestionnaire] = None
 
         self._web_api: ServerWebAPI = cast(ServerWebAPI, None)
 
@@ -326,9 +324,6 @@ class ServiceMonitor:
     def preparer_web_api(self):
         self._web_api = ServerWebAPI(self, webroot=self._args.webroot)
         self._web_api.start()
-
-    def preparer_mdns(self):
-        self._gestionnaire_mdns = MdnsGestionnaire(self)
 
     def get_info_monitor(self, inclure_services=False):
         dict_infomillegrille = dict()
@@ -1056,7 +1051,7 @@ class ServiceMonitorPrive(ServiceMonitor):
 
         self._connexion_middleware = ConnexionMiddlewarePrive(
             configuration, self._docker, self, self._gestionnaire_certificats.certificats,
-            secrets=self._args.secrets, gestionnaire_mdns=self._gestionnaire_mdns)
+            secrets=self._args.secrets)
 
         try:
             self._connexion_middleware.initialiser()

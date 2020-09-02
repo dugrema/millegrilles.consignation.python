@@ -1614,6 +1614,7 @@ class ConstantesServiceMonitor:
 
     # Commande de l'acteur systeme du noeud
     COMMANDE_ACTEUR_GET_INFORMATION_NOEUD = 'acteur.getInformationNoeud'
+    COMMANDE_ACTEUR_REPONSE_MDNS = 'acteur.reponseMdns'
 
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
     CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'

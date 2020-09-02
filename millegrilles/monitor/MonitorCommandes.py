@@ -34,6 +34,8 @@ class GestionnaireCommandes:
 
         self.__socket_fifo = None
         self.__pipe_acteur: Optional[PipeActeur] = None
+        self.__attente_acteur_mdns = Event()
+        self.__reponse_acteur_mdns = Optional[dict] = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -147,6 +149,9 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
             self._service_monitor.transmettre_catalogue_local()
 
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_REPONSE_MDNS:
+            self.recevoir_reponse_mdns()
+
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)
 
@@ -205,6 +210,26 @@ class GestionnaireCommandes:
         :return:
         """
         self.__pipe_acteur.transmettre_commande(commande)
+
+    def requete_mdns_acteur(self, idmg):
+        commande = {
+            'commande': 'get_mdns_services',
+            'idmg': idmg
+        }
+
+        self.__attente_acteur_mdns.clear()
+        self.__pipe_acteur.transmettre_commande(commande)
+        self.__attente_acteur_mdns.wait(5)
+        if self.__attente_acteur_mdns.is_set():
+            reponse = self.__reponse_acteur_mdns
+            self.__reponse_acteur_mdns = None
+            return reponse
+        else:
+            raise Exception("Aucune reponse de l'acteur")
+
+    def recevoir_reponse_mdns(self, reponse: dict):
+        self.__reponse_acteur_mdns = reponse.get('contenu')
+        self.__attente_acteur_mdns.set()
 
 
 class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):

@@ -635,14 +635,10 @@ class ConnexionMiddlewarePrive(ConnexionMiddleware):
         super().initialiser(init_document=init_document)
 
     def get_mq_info(self):
-        node_name = self._docker.info()['Name']
-
-        gestionnaire_mdns = self._gestionnaire_mdns
-
         self.__logger.debug("Attente de 5 secondes pour recevoir evenements mdns")
         self._fermeture_event.wait(5)  # Donner 5 secondes pour recevoir information mdns
 
-        services = gestionnaire_mdns.get_service(self._service_monitor.idmg, '_mgamqps._tcp')
+        services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
 
         self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
         for service in services:
