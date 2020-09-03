@@ -35,7 +35,7 @@ class GestionnaireCommandes:
         self.__socket_fifo = None
         self.__pipe_acteur: Optional[PipeActeur] = None
         self.__attente_acteur_mdns = Event()
-        self.__reponse_acteur_mdns = Optional[dict] = None
+        self.__reponse_acteur_mdns: Optional[dict] = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
