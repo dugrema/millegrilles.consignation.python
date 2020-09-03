@@ -635,8 +635,7 @@ class ConnexionMiddlewarePrive(ConnexionMiddleware):
         super().initialiser(init_document=init_document)
 
     def get_mq_info(self):
-        self.__logger.debug("Attente de 5 secondes pour recevoir evenements mdns")
-        self._fermeture_event.wait(5)  # Donner 5 secondes pour recevoir information mdns
+        self.__logger.debug("Demande services mdns pour idmg %s" % self._service_monitor.idmg)
 
         services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
 

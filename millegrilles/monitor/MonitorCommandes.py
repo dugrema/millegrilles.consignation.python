@@ -59,8 +59,16 @@ class GestionnaireCommandes:
         os.remove(self._path_fifo)
 
     def ajouter_commande(self, commande: CommandeMonitor):
-        self.__commandes_queue.append(commande)
-        self.__action_event.set()
+        nom_commande = commande.nom_commande
+
+        self.__logger.debug("Commande acteur recue : %s" % nom_commande)
+
+        # Certaines commandes doivent etre traitees immediatement (thread attente sur reception)
+        if nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_REPONSE_MDNS:
+            self.recevoir_reponse_mdns(commande)
+        else:
+            self.__commandes_queue.append(commande)
+            self.__action_event.set()
 
     def lire_fifo(self):
         self.__logger.info("Demarrage thread FIFO commandes")
@@ -149,9 +157,6 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
             self._service_monitor.transmettre_catalogue_local()
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_REPONSE_MDNS:
-            self.recevoir_reponse_mdns()
-
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)
 
@@ -223,12 +228,15 @@ class GestionnaireCommandes:
         if self.__attente_acteur_mdns.is_set():
             reponse = self.__reponse_acteur_mdns
             self.__reponse_acteur_mdns = None
-            return reponse
+            self.__logger.debug("Reponse mdns : %s" % reponse)
+
+            contenu = reponse.get('contenu')
+            return contenu
         else:
             raise Exception("Aucune reponse de l'acteur")
 
-    def recevoir_reponse_mdns(self, reponse: dict):
-        self.__reponse_acteur_mdns = reponse.get('contenu')
+    def recevoir_reponse_mdns(self, reponse: CommandeMonitor):
+        self.__reponse_acteur_mdns = reponse.contenu
         self.__attente_acteur_mdns.set()
 
 
