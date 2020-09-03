@@ -234,14 +234,6 @@ class ServiceMonitor:
             self._fermeture_event.set()
             self._attente_event.set()
             try:
-                self._gestionnaire_mdns.fermer()
-            except Exception as mdnse:
-                if self.__logger.isEnabledFor(logging.DEBUG):
-                    self.__logger.exception('Erreur fermeture mdns')
-                else:
-                    self.__logger.info("Erreur fermeture mdns : %s", str(mdnse))
-
-            try:
                 self._web_api.server_close()
             except Exception:
                 self.__logger.debug("Erreur fermeture web_api")
@@ -564,7 +556,8 @@ class ServiceMonitor:
         except:
             # Connexion middleware pas chargee, on tente d'utiliser mdns
             self._attente_event.wait(2)
-            services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
+            # services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
+            services = self._gestionnaire_commandes.requete_mdns_acteur(self.idmg)
             if len(services) > 0:
                 service = services[0]
                 info_mq['MQ_HOST'] = service['addresses'][0]
@@ -763,11 +756,6 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
 
         super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
-
-    def preparer_mdns(self):
-        super().preparer_mdns()
-        # self._gestionnaire_mdns.ajouter_service('millegrilles', '_amqps._tcp.local.', 5673)
-        # self._gestionnaire_mdns.ajouter_service('millegrilles', '_https._tcp.local.', 443)
 
     def rediriger_messages_downstream(self, nom_domaine: str, exchanges_routing: dict):
         pass  # Rien a faire pour le monitor principal
@@ -1069,7 +1057,6 @@ class ServiceMonitorPrive(ServiceMonitor):
         self.__logger.info("Demarrage du ServiceMonitor")
 
         try:
-            self.preparer_mdns()
             self._charger_configuration()
             self.configurer_millegrille()
             self.preparer_gestionnaire_certificats()
@@ -1140,9 +1127,6 @@ class ServiceMonitorPrive(ServiceMonitor):
         self._gestionnaire_certificats = GestionnaireCertificatsNoeudPrive(self._docker, self, **params)
         self._gestionnaire_certificats.charger_certificats()
 
-    def preparer_mdns(self):
-        super().preparer_mdns()
-
     def ajouter_compte(self, certificat: str):
         self.__logger.debug("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
 
@@ -1179,8 +1163,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
             insecure=self._args.dev
         )
-
-        self.preparer_mdns()
 
         try:
             self._gestionnaire_docker.initialiser_noeud()
@@ -1476,11 +1458,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.maj_service('nginx')
 
         raise ForcerRedemarrage("Redemarrage")
-
-    def preparer_mdns(self):
-        self.__logger.info("Initialisation mdns http sur port 80")
-        super().preparer_mdns()
-        # self._gestionnaire_mdns.ajouter_service('millegrilles', '_http._tcp.local.', 80)
 
     def _get_info_noeud(self):
         information_systeme = super()._get_info_noeud()
