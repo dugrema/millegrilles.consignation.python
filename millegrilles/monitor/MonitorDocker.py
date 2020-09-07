@@ -687,11 +687,12 @@ class GestionnaireModulesDocker:
             # Service labels
             config_labels = config_service.get('labels')
             updated_labels = dict()
+            dict_config_docker['labels'] = updated_labels
+
             if config_labels:
                 for key, value in config_labels.items():
                     value = self.__mapping(value)
                     updated_labels[key] = value
-                dict_config_docker['labels'] = updated_labels
 
             if kwargs.get('application'):
                 updated_labels['application'] = kwargs.get('application')

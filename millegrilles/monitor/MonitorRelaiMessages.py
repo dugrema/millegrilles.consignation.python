@@ -441,6 +441,7 @@ class ConnexionMiddleware:
         monitor_key_file = path.join(self._path_secrets, self._certificats[GestionnaireCertificats.MONITOR_KEY_FILE])
 
         mq_info = self.get_mq_info()
+        self.__logger.info("Information de connexion MQ : %s" % str(mq_info))
 
         additionnals = [{
             'MG_MQ_HOST': mq_info['host'],

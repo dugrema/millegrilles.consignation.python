@@ -671,7 +671,6 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             self._charger_configuration()
             self.preparer_gestionnaire_certificats()
             self.configurer_millegrille()
-            self.preparer_mdns()
             self.preparer_gestionnaire_comptesmq()
             self.preparer_gestionnaire_commandes()
             self.preparer_gestionnaire_applications()
@@ -811,7 +810,7 @@ class ServiceMonitorDependant(ServiceMonitor):
         # Verifier si le certificat de millegrille a ete charge
         try:
             info_cert_millegrille = MonitorConstantes.trouver_config(
-                'pki.millegrille.cert', self.idmg_tronque, self._docker)
+                'pki.millegrille.cert', self._docker)
             self.__logger.debug("Cert millegrille deja charge, date %s" % info_cert_millegrille['date'])
         except AttributeError:
             self.__logger.info("Run initialisation noeud dependant")
@@ -910,7 +909,7 @@ class ServiceMonitorDependant(ServiceMonitor):
         for role in MonitorConstantes.CERTIFICATS_REQUIS_DEPENDANT:
             label_cert = 'pki.%s.cert' % role
             try:
-                MonitorConstantes.trouver_config(label_cert, self.idmg_tronque, self._docker)
+                MonitorConstantes.trouver_config(label_cert, self._docker)
             except AttributeError:
                 label_key = 'pki.%s.key' % role
                 fichier_csr = 'pki.%s.csr.pem' % role

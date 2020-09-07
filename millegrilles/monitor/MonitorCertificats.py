@@ -248,7 +248,7 @@ class GestionnaireCertificats:
     def generer_nouveau_idmg(self):
         raise NotImplementedError()
 
-    def generer_clecert_module(self, role: str, node_name: str) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None) -> EnveloppeCleCert:
         raise NotImplementedError()
 
 
