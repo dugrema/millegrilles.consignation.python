@@ -8,6 +8,8 @@ PATH_FIFO = '/var/opt/millegrilles/monitor.socket'
 PATH_PKI = '/var/opt/millegrilles/pki'
 DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
+PATH_SECRET_DEFAUT = '/run/secrets'
+
 DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME

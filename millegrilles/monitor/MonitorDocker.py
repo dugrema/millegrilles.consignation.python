@@ -4,6 +4,7 @@ import os
 import datetime
 import socket
 import docker
+import shutil
 
 from uuid import uuid4
 from base64 import b64decode
@@ -608,18 +609,37 @@ class GestionnaireModulesDocker:
             dict_config_docker['mounts'] = mounts
 
         path_secrets = self.__service_monitor.path_secrets
-        if path_secrets:
+        if path_secrets != MonitorConstantes.PATH_SECRET_DEFAUT:
+            self.__logger.debug("Configuration container : Path secret externe : %s" % path_secrets)
             mounts.append({
-                'target': '/run/secrets',
+                'target': MonitorConstantes.PATH_SECRET_DEFAUT,
                 'source': path_secrets,
                 'type': 'bind'
             })
         else:
+            self.__logger.debug("Configuration container : Path secret volume interne millegrille-secrets")
             mounts.append({
-                'target': '/run/secrets',
+                'target': MonitorConstantes.PATH_SECRET_DEFAUT,
                 'source': 'millegrille-secrets',
                 'type': 'volume'
             })
+
+            # Copier les secrets
+            if dict_config_docker.get('injecter_clecert'):
+                # Copier cert et cle vers le repertoire secret
+                cert_file = self.__service_monitor.contexte.configuration.mq_certfile
+                key_file = self.__service_monitor.contexte.configuration.mq_keyfile
+                ca_file = self.__service_monitor.contexte.configuration.mq_cafile
+
+                dest = '/var/opt/millegrilles_secrets'
+                self.__logger.info("Copier certs/cles vers %s" % dest)
+
+                cert_dest = os.path.join(dest, 'cert.pem')
+                key_dest = os.path.join(dest, 'key.pem')
+                ca_dest = os.path.join(dest, 'millegrille.cert.pem')
+                shutil.copy(cert_file, cert_dest)
+                shutil.copy(key_file, key_dest)
+                shutil.copy(ca_file, ca_dest)
 
         labels['mode_container'] = 'true'
 
