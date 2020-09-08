@@ -148,6 +148,9 @@ class TransactionConfiguration:
             except FileNotFoundError:
                 self.__logger.exception("IDMG inconne, on utilise sansnom")
 
+        self.__logger.info("Configuration MQ: host: %s, port: %s" % (self.mq_host, self.mq_port))
+        self.__logger.info("Configuration Mongo: host: %s, port: %s" % (self.mongo_host, self.mongo_port))
+
     def find_value(self, dict_fichier_json, property):
         value = os.environ.get('%s%s' % (Constantes.PREFIXE_ENV_MG, property.upper()))
         if not value:

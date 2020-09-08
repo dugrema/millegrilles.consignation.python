@@ -179,6 +179,8 @@ class InitialiserServiceMonitor:
 
     def demarrer(self):
         class_noeud = self.detecter_type_noeud()
+        self.__logger.info("Chargement d'un monitor type %s", class_noeud.__name__)
+
         service_monitor = class_noeud(self.__args, self.__docker, self._configuration_json)
         service_monitor.run()
 
