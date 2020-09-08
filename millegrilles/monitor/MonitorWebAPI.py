@@ -187,15 +187,18 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             issuer_info[key] = value
         idmg_issuer = issuer_info['O']
         headers = self.headers
-        if idmg_issuer == self.service_monitor.idmg:
-            cert_pem = self.headers.get('X-Client-Cert')
-            cert_pem = cert_pem.replace('\t', '')
-            # cert_payload = self.headers.get_payload()
-            # cert_pem = cert_pem + '\n' + cert_payload
-            self.service_monitor.ajouter_compte(cert_pem)
-            self.send_response(200)
-        else:
-            self.send_response(403)
+        try:
+            if idmg_issuer == self.service_monitor.idmg:
+                cert_pem = self.headers.get('X-Client-Cert')
+                cert_pem = cert_pem.replace('\t', '')
+                # cert_payload = self.headers.get_payload()
+                # cert_pem = cert_pem + '\n' + cert_payload
+                self.service_monitor.ajouter_compte(cert_pem)
+                self.send_response(200)
+            else:
+                self.send_response(403)
+        except:
+            self.send_response(503)
 
         self.end_headers()
         self.wfile.write(b"")

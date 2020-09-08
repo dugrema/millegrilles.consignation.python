@@ -1129,7 +1129,7 @@ class ServiceMonitorPrive(ServiceMonitor):
         self._gestionnaire_certificats.charger_certificats()
 
     def ajouter_compte(self, certificat: str):
-        self.__logger.debug("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
+        raise Exception("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
 
 
 class ServiceMonitorInstalleur(ServiceMonitor):
