@@ -51,6 +51,7 @@ DEFAUT_QUEUE_GENERATEUR_DOCUMENTS = 'generateur_documents'
 DEFAUT_QUEUE_NOTIFICATIONS = 'notifications'
 
 DEFAUT_HOSTNAME = 'mq'
+DEFAUT_HOSTNAME_MONGO = 'mongo'
 DEFAUT_KEYFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'
 DEFAUT_KEYCERTFILE = '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key_cert'
 DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert'

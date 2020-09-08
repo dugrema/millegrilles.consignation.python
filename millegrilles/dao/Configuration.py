@@ -21,7 +21,7 @@ class TransactionConfiguration:
         # Configuration de connection a RabbitMQ
         self._mq_config = {
             Constantes.CONFIG_MQ_HOST: Constantes.DEFAUT_HOSTNAME,
-            Constantes.CONFIG_MQ_PORT: '5671',
+            Constantes.CONFIG_MQ_PORT: '5673',
             Constantes.CONFIG_MQ_HEARTBEAT: Constantes.DEFAUT_MQ_HEARTBEAT,
             Constantes.CONFIG_MQ_VIRTUAL_HOST: Constantes.DEFAUT_MQ_VIRTUAL_HOST,
             Constantes.CONFIG_QUEUE_NOUVELLES_TRANSACTIONS: Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
@@ -64,7 +64,7 @@ class TransactionConfiguration:
 
         # Configuration de connection a MongoDB
         self._mongo_config = {
-            Constantes.CONFIG_MONGO_HOST: Constantes.DEFAUT_HOSTNAME,
+            Constantes.CONFIG_MONGO_HOST: Constantes.DEFAUT_HOSTNAME_MONGO,
             Constantes.CONFIG_MONGO_PORT: '27017',
             Constantes.CONFIG_MONGO_USER: 'root',
             Constantes.CONFIG_MONGO_PASSWORD: 'example',
