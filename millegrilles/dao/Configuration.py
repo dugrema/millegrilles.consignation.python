@@ -133,7 +133,7 @@ class TransactionConfiguration:
             # Configuration de connection a RabbitMQ
             for property in config_dict.keys():
                 value = self.find_value(dict_fichier_json, property)
-                if value is not None :
+                if value is not None:
                     config_dict[property] = value
 
         # Si le IDMG n'est pas fourni, tenter de le charger a partir du certificat MQ
