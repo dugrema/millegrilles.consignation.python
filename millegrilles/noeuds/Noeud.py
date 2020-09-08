@@ -71,7 +71,7 @@ class DemarreurNoeud(Daemon):
 
         self._thread_transactions: Optional[Thread] = None  # Thread de traitement du buffer, tranmission de transactions
 
-        self._noeud_id = os.environ['NOEUD_ID']
+        self._noeud_id = os.environ['MG_NOEUD_ID']
 
     def print_help(self):
         self._parser.print_help()
