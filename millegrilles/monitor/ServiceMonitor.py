@@ -572,17 +572,7 @@ class ServiceMonitor:
         Expose les certs/cle prive dans le volume secrets pour les containers
         :return:
         """
-        volume_secrets = self.path_secrets
-        fichiers = [
-            (os.path.join(volume_secrets, 'key.pem'), self._connexion_middleware.configuration.mq_keyfile),
-            (os.path.join(volume_secrets, 'cert.pem'), self._connexion_middleware.configuration.mq_certfile),
-            (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._connexion_middleware.configuration.mq_cafile)
-        ]
-
-        for fichier in fichiers:
-            with open(fichier[0], 'w') as cle_out:
-                with open(fichier[1], 'r') as cle_in:
-                    cle_out.write(cle_in.read())
+        pass
 
     def transmettre_catalogue_local(self):
         """
@@ -1127,6 +1117,28 @@ class ServiceMonitorPrive(ServiceMonitor):
             params['secrets'] = self._args.secrets
         self._gestionnaire_certificats = GestionnaireCertificatsNoeudPrive(self._docker, self, **params)
         self._gestionnaire_certificats.charger_certificats()
+
+    def preparer_secrets(self):
+        """
+        Expose les certs/cle prive dans le volume secrets pour les containers
+        :return:
+        """
+
+        if self.path_secrets == MonitorConstantes.PATH_SECRET_DEFAUT:
+            path_secret_prives = '/var/opt/millegrilles_secrets'
+            if os.path.exists(path_secret_prives):
+                volume_secrets = '/var/opt/millegrilles_secrets'
+                self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
+                fichiers = [
+                    (os.path.join(volume_secrets, 'key.pem'), self._connexion_middleware.configuration.mq_keyfile),
+                    (os.path.join(volume_secrets, 'cert.pem'), self._connexion_middleware.configuration.mq_certfile),
+                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._connexion_middleware.configuration.mq_cafile)
+                ]
+
+                for fichier in fichiers:
+                    with open(fichier[0], 'w') as cle_out:
+                        with open(fichier[1], 'r') as cle_in:
+                            cle_out.write(cle_in.read())
 
     def ajouter_compte(self, certificat: str):
         raise Exception("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
