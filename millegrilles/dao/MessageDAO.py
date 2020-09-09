@@ -237,7 +237,11 @@ class ConnexionWrapper:
                 self.__ouvrir_channel_listener(listener)
 
     def __on_open_error(self, connection, exception):
-        code_erreur = exception.args[0]
+        try:
+            code_erreur = exception.args[0]
+        except AttributeError:
+            code_erreur = -1
+
         if code_erreur == 403:
             # Acces refuse, on tente de transmettre notre certificat pour creer le compte
             compte_ok = self._creer_compte_mq()
@@ -354,11 +358,13 @@ class ConnexionWrapper:
         path = 'administration/ajouterCompte'
 
         cle_cert = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
+        self._logger.debug("Creation compte MQ avec fichiers %s" % str(cle_cert))
         try:
             import requests
             for host in hosts:
                 try:
                     path_complet = 'https://%s:%d/%s' % (host, port, path)
+                    self._logger.debug("Creation compte avec path %s" % path_complet)
                     reponse = requests.post(path_complet, cert=cle_cert, verify=False)
                     if reponse.status_code == 200:
                         return True
