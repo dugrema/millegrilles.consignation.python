@@ -1295,10 +1295,12 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         params_environnement = list()
         params_secrets = list()
+        mode_dns = False
         if params.get('modeCreation') == 'dns_cloudns':
             methode_validation = '--dns dns_cloudns'
             params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['cloudnsSubid'])
             params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['cloudnsPassword'])
+            mode_dns = True
         else:
             methode_validation = '--webroot /usr/share/nginx/html'
 
@@ -1320,6 +1322,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
         commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
+        if mode_dns:
+            self.__logger.info("Mode DNS, on ajoute wildcard *.%s" % domaine_noeud)
+            commande_acme = commande_acme + " -d '*.%s'" % domaine_noeud
         resultat_acme, output_acme = gestionnaire_docker.executer_script_blind(
             acme_container_id,
             commande_acme,
