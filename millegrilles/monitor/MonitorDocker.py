@@ -45,6 +45,13 @@ class GestionnaireModulesDocker:
 
         fqdn = self.hostname
 
+        try:
+            acme_config = json.loads(self.charger_config('acme.configuration'))
+            hostname_domaine = acme_config.get('domain') or fqdn
+        except:
+            self.__logger.warning("Erreur chargement acme.config pour trouver domaine, host = %s" % fqdn)
+            hostname_domaine = fqdn
+
         self.__mappings = {
             'IDMG': self.__idmg,
             'IDMGLOWER': self.__idmg.lower(),
@@ -53,6 +60,7 @@ class GestionnaireModulesDocker:
             'MOUNTS': '/var/opt/millegrilles/mounts',
             'NODENAME': self.nodename,
             'HOSTNAME': fqdn,
+            'HOSTNAME_DOMAINE': hostname_domaine,
             'NGINX_CONFIG_VOLUME': '/var/opt/millegrilles/nginx/modules',
             'NGINX_HTML_VOLUME': '/var/opt/millegrilles/nginx/html',
             'NGINX_DATA_VOLUME': '/var/opt/millegrilles/nginx/data',
