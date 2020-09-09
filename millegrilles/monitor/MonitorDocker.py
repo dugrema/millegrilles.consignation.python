@@ -42,6 +42,7 @@ class GestionnaireModulesDocker:
         self.__configuration_services = configuration_services
 
         self.__insecure = kwargs.get('insecure') or False
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         fqdn = self.hostname
 
@@ -77,8 +78,6 @@ class GestionnaireModulesDocker:
 
         self.__intervalle_entretien_comptes = datetime.timedelta(minutes=5)
         self.__derniere_creation_comptes = datetime.datetime.utcnow() - self.__intervalle_entretien_comptes + datetime.timedelta(seconds=15)
-
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def start_events(self):
         self.__thread_events = Thread(target=self.ecouter_events, name='events', daemon=True)
