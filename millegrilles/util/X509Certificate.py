@@ -1932,9 +1932,6 @@ class RenouvelleurCertificat:
         clecert = EnveloppeCleCert(cert=certificat)
         clecert.chaine = chaine
 
-        # Generer transaction de navigateur
-
-
         return clecert
 
     def signer_backup(self, public_key_pem: str, sujet: str):

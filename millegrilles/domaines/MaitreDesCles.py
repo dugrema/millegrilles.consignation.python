@@ -975,7 +975,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         reponse = {
             'certificat_pem': pem_cert,
-            'chaines': chaine,
+            'chaine': chaine,
         }
         return reponse
 
