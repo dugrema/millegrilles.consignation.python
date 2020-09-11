@@ -347,13 +347,14 @@ class GenerateurCertificat:
 
     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
                                    duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NOEUD,
-                                   role: str = None) -> x509.CertificateBuilder:
+                                   role: str = None,
+                                   **kwargs) -> x509.CertificateBuilder:
 
         builder = x509.CertificateBuilder()
 
         subject = csr_request.subject
         idmg_certificat = subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
-        if idmg_certificat:
+        if idmg_certificat and idmg_certificat[0].value != 'idmg':
             idmg_certificat = idmg_certificat[0].value
         else:
             idmg_certificat = self._idmg
@@ -480,10 +481,13 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
 
         return builder
 
-    def preparer_builder(self, cle_publique_pem: str, sujet: str,
-                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NAVIGATEUR) -> x509.CertificateBuilder:
+    def preparer_builder(self, cle_publique_pem: str,
+                         duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_NAVIGATEUR,
+                         **kwargs) -> x509.CertificateBuilder:
 
         builder = x509.CertificateBuilder()
+
+        sujet = kwargs.get('sujet')
 
         name = x509.Name([
             x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
@@ -521,7 +525,7 @@ class GenerateurCertificateParClePublique(GenerateurCertificat):
         )
 
         # Ajouter les acces specifiques a ce type de cert
-        builder = self._get_keyusage(builder)
+        builder = self._get_keyusage(builder, **kwargs)
 
         return builder
 
@@ -629,10 +633,10 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
         return domaines_publics
 
-    def signer(self, csr: x509.CertificateSigningRequest, role: str = None) -> x509.Certificate:
+    def signer(self, csr: x509.CertificateSigningRequest, role: str = None, **kwargs) -> x509.Certificate:
         cert_autorite = self._autorite.cert
         builder = self._preparer_builder_from_csr(
-            csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD, role=role)
+            csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD, role=role, **kwargs)
 
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
@@ -650,7 +654,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
         )
 
         # Ajouter les acces specifiques a ce type de cert
-        builder = self._get_keyusage(builder, csr=csr)
+        builder = self._get_keyusage(builder, csr=csr, **kwargs)
 
         cle_autorite = self._autorite.private_key
         certificate = builder.sign(
@@ -1664,7 +1668,7 @@ class GenerateurCertificatTiers(GenerateurCertificateParRequest):
         return builder
 
 
-class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
+class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
 
     def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
         super().__init__(idmg, dict_ca, autorite)
@@ -1672,10 +1676,24 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParClePublique):
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
+        roles = ['navigateur']
+        exchange_list = [Constantes.SECURITE_PRIVE]
+
+        if kwargs.get('securite') == Constantes.SECURITE_PROTEGE:
+            exchange_list.append(Constantes.SECURITE_PROTEGE)
+            roles.append('proprietaire')
+
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = 'coupdoeil.navigateur'.encode('utf-8')
+        roles = '.'.join(roles).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ','.join(exchange_list).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
             critical=False
         )
 
@@ -1687,8 +1705,10 @@ class GenerateurCertificatBackup(GenerateurCertificateParClePublique):
     def __init__(self, idmg, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
         super().__init__(idmg, dict_ca, autorite)
 
-    def preparer_builder(self, cle_publique_pem: str, sujet: str, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_BACKUP) -> x509.CertificateBuilder:
-        return super().preparer_builder(cle_publique_pem, sujet, duree_cert)
+    def preparer_builder(self, cle_publique_pem: str,
+                         duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_BACKUP,
+                         **kwargs) -> x509.CertificateBuilder:
+        return super().preparer_builder(cle_publique_pem, duree_cert, **kwargs)
 
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
@@ -1899,15 +1919,21 @@ class RenouvelleurCertificat:
         cert_dict = generateur_instance.generer()
         return cert_dict
 
-    def signer_navigateur(self, public_key_pem: str, sujet: str):
+    def signer_navigateur(self, csr_pem: str, securite: str, est_proprietaire: bool):
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
-        builder = generateur.preparer_builder(public_key_pem, sujet)
-        certificat = generateur.signer(builder)
+        csr = x509.load_pem_x509_csr(csr_pem, backend=default_backend())
+        if not csr.is_signature_valid:
+            raise ValueError("Signature invalide")
+
+        certificat = generateur.signer(csr, securite=securite, est_proprietaire=est_proprietaire)
         chaine = generateur.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)
         clecert.chaine = chaine
+
+        # Generer transaction de navigateur
+
 
         return clecert
 

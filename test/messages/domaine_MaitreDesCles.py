@@ -82,8 +82,8 @@ class MessagesSample(BaseCallback):
             self.cert_maitredescles_recu.set()
         else:
             self.event_recu.set()
-            if message_dict['resultats'].get('certificats_pem'):
-                for cert in message_dict['resultats'].get('certificats_pem'):
+            if message_dict.get('certificats_pem'):
+                for cert in message_dict.get('certificats_pem'):
                     print(cert)
 
             print(json.dumps(message_dict, indent=4))
@@ -314,16 +314,33 @@ class MessagesSample(BaseCallback):
 
     def transaction_signer_certificat_navigateur(self):
 
-        public_key_str = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqYE8pRzlFVwAgc2uB3ot6Ffd8pPpG4Sb8btFdjArvYcbuWvsRntBUgm/w6c831GpEoOrDr/EoEPRgTjJ81zxa1tkFprsmw9t8HJ0IOV9WF6p1X8gvf4FZaeLW6wTcA6LGhk1lRoN0jIr0VhNBejX4Xl7m7B1hR+pgmafG9Qm9acAZx2+opi9cYkG0lcl33R/106x8nnaF3jwjhBjFEazH5roHN9W253Y1subRXYC0Uq6SIlzN2HDPLn0oHLujAmf0NP6PrqHmDxfrnWc+KKuSJD2Dyf8w07AjJwJgpmWa9JrcqvYjR/BViI06/CqrtJpSAHpCguSQB3QbidSzbFF3wIDAQAB'
+        public_key_str = """
+-----BEGIN CERTIFICATE REQUEST-----
+MIICfTCCAWUCAQAwODESMBAGA1UEAxMJbm9tVXNhZ2VyMRMwEQYDVQQLEwpOYXZp
+Z2F0ZXVyMQ0wCwYDVQQKEwRpZG1nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+CgKCAQEAwDlWi2KJsccrDJKHq8xLYjCqndu+Oh4GNsbRypPctuu+oU6PNkwwjSIN
+xNuJret+ZVr2mw2MNbt9JYANriltYwvFWkF63NTIGXstaegNCkj6vqa4KdtXK7uu
+NREtMLEhEu+ZWYcR2hWzVEN9GyIPwEgPNYQwUjjjLADUnaZ73t9Bk+fivgll0JbJ
+reSw8DHqvdcmB28AnXltch6Wh34EGiYPbJqDm+NnCHHZ2EumbPRkN5/bqZTmpUDw
+qqt+6cTcgAtdIuzYm3sPQt/Zf3EJwDT9dBxVrdbBnNFG4js3lauy49hog78zwwNP
+/i3DZU3VDDCDeT4POKfEHXtwxTLF4QIDAQABoAAwDQYJKoZIhvcNAQENBQADggEB
+AKBdiHJamlXfevloSBhehrf5g7lRbISGEsyY5HOXvVMLbip75QcGMcz8jnEJxYFk
+8mDPuxlR3VOkyDiPGpLloN9hOgk50igwtRmFXcGCENbaJX2FZdho0yyx/yS03WXR
+HXkje/v1Z6x1gitAxACbvvywo4qtIQoBSwP08D0JIGtD2GWPvzd1+PSgsdqQsmxz
+EMkpLW0RZ2y1fCZyXbXPfAI4rnCL5Lb3CW7e4sbdH2XkcV4fBPEDGo03TE8648XV
+6PCY9G7vw3iPiAhicMp1nI9bx+N/IapZvWmqR8vOURfFHYB1ilnli7S3MNXpDC9Q
+BMz4ginADdtNs9ARr3DcwG4=
+-----END CERTIFICATE REQUEST-----
+        """
 
-        transaction = {
-            'sujet': 'test-domaine_MaitreDescLes',
-            'cle_publique': public_key_str,
+        commande = {
+            'est_proprietaire': True,
+            'csr': public_key_str,
         }
 
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction,
-            ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR,
+        enveloppe_val = self.generateur.transmettre_commande(
+            commande,
+            'commande.MaitreDesCles.' + ConstantesMaitreDesCles.COMMANDE_SIGNER_NAVIGATEUR_CSR,
             reply_to=self.queue_name,
             correlation_id='efgh'
         )
@@ -446,7 +463,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
-        # enveloppe = self.transaction_signer_certificat_navigateur()
+        enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
         # enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
         # self.transaction_demande_inscription_tierce()
@@ -458,7 +475,7 @@ class MessagesSample(BaseCallback):
         # self.commande_restaurer_backup_cle()
         # self.commande_creer_cles_millegrille_hebergee()
         # self.commande_signer_csr()
-        self.commande_signer_csr_noeud_prive()
+        # self.commande_signer_csr_noeud_prive()
 
 
 # --- MAIN ---

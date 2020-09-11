@@ -100,6 +100,9 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
         elif routing_key == 'commande.%s.%s' % (
             ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_CSR):
                 resultat = self.gestionnaire.signer_csr(properties, message_dict)
+        elif routing_key == 'commande.%s.%s' % (
+            ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SIGNER_NAVIGATEUR_CSR):
+                resultat = self.gestionnaire.signer_csr_navigateur(properties, message_dict)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -935,6 +938,46 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             #     reponse, replying_to=properties.reply_to, correlation_id=properties.correlation_id)
         else:
             raise Exception("Certificat non autorise pour signature de CSR : %s" % str(roles_cert))
+
+    def signer_csr_navigateur(self, properties, message_dict):
+        """
+        Signer des requetes (CSR) et retourner les certificats
+        :param properties:
+        :param message_dict:
+        :return:
+        """
+        # Verifier si le demandeur est autorise
+        enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
+        roles_permis = [
+            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+        ]
+        roles_cert = enveloppe_cert.get_roles
+        # Generer certificats
+        pem_csr = message_dict['csr']
+
+        niveau_securite = Constantes.SECURITE_PRIVE
+        est_proprietaire = message_dict.get('est_proprietaire') or False
+        if est_proprietaire:
+            niveau_securite = Constantes.SECURITE_PROTEGE
+
+        clecert = self.__renouvelleur_certificat.signer_navigateur(
+            pem_csr.encode('utf-8'),
+            securite=niveau_securite,
+            est_proprietaire=est_proprietaire
+        )
+        chaine = clecert.chaine
+
+        # Soumettre transaction du nouveau certificat
+        self.soumettre_transaction_certificat(clecert)
+
+        # Transmettre certificats en reponse
+        pem_cert = clecert.cert_bytes.decode('utf-8')
+
+        reponse = {
+            'certificat_pem': pem_cert,
+            'chaines': chaine,
+        }
+        return reponse
 
     def sauvegarder_trousseau_hebergement(self, transaction):
         """
