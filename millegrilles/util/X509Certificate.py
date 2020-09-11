@@ -1683,10 +1683,12 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
 
         if kwargs.get('securite') == Constantes.SECURITE_PROTEGE:
             exchange_list.append(Constantes.SECURITE_PROTEGE)
+
+        if kwargs.get('est_proprietaire'):
             roles.append('proprietaire')
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = '.'.join(roles).encode('utf-8')
+        roles = ','.join(roles).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1921,14 +1923,14 @@ class RenouvelleurCertificat:
         cert_dict = generateur_instance.generer()
         return cert_dict
 
-    def signer_navigateur(self, csr_pem: str, securite: str, est_proprietaire: bool):
+    def signer_navigateur(self, csr_pem: str, securite: str, **kwargs):
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
         csr = x509.load_pem_x509_csr(csr_pem, backend=default_backend())
         if not csr.is_signature_valid:
             raise ValueError("Signature invalide")
 
-        certificat = generateur.signer(csr, securite=securite, est_proprietaire=est_proprietaire)
+        certificat = generateur.signer(csr, securite=securite, **kwargs)
         chaine = generateur.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)

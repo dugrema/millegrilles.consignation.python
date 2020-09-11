@@ -950,13 +950,20 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
         roles_permis = [
             ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+            ConstantesGenerateurCertificat.ROLE_DOMAINES,
         ]
         roles_cert = enveloppe_cert.get_roles
+        if enveloppe_cert.subject_organization_name == self.configuration.idmg and \
+            any(any([role in roles_cert]) for role in roles_permis):
+            pass
+        else:
+            raise Exception("Role non permis pour signer un certificat de navigateur : %s" % str(roles_cert))
+
         # Generer certificats
         pem_csr = message_dict['csr']
 
         niveau_securite = Constantes.SECURITE_PRIVE
-        est_proprietaire = message_dict.get('est_proprietaire') or False
+        est_proprietaire = message_dict.get('estProprietaire')
         if est_proprietaire:
             niveau_securite = Constantes.SECURITE_PROTEGE
 
