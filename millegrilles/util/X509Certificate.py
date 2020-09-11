@@ -635,8 +635,10 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
     def signer(self, csr: x509.CertificateSigningRequest, role: str = None, **kwargs) -> x509.Certificate:
         cert_autorite = self._autorite.cert
+        duree_jours = kwargs.get('duree') or 31
+        duree = datetime.timedelta(days=duree_jours)
         builder = self._preparer_builder_from_csr(
-            csr, cert_autorite, ConstantesGenerateurCertificat.DUREE_CERT_NOEUD, role=role, **kwargs)
+            csr, cert_autorite, duree, role=role, **kwargs)
 
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
