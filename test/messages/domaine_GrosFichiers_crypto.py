@@ -14,7 +14,7 @@ import uuid
 
 
 contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser(init_document=False)
+contexte.initialiser()
 
 
 class MessagesSample(BaseCallback):
@@ -66,7 +66,7 @@ class MessagesSample(BaseCallback):
 
     def transmettre_transaction_decrypterFichier(self):
         commande = {
-            'fuuid': 'ca02ffc0-183c-11ea-af4c-dd485a6cf00f',
+            'fuuid': '9158c187-f560-11ea-a914-1b4edbfd1a69',
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             commande, 'millegrilles.domaines.GrosFichiers.decrypterFichier')
@@ -75,8 +75,8 @@ class MessagesSample(BaseCallback):
         return enveloppe_val
 
     def executer(self):
-        enveloppe = sample.transmettre_transaction_decrypterFichier()
-        # enveloppe = sample.transmettre_commande_decrypter_fichier()
+        # enveloppe = sample.transmettre_transaction_decrypterFichier()
+        enveloppe = sample.transmettre_commande_decrypter_fichier()
 
 
 # --- MAIN ---

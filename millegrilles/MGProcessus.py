@@ -1162,6 +1162,8 @@ class MGProcessus:
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Erreur traitement processus")
             self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur, processus=self)
 
     ''' Methode initiale, doit etre implementee par la sous-classe '''

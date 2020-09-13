@@ -239,17 +239,17 @@ class MessagesSample(BaseCallback):
                 label=None
             )
         )
-        cle_secrete_encryptee_mime64 = b64encode(cle_secrete_encryptee).decode('utf8')
+        cle_secrete_encryptee_base64 = b64encode(cle_secrete_encryptee).decode('utf8')
 
         nouvelle_cle = {
-            "domaine": "millegrilles.domaines.GrosFichiers",
+            "domaine": "GrosFichiers",
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841c",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
                 "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa851a",
             },
-            "fingerprint": "abcd",
-            "cle": cle_secrete_encryptee_mime64,
+            "cles": {'/a6zPN+mHf/fOH73AfpW3s7rUcg=': cle_secrete_encryptee_base64},
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
+            "sujet": ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -457,10 +457,10 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.event_recu.wait(5)
         # self.event_recu.clear()
 
-        enveloppe = self.requete_cert_maitredescles()
+        # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        # enveloppe = self.nouvelle_cle_grosfichiers()
+        enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()

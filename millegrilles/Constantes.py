@@ -698,7 +698,7 @@ class ConstantesMaitreDesCles:
 
     LIBVAL_CONFIGURATION = 'configuration'
 
-    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.nouvelleCle.grosFichier' % DOMAINE_NOM
+    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.cleGrosFichier' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.nouvelleCle.document' % DOMAINE_NOM
     TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
     TRANSACTION_MAJ_MOTDEPASSE = '%s.maj_motdepasse' % DOMAINE_NOM
@@ -1096,7 +1096,7 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_TORRENT_HASHSTRING = 'torrent_hashstring'
 
-    TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion.metadata' % DOMAINE_NOM
+    TRANSACTION_NOUVELLEVERSION_METADATA = '%s.nouvelleVersion' % DOMAINE_NOM
     TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE = '%s.demandeThumbnailProtege' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM

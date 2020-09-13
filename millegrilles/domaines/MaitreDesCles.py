@@ -1432,15 +1432,63 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
         # Genere message reponse
         message_resultat = {
-            'certifica_millegrille': self.get_ca_pem,
-            'certificats_intermediaires': [self.get_intermediaires_pem],
-            'certificat': self.get_certificat_pem,
-            'certificats_backup': [self.get_certificats_backup],
+            'certificat_millegrille': self.get_ca_pem,
+            'certificat': [self.get_certificat_pem, self.get_intermediaires_pem],
+            'certificats_backup': self.get_certificats_backup,
         }
 
         self.generateur_transactions.transmettre_reponse(
             message_resultat, properties.reply_to, properties.correlation_id
         )
+
+    def maj_document_cle(self, transaction: dict):
+        # Extraire les cles de document de la transaction (par processus d'elimination)
+        cles_document = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
+                transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
+                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
+        }
+
+        contenu_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            'iv': transaction['iv'],
+        }
+        contenu_on_insert.update(cles_document)
+
+        contenu_date = {
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
+        }
+
+        contenu_set = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+        }
+        for fingerprint in transaction['cles'].keys():
+            cle_dict = 'cles.%s' % fingerprint
+            valeur = transaction['cles'].get(fingerprint)
+            contenu_set[cle_dict] = valeur
+
+        if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
+            contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = \
+                transaction[ConstantesMaitreDesCles.DOCUMENT_SECURITE]
+        else:
+            # Par defaut, on met le document en mode secure
+            contenu_on_insert[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = Constantes.SECURITE_PROTEGE
+
+        operations_mongo = {
+            '$set': contenu_set,
+            '$currentDate': contenu_date,
+            '$setOnInsert': contenu_on_insert,
+        }
+
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        self._logger.debug("Operations: %s" % str({'filtre': cles_document, 'operation': operations_mongo}))
+
+        resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
+        self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+        if resultat_update.upserted_id is None:
+            raise Exception("Erreur insertion cles")
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -1455,9 +1503,10 @@ class ProcessusReceptionCles(MGProcessusTransaction):
     def recrypterCle(self, cle_secrete_encryptee):
         cert_maitredescles = self._controleur.gestionnaire.get_certificat
         fingerprint_certmaitredescles = b64encode(cert_maitredescles.fingerprint(hashes.SHA1())).decode('utf-8')
-        cles_secretes_encryptees = {fingerprint_certmaitredescles: cle_secrete_encryptee}
+        cle_symmetrique_chiffree = cle_secrete_encryptee[fingerprint_certmaitredescles]
+        cles_secretes_encryptees = cle_secrete_encryptee.copy()
 
-        cle_secrete = self._controleur.gestionnaire.decrypter_contenu(cle_secrete_encryptee)
+        cle_secrete = self._controleur.gestionnaire.decrypter_contenu(cle_symmetrique_chiffree)
         # self._logger.debug("Cle secrete: %s" % cle_secrete)
 
         # Re-encrypter la cle secrete avec les cles backup
@@ -1544,11 +1593,17 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         transaction = self.transaction
 
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
-        cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
+        cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES]
         cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
         identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
-        self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.generer_transaction_cles_backup.__name__)
+        # Verifier si on a des cles differentes
+        if all([cle in cle_secrete_encryptee.keys() for cle in cles_secretes_encryptees.keys()]):
+            self.controleur.gestionnaire.maj_document_cle(transaction)
+        else:
+            self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+
+        self.set_etape_suivante()  # Termine
 
         return {
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
@@ -1564,24 +1619,6 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         :return:
         """
         self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
-        self.set_etape_suivante(ProcessusNouvelleCleGrosFichier.mettre_token_resumer_transaction.__name__)
-
-    def mettre_token_resumer_transaction(self):
-        """
-        Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
-        :return:
-        """
-        generateur_transaction = self.generateur_transactions
-        transaction_resumer = ConstantesMaitreDesCles.DOCUMENT_TRANSACTION_GROSFICHIERRESUME.copy()
-        transaction_resumer['fuuid'] = self.parametres['fuuid']
-        domaine_routing = ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES
-
-        # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
-        self.__logger.debug("Transmission nouvelle transaction cle recues pour GrosFichier")
-        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
-
-        self.set_etape_suivante()  # Termine
-        return {'resumer': transaction_resumer}
 
 
 class ProcessusNouveauMotDePasse(ProcessusReceptionCles):
@@ -1642,52 +1679,7 @@ class ProcessusMAJDocumentCles(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.transaction
-
-        # Extraire les cles de document de la transaction (par processus d'elimination)
-        cles_document = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
-                transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
-                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
-        }
-
-        contenu_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            'iv': transaction['iv'],
-        }
-        contenu_on_insert.update(cles_document)
-
-        contenu_date = {
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
-        }
-
-        contenu_set = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-        }
-        for fingerprint in transaction['cles'].keys():
-            cle_dict = 'cles.%s' % fingerprint
-            valeur = transaction['cles'].get(fingerprint)
-            contenu_set[cle_dict] = valeur
-
-        if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
-            contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = \
-                transaction[ConstantesMaitreDesCles.DOCUMENT_SECURITE]
-        else:
-            # Par defaut, on met le document en mode secure
-            contenu_on_insert[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = Constantes.SECURITE_SECURE
-
-        operations_mongo = {
-            '$set': contenu_set,
-            '$currentDate': contenu_date,
-            '$setOnInsert': contenu_on_insert,
-        }
-
-        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        self.__logger.debug("Operations: %s" % str({'filtre': cles_document, 'operation': operations_mongo}))
-
-        resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
-        self.__logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+        self.controleur.gestionnaire.maj_document_cle(transaction)
 
         self.set_etape_suivante()  # Termine
 
