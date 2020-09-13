@@ -42,33 +42,18 @@ class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
         if routing_key_sansprefixe == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
             # Transmettre le certificat courant du maitre des cles
-            self.transmettre_certificat(properties)
+            self.gestionnaire.transmettre_certificat(properties)
         else:
             # Type de transaction inconnue, on lance une exception
             raise TransactionTypeInconnuError("Type de transaction inconnue: message: %s" % message_dict, routing_key)
-
-    def transmettre_certificat(self, properties):
-        """
-        Transmet le certificat courant du MaitreDesCles au demandeur.
-        :param properties:
-        :return:
-        """
-        self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
-        # Genere message reponse
-        message_resultat = {
-            'certificat': self._gestionnaire.get_certificat_pem,
-            'certificats_intermediaires': [self._gestionnaire.get_intermediaires_pem],
-        }
-
-        self._gestionnaire.generateur_transactions.transmettre_reponse(
-            message_resultat, properties.reply_to, properties.correlation_id
-        )
 
 
 class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         domaine_routing_key = method.routing_key.replace('requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM, '')
+
+        action = domaine_routing_key.split('.')[-1]
 
         reponse = None
         if domaine_routing_key == ConstantesMaitreDesCles.REQUETE_CLE_RACINE:
@@ -79,6 +64,8 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
             self.gestionnaire.transmettre_cle_document(message_dict, properties)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_TROUSSEAU_HEBERGEMENT:
             self.gestionnaire.transmettre_trousseau_hebergement(message_dict, properties)
+        elif action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
+            self.gestionnaire.transmettre_certificat(properties)
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -154,6 +141,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # self.__certificat_courant_pem = None
         self.__certificat_intermediaires_pem = None
         self.__certificats_backup = dict()  # Liste de certificats backup utilises pour conserver les cles secretes.
+        self.__ca_file_pem = None
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
 
         self.__renouvelleur_certificat = None
@@ -177,6 +165,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         self.charger_ca_chaine()
         self.__clecert_intermediaire = self.charger_clecert_intermediaire()
+        self.__certificat_intermediaires_pem = self.__clecert_intermediaire.cert_bytes.decode('utf-8')
 
         self.__renouvelleur_certificat = RenouvelleurCertificat(
             self.configuration.idmg,
@@ -218,6 +207,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         ca_file = self.configuration.pki_cafile
         with open(ca_file, 'rb') as fichier:
             cert = fichier.read()
+            self.__ca_file_pem = cert.decode('utf-8')
             x509_cert = x509.load_pem_x509_certificate(cert, backend=default_backend())
             skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
             self.__dict_ca[skid] = x509_cert
@@ -1100,6 +1090,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return self.__certificat_intermediaires_pem
 
     @property
+    def get_ca_pem(self):
+        return self.__ca_file_pem
+
+    @property
     def get_certificats_backup(self):
         return self.__certificats_backup
 
@@ -1427,6 +1421,25 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.generateur_transactions.soumettre_transaction(
             transaction,
             domaine_action=ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+        )
+
+    def transmettre_certificat(self, properties):
+        """
+        Transmet le certificat courant du MaitreDesCles au demandeur.
+        :param properties:
+        :return:
+        """
+        self._logger.debug("Transmettre certificat a %s" % properties.reply_to)
+        # Genere message reponse
+        message_resultat = {
+            'certifica_millegrille': self.get_ca_pem,
+            'certificats_intermediaires': [self.get_intermediaires_pem],
+            'certificat': self.get_certificat_pem,
+            'certificats_backup': [self.get_certificats_backup],
+        }
+
+        self.generateur_transactions.transmettre_reponse(
+            message_resultat, properties.reply_to, properties.correlation_id
         )
 
 
