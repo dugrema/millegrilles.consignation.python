@@ -1461,9 +1461,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
         }
 
-        contenu_set = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-        }
+        contenu_set = dict()
         for fingerprint in transaction['cles'].keys():
             cle_dict = 'cles.%s' % fingerprint
             valeur = transaction['cles'].get(fingerprint)
@@ -1487,7 +1485,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
         self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
-        if resultat_update.upserted_id is None:
+        if resultat_update.upserted_id is None and resultat_update.matched_count != 1:
             raise Exception("Erreur insertion cles")
 
 
@@ -1531,8 +1529,6 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         # Copier les champs d'identification de ce document
         transaction_nouvellescles[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = \
             self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
-        transaction_nouvellescles[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = \
-            self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = \
             self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 

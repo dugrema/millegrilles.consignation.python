@@ -434,6 +434,7 @@ class ConstantesSecurityPki:
 
     EVENEMENT_CERTIFICAT = 'pki.certificat'  # Indique que c'est un evenement avec un certificat (reference)
     EVENEMENT_REQUETE = 'requete.certificat'  # Indique que c'est une requete pour trouver un certificat par fingerprint
+    EVENEMENT_EMISSION_CERT = 'evenement.Pki'
 
     LIBVAL_CERTIFICAT_RACINE = 'certificat.root'
     LIBVAL_CERTIFICAT_MILLEGRILLE = 'certificat.millegrille'
@@ -1047,18 +1048,18 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_REPERTOIRE_FICHIERS = 'fichiers'
 
-    DOCUMENT_FICHIER_NOMFICHIER = 'nom'
+    DOCUMENT_FICHIER_NOMFICHIER = 'nom_fichier'
     DOCUMENT_FICHIER_COMMENTAIRES = 'commentaires'
     DOCUMENT_FICHIER_EXTENSION_ORIGINAL = 'extension'
     DOCUMENT_FICHIER_UUID_DOC = 'uuid'                    # UUID du document de fichier (metadata)
-    DOCUMENT_UUID_GENERIQUE = 'documentuuid'            # Represente un UUID de n'import quel type de document
+    DOCUMENT_UUID_GENERIQUE = 'document_uuid'            # Represente un UUID de n'import quel type de document
     DOCUMENT_FICHIER_FUUID = 'fuuid'                    # UUID (v1) du fichier
     DOCUMENT_FICHIER_DATEVCOURANTE = 'date_v_courante'  # Date de la version courante
     DOCUMENT_FICHIER_UUIDVCOURANTE = 'fuuid_v_courante'  # FUUID de la version courante
     DOCUMENT_FICHIER_VERSIONS = 'versions'
     DOCUMENT_FICHIER_MIMETYPE = 'mimetype'
     DOCUMENT_FICHIER_TAILLE = 'taille'
-    DOCUMENT_FICHIER_SHA256 = 'sha256'
+    DOCUMENT_FICHIER_HACHAGE = 'hachage'
     DOCUMENT_FICHIER_SUPPRIME = 'supprime'
     DOCUMENT_FICHIER_ETIQUETTES = 'etiquettes'
     DOCUMENT_FICHIER_THUMBNAIL = 'thumbnail'
@@ -1161,7 +1162,7 @@ class ConstantesGrosFichiers:
         DOCUMENT_VERSION_DATE_FICHIER: None,
         DOCUMENT_VERSION_DATE_VERSION: None,
         DOCUMENT_FICHIER_TAILLE: None,
-        DOCUMENT_FICHIER_SHA256: None,
+        DOCUMENT_FICHIER_HACHAGE: None,
         DOCUMENT_COMMENTAIRES: None,
     }
 

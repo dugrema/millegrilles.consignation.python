@@ -70,13 +70,13 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
 
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256]
+            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
             nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
             extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
 
             fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
                 'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
                 'extension': extension,
                 'heure': heure_str,
             }
@@ -99,7 +99,7 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
 
             fuuid_dict[fuuid_document_dechiffre] = {
                 'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: extension,
                 'heure': heure_str,
             }
@@ -152,16 +152,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Ajout document favoris
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_FAVORIS, ConstantesGrosFichiers.DOCUMENT_FAVORIS)
 
-        # Ajout documents vitrine
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_VITRINE_FICHIERS, ConstantesGrosFichiers.DOCUMENT_VITRINE_FICHIERS)
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS, ConstantesGrosFichiers.DOCUMENT_VITRINE_ALBUMS)
-
-        # Creation liste de recherche speciale pour l'activite des fichiers
-        liste_recherche = ConstantesGrosFichiers.DOCUMENT_RAPPORT_RECHERCHE.copy()
-        liste_recherche[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
-        liste_recherche['description'] = "Activité récente"
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE, liste_recherche)
-
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
@@ -172,71 +162,71 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Fichiers
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDemandeThumbnailProtege"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionClesRecues"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDemandeThumbnailProtege"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionClesRecues"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
 
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecreteFichier"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_THUMBNAIL:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierThumbnail"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CLESECRETE_FICHIER:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecreteFichier"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_THUMBNAIL:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierThumbnail"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
 
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_FIGER_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionFigerCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREERTORRENT_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerTorrentCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ChangerNiveauSecuriteCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_FIGER_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionFigerCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREERTORRENT_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerTorrentCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ChangerNiveauSecuriteCollection"
 
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FAVORI:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFavori"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FAVORI:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFavori"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FAVORI:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFavori"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FAVORI:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFavori"
 
         # Torrent
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_NOUVEAU:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentNouveau"
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_SEEDING:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentSeeding"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_NOUVEAU:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentNouveau"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_SEEDING:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionTorrentSeeding"
 
         # Distribution
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusPublierCollection"
+        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_PUBLIER_COLLECTION:
+        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusPublierCollection"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -323,14 +313,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             [
                 ('%s.%s' %
                  (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
-                  ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256),
+                  ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE),
                  1),
                 ('%s.%s' %
                  (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
                   ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE),
                  1),
             ],
-            name='sha256-taille'
+            name='hachage-taille'
         )
 
     def get_nom_domaine(self):
@@ -434,7 +424,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         :return: True si c'est la version la plus recent, false si la transaction est plus vieille.
         """
         domaine = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE].get(Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE)
-        if domaine not in [ConstantesGrosFichiers.TRANSACTION_TYPE_METADATA, ConstantesGrosFichiers.TRANSACTION_TORRENT_NOUVEAU]:
+        if domaine not in [ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA]:
             raise ValueError('La transaction doit etre de type metadata ou nouveau torrent. Trouve: %s' % domaine)
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -478,7 +468,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         masque_transaction = [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
             ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES,
@@ -529,6 +519,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger.debug("maj_fichier: operations = %s" % operations)
         try:
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
+            if resultat.upserted_id is None or resultat.matched_count != 1:
+                raise Exception("Erreur mise a jour fichier fuuid: %s" % fuuid)
         except DuplicateKeyError as dke:
             self._logger.info("Cle dupliquee sur fichier %s, on ajoute un id unique dans le nom" % fuuid)
             nom_fichier = '%s_%s' % (uuid.uuid1(), transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER])
@@ -944,35 +936,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # doivent etre presentes dans le document)
         self.__ajouter_activite(collection, type_operation)
 
-    def __ajouter_activite(self, activite, type_activite):
-        wrapper_activite = {
-            'date': datetime.datetime.utcnow(),
-            'uuid_activite': str(uuid.uuid1()),
-            'type_activite': type_activite,
-            'sujet': activite
-        }
-
-        ops = {
-            '$push': {
-                'activites': {
-                    '$each': [wrapper_activite],
-                    '$sort': {'date': -1},
-                    '$slice': 100,
-                }
-            },
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
-        }
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_RAPPORT_ACTIVITE
-        }
-
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        collection_domaine.update(filtre, ops)
-
-
     def ajouter_favori(self, doc_uuid: str):
         self._logger.debug("Ajouter favor %s" % doc_uuid)
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1101,7 +1064,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_SECURITE: Constantes.SECURITE_PRIVE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE],
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE: taille,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256: sha256_fichier
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256_fichier
         }
 
         if transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_THUMBNAIL) is not None:
@@ -1342,7 +1305,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P,
@@ -1426,7 +1389,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_SHA256,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P,
@@ -1566,28 +1529,26 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def initiale(self):
-        """ Sauvegarder une nouvelle version d'un fichier """
-        transaction = self.charger_transaction()
-
-        # Vierifier si le document de fichier existe deja
-        self.__logger.debug("Fichier existe, on ajoute une version")
-
-        fuuid = transaction['fuuid']
-        document_uuid = transaction.get('documentuuid')  # Represente la collection, si present
-
-        transaction = self.charger_transaction()
-        # resultat = self._controleur.gestionnaire.maj_fichier(transaction)
-        # resultat = {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier, 'info_version': info_version}
         # info-version :
         #   "date_version": ISODate("2020-04-09T13:22:16.000Z"),
         #   "fuuid": "20805bb0-7a65-11ea-8d47-6740c3cdc870",
         #   "securite": "3.protege",
-        #   "nom": "IMG_0005.JPG",
+        #   "nom_fichier": "IMG_0005.JPG",
         #   "taille": 265334,
         #   "mimetype": "image/jpeg",
         #   "sha256": "a99e771ebda5b9c599852782d5317334b2358aeb78931e3ba569a29d95ce5ae1",
         #   "extension": "jpg",
+
+    def initiale(self):
+        """ Sauvegarder une nouvelle version d'un fichier """
+        transaction = self.charger_transaction()
+        resultat = self._controleur.gestionnaire.maj_fichier(transaction)
+
+        # Vierifier si le document de fichier existe deja
+        # self.__logger.debug("Fichier existe, on ajoute une version")
+
+        fuuid = transaction['fuuid']
+        document_uuid = transaction.get('document_uuid')  # Represente la collection, si present
         nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
         resultat = {
@@ -1599,74 +1560,92 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             'extension': extension,
         }
 
-        self.set_etape_suivante(
-            ProcessusTransactionNouvelleVersionMetadata.confirmer_reception_update_collections.__name__,
-            self._get_tokens_attente(resultat))
+        # # Verifier s'il y a un traitement supplementaire a faire
+        # mimetype = self.parametres['mimetype'].split('/')[0]
+        # fuuid = self.parametres['fuuid']
+        # est_media_visuel = mimetype in ['image', 'video']
+        #
+        # if est_media_visuel:
+        #     self._traiter_media_visuel(resultat)
+
+        self.set_etape_suivante()  # Termine
 
         return resultat
 
-    def confirmer_reception_update_collections(self):
-        # Verifie si la transaction correspond a un document d'image
-        self.__logger.debug("Debut confirmer_reception_update_collections")
-        mimetype = self.parametres['mimetype'].split('/')[0]
-        fuuid = self.parametres['fuuid']
-        est_image = mimetype == 'image'
-        est_video = mimetype == 'video'
-        extension = self.parametres['extension']
+    def _maj_collection(self, transaction):
+        pass
 
-        chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
-        id_transaction_image = None
-        if not chiffre and (est_image or est_video):
-            tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
-
-            self.__logger.debug("Token attente image preview: %s" % str(tokens_attente))
-
-            if est_video:
-                # Transmettre une commande de transcodage apres cette etape
-                transaction_transcoder = {
-                    'fuuid': fuuid,
-                    'mimetype': mimetype,
-                    'extension': self.parametres['extension'],
-                    'securite': self.parametres['securite'],
-                }
-                self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
-
-            try:
-                id_transaction_image = self.parametres['millegrilles']['domaines']['GrosFichiers'][
-                    'nouvelleVersion']['transfertComplete']['_id-transaction']
-                # transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
-            except Exception as e:
-                # Charger la transaction par recherche direct - on est probablement en regeneration
-                token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
-                try:
-                    transaction_image = self.controleur.gestionnaire.get_transaction_par_token_resumer(token_resumer)
-                    id_transaction_image = str(transaction_image['_id'])
-                except Exception:
-                    self.__logger.exception("Erreur chargement preview/thumbnail")
-
-            if id_transaction_image is not None:
-                self.__logger.debug("Presence preview et thumbnail image : %s" % str(id_transaction_image))
-                # self.controleur.gestionnaire.enregistrer_image_info(transaction_image)
-            else:
-                self.__logger.warning("Image ajoutee sans thumbnail/preview (non transmis)")
-
-        # Met a jour les collections existantes avec ce fichier
-        # uuid_fichier = self.parametres['uuid_fichier']
-        # self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
-
-        # Verifier si le fichier est une image protegee - il faut generer un thumbnail
-        self.__logger.debug("Mimetype fichier %s" % self.parametres['mimetype'])
-
-        self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.persister.__name__)
-
-        self.__logger.debug("Fin confirmer_reception_update_collections")
-
-        return {
-            'id_transaction_image': id_transaction_image,
-            'chiffre': chiffre,
-            'est_image': est_image,
-            'est_video': est_video,
+    def _traiter_media_visuel(self, info: dict):
+        # Transmettre une commande de transcodage
+        transaction_transcoder = {
+            'fuuid': info['fuuid'],
+            'mimetype': info['mimetype'],
+            'extension': info['extension'],
+            'securite': info['securite'],
         }
+        self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
+
+    # def confirmer_reception_update_collections(self):
+    #     # Verifie si la transaction correspond a un document d'image
+    #     self.__logger.debug("Debut confirmer_reception_update_collections")
+    #     mimetype = self.parametres['mimetype'].split('/')[0]
+    #     fuuid = self.parametres['fuuid']
+    #     est_image = mimetype == 'image'
+    #     est_video = mimetype == 'video'
+    #
+    #     chiffre = self.parametres['securite'] in [Constantes.SECURITE_PROTEGE]
+    #     id_transaction_image = None
+    #     if not chiffre and (est_image or est_video):
+    #         tokens_attente = self._get_tokens_attente({'fuuid': fuuid, 'securite': None})
+    #
+    #         self.__logger.debug("Token attente image preview: %s" % str(tokens_attente))
+    #
+    #         if est_video:
+    #             # Transmettre une commande de transcodage apres cette etape
+    #             transaction_transcoder = {
+    #                 'fuuid': fuuid,
+    #                 'mimetype': mimetype,
+    #                 'extension': self.parametres['extension'],
+    #                 'securite': self.parametres['securite'],
+    #             }
+    #             self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
+    #
+    #         try:
+    #             id_transaction_image = self.parametres['millegrilles']['domaines']['GrosFichiers'][
+    #                 'nouvelleVersion']['transfertComplete']['_id-transaction']
+    #             # transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
+    #         except Exception as e:
+    #             # Charger la transaction par recherche direct - on est probablement en regeneration
+    #             token_resumer = '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
+    #             try:
+    #                 transaction_image = self.controleur.gestionnaire.get_transaction_par_token_resumer(token_resumer)
+    #                 id_transaction_image = str(transaction_image['_id'])
+    #             except Exception:
+    #                 self.__logger.exception("Erreur chargement preview/thumbnail")
+    #
+    #         if id_transaction_image is not None:
+    #             self.__logger.debug("Presence preview et thumbnail image : %s" % str(id_transaction_image))
+    #             # self.controleur.gestionnaire.enregistrer_image_info(transaction_image)
+    #         else:
+    #             self.__logger.warning("Image ajoutee sans thumbnail/preview (non transmis)")
+    #
+    #     # Met a jour les collections existantes avec ce fichier
+    #     # uuid_fichier = self.parametres['uuid_fichier']
+    #     # self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+    #
+    #     # Verifier si le fichier est une image protegee - il faut generer un thumbnail
+    #     self.__logger.debug("Mimetype fichier %s" % self.parametres['mimetype'])
+    #
+    #     self.set_etape_suivante(ProcessusTransactionNouvelleVersionMetadata.persister.__name__)
+    #
+    #     self.__logger.debug("Fin confirmer_reception_update_collections")
+    #
+    #     return {
+    #         'id_transaction_image': id_transaction_image,
+    #         'chiffre': chiffre,
+    #         'est_image': est_image,
+    #         'est_video': est_video,
+    #     }
 
     def persister(self):
         """
@@ -1678,10 +1657,10 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         resultat = self._controleur.gestionnaire.maj_fichier(transaction)
         uuid_fichier = resultat['uuid_fichier']
 
-        id_transaction_image = self.parametres.get('id_transaction_image')
-        if id_transaction_image:
-            transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
-            self.controleur.gestionnaire.enregistrer_image_info(transaction_image)
+        # id_transaction_image = self.parametres.get('id_transaction_image')
+        # if id_transaction_image:
+        #     transaction_image = self.controleur.gestionnaire.get_transaction(id_transaction_image)
+        #     self.controleur.gestionnaire.enregistrer_image_info(transaction_image)
 
         try:
             collection_uuid = self.parametres['collection_uuid']
@@ -1691,33 +1670,22 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             # MAJ Collections associes au fichier
             self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
 
-        if self.parametres.get('chiffre') and (self.parametres.get('est_image') or self.parametres.get('est_video')):
-            self.__logger.info("Mimetype est une image/video")
-            # Les changements sont sauvegardes. Lancer une nouvelle transaction pour demander le thumbnail protege.
-
-            transaction_thumbnail = {
-                'fuuid': transaction['fuuid'],
-                'uuid_fichier': uuid_fichier,
-            }
-            self.ajouter_transaction_a_soumettre(
-                ConstantesGrosFichiers.TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE,
-                transaction_thumbnail
-            )
+        # if self.parametres.get('chiffre') and (self.parametres.get('est_image') or self.parametres.get('est_video')):
+        #     self.__logger.info("Mimetype est une image/video")
+        #     # Les changements sont sauvegardes. Lancer une nouvelle transaction pour demander le thumbnail protege.
+        #
+        #     transaction_thumbnail = {
+        #         'fuuid': transaction['fuuid'],
+        #         'uuid_fichier': uuid_fichier,
+        #     }
+        #     self.ajouter_transaction_a_soumettre(
+        #         ConstantesGrosFichiers.TRANSACTION_DEMANDE_THUMBNAIL_PROTEGE,
+        #         transaction_thumbnail
+        #     )
 
         self.set_etape_suivante()  # Termine
 
         return resultat
-
-    def _get_tokens_attente(self, resultat):
-        fuuid = resultat['fuuid']
-        tokens = [
-            '%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE, fuuid)
-        ]
-
-        if resultat['securite'] in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]:
-            tokens.append('%s:%s' % (ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES, fuuid))
-
-        return tokens
 
 
 class ProcessusTransactionDemandeThumbnailProtege(ProcessusGrosFichiersActivite):

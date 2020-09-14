@@ -16,6 +16,7 @@ from millegrilles import Constantes
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -256,6 +257,14 @@ class ConsignateurTransactionCallback(BaseCallback):
             # Emettre demande pour le certificat manquant
             self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
 
+        certificats = enveloppe_transaction.get('_certificat')
+        try:
+            del enveloppe_transaction['_certificat']
+        except KeyError:
+            pass
+
+        self.__emettre_certificats(certificats)
+
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
         # Changer estampille du format epoch en un format date et sauver l'evenement
@@ -275,6 +284,14 @@ class ConsignateurTransactionCallback(BaseCallback):
         doc_id = resultat.inserted_id
 
         return doc_id, signature_valide
+
+    def __emettre_certificats(self, certs: list):
+        for cert in certs:
+            enveloppe = EnveloppeCleCert()
+            enveloppe.cert_from_pem_bytes(cert.encode('utf-8'))
+            fingerprint_ascii = enveloppe.fingerprint
+
+            self.contexte.generateur_transactions.emettre_certificat(cert, fingerprint_ascii)
 
     def sauvegarder_transaction_restauree(self, enveloppe_transaction):
 

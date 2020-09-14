@@ -272,7 +272,7 @@ class GenerateurTransaction:
         if correlation_csr is not None:
             message_evenement[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
 
-        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, fingerprint_ascii)
+        routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
         self._contexte.message_dao.transmettre_message(
             message_evenement, routing,
         )

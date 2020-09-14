@@ -243,7 +243,6 @@ class MessagesSample(BaseCallback):
 
         nouvelle_cle = {
             "domaine": "GrosFichiers",
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841c",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
                 "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa851a",
             },

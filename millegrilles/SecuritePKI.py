@@ -566,7 +566,7 @@ class VerificateurTransaction(UtilCertificats):
         except CertificatInconnu as ci:
             # Le certificat est inconnu. Verifier si le message contient une fiche (privee ou publique)
             # ou des certificats inline
-            certificats_inline = transaction.get('_certificats')
+            certificats_inline = transaction.get('_certificats') or transaction.get('_certificat')
             if certificats_inline:
                 # Charger les nouveaux certificats associes au message
                 for cert in certificats_inline:
