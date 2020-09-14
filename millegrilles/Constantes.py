@@ -1136,6 +1136,7 @@ class ConstantesGrosFichiers:
     REQUETE_VITRINE_FICHIERS = '%s.vitrineFichiers' % DOMAINE_NOM
     REQUETE_VITRINE_ALBUMS = '%s.vitrineAlbums' % DOMAINE_NOM
     REQUETE_COLLECTION_FIGEE = '%s.collectionFigee' % DOMAINE_NOM
+    REQUETE_ACTIVITE_RECENTE = '%s.activiteRecente' % DOMAINE_NOM
 
     COMMANDE_DECRYPTER_FICHIER = 'commande.grosfichiers.decrypterFichier'
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'

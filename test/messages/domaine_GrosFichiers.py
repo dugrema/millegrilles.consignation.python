@@ -1,6 +1,7 @@
 # Script de test pour transmettre message de transaction
 
 import datetime, time
+import json
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -46,7 +47,8 @@ class MessagesSample(BaseCallback):
 
     def traiter_message(self, ch, method, properties, body):
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(body)
+        reponse = json.loads(body.decode('utf-8'))
+        print(json.dumps(reponse, indent=2))
 
     def transaction_nouvelle_version_metadata(self):
         transaction = {
@@ -272,6 +274,17 @@ class MessagesSample(BaseCallback):
         print("Supprimer favori: %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_activite(self):
+        requete = {
+        }
+
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, Constantes.ConstantesGrosFichiers.REQUETE_ACTIVITE_RECENTE,
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Activite recente %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -295,6 +308,8 @@ class MessagesSample(BaseCallback):
 
         # enveloppe = sample.transaction_ajouter_favoris()
         # enveloppe = sample.transaction_supprimer_favoris()
+
+        enveloppe = sample.requete_activite()
 
         pass
 

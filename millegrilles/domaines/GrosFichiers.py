@@ -36,19 +36,27 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
-            fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
-            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
-        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
-            fichiers_vitrine = self.gestionnaire.get_document_vitrine_albums()
-            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
-        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_COLLECTION_FIGEE:
-            uuid_collection = message_dict.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-            fichiers_vitrine = self.gestionnaire.get_collection_figee_recente_par_collection(uuid_collection)
-            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        action = '.'.join(routing_key.split('.')[-2:])
+
+        reponse = None
+        if action == ConstantesGrosFichiers.REQUETE_ACTIVITE_RECENTE:
+            reponse = {'resultats': self.gestionnaire.get_activite_recente(message_dict)}
+        # if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
+        #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
+        #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
+        #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_albums()
+        #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_COLLECTION_FIGEE:
+        #     uuid_collection = message_dict.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+        #     fichiers_vitrine = self.gestionnaire.get_collection_figee_recente_par_collection(uuid_collection)
+        #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
+            return
 
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 class HandlerBackupGrosFichiers(HandlerBackupDomaine):
 
@@ -345,6 +353,40 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fichier = collection_domaine.find_one(filtre)
 
         return fichier
+
+    def get_activite_recente(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ]},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+
+        sort_order = [
+            (Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION, -1),
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
+        ]
+
+        limit = params.get('limit') or 100
+
+        curseur_documents = collection_domaine.find(filtre).sort(sort_order).limit(limit)
+
+        documents = list()
+
+        # Extraire docs du curseur, filtrer donnees
+        for doc in curseur_documents:
+            doc_filtre = dict()
+            for key, value in doc.items():
+                if key not in ['versions', '_id']:
+                    doc_filtre[key] = value
+            fuuid_v_courante = doc['fuuid_v_courante']
+            doc_filtre['version_courante'] = doc['versions'][fuuid_v_courante]
+            documents.append(doc_filtre)
+
+        return documents
 
     def get_torrent_par_collection(self, uuid_collection):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
