@@ -1078,11 +1078,13 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTION_NOMCOLLECTION = 'nom_collection'
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
+    DOCUMENT_COLLECTION_DOCS_UUIDS = 'documents_uuids'
     DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE = 'uuid_source_figee'
     DOCUMENT_COLLECTIONS_FIGEES = 'figees'
     DOCUMENT_COLLECTION_UUID = 'uuid-collection'
     DOCUMENT_TORRENT_COLLECTION_UUID = 'uuid_collection_torrent'
     DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
+    DOCUMENT_COLLECTIONS = 'collections'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
 
@@ -1139,6 +1141,7 @@ class ConstantesGrosFichiers:
     REQUETE_COLLECTION_FIGEE = '%s.collectionFigee' % DOMAINE_NOM
     REQUETE_ACTIVITE_RECENTE = '%s.activiteRecente' % DOMAINE_NOM
     REQUETE_COLLECTIONS = '%s.collections' % DOMAINE_NOM
+    REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM
 
     COMMANDE_DECRYPTER_FICHIER = 'commande.grosfichiers.decrypterFichier'
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'

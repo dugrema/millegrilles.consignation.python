@@ -96,7 +96,7 @@ class MessagesSample(BaseCallback):
             transaction, ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION,
             reply_to=self.queue_name, correlation_id='efgh')
 
-        print("Publier collection figee: %s" % enveloppe_val)
+        print("Publier collection : %s" % enveloppe_val)
 
     def requete_collections(self):
         requete = {
@@ -105,14 +105,14 @@ class MessagesSample(BaseCallback):
             requete, ConstantesGrosFichiers.REQUETE_COLLECTIONS,
             reply_to=self.queue_name, correlation_id='efgh')
 
-        print("Publier collection figee: %s" % enveloppe_val)
+        print("Requete collections : %s" % enveloppe_val)
 
     def executer(self):
         # sample.set_securite_collection_prive()
         # sample.set_securite_collection_public()
         # sample.publier_collection()
-        # sample.creer_collection()
-        sample.requete_collections()
+        sample.creer_collection()
+        # sample.requete_collections()
 
         pass
 

@@ -7,7 +7,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
-from millegrilles.domaines.Principale import ConstantesPrincipale
+from millegrilles.Constantes import ConstantesGrosFichiers
 from threading import Thread, Event
 
 
@@ -223,14 +223,13 @@ class MessagesSample(BaseCallback):
 
     def transaction_ajouter_fichiers_collection(self):
         transaction = {
-            "uuid": "0fda4ce6-0ecf-11ea-bb74-00155d011f09",
-            "documents": [
-                'def78794-0ec7-11ea-bb74-00155d011f09',
-                '3c2e929e-57d4-432f-8b63-89131739af68',
+            "uuid": "5edceede-f77c-11ea-8eb7-ff28b56f498d",
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS: [
+                'ab13c39c-35e4-4f60-a353-ef2b63d92c54',
             ]
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.ajouterFichiersCollection',
+            transaction, 'GrosFichiers.ajouterFichiersCollection',
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -285,6 +284,17 @@ class MessagesSample(BaseCallback):
         print("Activite recente %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_documents_collection(self):
+        requete = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: '5edceede-f77c-11ea-8eb7-ff28b56f498d',
+        }
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION,
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("requete_documents_collection %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -309,7 +319,8 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_ajouter_favoris()
         # enveloppe = sample.transaction_supprimer_favoris()
 
-        enveloppe = sample.requete_activite()
+        # enveloppe = sample.requete_activite()
+        enveloppe = sample.requete_documents_collection()
 
         pass
 

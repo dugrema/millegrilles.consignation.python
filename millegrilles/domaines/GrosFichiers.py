@@ -42,6 +42,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_activite_recente(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_COLLECTIONS:
             reponse = {'resultats': self.gestionnaire.get_collections(message_dict)}
+        elif action == ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION:
+            reponse = {'resultats': self.gestionnaire.get_contenu_collection(message_dict)}
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
@@ -216,8 +218,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesCollection"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CREERTORRENT_COLLECTION:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerTorrentCollection"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION:
@@ -318,6 +320,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             name='etiquettes'
         )
 
+        # Appartenance aux collections
+        collection_domaine.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_COLLECTIONS, 1),
+            ],
+            name='collections'
+        )
+
         # Index par SHA256 / taille. Permet de determiner si le fichier existe deja (et juste faire un lien).
         collection_domaine.create_index(
             [
@@ -376,9 +386,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         curseur_documents = collection_domaine.find(filtre).sort(sort_order).limit(limit)
 
-        documents = list()
+        documents = self.mapper_fichier_version(curseur_documents)
 
+        return documents
+
+    def mapper_fichier_version(self, curseur_documents):
         # Extraire docs du curseur, filtrer donnees
+        documents = list()
         for doc in curseur_documents:
             doc_filtre = dict()
             for key, value in doc.items():
@@ -403,15 +417,31 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         curseur_documents = collection_domaine.find(filtre).limit(limit)
 
-        documents = list()
-
         # Extraire docs du curseur, filtrer donnees
-        for doc in curseur_documents:
-            doc_filtre = dict()
-            for key, value in doc.items():
-                if key not in ['versions', '_id']:
-                    doc_filtre[key] = value
-            documents.append(doc_filtre)
+        documents = self.mapper_fichier_version(curseur_documents)
+
+        return documents
+
+    def get_contenu_collection(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$all': [uuid_collection]},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ]},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+
+        hint = [
+            (ConstantesGrosFichiers.DOCUMENT_COLLECTIONS, 1)
+        ]
+
+        limit = params.get('limit') or 1000
+
+        curseur_documents = collection_domaine.find(filtre).hint(hint).limit(limit)
+        documents = self.mapper_fichier_version(curseur_documents)
 
         return documents
 
@@ -839,34 +869,24 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         filtre_documents = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION]},
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_documents}
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_documents},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                '$in': [ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION]
+            },
         }
-        curseur_documents = collection_domaine.find(filtre_documents)
 
-        nouveaux_documents = dict()
-        for fichier in curseur_documents:
-            fichier_uuid = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-            entree_document = self.__filtrer_entree_collection(fichier)
-
-            # Ajouter valeurs pour le document dans la liste de changements
-            nouveaux_documents['documents.%s' % fichier_uuid] = entree_document
+        addtoset_ops = {
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: uuid_collection
+        }
 
         ops = {
-            '$set': nouveaux_documents,
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
+            '$addToSet': addtoset_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-        }
-
-        # Inserer la nouvelle collection
-        resultat = collection_domaine.update_one(filtre, ops)
-        self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
+        resultats = collection_domaine.update_many(filtre_documents, ops)
+        if resultats.matched_count != len(uuid_documents):
+            raise Exception("Erreur association collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
 
     def __filtrer_entree_collection(self, entree):
         """
@@ -952,43 +972,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Inserer la nouvelle collection
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('supprimer fichiers resultat: %s' % str(resultat))
-
-    def maj_fichier_rapports_et_collections(self, uuid_fichier: str, type_operation: str):
-        """
-        Met a jour les listes et collections qui correspondent au fichier.
-        :param uuid_fichier:
-        :return:
-        """
-
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        fichier = collection_domaine.find_one({
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
-        })
-        etiquettes = fichier.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES)
-
-        # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
-        # doivent etre presentes dans le document)
-        self.__ajouter_activite(fichier, type_operation)
-
-    def maj_collections_rapports_et_collections(self, uuid_collection: str, type_operation: str = None):
-        """
-        Met a jour les listes et collections qui correspondent au fichier.
-        :param uuid_collection:
-        :param type_operation:
-        :return:
-        """
-
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-        collection = collection_domaine.find_one({
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-        })
-        # etiquettes = collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_ETIQUETTES]
-
-        # Mettre a jour les listes - on match sur les etiquettes (toutes les etiquettes de la liste
-        # doivent etre presentes dans le document)
-        self.__ajouter_activite(collection, type_operation)
 
     def ajouter_favori(self, doc_uuid: str):
         self._logger.debug("Ajouter favor %s" % doc_uuid)
@@ -1543,33 +1526,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
 
 
 class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
-
-    def set_etape_suivante(self, etape_suivante=None, token_attente: list = None):
-        if etape_suivante is None:
-            etape_suivante = ProcessusGrosFichiersActivite.mettre_a_jour_listes_et_collections.__name__
-        super().set_etape_suivante(etape_suivante, token_attente)
-
-    def mettre_a_jour_listes_et_collections(self):
-        """
-        Met a jour les liens dans les listes et collections correspondantes
-        :return:
-        """
-
-        # Le processus a deja extrait les uuid vers les parametres (return ...)
-        uuid_fichier = self.parametres.get('uuid_fichier')
-        uuid_collection = self.parametres.get('uuid_collection')
-        type_operation = self.parametres.get('type_operation')
-        if type_operation is None:
-            type_operation = self.__class__.__name__
-
-        if uuid_fichier is not None:
-            self._controleur.gestionnaire.maj_fichier_rapports_et_collections(uuid_fichier, type_operation)
-
-        if uuid_collection is not None:
-            self._controleur.gestionnaire.maj_collections_rapports_et_collections(uuid_collection, type_operation)
-
-        self.set_etape_suivante('finale')  # Executer etape finale
-
+    pass
 
 class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite):
     """
@@ -2228,9 +2185,9 @@ class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
 
     def initiale(self):
         transaction = self.charger_transaction()
-        collectionuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        documentsuuid = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
-        self._controleur.gestionnaire.ajouter_documents_collection(collectionuuid, documentsuuid)
+        collection_uuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        documents_uuids = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS]
+        self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, documents_uuids)
         self.set_etape_suivante()
 
 
