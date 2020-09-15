@@ -530,6 +530,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
+        addToSet = dict()
+
+        uuid_collection = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID)
+        if(uuid_collection):
+            addToSet[ConstantesGrosFichiers.DOCUMENT_COLLECTIONS] = uuid_collection
+
         uuid_generique = transaction.get(ConstantesGrosFichiers.DOCUMENT_UUID_GENERIQUE)
         super_document = None
         if uuid_generique is not None:
@@ -609,6 +615,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             '$currentDate': operation_currentdate,
             '$setOnInsert': set_on_insert
         }
+        if len(addToSet.items()) > 0:
+            operations['$addToSet'] = addToSet
+
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
