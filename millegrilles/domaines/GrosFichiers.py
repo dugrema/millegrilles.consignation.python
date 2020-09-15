@@ -38,10 +38,11 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
         routing_key = method.routing_key
         action = '.'.join(routing_key.split('.')[-2:])
 
-        reponse = None
         if action == ConstantesGrosFichiers.REQUETE_ACTIVITE_RECENTE:
             reponse = {'resultats': self.gestionnaire.get_activite_recente(message_dict)}
-        # if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
+        elif action == ConstantesGrosFichiers.REQUETE_COLLECTIONS:
+            reponse = {'resultats': self.gestionnaire.get_collections(message_dict)}
+        # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
@@ -57,6 +58,7 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
 
         if reponse:
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
 
 class HandlerBackupGrosFichiers(HandlerBackupDomaine):
 
@@ -382,8 +384,33 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             for key, value in doc.items():
                 if key not in ['versions', '_id']:
                     doc_filtre[key] = value
-            fuuid_v_courante = doc['fuuid_v_courante']
-            doc_filtre['version_courante'] = doc['versions'][fuuid_v_courante]
+            libelle_doc = doc[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            if libelle_doc == ConstantesGrosFichiers.LIBVAL_FICHIER:
+                fuuid_v_courante = doc['fuuid_v_courante']
+                doc_filtre['version_courante'] = doc['versions'][fuuid_v_courante]
+            documents.append(doc_filtre)
+
+        return documents
+
+    def get_collections(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+
+        limit = params.get('limit') or 1000
+
+        curseur_documents = collection_domaine.find(filtre).limit(limit)
+
+        documents = list()
+
+        # Extraire docs du curseur, filtrer donnees
+        for doc in curseur_documents:
+            doc_filtre = dict()
+            for key, value in doc.items():
+                if key not in ['versions', '_id']:
+                    doc_filtre[key] = value
             documents.append(doc_filtre)
 
         return documents
