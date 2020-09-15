@@ -198,8 +198,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
 
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_COLLECTION:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerCollection"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_COLLECTION:
@@ -661,31 +661,16 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         })
         self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
 
-    def creer_collection(self, uuid_collection: str, liste_documents: list, nom_collection: str = None):
+    def creer_collection(self, uuid_collection: str, nom_collection: str = None):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         collection = ConstantesGrosFichiers.DOCUMENT_COLLECTION.copy()
-        collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nom_collection
+        collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nom_collection
         collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_collection
-
-        info_documents_collection = dict()
-        if liste_documents is not None and len(liste_documents) > 0:
-            # Aller chercher les metadonnees pour inserer dans la collection
-            uuids_documents = [doc['uuid'] for doc in liste_documents]
-
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [ConstantesGrosFichiers.LIBVAL_COLLECTION, ConstantesGrosFichiers.LIBVAL_FICHIER]},
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuids_documents}
-            }
-            curseur_documents = collection_domaine.find(filtre)
-            for doc in curseur_documents:
-                doc_filtre = self.__filtrer_entree_collection(doc)
-                info_documents_collection[doc['uuid']] = doc_filtre
 
         date_creation = datetime.datetime.utcnow()
         collection[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = date_creation
         collection[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = date_creation
-        collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS] = info_documents_collection
 
         # Inserer la nouvelle collection
         resultat = collection_domaine.insert_one(collection)
@@ -1976,12 +1961,10 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
 
     def initiale(self):
         transaction = self.charger_transaction()
-        # nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
-        documents = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS)
-
+        nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION]
         uuid_collection = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
-        self._controleur.gestionnaire.creer_collection(uuid_collection, documents)
+        self._controleur.gestionnaire.creer_collection(uuid_collection, nom_collection)
 
         self.set_etape_suivante()  # Termine
 

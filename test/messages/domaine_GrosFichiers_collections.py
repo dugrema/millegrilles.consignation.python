@@ -1,6 +1,7 @@
 # Script de test pour transmettre message de transaction
 
 import datetime, time
+from uuid import uuid4
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -85,10 +86,21 @@ class MessagesSample(BaseCallback):
         print("Publier collection figee: %s" % enveloppe_val)
         return enveloppe_val
 
+    def creer_collection(self):
+        transaction = {
+            "nom_collection": 'Collection sample %s' % uuid4(),
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION,
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Publier collection figee: %s" % enveloppe_val)
+
     def executer(self):
         # sample.set_securite_collection_prive()
         # sample.set_securite_collection_public()
-        sample.publier_collection()
+        # sample.publier_collection()
+        sample.creer_collection()
 
         pass
 

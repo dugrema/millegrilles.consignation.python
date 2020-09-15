@@ -263,7 +263,8 @@ class ConsignateurTransactionCallback(BaseCallback):
         except KeyError:
             pass
 
-        self.__emettre_certificats(certificats)
+        if certificats:
+            self.__emettre_certificats(certificats)
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']

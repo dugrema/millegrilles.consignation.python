@@ -1075,6 +1075,7 @@ class ConstantesGrosFichiers:
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
 
+    DOCUMENT_COLLECTION_NOMCOLLECTION = 'nom_collection'
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
     DOCUMENT_COLLECTION_LISTEDOCS = 'documents'
     DOCUMENT_COLLECTION_UUID_SOURCE_FIGEE = 'uuid_source_figee'
@@ -1170,7 +1171,6 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTION = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_COLLECTION,
         DOCUMENT_FICHIER_UUID_DOC: None,        # Identificateur unique du fichier (UUID trans initiale)
-        DOCUMENT_COLLECTION_LISTEDOCS: dict(),  # Dictionnaire de fichiers, key=uuid, value=DOCUMENT_COLLECTION_FICHIER
         DOCUMENT_FICHIER_ETIQUETTES: list(),    # Etiquettes de la collection
         DOCUMENT_FICHIER_SUPPRIME: False,       # True si la collection est supprimee
         DOCUMENT_COMMENTAIRES: None,
