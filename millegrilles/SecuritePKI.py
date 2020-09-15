@@ -424,6 +424,9 @@ class UtilCertificats:
         chaine_certs = [c + UtilCertificats.END_CERTIFICATE for c in pem_str.split(UtilCertificats.END_CERTIFICATE)]
         return chaine_certs[0:-1]
 
+    def split_chaine_certificats(self, pem_str: str):
+        return self.__get_chaine_certificats(pem_str)
+
     @property
     def enveloppe_certificat_courant(self) -> EnveloppeCertificat:
         return self._enveloppe

@@ -527,8 +527,20 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        certificat_demandeur = self.verificateur_transaction.verifier(evenement)
-        enveloppe_certificat = certificat_demandeur
+
+        if evenement.get('certificat'):
+            cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
+            cert_navi = '\n'.join(cert[0].split(';'))
+            cert_inter = '\n'.join(cert[1].split(';'))
+
+            enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
+            enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
+
+            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+            self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+        else:
+            enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
 
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
@@ -540,10 +552,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
 
                 # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-                if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in enveloppe_certificat.get_roles:
-                    pass
-                elif ConstantesGenerateurCertificat.ROLE_DOMAINES in certificat_demandeur.get_roles:
-                    # Le middleware a le droit de demander une cle pour un autre composant
+                if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR in enveloppe_certificat.get_roles:
                     pass
                 else:
                     self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
@@ -551,41 +560,47 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             except CertificatInconnu:
                 enveloppe_certificat = None
 
+        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
         if enveloppe_certificat is None:
-            acces_permis = False
+            pass  # Pas de cert, Acces refuse
+        elif not enveloppe_certificat.est_verifie:
+            pass  # Cert invalide, access refuse
+        elif ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
+            pass  # Acces refuse
         else:
+
             self._logger.debug(
                 "Verification signature requete cle grosfichier. Cert: %s" % str(
                     enveloppe_certificat.fingerprint_ascii))
             acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
 
-        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                'fuuid': evenement['fuuid'],
+            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+            filtre = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    'fuuid': evenement['fuuid'],
+                }
             }
-        }
-        document = collection_documents.find_one(filtre)
-        # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
-        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
-        if document is not None:
-            self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
-            if acces_permis:
-                cle_secrete = self.decrypter_cle(document['cles'])
-                try:
-                    cle_secrete_reencryptee, fingerprint = self.crypter_cle(
-                        cle_secrete, enveloppe_certificat.certificat)
-                    reponse = {
-                        'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                        'iv': document['iv'],
-                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
-                    }
-                except TypeError:
-                    self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
-                    reponse = {
-                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
-                    }
+            document = collection_documents.find_one(filtre)
+            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+            if document is not None:
+                self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
+                if acces_permis:
+                    cle_secrete = self.decrypter_cle(document['cles'])
+                    try:
+                        cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+                            cle_secrete, enveloppe_certificat.certificat)
+                        reponse = {
+                            'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                            'iv': document['iv'],
+                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                        }
+                    except TypeError:
+                        self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
+                        reponse = {
+                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+                        }
 
         self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id

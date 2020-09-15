@@ -561,7 +561,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger.debug("maj_fichier: operations = %s" % operations)
         try:
             resultat = collection_domaine.update_one(filtre, operations, upsert=True)
-            if resultat.upserted_id is None or resultat.matched_count != 1:
+            if resultat.upserted_id is None and resultat.matched_count != 1:
                 raise Exception("Erreur mise a jour fichier fuuid: %s" % fuuid)
         except DuplicateKeyError as dke:
             self._logger.info("Cle dupliquee sur fichier %s, on ajoute un id unique dans le nom" % fuuid)

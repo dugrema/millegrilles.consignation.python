@@ -459,11 +459,11 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        enveloppe = self.nouvelle_cle_grosfichiers()
+        # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
-        # enveloppe = self.requete_decryptage_cle_fuuid()
+        enveloppe = self.requete_decryptage_cle_fuuid()
         # enveloppe = self.requete_decryptage_cle_fuuid_avecfingerprint()
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
