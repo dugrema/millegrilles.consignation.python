@@ -44,6 +44,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_collections(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION:
             reponse = {'resultats': self.gestionnaire.get_contenu_collection(message_dict)}
+        elif action == ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID:
+            reponse = {'resultats': self.gestionnaire.get_documents_par_uuid(message_dict)}
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
@@ -160,9 +162,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def demarrer(self):
         super().demarrer()
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
-
-        # Ajout document favoris
-        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_FAVORIS, ConstantesGrosFichiers.DOCUMENT_FAVORIS)
 
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
@@ -442,6 +441,24 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         hint = [
             (ConstantesGrosFichiers.DOCUMENT_COLLECTIONS, 1)
+        ]
+
+        limit = params.get('limit') or 1000
+
+        curseur_documents = collection_domaine.find(filtre).hint(hint).limit(limit)
+        documents = self.mapper_fichier_version(curseur_documents)
+
+        return documents
+
+    def get_documents_par_uuid(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_collection},
+        }
+
+        hint = [
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1)
         ]
 
         limit = params.get('limit') or 1000
@@ -1022,7 +1039,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         # On fait deux operations, une pour ajouter les favoris et une pour supprimer
         self._logger.debug("Ajouter favoris : %s", uuids_ajouter)
-        resultat = collection_domaine.update_many(filtre_docs_ajouter, op_ajouter, hint='document-uuid')
+        resultat = collection_domaine.update_many(filtre_docs_ajouter, op_ajouter)
         if resultat.matched_count != len(uuids_ajouter):
             raise Exception("Erreur ajout favoris, compte different du nombre fourni")
 

@@ -1032,7 +1032,6 @@ class ConstantesGrosFichiers:
     LIBVAL_FICHIER = 'fichier'
     LIBVAL_COLLECTION = 'collection'
     LIBVAL_COLLECTION_FIGEE = 'collection.figee'
-    LIBVAL_FAVORIS = 'favoris'
     LIBVAL_RAPPORT = 'rapport'
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
 
@@ -1074,6 +1073,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_SHA256_480P = "sha256Video480p"
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
+    DOCUMENT_LISTE_UUIDS = 'uuids_documents'
 
     DOCUMENT_COLLECTION_NOMCOLLECTION = 'nom_collection'
     DOCUMENT_COLLECTION_FICHIERS = 'fichiers'
@@ -1142,6 +1142,7 @@ class ConstantesGrosFichiers:
     REQUETE_ACTIVITE_RECENTE = '%s.activiteRecente' % DOMAINE_NOM
     REQUETE_COLLECTIONS = '%s.collections' % DOMAINE_NOM
     REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM
+    REQUETE_DOCUMENTS_PAR_UUID = '%s.documentsParUuid' % DOMAINE_NOM
 
     COMMANDE_DECRYPTER_FICHIER = 'commande.grosfichiers.decrypterFichier'
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
@@ -1188,11 +1189,6 @@ class ConstantesGrosFichiers:
         DOCUMENT_VERSION_DATE_FICHIER: None,
         DOCUMENT_FICHIER_TAILLE: None,
         DOCUMENT_COMMENTAIRES: None,
-    }
-
-    DOCUMENT_FAVORIS = {
-        DOCUMENT_INFODOC_LIBELLE: LIBVAL_FAVORIS,
-        DOCUMENT_FAVORIS_LISTE: list(),     # Liste DOCUMENT_FAVORIS_INFO
     }
 
     DOCUMENT_FAVORIS_INFO = {

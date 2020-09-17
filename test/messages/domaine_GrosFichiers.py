@@ -286,6 +286,17 @@ class MessagesSample(BaseCallback):
         print("requete_documents_collection %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_documents_par_uuid(self):
+        requete = {
+            ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: ['5edceede-f77c-11ea-8eb7-ff28b56f498d'],
+        }
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, Constantes.ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID,
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("requete_documents_collection %s" % enveloppe_val)
+        return enveloppe_val
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -307,10 +318,11 @@ class MessagesSample(BaseCallback):
         # enveloppe5 = sample.transaction_supprimer_collection()
         # enveloppe5 = sample.transaction_recuperer_collection()
 
-        enveloppe = sample.transaction_changer_favoris()
+        # enveloppe = sample.transaction_changer_favoris()
 
         # enveloppe = sample.requete_activite()
         # enveloppe = sample.requete_documents_collection()
+        enveloppe = sample.requete_documents_par_uuid()
 
         pass
 
