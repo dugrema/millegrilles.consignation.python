@@ -225,10 +225,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION:
         #     processus = "millegrilles_domaines_GrosFichiers:ChangerNiveauSecuriteCollection"
 
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FAVORI:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFavori"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FAVORI:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFavori"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_FAVORIS:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerFavoris"
 
         # Torrent
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_TORRENT_NOUVEAU:
@@ -341,6 +339,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                  1),
             ],
             name='hachage-taille'
+        )
+
+        # Index par SHA256 / taille. Permet de determiner si le fichier existe deja (et juste faire un lien).
+        collection_domaine.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
+            ],
+            name='document-uuid'
         )
 
     def get_nom_domaine(self):
@@ -982,69 +988,48 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, ops)
         self._logger.debug('supprimer fichiers resultat: %s' % str(resultat))
 
-    def ajouter_favori(self, doc_uuid: str):
-        self._logger.debug("Ajouter favor %s" % doc_uuid)
+    def changer_favoris(self, docs_uuids: dict):
+        self._logger.debug("Ajouter favor %s" % docs_uuids)
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        date_courante = datetime.datetime.utcnow()
+
+        # Separer uuids a ajouter au favoris et ceux a supprimer (False)
+        uuids_ajouter = list()
+        uuids_supprimer = list()
+        for uuid_doc, value in docs_uuids.items():
+            if value is True:
+                uuids_ajouter.append(uuid_doc)
+            elif value is False:
+                uuids_supprimer.append(uuid_doc)
 
         filtre_docs = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {
                 '$in': [ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION, ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE]
             },
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: doc_uuid,
         }
-        self._logger.debug("Trouver docs pour favoris: %s" % json.dumps(filtre_docs))
-        documents = collection_domaine.find(filtre_docs)
+        filtre_docs_supprimer = filtre_docs.copy()
+        filtre_docs_supprimer[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = {'$in': uuids_supprimer}
+        filtre_docs_ajouter = filtre_docs.copy()
+        filtre_docs_ajouter[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = {'$in': uuids_ajouter}
 
-        favoris = list()
-        for document in documents:
-            # Creer favori
-            favori = ConstantesGrosFichiers.DOCUMENT_FAVORIS_INFO.copy()
-
-            favori[Constantes.DOCUMENT_INFODOC_LIBELLE] = document[Constantes.DOCUMENT_INFODOC_LIBELLE]
-            favori[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = document[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-            favori[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = document[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
-
-            favoris.append(favori)
-
-        ops = {
-            '$push': {
-                ConstantesGrosFichiers.DOCUMENT_FAVORIS_LISTE: {
-                    '$each': favoris
-                }
-            }
+        op_ajouter = {
+            '$set': {'favoris': date_courante}
+        }
+        op_supprimer = {
+            '$unset': {'favoris': ''}
         }
 
-        # Le filtre s'assure que le favori n'est pas deja dans la liste ($not...)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FAVORIS,
-            ConstantesGrosFichiers.DOCUMENT_FAVORIS_LISTE: {'$not': {'$elemMatch': {'uuid': doc_uuid}}}
-        }
-        resultat = collection_domaine.update_one(filtre, ops)
-        self._logger.debug("Ajout favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
+        # On fait deux operations, une pour ajouter les favoris et une pour supprimer
+        self._logger.debug("Ajouter favoris : %s", uuids_ajouter)
+        resultat = collection_domaine.update_many(filtre_docs_ajouter, op_ajouter, hint='document-uuid')
+        if resultat.matched_count != len(uuids_ajouter):
+            raise Exception("Erreur ajout favoris, compte different du nombre fourni")
 
-        return resultat
-
-    def supprimer_favori(self, doc_uuid: str):
-        self._logger.debug("Supprimer favori %s" % doc_uuid)
-        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
-        ops = {
-            '$pull': {
-                ConstantesGrosFichiers.DOCUMENT_FAVORIS_LISTE: {
-                    ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: doc_uuid
-                }
-            }
-        }
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FAVORIS
-        }
-        resultat = collection_domaine.update_one(filtre, ops)
-        self._logger.debug("Supprimer favoris : filtre %s, ops %s" % (str(filtre), json.dumps(ops, indent=4)))
-
-        return resultat
+        self._logger.debug("Supprimer favoris : %s", uuids_supprimer)
+        resultat = collection_domaine.update_many(filtre_docs_supprimer, op_supprimer)
+        if resultat.matched_count != len(uuids_supprimer):
+            raise Exception("Erreur ajout favoris, compte different du nombre fourni")
 
     def associer_hashstring_torrent(self, collection_figee: str, hashstring: str):
         self._logger.debug("associer_seeding_torrent %s, hashstring %s" % (collection_figee, hashstring))
@@ -2213,27 +2198,15 @@ class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
         self.set_etape_suivante()
 
 
-class ProcessusTransactionAjouterFavori(ProcessusGrosFichiers):
+class ProcessusTransactionChangerFavoris(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
 
     def initiale(self):
         transaction = self.charger_transaction()
-        doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-        self._controleur.gestionnaire.ajouter_favori(doc_uuid)
-        self.set_etape_suivante()
-
-
-class ProcessusTransactionSupprimerFavori(ProcessusGrosFichiers):
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-
-    def initiale(self):
-        transaction = self.charger_transaction()
-        doc_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-        self._controleur.gestionnaire.supprimer_favori(doc_uuid)
+        docs_uuids = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS)
+        self._controleur.gestionnaire.changer_favoris(docs_uuids)
         self.set_etape_suivante()
 
 

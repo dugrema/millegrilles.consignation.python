@@ -249,28 +249,19 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_ajouter_favoris(self):
+    def transaction_changer_favoris(self):
         transaction = {
-            'uuid': 'b9abef30-0ccd-11ea-bb74-00155d011f09'
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_DOCS_UUIDS: {
+                'b212db7f-27f7-4d1e-bba2-5b2293e4d9ea': False,
+                '2ca533be-c463-4cc3-b729-5bf34f53c623': True,
+            }
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.ajouterFavori',
+            transaction, ConstantesGrosFichiers.TRANSACTION_CHANGER_FAVORIS,
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Ajouter favori: %s" % enveloppe_val)
-        return enveloppe_val
-
-    def transaction_supprimer_favoris(self):
-        transaction = {
-            'uuid': '8671512c-0c06-11ea-bb74-00155d011f09'
-        }
-
-        enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.supprimerFavori',
-            reply_to=self.queue_name, correlation_id='abcd')
-
-        print("Supprimer favori: %s" % enveloppe_val)
         return enveloppe_val
 
     def requete_activite(self):
@@ -316,11 +307,10 @@ class MessagesSample(BaseCallback):
         # enveloppe5 = sample.transaction_supprimer_collection()
         # enveloppe5 = sample.transaction_recuperer_collection()
 
-        # enveloppe = sample.transaction_ajouter_favoris()
-        # enveloppe = sample.transaction_supprimer_favoris()
+        enveloppe = sample.transaction_changer_favoris()
 
         # enveloppe = sample.requete_activite()
-        enveloppe = sample.requete_documents_collection()
+        # enveloppe = sample.requete_documents_collection()
 
         pass
 

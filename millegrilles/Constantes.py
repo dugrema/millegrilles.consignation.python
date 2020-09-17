@@ -1085,6 +1085,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_TORRENT_COLLECTION_UUID = 'uuid_collection_torrent'
     DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
     DOCUMENT_COLLECTIONS = 'collections'
+    DOCUMENT_FAVORIS = 'favoris'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
 
@@ -1128,8 +1129,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_RETIRER_FICHIERS_COLLECTION = '%s.retirerFichiersCollection' % DOMAINE_NOM
     TRANSACTION_CHANGER_SECURITE_COLLECTION = '%s.changerSecuriteCollection' % DOMAINE_NOM
 
-    TRANSACTION_AJOUTER_FAVORI = '%s.ajouterFavori' % DOMAINE_NOM
-    TRANSACTION_SUPPRIMER_FAVORI = '%s.supprimerFavori' % DOMAINE_NOM
+    TRANSACTION_CHANGER_FAVORIS = '%s.changerFavoris' % DOMAINE_NOM
 
     TRANSACTION_TORRENT_NOUVEAU = '%s.nouveauTorrent' % DOMAINE_NOM
     TRANSACTION_TORRENT_SEEDING = '%s.seedingTorrent' % DOMAINE_NOM
