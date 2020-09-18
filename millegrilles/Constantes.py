@@ -1141,6 +1141,7 @@ class ConstantesGrosFichiers:
     REQUETE_COLLECTION_FIGEE = '%s.collectionFigee' % DOMAINE_NOM
     REQUETE_ACTIVITE_RECENTE = '%s.activiteRecente' % DOMAINE_NOM
     REQUETE_COLLECTIONS = '%s.collections' % DOMAINE_NOM
+    REQUETE_FAVORIS = '%s.favoris' % DOMAINE_NOM
     REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM
     REQUETE_DOCUMENTS_PAR_UUID = '%s.documentsParUuid' % DOMAINE_NOM
 
@@ -1189,12 +1190,6 @@ class ConstantesGrosFichiers:
         DOCUMENT_VERSION_DATE_FICHIER: None,
         DOCUMENT_FICHIER_TAILLE: None,
         DOCUMENT_COMMENTAIRES: None,
-    }
-
-    DOCUMENT_FAVORIS_INFO = {
-        DOCUMENT_INFODOC_LIBELLE: None,      # Type document
-        'nom': None,                                    # Nom affiche a l'ecran
-        'uuid': None,                                   # Lien vers document, doit etre unique dans la liste de favoris
     }
 
     DOCUMENT_VITRINE_FICHIERS = {

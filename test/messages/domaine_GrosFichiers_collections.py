@@ -107,12 +107,22 @@ class MessagesSample(BaseCallback):
 
         print("Requete collections : %s" % enveloppe_val)
 
+    def requete_favoris(self):
+        requete = {
+        }
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, ConstantesGrosFichiers.REQUETE_FAVORIS,
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Requete collections : %s" % enveloppe_val)
+
     def executer(self):
         # sample.set_securite_collection_prive()
         # sample.set_securite_collection_public()
         # sample.publier_collection()
-        sample.creer_collection()
+        # sample.creer_collection()
         # sample.requete_collections()
+        sample.requete_favoris()
 
         pass
 

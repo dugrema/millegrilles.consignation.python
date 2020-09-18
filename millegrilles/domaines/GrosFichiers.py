@@ -42,6 +42,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_activite_recente(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_COLLECTIONS:
             reponse = {'resultats': self.gestionnaire.get_collections(message_dict)}
+        elif action == ConstantesGrosFichiers.REQUETE_FAVORIS:
+            reponse = {'resultats': self.gestionnaire.get_favoris(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION:
             reponse = {'resultats': self.gestionnaire.get_contenu_collection(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID:
@@ -411,19 +413,71 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return documents
 
+    def mapper_favoris(self, curseur_documents):
+        # Extraire docs du curseur, filtrer donnees
+        documents = list()
+        for doc in curseur_documents:
+            doc_filtre = dict()
+            for key, value in doc.items():
+                if key in [
+                    'uuid',
+                    'nom_fichier',
+                    'nom_collection',
+                    Constantes.DOCUMENT_INFODOC_LIBELLE,
+                    Constantes.DOCUMENT_INFODOC_SECURITE,
+                ]:
+                    doc_filtre[key] = value
+            documents.append(doc_filtre)
+
+        return documents
+
     def get_collections(self, params: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
+        projection = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: True,
+            Constantes.DOCUMENT_INFODOC_SECURITE: True,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: True,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: True,
+        }
 
         limit = params.get('limit') or 1000
 
-        curseur_documents = collection_domaine.find(filtre).limit(limit)
+        curseur_documents = collection_domaine.find(filtre, projection).limit(limit)
 
         # Extraire docs du curseur, filtrer donnees
         documents = self.mapper_fichier_version(curseur_documents)
+
+        return documents
+
+    def get_favoris(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ]},
+            ConstantesGrosFichiers.DOCUMENT_FAVORIS: {'$exists': True},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+        projection = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: True,
+            Constantes.DOCUMENT_INFODOC_SECURITE: True,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: True,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION: True,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: True,
+        }
+
+        limit = params.get('limit') or 1000
+
+        curseur_documents = collection_domaine.find(filtre, projection).limit(limit)
+
+        # Extraire docs du curseur, filtrer donnees
+        documents = self.mapper_favoris(curseur_documents)
 
         return documents
 
