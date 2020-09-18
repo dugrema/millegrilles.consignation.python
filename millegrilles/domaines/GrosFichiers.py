@@ -2030,7 +2030,7 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION]
         uuid_collection = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        uuid_parent = transaction[ConstantesGrosFichiers.DOCUMENT_UUID_PARENT]
+        uuid_parent = transaction.get(ConstantesGrosFichiers.DOCUMENT_UUID_PARENT)
 
         self._controleur.gestionnaire.creer_collection(uuid_collection, nom_collection, uuid_parent)
 
