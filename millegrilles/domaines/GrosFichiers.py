@@ -221,8 +221,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCreerTorrentCollection"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_AJOUTER_FICHIERS_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAjouterFichiersDansCollection"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RETIRER_FICHIERS_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRetirerFichiersDeCollection"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_SECURITE_COLLECTION:
         #     processus = "millegrilles_domaines_GrosFichiers:ChangerNiveauSecuriteCollection"
 
@@ -1064,28 +1064,30 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return entree_filtree
 
-    def retirer_fichiers_collection(self, uuid_collection: str, uuid_fichiers: list):
+    def retirer_fichiers_collection(self, uuid_collection: str, uuid_documents: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-        fichiers = dict()
-        for uuid in uuid_fichiers:
-            fichiers['documents.%s' % uuid] = ''
+        filtre_documents = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuid_documents},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ]},
+        }
+
+        pull_ops = {
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: uuid_collection
+        }
 
         ops = {
-            '$unset': fichiers,
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
+            '$pull': pull_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
         }
 
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
-        }
-
-        # Inserer la nouvelle collection
-        resultat = collection_domaine.update_one(filtre, ops)
-        self._logger.debug('supprimer fichiers resultat: %s' % str(resultat))
+        resultats = collection_domaine.update_many(filtre_documents, ops)
+        if resultats.matched_count != len(uuid_documents):
+            raise Exception("Erreur retrait collection, %d != %d" % (resultats.matched_count, len(uuid_documents)))
 
     def changer_favoris(self, docs_uuids: dict):
         self._logger.debug("Ajouter favor %s" % docs_uuids)
@@ -2293,8 +2295,8 @@ class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.charger_transaction()
         collectionuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        documentsuuid = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_LISTEDOCS]
-        self._controleur.gestionnaire.retirer_fichiers_collection(collectionuuid, documentsuuid)
+        documents_uuids = transaction[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
+        self._controleur.gestionnaire.retirer_fichiers_collection(collectionuuid, documents_uuids)
         self.set_etape_suivante()
 
 
