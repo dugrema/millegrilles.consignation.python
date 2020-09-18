@@ -798,7 +798,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
             ]}
         }
-        resultat = collection_domaine.update_one(filtre, {
+        resultat = collection_domaine.update_many(filtre, {
             '$set': set_operation
         })
         if resultat.matched_count != len(uuids_documents):
