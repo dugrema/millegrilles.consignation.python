@@ -187,10 +187,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_FICHIER:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionChangerEtiquettesFichier"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
 
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
@@ -783,7 +783,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         })
         self._logger.debug('maj_libelles_fichier resultat: %s' % str(resultat))
 
-    def supprimer_fichier(self, uuid_fichier):
+    def supprimer_fichier(self, uuids_documents: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = {
@@ -791,15 +791,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_SUPPRESSION: datetime.datetime.utcnow()
         }
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuids_documents},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ]}
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation
         })
-        self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
+        if resultat.matched_count != len(uuids_documents):
+            raise Exception("Erreur supprimer documents, match count %d != %d" % (resultat.matched_count, len(uuids_documents)))
 
-    def recuperer_fichier(self, uuid_fichier):
+    def recuperer_fichier(self, uuids_documents: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = {
@@ -809,14 +814,19 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_SUPPRESSION: True
         }
         filtre = {
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': uuids_documents},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ]}
         }
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation,
             '$unset': unset_operation
         })
-        self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
+        if resultat.matched_count != len(uuids_documents):
+            raise Exception("Erreur recuperer documents, match count %d != %d" % (resultat.matched_count, len(uuids_documents)))
 
     def creer_collection(self, uuid_collection: str, nom_collection: str = None, uuid_parent: str = None):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1998,12 +2008,12 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersActivite):
 
     def initiale(self):
         transaction = self.charger_transaction()
-        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        self._controleur.gestionnaire.supprimer_fichier(uuid_fichier)
+        uuids_documents = transaction[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
+        self._controleur.gestionnaire.supprimer_fichier(uuids_documents)
 
         self.set_etape_suivante()  # Termine
 
-        return {'uuid_fichier': uuid_fichier}
+        return {'uuids_documents': uuids_documents}
 
 
 class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersActivite):
@@ -2013,12 +2023,12 @@ class ProcessusTransactionRecupererFichier(ProcessusGrosFichiersActivite):
 
     def initiale(self):
         transaction = self.charger_transaction()
-        uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        self._controleur.gestionnaire.recuperer_fichier(uuid_fichier)
+        uuids_documents = transaction[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
+        self._controleur.gestionnaire.recuperer_fichier(uuids_documents)
 
         self.set_etape_suivante()  # Termine
 
-        return {'uuid_fichier': uuid_fichier}
+        return {'uuids_documents': uuids_documents}
 
 
 class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):

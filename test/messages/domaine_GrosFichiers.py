@@ -120,10 +120,12 @@ class MessagesSample(BaseCallback):
 
     def transaction_supprimer_fichier(self):
         transaction = {
-            "uuid": "c0f8649e-0ccd-11ea-bb74-00155d011f09",
+            ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [
+                "53aca732-fa3c-4e21-9462-e01e5157741a"
+            ],
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.supprimerFichier',
+            transaction, ConstantesGrosFichiers.TRANSACTION_SUPPRIMER_FICHIER,
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -131,10 +133,12 @@ class MessagesSample(BaseCallback):
 
     def transaction_recuperer_fichier(self):
         transaction = {
-            "uuid": "c0f8649e-0ccd-11ea-bb74-00155d011f09",
+            ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [
+                "53aca732-fa3c-4e21-9462-e01e5157741a"
+            ],
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.recupererFichier',
+            transaction, ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER,
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -306,7 +310,7 @@ class MessagesSample(BaseCallback):
         # enveloppe11 = sample.transaction_commenter_fichier()
         # enveloppe8 = sample.transaction_changer_etiquettes_fichier()
         # enveloppe = sample.transaction_supprimer_fichier()
-        # enveloppe = sample.transaction_recuperer_fichier()
+        enveloppe = sample.transaction_recuperer_fichier()
 
         # enveloppe3 = sample.transaction_creer_collection_vide()
         # enveloppe3 = sample.transaction_creer_collection_2docs()
@@ -321,7 +325,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_changer_favoris()
 
         # enveloppe = sample.requete_activite()
-        enveloppe = sample.requete_documents_collection()
+        # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
 
         pass
