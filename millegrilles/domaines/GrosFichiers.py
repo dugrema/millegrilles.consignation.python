@@ -484,6 +484,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def get_contenu_collection(self, params: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         uuid_collection = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        # Charger objet collection
+        filtre_collection = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+        }
+        hint = [
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1)
+        ]
+        info_collection = collection_domaine.find_one(filtre_collection, hint=hint)
+
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$all': [uuid_collection]},
             Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
@@ -502,7 +513,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         curseur_documents = collection_domaine.find(filtre).hint(hint).limit(limit)
         documents = self.mapper_fichier_version(curseur_documents)
 
-        return documents
+        return {
+            'collection': info_collection,
+            'documents': documents,
+        }
 
     def get_documents_par_uuid(self, params: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -804,12 +818,16 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         })
         self._logger.debug('supprimer_fichier resultat: %s' % str(resultat))
 
-    def creer_collection(self, uuid_collection: str, nom_collection: str = None):
+    def creer_collection(self, uuid_collection: str, nom_collection: str = None, uuid_parent: str = None):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         collection = ConstantesGrosFichiers.DOCUMENT_COLLECTION.copy()
         collection[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nom_collection
         collection[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_collection
+
+        if uuid_parent:
+            self._logger.debug("Creer collection %s avec parent %s" % (uuid_collection, uuid_parent))
+            collection[ConstantesGrosFichiers.DOCUMENT_COLLECTIONS] = [uuid_parent]
 
         date_creation = datetime.datetime.utcnow()
         collection[Constantes.DOCUMENT_INFODOC_DATE_CREATION] = date_creation
@@ -2012,8 +2030,9 @@ class ProcessusTransactionNouvelleCollection(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         nom_collection = transaction[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION]
         uuid_collection = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        uuid_parent = transaction[ConstantesGrosFichiers.DOCUMENT_UUID_PARENT]
 
-        self._controleur.gestionnaire.creer_collection(uuid_collection, nom_collection)
+        self._controleur.gestionnaire.creer_collection(uuid_collection, nom_collection, uuid_parent)
 
         self.set_etape_suivante()  # Termine
 

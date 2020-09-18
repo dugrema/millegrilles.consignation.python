@@ -321,8 +321,8 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_changer_favoris()
 
         # enveloppe = sample.requete_activite()
-        # enveloppe = sample.requete_documents_collection()
-        enveloppe = sample.requete_documents_par_uuid()
+        enveloppe = sample.requete_documents_collection()
+        # enveloppe = sample.requete_documents_par_uuid()
 
         pass
 

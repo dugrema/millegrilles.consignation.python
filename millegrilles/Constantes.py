@@ -1086,6 +1086,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTION_FIGEE_DATE = 'date'
     DOCUMENT_COLLECTIONS = 'collections'
     DOCUMENT_FAVORIS = 'favoris'
+    DOCUMENT_UUID_PARENT = 'uuid_parent'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
 

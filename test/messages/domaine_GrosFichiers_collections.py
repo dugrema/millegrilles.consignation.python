@@ -91,6 +91,7 @@ class MessagesSample(BaseCallback):
     def creer_collection(self):
         transaction = {
             "nom_collection": 'Collection sample %s' % uuid4(),
+            "uuid_parent": "4ea93997-3721-443d-9755-65a574126775",
         }
         enveloppe_val = self.generateur.soumettre_transaction(
             transaction, ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION,
@@ -120,9 +121,9 @@ class MessagesSample(BaseCallback):
         # sample.set_securite_collection_prive()
         # sample.set_securite_collection_public()
         # sample.publier_collection()
-        # sample.creer_collection()
+        sample.creer_collection()
         # sample.requete_collections()
-        sample.requete_favoris()
+        # sample.requete_favoris()
 
         pass
 
