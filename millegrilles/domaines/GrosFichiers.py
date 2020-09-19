@@ -491,10 +491,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
         }
-        hint = [
-            (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1)
+
+        hint_collection = [
+            (ConstantesGrosFichiers.DOCUMENT_COLLECTIONS, 1)
         ]
-        info_collection = collection_domaine.find_one(filtre_collection, hint=hint)
+        info_collection = collection_domaine.find_one(filtre_collection, hint=hint_collection)
 
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$all': [uuid_collection]},
@@ -505,13 +506,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
 
-        hint = [
+        hint_fichiers = [
             (ConstantesGrosFichiers.DOCUMENT_COLLECTIONS, 1)
         ]
 
+        sort_keys = params.get('sort_keys')
+        sort_key = [
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER, 1),
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
+        ]
+        if sort_keys is not None:
+            sort_key = [(k, 1) for k in sort_keys]
+            sort_key.append((ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1))
+
+        skip = params.get('skip') or 0
         limit = params.get('limit') or 1000
 
-        curseur_documents = collection_domaine.find(filtre).hint(hint).limit(limit)
+        curseur_documents = collection_domaine.find(filtre).collation({'locale': 'en' }).sort(sort_key).hint(hint_fichiers).skip(skip).limit(limit)
         documents = self.mapper_fichier_version(curseur_documents)
 
         return {

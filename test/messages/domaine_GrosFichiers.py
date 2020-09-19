@@ -284,6 +284,9 @@ class MessagesSample(BaseCallback):
     def requete_documents_collection(self):
         requete = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: '5edceede-f77c-11ea-8eb7-ff28b56f498d',
+            'skip': 1,
+            'limit': 2,
+            'sort_keys': ['nom_collection', 'nom_fichier']
         }
         enveloppe_val = self.generateur.transmettre_requete(
             requete, Constantes.ConstantesGrosFichiers.REQUETE_CONTENU_COLLECTION,
@@ -326,8 +329,8 @@ class MessagesSample(BaseCallback):
 
         # enveloppe = sample.transaction_changer_favoris()
 
-        enveloppe = sample.requete_activite()
-        # enveloppe = sample.requete_documents_collection()
+        # enveloppe = sample.requete_activite()
+        enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
 
         pass
