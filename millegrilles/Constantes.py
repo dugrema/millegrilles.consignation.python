@@ -1141,6 +1141,7 @@ class ConstantesGrosFichiers:
     REQUETE_VITRINE_ALBUMS = '%s.vitrineAlbums' % DOMAINE_NOM
     REQUETE_COLLECTION_FIGEE = '%s.collectionFigee' % DOMAINE_NOM
     REQUETE_ACTIVITE_RECENTE = '%s.activiteRecente' % DOMAINE_NOM
+    REQUETE_CORBEILLE = '%s.getCorbeille' % DOMAINE_NOM
     REQUETE_COLLECTIONS = '%s.collections' % DOMAINE_NOM
     REQUETE_FAVORIS = '%s.favoris' % DOMAINE_NOM
     REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM

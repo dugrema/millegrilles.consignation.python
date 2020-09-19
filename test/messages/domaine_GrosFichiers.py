@@ -281,6 +281,19 @@ class MessagesSample(BaseCallback):
         print("Activite recente %s" % enveloppe_val)
         return enveloppe_val
 
+    def requete_corbeille(self):
+        requete = {
+            'skip': 0,
+            'limit': 3,
+        }
+
+        enveloppe_val = self.generateur.transmettre_requete(
+            requete, Constantes.ConstantesGrosFichiers.REQUETE_CORBEILLE,
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        print("Activite recente %s" % enveloppe_val)
+        return enveloppe_val
+
     def requete_documents_collection(self):
         requete = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: '5edceede-f77c-11ea-8eb7-ff28b56f498d',
@@ -330,7 +343,8 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_changer_favoris()
 
         # enveloppe = sample.requete_activite()
-        enveloppe = sample.requete_documents_collection()
+        enveloppe = sample.requete_corbeille()
+        # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
 
         pass

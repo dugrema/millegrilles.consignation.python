@@ -40,6 +40,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
 
         if action == ConstantesGrosFichiers.REQUETE_ACTIVITE_RECENTE:
             reponse = {'resultats': self.gestionnaire.get_activite_recente(message_dict)}
+        elif action == ConstantesGrosFichiers.REQUETE_CORBEILLE:
+            reponse = {'resultats': self.gestionnaire.get_corbeille(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_COLLECTIONS:
             reponse = {'resultats': self.gestionnaire.get_collections(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_FAVORIS:
@@ -398,6 +400,31 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return documents
 
+    def get_corbeille(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE,
+            ]},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: True,
+        }
+
+        sort_order = [
+            (ConstantesGrosFichiers.DOCUMENT_VERSION_DATE_SUPPRESSION, -1),
+            (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
+        ]
+
+        skip = params.get('skip') or 0
+        limit = params.get('limit') or 100
+
+        curseur_documents = collection_domaine.find(filtre).sort(sort_order).skip(skip).limit(limit)
+
+        documents = self.mapper_fichier_version(curseur_documents)
+
+        return documents
+
     def mapper_fichier_version(self, curseur_documents):
         # Extraire docs du curseur, filtrer donnees
         documents = list()
@@ -522,7 +549,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         skip = params.get('skip') or 0
         limit = params.get('limit') or 1000
 
-        curseur_documents = collection_domaine.find(filtre).collation({'locale': 'en' }).sort(sort_key).hint(hint_fichiers).skip(skip).limit(limit)
+        curseur_documents = collection_domaine.find(filtre).collation({'locale': 'en'}).hint(hint_fichiers).sort(sort_key).skip(skip).limit(limit)
         documents = self.mapper_fichier_version(curseur_documents)
 
         return {
