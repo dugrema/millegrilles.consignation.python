@@ -270,6 +270,8 @@ class MessagesSample(BaseCallback):
 
     def requete_activite(self):
         requete = {
+            'skip': 0,
+            'limit': 3,
         }
 
         enveloppe_val = self.generateur.transmettre_requete(
@@ -316,7 +318,7 @@ class MessagesSample(BaseCallback):
         # enveloppe3 = sample.transaction_creer_collection_2docs()
         # enveloppe4 = sample.transaction_renommer_collection()
         # enveloppe7 = sample.transaction_ajouter_fichiers_collection()
-        enveloppe7 = sample.transaction_retirer_fichiers_collection()
+        # enveloppe7 = sample.transaction_retirer_fichiers_collection()
         # enveloppe = sample.transaction_changer_etiquettes_collection()
         # enveloppe5 = sample.transaction_figer_collection()
         # enveloppe5 = sample.transaction_supprimer_collection()
@@ -324,7 +326,7 @@ class MessagesSample(BaseCallback):
 
         # enveloppe = sample.transaction_changer_favoris()
 
-        # enveloppe = sample.requete_activite()
+        enveloppe = sample.requete_activite()
         # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
 

@@ -389,9 +389,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
         ]
 
+        skip = params.get('skip') or 0
         limit = params.get('limit') or 100
 
-        curseur_documents = collection_domaine.find(filtre).sort(sort_order).limit(limit)
+        curseur_documents = collection_domaine.find(filtre).sort(sort_order).skip(skip).limit(limit)
 
         documents = self.mapper_fichier_version(curseur_documents)
 
