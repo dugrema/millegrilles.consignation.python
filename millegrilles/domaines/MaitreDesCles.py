@@ -561,7 +561,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 if not any([r in roles_permis for r in roles_certificat]):
                     enveloppe_certificat = None  # Acces refuse
 
-                duree_permission = evenement.get('duree') or (30 * 60)  # Par defaut, 30 minutes pour une permission
+                # Par defaut, 30 minutes pour une permission
+                duree_permission = evenement.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION) or (30 * 60)
                 temps_limite_demande = datetime.datetime.utcnow().timestamp() - duree_permission
 
             else:

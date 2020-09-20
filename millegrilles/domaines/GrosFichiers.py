@@ -1798,14 +1798,28 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         # Sauvegarder demande conversion
         self.controleur.gestionnaire.ajouter_conversion_media(info)
 
+        commande_preview = info.copy()
+
         if securite == Constantes.SECURITE_PROTEGE:
-            pass
+            # Creer une permission de dechiffrage pour recuperer la cle du fichier
+            permission = {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
+                Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
+                Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2*60),  # 2 minutes
+            }
+            # Signer
+            generateur_transactions = self.controleur.generateur_transactions
+            commande_permission = generateur_transactions.preparer_enveloppe(
+                permission,
+                '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM, Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
+            )
+            commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
 
         mimetype = info['mimetype'].split('/')[0]
         if mimetype == 'video':
-            self.ajouter_commande_a_transmettre('commande.fichiers.previewVideo', info)
+            self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
         elif mimetype == 'image':
-            self.ajouter_commande_a_transmettre('commande.fichiers.previewImage', info)
+            self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
 
     # def confirmer_reception_update_collections(self):
     #     # Verifie si la transaction correspond a un document d'image

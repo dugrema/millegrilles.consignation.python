@@ -753,6 +753,9 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_HEBERGEMENT = 'hebergement'
     TRANSACTION_CHAMP_HOTE = 'hote'
     TRANSACTION_CHAMP_HOTE_PEM = 'hote_pem'
+    TRANSACTION_CHAMP_ROLES_PERMIS = 'roles_permis'
+    TRANSACTION_CHAMP_CERTIFICAT_TIERS = '_certificat_tiers'
+    TRANSACTION_CHAMP_DUREE_PERMISSION = 'duree'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -1073,6 +1076,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_MIMETYPE_480P = "mimetypeVideo480p"
     DOCUMENT_FICHIER_TAILLE_480P = "tailleVideo480p"
     DOCUMENT_FICHIER_SHA256_480P = "sha256Video480p"
+    DOCUMENT_FICHIER_COMMANDE_PERMISSION = 'permission'
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'

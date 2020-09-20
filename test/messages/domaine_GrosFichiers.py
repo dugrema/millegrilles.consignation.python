@@ -345,11 +345,14 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def requete_permission_decryptage_cle_fuuid(self):
-        mq_cert = self.configuration.mq_certfile
-        with open(mq_cert, 'r') as fichier:
-            mq_certfile = fichier.read()
+        # mq_cert = self.configuration.mq_certfile
+        # with open(mq_cert, 'r') as fichier:
+        #     mq_certfile = fichier.read()
 
-        certs = self.contexte.signateur_transactions.split_chaine_certificats(mq_certfile)
+        signateur = self.contexte.signateur_transactions
+        certs = signateur.chaine_certs
+
+        # certs = signateur.split_chaine_certificats(mq_certfile)
 
         requete_cert_maitredescles = {
             'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0",
@@ -369,7 +372,7 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
-        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
@@ -395,7 +398,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.requete_documents_par_uuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
-        sample.requete_permission_decryptage_cle_fuuid()
+        # sample.requete_permission_decryptage_cle_fuuid()
 
         pass
 
