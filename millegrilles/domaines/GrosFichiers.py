@@ -167,6 +167,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONFIGURATION, ConstantesGrosFichiers.DOCUMENT_DEFAUT)
 
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA, {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+        })
+
+        self.initialiser_document(ConstantesGrosFichiers.LIBVAL_PUBLICATION_FICHIERS, {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_PUBLICATION_FICHIERS
+        })
+
         self.demarrer_watcher_collection(
             ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
@@ -200,6 +208,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCleSecreteFichier"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouveauFichierDecrypte"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierPreview"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_THUMBNAIL:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierThumbnail"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
@@ -1371,15 +1381,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         collection_domaine.update(filtre, ops)
 
-    def associer_thumbnail(self, fuuid, thumbnail, metadata = None):
+    def associer_info_media(self, transaction: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        fuuid = transaction['fuuid']
+        uuid_document = transaction['uuid']
+        thumbnail = transaction.get('thumbnail')
+        preview_fuuid = transaction.get('preview_fuuid')
+        metadata = transaction.get('metadata')
+
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
             '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid): {
                 '$exists': True,
             }
         }
-
         set_opts = {
             '%s.%s.%s' % (
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
@@ -1634,6 +1650,67 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine.update_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS}, ops)
 
+    def ajouter_conversion_media(self, info: dict):
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+        }
+
+        info_copy = info.copy()
+        info_copy['derniere_activite'] = datetime.datetime.utcnow()
+        set_ops = {
+            ConstantesGrosFichiers.DOCUMENT_PREVIEWS + '.' + info['fuuid']: info_copy
+        }
+
+        ops = {'$set': set_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(filtre, ops)
+
+    def associer_preview(self, transaction: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        fuuid = transaction['fuuid']
+        uuid_document = transaction['uuid']
+
+        # Sauvegarder preview
+        filtre_fichier = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.LIBVAL_COLLECTION_FIGEE
+            ]},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_document
+        }
+        set_ops_fichier = dict()
+        for key in [
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA,
+        ]:
+            value = transaction.get(key)
+            if value:
+                key_version = '.'.join([
+                    ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS,
+                    fuuid,
+                    key,
+                ])
+                set_ops_fichier[key_version] = value
+        ops_fichier = {
+            '$set': set_ops_fichier,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        collection_domaine.update_one(filtre_fichier, ops_fichier)
+
+        # MAJ document medias, retirer la demande de preview (complete)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+        }
+        unset_ops = {
+            ConstantesGrosFichiers.DOCUMENT_PREVIEWS + '.' + fuuid: True
+        }
+        ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
+        collection_domaine.update_one(filtre, ops)
+
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
 
@@ -1661,6 +1738,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
 
 class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
     pass
+
 
 class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite):
     """
@@ -1690,45 +1768,44 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         resultat = self._controleur.gestionnaire.maj_fichier(transaction)
 
         # Vierifier si le document de fichier existe deja
-        # self.__logger.debug("Fichier existe, on ajoute une version")
-
         fuuid = transaction['fuuid']
         document_uuid = transaction.get('document_uuid')  # Represente la collection, si present
         nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
         resultat = {
+            'uuid': resultat['uuid_fichier'],
             'fuuid': fuuid,
             'securite': transaction['securite'],
             'collection_uuid': document_uuid,
-            'type_operation': 'Nouveau fichier',
             'mimetype': transaction['mimetype'],
             'extension': extension,
+            'nom_fichier': transaction['nom_fichier'],
         }
 
-        # # Verifier s'il y a un traitement supplementaire a faire
-        # mimetype = self.parametres['mimetype'].split('/')[0]
-        # fuuid = self.parametres['fuuid']
-        # est_media_visuel = mimetype in ['image', 'video']
-        #
-        # if est_media_visuel:
-        #     self._traiter_media_visuel(resultat)
+        # Verifier s'il y a un traitement supplementaire a faire
+        mimetype = self.transaction['mimetype'].split('/')[0]
+        if mimetype in ['video', 'image']:
+            self._traiter_media(resultat)
 
         self.set_etape_suivante()  # Termine
 
         return resultat
 
-    def _maj_collection(self, transaction):
-        pass
-
-    def _traiter_media_visuel(self, info: dict):
+    def _traiter_media(self, info: dict):
         # Transmettre une commande de transcodage
-        transaction_transcoder = {
-            'fuuid': info['fuuid'],
-            'mimetype': info['mimetype'],
-            'extension': info['extension'],
-            'securite': info['securite'],
-        }
-        self.ajouter_commande_a_transmettre('commande.grosfichiers.transcoderVideo', transaction_transcoder)
+        securite = info['securite']
+
+        # Sauvegarder demande conversion
+        self.controleur.gestionnaire.ajouter_conversion_media(info)
+
+        if securite == Constantes.SECURITE_PROTEGE:
+            pass
+
+        mimetype = info['mimetype'].split('/')[0]
+        if mimetype == 'video':
+            self.ajouter_commande_a_transmettre('commande.fichiers.previewVideo', info)
+        elif mimetype == 'image':
+            self.ajouter_commande_a_transmettre('commande.fichiers.previewImage', info)
 
     # def confirmer_reception_update_collections(self):
     #     # Verifie si la transaction correspond a un document d'image
@@ -2535,6 +2612,17 @@ class ProcessusTransactionAssocierThumbnail(ProcessusGrosFichiers):
         token_resumer = 'associer_thumbnail:%s' % fuuid
         self.resumer_processus([token_resumer])
 
+        self.set_etape_suivante()
+
+
+class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        self.controleur.gestionnaire.associer_preview(transaction)
         self.set_etape_suivante()
 
 

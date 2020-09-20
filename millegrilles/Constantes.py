@@ -1034,6 +1034,8 @@ class ConstantesGrosFichiers:
     LIBVAL_COLLECTION_FIGEE = 'collection.figee'
     LIBVAL_RAPPORT = 'rapport'
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
+    LIBVAL_CONVERSION_MEDIA = 'conversionMedia'
+    LIBVAL_PUBLICATION_FICHIERS = 'publicationFichiers'
 
     LIBVAL_VITRINE_FICHIERS = 'vitrine.fichiers'
     LIBVAL_VITRINE_ALBUMS = 'vitrine.albums'
@@ -1087,6 +1089,8 @@ class ConstantesGrosFichiers:
     DOCUMENT_COLLECTIONS = 'collections'
     DOCUMENT_FAVORIS = 'favoris'
     DOCUMENT_UUID_PARENT = 'uuid_parent'
+    DOCUMENT_PREVIEWS = 'previews'
+    DOCUMENT_TRANSCODAGE = 'transcodage'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
 
@@ -1117,6 +1121,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_NOUVEAU_FICHIER_DECRYPTE = '%s.nouveauFichierDecrypte' % DOMAINE_NOM
     TRANSACTION_ASSOCIER_THUMBNAIL = '%s.associerThumbnail' % DOMAINE_NOM
     TRANSACTION_ASSOCIER_VIDEO_TRANSCODE = '%s.associerVideo' % DOMAINE_NOM
+    TRANSACTION_ASSOCIER_PREVIEW = '%s.associerPreview' % DOMAINE_NOM
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM

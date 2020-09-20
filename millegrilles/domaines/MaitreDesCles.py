@@ -528,7 +528,46 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
 
-        if evenement.get('certificat'):
+        temps_limite_demande = datetime.datetime.utcnow().timestamp() - 30  # 30 secondes max
+        estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+
+        if evenement.get('roles_permis'):
+            # C'est une demande pour un tiers (e.g. domaine pour consignationfichiers)
+            # Le certificat va etre attache, on doit s'assurer que c'est un role permis
+
+            # En premier, s'assurer que l'emetteur est autorise
+            enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+            roles = enveloppe_certificat.get_roles
+            if 'domaines' in roles:
+                cert = evenement.get('_certificat_tiers')
+                cert_navi = cert[0]
+                cert_inter = cert[1]
+
+                enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
+                enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
+
+                self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+                self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+                self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+                # Verifier si la validite de la permission de dechiffrage est expiree
+                estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+
+                # Verifiser si le role du certificat correspond a celui de la permission
+                roles_certificat = enveloppe_certificat.get_roles
+                roles_permis = evenement.get('roles_permis')
+                if not any([r in roles_permis for r in roles_certificat]):
+                    enveloppe_certificat = None  # Acces refuse
+
+                duree_permission = evenement.get('duree') or (30 * 60)  # Par defaut, 30 minutes pour une permission
+                temps_limite_demande = datetime.datetime.utcnow().timestamp() - duree_permission
+
+            else:
+                enveloppe_certificat = None  # Va forcer le refus de la requete
+
+        elif evenement.get('certificat'):
             cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
             cert_navi = '\n'.join(cert[0].split(';'))
             cert_inter = '\n'.join(cert[1].split(';'))
@@ -539,8 +578,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
             self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
             self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+            if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
+                enveloppe_certificat = None  # Acces refuse
+
         else:
             enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+
+            if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
+                enveloppe_certificat = None  # Acces refuse
 
         # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
@@ -566,8 +612,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             pass  # Pas de cert, Acces refuse
         elif not enveloppe_certificat.est_verifie:
             pass  # Cert invalide, access refuse
-        elif ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
-            pass  # Acces refuse
+        elif temps_limite_demande > estampille:
+            pass  # Vieille demande, on la rejette
         else:
 
             self._logger.debug(

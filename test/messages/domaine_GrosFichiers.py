@@ -2,6 +2,7 @@
 
 import datetime, time
 import json
+from uuid import uuid4
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -52,19 +53,15 @@ class MessagesSample(BaseCallback):
 
     def transaction_nouvelle_version_metadata(self):
         transaction = {
-            "fuuid": self.fichier_fuuid,
-            "securite": "2.prive",
-            "nom": "ExplorationGrosFichiers10.txt",
-            "taille": 5478,
-            "sha256": "739291ef2f7f3e0f945712112df9a62aeb2642d3828551f9fa3c95449a415e31",
-            "mimetype": "test/plain",
-            "reception": {
-                "methode": "coupdoeil",
-                "noeud": "public1.maple.mdugre.info"
-            },
+            'nom_fichier': 'Bill Morneau resigns as finance minister and MP, will seek to lead OECD.pdf',
+            'securite': '3.protege',
+            'fuuid': str(uuid4()),
+            'mimetype': 'image/blarghs',
+            'taille': 1190698,
+            'hachage': 'sha512_b64:ONOJGqswORDLwxeB/82dewqx2kAyOD0k3YQkipbkCBt3CyYAqk6BwAPw+sAFLo8BmRmLvNGlpmnnuFPs0hAmfg==',
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.nouvelleVersion.metadata',
+            transaction, ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA,
             reply_to=self.queue_name, correlation_id='efgh')
 
         print("Envoi metadata: %s" % enveloppe_val)
@@ -319,6 +316,56 @@ class MessagesSample(BaseCallback):
         print("requete_documents_collection %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_associer_preview(self):
+        transaction = {
+            'uuid': 'af6606b0-fac9-11ea-af1c-37323461d64a',
+            'fuuid': '40b268a7-2af4-4424-97ff-cb2a3610b7a1',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW: 'image/blarghs',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW: str(uuid4()),
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW,
+            reply_to=self.queue_name, correlation_id='efgh')
+
+        print("Envoi metadata: %s" % enveloppe_val)
+        return enveloppe_val
+
+    def requete_decryptage_cle_fuuid(self):
+        requete_cert_maitredescles = {
+            'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0"
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
+    def requete_permission_decryptage_cle_fuuid(self):
+        mq_cert = self.configuration.mq_certfile
+        with open(mq_cert, 'r') as fichier:
+            mq_certfile = fichier.read()
+
+        certs = self.contexte.signateur_transactions.split_chaine_certificats(mq_certfile)
+
+        requete_cert_maitredescles = {
+            'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0",
+            'roles_permis': ['domaines'],
+            '_certificat_tiers': certs
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -343,9 +390,12 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_changer_favoris()
 
         # enveloppe = sample.requete_activite()
-        enveloppe = sample.requete_corbeille()
+        # enveloppe = sample.requete_corbeille()
         # enveloppe = sample.requete_documents_collection()
         # enveloppe = sample.requete_documents_par_uuid()
+        # enveloppe = sample.transaction_associer_preview()
+        # sample.requete_decryptage_cle_fuuid()
+        sample.requete_permission_decryptage_cle_fuuid()
 
         pass
 

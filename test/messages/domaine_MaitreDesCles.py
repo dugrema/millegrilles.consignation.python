@@ -118,11 +118,11 @@ class MessagesSample(BaseCallback):
 
     def requete_decryptage_cle_fuuid(self):
         requete_cert_maitredescles = {
-            'fuuid': "b4ecca10-1c2b-11ea-904a-7b4d1a2d4432"
+            'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0"
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
-            'millegrilles.domaines.MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
             'abcd-1234',
             self.queue_name
         )
