@@ -1685,6 +1685,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         for key in [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA,
         ]:
             value = transaction.get(key)
