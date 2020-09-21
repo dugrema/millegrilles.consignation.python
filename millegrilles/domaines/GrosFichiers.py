@@ -1687,6 +1687,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_DATA_VIDEO,
         ]:
             value = transaction.get(key)
             if value:
