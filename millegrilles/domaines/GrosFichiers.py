@@ -1,4 +1,3 @@
-# Domaine de l'interface GrosFichiers
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
@@ -367,6 +366,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
+
+        minutes = evenement['timestamp']['UTC'][4]
+
+        if minutes % 15 == 3:
+            self.resoumettre_conversions_manquantes()
 
     def creer_regenerateur_documents(self):
         return RegenerateurGrosFichiers(self)
@@ -1472,6 +1476,85 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     raise Exception("Nombre de fichiers modifies ne correspond pas, changes < demandes (%d < %d)" %
         #                     (resultat.matched_count, len(liste_uuid)))
 
+    def resoumettre_conversions_manquantes(self):
+        filtre_doc_media = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA}
+        collection_documents = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        document_conversion_media = collection_documents.find_one(filtre_doc_media)
+
+        # Si le debut de resoumission depasse ce timestamp, on abandonne
+        ts_limite_resoumission = datetime.datetime.utcnow() - datetime.timedelta(minutes=2)
+
+        set_ops = dict()
+        unset_ops = dict()
+        current_date = dict()
+        if document_conversion_media:
+            previews_en_cours = document_conversion_media.get('previews')
+
+            if previews_en_cours:
+                for fuuid, doc in previews_en_cours.items():
+                    debut_resoumission = doc.get('debut_resoumission')
+                    securite = doc['securite']
+
+                    if debut_resoumission is None:
+                        self._logger.debug("Debut periode resoumission preview %s" % fuuid)
+                        debut_resoumission = datetime.datetime.utcnow()
+                        set_ops['previews.%s.debut_resoumission' % fuuid] = debut_resoumission
+
+                    if debut_resoumission < ts_limite_resoumission:
+                        self._logger.debug("Fin tentative resoumissions preview %s, echec" % fuuid)
+                        unset_ops['previews.%s' % fuuid] = True
+                    else:
+                        # Resoumettre demande de conversion
+                        commande_preview = doc.copy()
+                        if securite == Constantes.SECURITE_PROTEGE:
+                            # Creer une permission de dechiffrage pour recuperer la cle du fichier
+                            commande_permission = self.preparer_permission_dechiffrage_fichier(fuuid)
+                            commande_preview[
+                                ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+
+                        current_date['previews.%s.derniere_activite' % fuuid] = True
+
+                        mimetype = doc['mimetype'].split('/')[0]
+                        if mimetype == 'video':
+                            routing_key = 'commande.fichiers.genererPreviewVideo'
+                        elif mimetype == 'image':
+                            routing_key = 'commande.fichiers.genererPreviewImage'
+                        else:
+                            routing_key = None
+
+                        if routing_key is not None:
+                            self.generateur_transactions.transmettre_commande(commande_preview, routing_key)
+
+        current_date[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = True
+        ops = {
+            '$currentDate': current_date
+        }
+        if len(set_ops.keys()) > 0:
+            ops['$set'] = set_ops
+        if len(unset_ops.keys()) > 0:
+            ops['$unset'] = unset_ops
+
+        collection_documents.update_one(filtre_doc_media, ops)
+
+        self._logger.debug("Set ops : %s\nUnset ops: %s" % (set_ops, unset_ops))
+
+    def preparer_permission_dechiffrage_fichier(self, fuuid):
+        permission = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
+        }
+
+        # Signer
+        generateur_transactions = self._contexte.generateur_transactions
+        commande_permission = generateur_transactions.preparer_enveloppe(
+            permission,
+            '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+                      Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
+        )
+
+        return commande_permission
+
     def maj_documents_vitrine(self, collection_figee_uuid):
         collection_figee = self.get_collection_figee_par_uuid(collection_figee_uuid)
         self.__maj_vitrine_fichiers(collection_figee)
@@ -1796,6 +1879,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
     def _traiter_media(self, info: dict):
         # Transmettre une commande de transcodage
         securite = info['securite']
+        fuuid = info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
         # Sauvegarder demande conversion
         self.controleur.gestionnaire.ajouter_conversion_media(info)
@@ -1804,17 +1888,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         if securite == Constantes.SECURITE_PROTEGE:
             # Creer une permission de dechiffrage pour recuperer la cle du fichier
-            permission = {
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID],
-                Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
-                Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2*60),  # 2 minutes
-            }
-            # Signer
-            generateur_transactions = self.controleur.generateur_transactions
-            commande_permission = generateur_transactions.preparer_enveloppe(
-                permission,
-                '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM, Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
-            )
+            commande_permission = self.controleur.gestionnaire.preparer_permission_dechiffrage_fichier(fuuid)
             commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
 
         mimetype = info['mimetype'].split('/')[0]
