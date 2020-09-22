@@ -79,13 +79,13 @@ class MessagesSample(BaseCallback):
         print("Envoi transfert complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_renommer_fichier(self):
+    def transaction_renommer_document(self):
         transaction = {
-            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
-            "nom": 'Bashir Bouzouka 3!',
+            "uuid": "ea1e1a37-14ef-46f4-8a75-021850e0630a",
+            "nom": 'Bashir Bouzouka 3!.jpg',
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.renommerFichier',
+            transaction, ConstantesGrosFichiers.TRANSACTION_RENOMMER_DOCUMENT,
             reply_to=self.queue_name, correlation_id='abcd')
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
@@ -372,7 +372,7 @@ class MessagesSample(BaseCallback):
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
-        enveloppe1 = sample.transaction_nouvelle_version_metadata()
+        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe2 = sample.transaction_nouvelle_version_transfertcomplete()
         # enveloppe6 = sample.transaction_renommer_fichier()
         # enveloppe11 = sample.transaction_commenter_fichier()
@@ -392,6 +392,7 @@ class MessagesSample(BaseCallback):
 
         # enveloppe = sample.transaction_changer_favoris()
 
+        # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe = sample.requete_activite()
         # enveloppe = sample.requete_corbeille()
         # enveloppe = sample.requete_documents_collection()
@@ -399,6 +400,7 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
         # sample.requete_permission_decryptage_cle_fuuid()
+        sample.transaction_renommer_document()
 
         pass
 

@@ -190,8 +190,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionTransfertComplete"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_CLES_RECUES:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionClesRecues"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_FICHIER:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDeplacerFichier"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RENOMMER_DOCUMENT:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRenommerDocument"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_COMMENTER_FICHIER:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionCommenterFichier"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_CHANGER_ETIQUETTES_FICHIER:
@@ -788,21 +788,36 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return {'plus_recent': plus_recente_version, 'uuid_fichier': uuid_fichier, 'info_version': info_version}
 
-    def renommer_deplacer_fichier(self, uuid_doc, changements):
+    def renommer_document(self, uuid_doc, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-
-        set_operations = changements
-
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_doc,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesGrosFichiers.LIBVAL_FICHIER, ConstantesGrosFichiers.LIBVAL_COLLECTION
+            ]},
         }
+        document_a_modifier = collection_domaine.find_one(filtre)
 
-        resultat = collection_domaine.update_one(filtre, {
-            '$set': set_operations,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        })
-        self._logger.debug('renommer_deplacer_fichier resultat: %s' % str(resultat))
+        nouveau_nom = changements['nom']
+
+        set_ops = dict()
+        if document_a_modifier is not None:
+            # Determiner si on a un fichier ou collection
+            libval = document_a_modifier[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            if libval == ConstantesGrosFichiers.LIBVAL_FICHIER:
+                set_ops[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = nouveau_nom
+            elif libval == ConstantesGrosFichiers.LIBVAL_COLLECTION:
+                set_ops[ConstantesGrosFichiers.DOCUMENT_COLLECTION_NOMCOLLECTION] = nouveau_nom
+
+            resultat = collection_domaine.update_one(filtre, {
+                '$set': set_ops,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            })
+
+            if resultat.matched_count != 1:
+                raise Exception("Erreur renommer fichier/collection, mismatch count : %d" % resultat.matched_count)
+        else:
+            self._logger.error('renommer_deplacer_fichier aucun document trouve pour uuid : %s' % uuid_doc)
 
     def maj_commentaire_fichier(self, uuid_fichier, changements: dict):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -2125,7 +2140,7 @@ class ProcessusTransactionNouvelleVersionClesRecues(ProcessusGrosFichiers):
         return {'fuuid': fuuid}
 
 
-class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersActivite):
+class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -2133,30 +2148,11 @@ class ProcessusTransactionRenommerDeplacerFichier(ProcessusGrosFichiersActivite)
     def initiale(self):
         transaction = self.charger_transaction()
         uuid_doc = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+        nouveau_nom = transaction[ConstantesGrosFichiers.DOCUMENT_VERSION_NOMFICHIER]
 
-        champs_multilingues = [
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER
-        ]
-
-        changements = dict()
-        for key, value in transaction.items():
-            for champ in champs_multilingues:
-                if key.startswith(champ):
-                    changements[key] = value
-
-        self._controleur.gestionnaire.renommer_deplacer_fichier(uuid_doc, changements)
-
-        # Le resultat a deja ancien_repertoire_uuid. On ajoute le nouveau pour permettre de traiter les deux.
-        resultat = {
-            'uuid_fichier': uuid_doc
-        }
-
-        # Met a jour les collections existantes avec ce fichier
-        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_doc)
+        self._controleur.gestionnaire.renommer_document(uuid_doc, {'nom': nouveau_nom})
 
         self.set_etape_suivante()  # Termine
-
-        return resultat
 
 
 class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):

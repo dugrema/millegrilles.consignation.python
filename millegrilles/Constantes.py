@@ -1116,7 +1116,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_NOUVELLEVERSION_TRANSFERTCOMPLETE = '%s.nouvelleVersion.transfertComplete' % DOMAINE_NOM
     TRANSACTION_NOUVELLEVERSION_CLES_RECUES = '%s.nouvelleVersion.clesRecues' % DOMAINE_NOM
     TRANSACTION_COPIER_FICHIER = '%s.copierFichier' % DOMAINE_NOM
-    TRANSACTION_RENOMMER_FICHIER = '%s.renommerFichier' % DOMAINE_NOM
+    TRANSACTION_RENOMMER_DOCUMENT = '%s.renommerDocument' % DOMAINE_NOM
     TRANSACTION_COMMENTER_FICHIER = '%s.commenterFichier' % DOMAINE_NOM
     TRANSACTION_CHANGER_ETIQUETTES_FICHIER = '%s.changerEtiquettesFichier' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_FICHIER = '%s.supprimerDocuments' % DOMAINE_NOM
