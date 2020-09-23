@@ -138,6 +138,22 @@ class GestionnaireWeb:
             }
         """
 
+        location_fichiers = """
+            location /fichiers {
+              proxy_pass        https://fichiers;
+            
+              # Mapping certificat client pour connexion consignation fichiers
+              proxy_ssl_certificate     /run/secrets/nginx.cert.pem;
+              proxy_ssl_certificate_key /run/secrets/nginx.key.pem;
+            
+              proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+              proxy_ssl_verify       on;
+              proxy_ssl_verify_depth 1;
+            
+              include /etc/nginx/conf.d/component_base_auth.include;
+            }
+        """
+
         location_public_component = """
             location %s {
                 include /etc/nginx/conf.d/modules/proxypass.include;
@@ -180,6 +196,7 @@ class GestionnaireWeb:
         locations_list = list()
         locations_list.append(location_redirect_installation)
         locations_list.append(location_data_vitrine)
+        locations_list.append(location_fichiers)
         locations_list.append(certificats)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
         locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
