@@ -164,6 +164,7 @@ class GestionnaireWeb:
             "/posteur",
             "/messagerie",
             "/senseurspassifs",
+            "/grosfichiers",
         ]
         location_installation_paths = [
             "/installation",
