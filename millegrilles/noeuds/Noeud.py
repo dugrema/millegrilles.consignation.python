@@ -411,59 +411,62 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                 # evenement = fichier.readline()
                 line_reader = LineReader(fichier)
                 for evenement in line_reader:
-                    if not evenement or not evenement.strip():
-                        # Ligne vide
-                        continue
-                    self._logger.debug(evenement)
                     try:
-                        evenement_dict = json.loads(evenement)
-                    except json.decoder.JSONDecodeError:
-                        self._logger.exception("Erreur decodage evenement:\n%s" % evenement)
-                        continue
+                        if not evenement or not evenement.strip():
+                            # Ligne vide
+                            continue
+                        self._logger.debug(evenement)
+                        try:
+                            evenement_dict = json.loads(evenement)
+                        except json.decoder.JSONDecodeError:
+                            self._logger.exception("Erreur decodage evenement:\n%s" % evenement)
+                            continue
 
-                    # Traiter les transactions qui ne sont pas pour l'heure en cours
-                    uuid_senseur = evenement_dict['uuid_senseur']
-                    noeud_id = evenement_dict['noeud_id']
-                    senseurs = evenement_dict['senseurs']
+                        # Traiter les transactions qui ne sont pas pour l'heure en cours
+                        uuid_senseur = evenement_dict['uuid_senseur']
+                        noeud_id = evenement_dict['noeud_id']
+                        senseurs = evenement_dict['senseurs']
 
-                    for type, lecture in senseurs.items():
-                        timestamp = lecture['timestamp']
-                        if timestamp < heure_courante_ts:
-                            timestamp_dt = datetime.datetime.fromtimestamp(timestamp)
-                            timestamp_heure = datetime.datetime(year=timestamp_dt.year, month=timestamp_dt.month,
-                                                                day=timestamp_dt.day, hour=timestamp_dt.hour)
+                        for type, lecture in senseurs.items():
+                            timestamp = lecture['timestamp']
+                            if timestamp < heure_courante_ts:
+                                timestamp_dt = datetime.datetime.fromtimestamp(timestamp)
+                                timestamp_heure = datetime.datetime(year=timestamp_dt.year, month=timestamp_dt.month,
+                                                                    day=timestamp_dt.day, hour=timestamp_dt.hour)
 
-                            cle = '/'.join([uuid_senseur, type, str(int(timestamp_heure.timestamp()))])
+                                cle = '/'.join([uuid_senseur, type, str(int(timestamp_heure.timestamp()))])
 
-                            lectures = appareils_heure_dict.get(cle)
-                            valeur = lecture['valeur']
-                            if not lectures:
-                                lectures = {
-                                    'timestamp': timestamp_heure,
-                                    'timestamp_max': timestamp,
-                                    'timestamp_min': timestamp,
-                                    'lectures': list(),
-                                    'avg': None,
-                                    'max': valeur,
-                                    'min': valeur,
-                                    'senseur': type,
-                                    'type': lecture['type'],
-                                    'uuid_senseur': uuid_senseur,
-                                    'noeud_id': noeud_id,
-                                }
+                                lectures = appareils_heure_dict.get(cle)
+                                valeur = lecture['valeur']
+                                if not lectures:
+                                    lectures = {
+                                        'timestamp': timestamp_heure,
+                                        'timestamp_max': timestamp,
+                                        'timestamp_min': timestamp,
+                                        'lectures': list(),
+                                        'avg': None,
+                                        'max': valeur,
+                                        'min': valeur,
+                                        'senseur': type,
+                                        'type': lecture['type'],
+                                        'uuid_senseur': uuid_senseur,
+                                        'noeud_id': noeud_id,
+                                    }
+                                    appareils_heure_dict[cle] = lectures
+
+                                lectures['timestamp_max'] = timestamp
+                                lectures['lectures'].append({"timestamp": timestamp, "valeur": valeur})
+                                if lectures['max'] < valeur:
+                                    lectures['max'] = valeur
+                                if lectures['min'] > valeur:
+                                    lectures['min'] = valeur
+
                                 appareils_heure_dict[cle] = lectures
-
-                            lectures['timestamp_max'] = timestamp
-                            lectures['lectures'].append({"timestamp": timestamp, "valeur": valeur})
-                            if lectures['max'] < valeur:
-                                lectures['max'] = valeur
-                            if lectures['min'] > valeur:
-                                lectures['min'] = valeur
-
-                            appareils_heure_dict[cle] = lectures
-                        else:
-                            # Le fichier contient des evenements de l'heure courante, on ne le supprime pas
-                            conserver_fichier.append(nom_fichier)
+                            else:
+                                # Le fichier contient des evenements de l'heure courante, on ne le supprime pas
+                                conserver_fichier.append(nom_fichier)
+                    except Exception:
+                        self._logger.exception("Erreur traitement ligne %s" % evenement)
 
         # Calculer la moyenne de chaque transaction et soumettre les transactions
         for key, app in appareils_heure_dict.items():
