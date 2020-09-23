@@ -140,7 +140,8 @@ class GestionnaireWeb:
 
         location_fichiers = """
             location /fichiers {
-              proxy_pass        https://fichiers;
+              set $upstream_fichiers https://fichiers:443;
+              proxy_pass $upstream_fichiers;
             
               # Mapping certificat client pour connexion consignation fichiers
               proxy_ssl_certificate     /run/secrets/nginx.cert.pem;
