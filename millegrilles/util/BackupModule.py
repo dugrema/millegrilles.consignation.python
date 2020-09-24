@@ -9,6 +9,7 @@ import requests
 from os import path
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
+from base64 import b64encode
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
@@ -31,7 +32,7 @@ class HandlerBackupDomaine:
 
     def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str, entete_backup_precedent: dict):
         debut_backup = heure
-        niveau_securite = Constantes.SECURITE_PRIVE  # A FAIRE : supporter differents niveaux
+        niveau_securite = Constantes.SECURITE_PROTEGE  # A FAIRE : supporter differents niveaux
 
         self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup, niveau_securite)
 
@@ -50,6 +51,7 @@ class HandlerBackupDomaine:
         for transanter in curseur:
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
             heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
+            sous_domaine = transanter['sousdomaine'][0][0]
 
             # Conserver l'heure la plus vieille dans ce backup
             # Permet de declencher backup quotidiens anterieurs
@@ -59,9 +61,8 @@ class HandlerBackupDomaine:
             # Creer le fichier de backup
             dependances_backup = self._backup_horaire_domaine(
                 self._nom_collection_transactions,
-                self._contexte.idmg,
+                sous_domaine,
                 heure_anterieure,
-                prefixe_fichier,
                 niveau_securite,
                 chainage_backup_precedent
             )
@@ -119,11 +120,11 @@ class HandlerBackupDomaine:
                     reponse_json = json.loads(r.text)
                     self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
 
-                    # Verifier si le SHA3_512 du fichier de backup recu correspond a celui calcule localement
+                    # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
                     if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
-                            catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_SHA3_512]:
+                            catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH]:
                         raise ValueError(
-                            "Le SHA3_512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
+                            "Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
 
                     # Transmettre la transaction au domaine de backup
                     # L'enveloppe est deja prete, on fait juste l'emettre
@@ -137,13 +138,13 @@ class HandlerBackupDomaine:
                         ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
                         ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][ConstantesBackup.LIBELLE_SECURITE],
                         ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
-                        ConstantesBackup.LIBELLE_CATALOGUE_SHA3_512: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA3_512],
+                        ConstantesBackup.LIBELLE_CATALOGUE_HASH: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH],
                         ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete,
                         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_catalogue,
                     }
 
                     self._contexte.generateur_transactions.soumettre_transaction(
-                        transaction_sha512_catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA3_512)
+                        transaction_sha512_catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE)
 
                 else:
                     raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
@@ -190,12 +191,22 @@ class HandlerBackupDomaine:
             'day': {'$dayOfMonth': '$_evenements.transaction_traitee'},
             'hour': {'$hour': '$_evenements.transaction_traitee'},
         }
+
+        # Regroupeemnt par date et par domaine/sous-domaine (l'action est retiree du domaine pour grouper)
         regroupement = {
             '_id': {
                 'timestamp': {
                     '$dateFromParts': regroupement_periode
                 },
             },
+            'sousdomaine': {
+                '$addToSet': {
+                    '$slice': [
+                        {'$split': ['$en-tete.domaine', '.']},
+                        {'$add': [{'$size': {'$split': ['$en-tete.domaine', '.']}}, -1]}
+                    ]
+                }
+            }
         }
         sort = {'_id': 1}
         operation = [
@@ -211,10 +222,15 @@ class HandlerBackupDomaine:
 
         return collection_transactions.aggregate(operation, hint=hint)
 
-    def _backup_horaire_domaine(self, nom_collection_mongo: str, idmg: str, heure: datetime, prefixe_fichier: str, niveau_securite: str, chainage_backup_precedent: dict) -> dict:
+    def _backup_horaire_domaine(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime,
+                                niveau_securite: str, chainage_backup_precedent: dict) -> dict:
         heure_str = heure.strftime("%Y%m%d%H")
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
+
+        prefixe_fichier = sous_domaine
+
+        sous_domaine_regex = '^' + sous_domaine.replace('.', '\\.') + '\\.'
 
         coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
         label_tran = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
@@ -222,6 +238,7 @@ class HandlerBackupDomaine:
         filtre = {
             label_tran: True,
             label_backup: False,
+            'en-tete.domaine': {'$regex': sous_domaine_regex},
         }
         sort = [
             ('_evenements.transaction_traitee', 1)
@@ -249,7 +266,7 @@ class HandlerBackupDomaine:
 
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: catalogue_nomfichier,
             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: backup_nomfichier,
-            ConstantesBackup.LIBELLE_TRANSACTIONS_SHA3_512: None,
+            ConstantesBackup.LIBELLE_CATALOGUE_HASH: None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
             # verifier toutes les transactions de ce backup
@@ -322,12 +339,12 @@ class HandlerBackupDomaine:
                     self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
 
         if len(liste_uuid_transactions) > 0:
-            # Calculer SHA3-512 du fichier de backup des transactions
-            sha512 = hashlib.sha3_512()
+            # Calculer SHA512 du fichier de backup des transactions
+            sha512 = hashlib.sha512()
             with open(path_fichier_backup, 'rb') as fichier:
                 sha512.update(fichier.read())
-            sha512_digest = sha512.hexdigest()
-            catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_SHA3_512] = sha512_digest
+            sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+            catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = sha512_digest
             catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = backup_nomfichier
 
             # Changer les set() par des list() pour extraire en JSON
@@ -353,11 +370,11 @@ class HandlerBackupDomaine:
                 # Dump du catalogue en format de transaction avec DateFormatEncoder
                 fichier.write(catalogue_json)
 
-            sha512 = hashlib.sha3_512()
+            sha512 = hashlib.sha512()
             with open(path_catalogue, 'rb') as fichier:
                 sha512.update(fichier.read())
-            sha512_digest = sha512.hexdigest()
-            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_SHA3_512] = sha512_digest
+            sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = sha512_digest
 
         else:
             self.__logger.info("Backup: aucune transaction, backup annule")
@@ -502,16 +519,16 @@ class HandlerBackupDomaine:
                     fichier.flush()
 
             # Catalogue ok, on verifie fichier de transactions
-            self.__logger.debug("Verifier SHA3_512 sur le fichier de transactions %s" % nom_fichier_transaction)
-            transactions_sha512 = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_SHA3_512]
-            sha512 = hashlib.sha3_512()
+            self.__logger.debug("Verifier SHA_512 sur le fichier de transactions %s" % nom_fichier_transaction)
+            transactions_sha512 = catalogue[ConstantesBackup.LIBELLE_CATALOGUE_HASH]
+            sha512 = hashlib.sha512()
             with open(path.join(backup_workdir, nom_fichier_transaction), 'rb') as fichier:
                 sha512.update(fichier.read())
-            sha512_digest_calcule = sha512.hexdigest()
+            sha512_digest_calcule = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
 
             if transactions_sha512 != sha512_digest_calcule:
                 raise Exception(
-                    "Le fichier de transactions %s est incorrect, SHA3_512 ne correspond pas a celui du catalogue" %
+                    "Le fichier de transactions %s est incorrect, SHA512 ne correspond pas a celui du catalogue" %
                     nom_fichier_transaction
                 )
 
@@ -786,5 +803,5 @@ class HandlerBackupDomaine:
         :param entete:
         :return:
         """
-        hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA3_512())
+        hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA512())
         return hachage_backup

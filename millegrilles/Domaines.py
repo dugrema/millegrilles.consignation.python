@@ -1359,9 +1359,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             heure_demandee = heure_precedente
 
         domaine = self.get_nom_domaine()
-        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
 
-        self.__logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure_demandee)))
+        self.__logger.info("Declencher backup horaire pour domaine %s, heure %s" % (domaine, str(heure_demandee)))
         routing = domaine
         nom_module = 'millegrilles_Domaines'
         nom_classe = 'BackupHoraire'
@@ -1369,7 +1368,6 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         parametres = {
             'heure': heure_demandee,
-            'securite': securite,
         }
 
         self.demarrer_processus(processus, parametres)
@@ -1841,7 +1839,6 @@ class BackupHoraire(MGProcessus):
         # Charger l'information du backup horaire precedent pour creer une chaine
         requete = {
             ConstantesBackup.LIBELLE_DOMAINE: self.controleur.gestionnaire.get_nom_domaine(),
-            ConstantesBackup.LIBELLE_SECURITE: self.parametres[ConstantesBackup.LIBELLE_SECURITE],
         }
         self.set_requete(ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE, requete)
 

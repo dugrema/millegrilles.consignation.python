@@ -1299,8 +1299,8 @@ class ConstantesBackup:
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
 
     TRANSACTION_CATALOGUE_HORAIRE = '%s.catalogueHoraire' % DOMAINE_NOM
-    TRANSACTION_CATALOGUE_HORAIRE_SHA3_512 = '%s.catalogueHoraireSHA3_512' % DOMAINE_NOM
-    TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE = '%s.catalogueHoraireSHAEntete' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_HORAIRE_HACHAGE = '%s.catalogueHoraireHachage' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE = '%s.catalogueHoraireHachageEntete' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidienFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_MENSUEL = '%s.catalogueMensuelFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_ANNUEL = '%s.catalogueAnnuelFinaliser' % DOMAINE_NOM
@@ -1349,9 +1349,8 @@ class ConstantesBackup:
     LIBELLE_FICHIERS_QUOTIDIEN = 'fichiers_quotidien'
     LIBELLE_FICHIERS_MENSUEL = 'fichiers_mensuel'
     LIBELLE_INFO_HORAIRE = 'info_horaire'
-    LIBELLE_TRANSACTIONS_SHA3_512 = 'transactions_sha3_512'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'
-    LIBELLE_CATALOGUE_SHA3_512 = 'catalogue_sha3_512'
+    LIBELLE_CATALOGUE_HASH = 'hash'
     LIBELLE_CATALOGUE_NOMFICHIER = 'catalogue_nomfichier'
     LIBELLE_CATALOGUES = 'catalogues'
     LIBELLE_FICHIERS_TRANSACTIONS = 'fichiers_transactions'
@@ -1359,7 +1358,6 @@ class ConstantesBackup:
     LIBELLE_BACKUP_PRECEDENT = 'backup_precedent'
     LIBELLE_HACHAGE_ENTETE = 'hachage_entete'
 
-    LIBELLE_ARCHIVE_SHA3_512 = 'archive_sha3_512'
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
 
 

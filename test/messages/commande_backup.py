@@ -81,14 +81,27 @@ class MessagesSample(BaseCallback):
 
     def requete_backup_dernierhoraire(self):
         requete = {
-            # 'securite': '2.prive',
-            'domaine': 'Pki',
+            'domaine': Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
         }
         self._contexte.generateur_transactions.transmettre_requete(
             requete,
             ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE,
             reply_to=self.queue_name,
             correlation_id='requete'
+        )
+
+    def trigger_backup_maitrecles(self):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', Constantes.ConstantesMaitreDesCles.DOMAINE_NOM),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_horaire'
         )
 
     def trigger_backup_global(self):
@@ -125,7 +138,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
-        sample.trigger_backup_global()
+        # sample.trigger_backup_global()
+        sample.trigger_backup_maitrecles()
 
 
 # --- MAIN ---
