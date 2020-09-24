@@ -971,39 +971,21 @@ class VerificateurCertificats(UtilCertificats):
         shutil.rmtree(self.__workdir, ignore_errors=True)
 
 
-class EncryptionHelper:
+class EncryptionHelper():
 
     def __init__(self, enveloppe_certificat: EnveloppeCertificat):
         self.__enveloppe_certificat = enveloppe_certificat
         self.__json_helper = JSONHelper()
 
-    def __ouvrir_cipher(self, cert):
-        password = secrets.token_bytes(32)  # AES-256 = 32 bytes
-        cle_publique = cert.public_key()
-        password_crypte = cle_publique.encrypt(
-            password,
-            asymmetric.padding.OAEP(
-                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-
-        iv = secrets.token_bytes(16)
-        backend = default_backend()
-        cipher = Cipher(algorithms.AES(password), modes.CBC(iv), backend=backend)
-
-        return password_crypte, iv, cipher
-
     def crypter_dict(self, contenu_dict: dict):
 
         cert = self.__enveloppe_certificat.certificat
-        password_crypte, iv, cipher = self.__ouvrir_cipher(cert)
+        password_crypte, iv, padder, cipher = self.ouvrir_cipher(cert)
 
         # Crypter contenu du dictionnaire (cle symmetrique)
         encryptor = cipher.encryptor()
 
-        padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
+        # padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
         dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, DateFormatEncoder).encode('utf-8')
 
         # Inserer IV dans les premiers 16 bytes - pas vraiment le choix, c'est l'algo:
