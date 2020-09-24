@@ -12,7 +12,7 @@ class TestChiffrage:
         self._enveloppe = EnveloppeCertificat(certificat_pem=certificat_pem)
 
     def chiffrer(self) -> (bytes, bytes, bytes):
-        chiffreur = CipherMsg1Chiffrer(self._enveloppe)
+        chiffreur = CipherMsg1Chiffrer()
 
         contenu = 'abcdefghijklmnopqrstuvwxyz0123456789'.encode('utf-8')
         data = chiffreur.start_encrypt()
@@ -21,7 +21,7 @@ class TestChiffrage:
 
         print("Data chiffree : %s" % data)
 
-        print("Mot de passe chiffre " + b64encode(chiffreur.chiffrer_motdepasse()).decode('utf-8'))
+        print("Mot de passe chiffre " + b64encode(chiffreur.chiffrer_motdepasse_enveloppe(self._enveloppe)).decode('utf-8'))
 
         return data, chiffreur.iv, chiffreur.password
 

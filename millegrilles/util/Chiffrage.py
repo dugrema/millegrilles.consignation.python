@@ -30,11 +30,17 @@ class CipherMgs1:
 
 
 class CipherMsg1Chiffrer(CipherMgs1):
+    """
+    Helper pour chiffrer en mode MilleGrilles (mgs1)
+    Instructions: 1. utiliser start_encrypt() et recuperer debut chiffrage (iv)
+                  2. update(data)
+                  3. finalize()
+    Helper method : chiffrer_motdepasse pour chiffrer le secret avec la cle publique (cert)
+    """
 
-    def __init__(self, enveloppe):
+    def __init__(self):
         super().__init__()
         self.__padder: Optional[padding.PaddingContext] = None
-        self.__public_key = enveloppe.certificat.public_key()
         self.__generer()
         self._ouvrir_cipher()
 
@@ -55,8 +61,12 @@ class CipherMsg1Chiffrer(CipherMgs1):
         data = self._context.update(self.__padder.finalize())
         return data + self._context.finalize()
 
-    def chiffrer_motdepasse(self):
-        password_chiffre = self.__public_key.encrypt(
+    def chiffrer_motdepasse_enveloppe(self, enveloppe):
+        public_key = enveloppe.certificat.public_key()
+        return self.chiffrer_motdepasse(public_key)
+
+    def chiffrer_motdepasse(self, public_key):
+        password_chiffre = public_key.encrypt(
             self._password,
             asymmetric.padding.OAEP(
                 mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
@@ -76,6 +86,9 @@ class CipherMsg1Chiffrer(CipherMgs1):
 
 
 class CipherMsg1Dechiffrer(CipherMgs1):
+    """
+    Helper pour dechiffrer en format MilleGrilles (mgs1)
+    """
 
     def __init__(self, iv: bytes = None, password: bytes = None):
         super().__init__()
