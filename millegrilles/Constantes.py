@@ -700,6 +700,7 @@ class ConstantesMaitreDesCles:
     LIBVAL_CONFIGURATION = 'configuration'
 
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.cleGrosFichier' % DOMAINE_NOM
+    TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP = 'cleGrosFichierBackup'
     TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.nouvelleCle.document' % DOMAINE_NOM
     TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
     TRANSACTION_MAJ_MOTDEPASSE = '%s.maj_motdepasse' % DOMAINE_NOM

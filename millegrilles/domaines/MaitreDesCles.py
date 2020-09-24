@@ -19,6 +19,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography import x509
 from base64 import b64encode, b64decode
+from typing import Optional
 
 import binascii
 import logging
@@ -140,6 +141,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # self.__clecert_maitredescles = None  # Cle et certificat de maitredescles local
         # self.__certificat_courant_pem = None
         self.__certificat_intermediaires_pem = None
+        self.__certificat_millegrille: Optional[EnveloppeCertificat] = None
         self.__certificats_backup = dict()  # Liste de certificats backup utilises pour conserver les cles secretes.
         self.__ca_file_pem = None
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
@@ -211,6 +213,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             x509_cert = x509.load_pem_x509_certificate(cert, backend=default_backend())
             skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
             self.__dict_ca[skid] = x509_cert
+            self.__certificat_millegrille = EnveloppeCertificat(certificat_pem=cert)
 
         self._logger.info("Cert maitre des cles: %s" % self.configuration.pki_certfile)
         with open(self.configuration.pki_certfile, 'r') as fichier:
@@ -324,7 +327,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         Les cles publiques des backups sont utilisees pour re-encrypter les cles secretes.
         :return:
         """
-        certificats = message_dict.get('certificats') or  message_dict['resultats']['certificats']
+        certificats = message_dict.get('certificats') or message_dict['resultats']['certificats']
 
         verificateur_certificats = self.verificateur_certificats
         for fingerprint_hex, certificat in certificats.items():
@@ -348,6 +351,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.demarrer_processus(processus, fingerprints_backup)
 
     def identifier_processus(self, domaine_transaction):
+
+        domaine_action = domaine_transaction.split('.')[-1]
 
         if domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleGrosFichier"
@@ -377,6 +382,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMotdepasseCle"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_SUPPRIMER:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementSupprimer"
+
+        elif domaine_action == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusCleGrosfichierBackup"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -1524,9 +1532,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
 
         contenu_set = dict()
-        for fingerprint in transaction['cles'].keys():
+        cles = transaction.get('cles')
+        if cles is None:
+            # Mode individuel / backup de cle
+            fingerprint = transaction['fingerprint']
+            cles = {fingerprint: transaction['cle']}
+
+        for fingerprint in cles.keys():
             cle_dict = 'cles.%s' % fingerprint
-            valeur = transaction['cles'].get(fingerprint)
+            valeur = cles.get(fingerprint)
             contenu_set[cle_dict] = valeur
 
         if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
@@ -1549,6 +1563,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
         if resultat_update.upserted_id is None and resultat_update.matched_count != 1:
             raise Exception("Erreur insertion cles")
+
+    @property
+    def certificat_millegrille(self) -> EnveloppeCertificat:
+        return self.__certificat_millegrille
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):
@@ -1594,12 +1612,49 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         transaction_nouvellescles[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = \
             self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
-        # La transaction va mettre a jour (ou creer) les cles pour
-        generateur_transaction.soumettre_transaction(
-            transaction_nouvellescles,
-            ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES,
-            version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
-        )
+        self.ajouter_transaction_a_soumettre(ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES, transaction_nouvellescles)
+
+        # # La transaction va mettre a jour (ou creer) les cles pour
+        # generateur_transaction.soumettre_transaction(
+        #     transaction_nouvellescles,
+        #     ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES,
+        #     version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
+        # )
+
+    def generer_transactions_backup(self, sujet):
+        """
+        Genere les transaction manquantes pour cle de millegrille ou cles de backup
+        Remplace le domaine MaitreDesCles.* par MaitreDesCles.FINGERPRINTB64.*
+        :param sujet:
+        :return:
+        """
+        transaction = self.transaction
+        domaine_action = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        action = domaine_action.split('.')[-1]
+
+        cert_millegrille = self.controleur.gestionnaire.certificat_millegrille
+        fingerprint_cert_millegrille = cert_millegrille.fingerprint_b64
+
+        fingerprint_backup = [fingerprint_cert_millegrille]
+        if self._controleur.gestionnaire.get_certificats_backup is not None:
+            certificats_backup = self.controleur.gestionnaire.get_certificats_backup
+            for fingerprint_cle_backup in certificats_backup.keys():
+                fingerprint_backup.append(fingerprint_cle_backup)
+
+        for fingerprint, cle in self.parametres['cles_secretes_encryptees'].items():
+            if fingerprint not in fingerprint_backup:
+                continue
+
+            sous_domaine = '.'.join([ConstantesMaitreDesCles.DOMAINE_NOM, fingerprint, action + 'Backup'])
+            transaction_cle = {
+                'domaine': transaction['domaine'],
+                'identificateurs_document': transaction['identificateurs_document'],
+                'fingerprint': fingerprint,
+                'cle': cle,
+                'iv': transaction['iv'],
+                'sujet': sujet,
+            }
+            self.ajouter_transaction_a_soumettre(sous_domaine, transaction_cle)
 
     def generer_transaction_maj_motdepasse(self, sujet, information):
         """
@@ -1643,9 +1698,9 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
-        pass
+    # def traitement_regenerer(self, id_transaction, parametres_processus):
+    #     """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
+    #     pass
 
     def initiale(self):
         transaction = self.transaction
@@ -1655,20 +1710,26 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
         identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
+        nouveaux_params = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
+            'fuuid': identificateurs_document['fuuid'],
+            'cles_secretes_encryptees': cles_secretes_encryptees,
+            'iv': transaction['iv'],
+        }
+        self.parametres.update(nouveaux_params)
+
         # Verifier si on a des cles differentes
         if all([cle in cle_secrete_encryptee.keys() for cle in cles_secretes_encryptees.keys()]):
             self.controleur.gestionnaire.maj_document_cle(transaction)
         else:
             self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
 
+        # Generer transactions pour separer les sous-domaines de backup
+        self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+
         self.set_etape_suivante()  # Termine
 
-        return {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
-            'fuuid': identificateurs_document['fuuid'],
-            'cles_secretes_encryptees': cles_secretes_encryptees,
-            'iv': transaction['iv'],
-        }
+        return nouveaux_params
 
     def generer_transaction_cles_backup(self):
         """
@@ -1677,6 +1738,21 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         :return:
         """
         self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+
+
+class ProcessusCleGrosfichierBackup(ProcessusReceptionCles):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+        self.controleur.gestionnaire.maj_document_cle(transaction)
+
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusNouveauMotDePasse(ProcessusReceptionCles):
@@ -1817,6 +1893,7 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
     def initiale(self):
         transaction = self.transaction
         domaine = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE]
+
         # UUID du contenu, pas celui dans en-tete
         uuid_transaction_doc = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         iddoc = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
@@ -1826,50 +1903,20 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
         cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
         self.__logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
 
-        self.set_etape_suivante(ProcessusNouvelleCleDocument.generer_transaction_cles_backup.__name__)
-
-        return {
+        nouveaux_params = {
             'domaine': domaine,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_doc,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: iddoc,
             'cles_secretes_encryptees': cles_secretes_encryptees,
             'iv': transaction['iv'],
         }
+        self.parametres.update(nouveaux_params)
 
-    def generer_transaction_cles_backup(self):
-        """
-        Sauvegarder les cles de backup sous forme de transaction dans le domaine MaitreDesCles.
-        Va aussi declencher la mise a jour du document de cles associe.
-        :return:
-        """
         self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT)
 
-        self.set_etape_suivante(ProcessusNouvelleCleDocument.mettre_token_resumer_transaction.__name__)
+        self.set_etape_suivante()  # Terminer
 
-    def mettre_token_resumer_transaction(self):
-        """
-        Mettre le token pour permettre a GrosFichier de resumer son processus de sauvegarde du fichier.
-        :return:
-        """
-        generateur_transaction = self.generateur_transactions
-        identificateurs_document = self.parametres[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
-        transaction_resumer = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
-                self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID:
-                self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
-        }
-
-        domaine_routing = '%s.%s' % (
-            self.parametres['domaine'], ConstantesMaitreDesCles.TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES)
-
-        # La transaction va mettre permettre au processu GrosFichiers.nouvelleVersion de continuer
-        self.__logger.debug("Transmission nouvelle transaction cle recues pour %s" % domaine_routing)
-        generateur_transaction.soumettre_transaction(transaction_resumer, domaine_routing)
-
-        self.set_etape_suivante()  # Termine
-        return {'resumer': transaction_resumer}
+        return nouveaux_params
 
 
 class ProcessusRenouvellerCertificat(MGProcessusTransaction):
