@@ -15,6 +15,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
+from millegrilles.util.Chiffrage import CipherMsg1Chiffrer
 
 
 class HandlerBackupDomaine:
@@ -312,7 +313,19 @@ class HandlerBackupDomaine:
 
         cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
 
-        with lzma.open(path_fichier_backup, 'wt') as fichier:
+        lzma_compressor = lzma.LZMACompressor()
+
+        with open(path_fichier_backup, 'wb') as fichier:
+
+            # Preparer chiffrage, cle
+            cipher = CipherMsg1Chiffrer()
+            fichier.write(cipher.start_encrypt())
+
+            # DEBUG, afficher cle secret en base64
+            motdepasse = b64encode(cipher.password).decode('utf-8')
+            iv = b64encode(cipher.iv).decode('utf-8')
+            self.__logger.error("Fichier transactions, IV=%s, Mot de passe secret : %s " % (iv, motdepasse))
+
             for transaction in curseur:
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 try:
@@ -324,10 +337,11 @@ class HandlerBackupDomaine:
                         except KeyError:
                             pass
 
-                    json.dump(transaction, fichier, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
+                    tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
+                    fichier.write(cipher.update(lzma_compressor.compress(tran_json.encode('utf-8'))))
 
                     # Une transaction par ligne
-                    fichier.write('\n')
+                    fichier.write(cipher.update(lzma_compressor.compress(b'\n')))
 
                     # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
                     liste_uuid_transactions.append(uuid_transaction)
@@ -337,6 +351,9 @@ class HandlerBackupDomaine:
                     liste_uuids_invalides.append(uuid_transaction)
                 except CertificatInvalide:
                     self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
+
+            fichier.write(cipher.update(lzma_compressor.flush()))
+            fichier.write(cipher.finalize())
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA512 du fichier de backup des transactions
