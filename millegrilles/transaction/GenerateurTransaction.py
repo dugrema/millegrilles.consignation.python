@@ -23,9 +23,13 @@ class GenerateurTransaction:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                           idmg_destination: str = None):
+                           idmg_destination: str = None, ajouter_certificats=False):
 
         message, uuid_transaction = self.__formatteur_message.signer_message(message_dict, domaine, version, idmg_destination)
+
+        if ajouter_certificats:
+            message['_certificat'] = self.__formatteur_message.chaine_certificat
+
         return message
 
         # # Identifier usager du systeme, nom de domaine

@@ -79,3 +79,7 @@ class FormatteurMessageMilleGrilles:
         """
         message_contresigne = self.__contresignateur_transactions.signer(message)
         return message_contresigne
+
+    @property
+    def chaine_certificat(self):
+        return self.__signateur_transactions.chaine_certs

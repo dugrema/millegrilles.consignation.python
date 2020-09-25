@@ -431,6 +431,12 @@ class UtilCertificats:
     def enveloppe_certificat_courant(self) -> EnveloppeCertificat:
         return self._enveloppe
 
+    def get_enveloppe_millegrille(self) -> EnveloppeCertificat:
+        if self._chaine is not None:
+            pem_millegrille = self._chaine[-1]
+            return EnveloppeCertificat(certificat_pem=pem_millegrille)
+        return None
+
     @property
     def configuration(self):
         return self._contexte.configuration

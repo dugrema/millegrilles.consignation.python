@@ -326,6 +326,11 @@ class HandlerBackupDomaine:
             iv = b64encode(cipher.iv).decode('utf-8')
             self.__logger.error("Fichier transactions, IV=%s, Mot de passe secret : %s " % (iv, motdepasse))
 
+            # Conserver iv et cle chiffre avec cle de millegrille (restore dernier recours)
+            enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
+            catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
+            catalogue_backup['iv'] = iv
+
             for transaction in curseur:
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 try:
@@ -375,7 +380,7 @@ class HandlerBackupDomaine:
             # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
             catalogue_backup = json.loads(catalogue_json)
             catalogue_backup = self._contexte.generateur_transactions.preparer_enveloppe(
-                catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE)
+                catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE, ajouter_certificats=True)
             catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
             info_backup['catalogue'] = catalogue_backup
 
