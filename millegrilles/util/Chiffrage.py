@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, CipherContext
 from cryptography.hazmat.backends import default_backend
+from base64 import b64decode
 
 from millegrilles.Constantes import ConstantesSecurityPki
 
@@ -90,7 +91,7 @@ class CipherMsg1Dechiffrer(CipherMgs1):
     Helper pour dechiffrer en format MilleGrilles (mgs1)
     """
 
-    def __init__(self, iv: bytes = None, password: bytes = None):
+    def __init__(self, iv: bytes, password: bytes):
         super().__init__()
         self.__skip_iv = True
         self.__unpadder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).unpadder()
@@ -115,3 +116,21 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         data = self.__unpadder.update(self._context.finalize())
         data = data + self.__unpadder.finalize()
         return data
+
+    @staticmethod
+    def dechiffrer_cle(cle_privee, cle_chiffree):
+        """
+        Utilise la cle privee dans l'enveloppe pour dechiffrer la cle secrete chiffree
+        """
+        contenu_bytes = b64decode(cle_chiffree)
+
+        contenu_dechiffre = cle_privee.decrypt(
+            contenu_bytes,
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+
+        return contenu_dechiffre

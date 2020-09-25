@@ -1,7 +1,12 @@
+import json
+import lzma
+
 from base64 import b64encode, b64decode
+from os import path
 
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer
 from millegrilles.SecuritePKI import EnveloppeCertificat
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 
 class TestChiffrage:
@@ -62,6 +67,10 @@ class TestFichier:
                 fichier_out.write(dechiffreur.update(fichier_in.read()))
                 fichier_out.write(dechiffreur.finalize())
 
+    def dechiffrer_asymmetrique(self, path_src: str, path_dst: str, iv: str, password: str, enveloppe):
+        password_dechiffre = CipherMsg1Dechiffrer.dechiffrer_cle(enveloppe.private_key, password)
+        password_dechiffre_b64 = b64encode(password_dechiffre)
+        return self.dechiffrer(path_src, path_dst, iv, password_dechiffre_b64)
 
 def chiffrer_fichier():
     src_cat = '/tmp/mgbackup/test.txt'
@@ -80,13 +89,44 @@ def dechiffrer_fichier():
     test_fichier.dechiffrer(src, dst, iv, password)
 
 
+def dechiffrer_backup(path_catalogue):
+    with lzma.open(path_catalogue, 'rb') as fichier:
+        catalogue = json.load(fichier)
+
+    path_archives = path.dirname(path_catalogue)
+    path_transactions = path.abspath(path.join(path_archives, '..', 'transactions'))
+
+    nom_transaction = catalogue['transactions_nomfichier']
+    path_fichier_transactions = path.join(path_transactions, nom_transaction)
+    path_output = path_fichier_transactions.replace('.mgs1', '')
+
+    iv = catalogue['iv']
+    password = catalogue['cle']
+
+    # Dechiffrer cle secrete avec cle de millegrille
+    with open('/home/mathieu/mgdev/cle_mg/cle.pem', 'r') as fichier:
+        private_key = fichier.read()
+    with open('/home/mathieu/mgdev/cle_mg/password.txt', 'r') as fichier:
+        pwd_cle_privee = fichier.read()
+    pwd_cle_privee = pwd_cle_privee.strip().encode('utf-8')
+
+    clecert_millegrille = EnveloppeCleCert()
+    clecert_millegrille.key_from_pem_bytes(private_key.encode('utf-8'), pwd_cle_privee)
+
+    test_fichier = TestFichier()
+
+    test_fichier.dechiffrer_asymmetrique(path_fichier_transactions, path_output, iv, password, clecert_millegrille)
+
+
 def run_test():
     # test = TestChiffrage()
     # data, iv, password = test.chiffrer()
     # test.dechiffrer(data, iv, password)
 
     # chiffrer_fichier()
-    dechiffrer_fichier()
+    # dechiffrer_fichier()
+
+    dechiffrer_backup('/var/opt/millegrilles/consignation/JPtGcNcFSkfSdw49YsDpQHKxqTHMitpbPZW17a2JC54T/backup/horaire/2020/09/24/12/catalogues/MaitreDesCles_catalogue_2020092412_3.protege.json.xz')
 
 
 
