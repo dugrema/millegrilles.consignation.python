@@ -767,6 +767,7 @@ class ConstantesMaitreDesCles:
     TOKEN_SYNCHRONISER = 'synchroniser'
 
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
+    DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS = 'cles.backupTransactions'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
     DOCUMENT_LIBVAL_MOTDEPASSE = 'motdepasse.document'
     DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU = 'hebergement.trousseau'
