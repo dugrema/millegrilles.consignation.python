@@ -255,7 +255,7 @@ class HandlerBackupDomaine:
         backup_workdir = self._contexte.configuration.backup_workdir
         Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
-        backup_nomfichier = '%s_transactions_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
+        backup_nomfichier = '%s_transactions_%s_%s.json.xz.mgs1' % (prefixe_fichier, heure_str, niveau_securite)
         path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
         catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
