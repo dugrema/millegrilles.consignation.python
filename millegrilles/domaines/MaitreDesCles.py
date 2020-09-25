@@ -24,7 +24,6 @@ from typing import Optional
 import binascii
 import logging
 import datetime
-from os import path
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
@@ -429,19 +428,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             return b64encode(motdepasse)
         else:
             return None
-
-    def crypter_cle(self, cle_secrete, cert=None):
-        """
-        Chiffre une cle de maniere asymmetrique
-        :param cle_secrete:
-        :param cert:
-        :return:
-        """
-        if cert is not None:
-            clecert = EnveloppeCleCert(cert=cert)
-            return clecert.chiffrage_asymmetrique(cle_secrete)
-        else:
-            return self._contexte.signateur_transactions.chiffrage_asymmetrique(cle_secrete)
 
     def decrypter_grosfichier(self, fuuid):
         """

@@ -21,6 +21,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.BackupModule import HandlerBackupDomaine
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 
 class TraitementMessageDomaineCommande(TraitementMessageDomaine):
@@ -1097,6 +1098,19 @@ class GestionnaireDomaine:
 
         return nom_collection
 
+    def crypter_cle(self, cle_secrete, cert=None):
+        """
+        Chiffre une cle de maniere asymmetrique
+        :param cle_secrete:
+        :param cert:
+        :return:
+        """
+        if cert is not None:
+            clecert = EnveloppeCleCert(cert=cert)
+            return clecert.chiffrage_asymmetrique(cle_secrete)
+        else:
+            return self._contexte.signateur_transactions.chiffrage_asymmetrique(cle_secrete)
+
 
 class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
@@ -1842,18 +1856,23 @@ class BackupHoraire(MGProcessus):
         }
         self.set_requete(ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE, requete)
 
+        self.set_etape_suivante(BackupHoraire.requete_cles_backup.__name__)
+
+    def requete_cles_backup(self):
+        domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
+        self.set_requete(domaine_action, dict())
         self.set_etape_suivante(BackupHoraire.executer_backup.__name__)
 
     def executer_backup(self):
         heure = pytz.utc.localize(self.parametres[ConstantesBackup.LIBELLE_HEURE])
         gestionnaire = self.controleur.gestionnaire
-        domaine = gestionnaire.get_nom_domaine()
 
         entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
 
         self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
 
-        gestionnaire.handler_backup.backup_domaine(heure, domaine, entete_dernier_backup)
+        info_cles = self.parametres['reponse'][1]
+        gestionnaire.handler_backup.backup_domaine(heure, entete_dernier_backup, info_cles)
 
         self.set_etape_suivante()  # Termine
 

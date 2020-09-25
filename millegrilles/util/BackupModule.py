@@ -15,6 +15,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer
 
 
@@ -31,7 +32,14 @@ class HandlerBackupDomaine:
         self._nom_collection_transactions = nom_collection_transactions
         self._nom_collection_documents = nom_collection_documents
 
-    def backup_domaine(self, heure: datetime.datetime, prefixe_fichier: str, entete_backup_precedent: dict):
+    def backup_domaine(self, heure: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
+        """
+
+        :param heure: Heure du backup horaire
+        :param entete_backup_precedent: Entete du catalogue precedent, sert a creer une chaine de backups (merkle tree)
+        :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
+        :return:
+        """
         debut_backup = heure
         niveau_securite = Constantes.SECURITE_PROTEGE  # A FAIRE : supporter differents niveaux
 
@@ -65,7 +73,8 @@ class HandlerBackupDomaine:
                 sous_domaine,
                 heure_anterieure,
                 niveau_securite,
-                chainage_backup_precedent
+                chainage_backup_precedent,
+                info_cles
             )
 
             catalogue_backup = dependances_backup.get('catalogue')
@@ -87,7 +96,8 @@ class HandlerBackupDomaine:
                 # Transferer vers consignation_fichier
                 data = {
                     'timestamp_backup': int(heure_anterieure.timestamp()),
-                    'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers'])
+                    'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers']),
+                    'transaction_maitredescles': json.dumps(dependances_backup['transaction_maitredescles']),
                 }
 
                 # Preparer URL de connexion a consignationfichiers
@@ -224,32 +234,15 @@ class HandlerBackupDomaine:
         return collection_transactions.aggregate(operation, hint=hint)
 
     def _backup_horaire_domaine(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime,
-                                niveau_securite: str, chainage_backup_precedent: dict) -> dict:
+                                niveau_securite: str, chainage_backup_precedent: dict,
+                                info_cles: dict) -> dict:
         heure_str = heure.strftime("%Y%m%d%H")
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
 
         prefixe_fichier = sous_domaine
 
-        sous_domaine_regex = '^' + sous_domaine.replace('.', '\\.') + '\\.'
-
-        coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
-        label_tran = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
-        label_backup = '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
-        filtre = {
-            label_tran: True,
-            label_backup: False,
-            'en-tete.domaine': {'$regex': sous_domaine_regex},
-        }
-        sort = [
-            ('_evenements.transaction_traitee', 1)
-        ]
-        hint = [
-            (label_tran, 1),
-            (label_backup, 1),
-        ]
-
-        curseur = coltrans.find(filtre, sort=sort, hint=hint)
+        curseur = self.preparer_curseur_transactions(nom_collection_mongo, sous_domaine)
 
         # Creer repertoire backup et determiner path fichier
         backup_workdir = self._contexte.configuration.backup_workdir
@@ -260,48 +253,8 @@ class HandlerBackupDomaine:
 
         catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
 
-        catalogue_backup = {
-            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
-            ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
-            ConstantesBackup.LIBELLE_HEURE: heure,
-
-            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: catalogue_nomfichier,
-            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: backup_nomfichier,
-            ConstantesBackup.LIBELLE_CATALOGUE_HASH: None,
-
-            # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
-            # verifier toutes les transactions de ce backup
-            ConstantesBackup.LIBELLE_CERTS_RACINE: set(),
-            ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES: set(),
-            ConstantesBackup.LIBELLE_CERTS: set(),
-            ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE: list(),
-
-            # Conserver la liste des grosfichiers requis pour ce backup
-            ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS: dict(),
-
-            ConstantesBackup.LIBELLE_BACKUP_PRECEDENT: chainage_backup_precedent,
-        }
-
-        # Ajouter le certificat du module courant pour etre sur
-        enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
-
-        # Conserver la chaine de validation du catalogue
-        certificats_validation_catalogue = [
-            enveloppe_certificat_module_courant.fingerprint_ascii
-        ]
-        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
-
-        certs_pem = {
-            enveloppe_certificat_module_courant.fingerprint_ascii: enveloppe_certificat_module_courant.certificat_pem
-        }
-        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
-
-        liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(
-            enveloppe_certificat_module_courant)
-        for cert_ca in liste_enveloppes_cas:
-            fingerprint_ca = cert_ca.fingerprint_ascii
-            certificats_validation_catalogue.append(fingerprint_ca)
-            certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+        catalogue_backup = self.preparer_catalogue(backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent,
+                                                   heure, niveau_securite, nom_collection_mongo)
 
         liste_uuid_transactions = list()
         liste_uuids_invalides = list()
@@ -315,21 +268,44 @@ class HandlerBackupDomaine:
 
         lzma_compressor = lzma.LZMACompressor()
 
+        # Preparer chiffrage, cle
+        cipher = CipherMsg1Chiffrer()
+
+        # DEBUG, afficher cle secret en base64
+        # motdepasse = b64encode(cipher.password).decode('utf-8')
+        iv = b64encode(cipher.iv).decode('utf-8')
+        # self.__logger.error("Fichier transactions, IV=%s, Mot de passe secret : %s " % (iv, motdepasse))
+
+        # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
+        enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
+        catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
+        catalogue_backup['iv'] = iv
+
+        # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
+        certs_cles_backup = [
+            info_cles['certificat'][0],   # Certificat de maitredescles
+            info_cles['certificat_millegrille'],  # Certificat de millegrille
+        ]
+        certs_cles_backup.extend(info_cles['certificats_backup'].values())
+        cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
+        transaction_maitredescles = {
+            'domaine': self._nom_domaine,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
+            },
+            'iv': iv,
+            'cles': cles_chiffrees,
+            'sujet': 'cles.backupTransactions',
+        }
+
+        info_backup['transaction_maitredescles'] = self._contexte.generateur_transactions.preparer_enveloppe(
+            transaction_maitredescles,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
+        )
+
         with open(path_fichier_backup, 'wb') as fichier:
 
-            # Preparer chiffrage, cle
-            cipher = CipherMsg1Chiffrer()
             fichier.write(cipher.start_encrypt())
-
-            # DEBUG, afficher cle secret en base64
-            motdepasse = b64encode(cipher.password).decode('utf-8')
-            iv = b64encode(cipher.iv).decode('utf-8')
-            self.__logger.error("Fichier transactions, IV=%s, Mot de passe secret : %s " % (iv, motdepasse))
-
-            # Conserver iv et cle chiffre avec cle de millegrille (restore dernier recours)
-            enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
-            catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
-            catalogue_backup['iv'] = iv
 
             for transaction in curseur:
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -362,41 +338,10 @@ class HandlerBackupDomaine:
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA512 du fichier de backup des transactions
-            sha512 = hashlib.sha512()
-            with open(path_fichier_backup, 'rb') as fichier:
-                sha512.update(fichier.read())
-            sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
-            catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = sha512_digest
-            catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = backup_nomfichier
+            hachage = self.sauvegarder_catalogue(backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
+                                                 cles_set, info_backup, path_fichier_backup)
 
-            # Changer les set() par des list() pour extraire en JSON
-            for cle in cles_set:
-                if isinstance(catalogue_backup[cle], set):
-                    catalogue_backup[cle] = list(catalogue_backup[cle])
-
-            # Generer l'entete et la signature pour le catalogue
-            catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-
-            # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
-            catalogue_backup = json.loads(catalogue_json)
-            catalogue_backup = self._contexte.generateur_transactions.preparer_enveloppe(
-                catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE, ajouter_certificats=True)
-            catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-            info_backup['catalogue'] = catalogue_backup
-
-            # Sauvegarder catlogue sur disque pour transferer
-            path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
-            info_backup['path_catalogue'] = path_catalogue
-
-            with lzma.open(path_catalogue, 'wt') as fichier:
-                # Dump du catalogue en format de transaction avec DateFormatEncoder
-                fichier.write(catalogue_json)
-
-            sha512 = hashlib.sha512()
-            with open(path_catalogue, 'rb') as fichier:
-                sha512.update(fichier.read())
-            sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
-            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = sha512_digest
+            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = hachage
 
         else:
             self.__logger.info("Backup: aucune transaction, backup annule")
@@ -405,6 +350,103 @@ class HandlerBackupDomaine:
             }
 
         return info_backup
+
+    def sauvegarder_catalogue(self, backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
+                              cles_set, info_backup, path_fichier_backup):
+        sha512 = hashlib.sha512()
+        with open(path_fichier_backup, 'rb') as fichier:
+            sha512.update(fichier.read())
+        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+        catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = sha512_digest
+        catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = backup_nomfichier
+        # Changer les set() par des list() pour extraire en JSON
+        for cle in cles_set:
+            if isinstance(catalogue_backup[cle], set):
+                catalogue_backup[cle] = list(catalogue_backup[cle])
+        # Generer l'entete et la signature pour le catalogue
+        catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+        # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
+        catalogue_backup = json.loads(catalogue_json)
+        catalogue_backup = self._contexte.generateur_transactions.preparer_enveloppe(
+            catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE, ajouter_certificats=True)
+        catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+        info_backup['catalogue'] = catalogue_backup
+        # Sauvegarder catlogue sur disque pour transferer
+        path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
+        info_backup['path_catalogue'] = path_catalogue
+        with lzma.open(path_catalogue, 'wt') as fichier:
+            # Dump du catalogue en format de transaction avec DateFormatEncoder
+            fichier.write(catalogue_json)
+        sha512 = hashlib.sha512()
+        with open(path_catalogue, 'rb') as fichier:
+            sha512.update(fichier.read())
+        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+
+        return sha512_digest
+
+    def preparer_catalogue(self, backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent, heure,
+                           niveau_securite, nom_collection_mongo):
+        catalogue_backup = {
+            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
+            ConstantesBackup.LIBELLE_HEURE: heure,
+
+            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: catalogue_nomfichier,
+            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: backup_nomfichier,
+            ConstantesBackup.LIBELLE_CATALOGUE_HASH: None,
+
+            # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
+            # verifier toutes les transactions de ce backup
+            ConstantesBackup.LIBELLE_CERTS_RACINE: set(),
+            ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES: set(),
+            ConstantesBackup.LIBELLE_CERTS: set(),
+            ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE: list(),
+
+            # Conserver la liste des grosfichiers requis pour ce backup
+            ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS: dict(),
+
+            ConstantesBackup.LIBELLE_BACKUP_PRECEDENT: chainage_backup_precedent,
+        }
+        # Ajouter le certificat du module courant pour etre sur
+        enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        # Conserver la chaine de validation du catalogue
+        certificats_validation_catalogue = [
+            enveloppe_certificat_module_courant.fingerprint_ascii
+        ]
+        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
+        certs_pem = {
+            enveloppe_certificat_module_courant.fingerprint_ascii: enveloppe_certificat_module_courant.certificat_pem
+        }
+        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
+        liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(
+            enveloppe_certificat_module_courant)
+        for cert_ca in liste_enveloppes_cas:
+            fingerprint_ca = cert_ca.fingerprint_ascii
+            certificats_validation_catalogue.append(fingerprint_ca)
+            certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+        return catalogue_backup
+
+    def preparer_curseur_transactions(self, nom_collection_mongo, sous_domaine):
+        sous_domaine_regex = '^' + sous_domaine.replace('.', '\\.') + '\\.'
+        coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
+        label_tran = '%s.%s' % (
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
+        label_backup = '%s.%s' % (
+        Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
+        filtre = {
+            label_tran: True,
+            label_backup: False,
+            'en-tete.domaine': {'$regex': sous_domaine_regex},
+        }
+        sort = [
+            ('_evenements.transaction_traitee', 1)
+        ]
+        hint = [
+            (label_tran, 1),
+            (label_backup, 1),
+        ]
+        curseur = coltrans.find(filtre, sort=sort, hint=hint)
+        return curseur
 
     def _traiter_transaction(self, transaction, heure: datetime.datetime):
         """
@@ -827,3 +869,16 @@ class HandlerBackupDomaine:
         """
         hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA512())
         return hachage_backup
+
+    def chiffrer_cle(self, pems: list, cle_secrete: bytes):
+        cles = dict()
+        for pem in pems:
+            clecert = EnveloppeCleCert()
+            clecert.cert_from_pem_bytes(pem.encode('utf-8'))
+            fingerprint_b64 = clecert.fingerprint_b64
+            cle_chiffree, fingerprint = clecert.chiffrage_asymmetrique(cle_secrete)
+
+            cle_chiffree_b64 = b64encode(cle_chiffree).decode('utf-8')
+            cles[fingerprint_b64] = cle_chiffree_b64
+
+        return cles
