@@ -248,8 +248,17 @@ class HandlerBackupDomaine:
         backup_workdir = self._contexte.configuration.backup_workdir
         Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
-        # Nom ficheir transactions avec .jsonl, indique que chaque ligne est un message JSON
-        backup_nomfichier = '%s_transactions_%s_%s.jsonl.xz.mgs1' % (prefixe_fichier, heure_str, niveau_securite)
+        # Determiner si on doit chiffrer le fichier de transactions
+        chiffrer_transactions = niveau_securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
+
+        # Nom fichier transactions avec .jsonl, indique que chaque ligne est un message JSON
+        if chiffrer_transactions:
+            # Fichier va etre chiffre en format mgs1
+            extension_transactions = 'jsonl.xz.mgs1'
+        else:
+            extension_transactions = 'jsonl.xz'
+
+        backup_nomfichier = '%s_transactions_%s_%s.%s' % (prefixe_fichier, heure_str, niveau_securite, extension_transactions)
         path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
         catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
@@ -267,45 +276,22 @@ class HandlerBackupDomaine:
 
         cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
 
-        lzma_compressor = lzma.LZMACompressor()
-
         # Preparer chiffrage, cle
-        cipher = CipherMsg1Chiffrer()
+        if chiffrer_transactions:
+            cipher, transaction_maitredescles = self.preparer_cipher(catalogue_backup, info_cles)
 
-        # DEBUG, afficher cle secret en base64
-        # motdepasse = b64encode(cipher.password).decode('utf-8')
-        iv = b64encode(cipher.iv).decode('utf-8')
-        # self.__logger.error("Fichier transactions, IV=%s, Mot de passe secret : %s " % (iv, motdepasse))
+            # Inserer la transaction de maitre des cles dans l'info backup pour l'uploader avec le PUT
+            info_backup['transaction_maitredescles'] = self._contexte.generateur_transactions.preparer_enveloppe(
+                transaction_maitredescles,
+                Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
+            )
 
-        # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
-        enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
-        catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
-        catalogue_backup['iv'] = iv
-
-        # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
-        certs_cles_backup = [
-            info_cles['certificat'][0],   # Certificat de maitredescles
-            info_cles['certificat_millegrille'],  # Certificat de millegrille
-        ]
-        certs_cles_backup.extend(info_cles['certificats_backup'].values())
-        cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
-        transaction_maitredescles = {
-            'domaine': self._nom_domaine,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
-            },
-            'iv': iv,
-            'cles': cles_chiffrees,
-            'sujet': 'cles.backupTransactions',
-        }
-
-        info_backup['transaction_maitredescles'] = self._contexte.generateur_transactions.preparer_enveloppe(
-            transaction_maitredescles,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
-        )
+        else:
+            # Pas de chiffrage
+            cipher = None
 
         with open(path_fichier_backup, 'wb') as fichier:
-
+            lzma_compressor = lzma.LZMACompressor()
             fichier.write(cipher.start_encrypt())
 
             for transaction in curseur:
@@ -351,6 +337,42 @@ class HandlerBackupDomaine:
             }
 
         return info_backup
+
+    def preparer_cipher(self, catalogue_backup, info_cles):
+        """
+        Prepare un objet cipher pour chiffrer le fichier de transactions
+
+        :param catalogue_backup:
+        :param info_cles: Cles publiques (certs) retournees par le maitre des cles. Utilisees pour chiffrer cle secrete.
+        :return:
+        """
+        cipher = CipherMsg1Chiffrer()
+        iv = b64encode(cipher.iv).decode('utf-8')
+
+        # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
+        enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
+        catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
+        catalogue_backup['iv'] = iv
+
+        # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
+        certs_cles_backup = [
+            info_cles['certificat'][0],  # Certificat de maitredescles
+            info_cles['certificat_millegrille'],  # Certificat de millegrille
+        ]
+        certs_cles_backup.extend(info_cles['certificats_backup'].values())
+        cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
+        transaction_maitredescles = {
+            'domaine': self._nom_domaine,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[
+                    ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
+            },
+            'iv': iv,
+            'cles': cles_chiffrees,
+            'sujet': 'cles.backupTransactions',
+        }
+
+        return cipher, transaction_maitredescles
 
     def sauvegarder_catalogue(self, backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
                               cles_set, info_backup, path_fichier_backup):
