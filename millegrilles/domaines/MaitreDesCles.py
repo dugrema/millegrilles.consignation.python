@@ -1629,20 +1629,28 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         cert_millegrille = self.controleur.gestionnaire.certificat_millegrille
         fingerprint_cert_millegrille = cert_millegrille.fingerprint_b64
 
-        fingerprint_backup = [fingerprint_cert_millegrille]
+        fingerprint_b64_backup = [fingerprint_cert_millegrille]
         if self._controleur.gestionnaire.get_certificats_backup is not None:
             certificats_backup = self.controleur.gestionnaire.get_certificats_backup
             for fingerprint_cle_backup in certificats_backup.keys():
-                fingerprint_backup.append(fingerprint_cle_backup)
+                fingerprint_b64_backup.append(fingerprint_cle_backup)
 
-        for fingerprint, cle in self.parametres['cles_secretes_encryptees'].items():
-            if fingerprint not in fingerprint_backup:
+        for fingerprint_b64, cle in self.parametres['cles_secretes_encryptees'].items():
+            if fingerprint_b64 not in fingerprint_b64_backup:
                 continue
 
+            # Convertir fingerprint b64 en hex - safe pour routing key MQ et nom de fichier
+            fingerprint_bytes = b64decode(fingerprint_b64)
+            fingerprint = binascii.hexlify(fingerprint_bytes).decode('utf-8')
+
             sous_domaine = '.'.join([ConstantesMaitreDesCles.DOMAINE_NOM, fingerprint, action + 'Backup'])
+
+            identificateurs_document = transaction['identificateurs_document'].copy()
+            identificateurs_document['fingerprint'] = fingerprint_b64
+
             transaction_cle = {
                 'domaine': transaction['domaine'],
-                'identificateurs_document': transaction['identificateurs_document'],
+                'identificateurs_document': identificateurs_document,
                 'fingerprint': fingerprint,
                 'cle': cle,
                 'iv': transaction['iv'],
@@ -1713,10 +1721,12 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         self.parametres.update(nouveaux_params)
 
         # Verifier si on a des cles differentes
-        if all([cle in cle_secrete_encryptee.keys() for cle in cles_secretes_encryptees.keys()]):
-            self.controleur.gestionnaire.maj_document_cle(transaction)
-        else:
-            self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+        # if all([cle in cle_secrete_encryptee.keys() for cle in cles_secretes_encryptees.keys()]):
+        #     self.controleur.gestionnaire.maj_document_cle(transaction)
+        # else:
+        #     self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+
+        self.controleur.gestionnaire.maj_document_cle(transaction)
 
         # Generer transactions pour separer les sous-domaines de backup
         self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)

@@ -62,7 +62,7 @@ class HandlerBackupDomaine:
         for transanter in curseur:
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
             heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
-            sous_domaine = transanter['sousdomaine'][0][0]
+            sous_domaine = '.'.join(transanter['sousdomaine'][0])
 
             # Conserver l'heure la plus vieille dans ce backup
             # Permet de declencher backup quotidiens anterieurs
@@ -222,7 +222,7 @@ class HandlerBackupDomaine:
                 }
             }
         }
-        sort = {'_id': 1}
+        sort = {'_id.timestamp': 1, 'sousdomaine': 1}
         operation = [
             {'$match': filtre_verif_transactions_anterieures},
             {'$group': regroupement},
