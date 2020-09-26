@@ -1758,7 +1758,7 @@ class ProcessusNouvelleCleBackupTransaction(ProcessusReceptionCles):
             self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS)
 
         # Generer transactions pour separer les sous-domaines de backup
-        self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+        self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS)
 
         self.set_etape_suivante()  # Termine
 
