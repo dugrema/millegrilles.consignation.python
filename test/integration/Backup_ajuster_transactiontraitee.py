@@ -68,8 +68,8 @@ def reset_dates_moins1semaine(contexte):
     modificateur.appliquer()
 
 
-def reset_dates_moins18mois(contexte):
-    offset = datetime.timedelta(days=-549)
+def reset_dates_moins2ans(contexte):
+    offset = datetime.timedelta(days=-720)
     modificateur = ModifierDateTransaction(contexte, offset)
     modificateur.appliquer()
 
@@ -79,9 +79,9 @@ def main():
     contexte = ContexteRessourcesDocumentsMilleGrilles()
     contexte.initialiser(init_document=True)
 
-    reset_dates_moins2heures(contexte)
-    # reset_dates_moins1semaine(contexte)
-    # reset_dates_moins18mois(contexte)
+    # reset_dates_moins2heures(contexte)
+    reset_dates_moins1semaine(contexte)
+    # reset_dates_moins2ans(contexte)
 
 
 # TEST

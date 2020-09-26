@@ -89,9 +89,9 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraire"
-        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA3_512:
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHA512"
-        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE:
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE:
             processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueHoraireSHAEntete"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN:
             processus = "millegrilles_domaines_Backup:ProcessusFinaliserCatalogueQuotidien"
@@ -146,8 +146,8 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN,
             ConstantesBackup.TRANSACTION_CATALOGUE_MENSUEL,
             ConstantesBackup.TRANSACTION_CATALOGUE_ANNUEL,
-            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA3_512,
-            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_SHA_ENTETE,
+            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE,
+            ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE,
             ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO,
             ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO,
             ConstantesBackup.TRANSACTION_ARCHIVE_MENSUELLE_INFO,
@@ -189,12 +189,14 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
         champs_fichier = [
             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER,
-            ConstantesBackup.LIBELLE_TRANSACTIONS_SHA3_512,
-            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER
+            ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE,
+            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER,
+            ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE,
         ]
 
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
+            Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
         }
 
         for champ in champs_fichier:
@@ -205,19 +207,8 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
         for fuuid, info_fichier in transaction[ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS].items():
             set_ops['%s.%s' % (ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS, fuuid)] = info_fichier
 
-        # Ces valeurs doivent etre agregees commes si elles etaient des sets()
-        sets_a_copier = [
-            ConstantesBackup.LIBELLE_CERTS_RACINE,
-            ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES,
-            ConstantesBackup.LIBELLE_CERTS,
-        ]
-        add_to_sets = dict()
-        for champ in sets_a_copier:
-            add_to_sets[champ] = {'$each': transaction[champ]}
-
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
-            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
             ConstantesBackup.LIBELLE_JOUR: jour_backup,
         }
@@ -229,7 +220,6 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
         ops = {
             '$setOnInsert': set_on_insert,
             '$set': set_ops,
-            '$addToSet': add_to_sets,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
@@ -257,7 +247,7 @@ class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):
         jour_backup = datetime.datetime(year=heure_backup.year, month=heure_backup.month, day=heure_backup.day)
 
         champs_fichier = [
-            ConstantesBackup.LIBELLE_CATALOGUE_SHA3_512,
+            ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE,
             ConstantesBackup.LIBELLE_HACHAGE_ENTETE,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID,
         ]
@@ -272,7 +262,6 @@ class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
-            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
             ConstantesBackup.LIBELLE_JOUR: jour_backup,
         }
@@ -372,7 +361,7 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
             '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_QUOTIDIEN, str(jour_backup.day)): {
-                ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512],
+                ConstantesBackup.LIBELLE_CATALOGUE_HASH: transaction[ConstantesBackup.LIBELLE_CATALOGUE_HASH],
                 ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
             }
         }

@@ -136,9 +136,9 @@ class HandlerBackupDomaine:
 
                     # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
                     if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
-                            catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH]:
+                            catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]:
                         raise ValueError(
-                            "Le SHA512 du fichier de backup ne correspond pas a celui recu de consignationfichiers")
+                            "Le SHA512 du fichier de backup de transactions ne correspond pas a celui recu de consignationfichiers")
 
                     # Transmettre la transaction au domaine de backup
                     # L'enveloppe est deja prete, on fait juste l'emettre
@@ -149,10 +149,10 @@ class HandlerBackupDomaine:
                     self.marquer_transactions_backup_complete(self._nom_collection_transactions, liste_uuids)
 
                     transaction_sha512_catalogue = {
-                        ConstantesBackup.LIBELLE_DOMAINE: self._nom_collection_transactions,
+                        ConstantesBackup.LIBELLE_DOMAINE: sous_domaine,
                         ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][ConstantesBackup.LIBELLE_SECURITE],
                         ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
-                        ConstantesBackup.LIBELLE_CATALOGUE_HASH: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH],
+                        ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: dependances_backup[ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE],
                         ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete,
                         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_catalogue,
                     }
@@ -267,7 +267,7 @@ class HandlerBackupDomaine:
         catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, self.__niveau_securite)
 
         catalogue_backup = self.preparer_catalogue(backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent,
-                                                   heure, nom_collection_mongo)
+                                                   heure, sous_domaine)
 
         liste_uuid_transactions = list()
         liste_uuids_invalides = list()
@@ -339,10 +339,11 @@ class HandlerBackupDomaine:
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA512 du fichier de backup des transactions
-            hachage = self.sauvegarder_catalogue(backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
-                                                 cles_set, info_backup, path_fichier_backup)
+            hachage_catalogue = self.sauvegarder_catalogue(backup_nomfichier, backup_workdir, catalogue_backup,
+                                                           catalogue_nomfichier, cles_set, info_backup,
+                                                           path_fichier_backup)
 
-            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = hachage
+            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE] = hachage_catalogue
 
         else:
             self.__logger.info("Backup: aucune transaction, backup annule")
@@ -394,7 +395,7 @@ class HandlerBackupDomaine:
         with open(path_fichier_backup, 'rb') as fichier:
             sha512.update(fichier.read())
         sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
-        catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_HASH] = sha512_digest
+        catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE] = sha512_digest
         catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = backup_nomfichier
         # Changer les set() par des list() pour extraire en JSON
         for cle in cles_set:
@@ -422,15 +423,15 @@ class HandlerBackupDomaine:
         return sha512_digest
 
     def preparer_catalogue(self, backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent, heure,
-                           nom_collection_mongo):
+                           sous_domaine):
         catalogue_backup = {
-            ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
+            ConstantesBackup.LIBELLE_DOMAINE: sous_domaine,
             ConstantesBackup.LIBELLE_SECURITE: self.__niveau_securite,
             ConstantesBackup.LIBELLE_HEURE: heure,
 
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: catalogue_nomfichier,
             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: backup_nomfichier,
-            ConstantesBackup.LIBELLE_CATALOGUE_HASH: None,
+            ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
             # verifier toutes les transactions de ce backup
@@ -621,7 +622,7 @@ class HandlerBackupDomaine:
 
             # Catalogue ok, on verifie fichier de transactions
             self.__logger.debug("Verifier SHA_512 sur le fichier de transactions %s" % nom_fichier_transaction)
-            transactions_sha512 = catalogue[ConstantesBackup.LIBELLE_CATALOGUE_HASH]
+            transactions_sha512 = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
             sha512 = hashlib.sha512()
             with open(path.join(backup_workdir, nom_fichier_transaction), 'rb') as fichier:
                 sha512.update(fichier.read())
@@ -665,68 +666,11 @@ class HandlerBackupDomaine:
 
         for catalogue in curseur_catalogues:
 
-            # S'assurer que le catalogue contient tous les certificats
-            certs = catalogue[ConstantesBackup.LIBELLE_CERTS_RACINE].copy()
-            certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES])
-            certs.extend(catalogue[ConstantesBackup.LIBELLE_CERTS])
-
             # Identifier le plus vieux backup qui est effectue
-            # Utilise pour transmettre trigger backup mensuel
+            # Utilise pour transmettre trigger backup annuel
             jour_backup = pytz.utc.localize(catalogue[ConstantesBackup.LIBELLE_JOUR])
             if plus_vieux_jour > jour_backup:
                 plus_vieux_jour = jour_backup
-
-            try:
-                certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
-            except KeyError:
-                certs_pem = dict()
-                catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
-
-            # Ajouter le certificat du module courant pour etre sur
-            enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
-
-            # Conserver la chaine de validation du catalogue
-            certificats_validation_catalogue = [
-                enveloppe_certificat_module_courant.fingerprint_ascii
-            ]
-            catalogue[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
-
-            certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
-
-            liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
-            for cert_ca in liste_enveloppes_cas:
-                fingerprint_ca = cert_ca.fingerprint_ascii
-                certificats_validation_catalogue.append(fingerprint_ca)
-                certs_pem[fingerprint_ca] = cert_ca.certificat_pem
-
-            certs_manquants = set()
-            for fingerprint in certs:
-                if not certs_pem.get(fingerprint):
-                    certs_manquants.add(fingerprint)
-
-            self.__logger.debug("Liste de certificats a trouver: %s" % str(certs_manquants))
-
-            if len(certs_manquants) > 0:
-                filtre_certs_pki = {
-                    ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(certs_manquants)},
-                    # ConstantesPki.LIBELLE_CHAINE_COMPLETE: True,
-                    Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                        ConstantesPki.LIBVAL_CERTIFICAT_ROOT,
-                        ConstantesPki.LIBVAL_CERTIFICAT_INTERMEDIAIRE,
-                        ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
-                        ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
-                    ]}
-                }
-                curseur_certificats = collection_pki.find(filtre_certs_pki)
-                for cert in curseur_certificats:
-                    fingerprint = cert[ConstantesPki.LIBELLE_FINGERPRINT]
-                    pem = cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
-                    certs_pem[fingerprint] = pem
-                    certs_manquants.remove(fingerprint)
-
-                # Verifier s'il manque des certificats
-                if len(certs_manquants) > 0:
-                    raise Exception("Certificats manquants  dans backup domaine %s : %s" % (self._nom_domaine, str(certs_manquants)))
 
             # Filtrer catalogue pour retirer les champs Mongo
             for champ in catalogue.copy().keys():
@@ -737,7 +681,7 @@ class HandlerBackupDomaine:
             catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
             catalogue = json.loads(catalogue_json)
             catalogue_quotidien = self._contexte.generateur_transactions.preparer_enveloppe(
-                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN)
+                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN, ajouter_certificats=True)
             self.__logger.debug("Catalogue:\n%s" % catalogue_quotidien)
 
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
@@ -746,7 +690,7 @@ class HandlerBackupDomaine:
             self._contexte.generateur_transactions.transmettre_commande(
                 {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
-        self.transmettre_trigger_mois_precedent(plus_vieux_jour)
+        self.transmettre_trigger_annee_precedente(plus_vieux_jour)
 
     def creer_backup_mensuel(self, domaine: str, mois: datetime.datetime):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
@@ -864,28 +808,9 @@ class HandlerBackupDomaine:
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
-    def transmettre_trigger_mois_precedent(self, jour: datetime.datetime):
-        annee = jour.year
-        mois_precedent = jour.month - 1
-        if mois_precedent == 0:
-            annee = annee - 1
-            mois_precedent = 12
-
-        mois_precedent = datetime.datetime(year=annee, month=mois_precedent, day=1, tzinfo=datetime.timezone.utc)
-
-        commande_backup_mensuel = {
-            ConstantesBackup.LIBELLE_MOIS: int(mois_precedent.timestamp()),
-            ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
-        }
-        self._contexte.generateur_transactions.transmettre_commande(
-            commande_backup_mensuel,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace('_DOMAINE_', self._nom_domaine),
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
-        )
-
-    def transmettre_trigger_annee_precedente(self, mois: datetime.datetime):
-        annee_precedente = datetime.datetime(year=mois.year-1, month=1, day=1, tzinfo=datetime.timezone.utc)
+    def transmettre_trigger_annee_precedente(self, date: datetime.datetime):
+        mois_moins_18 = date - datetime.timedelta(days=-549)  # 18 mois
+        annee_precedente = datetime.datetime(year=mois_moins_18.year, month=1, day=1, tzinfo=datetime.timezone.utc)
 
         commande_backup_annuel = {
             ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
@@ -905,6 +830,7 @@ class HandlerBackupDomaine:
         :return:
         """
         hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA512())
+        hachage_backup = 'sha512_b64:' + hachage_backup
         return hachage_backup
 
     def chiffrer_cle(self, pems: list, cle_secrete: bytes):
