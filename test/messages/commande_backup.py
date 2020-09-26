@@ -138,8 +138,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
-        sample.trigger_backup_global()
-        # sample.trigger_backup_maitrecles()
+        # sample.trigger_backup_global()
+        sample.trigger_backup_maitrecles()
 
 
 # --- MAIN ---

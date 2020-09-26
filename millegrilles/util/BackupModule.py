@@ -657,7 +657,6 @@ class HandlerBackupDomaine:
 
     def creer_backup_quoditien(self, domaine: str, jour: datetime.datetime):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
-        collection_pki = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
 
         # Calculer la fin du jour comme etant le lendemain, on fait un "<" dans la selection
         fin_jour = jour + datetime.timedelta(days=1)
