@@ -1193,10 +1193,13 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def __init__(self, contexte):
         super().__init__(contexte)
 
-        #self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
         self.__traitement_noeud = TraitementMessageDomaineRequete(self)
-        self.__handler_backup = HandlerBackupDomaine(
-            contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(), self.get_collection())
+
+        # self.__traitement_middleware = TraitementMessageDomaineMiddleware(self)
+        # self.__handler_backup = HandlerBackupDomaine(
+        #     contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(), self.get_collection())
+
+        self.__handler_backup = self._preparer_handler_backup()
 
         self.__handler_cedule = TraitementMessageCedule(self)
         self.__handler_commandes = {
@@ -1457,6 +1460,10 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 document_filtre[key] = value
 
         return document_filtre
+
+    def _preparer_handler_backup(self):
+        return HandlerBackupDomaine(self._contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
+                                    self.get_collection())
 
     @property
     def handler_backup(self):

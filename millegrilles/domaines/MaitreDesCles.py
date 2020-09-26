@@ -14,6 +14,7 @@ from millegrilles.util.JSONEncoders import DocElemFilter
 from millegrilles.domaines.Pki import ConstantesPki
 from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.domaines.Annuaire import ConstantesAnnuaire
+from millegrilles.util.BackupModule import HandlerBackupDomaine
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -1557,6 +1558,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     @property
     def certificat_millegrille(self) -> EnveloppeCertificat:
         return self.__certificat_millegrille
+
+    def _preparer_handler_backup(self):
+        return HandlerBackupDomaine(self._contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
+                                    self.get_collection(), Constantes.SECURITE_PRIVE)
 
 
 class ProcessusReceptionCles(MGProcessusTransaction):

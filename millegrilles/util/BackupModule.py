@@ -24,13 +24,15 @@ class HandlerBackupDomaine:
     Gestionnaire de backup des transactions d'un domaine.
     """
 
-    def __init__(self, contexte, nom_domaine, nom_collection_transactions, nom_collection_documents):
+    def __init__(self, contexte, nom_domaine, nom_collection_transactions, nom_collection_documents,
+                 niveau_securite=Constantes.SECURITE_PROTEGE):
         self._contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self._nom_domaine = nom_domaine
         self._nom_collection_transactions = nom_collection_transactions
         self._nom_collection_documents = nom_collection_documents
+        self.__niveau_securite = niveau_securite
 
     def backup_domaine(self, heure: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
         """
@@ -43,7 +45,7 @@ class HandlerBackupDomaine:
         debut_backup = heure
         niveau_securite = Constantes.SECURITE_PROTEGE  # A FAIRE : supporter differents niveaux
 
-        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup, niveau_securite)
+        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
 
         curseur = self._effectuer_requete_domaine(heure)
 
@@ -72,7 +74,6 @@ class HandlerBackupDomaine:
                 self._nom_collection_transactions,
                 sous_domaine,
                 heure_anterieure,
-                niveau_securite,
                 chainage_backup_precedent,
                 info_cles
             )
@@ -97,8 +98,10 @@ class HandlerBackupDomaine:
                 data = {
                     'timestamp_backup': int(heure_anterieure.timestamp()),
                     'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers']),
-                    'transaction_maitredescles': json.dumps(dependances_backup['transaction_maitredescles']),
                 }
+                transaction_maitredescles = dependances_backup.get('transaction_maitredescles')
+                if transaction_maitredescles is not None:
+                    data['transaction_maitredescles'] = json.dumps(transaction_maitredescles)
 
                 # Preparer URL de connexion a consignationfichiers
                 url_consignationfichiers = 'https://%s:%s' % (
@@ -234,7 +237,7 @@ class HandlerBackupDomaine:
         return collection_transactions.aggregate(operation, hint=hint)
 
     def _backup_horaire_domaine(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime,
-                                niveau_securite: str, chainage_backup_precedent: dict,
+                                chainage_backup_precedent: dict,
                                 info_cles: dict) -> dict:
         heure_str = heure.strftime("%Y%m%d%H")
         heure_fin = heure + datetime.timedelta(hours=1)
@@ -249,7 +252,7 @@ class HandlerBackupDomaine:
         Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
         # Determiner si on doit chiffrer le fichier de transactions
-        chiffrer_transactions = niveau_securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
+        chiffrer_transactions = self.__niveau_securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
 
         # Nom fichier transactions avec .jsonl, indique que chaque ligne est un message JSON
         if chiffrer_transactions:
@@ -258,13 +261,13 @@ class HandlerBackupDomaine:
         else:
             extension_transactions = 'jsonl.xz'
 
-        backup_nomfichier = '%s_transactions_%s_%s.%s' % (prefixe_fichier, heure_str, niveau_securite, extension_transactions)
+        backup_nomfichier = '%s_transactions_%s_%s.%s' % (prefixe_fichier, heure_str, self.__niveau_securite, extension_transactions)
         path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
-        catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, niveau_securite)
+        catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, self.__niveau_securite)
 
         catalogue_backup = self.preparer_catalogue(backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent,
-                                                   heure, niveau_securite, nom_collection_mongo)
+                                                   heure, nom_collection_mongo)
 
         liste_uuid_transactions = list()
         liste_uuids_invalides = list()
@@ -292,7 +295,9 @@ class HandlerBackupDomaine:
 
         with open(path_fichier_backup, 'wb') as fichier:
             lzma_compressor = lzma.LZMACompressor()
-            fichier.write(cipher.start_encrypt())
+
+            if cipher is not None:
+                fichier.write(cipher.start_encrypt())
 
             for transaction in curseur:
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -306,10 +311,16 @@ class HandlerBackupDomaine:
                             pass
 
                     tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
-                    fichier.write(cipher.update(lzma_compressor.compress(tran_json.encode('utf-8'))))
+                    if cipher is not None:
+                        fichier.write(cipher.update(lzma_compressor.compress(tran_json.encode('utf-8'))))
+                    else:
+                        fichier.write(lzma_compressor.compress(tran_json.encode('utf-8')))
 
                     # Une transaction par ligne
-                    fichier.write(cipher.update(lzma_compressor.compress(b'\n')))
+                    if cipher is not None:
+                        fichier.write(cipher.update(lzma_compressor.compress(b'\n')))
+                    else:
+                        fichier.write(lzma_compressor.compress(b'\n'))
 
                     # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
                     liste_uuid_transactions.append(uuid_transaction)
@@ -320,8 +331,11 @@ class HandlerBackupDomaine:
                 except CertificatInvalide:
                     self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
 
-            fichier.write(cipher.update(lzma_compressor.flush()))
-            fichier.write(cipher.finalize())
+            if cipher is not None:
+                fichier.write(cipher.update(lzma_compressor.flush()))
+                fichier.write(cipher.finalize())
+            else:
+                fichier.write(lzma_compressor.flush())
 
         if len(liste_uuid_transactions) > 0:
             # Calculer SHA512 du fichier de backup des transactions
@@ -408,10 +422,10 @@ class HandlerBackupDomaine:
         return sha512_digest
 
     def preparer_catalogue(self, backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent, heure,
-                           niveau_securite, nom_collection_mongo):
+                           nom_collection_mongo):
         catalogue_backup = {
             ConstantesBackup.LIBELLE_DOMAINE: nom_collection_mongo,
-            ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
+            ConstantesBackup.LIBELLE_SECURITE: self.__niveau_securite,
             ConstantesBackup.LIBELLE_HEURE: heure,
 
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: catalogue_nomfichier,
@@ -809,12 +823,12 @@ class HandlerBackupDomaine:
     def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
         pass
 
-    def transmettre_evenement_backup(self, evenement: str, heure: datetime.datetime, niveau_securite: str, info: dict = None):
+    def transmettre_evenement_backup(self, evenement: str, heure: datetime.datetime, info: dict = None):
         evenement_contenu = {
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
             ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: int(heure.timestamp()),
-            ConstantesBackup.LIBELLE_SECURITE: niveau_securite,
+            ConstantesBackup.LIBELLE_SECURITE: self.__niveau_securite,
         }
         if info:
             evenement_contenu['info'] = info
