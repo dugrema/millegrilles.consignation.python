@@ -1342,6 +1342,7 @@ class ConstantesBackup:
     LIBELLE_MOIS = 'mois'
     LIBELLE_ANNEE = 'annee'
     LIBELLE_DOMAINE = 'domaine'
+    LIBELLE_SOUS_DOMAINE = 'sous_domaine'
     LIBELLE_CERTS_RACINE = 'certificats_racine'
     LIBELLE_CERTS_INTERMEDIAIRES = 'certificats_intermediaires'
     LIBELLE_CERTS = 'certificats'

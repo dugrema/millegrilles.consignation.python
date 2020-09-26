@@ -304,9 +304,6 @@ class ProcessusFinaliserCatalogueQuotidien(MGProcessusTransaction):
         jour_backup = datetime.datetime(year=jour_backup.year, month=jour_backup.month, day=jour_backup.day)
 
         champs_copier = [
-            ConstantesBackup.LIBELLE_CERTS,
-            ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES,
-            ConstantesBackup.LIBELLE_CERTS_RACINE,
             ConstantesBackup.LIBELLE_FICHIERS_HORAIRE,
         ]
 
