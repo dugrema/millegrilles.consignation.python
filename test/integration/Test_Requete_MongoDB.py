@@ -1,7 +1,7 @@
 # Script de test pour transmettre une requete MongoDB
 
 from millegrilles import Constantes
-from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
@@ -60,8 +60,8 @@ class TestCallback(BaseCallback):
 
 # --- MAIN ---
 
-contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser(init_document=False)
+contexte = ContexteRessourcesDocumentsMilleGrilles()
+contexte.initialiser(init_document=True)
 
 test = TestEnvoyerRequete(contexte)
 message_dao = contexte.message_dao
