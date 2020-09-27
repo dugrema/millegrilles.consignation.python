@@ -97,12 +97,10 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Backup:ProcessusFinaliserCatalogueQuotidien"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO:
             processus = "millegrilles_domaines_Backup:ProcessusInformationArchiveQuotidienne"
-        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_MENSUEL:
-            processus = "millegrilles_domaines_Backup:ProcessusFinaliserCatalogueMensuel"
-        elif domaine_transaction == ConstantesBackup.TRANSACTION_ARCHIVE_MENSUELLE_INFO:
-            processus = "millegrilles_domaines_Backup:ProcessusInformationArchiveMensuelle"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_ANNUEL:
             processus = "millegrilles_domaines_Backup:ProcessusFinaliserCatalogueAnnuel"
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_ARCHIVE_ANNUELLE_INFO:
+            processus = "millegrilles_domaines_Backup:ProcessusInformationArchiveAnnuelle"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -144,7 +142,6 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         backup_domaines = [
             ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE,
             ConstantesBackup.TRANSACTION_CATALOGUE_QUOTIDIEN,
-            ConstantesBackup.TRANSACTION_CATALOGUE_MENSUEL,
             ConstantesBackup.TRANSACTION_CATALOGUE_ANNUEL,
             ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE,
             ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE,
@@ -161,7 +158,6 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         backup_libval = [
             ConstantesBackup.LIBVAL_CATALOGUE_HORAIRE,
             ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
-            ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
             ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
         ]
         filtre_documents = {
@@ -316,7 +312,6 @@ class ProcessusFinaliserCatalogueQuotidien(MGProcessusTransaction):
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
-            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
             ConstantesBackup.LIBELLE_JOUR: jour_backup,
         }
@@ -372,6 +367,7 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE]
         }
         set_on_insert.update(filtre)  # On utilise les memes valeurs que le filtre lors de l'insertion
 
@@ -387,22 +383,22 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusFinaliserCatalogueMensuel(MGProcessusTransaction):
+class ProcessusFinaliserCatalogueAnnuel(MGProcessusTransaction):
 
     def __init__(self, controleur, evenement, transaction_mapper=None):
         super().__init__(controleur, evenement, transaction_mapper)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def initiale(self):
-        self.__finaliser_catalogue_mensuel()
+        self.__finaliser_catalogue_annuel()
         self.set_etape_suivante()  # Termine
 
-    def __finaliser_catalogue_mensuel(self):
+    def __finaliser_catalogue_annuel(self):
         transaction = self.charger_transaction()
 
         self.__logger.debug("Transaction catalogue mensuel : %s" % str(transaction))
-        mois_backup = datetime.datetime.fromtimestamp(
-            transaction[ConstantesBackup.LIBELLE_MOIS],
+        annee_backup = datetime.datetime.fromtimestamp(
+            transaction[ConstantesBackup.LIBELLE_ANNEE],
             tz=datetime.timezone.utc
         )
 
@@ -418,10 +414,10 @@ class ProcessusFinaliserCatalogueMensuel(MGProcessusTransaction):
             set_ops[champ] = transaction[champ]
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
             ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
-            ConstantesBackup.LIBELLE_MOIS: mois_backup,
+            ConstantesBackup.LIBELLE_ANNEE: annee_backup,
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
@@ -438,9 +434,9 @@ class ProcessusFinaliserCatalogueMensuel(MGProcessusTransaction):
         collection_backup.update_one(filtre, ops, upsert=True)
 
 
-class ProcessusInformationArchiveMensuelle(MGProcessusTransaction):
+class ProcessusInformationArchiveAnnuelle(MGProcessusTransaction):
     """
-    Sauvegarder les informations de l'archive mensuelle dans le catalogue annuel.
+    Sauvegarder les informations de finalisation de l'archive annuelle.
     """
 
     def __init__(self, controleur, evenement, transaction_mapper=None):
@@ -450,25 +446,22 @@ class ProcessusInformationArchiveMensuelle(MGProcessusTransaction):
     def initiale(self):
         transaction = self.charger_transaction()
 
-        self.__logger.debug("Transaction information archive mensuelle : %s" % str(transaction))
+        self.__logger.debug("Transaction information archive annuelle : %s" % str(transaction))
         mois_backup = datetime.datetime.fromtimestamp(
-            transaction[ConstantesBackup.LIBELLE_MOIS],
+            transaction[ConstantesBackup.LIBELLE_ANNEE],
             tz=datetime.timezone.utc
         )
 
         annee_backup = datetime.datetime(year=mois_backup.year, month=1, day=1)
 
         set_ops = {
-            ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
-            '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_MENSUEL, str(mois_backup.month)): {
-                ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE: transaction[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE],
-                ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
-            }
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: False,
+            ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE: transaction[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE],
+            ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
         }
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
-            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
             ConstantesBackup.LIBELLE_ANNEE: annee_backup,
         }

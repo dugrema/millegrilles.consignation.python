@@ -699,57 +699,29 @@ class HandlerBackupDomaine:
 
         self.transmettre_trigger_annee_precedente(plus_vieux_jour)
 
-    def creer_backup_mensuel(self, domaine: str, mois: datetime.datetime):
+    def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
-        collection_pki = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
 
-        # Calculer la fin du jour comme etant le lendemain, on fait un "<" dans la selection
-        annee_fin = mois.year
-        mois_fin = mois.month + 1
-        if mois_fin > 12:
-            annee_fin = annee_fin + 1
-            mois_fin = 1
-        fin_mois = datetime.datetime(year=annee_fin, month=mois_fin, day=1)
+        annee_fin = annee.year
+        fin_annee = datetime.datetime(year=annee_fin, month=1, day=1)
 
         # Faire la liste des catalogues de backups qui sont dus
-        filtre_backups_mensuels_dirty = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
-            ConstantesBackup.LIBELLE_DOMAINE: domaine,
+        filtre_backups_annuels_dirty = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
+            ConstantesBackup.LIBELLE_DOMAINE: {'$regex': '^' + domaine},
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
-            ConstantesBackup.LIBELLE_MOIS: {'$lt': fin_mois}
+            ConstantesBackup.LIBELLE_ANNEE: {'$lte': fin_annee}
         }
-        curseur_catalogues = coldocs.find(filtre_backups_mensuels_dirty)
-        plus_vieux_mois = mois
+        curseur_catalogues = coldocs.find(filtre_backups_annuels_dirty)
+        plus_vieille_annee = annee
 
         for catalogue in curseur_catalogues:
 
             # Identifier le plus vieux backup qui est effectue
             # Utilise pour transmettre trigger backup mensuel
-            mois_backup = pytz.utc.localize(catalogue[ConstantesBackup.LIBELLE_MOIS])
-            if plus_vieux_mois > mois_backup:
-                plus_vieux_mois = mois_backup
-
-            # Ajouter le certificat du module courant pour etre sur de pouvoir valider le catalogue mensuel
-            enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
-
-            try:
-                certs_pem = catalogue[ConstantesBackup.LIBELLE_CERTS_PEM]
-            except KeyError:
-                certs_pem = dict()
-                catalogue[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
-
-            certificats_validation_catalogue = [
-                enveloppe_certificat_module_courant.fingerprint_ascii
-            ]
-            catalogue[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
-
-            certs_pem[enveloppe_certificat_module_courant.fingerprint_ascii] = enveloppe_certificat_module_courant.certificat_pem
-
-            liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
-            for cert_ca in liste_enveloppes_cas:
-                fingerprint_ca = cert_ca.fingerprint_ascii
-                certificats_validation_catalogue.append(fingerprint_ca)
-                certs_pem[fingerprint_ca] = cert_ca.certificat_pem
+            annee_backup = pytz.utc.localize(catalogue[ConstantesBackup.LIBELLE_ANNEE])
+            if plus_vieille_annee > annee_backup:
+                plus_vieille_annee = annee_backup
 
             # Filtrer catalogue pour retirer les champs Mongo
             for champ in catalogue.copy().keys():
@@ -759,20 +731,15 @@ class HandlerBackupDomaine:
             # Generer l'entete et la signature pour le catalogue
             catalogue_json = json.dumps(catalogue, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
             catalogue = json.loads(catalogue_json)
-            catalogue_mensuel = self._contexte.generateur_transactions.preparer_enveloppe(
-                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_MENSUEL)
-            self.__logger.debug("Catalogue:\n%s" % catalogue_mensuel)
+            catalogue_annuel = self._contexte.generateur_transactions.preparer_enveloppe(
+                catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_ANNUEL, ajouter_certificats=True)
+            self.__logger.debug("Catalogue:\n%s" % catalogue_annuel)
 
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
             # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
             # transaction de catalogue quotidien.
             self._contexte.generateur_transactions.transmettre_commande(
-                {'catalogue': catalogue_mensuel}, ConstantesBackup.COMMANDE_BACKUP_MENSUEL)
-
-        self.transmettre_trigger_annee_precedente(mois)
-
-    def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
-        pass
+                {'catalogue': catalogue_annuel}, ConstantesBackup.COMMANDE_BACKUP_ANNUEL)
 
     def transmettre_evenement_backup(self, evenement: str, heure: datetime.datetime, info: dict = None):
         evenement_contenu = {
@@ -816,7 +783,7 @@ class HandlerBackupDomaine:
         )
 
     def transmettre_trigger_annee_precedente(self, date: datetime.datetime):
-        mois_moins_18 = date - datetime.timedelta(days=-549)  # 18 mois
+        mois_moins_18 = date + datetime.timedelta(days=-549)  # 18 mois
         annee_precedente = datetime.datetime(year=mois_moins_18.year, month=1, day=1, tzinfo=datetime.timezone.utc)
 
         commande_backup_annuel = {

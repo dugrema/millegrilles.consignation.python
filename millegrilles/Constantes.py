@@ -1305,11 +1305,10 @@ class ConstantesBackup:
     TRANSACTION_CATALOGUE_HORAIRE_HACHAGE = '%s.catalogueHoraireHachage' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE = '%s.catalogueHoraireHachageEntete' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidienFinaliser' % DOMAINE_NOM
-    TRANSACTION_CATALOGUE_MENSUEL = '%s.catalogueMensuelFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_ANNUEL = '%s.catalogueAnnuelFinaliser' % DOMAINE_NOM
 
     TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO = '%s.archiveQuotidienneInfo' % DOMAINE_NOM
-    TRANSACTION_ARCHIVE_MENSUELLE_INFO = '%s.archiveMensuelleInfo' % DOMAINE_NOM
+    TRANSACTION_ARCHIVE_ANNUELLE_INFO = '%s.archiveAnnuelleInfo' % DOMAINE_NOM
 
     COMMANDE_BACKUP_QUOTIDIEN = 'commande.backup.genererBackupQuotidien'
     COMMANDE_BACKUP_MENSUEL = 'commande.backup.genererBackupMensuel'
@@ -1319,7 +1318,6 @@ class ConstantesBackup:
     COMMANDE_BACKUP_RESET_GLOBAL = 'commande.global.resetBackup'
     COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande._DOMAINE_.declencherBackupHoraire'
     COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande._DOMAINE_.declencherBackupQuotidien'
-    COMMANDE_BACKUP_DECLENCHER_MENSUEL = 'commande._DOMAINE_.declencherBackupMensuel'
     COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande._DOMAINE_.declencherBackupAnnuel'
 
     COMMANDE_BACKUP_PREPARER_RESTAURATION = 'commande.backup.preparerStagingRestauration'

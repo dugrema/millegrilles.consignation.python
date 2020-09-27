@@ -1123,8 +1123,6 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_quotidien(message_dict)
-        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace("_DOMAINE_", nom_domaine):
-            resultat = self.gestionnaire.declencher_backup_mensuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         else:
@@ -1149,8 +1147,6 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_quotidien(message_dict)
-        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_MENSUEL.replace("_DOMAINE_", nom_domaine):
-            resultat = self.gestionnaire.declencher_backup_mensuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         elif routing_key == ConstantesDomaines.COMMANDE_GLOBAL_REGENERER:
@@ -1416,27 +1412,12 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         # self._contexte.message_dao.transmettre_message(evenement, domaine_commande)
         self._contexte.generateur_transactions.emettre_message(evenement, domaine_commande, exchanges=[Constantes.SECURITE_SECURE])
 
-    def executer_backup_horaire(self, declencheur: dict):
-        heure = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_HEURE], tz=datetime.timezone.utc)
-        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
-        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        backup_precedent = declencheur.get(ConstantesBackup.LIBELLE_BACKUP_PRECEDENT)
-        self.__logger.info("Declencher backup horaire pour domaine %s, securite %s, heure %s" % (domaine, securite, str(heure)))
-        self.handler_backup.backup_domaine(heure, domaine)
-
     def declencher_backup_quotidien(self, declencheur: dict):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         self.__logger.info("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
         self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour)
-
-    def declencher_backup_mensuel(self, declencheur: dict):
-        mois = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_MOIS], tz=datetime.timezone.utc)
-        domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
-        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self.__logger.info("Declencher backup mensuel pour domaine %s, securite %s, mois %s" % (domaine, securite, str(mois)))
-        self.__handler_backup.creer_backup_mensuel(self.get_nom_domaine(), mois)
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
