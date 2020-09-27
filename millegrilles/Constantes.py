@@ -1319,6 +1319,7 @@ class ConstantesBackup:
     COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande._DOMAINE_.declencherBackupHoraire'
     COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande._DOMAINE_.declencherBackupQuotidien'
     COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande._DOMAINE_.declencherBackupAnnuel'
+    COMMANDE_BACKUP_DECLENCHER_SNAPSHOT = 'commande._DOMAINE_.declencherBackupSnapshot'
 
     COMMANDE_BACKUP_PREPARER_RESTAURATION = 'commande.backup.preparerStagingRestauration'
 
@@ -1328,6 +1329,11 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET = 'backupHoraireCataloguePret'
     EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME = 'backupHoraireUploadConfirme'
     EVENEMENT_BACKUP_HORAIRE_TERMINE = 'backupHoraireTermine'
+
+    EVENEMENT_BACKUP_SNAPSHOT_DEBUT = 'backupSnapshotDebut'
+    EVENEMENT_BACKUP_SNAPSHOT_CATALOGUE_PRET = 'backupSnapshotCataloguePret'
+    EVENEMENT_BACKUP_SNAPSHOT_UPLOAD_CONFIRME = 'backupSnapshotUploadConfirme'
+    EVENEMENT_BACKUP_SNAPSHOT_TERMINE = 'backupSnapshotTermine'
 
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'

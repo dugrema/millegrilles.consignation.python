@@ -25,7 +25,7 @@ class ModifierDateTransaction:
     def __init__(self, contexte, offset: datetime.timedelta, domaines: list = None):
         # self.callback = TestCallback(contexte, self)
         self.__contexte = contexte
-        self.__domaines = domaines or ['MaitreDesCles']
+        self.__domaines = domaines or ['GrosFichiers']
         self.__offset = offset
 
     def appliquer(self):
@@ -56,9 +56,47 @@ class ModifierDateTransaction:
             collection.update_one(filtre, ops)
 
 
-def reset_dates_moins2heures(contexte):
+class TestRequetesMatchBackup:
+
+    def __init__(self, contexte, nom_collection: str, domaine: str):
+        self.__contexte = contexte
+        self.__nom_collection = nom_collection
+        self.__domaine = domaine
+
+    def requete_horaire(self, heure_max: datetime.datetime):
+        sous_domaine_regex = '^' + self.__domaine.replace('.', '\\.') + '\\.'
+        coltrans = self.__contexte.document_dao.get_collection(self.__nom_collection)
+        label_tran = '%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)
+        label_backup = '%s.%s' % (
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG)
+        filtre = {
+            label_tran: True,
+            label_backup: False,
+            'en-tete.domaine': {'$regex': sous_domaine_regex},
+        }
+
+        if heure_max:
+            filtre['_evenements.transaction_traitee'] = {'$lt': heure_max}
+            # heure_max_ts = int(heure_max.timestamp())
+            # filtre['en-tete.estampille'] = {'$lt': heure_max_ts}
+
+        sort = [
+            ('_evenements.transaction_traitee', 1)
+        ]
+        hint = [
+            (label_tran, 1),
+            (label_backup, 1),
+        ]
+        curseur = coltrans.find(filtre, sort=sort, hint=hint)
+
+        for doc in curseur:
+            print(doc)
+
+
+def reset_dates_moins2heures(contexte, domaines):
     offset = datetime.timedelta(hours=-2)
-    modificateur = ModifierDateTransaction(contexte, offset)
+    modificateur = ModifierDateTransaction(contexte, offset, domaines)
     modificateur.appliquer()
 
 
@@ -73,35 +111,26 @@ def reset_dates_moins2ans(contexte):
     modificateur = ModifierDateTransaction(contexte, offset)
     modificateur.appliquer()
 
+
+def requete_transactions_moinsuneheure(contexte, nom_collection, domaine):
+    test = TestRequetesMatchBackup(contexte, nom_collection, domaine)
+    heure_max = datetime.datetime.utcnow() + datetime.timedelta(hours=-31)
+    test.requete_horaire(heure_max)
+
+
 # --- MAIN ---
 
 def main():
     contexte = ContexteRessourcesDocumentsMilleGrilles()
     contexte.initialiser(init_document=True)
 
-    # reset_dates_moins2heures(contexte)
+    reset_dates_moins2heures(contexte, ['MaitreDesCles'])
     # reset_dates_moins1semaine(contexte)
-    reset_dates_moins2ans(contexte)
+    # reset_dates_moins2ans(contexte)
+
+    # requete_transactions_moinsuneheure(contexte, 'MaitreDesCles', 'MaitreDesCles')
 
 
 # TEST
 if __name__ == '__main__':
     main()
-
-
-# test = TestEnvoyerRequete(contexte)
-# message_dao = contexte.message_dao
-# message_dao.inscrire_topic(Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, [], test.callback.callbackAvecAck)
-#
-# enveloppe = test.envoyer_message_test_alerte()
-#
-# print("Sent: %s" % enveloppe)
-# # message_dao.channel.consume(message_dao.queue_reponse)
-# thread_consume = Thread(target=message_dao.start_consuming)
-# thread_consume.start()
-# time.sleep(10)
-# message_dao.channel.stop_consuming()
-
-# FIN TEST
-
-

@@ -1125,6 +1125,8 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_quotidien(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
+            resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
         else:
             raise ValueError("Commande inconnue: " + routing_key)
 
@@ -1149,6 +1151,8 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_quotidien(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
+            resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
         elif routing_key == ConstantesDomaines.COMMANDE_GLOBAL_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
         elif commande == ConstantesDomaines.COMMANDE_REGENERER:
@@ -1425,6 +1429,19 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
         self.__logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
         self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
+
+    def declencher_backup_snapshot(self, declencheur: dict):
+        domaine = self.get_nom_domaine()
+        self.__logger.info("Declencher backup snapshot pour domaine %s" % domaine)
+        routing = domaine
+        nom_module = 'millegrilles_Domaines'
+        nom_classe = 'BackupSnapshot'
+        processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
+
+        parametres = {
+        }
+
+        self.demarrer_processus(processus, parametres)
 
     def filtrer_champs_document(self, document, retirer: list = None):
         """
@@ -1861,6 +1878,44 @@ class BackupHoraire(MGProcessus):
 
         info_cles = self.parametres['reponse'][1]
         gestionnaire.handler_backup.backup_domaine(heure, entete_dernier_backup, info_cles)
+
+        self.set_etape_suivante()  # Termine
+
+        return dict()
+
+
+class BackupSnapshot(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        self.__logger.info("Processus backup snapshot demarre, %s" % str(self.parametres))
+
+        # Charger l'information du backup horaire precedent pour creer une chaine
+        requete = {
+            ConstantesBackup.LIBELLE_DOMAINE: self.controleur.gestionnaire.get_nom_domaine(),
+        }
+        self.set_requete(ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE, requete)
+
+        self.set_etape_suivante(BackupHoraire.requete_cles_backup.__name__)
+
+    def requete_cles_backup(self):
+        domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
+        self.set_requete(domaine_action, dict())
+        self.set_etape_suivante(BackupHoraire.executer_backup.__name__)
+
+    def executer_backup(self):
+        date_snapshot = pytz.utc.localize(datetime.datetime.utcnow())
+        gestionnaire = self.controleur.gestionnaire
+
+        entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
+
+        self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
+
+        info_cles = self.parametres['reponse'][1]
+        gestionnaire.handler_backup.backup_snapshot(date_snapshot, entete_dernier_backup, info_cles)
 
         self.set_etape_suivante()  # Termine
 

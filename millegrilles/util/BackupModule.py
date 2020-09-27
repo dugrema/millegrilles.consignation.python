@@ -43,7 +43,6 @@ class HandlerBackupDomaine:
         :return:
         """
         debut_backup = heure
-        niveau_securite = Constantes.SECURITE_PROTEGE  # A FAIRE : supporter differents niveaux
 
         self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
 
@@ -86,7 +85,7 @@ class HandlerBackupDomaine:
                 catalogue_backup = dependances_backup.get('catalogue')
                 if catalogue_backup is not None:
                     self.transmettre_evenement_backup(
-                        ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, debut_backup, niveau_securite)
+                        ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, debut_backup)
 
                     hachage_entete = self.calculer_hash_entetebackup(catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE])
                     uuid_transaction_catalogue = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -134,7 +133,7 @@ class HandlerBackupDomaine:
 
                     if r.status_code == 200:
                         self.transmettre_evenement_backup(
-                            ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME, debut_backup, niveau_securite)
+                            ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME, debut_backup)
 
                         reponse_json = json.loads(r.text)
                         self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
@@ -191,9 +190,140 @@ class HandlerBackupDomaine:
                     )
                     self.marquer_transactions_invalides(self._nom_collection_transactions, liste_uuids_invalides)
 
-        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, niveau_securite)
+        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
 
         self.transmettre_trigger_jour_precedent(heure_plusvieille)
+
+    def backup_snapshot(self, date_snapshot: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
+        """
+
+        :param date_snapshot: Heure du backup de snapshot
+        :param entete_backup_precedent: Entete du catalogue precedent, sert a creer une chaine de backups (merkle tree)
+        :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
+        :return:
+        """
+        debut_backup = date_snapshot
+
+        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_DEBUT, debut_backup)
+
+        curseur = self._effectuer_requete_domaine(date_snapshot)
+
+        # Utilise pour creer une chaine entre backups horaires
+        chainage_backup_precedent = None
+        if entete_backup_precedent:
+            chainage_backup_precedent = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(entete_backup_precedent)
+            }
+
+        heures_sous_domaines = dict()
+
+        for transanter in curseur:
+            self.__logger.debug("Vieille transaction : %s" % str(transanter))
+            heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
+            for sous_domaine_gr in transanter['sousdomaine']:
+                sous_domaine = '.'.join(sous_domaine_gr)
+
+                # Conserver l'heure la plus vieille dans ce backup
+                # Permet de declencher backup quotidiens anterieurs
+                heure_plusvieille = heures_sous_domaines.get(sous_domaine)
+                if heure_plusvieille is None or heure_plusvieille > heure_anterieure:
+                    heure_plusvieille = heure_anterieure
+                    heures_sous_domaines[sous_domaine] = heure_anterieure
+
+                # Creer le fichier de backup
+                dependances_backup = self._backup_horaire_domaine(
+                    self._nom_collection_transactions,
+                    sous_domaine,
+                    heure_anterieure,
+                    chainage_backup_precedent,
+                    info_cles
+                )
+
+                catalogue_backup = dependances_backup.get('catalogue')
+                if catalogue_backup is not None:
+                    self.transmettre_evenement_backup(
+                        ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_CATALOGUE_PRET, debut_backup)
+
+                    hachage_entete = self.calculer_hash_entetebackup(
+                        catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE])
+                    uuid_transaction_catalogue = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+                    path_fichier_transactions = dependances_backup['path_fichier_backup']
+                    nom_fichier_transactions = path.basename(path_fichier_transactions)
+
+                    path_fichier_catalogue = dependances_backup['path_catalogue']
+                    nom_fichier_catalogue = path.basename(path_fichier_catalogue)
+
+                    self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4,
+                                                                                       cls=BackupFormatEncoder))
+
+                    # Transferer vers consignation_fichier
+                    data = {
+                        'timestamp_backup': int(heure_anterieure.timestamp()),
+                        'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers']),
+                    }
+                    transaction_maitredescles = dependances_backup.get('transaction_maitredescles')
+                    if transaction_maitredescles is not None:
+                        data['transaction_maitredescles'] = json.dumps(transaction_maitredescles)
+
+                    # Preparer URL de connexion a consignationfichiers
+                    url_consignationfichiers = 'https://%s:%s' % (
+                        self._contexte.configuration.serveur_consignationfichiers_host,
+                        self._contexte.configuration.serveur_consignationfichiers_port
+                    )
+
+                    with open(path_fichier_transactions, 'rb') as transactions_fichier:
+                        with open(path_fichier_catalogue, 'rb') as catalogue_fichier:
+                            files = {
+                                'transactions': (nom_fichier_transactions, transactions_fichier, 'application/x-xz'),
+                                'catalogue': (nom_fichier_catalogue, catalogue_fichier, 'application/x-xz'),
+                            }
+
+                            certfile = self._contexte.configuration.mq_certfile
+                            keyfile = self._contexte.configuration.mq_keyfile
+
+                            r = requests.put(
+                                '%s/backup/domaine/%s' % (url_consignationfichiers, nom_fichier_catalogue),
+                                data=data,
+                                files=files,
+                                verify=self._contexte.configuration.mq_cafile,
+                                cert=(certfile, keyfile)
+                            )
+
+                    if r.status_code == 200:
+                        self.transmettre_evenement_backup(
+                            ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_UPLOAD_CONFIRME, debut_backup)
+
+                        reponse_json = json.loads(r.text)
+                        self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
+
+                        # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
+                        if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
+                                catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]:
+                            raise ValueError(
+                                "Le hachage du fichier de backup de transactions ne correspond pas a celui recu de consignationfichiers")
+
+                    else:
+                        raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
+
+                    # Calculer nouvelle entete
+                    entete_backup_precedent = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+                    chainage_backup_precedent = {
+                        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
+                            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                        ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete
+                    }
+
+                else:
+                    self.__logger.warning(
+                        "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
+                            self._nom_collection_transactions, str(heure_anterieure))
+                    )
+
+        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_TERMINE, debut_backup)
 
     def _effectuer_requete_domaine(self, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
@@ -253,7 +383,7 @@ class HandlerBackupDomaine:
 
         prefixe_fichier = sous_domaine
 
-        curseur = self.preparer_curseur_transactions(nom_collection_mongo, sous_domaine)
+        curseur = self.preparer_curseur_transactions(nom_collection_mongo, sous_domaine, heure_fin)
 
         # Creer repertoire backup et determiner path fichier
         backup_workdir = self._contexte.configuration.backup_workdir
@@ -472,7 +602,7 @@ class HandlerBackupDomaine:
             certs_pem[fingerprint_ca] = cert_ca.certificat_pem
         return catalogue_backup
 
-    def preparer_curseur_transactions(self, nom_collection_mongo, sous_domaine):
+    def preparer_curseur_transactions(self, nom_collection_mongo, sous_domaine, heure_max: datetime.datetime = None):
         sous_domaine_regex = '^' + sous_domaine.replace('.', '\\.') + '\\.'
         coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
         label_tran = '%s.%s' % (
@@ -484,6 +614,9 @@ class HandlerBackupDomaine:
             label_backup: False,
             'en-tete.domaine': {'$regex': sous_domaine_regex},
         }
+        if heure_max:
+            filtre['_evenements.transaction_traitee'] = {'$lt': heure_max}
+
         sort = [
             ('_evenements.transaction_traitee', 1)
         ]

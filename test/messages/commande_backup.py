@@ -104,6 +104,33 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_horaire'
         )
 
+    def trigger_backup_grosfichiers(self):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_',
+                                                                        Constantes.ConstantesGrosFichiers.DOMAINE_NOM),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_horaire'
+        )
+
+    def trigger_backup_snapshot_maitredescles(self):
+        commande_backup_snapshot = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_snapshot,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_',
+                                                                         Constantes.ConstantesMaitreDesCles.DOMAINE_NOM),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_snapshot'
+        )
+
     def trigger_backup_global(self):
         timestamp_courant = datetime.datetime.utcnow()
 
@@ -140,6 +167,8 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_reset_global()
         # sample.trigger_backup_global()
         sample.trigger_backup_maitrecles()
+        # sample.trigger_backup_grosfichiers()
+        # sample.trigger_backup_snapshot_maitredescles()
 
 
 # --- MAIN ---
