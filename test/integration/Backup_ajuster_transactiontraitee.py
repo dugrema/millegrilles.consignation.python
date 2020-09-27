@@ -94,21 +94,8 @@ class TestRequetesMatchBackup:
             print(doc)
 
 
-def reset_dates_moins2heures(contexte, domaines):
-    offset = datetime.timedelta(hours=-2)
+def reset_dates(contexte, domaines, offset: datetime.timedelta):
     modificateur = ModifierDateTransaction(contexte, offset, domaines)
-    modificateur.appliquer()
-
-
-def reset_dates_moins1semaine(contexte):
-    offset = datetime.timedelta(days=-7)
-    modificateur = ModifierDateTransaction(contexte, offset)
-    modificateur.appliquer()
-
-
-def reset_dates_moins2ans(contexte):
-    offset = datetime.timedelta(days=-720)
-    modificateur = ModifierDateTransaction(contexte, offset)
     modificateur.appliquer()
 
 
@@ -124,9 +111,10 @@ def main():
     contexte = ContexteRessourcesDocumentsMilleGrilles()
     contexte.initialiser(init_document=True)
 
-    reset_dates_moins2heures(contexte, ['MaitreDesCles'])
-    # reset_dates_moins1semaine(contexte)
-    # reset_dates_moins2ans(contexte)
+    reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(hours=0))
+    # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(hours=-2))
+    # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(days=-7))
+    # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(days=-732))
 
     # requete_transactions_moinsuneheure(contexte, 'MaitreDesCles', 'MaitreDesCles')
 

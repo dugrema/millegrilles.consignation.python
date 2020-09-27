@@ -194,7 +194,7 @@ class HandlerBackupDomaine:
 
         self.transmettre_trigger_jour_precedent(heure_plusvieille)
 
-    def backup_snapshot(self, date_snapshot: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
+    def backup_snapshot(self, entete_backup_precedent: dict, info_cles: dict):
         """
 
         :param date_snapshot: Heure du backup de snapshot
@@ -202,11 +202,11 @@ class HandlerBackupDomaine:
         :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         :return:
         """
-        debut_backup = date_snapshot
+        debut_backup = datetime.datetime.utcnow()
 
         self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_DEBUT, debut_backup)
 
-        curseur = self._effectuer_requete_domaine(date_snapshot)
+        curseur = self._effectuer_requete_domaine(debut_backup)
 
         # Utilise pour creer une chaine entre backups horaires
         chainage_backup_precedent = None
@@ -217,28 +217,30 @@ class HandlerBackupDomaine:
                 ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(entete_backup_precedent)
             }
 
-        heures_sous_domaines = dict()
+        #SNAP heures_sous_domaines = dict()
+        heure_backup = datetime.datetime.utcnow()
 
         for transanter in curseur:
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
-            heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
+            # SNAP heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
             for sous_domaine_gr in transanter['sousdomaine']:
                 sous_domaine = '.'.join(sous_domaine_gr)
 
                 # Conserver l'heure la plus vieille dans ce backup
                 # Permet de declencher backup quotidiens anterieurs
-                heure_plusvieille = heures_sous_domaines.get(sous_domaine)
-                if heure_plusvieille is None or heure_plusvieille > heure_anterieure:
-                    heure_plusvieille = heure_anterieure
-                    heures_sous_domaines[sous_domaine] = heure_anterieure
+                # SNAP heure_plusvieille = heures_sous_domaines.get(sous_domaine)
+                # SNAP if heure_plusvieille is None or heure_plusvieille > heure_anterieure:
+                # SNAP     heure_plusvieille = heure_anterieure
+                # SNAP     heures_sous_domaines[sous_domaine] = heure_anterieure
 
                 # Creer le fichier de backup
                 dependances_backup = self._backup_horaire_domaine(
                     self._nom_collection_transactions,
                     sous_domaine,
-                    heure_anterieure,
+                    heure_backup,
                     chainage_backup_precedent,
-                    info_cles
+                    info_cles,
+                    snapshot=True
                 )
 
                 catalogue_backup = dependances_backup.get('catalogue')
@@ -262,7 +264,7 @@ class HandlerBackupDomaine:
 
                     # Transferer vers consignation_fichier
                     data = {
-                        'timestamp_backup': int(heure_anterieure.timestamp()),
+                        'timestamp_backup': int(heure_backup.timestamp()),
                         'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers']),
                     }
                     transaction_maitredescles = dependances_backup.get('transaction_maitredescles')
@@ -319,8 +321,8 @@ class HandlerBackupDomaine:
 
                 else:
                     self.__logger.warning(
-                        "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
-                            self._nom_collection_transactions, str(heure_anterieure))
+                        "Aucune transaction valide inclue dans le backup snapshot de %s a %s mais transactions en erreur presentes" % (
+                            self._nom_collection_transactions, str(heure_backup))
                     )
 
         self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_TERMINE, debut_backup)
@@ -376,8 +378,12 @@ class HandlerBackupDomaine:
 
     def _backup_horaire_domaine(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime,
                                 chainage_backup_precedent: dict,
-                                info_cles: dict) -> dict:
-        heure_str = heure.strftime("%Y%m%d%H")
+                                info_cles: dict, snapshot=False) -> dict:
+        if snapshot:
+            heure_str = heure.strftime("%Y%m%d%H%M") + '-SNAPSHOT'
+        else:
+            heure_str = heure.strftime("%Y%m%d%H")
+
         heure_fin = heure + datetime.timedelta(hours=1)
         self.__logger.debug("Backup collection %s entre %s et %s" % (nom_collection_mongo, heure, heure_fin))
 
@@ -603,7 +609,9 @@ class HandlerBackupDomaine:
         return catalogue_backup
 
     def preparer_curseur_transactions(self, nom_collection_mongo, sous_domaine, heure_max: datetime.datetime = None):
-        sous_domaine_regex = '^' + sous_domaine.replace('.', '\\.') + '\\.'
+        # Format sous-domaine est domaine.action ou domaine.sousdomaine.action
+        sous_domaine_regex = '^' + sous_domaine.replace('.', '\\.') + '\\.[A-Za-z0-9_\\/\\-]+$'
+
         coltrans = self._contexte.document_dao.get_collection(nom_collection_mongo)
         label_tran = '%s.%s' % (
         Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE)

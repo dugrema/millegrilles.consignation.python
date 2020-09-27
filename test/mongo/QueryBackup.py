@@ -106,6 +106,26 @@ class RequeteBackupQuotidiens:
             print(doc)
 
 
+class RequeteTransactionsDomaines:
+
+    def __init__(self, contexte, domaine: str):
+        # self.callback = TestCallback(contexte, self)
+        self.__contexte = contexte
+        self.__domaine = domaine
+
+    def requete_backup_quotidien(self):
+        collection_transactions = self.__contexte.document_dao.get_collection('MaitreDesCles')
+
+        filtre_backups_quotidiens_dirty = {
+            'en-tete.domaine': {'$regex': '^' + self.__domaine + '\\.[A-Za-z0-9_\\/\\-]+$'}
+        }
+
+        curseur = collection_transactions.find(filtre_backups_quotidiens_dirty)
+
+        for doc in curseur:
+            print(doc)
+
+
 def requete_agg_backup(contexte):
     modificateur = ModifierDateTransaction(contexte, 'MaitreDesCles')
     modificateur.requete()
@@ -116,6 +136,11 @@ def requete_quotidien(contexte):
     modificateur.requete_backup_quotidien()
 
 
+def requete_transactions_domaines(contexte):
+    modificateur = RequeteTransactionsDomaines(contexte, 'MaitreDesCles')
+    modificateur.requete_backup_quotidien()
+
+
 # --- MAIN ---
 
 def main():
@@ -123,7 +148,8 @@ def main():
     contexte.initialiser(init_document=True)
 
     # requete_agg_backup(contexte)
-    requete_quotidien(contexte)
+    # requete_quotidien(contexte)
+    requete_transactions_domaines(contexte)
 
 # TEST
 if __name__ == '__main__':

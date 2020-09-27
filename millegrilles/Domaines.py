@@ -1907,7 +1907,6 @@ class BackupSnapshot(MGProcessus):
         self.set_etape_suivante(BackupHoraire.executer_backup.__name__)
 
     def executer_backup(self):
-        date_snapshot = pytz.utc.localize(datetime.datetime.utcnow())
         gestionnaire = self.controleur.gestionnaire
 
         entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
@@ -1915,7 +1914,7 @@ class BackupSnapshot(MGProcessus):
         self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
 
         info_cles = self.parametres['reponse'][1]
-        gestionnaire.handler_backup.backup_snapshot(date_snapshot, entete_dernier_backup, info_cles)
+        gestionnaire.handler_backup.backup_snapshot(entete_dernier_backup, info_cles)
 
         self.set_etape_suivante()  # Termine
 
