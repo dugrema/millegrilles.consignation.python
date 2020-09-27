@@ -1333,7 +1333,6 @@ class ConstantesBackup:
 
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
-    LIBVAL_CATALOGUE_MENSUEL = 'catalogue.mensuel'
     LIBVAL_CATALOGUE_ANNUEL = 'catalogue.annuel'
 
     LIBELLE_SECURITE = 'securite'
@@ -1364,6 +1363,7 @@ class ConstantesBackup:
     LIBELLE_HACHAGE_ENTETE = 'hachage_entete'
 
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
+    LIBELLE_ARCHIVE_HACHAGE = 'archive_hachage'
 
 
 class ConstantesHebergement:

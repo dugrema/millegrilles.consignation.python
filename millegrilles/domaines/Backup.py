@@ -353,21 +353,22 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
             tz=datetime.timezone.utc
         )
 
-        mois_backup = datetime.datetime(year=jour_backup.year, month=jour_backup.month, day=1)
+        annee_backup = datetime.datetime(year=jour_backup.year, month=1, day=1)
+
+        jour_formatte = jour_backup.strftime('%m%d')
 
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
-            '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_QUOTIDIEN, str(jour_backup.day)): {
-                ConstantesBackup.LIBELLE_CATALOGUE_HASH: transaction[ConstantesBackup.LIBELLE_CATALOGUE_HASH],
+            '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_QUOTIDIEN, jour_formatte): {
+                ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE: transaction[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE],
                 ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
             }
         }
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_MENSUEL,
-            ConstantesBackup.LIBELLE_SECURITE: transaction[ConstantesBackup.LIBELLE_SECURITE],
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
             ConstantesBackup.LIBELLE_DOMAINE: transaction[ConstantesBackup.LIBELLE_DOMAINE],
-            ConstantesBackup.LIBELLE_MOIS: mois_backup,
+            ConstantesBackup.LIBELLE_ANNEE: annee_backup,
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
@@ -460,7 +461,7 @@ class ProcessusInformationArchiveMensuelle(MGProcessusTransaction):
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
             '%s.%s' % (ConstantesBackup.LIBELLE_FICHIERS_MENSUEL, str(mois_backup.month)): {
-                ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512: transaction[ConstantesBackup.LIBELLE_ARCHIVE_SHA3_512],
+                ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE: transaction[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE],
                 ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER],
             }
         }
