@@ -267,9 +267,6 @@ class HandlerBackupDomaine:
                         'timestamp_backup': int(heure_backup.timestamp()),
                         'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers']),
                     }
-                    transaction_maitredescles = dependances_backup.get('transaction_maitredescles')
-                    if transaction_maitredescles is not None:
-                        data['transaction_maitredescles'] = json.dumps(transaction_maitredescles)
 
                     # Preparer URL de connexion a consignationfichiers
                     url_consignationfichiers = 'https://%s:%s' % (
@@ -413,6 +410,11 @@ class HandlerBackupDomaine:
         catalogue_backup = self.preparer_catalogue(backup_nomfichier, catalogue_nomfichier, chainage_backup_precedent,
                                                    heure, sous_domaine)
 
+        if snapshot:
+            # Ajouter flag pour indiquer que ce catalogue de backup est un snapshot
+            # Les snapshots sont des backups horaires incomplets et volatils
+            catalogue_backup['snapshot'] = True
+
         liste_uuid_transactions = list()
         liste_uuids_invalides = list()
         info_backup = {
@@ -432,6 +434,9 @@ class HandlerBackupDomaine:
                 transaction_maitredescles,
                 Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
             )
+
+            if snapshot is True:
+                catalogue_backup['cles'] = transaction_maitredescles['cles']
 
         else:
             # Pas de chiffrage

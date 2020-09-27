@@ -1151,7 +1151,8 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_quotidien(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_ANNUEL.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
-        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine) or \
+            routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", 'global'):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
         elif routing_key == ConstantesDomaines.COMMANDE_GLOBAL_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
