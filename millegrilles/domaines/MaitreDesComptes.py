@@ -453,7 +453,7 @@ class ProcessusInscrireUsager(MGProcessusTransaction):
         self.set_etape_suivante()  #Termine
 
 
-class ProcessusMajMotdepasseProprietaire(MGProcessusTransaction):
+class ProcessusMajMotdepasse(MGProcessusTransaction):
     """
     Met a jour un mot de passe d'usager
     """
