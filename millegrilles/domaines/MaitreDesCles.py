@@ -360,6 +360,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleBackupTransaction"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocument"
+        elif domaine_action == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT_BACKUP:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleDocumentBackup"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_MOTDEPASSE:
@@ -1585,12 +1587,12 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         # self._logger.debug("Cle secrete: %s" % cle_secrete)
 
         # Re-encrypter la cle secrete avec les cles backup
-        if self._controleur.gestionnaire.get_certificats_backup is not None:
-            certificats_backup = self.controleur.gestionnaire.get_certificats_backup
-            for backup in certificats_backup.values():
-                cle_secrete_backup, fingerprint = self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
-                fingerprint_b64 = b64encode(binascii.unhexlify(fingerprint)).decode('utf-8')
-                cles_secretes_encryptees[fingerprint_b64] = b64encode(cle_secrete_backup).decode('utf-8')
+        cert_rechiffrage = [self.controleur.gestionnaire.certificat_millegrille]
+        cert_rechiffrage.extend(self._controleur.gestionnaire.get_certificats_backup.values())
+        for backup in cert_rechiffrage:
+            cle_secrete_backup, fingerprint = self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
+            fingerprint_b64 = b64encode(binascii.unhexlify(fingerprint)).decode('utf-8')
+            cles_secretes_encryptees[fingerprint_b64] = b64encode(cle_secrete_backup).decode('utf-8')
 
         return cles_secretes_encryptees
 
@@ -1884,6 +1886,21 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
     #     self.set_etape_suivante()  # Terminer
     #
     #     return nouveaux_params
+
+
+class ProcessusNouvelleCleDocumentBackup(ProcessusReceptionCles):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+        self.controleur.gestionnaire.maj_document_cle(transaction)
+
+        self.set_etape_suivante()  # Termine
 
 
 class ProcessusRenouvellerCertificat(MGProcessusTransaction):
