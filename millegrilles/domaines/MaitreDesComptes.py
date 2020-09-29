@@ -95,6 +95,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajCleUsagerPrive"
         elif action == ConstantesMaitreDesComptes.TRANSACTION_AJOUTER_NAVIGATEUR:
             processus = "millegrilles_domaines_MaitreDesComptes:ProcessusAjouterCertificatNavigateur"
+        elif action == ConstantesMaitreDesComptes.TRANSACTION_MAJ_USAGER_TOTP:
+            processus = "millegrilles_domaines_MaitreDesComptes:ProcessusMajUsagerTotp"
         else:
             processus = super().identifier_processus(domaine_transaction)
 
@@ -255,6 +257,33 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         resultat = collection.update_one(filtre, ops)
         if resultat.matched_count != 1:
             raise Exception("Erreur maj mot de passe, aucun document modifie")
+
+    def maj_usager_totp(self, transaction: dict):
+        collection = self.document_dao.get_collection(self.get_nom_collection())
+
+        info_totp = transaction['totp']
+
+        mg_libelle = info_totp[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['libelle']
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle,
+            'nomUsager': transaction['nomUsager'],
+        }
+        set_ops = {
+            'totp': info_totp
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        ops = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+        }
+        resultat = collection.update_one(filtre, ops, upsert=True)
+
+        if resultat.matched_count != 1 and resultat.inserted_id is None:
+            raise Exception("Erreur maj_usager_totp, aucun document modifie")
 
     def maj_cle_usagerprive(self, nom_usager: str, cle: str):
         collection = self.document_dao.get_collection(self.get_nom_collection())
@@ -464,6 +493,18 @@ class ProcessusMajMotdepasse(MGProcessusTransaction):
         motdepasse = transaction[ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE]
         est_proprietaire = transaction.get(ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE) or False
         self.controleur.gestionnaire.maj_motdepasse(nom_usager, motdepasse, est_proprietaire)
+
+        self.set_etape_suivante()  #Termine
+
+
+class ProcessusMajUsagerTotp(MGProcessusTransaction):
+    """
+    Met a jour un mot de passe d'usager
+    """
+    def initiale(self):
+        transaction = self.transaction
+
+        self.controleur.gestionnaire.maj_usager_totp(transaction)
 
         self.set_etape_suivante()  #Termine
 

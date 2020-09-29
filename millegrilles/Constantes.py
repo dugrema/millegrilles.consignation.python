@@ -1437,6 +1437,7 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_SUPPRIMER_USAGER = 'supprimerUsager'
     TRANSACTION_ASSOCIER_CERTIFICAT = 'associerCertificat'
     TRANSACTION_AJOUTER_NAVIGATEUR = 'ajouterNavigateur'
+    TRANSACTION_MAJ_USAGER_TOTP = 'majUsagerTotp'
 
 
 class ConstantesMessagerie:

@@ -174,6 +174,24 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def transaction_maj_usager_totp(self):
+        transaction = {
+            "totp": {
+                "chiffrement": "mgs1",
+                "uuid-transaction": "ae3f9e1e-2cad-4838-ae01-c797b525abaa",
+                "identificateurs_document": {
+                    "libelle": "proprietaire",
+                    "champ": "totp"
+                },
+                "secret_chiffre": "rEfqbgEjli3zxlWIjOeTxvAEY4RQVxR9PIIuCKgWA1T+Z1gQvaEBfP4Teu0hP6SYG0Exumxdtrl5f8VjB1TPnUOV6twOmGmqXQIPaxhlwNs="
+            },
+            'nomUsager': 'proprietaire',
+        }
+        domaine_action = '.'.join([ConstantesMaitreDesComptes.DOMAINE_NOM, 'MaitreDesComptes.' + ConstantesMaitreDesComptes.TRANSACTION_MAJ_USAGER_TOTP])
+        enveloppe = self.generateur.soumettre_transaction(transaction, domaine_action, 'abcd-1234', self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
         # self.requete_info_proprietaire()
         # self.requete_profil_usager()
@@ -187,7 +205,8 @@ class MessagesSample(BaseCallback):
         # self.transaction_supprimer_cles()
         # self.transaction_supprimer_usager()
         # self.transaction_associer_idmg()
-        self.transaction_ajouter_certificat_navigateur()
+        # self.transaction_ajouter_certificat_navigateur()
+        self.transaction_maj_usager_totp()
 
 
 # --- MAIN ---

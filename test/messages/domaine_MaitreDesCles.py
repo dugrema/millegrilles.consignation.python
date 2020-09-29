@@ -288,7 +288,6 @@ class MessagesSample(BaseCallback):
             },
             "cles": {fingerprint_b64: cle_secrete_encryptee_mime64},
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
-            "sujet": 'proprietaire.totp',
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
