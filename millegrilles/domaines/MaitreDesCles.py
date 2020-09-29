@@ -1522,7 +1522,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
         }
 
-        contenu_set = dict()
+        contenu_set = {
+            'version_courante': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        }
         cles = transaction.get('cles')
         if cles is None:
             # Mode individuel / backup de cle
@@ -1818,168 +1820,70 @@ class ProcessusNouvelleCleBackupTransactionBackup(ProcessusReceptionCles):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusNouveauMotDePasse(ProcessusReceptionCles):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
-        pass
-
-    def initiale(self):
-        transaction = self.transaction
-        uuid_transaction = self.transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-
-        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
-        mot_de_passe_chiffre = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE]
-        mot_de_passe_rechiffre = self.recrypterCle(mot_de_passe_chiffre)
-
-        domaine = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE]
-        identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
-
-        information = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
-            'motdepasse_chiffre': mot_de_passe_rechiffre,
-        }
-
-        etape_resumer = self._etape_resumer()
-        if etape_resumer:
-            information[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SYNCHRONISER] = True
-
-        uuid_transaction = self.generer_transaction_maj_motdepasse(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE, information)
-
-        if etape_resumer:
-            token_resumer = ConstantesMaitreDesCles.TOKEN_SYNCHRONISER + ':' + uuid_transaction
-            self.set_etape_suivante(etape_resumer, [token_resumer])
-        else:
-            self.set_etape_suivante()  # Termine
-
-        return information
-
-    def _etape_resumer(self):
-        """
-        Si retourne True, le processus a une etape resumer.
-        :return: Etape resumer, ou False si non supporte
-        """
-        return False
-
-
-class ProcessusMAJDocumentCles(MGProcessusTransaction):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement, TransactionDocumentMajClesVersionMapper())
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def initiale(self):
-        transaction = self.transaction
-        self.controleur.gestionnaire.maj_document_cle(transaction)
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusMAJMotdepasse(MGProcessusTransaction):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def initiale(self):
-        transaction = self.transaction
-
-        # Extraire les cles de document de la transaction (par processus d'elimination)
-        filtre_document = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
-                transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
-                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
-        }
-
-        contenu_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE],
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-        }
-        contenu_on_insert.update(filtre_document)
-
-        contenu_date = {
-            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
-        }
-
-        contenu_set = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-        }
-        for fingerprint in transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE].keys():
-            cle_dict = ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE + '.' + fingerprint
-            valeur = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE].get(fingerprint)
-            contenu_set[cle_dict] = valeur
-
-        if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
-            contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = \
-                transaction[ConstantesMaitreDesCles.DOCUMENT_SECURITE]
-        else:
-            # Par defaut, on met le document en mode secure
-            contenu_on_insert[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = Constantes.SECURITE_SECURE
-
-        operations_mongo = {
-            '$set': contenu_set,
-            '$currentDate': contenu_date,
-            '$setOnInsert': contenu_on_insert,
-        }
-
-        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        self.__logger.debug("Operations: %s" % str({'filtre': filtre_document, 'operation': operations_mongo}))
-
-        resultat_update = collection_documents.update_one(filter=filtre_document, update=operations_mongo, upsert=True)
-        self.__logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
-
-        if transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SYNCHRONISER):
-            uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            token_resumer = ConstantesMaitreDesCles.TOKEN_SYNCHRONISER + ':' + uuid_transaction
-            self.resumer_processus([token_resumer])
-
-        self.set_etape_suivante()  # Termine
-
-
 class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
-        pass
-
     def initiale(self):
         transaction = self.transaction
-        domaine = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE]
-
-        # UUID du contenu, pas celui dans en-tete
-        uuid_transaction_doc = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        iddoc = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
-        cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
-        cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
-        self.__logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
+        cles_secretes_chiffrees = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES]
+        cles_secretes_rechiffrees = self.recrypterCle(cles_secretes_chiffrees)
+        identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         nouveaux_params = {
-            'domaine': domaine,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_doc,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: iddoc,
-            'cles_secretes_encryptees': cles_secretes_encryptees,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
+            'cles_secretes_encryptees': cles_secretes_rechiffrees,
             'iv': transaction['iv'],
         }
         self.parametres.update(nouveaux_params)
 
-        self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT)
+        self.controleur.gestionnaire.maj_document_cle(transaction)
 
-        self.set_etape_suivante()  # Terminer
+        # Generer transactions pour separer les sous-domaines de backup
+        self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT)
+
+        self.set_etape_suivante()  # Termine
 
         return nouveaux_params
+
+    def generer_transaction_cles_backup(self):
+        """
+        Sauvegarder les cles de backup sous forme de transaction dans le domaine MaitreDesCles.
+        Va aussi declencher la mise a jour du document de cles associe.
+        :return:
+        """
+        self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT)
+
+    # def initiale(self):
+    #     transaction = self.transaction
+    #     domaine = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE]
+    #
+    #     uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+    #     iddoc = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+    #
+    #     # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+    #     cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLESECRETE]
+    #     cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
+    #     self.__logger.debug("Cle secrete encryptee: %s" % cle_secrete_encryptee)
+    #
+    #     nouveaux_params = {
+    #         'domaine': domaine,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_doc,
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: iddoc,
+    #         'cles_secretes_encryptees': cles_secretes_encryptees,
+    #         'iv': transaction['iv'],
+    #     }
+    #     self.parametres.update(nouveaux_params)
+    #
+    #     self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT)
+    #
+    #     self.set_etape_suivante()  # Terminer
+    #
+    #     return nouveaux_params
 
 
 class ProcessusRenouvellerCertificat(MGProcessusTransaction):
@@ -2715,24 +2619,6 @@ class ProcessusHebergementMajTrousseau(MGProcessusTransaction):
 
         self.resumer_processus([token_resumer])
         self.set_etape_suivante()  #Termine
-
-
-class ProcessusHebergementMotdepasseCle(ProcessusNouveauMotDePasse):
-    """
-    Conserve un mot de passe de cle de certificat d'hebergement
-    """
-
-    def resumer(self):
-        transaction = self.transaction
-        uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction
-
-        self.resumer_processus([token_resumer])
-        self.set_etape_suivante()  # Termine
-
-    def _etape_resumer(self):
-        return ProcessusHebergementMotdepasseCle.resumer.__name__
 
 
 class ProcessusHebergementSupprimer(MGProcessusTransaction):

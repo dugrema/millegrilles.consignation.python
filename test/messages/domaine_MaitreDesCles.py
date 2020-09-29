@@ -43,11 +43,13 @@ class MessagesSample(BaseCallback):
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
             certificat_courant_pem = certificat_pem.read()
-            cert = x509.load_pem_x509_certificate(
-                certificat_courant_pem,
-                backend=default_backend()
-            )
-            self.certificat_courant = cert
+            self.clecert = EnveloppeCleCert()
+            self.clecert.cert_from_pem_bytes(certificat_courant_pem)
+            # cert = x509.load_pem_x509_certificate(
+            #     certificat_courant_pem,
+            #     backend=default_backend()
+            # )
+            self.certificat_courant = self.clecert.cert
             self.certificat_courant_pem = certificat_courant_pem.decode('utf8')
 
     def on_channel_open(self, channel):
@@ -266,6 +268,7 @@ class MessagesSample(BaseCallback):
 
     def nouvelle_cle_document(self):
 
+        fingerprint_b64 = self.clecert.fingerprint_b64
         cle_secrete = 'Mon mot de passe secret'
         cle_secrete_encryptee = self.certificat_courant.public_key().encrypt(
             cle_secrete.encode('utf8'),
@@ -278,14 +281,14 @@ class MessagesSample(BaseCallback):
         cle_secrete_encryptee_mime64 = b64encode(cle_secrete_encryptee).decode('utf8')
 
         nouvelle_cle = {
-            "domaine": "millegrilles.domaines.Parametres",
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: "39c1e1b0-b6ee-11e9-b0cd-d30e8faa841c",
+            "domaine": "MaitreDesComptes",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesParametres.LIBVAL_EMAIL_SMTP,
+                "_mg-libelle": "proprietaire",
+                "champ": "totp",
             },
-            "fingerprint": "abcd",
-            "cle": cle_secrete_encryptee_mime64,
+            "cles": {fingerprint_b64: cle_secrete_encryptee_mime64},
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
+            "sujet": 'proprietaire.totp',
         }
 
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -459,11 +462,11 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.event_recu.wait(5)
         # self.event_recu.clear()
 
-        enveloppe = self.requete_cert_maitredescles()
+        # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
         # enveloppe = self.nouvelle_cle_grosfichiers()
-        # enveloppe = self.nouvelle_cle_document()
+        enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
