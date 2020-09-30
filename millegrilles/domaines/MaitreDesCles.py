@@ -651,10 +651,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         temps_limite_demande = datetime.datetime.utcnow().timestamp() - 30  # 30 secondes max
         estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+
         if evenement.get('roles_permis'):
             enveloppe_certificat, estampille, temps_limite_demande = self.verifier_roles_permis(
                 estampille, evenement, temps_limite_demande)
-        elif evenement.get('certificat'):
+        elif evenement.get('_certificat') is not None:
             enveloppe_certificat = self.extraire_certificat(evenement)
         else:
             enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
@@ -666,28 +667,33 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
             try:
                 enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
-
-                # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-                role_inclus_permis = [any(role in enveloppe_certificat.get_roles for role in roles_permis)]
-
-                if role_inclus_permis is False:
-                    self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
-                    enveloppe_certificat = None
             except CertificatInconnu:
                 enveloppe_certificat = None
+        elif not enveloppe_certificat.est_verifie:
+            # S'assurer que le certificat est verifie
+            self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+        # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
+        role_inclus_permis = [any(role in enveloppe_certificat.get_roles for role in roles_permis)]
+
+        if role_inclus_permis is False:
+            self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
+            enveloppe_certificat = None
+
         return enveloppe_certificat, estampille, temps_limite_demande
 
     def extraire_certificat(self, evenement):
-        cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
-        cert_navi = '\n'.join(cert[0].split(';'))
-        cert_inter = '\n'.join(cert[1].split(';'))
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
-        enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
+        # cert = self.verificateur_certificats.split_chaine_certificats(evenement['_certificat'])
+        # cert_navi = '\n'.join(cert[0].split(';'))
+        # cert_inter = '\n'.join(cert[1].split(';'))
+
+        cert = evenement['_certificat']
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
+        enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
         self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
         self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
         self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
-        if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
-            enveloppe_certificat = None  # Acces refuse
+
         return enveloppe_certificat
 
     def verifier_roles_permis(self, estampille, evenement, temps_limite_demande):

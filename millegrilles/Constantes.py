@@ -1423,6 +1423,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_CERTIFICATS = 'certificats'
     CHAMP_IDMGS = 'idmgs'
     CHAMP_IDMG_COMPTE = 'idmgCompte'
+    CHAMP_TOTP = 'totp'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'
