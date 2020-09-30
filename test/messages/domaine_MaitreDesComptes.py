@@ -193,7 +193,7 @@ class MessagesSample(BaseCallback):
         return enveloppe
 
     def executer(self):
-        # self.requete_info_proprietaire()
+        self.requete_info_proprietaire()
         # self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
@@ -206,7 +206,7 @@ class MessagesSample(BaseCallback):
         # self.transaction_supprimer_usager()
         # self.transaction_associer_idmg()
         # self.transaction_ajouter_certificat_navigateur()
-        self.transaction_maj_usager_totp()
+        # self.transaction_maj_usager_totp()
 
 
 # --- MAIN ---

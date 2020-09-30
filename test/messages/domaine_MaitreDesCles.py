@@ -42,15 +42,16 @@ class MessagesSample(BaseCallback):
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
-            certificat_courant_pem = certificat_pem.read()
+            self.certificat_courant_pem = certificat_pem.read()
             self.clecert = EnveloppeCleCert()
-            self.clecert.cert_from_pem_bytes(certificat_courant_pem)
+            self.clecert.set_chaine_str(self.certificat_courant_pem.decode('utf-8'))
+            self.clecert.cert_from_pem_bytes(self.certificat_courant_pem)
             # cert = x509.load_pem_x509_certificate(
             #     certificat_courant_pem,
             #     backend=default_backend()
             # )
             self.certificat_courant = self.clecert.cert
-            self.certificat_courant_pem = certificat_courant_pem.decode('utf8')
+            self.certificat_courant_pem = self.certificat_courant_pem.decode('utf8')
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -134,6 +135,28 @@ class MessagesSample(BaseCallback):
 
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
+
+    def requete_cle_document(self):
+        fingerprint = self.clecert.fingerprint
+
+        requete_cert_maitredescles = {
+            'fingerprint': fingerprint,
+            'certificat': self.certificat_courant_pem,
+            'domaine': 'MaitreDesComptes',
+            'identificateurs_document': {
+                "libelle": "proprietaire",
+                "champ": "totp"
+            }
+        }
+
+        print(requete_cert_maitredescles)
+
+        self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT,
+            'abcd-1234',
+            self.queue_name
+        )
 
     def requete_decryptage_cle_fuuid_avecfingerprint(self):
         requete_cert_maitredescles = {
@@ -465,7 +488,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_trousseau_hebergement()
 
         # enveloppe = self.nouvelle_cle_grosfichiers()
-        enveloppe = self.nouvelle_cle_document()
+        # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
@@ -473,6 +496,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
         # self.transaction_supprimer_trousseau_hebergement()
+        self.requete_cle_document()
 
         # self.requete_cle_racine()
         # self.commande_signer_cle_backup()

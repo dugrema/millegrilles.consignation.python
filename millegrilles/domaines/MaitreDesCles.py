@@ -529,84 +529,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
 
-        temps_limite_demande = datetime.datetime.utcnow().timestamp() - 30  # 30 secondes max
-        estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
-
-        if evenement.get('roles_permis'):
-            # C'est une demande pour un tiers (e.g. domaine pour consignationfichiers)
-            # Le certificat va etre attache, on doit s'assurer que c'est un role permis
-
-            # En premier, s'assurer que l'emetteur est autorise
-            enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
-            roles = enveloppe_certificat.get_roles
-            if 'domaines' in roles:
-                cert = evenement.get('_certificat_tiers')
-                cert_navi = cert[0]
-                cert_inter = cert[1]
-
-                enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
-                enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
-
-                self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-                self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-                self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
-
-                # Verifier si la validite de la permission de dechiffrage est expiree
-                estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
-
-                # Verifiser si le role du certificat correspond a celui de la permission
-                roles_certificat = enveloppe_certificat.get_roles
-                roles_permis = evenement.get('roles_permis')
-                if not any([r in roles_permis for r in roles_certificat]):
-                    enveloppe_certificat = None  # Acces refuse
-
-                # Par defaut, 30 minutes pour une permission
-                duree_permission = evenement.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION) or (30 * 60)
-                temps_limite_demande = datetime.datetime.utcnow().timestamp() - duree_permission
-
-            else:
-                enveloppe_certificat = None  # Va forcer le refus de la requete
-
-        elif evenement.get('certificat'):
-            cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
-            cert_navi = '\n'.join(cert[0].split(';'))
-            cert_inter = '\n'.join(cert[1].split(';'))
-
-            enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
-            enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
-
-            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-            self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
-
-            if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
-                enveloppe_certificat = None  # Acces refuse
-
-        else:
-            enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
-
-            if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
-                enveloppe_certificat = None  # Acces refuse
-
-        # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
-
-        # Verifier si on utilise un certificat different pour re-encrypter la cle
-        fingerprint_demande = evenement.get('fingerprint')
-        if fingerprint_demande is not None:
-            self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
-            try:
-                enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
-
-                # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-                if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR in enveloppe_certificat.get_roles:
-                    pass
-                else:
-                    self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
-                    enveloppe_certificat = None
-            except CertificatInconnu:
-                enveloppe_certificat = None
+        enveloppe_certificat, estampille, temps_limite_demande = self.trouver_certificat_autorisation(evenement)
 
         reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
@@ -661,15 +584,83 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :param properties:
         :return:
         """
-        self._logger.debug("Transmettre cle document a %s" % properties.reply_to)
+        self._logger.debug("Transmettre cle grosfichier a %s" % properties.reply_to)
 
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-        certificat_demandeur = self.verificateur_transaction.verifier(evenement)
-        enveloppe_certificat = certificat_demandeur
-        # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
 
+        enveloppe_certificat, estampille, temps_limite_demande = self.trouver_certificat_autorisation(evenement)
+
+        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+        if enveloppe_certificat is None:
+            pass  # Pas de cert, Acces refuse
+        elif not enveloppe_certificat.est_verifie:
+            pass  # Cert invalide, access refuse
+        elif temps_limite_demande > estampille:
+            pass  # Vieille demande, on la rejette
+        else:
+
+            self._logger.debug(
+                "Verification signature requete cle grosfichier. Cert: %s" % str(
+                    enveloppe_certificat.fingerprint_ascii))
+            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+
+            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+            filtre = {
+                'domaine': evenement['domaine'],
+            }
+            for key, value in evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS].items():
+                filtre['%s.%s' % (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, key)] = value
+
+            document = collection_documents.find_one(filtre)
+            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+            if document is not None:
+                self._logger.debug("Document de cles pour document: %s" % str(document))
+                if acces_permis:
+                    cle_secrete = self.decrypter_cle(document['cles'])
+                    try:
+                        cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+                            cle_secrete, enveloppe_certificat.certificat)
+                        reponse = {
+                            'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                            'iv': document['iv'],
+                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                        }
+                    except TypeError:
+                        self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
+                        reponse = {
+                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+                        }
+
+        self.generateur_transactions.transmettre_reponse(
+            reponse, properties.reply_to, properties.correlation_id
+        )
+
+    def trouver_certificat_autorisation(self, evenement, roles_permis: list = None):
+
+        if roles_permis is None:
+            # Utiliser roles par defaut
+            roles_permis = [
+                ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
+                ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+                ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+            ]
+
+        temps_limite_demande = datetime.datetime.utcnow().timestamp() - 30  # 30 secondes max
+        estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        if evenement.get('roles_permis'):
+            enveloppe_certificat, estampille, temps_limite_demande = self.verifier_roles_permis(
+                estampille, evenement, temps_limite_demande)
+        elif evenement.get('certificat'):
+            enveloppe_certificat = self.extraire_certificat(evenement)
+        else:
+            enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+
+        # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
+        # Verifier si on utilise un certificat different pour re-encrypter la cle
         fingerprint_demande = evenement.get('fingerprint')
         if fingerprint_demande is not None:
             self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
@@ -677,44 +668,63 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
 
                 # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-                if ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR in enveloppe_certificat.get_roles:
-                    pass
-                elif ConstantesGenerateurCertificat.ROLE_DOMAINES in certificat_demandeur.get_roles:
-                    # Le middleware a le droit de demander une cle pour un autre composant
-                    pass
-                else:
+                role_inclus_permis = [any(role in enveloppe_certificat.get_roles for role in roles_permis)]
+
+                if role_inclus_permis is False:
                     self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
                     enveloppe_certificat = None
             except CertificatInconnu:
                 enveloppe_certificat = None
+        return enveloppe_certificat, estampille, temps_limite_demande
 
-        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
-        acces_permis = enveloppe_certificat is not None
-        self._logger.debug(
-            "Verification signature requete cle document. Cert: %s" % str(enveloppe_certificat.fingerprint_ascii))
+    def extraire_certificat(self, evenement):
+        cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
+        cert_navi = '\n'.join(cert[0].split(';'))
+        cert_inter = '\n'.join(cert[1].split(';'))
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
+        enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
+        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+        self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+        if ConstantesGenerateurCertificat.ROLE_NAVIGATEUR not in enveloppe_certificat.get_roles:
+            enveloppe_certificat = None  # Acces refuse
+        return enveloppe_certificat
 
-        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
-        }
-        document = collection_documents.find_one(filtre)
-        # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
-        if document is not None:
-            self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
-            if acces_permis:
-                cle_secrete = self.decrypter_cle(document['cles'])
-                cle_secrete_reencryptee, fingerprint = self.crypter_cle(
-                    cle_secrete, enveloppe_certificat.certificat)
-                reponse = {
-                    'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                    'iv': document['iv'],
-                    Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
-                }
+    def verifier_roles_permis(self, estampille, evenement, temps_limite_demande):
+        # C'est une demande pour un tiers (e.g. domaine pour consignationfichiers)
+        # Le certificat va etre attache, on doit s'assurer que c'est un role permis
+        # En premier, s'assurer que l'emetteur est autorise
+        enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+        roles = enveloppe_certificat.get_roles
+        if 'domaines' in roles:
+            cert = evenement.get('_certificat_tiers')
+            cert_navi = cert[0]
+            cert_inter = cert[1]
 
-        self.generateur_transactions.transmettre_reponse(
-            reponse, properties.reply_to, properties.correlation_id
-        )
+            enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
+            enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
+
+            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+            self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+            # Verifier si la validite de la permission de dechiffrage est expiree
+            estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+
+            # Verifiser si le role du certificat correspond a celui de la permission
+            roles_certificat = enveloppe_certificat.get_roles
+            roles_permis = evenement.get('roles_permis')
+            if not any([r in roles_permis for r in roles_certificat]):
+                enveloppe_certificat = None  # Acces refuse
+
+            # Par defaut, 30 minutes pour une permission
+            duree_permission = evenement.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION) or (30 * 60)
+            temps_limite_demande = datetime.datetime.utcnow().timestamp() - duree_permission
+
+        else:
+            enveloppe_certificat = None  # Va forcer le refus de la requete
+        return enveloppe_certificat, estampille, temps_limite_demande
 
     def transmettre_trousseau_hebergement(self, evenement: dict, properties):
         """
@@ -1514,6 +1524,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
 
         contenu_on_insert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             'iv': transaction['iv'],
         }

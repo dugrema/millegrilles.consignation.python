@@ -69,10 +69,10 @@ class EnveloppeCleCert:
         self.chaine = chaine
 
     def set_chaine_str(self, chaine: str):
-        chaine_list = chaine.split('-----END PRIVATE KEY-----')
+        chaine_list = chaine.split('-----END CERTIFICATE-----')
         self.chaine = list()
         for cert in chaine_list:
-            cert = cert + '-----END PRIVATE KEY-----'
+            cert = cert + '-----END CERTIFICATE-----'
             self.chaine.append(cert)
 
     def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
