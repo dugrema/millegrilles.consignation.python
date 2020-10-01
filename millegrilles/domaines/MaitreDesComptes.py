@@ -196,7 +196,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         # S'assurer que le document n'existe pas deja
         doc_existant = collection.find_one(filtre)
-        if doc_existant:
+        if doc_existant and doc_existant.get('u2f'):
             raise ValueError("Proprietaire deja assigne pour cette MilleGrille")
 
         resultat = collection.insert_one(doc)
