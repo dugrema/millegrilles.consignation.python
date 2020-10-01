@@ -189,7 +189,8 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
-            ConstantesMaitreDesComptes.CHAMP_CLES_U2F: [cle]
+            ConstantesMaitreDesComptes.CHAMP_CLES_U2F: [cle],
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'proprietaire'
         }
 
         collection = self.document_dao.get_collection(self.get_nom_collection())
