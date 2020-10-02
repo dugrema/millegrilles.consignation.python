@@ -1541,6 +1541,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         domaine_action = domaine.split('.')[-1]
         if domaine_action == 'cleGrosFichier':
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS
+        elif domaine_action == 'cleGrosFichierBackup':
+            libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS
         elif domaine_action == 'cleDocument':
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT
         elif domaine_action == 'cleDocumentBackup':
