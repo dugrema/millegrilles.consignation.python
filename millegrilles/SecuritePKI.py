@@ -512,7 +512,8 @@ class SignateurTransaction(UtilCertificats):
             message_bytes,
             asymmetric.padding.PSS(
                 mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
-                salt_length=asymmetric.padding.PSS.MAX_LENGTH
+                # salt_length=asymmetric.padding.PSS.MAX_LENGTH
+                salt_length=64   # Maximum supporte sur iPhone
             ),
             self._sign_hash_function()
         )
@@ -646,7 +647,7 @@ class VerificateurTransaction(UtilCertificats):
             message_bytes,
             asymmetric.padding.PSS(
                 mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
-                salt_length=asymmetric.padding.PSS.MAX_LENGTH
+                salt_length=64  # max supporte sur iPhone asymmetric.padding.PSS.MAX_LENGTH
             ),
             self._sign_hash_function()
         )
