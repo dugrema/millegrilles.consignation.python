@@ -690,7 +690,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # cert_inter = '\n'.join(cert[1].split(';'))
 
         cert = evenement['_certificat']
-        cert_join = cert.join('\n')
+        cert_join = '\n'.join(cert)
         enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
         #enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
         #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
