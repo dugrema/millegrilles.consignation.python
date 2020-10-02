@@ -657,6 +657,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 estampille, evenement, temps_limite_demande)
         elif evenement.get('_certificat') is not None:
             enveloppe_certificat = self.extraire_certificat(evenement)
+        elif evenement.get('certificat') is not None:
+            enveloppe_certificat = self.extraire_certificat_string(evenement)
         else:
             enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
 
@@ -690,6 +692,19 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         cert = evenement['_certificat']
         enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
         enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
+        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+        self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+        return enveloppe_certificat
+
+    def extraire_certificat_string(self, evenement):
+        cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
+        cert_navi = '\n'.join(cert[0].split(';'))
+        cert_inter = '\n'.join(cert[1].split(';'))
+
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
+        enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
         self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
         self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
         self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
@@ -1521,16 +1536,26 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         )
 
     def maj_document_cle(self, transaction: dict):
+
+        domaine = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        domaine_action = domaine.split('.')[-1]
+        if domaine_action == 'cleGrosFichier':
+            libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS
+        elif domaine_action == 'cleDocument':
+            libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT
+        elif domaine_action == 'cleDocumentBackup':
+            libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT
+        else:
+            raise Exception("Type transaction non supportee")
+
         # Extraire les cles de document de la transaction (par processus d'elimination)
         cles_document = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
                 transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS:
-                transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
         }
 
         contenu_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: libval,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             'iv': transaction['iv'],
         }
@@ -1545,9 +1570,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
         cles = transaction.get('cles')
         if cles is None:
-            # Mode individuel / backup de cle
-            fingerprint = transaction['fingerprint']
+            # Mode individuel / backup de cle - on ajuste l'identificateur pour le document general
+            # avec tous les fingerprints
+            identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+            fingerprint = identificateurs_documents['fingerprint']
             cles = {fingerprint: transaction['cle']}
+            del identificateurs_documents['fingerprint']
+
+        for fingerprint, cle in cles.items():
+            contenu_set['cles.%s' % fingerprint] = cle
 
         for fingerprint in cles.keys():
             cle_dict = 'cles.%s' % fingerprint
