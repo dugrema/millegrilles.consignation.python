@@ -48,6 +48,13 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
             # Connecter RabbitMQ
             self._message_dao.connecter()
 
+    def fermer(self):
+        super().fermer()
+        try:
+            self._document_dao.deconnecter()
+        except:
+            pass
+
     @property
     def document_dao(self) -> MongoDAO:
         """

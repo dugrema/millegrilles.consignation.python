@@ -4,6 +4,8 @@ import os
 import json
 import logging
 import ssl
+import tempfile
+import shutil
 
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
@@ -19,6 +21,7 @@ class TransactionConfiguration:
     def __init__(self):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         # Configuration de connection a RabbitMQ
+
         self._mq_config = {
             Constantes.CONFIG_MQ_HOST: Constantes.DEFAUT_HOSTNAME,
             Constantes.CONFIG_MQ_PORT: '5673',
@@ -451,6 +454,10 @@ class ContexteRessourcesMilleGrilles:
         self._signateur_transactions = None
         self._generateur_transactions = None
 
+        self.validation_workdir_tmp = None
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def initialiser(self, init_message=True, connecter=True):
         """
         Initialise/reinitialise le contexte et connecte les DAOs.
@@ -464,12 +471,25 @@ class ContexteRessourcesMilleGrilles:
         self._configuration.loadEnvironment(additionals=self._additionnals)
         self._message_dao = None
 
+        self.validation_workdir_tmp = tempfile.mkdtemp(prefix='ctx_validation_', dir=self._configuration.pki_workdir)
+
         if init_message:
             self._message_dao = PikaDAO(self._configuration)
             self._signateur_transactions = SignateurTransaction(self)
             self._signateur_transactions.initialiser()
             if connecter:
                 self._message_dao.connecter()
+
+    def fermer(self):
+        try:
+            shutil.rmtree(self.validation_workdir_tmp)
+        except Exception as e:
+            self.__logger.warning("Erreur suppression workdir pki tmp : %s", str(e))
+
+        try:
+            self._message_dao.deconnecter()
+        except:
+            pass
 
     @property
     def configuration(self):

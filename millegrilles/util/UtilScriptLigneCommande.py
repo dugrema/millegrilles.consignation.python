@@ -106,17 +106,18 @@ class ModeleConfiguration:
             self._contexte.document_dao.connecter()
 
     def deconnecter(self):
-        try:
-            if self._contexte.message_dao is not None:
-                self._contexte.message_dao.deconnecter()
-        except Exception:
-            self._logger.warning("Erreur fermeture message_dao")
-
-        try:
-            if self._contexte.document_dao is not None:
-                self._contexte.document_dao.deconnecter()
-        except Exception:
-            self._logger.warning("Erreur fermeture document_dao")
+        self._contexte.fermer()
+        # try:
+        #     if self._contexte.message_dao is not None:
+        #         self._contexte.message_dao.deconnecter()
+        # except Exception:
+        #     self._logger.warning("Erreur fermeture message_dao")
+        #
+        # try:
+        #     if self._contexte.document_dao is not None:
+        #         self._contexte.document_dao.deconnecter()
+        # except Exception:
+        #     self._logger.warning("Erreur fermeture document_dao")
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """

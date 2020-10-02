@@ -694,7 +694,8 @@ class VerificateurCertificats(UtilCertificats):
         self._cache_certificats_fingerprint = dict()
         self._liste_CAs_connus = []  # Fingerprint de tous les CAs connus, trusted et untrusted
 
-        self.__workdir = tempfile.mkdtemp(prefix='validation_', dir=self.configuration.pki_workdir)
+        # self.__workdir = tempfile.mkdtemp(prefix='validation_', dir=self.configuration.pki_workdir)
+        self.__workdir = self.contexte.validation_workdir_tmp
 
     def __del__(self):
         self.close()
