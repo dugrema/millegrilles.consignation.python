@@ -1571,13 +1571,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             'version_courante': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         }
         cles = transaction.get('cles')
+        identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         if cles is None:
             # Mode individuel / backup de cle - on ajuste l'identificateur pour le document general
             # avec tous les fingerprints
-            identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
             fingerprint = identificateurs_documents['fingerprint']
             cles = {fingerprint: transaction['cle']}
             del identificateurs_documents['fingerprint']
+
+        contenu_on_insert[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = identificateurs_documents
 
         for fingerprint, cle in cles.items():
             contenu_set['cles.%s' % fingerprint] = cle
