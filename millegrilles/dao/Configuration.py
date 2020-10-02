@@ -471,7 +471,7 @@ class ContexteRessourcesMilleGrilles:
         self._configuration.loadEnvironment(additionals=self._additionnals)
         self._message_dao = None
 
-        self.validation_workdir_tmp = tempfile.mkdtemp(prefix='ctx_validation_', dir=self._configuration.pki_workdir)
+        self.validation_workdir_tmp = tempfile.mkdtemp(prefix='millegrilles_pki_', dir=self._configuration.pki_workdir)
 
         if init_message:
             self._message_dao = PikaDAO(self._configuration)
