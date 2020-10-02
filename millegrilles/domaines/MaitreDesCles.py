@@ -1550,11 +1550,23 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             raise Exception("Type transaction non supportee")
 
+        identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         # Extraire les cles de document de la transaction (par processus d'elimination)
         cles_document = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
                 transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
         }
+
+        cles = transaction.get('cles')
+        if cles is None:
+            # Mode individuel / backup de cle - on ajuste l'identificateur pour le document general
+            # avec tous les fingerprints
+            fingerprint = identificateurs_documents['fingerprint']
+            cles = {fingerprint: transaction['cle']}
+            del identificateurs_documents['fingerprint']
+
+        for key, value in identificateurs_documents.items():
+            cles_document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + key] = value
 
         contenu_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: libval,
@@ -1570,24 +1582,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         contenu_set = {
             'version_courante': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         }
-        cles = transaction.get('cles')
-        identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
-        if cles is None:
-            # Mode individuel / backup de cle - on ajuste l'identificateur pour le document general
-            # avec tous les fingerprints
-            fingerprint = identificateurs_documents['fingerprint']
-            cles = {fingerprint: transaction['cle']}
-            del identificateurs_documents['fingerprint']
-
-        contenu_on_insert[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS] = identificateurs_documents
 
         for fingerprint, cle in cles.items():
             contenu_set['cles.%s' % fingerprint] = cle
-
-        for fingerprint in cles.keys():
-            cle_dict = 'cles.%s' % fingerprint
-            valeur = cles.get(fingerprint)
-            contenu_set[cle_dict] = valeur
 
         if transaction.get(ConstantesMaitreDesCles.DOCUMENT_SECURITE) is not None:
             contenu_set[ConstantesMaitreDesCles.DOCUMENT_SECURITE] = \
