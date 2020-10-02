@@ -690,24 +690,30 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # cert_inter = '\n'.join(cert[1].split(';'))
 
         cert = evenement['_certificat']
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
-        enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
-        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+        cert_join = cert.join('\n')
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
+        #enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
+        #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
+        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
         self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
 
         return enveloppe_certificat
 
     def extraire_certificat_string(self, evenement):
-        cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
-        cert_navi = '\n'.join(cert[0].split(';'))
-        cert_inter = '\n'.join(cert[1].split(';'))
+        # cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
+        # cert_navi = '\n'.join(cert[0].split(';'))
+        # cert_inter = '\n'.join(cert[1].split(';'))
 
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
-        enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
-        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-        self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+        cert = '\n'.join(evenement['certificat'].split(';'))
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert)
         self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+        # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
+        # enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
+        # self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+        # self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+        # self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
 
         return enveloppe_certificat
 

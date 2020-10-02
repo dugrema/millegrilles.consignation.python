@@ -35,11 +35,15 @@ class EnveloppeCertificat:
 
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
+        self.reste_chaine_pem: Optional[list] = None  # Certs CA de la chaine
+
         self._est_verifie = False  # Flag qui est change une fois la chaine verifiee
 
         if certificat_pem is not None:
             if isinstance(certificat_pem, str):
-                certificat_pem = bytes(certificat_pem, 'utf-8')
+                chaine_cert = self.__split_chaine_certificats(certificat_pem)
+                certificat_pem = bytes(chaine_cert[0], 'utf-8')
+                self.reste_chaine_pem = chaine_cert[1:]
             self._certificat = x509.load_pem_x509_certificate(
                 certificat_pem,
                 backend=default_backend()
@@ -64,6 +68,10 @@ class EnveloppeCertificat:
     @staticmethod
     def calculer_fingerprint_b64(certificat):
         return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
+
+    def __split_chaine_certificats(self, pem_str: str):
+        chaine_certs = [c + UtilCertificats.END_CERTIFICATE for c in pem_str.split(UtilCertificats.END_CERTIFICATE)]
+        return chaine_certs[0:-1]
 
     @property
     def fingerprint(self):
@@ -697,6 +705,14 @@ class VerificateurCertificats(UtilCertificats):
         # self.__workdir = tempfile.mkdtemp(prefix='validation_', dir=self.configuration.pki_workdir)
         self.__workdir = self.contexte.validation_workdir_tmp
 
+        # Initialiser le fichier untrusted avec le certificat local - devrait avoir le cert intermediaire courant
+        with open(contexte.configuration.mq_certfile, 'r') as fichier:
+            certfile = fichier.read()
+
+        untrusted_cas_filename = os.path.join(self.__workdir, contexte.idmg + '.untrusted.cert.pem')
+        with open(untrusted_cas_filename, 'w') as fichier:
+            fichier.write(certfile)
+
     def __del__(self):
         self.close()
 
@@ -738,10 +754,6 @@ class VerificateurCertificats(UtilCertificats):
                         # self._liste_CAs_connus.append(enveloppe_ca)
                         with open(file_ca_racine, 'w') as fichier:
                             fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-
-                        untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
-                        with open(untrusted_cas_filename, 'w+'):
-                            pass   # Juste touch, initialiser le fichier
 
                     else:
                         raise CertificatInvalide("Le certificat racine de %s a ete altere (idmg != fingerprint)" % idmg)
@@ -888,8 +900,14 @@ class VerificateurCertificats(UtilCertificats):
             trusted_ca_filename = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
 
         nom_fichier_tmp = tempfile.mktemp(suffix='.cert.pem', dir=self.__workdir)
-        with open(nom_fichier_tmp, 'w') as output_cert_file :
+        with open(nom_fichier_tmp, 'w') as output_cert_file:
             output_cert_file.write(enveloppe.certificat_pem)
+
+            if enveloppe.reste_chaine_pem is not None:
+                for cert_pem in enveloppe.reste_chaine_pem:
+                    output_cert_file.write(cert_pem)
+
+                output_cert_file.write('\n')
 
             # Flush le contenu, mais on garde le write lock sur le fichier pour eviter
             # qu'il soit altere par un autre processus.
@@ -901,6 +919,7 @@ class VerificateurCertificats(UtilCertificats):
                 'openssl', 'verify',
                 '-CAfile', trusted_ca_filename,
                 '-untrusted', untrusted_cas_filename,
+                '-untrusted', nom_fichier_tmp,
                 nom_fichier_tmp,
             ]
 
