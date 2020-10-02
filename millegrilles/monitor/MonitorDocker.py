@@ -297,6 +297,65 @@ class GestionnaireModulesDocker:
         #        self.__logger.exception("Erreur demarrage service %s" % service_name)
         #        raise apie
 
+    def reconfigurer_service(self, service_name: str, docker_service=None, **kwargs):
+        self.__logger.info("Demarrage service %s", service_name)
+
+        if docker_service is None:
+            docker_service = self.get_service(service_name)
+
+        configuration_service = kwargs.get('config')
+        if not configuration_service:
+            configuration_service = MonitorConstantes.DICT_MODULES_PROTEGES.get(service_name)
+
+        gestionnaire_images = kwargs.get('images')
+        if not gestionnaire_images:
+            gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
+
+        if configuration_service:
+            # S'assurer que le certificat existe, est a date et que le compte est cree
+            cle_config_service = configuration_service.get('role') or configuration_service.get('nom')
+            if cle_config_service:
+                configuration_service_meta = self.charger_config_recente('docker.cfg.' + cle_config_service)
+                config_attrs = configuration_service_meta['config'].attrs
+                configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+                certificat_compte_cle = configuration_service_json.get('certificat_compte')
+                if certificat_compte_cle:
+                    self.creer_compte(certificat_compte_cle)
+
+        nom_image_docker = kwargs.get('nom_image') or service_name
+
+        configuration = dict()
+        try:
+            image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+
+            # Prendre un tag au hasard
+            try:
+                image_tag = image.tags[0]
+                configuration['image'] = image_tag
+            except:
+                pass  # On ne met pas a jour l'image
+
+            configuration = self.__formatter_configuration_service(service_name, application=service_name)
+
+            constraints = configuration.get('constraints')
+            if constraints:
+                self.__add_node_labels(constraints)
+
+            # Utiliser service existant pour integrer la nouvelle configuration
+            docker_service.update(**configuration)
+
+            # self.__docker.services.create(image_tag, command=command, **configuration)
+            return docker_service
+
+        except KeyError as ke:
+            self.__logger.error("Erreur chargement image %s, key error sur %s" % (nom_image_docker, str(ke)))
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail erreur chargement image :\n%s", json.dumps(configuration, indent=2))
+        except AttributeError as ae:
+            self.__logger.error("Erreur configuration service %s : %s" % (service_name, str(ae)))
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Detail erreur configuration service " + service_name)
+
     def demarrer_container(self, container_name: str, config: dict, **kwargs):
         self.__logger.info("Demarrage container %s", container_name)
 
@@ -909,6 +968,10 @@ class GestionnaireModulesDocker:
         for chunk in tar_data:
             array_data = array_data + chunk
         return array_data
+
+    def get_service(self, nom_service):
+        services = self.__docker.services.list(filters={'name': nom_service})
+        return services[0]
 
     def get_liste_services(self):
         services = self.__docker.services.list()

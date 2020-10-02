@@ -668,6 +668,9 @@ class ServiceMonitorPrincipal(ServiceMonitor):
             self.preparer_gestionnaire_applications()
             self.preparer_web_api()
 
+            # S'assurer d'utiliser les certificats les plus recents avec NGINX
+            self._gestionnaire_web.redeployer_nginx()
+
             while not self._fermeture_event.is_set():
                 self._attente_event.clear()
 

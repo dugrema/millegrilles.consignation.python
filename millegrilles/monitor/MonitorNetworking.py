@@ -26,6 +26,12 @@ class GestionnaireWeb:
             self.__creer_repertoires()
             self.__init_complete = True
 
+        # S'assurer d'utiliser les certificats les plus recents avec NGINX
+        try:
+            self.redeployer_nginx()
+        except IndexError:
+            self.__logger.info("entretien web : NGINX n'est pas demarre")
+
     def regenerer_configuration(self, mode_installe):
         self.__generer_fichiers_configuration(mode_installe=mode_installe)
 
@@ -216,7 +222,11 @@ class GestionnaireWeb:
             fichier.write(modules_includes_content)
 
         try:
-            self.redemarrer_nginx()
+            # self.redemarrer_nginx()
+            # self.redeployer_nginx()  # Tenter mise a jour de la configuration (si nouvelle cle disponible)
+
+            # Supprimer nginx - docker va recreer les certs/cles pki.nginx et redeployer nginx automatiquement
+            self.redeployer_nginx()
         except IndexError:
             pass  # OK, nginx n'est juste pas configure (pas de service, probablement en cours d'initialisation)
 
@@ -230,12 +240,18 @@ class GestionnaireWeb:
         except AttributeError:
             self.__logger.warning("Redemarrage nginx - Aucuns services configures")
 
-    def redeployer_nginx(self):
+    def redeployer_nginx(self, force_update=False):
         """
         Met a jour la configuration de nginx (e.g. nouveau certificat web)
+        Le service va etre redemarre si la configuration a change ou si le param force_update est True
+        :param force_update: Si True, force le redemarrage du service - permet de recharger fichiers .conf des modules
         :return:
         """
-        try:
-            self.__service_monitor.gestionnaire_docker.demarrer_service('nginx')
-        except AttributeError:
-            self.__logger.warning("Redemarrage nginx - Aucuns services configures")
+        docker_nginx = self.__service_monitor.gestionnaire_docker.reconfigurer_service('nginx')
+
+        if force_update:
+            docker_nginx.force_update()
+
+    def supprimer_nginx(self):
+        docker_nginx = self.__service_monitor.gestionnaire_docker.get_service('nginx')
+        docker_nginx.remove()
