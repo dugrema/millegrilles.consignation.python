@@ -1,5 +1,7 @@
 import logging
 import os
+import datetime
+
 from os import path
 # from typing import Union
 
@@ -21,16 +23,25 @@ class GestionnaireWeb:
         self.__repertoire_data = path.join('/var/opt/millegrilles/nginx/data')
         self.__repertoire_html = path.join('/var/opt/millegrilles/nginx/html')
 
+        self.__intervalle_entretien = datetime.timedelta(minutes=15)
+        self.__prochain_entretien = datetime.datetime.utcnow()
+
     def entretien(self):
         if not self.__init_complete:
             self.__creer_repertoires()
             self.__init_complete = True
 
-        # S'assurer d'utiliser les certificats les plus recents avec NGINX
-        try:
-            self.redeployer_nginx()
-        except IndexError:
-            self.__logger.info("entretien web : NGINX n'est pas demarre")
+        now = datetime.datetime.utcnow()
+
+        if self.__prochain_entretien < now:
+            self.__prochain_entretien = now + self.__intervalle_entretien
+
+            try:
+                # S'assurer d'utiliser les certificats les plus recents avec NGINX
+                self.redeployer_nginx()
+
+            except IndexError:
+                self.__logger.info("entretien web : NGINX n'est pas demarre")
 
     def regenerer_configuration(self, mode_installe):
         self.__generer_fichiers_configuration(mode_installe=mode_installe)

@@ -259,14 +259,12 @@ class GestionnaireCatalogueApplications(GestionnaireDomaineStandard):
     def get_liste_applications(self):
         collection = self.document_dao.get_collection(ConstantesCatalogueApplications.COLLECTION_DOCUMENTS_NOM)
         filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesCatalogueApplications.LIBVAL_APPLICATION}
-        projection = {'nom': 1}
+        projection = {'nom': 1, 'version': 1, 'images': 1, 'registries': 1}
 
         applications = list()
         for domaine in collection.find(filtre, projection):
-            info = {
-                'nom': domaine['nom']
-            }
-            applications.append(info)
+            del domaine['_id']
+            applications.append(domaine)
 
         return applications
 

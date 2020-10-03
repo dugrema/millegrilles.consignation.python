@@ -89,9 +89,9 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_liste_domaines()
-        # sample.requete_liste_applications()
+        sample.requete_liste_applications()
         # sample.requete_domaine()
-        sample.requete_application()
+        # sample.requete_application()
 
 
 # --- MAIN ---
