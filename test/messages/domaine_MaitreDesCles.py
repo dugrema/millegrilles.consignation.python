@@ -272,7 +272,7 @@ class MessagesSample(BaseCallback):
         nouvelle_cle = {
             "domaine": "GrosFichiers",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                "fuuid": "39c1e1b0-b6ee-11e9-b0cd-d30e8faa851a",
+                "fuuid": str(uuid4()),
             },
             "cles": {'/a6zPN+mHf/fOH73AfpW3s7rUcg=': cle_secrete_encryptee_base64},
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
@@ -487,7 +487,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        # enveloppe = self.nouvelle_cle_grosfichiers()
+        enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
@@ -496,7 +496,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.transaction_demande_inscription_tierce()
         # self.transaction_signature_inscription_tierce()
         # self.transaction_supprimer_trousseau_hebergement()
-        self.requete_cle_document()
+        # self.requete_cle_document()
 
         # self.requete_cle_racine()
         # self.commande_signer_cle_backup()

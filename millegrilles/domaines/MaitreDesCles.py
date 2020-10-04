@@ -1556,7 +1556,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             message_resultat, properties.reply_to, properties.correlation_id
         )
 
-    def maj_document_cle(self, transaction: dict):
+    def maj_document_cle(self, transaction: dict, non_dechiffrable=None):
 
         domaine = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         domaine_action = domaine.split('.')[-1]
@@ -1601,8 +1601,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
 
         contenu_set = {
-            'version_courante': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            'version_courante': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
         }
+
+        if non_dechiffrable is not None:
+            contenu_set['non_dechiffrable'] = non_dechiffrable
 
         for fingerprint, cle in cles.items():
             contenu_set['cles.%s' % fingerprint] = cle
@@ -1781,25 +1784,26 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         transaction = self.transaction
 
         # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
-        cle_secrete_encryptee = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES]
-        cles_secretes_encryptees = self.recrypterCle(cle_secrete_encryptee)
+        cles_recues = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES]
         identificateurs_document = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
         nouveaux_params = {
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'fuuid': identificateurs_document['fuuid'],
-            'cles_secretes_encryptees': cles_secretes_encryptees,
+            'cles_recues': cles_recues,
             'iv': transaction['iv'],
         }
         self.parametres.update(nouveaux_params)
 
-        # Verifier si on a des cles differentes
-        # if all([cle in cle_secrete_encryptee.keys() for cle in cles_secretes_encryptees.keys()]):
-        #     self.controleur.gestionnaire.maj_document_cle(transaction)
-        # else:
-        #     self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
+        non_dechiffrable = True
+        try:
+            cles_rechiffrees = self.recrypterCle(cles_recues)
+            non_dechiffrable = False  # Aucune erreur d'extraction, la cle est lisible
+            nouveaux_params['cles_rechiffrees'] = cles_rechiffrees
+        except KeyError:
+            nouveaux_params['cle_non_dechiffrable'] = True
 
-        self.controleur.gestionnaire.maj_document_cle(transaction)
+        self.controleur.gestionnaire.maj_document_cle(transaction, non_dechiffrable=non_dechiffrable)
 
         # Generer transactions pour separer les sous-domaines de backup
         self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
@@ -1807,14 +1811,6 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         self.set_etape_suivante()  # Termine
 
         return nouveaux_params
-
-    def generer_transaction_cles_backup(self):
-        """
-        Sauvegarder les cles de backup sous forme de transaction dans le domaine MaitreDesCles.
-        Va aussi declencher la mise a jour du document de cles associe.
-        :return:
-        """
-        self.generer_transaction_majcles(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
 
 
 class ProcessusNouvelleCleBackupTransaction(ProcessusReceptionCles):
