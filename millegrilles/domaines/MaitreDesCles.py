@@ -68,7 +68,7 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         elif action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
             self.gestionnaire.transmettre_certificat(properties)
         elif action == ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES:
-            self.gestionnaire.transmettre_cles_non_dechiffrables(message_dict)
+            reponse = self.gestionnaire.transmettre_cles_non_dechiffrables(message_dict)
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -852,10 +852,67 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
         taille_bacth = message_dict.get('taille') or 100
-        cle_dechiffrage = message_dict.get('cle_dechiffrage')
+        fingerprint_b64_dechiffrage = message_dict.get('fingerprint_b64_dechiffrage')
+
+        if not fingerprint_b64_dechiffrage:
+            # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
+            fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint_b64
 
         collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            'non_dechiffrable': True
+        }
+        sort_order = [(Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)]
 
+        resultats = collection.find(filtre).sort(sort_order).limit(taille_bacth)
+
+        # domaine, cles[fingerprint], iv, _mg - libelle, identificateurs_document, securite,
+        champs = [
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV,
+            Constantes.DOCUMENT_INFODOC_LIBELLE,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS,
+            Constantes.DOCUMENT_INFODOC_SECURITE,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE,
+        ]
+
+        cles = list()
+        for doc in resultats:
+            cles_existantes = doc.get('cles')
+            if cles_existantes is None:
+                continue
+
+            mg_libelle = doc[Constantes.DOCUMENT_INFODOC_LIBELLE]
+            if mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS:
+                domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER
+            elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT:
+                domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT
+            else:
+                self._logger.warning("Type de cle inconnu pour rechiffrage : %s" % mg_libelle)
+                continue
+
+            # Extraire cle specifique pour rechiffrage
+            cle_secrete = cles_existantes.get(fingerprint_b64_dechiffrage)
+
+            if cle_secrete is not None:
+                info_cle = {
+                    'cle': cle_secrete,
+                    'domaine_transaction': domaine_transaction,
+                }
+
+                for champ in champs:
+                    valeur = doc.get(champ)
+                    if valeur is not None:
+                        info_cle[champ] = valeur
+
+                cles.append(info_cle)
+
+        reponse = {
+            'cles': cles,
+            'certificat_rechiffrage': [self.get_certificat_pem, self.get_intermediaires_pem, self.get_ca_pem],
+        }
+
+        return reponse
 
     def signer_cle_backup(self, properties, message_dict):
         self._logger.debug("Signer cle de backup : %s" % str(message_dict))

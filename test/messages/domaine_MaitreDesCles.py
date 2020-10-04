@@ -496,6 +496,17 @@ BMz4ginADdtNs9ARr3DcwG4=
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_cles_non_dechiffrables(self):
+        requete_cle_racine = {
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cle_racine,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES,
+            'abcd-1234',
+            self.queue_name
+        )
+        return enveloppe_requete
+
     def executer(self):
         # self.event_recu.wait(5)
         # self.event_recu.clear()
@@ -503,7 +514,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        enveloppe = self.nouvelle_cle_grosfichiers()
+        # enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
@@ -520,6 +531,8 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_creer_cles_millegrille_hebergee()
         # self.commande_signer_csr()
         # self.commande_signer_csr_noeud_prive()
+
+        self.requete_cles_non_dechiffrables()
 
 
 # --- MAIN ---
