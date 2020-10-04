@@ -498,6 +498,7 @@ BMz4ginADdtNs9ARr3DcwG4=
 
     def requete_cles_non_dechiffrables(self):
         requete_cle_racine = {
+            'taille': 2
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cle_racine,
@@ -514,7 +515,8 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        enveloppe = self.nouvelle_cle_grosfichiers()
+        for i in range(0, 200):
+            enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()

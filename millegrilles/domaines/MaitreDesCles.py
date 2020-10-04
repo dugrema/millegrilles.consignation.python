@@ -860,7 +860,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         filtre = {
-            'non_dechiffrable': True
+            'non_dechiffrable': True,
+            'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
         }
         sort_order = [(Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)]
 
