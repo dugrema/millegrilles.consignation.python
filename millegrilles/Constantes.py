@@ -726,6 +726,7 @@ class ConstantesMaitreDesCles:
     REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
     REQUETE_TROUSSEAU_HEBERGEMENT = 'trousseauHebergement'
+    REQUETE_CLES_NON_DECHIFFRABLES = 'clesNonDechiffrables'
 
     COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
     COMMANDE_RESTAURER_BACKUP_CLES = 'restaurerBackupCles'

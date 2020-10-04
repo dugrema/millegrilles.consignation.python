@@ -67,6 +67,8 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
             self.gestionnaire.transmettre_trousseau_hebergement(message_dict, properties)
         elif action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
             self.gestionnaire.transmettre_certificat(properties)
+        elif action == ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES:
+            self.gestionnaire.transmettre_cles_non_dechiffrables(message_dict)
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -841,6 +843,19 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )
+
+    def transmettre_cles_non_dechiffrables(self, message_dict: dict):
+        """
+        Recupere une batch de cles qui ne sont pas dechiffrables par le maitre des cles.
+        Transmet cettre batch pour qu'elle soit dechiffree et retournee sous forme de transactions.
+        :param message_dict: taille/int, cle_dechiffrage/str_base64
+        :return:
+        """
+        taille_bacth = message_dict.get('taille') or 100
+        cle_dechiffrage = message_dict.get('cle_dechiffrage')
+
+        collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+
 
     def signer_cle_backup(self, properties, message_dict):
         self._logger.debug("Signer cle de backup : %s" % str(message_dict))
@@ -1627,9 +1642,9 @@ class ProcessusReceptionCles(MGProcessusTransaction):
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
-        pass
+    # def traitement_regenerer(self, id_transaction, parametres_processus):
+    #     """ Aucun traitement necessaire, le resultat est re-sauvegarde sous une nouvelle transaction """
+    #     pass
 
     def recrypterCle(self, cle_secrete_encryptee):
         cert_maitredescles = self._controleur.gestionnaire.get_certificat
@@ -1963,9 +1978,9 @@ class ProcessusRenouvellerCertificat(MGProcessusTransaction):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
-        pass
+    # def traitement_regenerer(self, id_transaction, parametres_processus):
+    #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+    #     pass
 
     def initiale(self):
         transaction = self.transaction
@@ -2040,9 +2055,9 @@ class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
-        pass
+    # def traitement_regenerer(self, id_transaction, parametres_processus):
+    #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+    #     pass
 
     def initiale(self):
         transaction = self.transaction
@@ -2131,9 +2146,9 @@ class ProcessusSignerCSRCADependant(MGProcessusTransaction):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    def traitement_regenerer(self, id_transaction, parametres_processus):
-        """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
-        pass
+    # def traitement_regenerer(self, id_transaction, parametres_processus):
+    #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+    #     pass
 
     def initiale(self):
         transaction = self.transaction

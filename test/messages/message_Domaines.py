@@ -68,9 +68,19 @@ class MessagesSample(BaseCallback):
             correlation_id='stats_domaine'
         )
 
+    def commande_regenerer(self):
+        commande = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.MaitreDesCles.' + ConstantesDomaines.COMMANDE_REGENERER,
+            reply_to=self.queue_name,
+            correlation_id='regenerer'
+        )
+
     def executer(self):
-        # sample.commande_regenerer()
-        sample.requete_stats_domaines()
+        sample.commande_regenerer()
+        # sample.requete_stats_domaines()
         # sample.trigger_backup_global()
 
 
