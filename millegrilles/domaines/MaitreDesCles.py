@@ -1858,6 +1858,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
             nouveaux_params['cles_rechiffrees'] = cles_rechiffrees
         except KeyError:
             nouveaux_params['cle_non_dechiffrable'] = True
+            nouveaux_params['cles_rechiffrees'] = cles_recues
 
         self.controleur.gestionnaire.maj_document_cle(transaction, non_dechiffrable=non_dechiffrable)
 
