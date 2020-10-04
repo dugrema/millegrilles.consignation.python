@@ -1768,7 +1768,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
             for fingerprint_cle_backup in certificats_backup.keys():
                 fingerprint_b64_backup.append(fingerprint_cle_backup)
 
-        for fingerprint_b64, cle in self.parametres['cles_secretes_encryptees'].items():
+        for fingerprint_b64, cle in self.parametres['cles_rechiffrees'].items():
             if fingerprint_b64 not in fingerprint_b64_backup:
                 continue
 
@@ -1850,7 +1850,6 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
             'cles_recues': cles_recues,
             'iv': transaction['iv'],
         }
-        self.parametres.update(nouveaux_params)
 
         non_dechiffrable = True
         try:
@@ -1863,6 +1862,7 @@ class ProcessusNouvelleCleGrosFichier(ProcessusReceptionCles):
         self.controleur.gestionnaire.maj_document_cle(transaction, non_dechiffrable=non_dechiffrable)
 
         # Generer transactions pour separer les sous-domaines de backup
+        self.parametres.update(nouveaux_params)
         self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS)
 
         self.set_etape_suivante()  # Termine

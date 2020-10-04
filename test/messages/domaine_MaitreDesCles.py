@@ -514,7 +514,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        # enveloppe = self.nouvelle_cle_grosfichiers()
+        enveloppe = self.nouvelle_cle_grosfichiers()
         # enveloppe = self.nouvelle_cle_document()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
@@ -532,7 +532,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_signer_csr()
         # self.commande_signer_csr_noeud_prive()
 
-        self.requete_cles_non_dechiffrables()
+        # self.requete_cles_non_dechiffrables()
 
 
 # --- MAIN ---
