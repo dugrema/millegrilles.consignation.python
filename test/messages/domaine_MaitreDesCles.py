@@ -53,6 +53,18 @@ class MessagesSample(BaseCallback):
             self.certificat_courant = self.clecert.cert
             self.certificat_courant_pem = self.certificat_courant_pem.decode('utf8')
 
+        with open('/home/mathieu/mgdev/certs/pki.millegrille.cert', 'rb') as certificat_pem:
+            self.certificat_millegrille_pem = certificat_pem.read()
+            self.clecert_millegrille = EnveloppeCleCert()
+            self.clecert_millegrille.set_chaine_str(self.certificat_millegrille_pem.decode('utf-8'))
+            self.clecert_millegrille.cert_from_pem_bytes(self.certificat_millegrille_pem)
+            # cert = x509.load_pem_x509_certificate(
+            #     certificat_courant_pem,
+            #     backend=default_backend()
+            # )
+            self.cert_millegrille = self.clecert_millegrille.cert
+            self.cert_millegrille_pem = self.certificat_millegrille_pem.decode('utf8')
+
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
@@ -259,7 +271,11 @@ class MessagesSample(BaseCallback):
     def nouvelle_cle_grosfichiers(self):
 
         cle_secrete = 'Mon mot de passe secret'
-        cle_secrete_encryptee = self.certificat_courant.public_key().encrypt(
+        clecert_chiffrage = self.clecert_millegrille
+        # cert_chiffrage = self.certificat_courant
+        cert_chiffrage = clecert_chiffrage.cert
+        fingerprint_b64 = clecert_chiffrage.fingerprint_b64
+        cle_secrete_encryptee = cert_chiffrage.public_key().encrypt(
             cle_secrete.encode('utf8'),
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -274,7 +290,7 @@ class MessagesSample(BaseCallback):
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
                 "fuuid": str(uuid4()),
             },
-            "cles": {'/a6zPN+mHf/fOH73AfpW3s7rUcg=': cle_secrete_encryptee_base64},
+            "cles": {fingerprint_b64: cle_secrete_encryptee_base64},
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
             "sujet": ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
         }
