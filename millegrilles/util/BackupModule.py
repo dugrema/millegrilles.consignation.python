@@ -12,7 +12,7 @@ from os import path
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
 from base64 import b64encode
-from threading import Event
+from lzma import LZMADecompressor, LZMAFile
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
@@ -1016,17 +1016,20 @@ class ArchivesBackupParser:
             with open(path_local,  'wb') as fichier:
                 fichier.write(tar_fo.read())
 
-            with open(path_local, 'rb') as fichier:
-                self.__traiter_archive(type_archive, nom_fichier, fichier)
+            try:
+                with open(path_local, 'rb') as fichier:
+                    self.__traiter_archive(type_archive, nom_fichier, fichier)
+            except:
+                self.__logger.exception("Erreur traitement archive top level")
         else:
             # Lecture directe du stream tar sans fichier local
             self.__traiter_archive(type_archive, nom_fichier, tar_fo)
 
     def __traiter_archive(self, type_archive, nom_fichier, file_object):
         if type_archive == 'annuelle':
-            self._process_archive_annuelle(nom_fichier, file_object)
+            self._process_archive_aggregee(nom_fichier, file_object)
         elif type_archive == 'quotidienne':
-            self._process_archive_quotidienne(nom_fichier, file_object)
+            self._process_archive_aggregee(nom_fichier, file_object)
         elif type_archive == 'catalogue':
             pass  # Catalogue annuel ou quotidien
         elif type_archive == 'horaire_catalogue':
@@ -1040,19 +1043,16 @@ class ArchivesBackupParser:
         else:
             raise TypeArchiveInconnue(type_archive)
 
-    def _process_archive_annuelle(self, nom_fichier: str, file_object):
-        pass
-
-    def _process_archive_quotidienne(self, nom_fichier: str, file_object):
-        self.__logger.debug("Traitement archive quotidienne")
+    def _process_archive_aggregee(self, nom_fichier: str, file_object):
+        self.__logger.debug("Traitement archive annuelle/quotidienne")
         try:
             tar_quotidienne = tarfile.open(fileobj=file_object, mode='r|')
-            self.__logger.debug("Liste contenu archive quotidienne")
+            self.__logger.debug("Liste contenu archive annuelle/quotidienne")
 
             for tarinfo_quotidien in tar_quotidienne:
                 nom_fichier = tarinfo_quotidien.name
                 basename = path.basename(nom_fichier)
-                type_archive = self.detecter_type_archive(nom_fichier)
+                type_archive = self.detecter_type_archive(basename)
                 fo = tar_quotidienne.extractfile(tarinfo_quotidien)
                 self.__traiter_archive(type_archive, basename, fo)
 
@@ -1060,28 +1060,43 @@ class ArchivesBackupParser:
             self.__logger.exception("Erreur lecture archive quotidienne")
 
     def _process_archive_horaire_catalogue(self, nom_fichier: str, file_object):
-        self.__logger.debug("Traiter archive horaire catalogue")
-        if self.__path_output is not None:
-            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
-                fichier.write(file_object.read())
+        self.__logger.debug("Catalogue horaire")
+        # catalogue_json = self._extract_catalogue(nom_fichier, file_object)
+        # self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
 
     def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
-        self.__logger.debug("Traiter archive horaire transaction")
-        if self.__path_output is not None:
-            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
-                fichier.write(file_object.read())
+        self.__logger.debug("Transactions horaire")
+        self._extract_transaction(nom_fichier, file_object)
 
     def _process_archive_snapshot_catalogue(self, nom_fichier: str, file_object):
-        self.__logger.debug("Traiter archive snapshot transaction")
-        if self.__path_output is not None:
-            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
-                fichier.write(file_object.read())
+        self.__logger.debug("Catalogue snapshot")
+        # catalogue_json = self._extract_catalogue(nom_fichier, file_object)
+        # self.__logger.debug("Catalogue snapshot : %s" % catalogue_json)
 
     def _process_archive_snapshot_transaction(self, nom_fichier: str, file_object):
-        self.__logger.debug("Traiter archive snapshot transaction")
-        if self.__path_output is not None:
-            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
-                fichier.write(file_object.read())
+        self.__logger.debug("Transactions snapshot")
+        # self._extract_transaction(nom_fichier, file_object)
+
+    def _extract_catalogue(self, nom_fichier, file_object):
+        try:
+            decompressor = LZMADecompressor()
+            fichier_bytes = decompressor.decompress(file_object)
+            archive_json = json.loads(fichier_bytes)
+
+            return archive_json
+        except json.decoder.JSONDecodeError:
+            self.__logger.warning("Erreur traitement catalogue %s" % nom_fichier)
+
+    def _extract_transaction(self, nom_fichier, file_object):
+        self.__logger.debug("Extract transactions %s", nom_fichier)
+        try:
+            lzma_file_object = LZMAFile(file_object)
+            for line in lzma_file_object:
+                archive_json = json.loads(line.decode('utf-8'))
+                self.__logger.debug("Transaction : %s" % archive_json)
+
+        except json.decoder.JSONDecodeError:
+            self.__logger.warning("Erreur traitement transactions %s" % nom_fichier)
 
     def detecter_type_archive(self, nom_fichier):
         # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot

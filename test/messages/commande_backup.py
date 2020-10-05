@@ -243,11 +243,10 @@ class MessagesSample(BaseCallback):
             #         fichier.write(fo.read())
 
             parser = ArchivesBackupParser(
-                resultat.iter_content(chunk_size=512 * 1024), '/home/mathieu/tmp/backup_test/')
+                resultat.iter_content(chunk_size=4 * 1024))  #, '/home/mathieu/tmp/backup_test/')
             parser.parse_tar_stream()
 
         resultat.close()
-
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
