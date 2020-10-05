@@ -1,11 +1,11 @@
 # Script de test pour transmettre message de transaction
-
-
-# Script de test pour transmettre message de transaction
-
 import datetime
 import time
 import json
+import requests
+import tarfile
+
+from io import BufferedReader, RawIOBase
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -18,6 +18,45 @@ from threading import Thread, Event
 
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
+
+
+class WrapperDownload(RawIOBase):
+
+    def __init__(self, generator):
+        super().__init__()
+        self.__generator = generator
+
+    def read(self, *args, **kwargs):  # real signature unknown
+        print(args)
+        for data in self.__generator:
+            return data
+
+    def read1(self, *args, **kwargs):  # real signature unknown
+        """
+        Read at most size bytes, returned as a bytes object.
+
+        If the size argument is negative or omitted, read until EOF is reached.
+        Return an empty bytes object at EOF.
+        """
+        pass
+
+    def readable(self, *args, **kwargs):  # real signature unknown
+        """ Returns True if the IO object can be read. """
+        return True
+
+    # def seek(self, *args, **kwargs):
+    #     print("Seek " + str(args))
+    #     return 1
+
+    def seekable(self):
+        return False
+
+    # def read(self):
+    #     if self.__iter is not None:
+    #         return self.__iter.__next__()
+    #     else:
+    #         self.__iter = self.__generator.__iter__()
+    #         return self.__iter.next()
 
 
 class MessagesSample(BaseCallback):
@@ -172,6 +211,33 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_reset'
         )
 
+    def preparer_restauration(self):
+        commande = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION,
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_reset'
+        )
+
+    def requete_get_backups_horaire(self):
+        url = 'https://mg-dev4:3021/fichiers/backup/restaurerDomaine/MaitreDesCles'
+        cacert = self.configuration.mq_cafile
+        certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
+        resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
+        print("Response code : %d" % resultat.status_code)
+        if resultat.status_code == 200:
+            print(resultat.headers)
+            wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
+            tar_stream = tarfile.open(fileobj=wrapper, mode='r|')
+            info = tar_stream.list()
+            print(info)
+
+        resultat.close()
+
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
@@ -180,7 +246,10 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
-        sample.trigger_backup_snapshot_global()
+        # sample.trigger_backup_snapshot_global()
+
+        # sample.preparer_restauration()
+        sample.requete_get_backups_horaire()
 
 
 # --- MAIN ---
