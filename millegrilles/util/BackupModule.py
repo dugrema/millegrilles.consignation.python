@@ -5,7 +5,9 @@ import json
 import lzma
 import hashlib
 import requests
+import tarfile
 
+from io import RawIOBase
 from os import path
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
@@ -965,3 +967,88 @@ class HandlerBackupDomaine:
             cles[fingerprint_b64] = cle_chiffree_b64
 
         return cles
+
+
+class WrapperDownload(RawIOBase):
+
+    def __init__(self, generator):
+        super().__init__()
+        self.__generator = generator
+
+    def read(self, *args, **kwargs):  # real signature unknown
+        print(args)
+        for data in self.__generator:
+            return data
+
+    def readable(self, *args, **kwargs):  # real signature unknown
+        """ Returns True if the IO object can be read. """
+        return True
+
+
+class ArchivesBackupParser:
+
+    def __init__(self, stream, path_output: str = None):
+        self.__path_output = path_output
+
+        # wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
+        wrapper = WrapperDownload(stream)
+        self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|')
+
+        # Placeholder pour un catalogue horaire
+        self.__catalogue_horaire_courant = None
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def parse_tar_stream(self):
+        for tar_info in self.__tar_stream:
+            self._process_tar_info(tar_info)
+
+    def _process_tar_info(self, tar_info):
+        path_fichier = tar_info.name
+        nom_fichier = path.basename(path_fichier)
+
+        self.detecter_type_archive(nom_fichier)
+
+        path_local = None
+        if self.__path_output is not None:
+            path_local = path.join(self.__path_output, nom_fichier)
+            with open(path_local,  'wb') as fichier:
+                tar_fo = self.__tar_stream.extractfile(tar_info)
+                fichier.write(tar_fo.read())
+
+    def _process_archive_annuelle(self, stream_annuelle):
+        pass
+
+    def _process_archive_quotidienne(self, stream_quotidienne):
+        pass
+
+    def _process_archive_horaire(self, catalogue, stream_transactions):
+        pass
+
+    def detecter_type_archive(self, nom_fichier):
+        # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot
+        nom_fichier_parts = nom_fichier.split('_')
+        if len(nom_fichier_parts) == 3:
+            date_fichier = nom_fichier_parts[1]
+            if len(date_fichier) == 8:
+                type_archive = 'quotidienne'
+            elif len(date_fichier) == 4:
+                type_archive = 'annuelle'
+            else:
+                raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
+        elif len(nom_fichier_parts) == 4:
+            date_fichier = nom_fichier_parts[2]
+            if len(date_fichier) == 10:
+                type_archive = 'horaire_' + nom_fichier_parts[1]
+            elif date_fichier.index('SNAPSHOT') > 0:
+                type_archive = 'snapshot_' + nom_fichier_parts[1]
+            else:
+                raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
+        else:
+            raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
+
+        self.__logger.debug("Archive %s : %s" % (type_archive, nom_fichier))
+
+
+class TypeArchiveInconnue(Exception):
+    pass

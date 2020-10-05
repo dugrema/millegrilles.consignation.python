@@ -4,6 +4,8 @@ import time
 import json
 import requests
 import tarfile
+import logging
+import sys
 
 from io import BufferedReader, RawIOBase
 
@@ -14,7 +16,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesDomaines, ConstantesBackup
 from millegrilles.domaines.Principale import ConstantesPrincipale
 from threading import Thread, Event
-
+from millegrilles.util.BackupModule import ArchivesBackupParser
 
 contexte = ContexteRessourcesMilleGrilles()
 contexte.initialiser()
@@ -228,18 +230,21 @@ class MessagesSample(BaseCallback):
         certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
         resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
         print("Response code : %d" % resultat.status_code)
+
         if resultat.status_code == 200:
             print(resultat.headers)
-            wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
-            tar_stream = tarfile.open(fileobj=wrapper, mode='r|')
+            # wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
+            # tar_stream = tarfile.open(fileobj=wrapper, mode='r|')
+            # for tar_info in tar_stream:
+            #     name = tar_info.name.split('/')[-1]
+            #     with open('/home/mathieu/tmp/backup_test/' + name, 'wb') as fichier:
+            #         print(tar_info.name)
+            #         fo = tar_stream.extractfile(tar_info)
+            #         fichier.write(fo.read())
 
-            for tar_info in tar_stream:
-                name = tar_info.name.split('/')[-1]
-                with open('/home/mathieu/tmp/backup_test/' + name, 'wb') as fichier:
-                    print(tar_info.name)
-                    fo = tar_stream.extractfile(tar_info)
-                    fichier.write(fo.read())
-
+            parser = ArchivesBackupParser(
+                resultat.iter_content(chunk_size=512 * 1024), '/home/mathieu/tmp/backup_test/')
+            parser.parse_tar_stream()
 
         resultat.close()
 
@@ -259,6 +264,8 @@ class MessagesSample(BaseCallback):
 
 
 # --- MAIN ---
+logging.basicConfig()
+logging.getLogger('millegrilles').setLevel(logging.DEBUG)
 sample = MessagesSample()
 
 # TEST
