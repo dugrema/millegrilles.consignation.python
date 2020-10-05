@@ -60,12 +60,12 @@ class MessagesSample(BaseCallback):
 
     def commande_regenerer(self):
         domaines = [
-            'commande.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,

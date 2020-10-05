@@ -20,6 +20,7 @@ from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateForma
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 
 class HandlerBackupDomaine:
@@ -987,7 +988,8 @@ class WrapperDownload(RawIOBase):
 
 class ArchivesBackupParser:
 
-    def __init__(self, stream, path_output: str = None):
+    def __init__(self, contexte: ContexteRessourcesMilleGrilles, stream, path_output: str = None):
+        self.__contexte = contexte
         self.__path_output = path_output
 
         # wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
@@ -1060,28 +1062,29 @@ class ArchivesBackupParser:
             self.__logger.exception("Erreur lecture archive quotidienne")
 
     def _process_archive_horaire_catalogue(self, nom_fichier: str, file_object):
-        self.__logger.debug("Catalogue horaire")
-        # catalogue_json = self._extract_catalogue(nom_fichier, file_object)
-        # self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
+        # self.__logger.debug("Catalogue horaire")
+        catalogue_json = self._extract_catalogue(nom_fichier, file_object)
+        self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
+        generateur = self.__contexte.generateur_transactions
+        generateur.emettre_message(catalogue_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
 
     def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions horaire")
         self._extract_transaction(nom_fichier, file_object)
 
     def _process_archive_snapshot_catalogue(self, nom_fichier: str, file_object):
-        self.__logger.debug("Catalogue snapshot")
-        # catalogue_json = self._extract_catalogue(nom_fichier, file_object)
-        # self.__logger.debug("Catalogue snapshot : %s" % catalogue_json)
+        # self.__logger.debug("Catalogue snapshot")
+        catalogue_json = self._extract_catalogue(nom_fichier, file_object)
+        self.__logger.debug("Catalogue snapshot : %s" % catalogue_json)
 
     def _process_archive_snapshot_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions snapshot")
-        # self._extract_transaction(nom_fichier, file_object)
+        self._extract_transaction(nom_fichier, file_object)
 
     def _extract_catalogue(self, nom_fichier, file_object):
         try:
-            decompressor = LZMADecompressor()
-            fichier_bytes = decompressor.decompress(file_object)
-            archive_json = json.loads(fichier_bytes)
+            lzma_file_object = LZMAFile(file_object)
+            archive_json = json.load(lzma_file_object)
 
             return archive_json
         except json.decoder.JSONDecodeError:
@@ -1090,10 +1093,12 @@ class ArchivesBackupParser:
     def _extract_transaction(self, nom_fichier, file_object):
         self.__logger.debug("Extract transactions %s", nom_fichier)
         try:
+            generateur = self.__contexte.generateur_transactions
             lzma_file_object = LZMAFile(file_object)
             for line in lzma_file_object:
                 archive_json = json.loads(line.decode('utf-8'))
                 self.__logger.debug("Transaction : %s" % archive_json)
+                generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
 
         except json.decoder.JSONDecodeError:
             self.__logger.warning("Erreur traitement transactions %s" % nom_fichier)
