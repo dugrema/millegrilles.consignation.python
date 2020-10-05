@@ -232,8 +232,14 @@ class MessagesSample(BaseCallback):
             print(resultat.headers)
             wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
             tar_stream = tarfile.open(fileobj=wrapper, mode='r|')
-            info = tar_stream.list()
-            print(info)
+
+            for tar_info in tar_stream:
+                name = tar_info.name.split('/')[-1]
+                with open('/home/mathieu/tmp/backup_test/' + name, 'wb') as fichier:
+                    print(tar_info.name)
+                    fo = tar_stream.extractfile(tar_info)
+                    fichier.write(fo.read())
+
 
         resultat.close()
 
