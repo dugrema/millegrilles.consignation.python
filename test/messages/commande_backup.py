@@ -258,10 +258,10 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
-        # sample.trigger_backup_snapshot_global()
+        sample.trigger_backup_snapshot_global()
 
         # sample.preparer_restauration()
-        sample.requete_get_backups_horaire()
+        # sample.requete_get_backups_horaire()
 
 
 # --- MAIN ---

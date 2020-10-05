@@ -339,6 +339,44 @@ class MessagesSample(BaseCallback):
         print("Sent: %s" % enveloppe_val)
         return enveloppe_val
 
+    def nouvelle_cle_backup(self):
+        cle_secrete = 'Mon mot de passe secret'
+        clecert_chiffrage = self.clecert_millegrille
+        # cert_chiffrage = self.certificat_courant
+        cert_chiffrage = clecert_chiffrage.cert
+        fingerprint_b64 = clecert_chiffrage.fingerprint_b64
+        cle_secrete_encryptee = cert_chiffrage.public_key().encrypt(
+            cle_secrete.encode('utf8'),
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        cle_secrete_encryptee_base64 = b64encode(cle_secrete_encryptee).decode('utf8')
+
+        date_str = datetime.datetime.utcnow().strftime('%y%m%d%h%m')
+
+        nouvelle_cle = {
+            "domaine": "Topologie",
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                "transactions_nomfichier": "Topologie_transactions_%s_3.protege.jsonl.xz.mgs1" % date_str,
+            },
+            "cles": {fingerprint_b64: cle_secrete_encryptee_base64},
+            "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
+            "sujet": ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS,
+        }
+
+        enveloppe_val = self.generateur.soumettre_transaction(
+            nouvelle_cle,
+            ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
+        print("Sent: %s" % enveloppe_val)
+        return enveloppe_val
+
     def transaction_declasser_grosfichier(self):
 
         transaction = {
@@ -515,9 +553,10 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        for i in range(0, 200):
-            enveloppe = self.nouvelle_cle_grosfichiers()
-        # enveloppe = self.nouvelle_cle_document()
+        for i in range(0, 2):
+            self.nouvelle_cle_grosfichiers()
+            self.nouvelle_cle_document()
+            self.nouvelle_cle_backup()
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
