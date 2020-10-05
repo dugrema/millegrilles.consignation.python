@@ -271,5 +271,5 @@ sample = MessagesSample()
 # TEST
 
 # FIN TEST
-sample.event_recu.wait(10)
+sample.event_recu.wait(100)
 sample.deconnecter()

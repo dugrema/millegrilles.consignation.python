@@ -7,11 +7,12 @@ import hashlib
 import requests
 import tarfile
 
-from io import RawIOBase
+from io import RawIOBase, BufferedReader, BytesIO
 from os import path
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
 from base64 import b64encode
+from threading import Event
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
@@ -976,7 +977,6 @@ class WrapperDownload(RawIOBase):
         self.__generator = generator
 
     def read(self, *args, **kwargs):  # real signature unknown
-        print(args)
         for data in self.__generator:
             return data
 
@@ -992,7 +992,7 @@ class ArchivesBackupParser:
 
         # wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
         wrapper = WrapperDownload(stream)
-        self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|')
+        self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
 
         # Placeholder pour un catalogue horaire
         self.__catalogue_horaire_courant = None
@@ -1007,23 +1007,81 @@ class ArchivesBackupParser:
         path_fichier = tar_info.name
         nom_fichier = path.basename(path_fichier)
 
-        self.detecter_type_archive(nom_fichier)
+        type_archive = self.detecter_type_archive(nom_fichier)
 
         path_local = None
+        tar_fo = self.__tar_stream.extractfile(tar_info)
         if self.__path_output is not None:
             path_local = path.join(self.__path_output, nom_fichier)
             with open(path_local,  'wb') as fichier:
-                tar_fo = self.__tar_stream.extractfile(tar_info)
                 fichier.write(tar_fo.read())
 
-    def _process_archive_annuelle(self, stream_annuelle):
+            with open(path_local, 'rb') as fichier:
+                self.__traiter_archive(type_archive, nom_fichier, fichier)
+        else:
+            # Lecture directe du stream tar sans fichier local
+            self.__traiter_archive(type_archive, nom_fichier, tar_fo)
+
+    def __traiter_archive(self, type_archive, nom_fichier, file_object):
+        if type_archive == 'annuelle':
+            self._process_archive_annuelle(nom_fichier, file_object)
+        elif type_archive == 'quotidienne':
+            self._process_archive_quotidienne(nom_fichier, file_object)
+        elif type_archive == 'catalogue':
+            pass  # Catalogue annuel ou quotidien
+        elif type_archive == 'horaire_catalogue':
+            self._process_archive_horaire_catalogue(nom_fichier, file_object)
+        elif type_archive == 'horaire_transactions':
+            self._process_archive_horaire_transaction(nom_fichier, file_object)
+        elif type_archive == 'snapshot_catalogue':
+            self._process_archive_snapshot_catalogue(nom_fichier, file_object)
+        elif type_archive == 'snapshot_transactions':
+            self._process_archive_snapshot_transaction(nom_fichier, file_object)
+        else:
+            raise TypeArchiveInconnue(type_archive)
+
+    def _process_archive_annuelle(self, nom_fichier: str, file_object):
         pass
 
-    def _process_archive_quotidienne(self, stream_quotidienne):
-        pass
+    def _process_archive_quotidienne(self, nom_fichier: str, file_object):
+        self.__logger.debug("Traitement archive quotidienne")
+        try:
+            tar_quotidienne = tarfile.open(fileobj=file_object, mode='r|')
+            self.__logger.debug("Liste contenu archive quotidienne")
 
-    def _process_archive_horaire(self, catalogue, stream_transactions):
-        pass
+            for tarinfo_quotidien in tar_quotidienne:
+                nom_fichier = tarinfo_quotidien.name
+                basename = path.basename(nom_fichier)
+                type_archive = self.detecter_type_archive(nom_fichier)
+                fo = tar_quotidienne.extractfile(tarinfo_quotidien)
+                self.__traiter_archive(type_archive, basename, fo)
+
+        except ValueError:
+            self.__logger.exception("Erreur lecture archive quotidienne")
+
+    def _process_archive_horaire_catalogue(self, nom_fichier: str, file_object):
+        self.__logger.debug("Traiter archive horaire catalogue")
+        if self.__path_output is not None:
+            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
+                fichier.write(file_object.read())
+
+    def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
+        self.__logger.debug("Traiter archive horaire transaction")
+        if self.__path_output is not None:
+            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
+                fichier.write(file_object.read())
+
+    def _process_archive_snapshot_catalogue(self, nom_fichier: str, file_object):
+        self.__logger.debug("Traiter archive snapshot transaction")
+        if self.__path_output is not None:
+            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
+                fichier.write(file_object.read())
+
+    def _process_archive_snapshot_transaction(self, nom_fichier: str, file_object):
+        self.__logger.debug("Traiter archive snapshot transaction")
+        if self.__path_output is not None:
+            with open(path.join(self.__path_output, nom_fichier), 'wb') as fichier:
+                fichier.write(file_object.read())
 
     def detecter_type_archive(self, nom_fichier):
         # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot
@@ -1038,16 +1096,24 @@ class ArchivesBackupParser:
                 raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
         elif len(nom_fichier_parts) == 4:
             date_fichier = nom_fichier_parts[2]
-            if len(date_fichier) == 10:
-                type_archive = 'horaire_' + nom_fichier_parts[1]
-            elif date_fichier.index('SNAPSHOT') > 0:
-                type_archive = 'snapshot_' + nom_fichier_parts[1]
-            else:
+            try:
+                if len(date_fichier) == 10:
+                    type_archive = 'horaire_' + nom_fichier_parts[1]
+                elif nom_fichier.endswith('.json.xz'):
+                    type_archive = 'catalogue'
+                else:
+                    try:
+                        date_fichier.index('SNAPSHOT')
+                        type_archive = 'snapshot_' + nom_fichier_parts[1]
+                    except ValueError:
+                        raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
+            except ValueError:
                 raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
         else:
             raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
 
         self.__logger.debug("Archive %s : %s" % (type_archive, nom_fichier))
+        return type_archive
 
 
 class TypeArchiveInconnue(Exception):
