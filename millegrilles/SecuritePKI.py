@@ -263,7 +263,7 @@ class UtilCertificats:
 
         self._certificat = None
         self._cle = None
-        self._enveloppe = None
+        self._enveloppe: Optional[EnveloppeCertificat] = None
         self._chaine: Optional[list] = None
 
     def initialiser(self):

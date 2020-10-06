@@ -63,6 +63,8 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
             self.gestionnaire.transmettre_cle_grosfichier(message_dict, properties)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
             self.gestionnaire.transmettre_cle_document(message_dict, properties)
+        elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP:
+            reponse = self.gestionnaire.transmettre_cle_backup(message_dict)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_TROUSSEAU_HEBERGEMENT:
             self.gestionnaire.transmettre_trousseau_hebergement(message_dict, properties)
         elif action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
@@ -639,6 +641,90 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.generateur_transactions.transmettre_reponse(
             reponse, properties.reply_to, properties.correlation_id
         )
+
+    def transmettre_cle_backup(self, evenement: dict):
+        # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
+        # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
+        # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
+
+        enveloppe_certificat, estampille, temps_limite_demande = self.trouver_certificat_autorisation(evenement)
+
+        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+        if enveloppe_certificat is None:
+            pass  # Pas de cert, Acces refuse
+        elif not enveloppe_certificat.est_verifie:
+            pass  # Cert invalide, access refuse
+        elif temps_limite_demande > estampille:
+            pass  # Vieille demande, on la rejette
+        else:
+
+            self._logger.debug(
+                "Verification signature requete cle grosfichier. Cert: %s" % str(
+                    enveloppe_certificat.fingerprint_ascii))
+            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+
+            fingerprint_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille().fingerprint_b64
+            fingerprint_local = self._contexte.signateur_transactions.enveloppe_certificat_courant.fingerprint_b64
+
+            transaction_cle_manquante = None
+            cles_chiffrees = None
+            iv = None
+            if evenement.get('cle') or evenement.get('cles') and evenement['cles'].get(fingerprint_millegrille):
+                # On n'a peut etre pas la cle qui va correspondre, creer nouvelle transaction backup au besoin
+                if evenement.get('cle'):
+                    cles_chiffrees = {fingerprint_millegrille: evenement['cle']}
+                else:
+                    cles_chiffrees = evenement['cles']
+
+                iv = evenement['iv']
+
+                transaction_cle_manquante = {
+                    'cles': cles_chiffrees,
+                    'iv': iv,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+                }
+
+            elif evenement.get('cles') and evenement['cles'].get(fingerprint_local):
+                cles_chiffrees = evenement['cles']
+                iv = evenement['iv']
+
+            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+            filtre = dict()
+            for key, value in evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS].items():
+                filtre['%s.%s' % (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, key)] = value
+
+            document = collection_documents.find_one(filtre)
+            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+            if document is not None:
+                self._logger.debug("Document de cles pour document: %s" % str(document))
+                cles_chiffrees = document['cles']
+                iv = document['iv']
+            elif transaction_cle_manquante is not None:
+                self._logger.info("Soumettre transaction pour cle manquante")
+                self._contexte.generateur_transactions.soumettre_transaction(transaction_cle_manquante, ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS)
+
+            if acces_permis and cles_chiffrees is not None:
+
+                try:
+                    cle_secrete = self.decrypter_cle(cles_chiffrees)
+                    cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+                        cle_secrete, enveloppe_certificat.certificat)
+
+                    reponse = {
+                        'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                        'iv': iv,
+                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+                    }
+
+                except TypeError:
+                    self._logger.exception("Document non dechiffrable")
+                    reponse = {
+                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+                    }
+
+        return reponse
 
     def trouver_certificat_autorisation(self, evenement, roles_permis: list = None):
 

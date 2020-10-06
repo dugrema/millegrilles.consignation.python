@@ -205,6 +205,29 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_cle_backup(self):
+        requete_cert_maitredescles = {
+            'certificat': self.certificat_courant_pem,
+            'domaine': 'Topologie',
+            'identificateurs_document': {
+                'transactions_nomfichier': 'Topologie_transactions_2020100323_3.protege.jsonl.xz.mgs1',
+            },
+            "cles": {
+                "cGrSTYhEB19QGjiipURder6/IRc=Z": "aVA+CkgvSqP496IBrDbFa2SVP11f+BKq8oc3vJ2+8g4Ypo4u2c5ZnYvNPTFEnoAGcggGRDDQY2wkCNUGOjh2gTMnItUOdWJNq5vmjs0XNTOpiEkJpq7U5ZzPTssn2m6V1JbG0TmTu5/f24K1HAhae2lz95mlVdwufm+kQolwL5rzULOzGGV+mX8PGuaQkCHPdcletVj9IUwgkwrwYAgjYHt9qPjGUHO7Bcyiw1t7dWTUTbvt59uh41J53IB79hRqwx8BMeY7rMsWoY5ffVIWBorV//XxcsnEqiXgEOUJoC/LmQfI21FxPNV6mBIzs4hakvOgET5D2yGoAlYX4wJnxg==",
+                "OaUo6vkTDQ26S9hbdFqeKYS3NyI=": "jYYDIgn4ShniCGkBgfJ1tIzOARRl1wBAps/SQwKBDMZnL+uH3MAhsieg6XW5vtdZyC/hh+hZ2q++2GGsgSUHAKbJlTn8YWS4WuRpUQssg4agpfCVPndkRoN1qf7QaQiN27HZJhMawqif0KDx7ZU0MsJoHF1l0X0E+frNuVg+WY+8DpHRxxc15CeHcLToSYn1V15WDiCTbrfvZ0zONEF2btie7eQ/B81prcTnUNrJe5xoHraEaQOcD4NOW1gCV0D8YfGcKZ2/by9zad3aJL5iUvGW4AeftewOaaKu4tM5bjdqSeICoeaI0fXwk7L/q2bBR2FOMM/P4so3JbabOaShHA=="
+            },
+            "iv": "16ldjBWXospiToJEKEIWGw==",
+        }
+
+        print(requete_cert_maitredescles)
+
+        self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP,
+            'abcd-1234',
+            self.queue_name
+        )
+
     def commande_signer_cle_backup(self):
         with open ('/home/mathieu/mgdev/certs/pki.connecteur.key', 'rb') as fichier:
             key_bytes = fichier.read()
@@ -323,7 +346,7 @@ class MessagesSample(BaseCallback):
             "domaine": "MaitreDesComptes",
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
                 "_mg-libelle": "proprietaire",
-                "champ": "totp",
+                "champ": 'dummy' + str(uuid4()),
             },
             "cles": {fingerprint_b64: cle_secrete_encryptee_mime64},
             "iv": "gA8cRaiJE+8aN2c6/N1vTg==",
@@ -553,10 +576,11 @@ BMz4ginADdtNs9ARr3DcwG4=
         # enveloppe = self.requete_cert_maitredescles()
         # self.requete_trousseau_hebergement()
 
-        for i in range(0, 2):
-            self.nouvelle_cle_grosfichiers()
-            self.nouvelle_cle_document()
-            self.nouvelle_cle_backup()
+        # for i in range(0, 2):
+        #     self.nouvelle_cle_grosfichiers()
+        #     self.nouvelle_cle_document()
+        #     self.nouvelle_cle_backup()
+
         # enveloppe = self.transaction_declasser_grosfichier()
         # enveloppe = self.transaction_signer_certificat_navigateur()
         # enveloppe = self.requete_decryptage_cle_fuuid()
@@ -574,6 +598,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_signer_csr_noeud_prive()
 
         # self.requete_cles_non_dechiffrables()
+        self.requete_cle_backup()
 
 
 # --- MAIN ---
