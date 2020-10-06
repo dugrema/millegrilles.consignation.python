@@ -228,6 +228,28 @@ class MessagesSample(BaseCallback):
             self.queue_name
         )
 
+    def commande_sauvegarder_cle(self):
+        commande = {
+            'domaine': 'Topologie',
+            'identificateurs_document': {
+                'transactions_nomfichier': 'Topologie_transactions_2020100325_3.protege.jsonl.xz.mgs1',
+            },
+            "cles": {
+                # "cGrSTYhEB19QGjiipURder6/IRc=Z": "aVA+CkgvSqP496IBrDbFa2SVP11f+BKq8oc3vJ2+8g4Ypo4u2c5ZnYvNPTFEnoAGcggGRDDQY2wkCNUGOjh2gTMnItUOdWJNq5vmjs0XNTOpiEkJpq7U5ZzPTssn2m6V1JbG0TmTu5/f24K1HAhae2lz95mlVdwufm+kQolwL5rzULOzGGV+mX8PGuaQkCHPdcletVj9IUwgkwrwYAgjYHt9qPjGUHO7Bcyiw1t7dWTUTbvt59uh41J53IB79hRqwx8BMeY7rMsWoY5ffVIWBorV//XxcsnEqiXgEOUJoC/LmQfI21FxPNV6mBIzs4hakvOgET5D2yGoAlYX4wJnxg==",
+                "OaUo6vkTDQ26S9hbdFqeKYS3NyI=": "jYYDIgn4ShniCGkBgfJ1tIzOARRl1wBAps/SQwKBDMZnL+uH3MAhsieg6XW5vtdZyC/hh+hZ2q++2GGsgSUHAKbJlTn8YWS4WuRpUQssg4agpfCVPndkRoN1qf7QaQiN27HZJhMawqif0KDx7ZU0MsJoHF1l0X0E+frNuVg+WY+8DpHRxxc15CeHcLToSYn1V15WDiCTbrfvZ0zONEF2btie7eQ/B81prcTnUNrJe5xoHraEaQOcD4NOW1gCV0D8YfGcKZ2/by9zad3aJL5iUvGW4AeftewOaaKu4tM5bjdqSeICoeaI0fXwk7L/q2bBR2FOMM/P4so3JbabOaShHA=="
+            },
+            "iv": "16ldjBWXospiToJEKEIWGw==",
+            'domaine_action_transaction': ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
+        }
+
+        self.generateur.transmettre_commande(
+            commande,
+            'commande.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            exchange=Constantes.SECURITE_SECURE,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
     def commande_signer_cle_backup(self):
         with open ('/home/mathieu/mgdev/certs/pki.connecteur.key', 'rb') as fichier:
             key_bytes = fichier.read()
@@ -598,7 +620,8 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_signer_csr_noeud_prive()
 
         # self.requete_cles_non_dechiffrables()
-        self.requete_cle_backup()
+        # self.requete_cle_backup()
+        self.commande_sauvegarder_cle()
 
 
 # --- MAIN ---

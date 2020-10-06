@@ -972,6 +972,9 @@ class HandlerBackupDomaine:
 
 
 class WrapperDownload(RawIOBase):
+    """
+    Simule un IOBase pour lecture d'un stream http response (requests)
+    """
 
     def __init__(self, generator):
         super().__init__()

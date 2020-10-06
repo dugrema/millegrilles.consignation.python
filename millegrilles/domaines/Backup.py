@@ -224,6 +224,19 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
         self.set_etape_suivante()  # Termine
 
+    def verifier_presence_cle(self):
+        transaction = self.charger_transaction()
+        if transaction.get('iv'):
+            iv = transaction['iv']
+            cles = transaction.get('cles')
+            if cles is None and transaction.get('cle'):
+                # On a seulement la cle de millegrille
+                enveloppe_millegrille = self._controleur._contexte.signateur_transactions.get_enveloppe_millegrille()
+                fingerprint_b64 = enveloppe_millegrille.fingerprint_b64
+                cles = {fingerprint_b64: transaction['cle']}
+
+
+
 
 class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):
 

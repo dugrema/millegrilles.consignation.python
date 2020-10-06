@@ -108,6 +108,7 @@ class TraitementCommandesMaitreDesClesSecures(TraitementCommandesSecures):
         correlation_id = properties.correlation_id
 
         prefixe_commande = 'commande.' + ConstantesMaitreDesCles.DOMAINE_NOM + '.'
+        action = routing_key.split('.')[-1]
 
         if routing_key == prefixe_commande + ConstantesMaitreDesCles.COMMANDE_SIGNER_CLE_BACKUP:
             resultat = self.gestionnaire.signer_cle_backup(properties, message_dict)
@@ -120,8 +121,8 @@ class TraitementCommandesMaitreDesClesSecures(TraitementCommandesSecures):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCSRCADependant"
             resultat = self.gestionnaire.demarreur_processus.demarrer_processus(processus, message_dict)
 
-        elif correlation_id == ConstantesMaitreDesCles.CORRELATION_CERTIFICATS_BACKUP:
-            resultat = self.gestionnaire.verifier_certificats_backup(message_dict)
+        elif action == ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE:
+            resultat = self.gestionnaire.sauvegarder_cle(message_dict)
 
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
@@ -1067,6 +1068,52 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             'cert': clecert.cert_bytes.decode('utf-8'),
             'fullchain': clecert.chaine,
         }
+
+    def sauvegarder_cle(self, message_dict: dict):
+        """
+        S'assure que la cle est sauvegardee - utiliser cette commande pour transmettre une cle qui pourrait
+        deja avoir ete recue (e.g. cle de backup ou lors de la restauration)
+        :param message_dict:
+        :return:
+        """
+        domaine_action_transaction = message_dict['domaine_action_transaction']
+
+        filtre = {'domaine': message_dict['domaine']}
+        identificateurs_document = message_dict[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
+        for key, value in identificateurs_document.items():
+            filtre[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + key] = value
+
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        document_cle = collection_documents.find_one(filtre)
+
+        cle_connue = False
+        if document_cle is not None:
+            # Le document existe deja pour cette cle - on s'assure d'avoir tous les fingerprints
+            fingerprint_recus = message_dict['cles'].keys()
+            fingerprint_connus = document_cle['cles'].keys()
+
+            if all([fp_recu in fingerprint_connus for fp_recu in fingerprint_recus]):
+                cle_connue = True
+
+        if cle_connue is False:
+            transaction = {
+                'domaine': message_dict['domaine'],
+                'identificateurs_document': identificateurs_document,
+                'iv': message_dict['iv'],
+                'cles': message_dict['cles'],
+            }
+            try:
+                transaction['sujet'] = message_dict['sujet']
+            except KeyError:
+                pass
+            try:
+                transaction['securite'] = message_dict['securite']
+            except KeyError:
+                transaction['securite'] = '3.protege'
+
+            return self.generateur_transactions.soumettre_transaction(transaction, domaine_action_transaction)
+
+        return {'ok': True}
 
     def restaurer_backup_cles(self, properties, message_dict):
         """

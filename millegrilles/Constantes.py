@@ -735,6 +735,7 @@ class ConstantesMaitreDesCles:
     COMMANDE_SIGNER_CSR = 'signerCsr'
     COMMANDE_SIGNER_NAVIGATEUR_CSR = 'signerNavigateurCsr'
     COMMANDE_SIGNER_CSR_CA_DEPENDANT = 'signerCSRCADependant'
+    COMMANDE_SAUVEGARDER_CLE = 'sauvegarderCle'
 
     CORRELATION_CERTIFICATS_BACKUP = 'certificatsBackup'
 
