@@ -722,7 +722,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 except TypeError:
                     self._logger.exception("Document non dechiffrable")
                     reponse = {
-                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+                        Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INDECHIFFRABLE
                     }
 
         return reponse
@@ -794,8 +794,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # cert_navi = '\n'.join(cert[0].split(';'))
         # cert_inter = '\n'.join(cert[1].split(';'))
 
-        cert = '\n'.join(evenement['certificat'].split(';'))
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert)
+        cert_list = evenement['certificat']
+
+        if isinstance(cert_list, str):
+            cert_pem = '\n'.join(cert_list.split(';'))
+        elif isinstance(cert_list, list):
+            cert_pem = cert_list[0]
+        else:
+            raise Exception("certificat d'un format non supporte")
+
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_pem)
         self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
 
         # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
@@ -975,6 +983,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER
             elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT:
                 domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT
+            elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS:
+                domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
             else:
                 self._logger.warning("Type de cle inconnu pour rechiffrage : %s" % mg_libelle)
                 continue

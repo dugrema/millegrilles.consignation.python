@@ -7,20 +7,23 @@ import hashlib
 import requests
 import tarfile
 
+from typing import Optional
 from io import RawIOBase, BufferedReader, BytesIO
 from os import path
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
-from base64 import b64encode
-from lzma import LZMADecompressor, LZMAFile
+from base64 import b64encode, b64decode
+from lzma import LZMADecompressor, LZMAFile, LZMAError
+from threading import Thread, Event
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesPki
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
 from millegrilles.util.X509Certificate import EnveloppeCleCert
-from millegrilles.util.Chiffrage import CipherMsg1Chiffrer
+from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.dao.MessageDAO import TraitementMessageCallback
 
 
 class HandlerBackupDomaine:
@@ -989,24 +992,94 @@ class WrapperDownload(RawIOBase):
         return True
 
 
+class ReceptionMessage(TraitementMessageCallback):
+
+    def __init__(self, backup_parser, message_dao, configuration):
+        super().__init__(message_dao, configuration)
+        self.__parser = backup_parser
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = json.loads(body)
+        self.__parser.nouveau_message(message_dict)
+
+
 class ArchivesBackupParser:
 
     def __init__(self, contexte: ContexteRessourcesMilleGrilles, stream, path_output: str = None):
         self.__contexte = contexte
         self.__path_output = path_output
+        self.__catalogue_horaire_courant = None
+        self.__channel = None
+        self.__nom_queue: Optional[str] = None
+
+        self.__handler_messages = ReceptionMessage(self, contexte.message_dao, contexte.configuration)
 
         # wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
         wrapper = WrapperDownload(stream)
         self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
 
-        # Placeholder pour un catalogue horaire
-        self.__catalogue_horaire_courant = None
+        self.__event_execution = Event()
+        self.__event_attente_reponse = Event()
+        self.__reponse_cle: Optional[dict] = None
+
+        self.__cle_iv_transactions: Optional[dict] = None
+
+        self.__chaine_pem_courante = contexte.signateur_transactions.chaine_certs
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def start(self) -> Event:
+        """
+        Demarre execution
+        :return: Event qui est set() a la fin de l'execution
+        """
+        self.__thread = Thread(name="ArchivesBackupParser", target=self.parse_tar_stream, daemon=True)
+        self.__contexte.message_dao.register_channel_listener(self)
+        return self.__event_execution
+
+    def stop(self):
+        self.__logger.debug("Stop")
+        self.__event_execution.set()
+        if self.__channel is not None:
+            self.__channel.close()
+
+    def on_channel_open(self, channel):
+        self.__logger.debug("Channel open")
+        channel.basic_qos(prefetch_count=10)
+        channel.add_on_close_callback(self.on_channel_close)
+        self.__channel = channel
+
+        self.__channel.queue_declare(
+            queue='',
+            callback=self.q_ouverte,
+        )
+
+    def on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+        self.__logger.info("MQ Channel ferme")
+
+    def q_ouverte(self, queue):
+        self.__nom_queue = queue.method.queue
+        self.__channel.basic_consume(self.__handler_messages.callbackAvecAck, queue=self.__nom_queue, no_ack=False)
+        self.__thread.start()
+
+    def nouveau_message(self, message_dict):
+        self.__logger.debug("Message cle de backup recu : %s", message_dict)
+        self.__reponse_cle = message_dict
+
+        self.__cle_iv_transactions = {
+            'cle': message_dict['cle'],
+            'iv': message_dict['iv'],
+        }
+
+        self.__event_attente_reponse.set()
+
     def parse_tar_stream(self):
-        for tar_info in self.__tar_stream:
-            self._process_tar_info(tar_info)
+        try:
+            for tar_info in self.__tar_stream:
+                self._process_tar_info(tar_info)
+        finally:
+            self.stop()
 
     def _process_tar_info(self, tar_info):
         path_fichier = tar_info.name
@@ -1070,6 +1143,7 @@ class ArchivesBackupParser:
         self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
         generateur = self.__contexte.generateur_transactions
         generateur.emettre_message(catalogue_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
+        self.__catalogue_horaire_courant = catalogue_json
 
     def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions horaire")
@@ -1079,6 +1153,7 @@ class ArchivesBackupParser:
         # self.__logger.debug("Catalogue snapshot")
         catalogue_json = self._extract_catalogue(nom_fichier, file_object)
         self.__logger.debug("Catalogue snapshot : %s" % catalogue_json)
+        self.__catalogue_horaire_courant = catalogue_json
 
     def _process_archive_snapshot_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions snapshot")
@@ -1089,22 +1164,69 @@ class ArchivesBackupParser:
             lzma_file_object = LZMAFile(file_object)
             archive_json = json.load(lzma_file_object)
 
+            # Si transactions chiffrees, demander cle
+            if archive_json.get('iv'):
+                info_cle = self.demander_cle(archive_json)
+                self.__logger.debug("Reponse commande submit catalogue : %s" % info_cle)
+
             return archive_json
         except json.decoder.JSONDecodeError:
             self.__logger.warning("Erreur traitement catalogue %s" % nom_fichier)
 
     def _extract_transaction(self, nom_fichier, file_object):
         self.__logger.debug("Extract transactions %s", nom_fichier)
+        catalogue = self.__catalogue_horaire_courant
+
         try:
-            generateur = self.__contexte.generateur_transactions
-            lzma_file_object = LZMAFile(file_object)
-            for line in lzma_file_object:
-                archive_json = json.loads(line.decode('utf-8'))
-                self.__logger.debug("Transaction : %s" % archive_json)
-                generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
+            extension = path.splitext(nom_fichier)
+
+            if extension[1] == '.mgs1':
+                # Transaction chiffree, demander la cle pour dechiffrer
+                internal_file_object = None
+
+                try:
+                    iv = b64decode(self.__cle_iv_transactions['iv'].encode('utf-8'))
+                    cle = self.__cle_iv_transactions['cle']
+
+                    cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
+                    decipher = CipherMsg1Dechiffrer(iv, cle_dechiffree)
+                    stream = DecipherStream(decipher, file_object)
+
+                    # Wrapper le stream dans un decodeur lzma
+                    internal_file_object = LZMAFile(stream)
+
+                except KeyError:
+                    self.__logger.warning("Fichier transaction, cle non dechiffrable")
+                except TypeError:
+                    self.__logger.exception("Fichier transaction, cle inconnue")
+                    self.__logger.warning("Fichier transaction, cle inconnue")
+
+            else:
+                # Note : pas de dechiffrage, juste le calcul du digest
+                stream = DigestStream(file_object)
+                internal_file_object = LZMAFile(stream)
+
+            if internal_file_object is not None:
+                generateur = self.__contexte.generateur_transactions
+                for line in internal_file_object:
+                    archive_json = json.loads(line.decode('utf-8'))
+                    self.__logger.debug("Transaction : %s" % archive_json)
+                    generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
+
+                digest_transactions = stream.digest()
+                digest_transactions_catalogue = catalogue['transactions_hachage']
+                if digest_transactions == digest_transactions_catalogue:
+                    self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
+                else:
+                    self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions)
 
         except json.decoder.JSONDecodeError:
             self.__logger.warning("Erreur traitement transactions %s" % nom_fichier)
+        except LZMAError:
+            self.__logger.exception("Erreur LZMA traitement transactions %s" % nom_fichier)
+        finally:
+            # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
+            file_object.read()
 
     def detecter_type_archive(self, nom_fichier):
         # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot
@@ -1137,6 +1259,74 @@ class ArchivesBackupParser:
 
         self.__logger.debug("Archive %s : %s" % (type_archive, nom_fichier))
         return type_archive
+
+    def demander_cle(self, catalogue):
+
+        # Effacer la reponse de la demande precedente, resetter event d'attente
+        self.__reponse_cle = None
+        self.__cle_iv_transactions = None
+        self.__event_attente_reponse.clear()
+
+        # Produire la requete, include la cle/iv du catalogue pour dechiffrage en ligne si possible
+        # Noter que la requete va permettre de conserver la cle cote serveur si elle n'est pas connue
+        domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP
+        requete = {
+            'certificat': self.__chaine_pem_courante ,
+            'domaine': catalogue[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            'identificateurs_document': {
+                'transactions_nomfichier': catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER],
+            },
+            "iv": catalogue['iv'],
+        }
+        try:
+            requete['cle'] = catalogue['cle']
+        except KeyError:
+            pass
+        try:
+            requete['cles'] = catalogue['cles']
+        except KeyError:
+            pass
+
+        # Demander la cle rechiffree - il est possible que la cle soit inconnue, la requete va automatiquement
+        # la conserver pour le prochein rechiffrage avec cle de backup ou cle de millegrille
+        self.__contexte.generateur_transactions.transmettre_requete(
+            requete, domaine_action, correlation_id='cle', reply_to=self.__nom_queue)
+
+        self.__logger.debug("Attendre reponse cle")
+        self.__event_attente_reponse.wait(10)
+        if self.__event_attente_reponse.is_set():
+            self.__logger.debug("Reponse recue")
+        self.__event_attente_reponse.clear()
+
+        return self.__reponse_cle
+
+    # def generer_commande_cle(self, catalogue):
+    #     iv = catalogue['iv']
+    #     cles = catalogue.get('cles')
+    #     if cles is None and catalogue.get('cle'):
+    #         # On a seulement la cle de millegrille
+    #         enveloppe_millegrille = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
+    #         fingerprint_b64 = enveloppe_millegrille.fingerprint_b64
+    #         cles = {fingerprint_b64: catalogue['cle']}
+    #
+    #     transactions_nomfichier = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
+    #
+    #     commande_sauvegarder_cle = {
+    #         'domaine': catalogue[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+    #         Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+    #             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: transactions_nomfichier,
+    #         },
+    #         "cles": cles,
+    #         "iv": iv,
+    #         'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
+    #         'securite': catalogue[Constantes.DOCUMENT_INFODOC_SECURITE],
+    #     }
+    #
+    #     return self.__contexte.generateur_transactions.transmettre_commande(
+    #         commande_sauvegarder_cle,
+    #         'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+    #         exchange=Constantes.SECURITE_SECURE,
+    #     )
 
 
 class TypeArchiveInconnue(Exception):

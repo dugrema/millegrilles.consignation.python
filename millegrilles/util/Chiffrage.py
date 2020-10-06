@@ -1,5 +1,8 @@
 import secrets
 
+from io import RawIOBase
+from base64 import b64encode
+
 from typing import Optional
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
@@ -134,3 +137,42 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         )
 
         return contenu_dechiffre
+
+
+class DigestStream(RawIOBase):
+
+    def __init__(self, file_object):
+        super().__init__()
+        self.__file_object = file_object
+
+        self.__digest = hashes.Hash(hashes.SHA512(), backend=default_backend())
+
+        self.__digest_result: Optional[str] = None
+
+    def read(self, *args, **kwargs):  # real signature unknown
+        data = self.__file_object.read()
+
+        # Calculer digest
+        self.__digest.update(data)
+
+        return data
+
+    def digest(self):
+        digest_result = self.__digest.finalize()
+        return 'sha512_b64:' + b64encode(digest_result).decode('utf-8')
+
+
+class DecipherStream(DigestStream):
+
+    def __init__(self, decipher: CipherMsg1Dechiffrer, file_object):
+        super().__init__(file_object)
+        self.__decipher = decipher
+
+    def read(self, *args, **kwargs):  # real signature unknown
+        data = super().read(args, kwargs)
+
+        # Dechiffrer
+        if data is None:
+            return self.__decipher.finalize()
+        else:
+            return self.__decipher.update(data)

@@ -401,7 +401,7 @@ class UtilCertificats:
         fingerprint = self._enveloppe.fingerprint_ascii
         return cle_secrete_backup, fingerprint
 
-    def dechiffrage_asymmetrique(self, contenu):
+    def dechiffrage_asymmetrique(self, contenu) -> bytes:
         """
         Utilise la cle privee en memoire pour dechiffrer le contenu.
         :param contenu:

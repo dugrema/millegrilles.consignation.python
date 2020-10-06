@@ -252,7 +252,8 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
             self.controleur.generateur_transactions.transmettre_commande(
                 commande_sauvegarder_cle,
-                Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE
+                'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+                exchange=Constantes.SECURITE_SECURE,
             )
 
 

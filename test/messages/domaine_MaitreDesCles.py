@@ -619,9 +619,9 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_signer_csr()
         # self.commande_signer_csr_noeud_prive()
 
-        # self.requete_cles_non_dechiffrables()
+        self.requete_cles_non_dechiffrables()
         # self.requete_cle_backup()
-        self.commande_sauvegarder_cle()
+        # self.commande_sauvegarder_cle()
 
 
 # --- MAIN ---

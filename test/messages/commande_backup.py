@@ -224,8 +224,8 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_reset'
         )
 
-    def requete_get_backups_horaire(self):
-        url = 'https://mg-dev4:3021/fichiers/backup/restaurerDomaine/MaitreDesCles'
+    def requete_get_backups_horaire(self, domaine):
+        url = 'https://mg-dev4:3021/fichiers/backup/restaurerDomaine/' + domaine
         cacert = self.configuration.mq_cafile
         certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
         resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
@@ -246,9 +246,50 @@ class MessagesSample(BaseCallback):
                 self.contexte,
                 resultat.iter_content(chunk_size=4 * 1024)
             )  #, '/home/mathieu/tmp/backup_test/')
-            parser.parse_tar_stream()
+
+            # parser.parse_tar_stream()
+            # parser.start().wait(30)
+            parser.start()
+            print("Execution terminee")
+
+        # resultat.close()
+
+    def requete_get_domaines(self):
+        url = 'https://mg-dev4:3021/fichiers/backup/listeDomaines'
+        cacert = self.configuration.mq_cafile
+        certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
+        resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
+        print("requete_get_domaines : Response code : %d" % resultat.status_code)
+
+        if resultat.status_code == 200:
+            print(resultat.headers)
+            print(resultat.json())
 
         resultat.close()
+
+    def requete_restaurer_tout(self):
+        url = 'https://mg-dev4:3021/fichiers/backup/listeDomaines'
+        cacert = self.configuration.mq_cafile
+        certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
+        resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
+
+        if resultat.status_code == 200:
+            domaines = resultat.json()['domaines']
+
+            for domaine in domaines:
+                print("Restaurer %s" % domaine)
+                url = 'https://mg-dev4:3021/fichiers/backup/restaurerDomaine/' + domaine
+                resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
+
+                if resultat.status_code == 200:
+                    print(resultat.headers)
+
+                    parser = ArchivesBackupParser(
+                        self.contexte,
+                        resultat.iter_content(chunk_size=4 * 1024)
+                    )
+                    # parser.parse_tar_stream()
+                    parser.start()
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
@@ -261,7 +302,11 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_snapshot_global()
 
         # sample.preparer_restauration()
-        sample.requete_get_backups_horaire()
+        # sample.requete_get_backups_horaire('MaitreDesCles')
+        # sample.requete_get_backups_horaire('CatalogueApplications')
+        # sample.requete_get_domaines()
+
+        sample.requete_restaurer_tout()
 
 
 # --- MAIN ---
