@@ -677,7 +677,10 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
 
 class StubMessageDao:
 
-    def transmettre_message(self, message_dict, routing_key, delivery_mode_v=1, encoding=None, reply_to=None, correlation_id=None, channel=None):
+    def transmettre_message(self, *args, **kwargs):
+        pass
+
+    def transmettre_message_exchange(self, *args, **kwargs):
         pass
 
 
@@ -815,41 +818,41 @@ class MGPProcesseurRegeneration(MGPProcesseur):
                 if transaction is not None:
                     traiter = True
 
-                    # Verifier si la transaction a un token resumer / attente
-                    try:
-                        evenements = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT]
-                        evenements_idmg = evenements[self.configuration.idmg]
-
-                        try:
-                            resumer_transaction = evenements_idmg[Constantes.EVENEMENT_TOKEN_RESUMER]
-                            for dict_token in resumer_transaction:
-                                cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
-                                # tokens_resumer[cle_token] = transaction
-                                self.ajouter_transaction_resumer(cle_token, transaction)
-                                traiter = False
-                                self.__logger.debug("Transaction %s, mise en attente" % uuid_transaction)
-                        except KeyError:
-                            # Ok, aucuns tokens resumer
-                            pass
-
-                        # try:
-                        #     attente_transactions = evenements_idmg[Constantes.EVENEMENT_TOKEN_ATTENTE]
-                        #     for dict_token in attente_transactions:
-                        #         try:
-                        #             cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
-                        #             transaction_resumer = tokens_resumer[cle_token]
-                        #             transactions_a_resumer.append(transaction_resumer)
-                        #             del tokens_resumer[cle_token]
-                        #         except KeyError:
-                        #             # Aucun token resumer pour ce token attente specifique
-                        #             pass
-                        # except KeyError:
-                        #     # Aucuns tokens attente
-                        #     pass
-
-                    except KeyError:
-                        # Aucune info d'evenements
-                        pass
+                    # # Verifier si la transaction a un token resumer / attente
+                    # try:
+                    #     evenements = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT]
+                    #     evenements_idmg = evenements[self.configuration.idmg]
+                    #
+                    #     try:
+                    #         resumer_transaction = evenements_idmg[Constantes.EVENEMENT_TOKEN_RESUMER]
+                    #         for dict_token in resumer_transaction:
+                    #             cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
+                    #             # tokens_resumer[cle_token] = transaction
+                    #             self.ajouter_transaction_resumer(cle_token, transaction)
+                    #             traiter = False
+                    #             self.__logger.debug("Transaction %s, mise en attente" % uuid_transaction)
+                    #     except KeyError:
+                    #         # Ok, aucuns tokens resumer
+                    #         pass
+                    #
+                    #     # try:
+                    #     #     attente_transactions = evenements_idmg[Constantes.EVENEMENT_TOKEN_ATTENTE]
+                    #     #     for dict_token in attente_transactions:
+                    #     #         try:
+                    #     #             cle_token = dict_token[Constantes.EVENEMENT_MESSAGE_TOKEN]
+                    #     #             transaction_resumer = tokens_resumer[cle_token]
+                    #     #             transactions_a_resumer.append(transaction_resumer)
+                    #     #             del tokens_resumer[cle_token]
+                    #     #         except KeyError:
+                    #     #             # Aucun token resumer pour ce token attente specifique
+                    #     #             pass
+                    #     # except KeyError:
+                    #     #     # Aucuns tokens attente
+                    #     #     pass
+                    #
+                    # except KeyError:
+                    #     # Aucune info d'evenements
+                    #     pass
 
                     if traiter:
                         self.traiter_transaction_wrapper(transaction)

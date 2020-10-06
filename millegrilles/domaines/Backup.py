@@ -222,6 +222,8 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
         collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
         collection_backup.update_one(filtre, ops, upsert=True)
 
+        self.verifier_presence_cle()
+
         self.set_etape_suivante()  # Termine
 
     def verifier_presence_cle(self):
@@ -235,7 +237,23 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
                 fingerprint_b64 = enveloppe_millegrille.fingerprint_b64
                 cles = {fingerprint_b64: transaction['cle']}
 
+            transactions_nomfichier = transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
 
+            commande_sauvegarder_cle = {
+                'domaine': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+                Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: transactions_nomfichier,
+                },
+                "cles": cles,
+                "iv": iv,
+                'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
+                'securite': transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
+            }
+
+            self.controleur.generateur_transactions.transmettre_commande(
+                commande_sauvegarder_cle,
+                Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE
+            )
 
 
 class ProcessusAjouterCatalogueHoraireSHA512(MGProcessusTransaction):

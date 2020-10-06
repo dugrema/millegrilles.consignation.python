@@ -1779,10 +1779,18 @@ class GroupeurTransactionsARegenerer:
         #  - _evenements.transaction_complete = True
         #  - _evenements.IDMG.transaction_traitee existe
         filtre = {
-            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                       Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
-            '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
-                          Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
+            '$or': [
+                {
+                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                               Constantes.EVENEMENT_TRANSACTION_COMPLETE): True,
+                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                                  Constantes.EVENEMENT_TRANSACTION_TRAITEE): {'$exists': True}
+                },
+                {
+                    '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT,
+                                  Constantes.EVENEMENT_TRANSACTION_BACKUP_RESTAURE): {'$exists': True}
+                }
+            ],
         }
 
         if self.__transactions_a_ignorer:

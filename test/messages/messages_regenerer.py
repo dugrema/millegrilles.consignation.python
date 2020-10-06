@@ -63,7 +63,7 @@ class MessagesSample(BaseCallback):
             # 'commande.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,

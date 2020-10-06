@@ -1751,7 +1751,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         domaine = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         domaine_action = domaine.split('.')[-1]
-        if domaine_action == ['cleGrosFichier', 'cleGrosFichierBackup']:
+        if domaine_action in ['cleGrosFichier', 'cleGrosFichierBackup']:
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS
         elif domaine_action in ['cleDocument', 'cleDocumentBackup']:
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT
