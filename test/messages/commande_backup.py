@@ -172,6 +172,18 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_snapshot'
         )
 
+    def trigger_backup_snapshot_grosfichiers(self):
+        commande_backup_snapshot = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_snapshot,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_',
+                                                                         Constantes.ConstantesGrosFichiers.DOMAINE_NOM),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_snapshot'
+        )
+
     def trigger_backup_snapshot_global(self):
         commande_backup_snapshot = {
         }
@@ -225,7 +237,7 @@ class MessagesSample(BaseCallback):
         )
 
     def requete_get_backups_horaire(self, domaine):
-        url = 'https://mg-dev4:3021/fichiers/backup/restaurerDomaine/' + domaine
+        url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + domaine
         cacert = self.configuration.mq_cafile
         certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
         resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
@@ -244,8 +256,7 @@ class MessagesSample(BaseCallback):
 
             parser = ArchivesBackupParser(
                 self.contexte,
-                resultat.iter_content(chunk_size=4 * 1024)
-            )  #, '/home/mathieu/tmp/backup_test/')
+                resultat.iter_content(chunk_size=4 * 1024), '/home/mathieu/tmp/backup_test/')
 
             # parser.parse_tar_stream()
             # parser.start().wait(30)
@@ -268,7 +279,7 @@ class MessagesSample(BaseCallback):
         resultat.close()
 
     def requete_restaurer_tout(self):
-        url = 'https://mg-dev4:3021/fichiers/backup/listeDomaines'
+        url = 'https://mg-dev4:3021/backup/listeDomaines'
         cacert = self.configuration.mq_cafile
         certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
         resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
@@ -278,7 +289,7 @@ class MessagesSample(BaseCallback):
 
             for domaine in domaines:
                 print("Restaurer %s" % domaine)
-                url = 'https://mg-dev4:3021/fichiers/backup/restaurerDomaine/' + domaine
+                url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + domaine
                 resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
 
                 if resultat.status_code == 200:
@@ -299,16 +310,19 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
+        # sample.trigger_backup_snapshot_grosfichiers()
         # sample.trigger_backup_snapshot_global()
 
         # sample.preparer_restauration()
         # sample.requete_get_backups_horaire('MaitreDesCles')
+        # sample.requete_get_backups_horaire('MaitreDesComptes')
+        sample.requete_get_backups_horaire('GrosFichiers')
         # sample.requete_get_domaines()
 
         # sample.requete_restaurer_tout()
 
-        thread = Thread(target=sample.requete_restaurer_tout)
-        thread.start()
+        # thread = Thread(target=sample.requete_restaurer_tout)
+        # thread.start()
 
 
 # --- MAIN ---

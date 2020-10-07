@@ -1177,16 +1177,16 @@ class ArchivesBackupParser:
             self._process_archive_aggregee(nom_fichier, file_object)
         elif type_archive == 'quotidienne':
             self._process_archive_aggregee(nom_fichier, file_object)
+        elif type_archive == 'snapshot_catalogue':
+            self._process_archive_snapshot_catalogue(nom_fichier, file_object)
+        elif type_archive == 'snapshot_transactions':
+            self._process_archive_snapshot_transaction(nom_fichier, file_object)
         elif type_archive == 'catalogue':
             pass  # Catalogue annuel ou quotidien
         elif type_archive == 'horaire_catalogue':
             self._process_archive_horaire_catalogue(nom_fichier, file_object)
         elif type_archive == 'horaire_transactions':
             self._process_archive_horaire_transaction(nom_fichier, file_object)
-        elif type_archive == 'snapshot_catalogue':
-            self._process_archive_snapshot_catalogue(nom_fichier, file_object)
-        elif type_archive == 'snapshot_transactions':
-            self._process_archive_snapshot_transaction(nom_fichier, file_object)
         else:
             raise TypeArchiveInconnue(type_archive)
 
@@ -1262,15 +1262,28 @@ class ArchivesBackupParser:
                     decipher = CipherMsg1Dechiffrer(iv, cle_dechiffree)
                     stream = DecipherStream(decipher, file_object)
 
+                    # data = stream.read()
+                    # while len(data) > 0:
+                    #     self.__logger.debug("Data : %d" % len(data))
+                    #     try:
+                    #         self.__logger.debug(data.decode('utf-8'))
+                    #     except UnicodeDecodeError:
+                    #         pass
+                    #     data = stream.read()
+                    #
+                    # digest_transactions = stream.digest()
+                    # self.__logger.debug("Digest transaction : %s" % digest_transactions)
+                    # digest_transactions_catalogue = catalogue['transactions_hachage']
+                    # if digest_transactions == digest_transactions_catalogue:
+                    #     self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
+                    # else:
+                    #     self.__logger.error("Erreur digest different : %s" % digest_transactions_catalogue)
+
                     # Wrapper le stream dans un decodeur lzma
                     internal_file_object = LZMAFile(stream)
 
-                except KeyError:
+                except (KeyError, TypeError):
                     self.__logger.warning("Fichier transaction, cle non dechiffrable")
-                    self.__rapport_restauration.incrementer_indechiffrables(domaine)
-                except TypeError:
-                    self.__logger.exception("Fichier transaction, cle inconnue")
-                    self.__logger.warning("Fichier transaction, cle inconnue")
                     self.__rapport_restauration.incrementer_indechiffrables(domaine)
 
             else:
@@ -1280,30 +1293,30 @@ class ArchivesBackupParser:
 
             if internal_file_object is not None:
                 generateur = self.__contexte.generateur_transactions
-                for line in internal_file_object:
-                    archive_json = json.loads(line.decode('utf-8'))
-                    self.__logger.debug("Transaction : %s" % archive_json)
-                    generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
+                try:
+                    for line in internal_file_object:
+                        archive_json = json.loads(line.decode('utf-8'))
+                        self.__logger.debug("Transaction : %s" % archive_json)
+                        generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
 
-                digest_transactions = stream.digest()
-                digest_transactions_catalogue = catalogue['transactions_hachage']
-                if digest_transactions == digest_transactions_catalogue:
-                    self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
-                else:
-                    self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions)
-                    self.__rapport_restauration.incrementer_digest_invalide(domaine)
+                    digest_transactions = stream.digest()
+                    digest_transactions_catalogue = catalogue['transactions_hachage']
+                    if digest_transactions == digest_transactions_catalogue:
+                        self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
+                    else:
+                        self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions)
+                        self.__rapport_restauration.incrementer_digest_invalide(domaine)
+                except EOFError as e:
+                    self.__logger.warning("Erreur - EOF : %s" % str(e))
 
             self.__rapport_restauration.incrementer_completee(domaine)
 
-        except json.decoder.JSONDecodeError:
-            self.__logger.warning("Erreur traitement transactions %s" % nom_fichier)
+        except (json.decoder.JSONDecodeError, LZMAError) as e:
+            self.__logger.exception("Erreur traitement transactions %s : %s" % (nom_fichier, str(e)))
             self.__rapport_restauration.incrementer_autres_erreurs_par_domaine(domaine)
-        except LZMAError:
-            self.__logger.exception("Erreur LZMA traitement transactions %s" % nom_fichier)
-            self.__rapport_restauration.incrementer_autres_erreurs_par_domaine(domaine)
-        finally:
-            # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
-            file_object.read()
+        # finally:
+        #     # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
+        #     file_object.read()
 
     def detecter_type_archive(self, nom_fichier):
         # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot
@@ -1321,7 +1334,7 @@ class ArchivesBackupParser:
             try:
                 if len(date_fichier) == 10:
                     type_archive = 'horaire_' + nom_fichier_parts[1]
-                elif nom_fichier.endswith('.json.xz'):
+                elif len(date_fichier) < 10:
                     type_archive = 'catalogue'
                 else:
                     try:

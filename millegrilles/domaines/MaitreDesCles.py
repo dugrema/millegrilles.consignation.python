@@ -735,6 +735,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
                 ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
                 ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+                ConstantesGenerateurCertificat.ROLE_DOMAINES,
             ]
 
         temps_limite_demande = datetime.datetime.utcnow().timestamp() - 30  # 30 secondes max
