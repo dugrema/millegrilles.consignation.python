@@ -289,7 +289,7 @@ class MessagesSample(BaseCallback):
                         resultat.iter_content(chunk_size=4 * 1024)
                     )
                     # parser.parse_tar_stream()
-                    parser.start()
+                    parser.start().wait(15)
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
@@ -303,10 +303,12 @@ class MessagesSample(BaseCallback):
 
         # sample.preparer_restauration()
         # sample.requete_get_backups_horaire('MaitreDesCles')
-        # sample.requete_get_backups_horaire('CatalogueApplications')
         # sample.requete_get_domaines()
 
-        sample.requete_restaurer_tout()
+        # sample.requete_restaurer_tout()
+
+        thread = Thread(target=sample.requete_restaurer_tout)
+        thread.start()
 
 
 # --- MAIN ---
@@ -317,5 +319,5 @@ sample = MessagesSample()
 # TEST
 
 # FIN TEST
-sample.event_recu.wait(100)
+sample.event_recu.wait(240)
 sample.deconnecter()

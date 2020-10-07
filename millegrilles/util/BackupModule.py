@@ -1003,6 +1003,70 @@ class ReceptionMessage(TraitementMessageCallback):
         self.__parser.nouveau_message(message_dict)
 
 
+class RapportRestauration:
+
+    def __init__(self):
+        self.__domaines = set()
+        self.__completees_par_domaine = dict()
+
+        # Erreurs catalogues ou fichiers transactions
+        self.__digest_transactions_invalide = dict()
+        self.__autres_erreurs_par_domaine = dict()
+        self.__indechiffrables_par_domaine = dict()
+
+    def incrementer_completee(self, domaine):
+        self.incrementer(domaine, self.__completees_par_domaine)
+
+    def incrementer_indechiffrables(self, domaine):
+        self.incrementer(domaine, self.__indechiffrables_par_domaine)
+
+    def incrementer_autres_erreurs_par_domaine(self, domaine):
+        self.incrementer(domaine, self.__autres_erreurs_par_domaine)
+
+    def incrementer_digest_invalide(self, domaine):
+        self.incrementer(domaine, self.__digest_transactions_invalide)
+
+    def incrementer(self, domaine, dictionnaire: dict):
+        self.__domaines.add(domaine)
+        compteur_domaine = dictionnaire.get(domaine) or 0
+        dictionnaire[domaine] = compteur_domaine + 1
+
+    def comptes_domaine(self, domaine):
+        info = dict()
+        dicts = [
+            ('completees', self.__completees_par_domaine),
+            ('invalides', self.__digest_transactions_invalide),
+            ('erreurs', self.__autres_erreurs_par_domaine),
+            ('indechiffrables', self.__indechiffrables_par_domaine),
+        ]
+        for d in dicts:
+            try:
+                info[d[0]] = d[1][domaine]
+            except(KeyError, IndexError):
+                pass
+
+        return info
+
+    def generer_transaction_restauration(self, generateur_transactions):
+        transaction = {
+            'domaines': list(self.__domaines),
+            # 'completees': self.__completees_par_domaine,
+            # 'indechiffrables': self.__indechiffrables_par_domaine,
+            # 'erreurs': self.__autres_erreurs_par_domaine,
+        }
+
+        comptes = list()
+        for domaine in self.__domaines:
+            info_domaine = self.comptes_domaine(domaine)
+            info_domaine['domaine'] = domaine
+            comptes.append(info_domaine)
+
+        transaction['comptes'] = comptes
+
+        domaine_action = ConstantesBackup.TRANSACTION_RAPPORT_RESTAURATION
+        generateur_transactions.soumettre_transaction(transaction, domaine_action)
+
+
 class ArchivesBackupParser:
 
     def __init__(self, contexte: ContexteRessourcesMilleGrilles, stream, path_output: str = None):
@@ -1025,6 +1089,9 @@ class ArchivesBackupParser:
         self.__cle_iv_transactions: Optional[dict] = None
 
         self.__chaine_pem_courante = contexte.signateur_transactions.chaine_certs
+
+        # Statistiques de restauration, erreurs, etc
+        self.__rapport_restauration = RapportRestauration()
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1079,6 +1146,8 @@ class ArchivesBackupParser:
             for tar_info in self.__tar_stream:
                 self._process_tar_info(tar_info)
         finally:
+            self.__rapport_restauration.generer_transaction_restauration(self.__contexte.generateur_transactions)
+            self.__event_execution.wait(1)
             self.stop()
 
     def _process_tar_info(self, tar_info):
@@ -1176,6 +1245,7 @@ class ArchivesBackupParser:
     def _extract_transaction(self, nom_fichier, file_object):
         self.__logger.debug("Extract transactions %s", nom_fichier)
         catalogue = self.__catalogue_horaire_courant
+        domaine = catalogue['domaine']
 
         try:
             extension = path.splitext(nom_fichier)
@@ -1197,9 +1267,11 @@ class ArchivesBackupParser:
 
                 except KeyError:
                     self.__logger.warning("Fichier transaction, cle non dechiffrable")
+                    self.__rapport_restauration.incrementer_indechiffrables(domaine)
                 except TypeError:
                     self.__logger.exception("Fichier transaction, cle inconnue")
                     self.__logger.warning("Fichier transaction, cle inconnue")
+                    self.__rapport_restauration.incrementer_indechiffrables(domaine)
 
             else:
                 # Note : pas de dechiffrage, juste le calcul du digest
@@ -1219,11 +1291,16 @@ class ArchivesBackupParser:
                     self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
                 else:
                     self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions)
+                    self.__rapport_restauration.incrementer_digest_invalide(domaine)
+
+            self.__rapport_restauration.incrementer_completee(domaine)
 
         except json.decoder.JSONDecodeError:
             self.__logger.warning("Erreur traitement transactions %s" % nom_fichier)
+            self.__rapport_restauration.incrementer_autres_erreurs_par_domaine(domaine)
         except LZMAError:
             self.__logger.exception("Erreur LZMA traitement transactions %s" % nom_fichier)
+            self.__rapport_restauration.incrementer_autres_erreurs_par_domaine(domaine)
         finally:
             # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
             file_object.read()
@@ -1293,7 +1370,7 @@ class ArchivesBackupParser:
             requete, domaine_action, correlation_id='cle', reply_to=self.__nom_queue)
 
         self.__logger.debug("Attendre reponse cle")
-        self.__event_attente_reponse.wait(10)
+        self.__event_attente_reponse.wait(1)
         if self.__event_attente_reponse.is_set():
             self.__logger.debug("Reponse recue")
         self.__event_attente_reponse.clear()

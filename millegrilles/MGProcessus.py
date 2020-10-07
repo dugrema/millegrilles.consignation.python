@@ -694,6 +694,9 @@ class StubGenerateurTransactions:
     def emettre_commande_noeuds(self, message_dict, routing_key):
         pass
 
+    def transmettre_commande(self, *args, **kwargs):
+        pass
+
 
 class RegenerationContexteWrapper:
     """

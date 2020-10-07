@@ -101,6 +101,8 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Backup:ProcessusFinaliserCatalogueAnnuel"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_ARCHIVE_ANNUELLE_INFO:
             processus = "millegrilles_domaines_Backup:ProcessusInformationArchiveAnnuelle"
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_RAPPORT_RESTAURATION:
+            processus = "millegrilles_domaines_Backup:ProcessusRapportRestauration"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -165,6 +167,39 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         }
         collection_documents = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
         collection_documents.delete_many(filtre_documents)
+
+    def maj_rapport_restauration(self, rapport):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_RAPPORT_RESTAURATION,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)
+
+        date_rapport = rapport[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        date_rapport = datetime.datetime.utcfromtimestamp(date_rapport)
+
+        set_ops = dict()
+        comptes = rapport['comptes']
+        for info_domaine in comptes:
+            info_domaine['date'] = date_rapport
+            domaine = info_domaine['domaine']
+            domaine = domaine.replace('.', '/')  # Pour supporter sous-domaines
+            del info_domaine['domaine']
+            set_ops[domaine] = info_domaine
+
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        resultat = collection.update_one(filtre, ops, upsert=True)
+
+        if resultat.upserted_id is None and resultat.matched_count != 1:
+            raise Exception("Erreur maj rapport restauration")
 
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
@@ -511,4 +546,19 @@ class ProcessusInformationArchiveAnnuelle(MGProcessusTransaction):
         collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
         collection_backup.update_one(filtre, ops, upsert=True)
 
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusRapportRestauration(MGProcessusTransaction):
+    """
+    Sauvegarder les informations de finalisation de l'archive annuelle.
+    """
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.transaction
+        self._controleur.gestionnaire.maj_rapport_restauration(transaction)
         self.set_etape_suivante()  # Termine
