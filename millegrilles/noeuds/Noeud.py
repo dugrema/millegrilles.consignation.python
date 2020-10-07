@@ -456,10 +456,11 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
 
                                 lectures['timestamp_max'] = timestamp
                                 lectures['lectures'].append({"timestamp": timestamp, "valeur": valeur})
-                                if lectures['max'] < valeur:
-                                    lectures['max'] = valeur
-                                if lectures['min'] > valeur:
-                                    lectures['min'] = valeur
+                                if valeur is not None:
+                                    if lectures['max'] < valeur:
+                                        lectures['max'] = valeur
+                                    if lectures['min'] > valeur:
+                                        lectures['min'] = valeur
 
                                 appareils_heure_dict[cle] = lectures
                             else:
