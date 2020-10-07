@@ -1806,6 +1806,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         if non_dechiffrable is not None:
             contenu_set['non_dechiffrable'] = non_dechiffrable
+        else:
+            contenu_on_insert['non_dechiffrable'] = True
 
         for fingerprint, cle in cles.items():
             contenu_set['cles.%s' % fingerprint] = cle
