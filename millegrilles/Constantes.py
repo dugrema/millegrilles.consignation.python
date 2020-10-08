@@ -1331,6 +1331,8 @@ class ConstantesBackup:
 
     COMMANDE_BACKUP_PREPARER_RESTAURATION = 'commande.backup.preparerStagingRestauration'
 
+    COMMANDE_BACKUP_RESTAURER_TRANSACTIONS = 'restaurerTransactions'
+
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
 
     EVENEMENT_BACKUP_HORAIRE_DEBUT = 'backupHoraireDebut'

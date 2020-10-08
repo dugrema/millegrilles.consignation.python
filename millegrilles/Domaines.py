@@ -4,6 +4,7 @@ import json
 import datetime
 import pytz
 import gc
+import requests
 
 from typing import cast
 from pika.exceptions import ChannelClosed
@@ -22,6 +23,7 @@ from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMi
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.BackupModule import HandlerBackupDomaine
 from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.util.BackupModule import ArchivesBackupParser
 
 
 class TraitementMessageDomaineCommande(TraitementMessageDomaine):
@@ -1116,6 +1118,7 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
 
         nom_domaine = self.gestionnaire.get_collection_transaction_nom()
 
@@ -1127,6 +1130,10 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
+
+        elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
+            resultat = self.gestionnaire.declencher_restauration_transactions(message_dict, properties)
+
         else:
             raise ValueError("Commande inconnue: " + routing_key)
 
@@ -1263,7 +1270,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         ]
 
         # Ajouter les handles de requete par niveau de securite
-        for securite, handler_requete in self.get_handler_requetes().items():
+        for securite, handler in self.get_handler_requetes().items():
             queues_config.append({
                 'nom': '%s.requete.%s' % (self.get_nom_domaine(), securite),
                 'routing': [
@@ -1272,10 +1279,10 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 ],
                 'exchange': securite,
                 'ttl': 20000,
-                'callback': handler_requete.callbackAvecAck
+                'callback': handler.callbackAvecAck
             })
 
-        for securite, handler_requete in self.get_handler_commandes().items():
+        for securite, handler in self.get_handler_commandes().items():
             queues_config.append({
                 'nom': '%s.commande.%s' % (self.get_nom_queue(), securite),
                 'routing': [
@@ -1284,7 +1291,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                 ],
                 'exchange': securite,
                 'ttl': 20000,
-                'callback': handler_requete.callbackAvecAck
+                'callback': handler.callbackAvecAck
             })
 
         return queues_config
@@ -1440,6 +1447,22 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
 
         parametres = {
+        }
+
+        self.demarrer_processus(processus, parametres)
+
+    def declencher_restauration_transactions(self, declencheur: dict, properties):
+        domaine = self.get_nom_domaine()
+        self.__logger.info("Declencher restauration domaine %s" % domaine)
+        routing = domaine
+        nom_module = 'millegrilles_Domaines'
+        nom_classe = 'RestaurationTransactions'
+        processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
+
+        parametres = {
+            'declencheur': declencheur,
+            'reply_to': properties.reply_to,
+            'correlation_id': properties.correlation_id,
         }
 
         self.demarrer_processus(processus, parametres)
@@ -1928,3 +1951,86 @@ class BackupSnapshot(MGProcessus):
         self.set_etape_suivante()  # Termine
 
         return dict()
+
+
+class RestaurationTransactions(MGProcessus):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        self.__logger.info("Processus restauration domaine demarre, %s" % str(self.parametres))
+        gestionnaire = self.controleur.gestionnaire
+        nom_domaine = gestionnaire.get_nom_domaine()
+        configuration = self.controleur.configuration
+
+        resultat_execution = False
+        try:
+            url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + nom_domaine
+            cacert = configuration.mq_cafile
+            certkey = (configuration.mq_certfile, configuration.mq_keyfile)
+            resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
+            self.__logger.debug("restaurerDomaines: Response code : %d" % resultat.status_code)
+
+            if resultat.status_code == 200:
+                self.emettre_evenement_restauration({
+                    'action': 'debut_restauration',
+                    'domaine': self.controleur.gestionnaire.get_nom_domaine(),
+                })
+
+                parser = ArchivesBackupParser(
+                    self.controleur.contexte,
+                    resultat.iter_content(chunk_size=10 * 1024)
+                )
+
+                # parser.start().wait(30)
+                event_attente = parser.start()
+                event_attente.wait(240)  # Donner 4 minutes pour traiter le domaine
+                resultat_execution = event_attente.is_set()
+
+            self.emettre_evenement_restauration({
+                'action': 'fin_restauration',
+                'domaine': self.controleur.gestionnaire.get_nom_domaine(),
+                'execution_complete': resultat_execution,
+            })
+        except:
+            self.__logger.exception("Erreur execution restauration")
+
+        # Conserver resultat, arreter traitement si erreur
+        reponse = {
+            'transactions_restaurees': resultat_execution,
+        }
+
+        if resultat_execution is True:
+            # Regenerer les documents du domaine
+            self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
+        else:
+            self.transmettre_reponse(reponse)
+
+        return reponse
+
+    def regenerer(self):
+        self.controleur.gestionnaire.regenerer_documents()
+
+        reponse = {
+            'transactions_restaurees': self.parametres['transactions_restaurees'],
+            'documents_regeneres': True,
+        }
+        self.transmettre_reponse(reponse)
+
+        self.set_etape_suivante()  # Termine
+
+    def emettre_evenement_restauration(self, event: dict):
+        """
+        Emet un evenement pour indiquer a quelle etape de restauration on est rendu
+        :param event:
+        :return:
+        """
+        domaine_action = 'evenement.backup.restaurationTransactions'
+        self.controleur.generateur_transactions.emettre_message(event, domaine_action, [Constantes.SECURITE_PROTEGE])
+
+    def transmettre_reponse(self, reponse: dict):
+        reply_q = self.parametres['reply_to']
+        correlation_id = self.parametres['correlation_id']
+        self.controleur.generateur_transactions.transmettre_reponse(reponse, reply_q, correlation_id)

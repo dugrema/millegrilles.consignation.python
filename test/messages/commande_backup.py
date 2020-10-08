@@ -96,6 +96,7 @@ class MessagesSample(BaseCallback):
         print("Method : " + str(method))
         print("Properties : " + str(properties))
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
+        self.event_recu.set()
 
     def commande_regenerer(self):
         domaines = [
@@ -225,17 +226,6 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_reset'
         )
 
-    def preparer_restauration(self):
-        commande = {
-        }
-        self._contexte.generateur_transactions.transmettre_commande(
-            commande,
-            ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION,
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
-            reply_to=self.queue_name,
-            correlation_id='trigger_backup_reset'
-        )
-
     def requete_get_backups_horaire(self, domaine):
         url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + domaine
         cacert = self.configuration.mq_cafile
@@ -302,6 +292,17 @@ class MessagesSample(BaseCallback):
                     # parser.parse_tar_stream()
                     parser.start().wait(15)
 
+    def trigger_restaurer_maitredescles(self):
+        commande = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.MaitreDesCles.' + ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS,
+            exchange=Constantes.SECURITE_SECURE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_restauration'
+        )
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
@@ -316,13 +317,15 @@ class MessagesSample(BaseCallback):
         # sample.preparer_restauration()
         # sample.requete_get_backups_horaire('MaitreDesCles')
         # sample.requete_get_backups_horaire('MaitreDesComptes')
-        sample.requete_get_backups_horaire('GrosFichiers')
+        # sample.requete_get_backups_horaire('GrosFichiers')
         # sample.requete_get_domaines()
 
         # sample.requete_restaurer_tout()
 
         # thread = Thread(target=sample.requete_restaurer_tout)
         # thread.start()
+
+        sample.trigger_restaurer_maitredescles()
 
 
 # --- MAIN ---
