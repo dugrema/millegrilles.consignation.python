@@ -1131,9 +1131,6 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
 
-        elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
-            resultat = self.gestionnaire.declencher_restauration_transactions(message_dict, properties)
-
         else:
             raise ValueError("Commande inconnue: " + routing_key)
 
@@ -1144,6 +1141,7 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
 
         commande = method.routing_key.split('.')[-1]
         nom_domaine = self.gestionnaire.get_collection_transaction_nom()
@@ -1165,6 +1163,10 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.regenerer_documents()
         elif commande == ConstantesDomaines.COMMANDE_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
+
+        elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
+            resultat = self.gestionnaire.declencher_restauration_transactions(message_dict, properties)
+
         else:
             raise ValueError("Commande inconnue: " + routing_key)
 
@@ -1988,10 +1990,13 @@ class RestaurationTransactions(MGProcessus):
                 event_attente.wait(240)  # Donner 4 minutes pour traiter le domaine
                 resultat_execution = event_attente.is_set()
 
-            self.emettre_evenement_restauration({
+            evenement_fin_restauration = {
                 'action': 'fin_restauration',
                 'execution_complete': resultat_execution,
-            })
+            }
+            if resultat_execution is False:
+                evenement_fin_restauration['err'] = {'code': 1, 'message': 'Echec de restauration'}
+            self.emettre_evenement_restauration(evenement_fin_restauration)
         except:
             self.__logger.exception("Erreur execution restauration")
 
@@ -2005,6 +2010,7 @@ class RestaurationTransactions(MGProcessus):
             self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
         else:
             reponse['action'] = 'restauration_annulee'
+            reponse['err'] = {'code': 1, 'message': 'Echec de restauration'}
             self.transmettre_reponse(reponse)
 
         return reponse
@@ -2014,18 +2020,31 @@ class RestaurationTransactions(MGProcessus):
             'action': 'debut_regeneration',
         })
 
-        self.controleur.gestionnaire.regenerer_documents()
+        erreur = None
+        try:
+            self.controleur.gestionnaire.regenerer_documents()
 
-        self.emettre_evenement_restauration({
-            'action': 'fin_regeneration',
-            'documents_regeneres': True,
-        })
+            self.emettre_evenement_restauration({
+                'action': 'fin_regeneration',
+                'documents_regeneres': True,
+            })
+        except Exception as e:
+            erreur = {'code': 2, 'message': str(e)}
+            self.emettre_evenement_restauration({
+                'action': 'fin_regeneration',
+                'documents_regeneres': True,
+                'err': erreur
+            })
 
         reponse = {
             'action': 'restauration_terminee',
             'transactions_restaurees': self.parametres['transactions_restaurees'],
             'documents_regeneres': True,
         }
+        if erreur is not None:
+            reponse['documents_regeneres'] = False
+            reponse['err'] = erreur
+
         self.transmettre_reponse(reponse)
 
         self.set_etape_suivante()  # Termine
