@@ -951,8 +951,10 @@ class GestionnaireModulesDocker:
         with open(src_path, 'rb') as fichier:
             container.put_archive(dst_path, fichier)
 
-    def save_archives(self, container_id: str, src_path: str, dest_path: str = '/tmp', dest_prefix: str = 'backup'):
+    def save_archives(self, container_id: str, src_path: str, dest_path: str = '/tmp/monitorbackup', dest_prefix: str = 'backup'):
         container = self.__docker.containers.get(container_id)
+
+        os.makedirs(dest_path, exist_ok=True)
 
         archive_index = 0
         archive_name = '%s.%d.tar' % (dest_prefix, archive_index)

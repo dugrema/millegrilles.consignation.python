@@ -105,7 +105,15 @@ class GestionnaireApplications:
         self.__logger.info("Backup application %s", str(commande))
 
         nom_image_docker = commande.contenu['nom_application']
-        configuration_docker = commande.contenu['configuration']
+
+        configuration_docker = commande.contenu.get('configuration')
+        if configuration_docker is None:
+            # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
+            gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+            configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
+            configuration_docker = json.loads(configuration_bytes)
+            commande.contenu['configuration'] = configuration_docker
+
         tar_scripts = self.preparer_script_file(commande)
         self.effectuer_backup(nom_image_docker, configuration_docker, tar_scripts)
 
@@ -113,7 +121,15 @@ class GestionnaireApplications:
         self.__logger.info("Restore application %s", str(commande))
 
         nom_image_docker = commande.contenu['nom_application']
-        configuration_docker = commande.contenu['configuration']
+
+        configuration_docker = commande.contenu.get('configuration')
+        if configuration_docker is None:
+            # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
+            gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+            configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
+            configuration_docker = json.loads(configuration_bytes)
+            commande.contenu['configuration'] = configuration_docker
+
         tar_scripts = self.preparer_script_file(commande)
         tar_archive = commande.contenu['archive_tarfile']
         self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
@@ -305,7 +321,7 @@ class GestionnaireApplications:
         backup_info = config_image['backup']
         config_elem = config_image['config']
 
-        service_name = self.__service_monitor.idmg_tronque + '_' + config_elem['name']
+        service_name = config_elem['name']
         self.__wait_start_service_name = service_name
         self.__wait_container_event.clear()
 
@@ -367,7 +383,7 @@ class GestionnaireApplications:
         backup_info = config_image['backup']
         config_elem = config_image['config']
 
-        service_name = self.__service_monitor.idmg_tronque + '_' + config_elem['name']
+        service_name = config_elem['name']
         self.__wait_start_service_name = service_name
         self.__wait_container_event.clear()
 
