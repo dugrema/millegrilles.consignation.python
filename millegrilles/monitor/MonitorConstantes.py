@@ -169,12 +169,17 @@ def trouver_config(config_name: str, docker_client):
 
 class CommandeMonitor:
 
-    def __init__(self, contenu: dict):
+    def __init__(self, contenu: dict, mq_properties=None):
         self.__contenu = contenu
+        self.__mq_properties = mq_properties
 
     @property
     def contenu(self):
         return self.__contenu
+
+    @property
+    def mq_properties(self):
+        return self.__mq_properties
 
     @property
     def nom_commande(self):

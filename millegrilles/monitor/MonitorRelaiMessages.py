@@ -53,7 +53,7 @@ class TraitementMessagesMiddleware(BaseCallback):
                 'properties': properties,
             }
             contenu.update(message_dict)
-            commande = CommandeMonitor(contenu=contenu)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties)
             self.__gestionnaire_commandes.ajouter_commande(commande)
         elif routing_key == Constantes.EVENEMENT_ROUTING_PRESENCE_DOMAINES:
             self.traiter_presence_domaine(message_dict)

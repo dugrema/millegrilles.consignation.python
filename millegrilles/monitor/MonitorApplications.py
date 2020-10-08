@@ -74,6 +74,8 @@ class GestionnaireApplications:
         # Transmettre maj
         self.__service_monitor.emettre_presence()
 
+        return {'ok': True}
+
     def preparer_script_file(self, commande):
         configuration = commande.contenu.get('configuration')
         if configuration and configuration.get('tar_xz'):
@@ -96,6 +98,8 @@ class GestionnaireApplications:
 
         # Transmettre maj
         self.__service_monitor.emettre_presence()
+
+        return {'ok': True}
 
     def backup_application(self, commande: CommandeMonitor):
         self.__logger.info("Backup application %s", str(commande))

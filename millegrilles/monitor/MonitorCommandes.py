@@ -113,7 +113,10 @@ class GestionnaireCommandes:
 
     def _executer_commande(self, commande: CommandeMonitor):
         nom_commande = commande.nom_commande
+        mq_properties = commande.mq_properties
         contenu = commande.contenu
+
+        reponse = None
 
         if nom_commande == 'demarrer_service':
             nom_service = contenu['nom_service']
@@ -134,10 +137,10 @@ class GestionnaireCommandes:
             self.desactiver_hebergement(contenu)
 
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION:
-            self._service_monitor.gestionnaire_applications.installer_application(commande)
+            reponse = self._service_monitor.gestionnaire_applications.installer_application(commande)
 
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION:
-            self._service_monitor.gestionnaire_applications.supprimer_application(commande)
+            reponse = self._service_monitor.gestionnaire_applications.supprimer_application(commande)
 
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION:
             self._service_monitor.gestionnaire_applications.backup_application(commande)
@@ -159,6 +162,14 @@ class GestionnaireCommandes:
 
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)
+            return
+
+        if reponse is not None and mq_properties is not None:
+            # Transmettre la reponse a la commande / requete
+            generateur_transactions = self._service_monitor.generateur_transactions
+            reply_to = mq_properties.reply_to
+            correlation_id = mq_properties.correlation_id
+            self._service_monitor.generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']

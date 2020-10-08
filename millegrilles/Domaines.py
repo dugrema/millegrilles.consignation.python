@@ -1462,10 +1462,10 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
 
         parametres = {
-            'declencheur': declencheur,
             'reply_to': properties.reply_to,
             'correlation_id': properties.correlation_id,
         }
+        parametres.update(declencheur)
 
         self.demarrer_processus(processus, parametres)
 
@@ -1967,9 +1967,11 @@ class RestaurationTransactions(MGProcessus):
         nom_domaine = gestionnaire.get_nom_domaine()
         configuration = self.controleur.configuration
 
+        hostname_fichiers = self.parametres.get('hostname_fichiers') or 'fichiers'
+
         resultat_execution = False
         try:
-            url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + nom_domaine
+            url = 'https://%s/backup/restaurerDomaine/%s' % (hostname_fichiers, nom_domaine)
             cacert = configuration.mq_cafile
             certkey = (configuration.mq_certfile, configuration.mq_keyfile)
             resultat = requests.get(url, verify=cacert, cert=certkey, stream=True)
