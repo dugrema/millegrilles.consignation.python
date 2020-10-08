@@ -337,4 +337,10 @@ sample = MessagesSample()
 
 # FIN TEST
 sample.event_recu.wait(240)
+
+# Attendre de recevoir tous les messages
+while sample.event_recu.is_set():
+    sample.event_recu.clear()
+    sample.event_recu.wait(5)
+
 sample.deconnecter()

@@ -1974,10 +1974,9 @@ class RestaurationTransactions(MGProcessus):
             self.__logger.debug("restaurerDomaines: Response code : %d" % resultat.status_code)
 
             if resultat.status_code == 200:
-                self.emettre_evenement_restauration({
-                    'action': 'debut_restauration',
-                    'domaine': self.controleur.gestionnaire.get_nom_domaine(),
-                })
+                # Reponse "initiale" - permet d'executer le traitement de manier asynchrone cote client
+                self.transmettre_reponse({'action': 'restauration_demarree'})
+                self.emettre_evenement_restauration({'action': 'debut_restauration'})
 
                 parser = ArchivesBackupParser(
                     self.controleur.contexte,
@@ -1991,7 +1990,6 @@ class RestaurationTransactions(MGProcessus):
 
             self.emettre_evenement_restauration({
                 'action': 'fin_restauration',
-                'domaine': self.controleur.gestionnaire.get_nom_domaine(),
                 'execution_complete': resultat_execution,
             })
         except:
@@ -2006,14 +2004,25 @@ class RestaurationTransactions(MGProcessus):
             # Regenerer les documents du domaine
             self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
         else:
+            reponse['action'] = 'restauration_annulee'
             self.transmettre_reponse(reponse)
 
         return reponse
 
     def regenerer(self):
+        self.emettre_evenement_restauration({
+            'action': 'debut_regeneration',
+        })
+
         self.controleur.gestionnaire.regenerer_documents()
 
+        self.emettre_evenement_restauration({
+            'action': 'fin_regeneration',
+            'documents_regeneres': True,
+        })
+
         reponse = {
+            'action': 'restauration_terminee',
             'transactions_restaurees': self.parametres['transactions_restaurees'],
             'documents_regeneres': True,
         }
@@ -2028,6 +2037,7 @@ class RestaurationTransactions(MGProcessus):
         :return:
         """
         domaine_action = 'evenement.backup.restaurationTransactions'
+        event['domaine'] = self.controleur.gestionnaire.get_nom_domaine()
         self.controleur.generateur_transactions.emettre_message(event, domaine_action, [Constantes.SECURITE_PROTEGE])
 
     def transmettre_reponse(self, reponse: dict):
