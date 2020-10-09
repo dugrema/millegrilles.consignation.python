@@ -58,7 +58,11 @@ class CipherMsg1Chiffrer(CipherMgs1):
     def start_encrypt(self):
         self._context = self._cipher.encryptor()
         self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
-        return self._context.update(self.__padder.update(self._iv))
+
+        data = self._context.update(self.__padder.update(self._iv))
+        self._digest.update(data)
+
+        return data
 
     def update(self, data: bytes):
         data = self._context.update(self.__padder.update(data))

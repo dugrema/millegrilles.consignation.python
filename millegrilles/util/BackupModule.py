@@ -1003,6 +1003,7 @@ class HandlerBackupApplication:
 
         self.__backup_util = BackupUtil(self.__handler_requetes.contexte)
         self.__generateur_transactions = self.__handler_requetes.contexte.generateur_transactions
+        self.__configuration = self.__handler_requetes.contexte.configuration
 
     def upload_backup(self, nom_application, path_archive):
 
@@ -1019,8 +1020,8 @@ class HandlerBackupApplication:
             self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (nom_fichier_backup, digest_archive))
             catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
 
-            fichiers_transactions = self._preparer_transactions_backup(nom_application, catalogue_backup, transaction_maitredescles)
-            fichiers_temporaire.extend(fichiers_transactions)
+            transactions = self._preparer_transactions_backup(nom_application, catalogue_backup, transaction_maitredescles)
+            self._put_backup(nom_application, transactions, nom_fichier_backup)
 
         finally:
             # Supprimer les archives
@@ -1029,6 +1030,79 @@ class HandlerBackupApplication:
                     os.remove(fichier)
                 except FileNotFoundError as e:
                     self.__logger.warning("Erreur nettoyage fichier " + str(e))
+
+    def _put_backup(self, nom_application, transactions: dict, nom_fichier_backup: str):
+        self.transmettre_evenement_backup(
+            ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET, nom_application)
+
+        # Transferer vers consignation_fichier
+        catalogue = transactions['catalogue']
+        data = {
+            'catalogue': json.dumps(catalogue)
+        }
+        transaction_maitredescles = transactions.get('maitredescles')
+        if transaction_maitredescles is not None:
+            data['transaction_maitredescles'] = json.dumps(transaction_maitredescles)
+
+        # Preparer URL de connexion a consignationfichiers
+        url_consignationfichiers = 'https://%s:%s' % (
+            self.__configuration.serveur_consignationfichiers_host,
+            self.__configuration.serveur_consignationfichiers_port
+        )
+
+        with open(nom_fichier_backup, 'rb') as fichier_archive:
+            files = {
+                'application': (nom_fichier_backup, fichier_archive, 'application/octet-stream'),
+            }
+
+            certfile = self.__configuration.mq_certfile
+            keyfile = self.__configuration.mq_keyfile
+
+            r = requests.put(
+                '%s/backup/application/%s' % (url_consignationfichiers, nom_application),
+                data=data,
+                files=files,
+                verify=self.__configuration.mq_cafile,
+                cert=(certfile, keyfile)
+            )
+
+        if r.status_code == 200:
+            self.transmettre_evenement_backup(
+                ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME, nom_application)
+
+            reponse_json = json.loads(r.text)
+            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
+
+            # # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
+            # if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
+            #         catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]:
+            #     raise ValueError(
+            #         "Le SHA512 du fichier de backup de transactions ne correspond pas a celui recu de consignationfichiers")
+            #
+            # # Transmettre la transaction au domaine de backup
+            # # L'enveloppe est deja prete, on fait juste l'emettre
+            # self._contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
+            #
+            # # Marquer les transactions comme inclue dans le backup
+            # liste_uuids = dependances_backup['uuid_transactions']
+            # self.marquer_transactions_backup_complete(self._nom_collection_transactions, liste_uuids)
+            #
+            # transaction_sha512_catalogue = {
+            #     ConstantesBackup.LIBELLE_DOMAINE: sous_domaine,
+            #     ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][
+            #         ConstantesBackup.LIBELLE_SECURITE],
+            #     ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
+            #     ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: dependances_backup[
+            #         ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE],
+            #     ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete,
+            #     Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_catalogue,
+            # }
+            #
+            # self._contexte.generateur_transactions.soumettre_transaction(
+            #     transaction_sha512_catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE)
+
+        self.transmettre_evenement_backup(
+            ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE, nom_application)
 
     def _preparer_transactions_backup(self, nom_application: str, catalogue_backup: dict, transaction_maitredescles: dict, path_fichiers: str = '/tmp'):
         """
@@ -1052,23 +1126,24 @@ class HandlerBackupApplication:
         )
         transaction_maitredescles = self.__generateur_transactions.preparer_enveloppe(
             transaction_maitredescles,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION,
+            'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION,
             ajouter_certificats=True)
 
-        fd_catalogue, tmpfile_catalogue = tempfile.mkstemp(dir=path_fichiers, prefix='transaction_', suffix='.json')
-        fp_catalogue = os.fdopen(fd_catalogue, 'w')
-        json.dump(catalogue_backup, fp_catalogue)
-        fp_catalogue.close()
+        # fd_catalogue, tmpfile_catalogue = tempfile.mkstemp(dir=path_fichiers, prefix='transaction_', suffix='.json')
+        # fp_catalogue = os.fdopen(fd_catalogue, 'w')
+        # json.dump(catalogue_backup, fp_catalogue)
+        # fp_catalogue.close()
 
-        fd_maitredescles, tmpfile_maitredescles = tempfile.mkstemp(dir=path_fichiers, prefix='transaction_', suffix='.json')
-        fp_maitredescles = os.fdopen(fd_maitredescles, 'w')
-        json.dump(transaction_maitredescles, fp_maitredescles)
-        fp_maitredescles.close()
+        # fd_maitredescles, tmpfile_maitredescles = tempfile.mkstemp(dir=path_fichiers, prefix='transaction_', suffix='.json')
+        # fp_maitredescles = os.fdopen(fd_maitredescles, 'w')
+        # json.dump(transaction_maitredescles, fp_maitredescles)
+        # fp_maitredescles.close()
 
-        return [tmpfile_catalogue, tmpfile_maitredescles]
+        # return [tmpfile_catalogue, tmpfile_maitredescles]
+        return {'maitredescles': transaction_maitredescles, 'catalogue': catalogue_backup}
 
     def _chiffrer_archive(self, nom_application, path_archive, catalogue_backup: dict):
-        date_formattee = datetime.datetime.utcnow().strftime('%y%m%d%H%M')
+        date_formattee = datetime.datetime.utcnow().strftime('%Y%m%d%H%M')
         nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs1' % (nom_application, date_formattee)
         nom_fichier_catalogue = 'application_%s_catalogue_%s.json' % (nom_application, date_formattee)
         catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER] = nom_fichier_backup
@@ -1104,6 +1179,20 @@ class HandlerBackupApplication:
         digest_archive = cipher.digest
 
         return nom_fichier_backup, digest_archive, transaction_maitredescles
+
+    def transmettre_evenement_backup(self, evenement: str, application: str, info: dict = None):
+        evenement_contenu = {
+            Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
+            ConstantesBackup.LIBELLE_APPLICATION: application,
+        }
+        if info:
+            evenement_contenu['info'] = info
+
+        domaine = 'evenement.Backup.%s' % evenement
+
+        self.__generateur_transactions.emettre_message(
+            evenement_contenu, domaine, exchanges=[Constantes.SECURITE_PROTEGE]
+        )
 
 
 class WrapperDownload(RawIOBase):

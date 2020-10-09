@@ -396,6 +396,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusCleGrosfichierBackup"
         elif domaine_action == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS_BACKUP:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleBackupTransactionBackup"
+        elif domaine_action == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleBackupApplication"
+        elif domaine_action == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION_BACKUP:
+            processus = "millegrilles_domaines_MaitreDesCles:ProcessusNouvelleCleBackupApplicationBackup"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -1768,15 +1772,23 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT
         elif domaine_action in ['cleBackupTransactions', 'cleBackupTransactionsBackup']:
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS
+        elif domaine_action in ['cleBackupApplication', 'cleBackupApplicationBackup']:
+            libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION
         else:
             raise Exception("Type transaction non supportee")
 
         identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         # Extraire les cles de document de la transaction (par processus d'elimination)
-        cles_document = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE:
-                transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-        }
+        cles_document = dict()
+        champs_cles = [
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE,
+            Constantes.ConstantesBackup.LIBELLE_APPLICATION,
+        ]
+        for champ in champs_cles:
+            try:
+                cles_document[champ] = transaction['champ']
+            except KeyError:
+                pass
 
         cles = transaction.get('cles')
         if cles is None:
@@ -1893,7 +1905,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         #     version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE
         # )
 
-    def generer_transactions_backup(self, sujet):
+    def generer_transactions_backup(self, sujet, domaine=None):
         """
         Genere les transaction manquantes pour cle de millegrille ou cles de backup
         Remplace le domaine MaitreDesCles.* par MaitreDesCles.FINGERPRINTB64.*
@@ -1926,8 +1938,10 @@ class ProcessusReceptionCles(MGProcessusTransaction):
             identificateurs_document = transaction['identificateurs_document'].copy()
             identificateurs_document['fingerprint'] = fingerprint_b64
 
+            domaine_effectif = domaine or transaction.get('domaine')
+
             transaction_cle = {
-                'domaine': transaction['domaine'],
+                'domaine': domaine_effectif,
                 'identificateurs_document': identificateurs_document,
                 'fingerprint': fingerprint,
                 'cle': cle,
@@ -2093,6 +2107,43 @@ class ProcessusNouvelleCleDocument(ProcessusReceptionCles):
 
 
 class ProcessusNouvelleCleDocumentBackup(ProcessusReceptionCles):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def initiale(self):
+        transaction = self.transaction
+
+        # Decrypter la cle secrete et la re-encrypter avec toutes les cles backup
+        self.controleur.gestionnaire.maj_document_cle(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusNouvelleCleBackupApplication(ProcessusReceptionCles):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def initiale(self):
+        transaction = self.transaction
+
+        nouveaux_params = self.mettre_a_jour_document(transaction)
+
+        # Generer transactions pour separer les sous-domaines de backup
+        self.parametres.update(nouveaux_params)
+
+        # Generer transactions pour separer les sous-domaines de backup
+        self.generer_transactions_backup(ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION, domaine='Applications')
+
+        self.set_etape_suivante()  # Termine
+
+        return nouveaux_params
+
+
+class ProcessusNouvelleCleBackupApplicationBackup(ProcessusReceptionCles):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)

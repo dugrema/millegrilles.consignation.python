@@ -705,7 +705,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP = 'cleGrosFichierBackup'
     TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS = '%s.cleBackupTransactions' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS_BACKUP = 'cleBackupTransactionsBackup'
-    TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION = '%s.cleBackupApplication' % DOMAINE_NOM
+    TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION = 'cleBackupApplication'
     TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION_BACKUP = 'cleBackupApplicationBackup'
     TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.cleDocument' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_DOCUMENT_BACKUP = 'cleDocumentBackup'
@@ -777,6 +777,7 @@ class ConstantesMaitreDesCles:
     DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
     DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS = 'cles.backupTransactions'
     DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
+    DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION = 'cles.backupApplication'
     DOCUMENT_LIBVAL_MOTDEPASSE = 'motdepasse.document'
     DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU = 'hebergement.trousseau'
 
@@ -1348,6 +1349,11 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_SNAPSHOT_UPLOAD_CONFIRME = 'backupSnapshotUploadConfirme'
     EVENEMENT_BACKUP_SNAPSHOT_TERMINE = 'backupSnapshotTermine'
 
+    EVENEMENT_BACKUP_APPLICATION_DEBUT = 'backupApplicationDebut'
+    EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET = 'backupApplicationCataloguePret'
+    EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME = 'backupApplicationUploadConfirme'
+    EVENEMENT_BACKUP_APPLICATION_TERMINE = 'backupApplicationTermine'
+
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
     LIBVAL_CATALOGUE_ANNUEL = 'catalogue.annuel'
@@ -1359,6 +1365,7 @@ class ConstantesBackup:
     LIBELLE_MOIS = 'mois'
     LIBELLE_ANNEE = 'annee'
     LIBELLE_DOMAINE = 'domaine'
+    LIBELLE_APPLICATION = 'application'
     LIBELLE_SOUS_DOMAINE = 'sous_domaine'
     LIBELLE_CERTS_RACINE = 'certificats_racine'
     LIBELLE_CERTS_INTERMEDIAIRES = 'certificats_intermediaires'
