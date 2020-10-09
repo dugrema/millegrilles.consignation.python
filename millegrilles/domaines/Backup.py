@@ -103,6 +103,8 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Backup:ProcessusInformationArchiveAnnuelle"
         elif domaine_transaction == ConstantesBackup.TRANSACTION_RAPPORT_RESTAURATION:
             processus = "millegrilles_domaines_Backup:ProcessusRapportRestauration"
+        elif domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_APPLICATION:
+            processus = "millegrilles_domaines_Backup:ProcessusAjouterCatalogueApplication"
 
         else:
             processus = super().identifier_processus(domaine_transaction)
@@ -562,3 +564,90 @@ class ProcessusRapportRestauration(MGProcessusTransaction):
         transaction = self.transaction
         self._controleur.gestionnaire.maj_rapport_restauration(transaction)
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusAjouterCatalogueApplication(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        nom_application = transaction[ConstantesBackup.LIBELLE_APPLICATION]
+
+        self.__logger.debug("Transaction recue: %s" % str(transaction))
+        heure_backup = datetime.datetime.fromtimestamp(
+            transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE],
+            tz=datetime.timezone.utc
+        )
+
+        jour_backup = datetime.datetime(year=heure_backup.year, month=heure_backup.month, day=heure_backup.day)
+
+        champs_fichier = [
+            ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER,
+            ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE,
+            ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER,
+            # ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE,
+        ]
+
+        set_ops = {
+            ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
+            Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
+        }
+
+        for champ in champs_fichier:
+            set_ops['%s.%s.%s' % (ConstantesBackup.LIBELLE_APPLICATIONS, nom_application, champ)] = transaction[champ]
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
+            ConstantesBackup.LIBELLE_DOMAINE: 'Applications',
+            ConstantesBackup.LIBELLE_JOUR: jour_backup,
+        }
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+        }
+        set_on_insert.update(filtre)  # On utilise les memes valeurs que le filtre lors de l'insertion
+
+        ops = {
+            '$setOnInsert': set_on_insert,
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection_backup = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        collection_backup.update_one(filtre, ops, upsert=True)
+
+        self.verifier_presence_cle()
+
+        self.set_etape_suivante()  # Termine
+
+    def verifier_presence_cle(self):
+        transaction = self.charger_transaction()
+        if transaction.get('iv'):
+            iv = transaction['iv']
+            cles = transaction.get('cles')
+            if cles is None and transaction.get('cle'):
+                # On a seulement la cle de millegrille
+                enveloppe_millegrille = self._controleur._contexte.signateur_transactions.get_enveloppe_millegrille()
+                fingerprint_b64 = enveloppe_millegrille.fingerprint_b64
+                cles = {fingerprint_b64: transaction['cle']}
+
+            transactions_nomfichier = transaction[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
+
+            commande_sauvegarder_cle = {
+                'domaine': 'Applications',
+                Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                    ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER: transactions_nomfichier,
+                },
+                "cles": cles,
+                "iv": iv,
+                'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION,
+                'securite': transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
+            }
+
+            self.controleur.generateur_transactions.transmettre_commande(
+                commande_sauvegarder_cle,
+                'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+                exchange=Constantes.SECURITE_SECURE,
+            )

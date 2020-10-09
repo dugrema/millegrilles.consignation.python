@@ -1376,6 +1376,7 @@ class ConstantesBackup:
     LIBELLE_FICHIERS_HORAIRE = 'fichiers_horaire'
     LIBELLE_FICHIERS_QUOTIDIEN = 'fichiers_quotidien'
     LIBELLE_FICHIERS_MENSUEL = 'fichiers_mensuel'
+    LIBELLE_APPLICATIONS = 'applications'
     LIBELLE_INFO_HORAIRE = 'info_horaire'
     LIBELLE_TRANSACTIONS_HACHAGE = 'transactions_hachage'
     LIBELLE_TRANSACTIONS_NOMFICHIER = 'transactions_nomfichier'

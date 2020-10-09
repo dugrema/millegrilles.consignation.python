@@ -1070,37 +1070,6 @@ class HandlerBackupApplication:
             self.transmettre_evenement_backup(
                 ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME, nom_application)
 
-            reponse_json = json.loads(r.text)
-            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
-
-            # # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
-            # if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
-            #         catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]:
-            #     raise ValueError(
-            #         "Le SHA512 du fichier de backup de transactions ne correspond pas a celui recu de consignationfichiers")
-            #
-            # # Transmettre la transaction au domaine de backup
-            # # L'enveloppe est deja prete, on fait juste l'emettre
-            # self._contexte.message_dao.transmettre_nouvelle_transaction(catalogue_backup, None, None)
-            #
-            # # Marquer les transactions comme inclue dans le backup
-            # liste_uuids = dependances_backup['uuid_transactions']
-            # self.marquer_transactions_backup_complete(self._nom_collection_transactions, liste_uuids)
-            #
-            # transaction_sha512_catalogue = {
-            #     ConstantesBackup.LIBELLE_DOMAINE: sous_domaine,
-            #     ConstantesBackup.LIBELLE_SECURITE: dependances_backup['catalogue'][
-            #         ConstantesBackup.LIBELLE_SECURITE],
-            #     ConstantesBackup.LIBELLE_HEURE: int(heure_anterieure.timestamp()),
-            #     ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: dependances_backup[
-            #         ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE],
-            #     ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete,
-            #     Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction_catalogue,
-            # }
-            #
-            # self._contexte.generateur_transactions.soumettre_transaction(
-            #     transaction_sha512_catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE)
-
         self.transmettre_evenement_backup(
             ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE, nom_application)
 
