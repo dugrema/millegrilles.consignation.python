@@ -28,6 +28,9 @@ class CipherMgs1:
 
         self._context: Optional[CipherContext] = None
 
+        self._digest = hashes.Hash(hashes.SHA512(), backend=default_backend())
+        self._digest_result: Optional[str] = None
+
     def _ouvrir_cipher(self):
         backend = default_backend()
         self._cipher = Cipher(algorithms.AES(self._password), modes.CBC(self._iv), backend=backend)
@@ -59,11 +62,18 @@ class CipherMsg1Chiffrer(CipherMgs1):
 
     def update(self, data: bytes):
         data = self._context.update(self.__padder.update(data))
+        self._digest.update(data)
         return data
 
     def finalize(self):
         data = self._context.update(self.__padder.finalize())
-        return data + self._context.finalize()
+        data_final = data + self._context.finalize()
+
+        if data_final is not None:
+            self._digest.update(data_final)
+        self._digest_result = self._digest.finalize()
+
+        return data_final
 
     def chiffrer_motdepasse_enveloppe(self, enveloppe):
         public_key = enveloppe.certificat.public_key()
@@ -87,6 +97,14 @@ class CipherMsg1Chiffrer(CipherMgs1):
     @property
     def password(self):
         return self._password
+
+    @property
+    def digest(self):
+        """
+        Digest calcule sur le resultat chiffre
+        :return:
+        """
+        return 'sha512_b64:' + b64encode(self._digest_result).decode('utf-8')
 
 
 class CipherMsg1Dechiffrer(CipherMgs1):

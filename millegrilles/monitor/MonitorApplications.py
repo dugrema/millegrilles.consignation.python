@@ -354,7 +354,7 @@ class GestionnaireApplications:
                     container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
 
                 handler_backup = HandlerBackupApplication(self.__handler_requetes)
-                handler_backup.upload_backup(path_archive)
+                handler_backup.upload_backup(service_name, path_archive)
 
             finally:
                 self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])

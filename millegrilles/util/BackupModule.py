@@ -6,6 +6,7 @@ import lzma
 import hashlib
 import requests
 import tarfile
+import tempfile
 
 from typing import Optional
 from io import RawIOBase
@@ -32,7 +33,7 @@ class BackupUtil:
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def preparer_cipher(self, catalogue_backup, info_cles: dict, nom_domaine: str):
+    def preparer_cipher(self, catalogue_backup, info_cles: dict, nom_domaine: str = None, nom_application: str = None):
         """
         Prepare un objet cipher pour chiffrer le fichier de transactions
 
@@ -56,15 +57,17 @@ class BackupUtil:
         certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
         transaction_maitredescles = {
-            'domaine': nom_domaine,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
                 ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[
                     ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
             },
             'iv': iv,
             'cles': cles_chiffrees,
-            'sujet': 'cles.backupTransactions',
         }
+        if nom_domaine is not None:
+            transaction_maitredescles['domaine'] = nom_domaine
+        if nom_application is not None:
+            transaction_maitredescles['application'] = nom_application
 
         return cipher, transaction_maitredescles
 
@@ -988,12 +991,49 @@ class HandlerBackupApplication:
         self.__handler_requetes = handler_requetes
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def upload_backup(self, path_archive):
+        self.__backup_util = BackupUtil(self.__handler_requetes.contexte)
+
+    def upload_backup(self, nom_application, path_archive):
+
+        date_formattee = datetime.datetime.utcnow().strftime('%y%m%d%H%M')
+        nom_fichier_backup = 'application_%s_%s.tar.xz.mgs1' % (nom_application, date_formattee)
+
+        catalogue_backup = {
+            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: nom_fichier_backup
+        }
 
         # Faire requete pour obtenir les cles de chiffrage
-        domaine_action = 'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES
+        domaine_action = 'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         cles_chiffrage = self.__handler_requetes.requete(domaine_action)
         self.__logger.debug("Cles chiffrage recu : %s" % cles_chiffrage)
+
+        cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(
+            catalogue_backup, cles_chiffrage, nom_application=nom_application)
+
+        basedir = path.dirname(path_archive)
+        output_name = path.join(basedir, path.basename(path_archive) + '.xz.mgs1')
+        self.__logger.debug("Compression et chiffrage de %s ver %s" % (path_archive, output_name))
+
+        block_size = 64 * 1024
+        with open(path_archive, 'rb') as input:
+
+            with open(output_name, 'wb') as output:
+                lzma_compressor = lzma.LZMACompressor()
+                output.write(cipher.start_encrypt())
+
+                data = input.read(block_size)
+                while len(data) > 0:
+                    data = lzma_compressor.compress(data)
+                    data = cipher.update(data)
+                    output.write(data)
+                    data = input.read(block_size)
+
+                output.write(cipher.update(lzma_compressor.flush()))
+                output.write(cipher.finalize())
+
+        digest_archive = cipher.digest
+
+        self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (output_name, digest_archive))
 
 
 class WrapperDownload(RawIOBase):
