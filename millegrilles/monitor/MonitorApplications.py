@@ -7,6 +7,7 @@ import os
 import tempfile
 import tarfile
 import io
+import requests
 
 from typing import Optional
 from threading import Event
@@ -18,6 +19,8 @@ from docker.errors import APIError
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
+from millegrilles.util.BackupModule import HandlerBackupApplication
+from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 
 
 class GestionnaireApplications:
@@ -39,6 +42,8 @@ class GestionnaireApplications:
         self.__wait_start_service_name = None
         self.__wait_start_container_name = None
         self.__wait_start_service_container_id = None
+
+        self.__handler_requetes: [TraitementMQRequetesBlocking] = None
 
     def event(self, event):
         # self.__logger.debug("Event docker APPS : %s", str(event))
@@ -345,8 +350,12 @@ class GestionnaireApplications:
                     self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
 
                 # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
-                self.__gestionnaire_modules_docker.save_archives(
+                path_archive = self.__gestionnaire_modules_docker.save_archives(
                     container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
+
+                handler_backup = HandlerBackupApplication(self.__handler_requetes)
+                handler_backup.upload_backup(path_archive)
+
             finally:
                 self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 
@@ -418,6 +427,15 @@ class GestionnaireApplications:
         else:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
             raise Exception("Image non installee : " + nom_image_docker)
+
+    def initialiser_handler_mq(self, contexte):
+        """
+        Initialise le handler, le retourne pour le faire enregistrer comme listener sur MQ
+        :param contexte:
+        :return:
+        """
+        self.__handler_requetes = TraitementMQRequetesBlocking(contexte)
+        return self.__handler_requetes
 
 
 class GestionnaireImagesApplications(GestionnaireImagesDocker):

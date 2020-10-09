@@ -10,6 +10,7 @@ from typing import Optional
 from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
+from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, GestionnaireComptesMQ
 from millegrilles.util.X509Certificate import EnveloppeCleCert, ConstantesGenerateurCertificat
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ForcerRedemarrage
@@ -36,6 +37,7 @@ class GestionnaireCommandes:
         self.__pipe_acteur: Optional[PipeActeur] = None
         self.__attente_acteur_mdns = Event()
         self.__reponse_acteur_mdns: Optional[dict] = None
+        self.__handler_requetes: Optional[TraitementMQRequetesBlocking] = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -249,6 +251,15 @@ class GestionnaireCommandes:
     def recevoir_reponse_mdns(self, reponse: CommandeMonitor):
         self.__reponse_acteur_mdns = reponse.contenu
         self.__attente_acteur_mdns.set()
+
+    def initialiser_handler_mq(self, contexte):
+        """
+        Initialise le handler, le retourne pour le faire enregistrer comme listener sur MQ
+        :param contexte:
+        :return:
+        """
+        self.__handler_requetes = TraitementMQRequetesBlocking(contexte)
+        return self.__handler_requetes
 
 
 class GestionnaireCommandesNoeudProtegeDependant(GestionnaireCommandes):

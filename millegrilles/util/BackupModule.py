@@ -8,22 +8,78 @@ import requests
 import tarfile
 
 from typing import Optional
-from io import RawIOBase, BufferedReader, BytesIO
+from io import RawIOBase
 from os import path
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes
 from base64 import b64encode, b64decode
-from lzma import LZMADecompressor, LZMAFile, LZMAError
+from lzma import LZMAFile, LZMAError
 from threading import Thread, Event
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesBackup, ConstantesPki
+from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import TraitementMessageCallback
+from millegrilles.dao.MessageDAO import TraitementMessageCallback, TraitementMQRequetesBlocking
+
+
+class BackupUtil:
+
+    def __init__(self, contexte):
+        self.__contexte = contexte
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def preparer_cipher(self, catalogue_backup, info_cles: dict, nom_domaine: str):
+        """
+        Prepare un objet cipher pour chiffrer le fichier de transactions
+
+        :param catalogue_backup:
+        :param info_cles: Cles publiques (certs) retournees par le maitre des cles. Utilisees pour chiffrer cle secrete.
+        :return:
+        """
+        cipher = CipherMsg1Chiffrer()
+        iv = b64encode(cipher.iv).decode('utf-8')
+
+        # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
+        enveloppe_millegrille = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
+        catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
+        catalogue_backup['iv'] = iv
+
+        # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
+        certs_cles_backup = [
+            info_cles['certificat'][0],  # Certificat de maitredescles
+            info_cles['certificat_millegrille'],  # Certificat de millegrille
+        ]
+        certs_cles_backup.extend(info_cles['certificats_backup'].values())
+        cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
+        transaction_maitredescles = {
+            'domaine': nom_domaine,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[
+                    ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
+            },
+            'iv': iv,
+            'cles': cles_chiffrees,
+            'sujet': 'cles.backupTransactions',
+        }
+
+        return cipher, transaction_maitredescles
+
+    def chiffrer_cle(self, pems: list, cle_secrete: bytes):
+        cles = dict()
+        for pem in pems:
+            clecert = EnveloppeCleCert()
+            clecert.cert_from_pem_bytes(pem.encode('utf-8'))
+            fingerprint_b64 = clecert.fingerprint_b64
+            cle_chiffree, fingerprint = clecert.chiffrage_asymmetrique(cle_secrete)
+
+            cle_chiffree_b64 = b64encode(cle_chiffree).decode('utf-8')
+            cles[fingerprint_b64] = cle_chiffree_b64
+
+        return cles
 
 
 class HandlerBackupDomaine:
@@ -40,6 +96,7 @@ class HandlerBackupDomaine:
         self._nom_collection_transactions = nom_collection_transactions
         self._nom_collection_documents = nom_collection_documents
         self.__niveau_securite = niveau_securite
+        self.__backup_util = BackupUtil(contexte)
 
     def backup_domaine(self, heure: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
         """
@@ -434,7 +491,7 @@ class HandlerBackupDomaine:
 
         # Preparer chiffrage, cle
         if chiffrer_transactions:
-            cipher, transaction_maitredescles = self.preparer_cipher(catalogue_backup, info_cles)
+            cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(catalogue_backup, info_cles, self._nom_domaine)
 
             # Inserer la transaction de maitre des cles dans l'info backup pour l'uploader avec le PUT
             info_backup['transaction_maitredescles'] = self._contexte.generateur_transactions.preparer_enveloppe(
@@ -508,42 +565,6 @@ class HandlerBackupDomaine:
             }
 
         return info_backup
-
-    def preparer_cipher(self, catalogue_backup, info_cles):
-        """
-        Prepare un objet cipher pour chiffrer le fichier de transactions
-
-        :param catalogue_backup:
-        :param info_cles: Cles publiques (certs) retournees par le maitre des cles. Utilisees pour chiffrer cle secrete.
-        :return:
-        """
-        cipher = CipherMsg1Chiffrer()
-        iv = b64encode(cipher.iv).decode('utf-8')
-
-        # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
-        enveloppe_millegrille = self._contexte.signateur_transactions.get_enveloppe_millegrille()
-        catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
-        catalogue_backup['iv'] = iv
-
-        # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
-        certs_cles_backup = [
-            info_cles['certificat'][0],  # Certificat de maitredescles
-            info_cles['certificat_millegrille'],  # Certificat de millegrille
-        ]
-        certs_cles_backup.extend(info_cles['certificats_backup'].values())
-        cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
-        transaction_maitredescles = {
-            'domaine': self._nom_domaine,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[
-                    ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
-            },
-            'iv': iv,
-            'cles': cles_chiffrees,
-            'sujet': 'cles.backupTransactions',
-        }
-
-        return cipher, transaction_maitredescles
 
     def sauvegarder_catalogue(self, backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
                               cles_set, info_backup, path_fichier_backup):
@@ -960,18 +981,19 @@ class HandlerBackupDomaine:
         hachage_backup = 'sha512_b64:' + hachage_backup
         return hachage_backup
 
-    def chiffrer_cle(self, pems: list, cle_secrete: bytes):
-        cles = dict()
-        for pem in pems:
-            clecert = EnveloppeCleCert()
-            clecert.cert_from_pem_bytes(pem.encode('utf-8'))
-            fingerprint_b64 = clecert.fingerprint_b64
-            cle_chiffree, fingerprint = clecert.chiffrage_asymmetrique(cle_secrete)
 
-            cle_chiffree_b64 = b64encode(cle_chiffree).decode('utf-8')
-            cles[fingerprint_b64] = cle_chiffree_b64
+class HandlerBackupApplication:
 
-        return cles
+    def __init__(self, handler_requetes: TraitementMQRequetesBlocking):
+        self.__handler_requetes = handler_requetes
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def upload_backup(self, path_archive):
+
+        # Faire requete pour obtenir les cles de chiffrage
+        domaine_action = 'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES
+        cles_chiffrage = self.__handler_requetes.requete(domaine_action)
+        self.__logger.debug("Cles chiffrage recu : %s" % cles_chiffrage)
 
 
 class WrapperDownload(RawIOBase):
@@ -1068,6 +1090,9 @@ class RapportRestauration:
 
 
 class ArchivesBackupParser:
+    """
+    Parse le fichier .tar transmis par consignationfichiers contenant toutes les archives de backup.
+    """
 
     def __init__(self, contexte: ContexteRessourcesMilleGrilles, stream, path_output: str = None):
         self.__contexte = contexte
@@ -1075,6 +1100,7 @@ class ArchivesBackupParser:
         self.__catalogue_horaire_courant = None
         self.__channel = None
         self.__nom_queue: Optional[str] = None
+        self.__thread: Optional[Thread] = None
 
         self.__handler_messages = ReceptionMessage(self, contexte.message_dao, contexte.configuration)
 
@@ -1156,7 +1182,6 @@ class ArchivesBackupParser:
 
         type_archive = self.detecter_type_archive(nom_fichier)
 
-        path_local = None
         tar_fo = self.__tar_stream.extractfile(tar_info)
         if self.__path_output is not None:
             path_local = path.join(self.__path_output, nom_fichier)
@@ -1261,23 +1286,6 @@ class ArchivesBackupParser:
                     cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
                     decipher = CipherMsg1Dechiffrer(iv, cle_dechiffree)
                     stream = DecipherStream(decipher, file_object)
-
-                    # data = stream.read()
-                    # while len(data) > 0:
-                    #     self.__logger.debug("Data : %d" % len(data))
-                    #     try:
-                    #         self.__logger.debug(data.decode('utf-8'))
-                    #     except UnicodeDecodeError:
-                    #         pass
-                    #     data = stream.read()
-                    #
-                    # digest_transactions = stream.digest()
-                    # self.__logger.debug("Digest transaction : %s" % digest_transactions)
-                    # digest_transactions_catalogue = catalogue['transactions_hachage']
-                    # if digest_transactions == digest_transactions_catalogue:
-                    #     self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
-                    # else:
-                    #     self.__logger.error("Erreur digest different : %s" % digest_transactions_catalogue)
 
                     # Wrapper le stream dans un decodeur lzma
                     internal_file_object = LZMAFile(stream)
@@ -1389,34 +1397,6 @@ class ArchivesBackupParser:
         self.__event_attente_reponse.clear()
 
         return self.__reponse_cle
-
-    # def generer_commande_cle(self, catalogue):
-    #     iv = catalogue['iv']
-    #     cles = catalogue.get('cles')
-    #     if cles is None and catalogue.get('cle'):
-    #         # On a seulement la cle de millegrille
-    #         enveloppe_millegrille = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
-    #         fingerprint_b64 = enveloppe_millegrille.fingerprint_b64
-    #         cles = {fingerprint_b64: catalogue['cle']}
-    #
-    #     transactions_nomfichier = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
-    #
-    #     commande_sauvegarder_cle = {
-    #         'domaine': catalogue[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-    #         Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-    #             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: transactions_nomfichier,
-    #         },
-    #         "cles": cles,
-    #         "iv": iv,
-    #         'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
-    #         'securite': catalogue[Constantes.DOCUMENT_INFODOC_SECURITE],
-    #     }
-    #
-    #     return self.__contexte.generateur_transactions.transmettre_commande(
-    #         commande_sauvegarder_cle,
-    #         'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
-    #         exchange=Constantes.SECURITE_SECURE,
-    #     )
 
 
 class TypeArchiveInconnue(Exception):

@@ -605,6 +605,15 @@ class ConnexionMiddleware:
     def rediriger_messages_domaine(self, nom_domaine: str, exchanges_routing: dict):
         self.__transfert_local_handler.ajouter_domaine(nom_domaine, exchanges_routing)
 
+    def enregistrer_listener(self, methode_initialisation):
+        """
+        Initialise un objet/methode avec le contexte et enregistre le listener retourne
+        :param methode_initialisation: Methode qui va recevoir contexte, doit retourner l'instance du listener
+        :return:
+        """
+        listener = methode_initialisation(self._contexte)
+        self._contexte.message_dao.register_channel_listener(listener)
+
     @property
     def document_dao(self) -> MongoDAO:
         return self._contexte.document_dao

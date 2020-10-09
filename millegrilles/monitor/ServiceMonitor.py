@@ -567,6 +567,10 @@ class ServiceMonitor:
 
         return info_mq
 
+    @property
+    def connexion_middleware(self) -> ConnexionMiddleware:
+        return self._connexion_middleware
+
     def preparer_secrets(self):
         """
         Expose les certs/cle prive dans le volume secrets pour les containers
@@ -729,6 +733,11 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         try:
             self._connexion_middleware.initialiser()
             self._connexion_middleware.start()
+
+            # Ajouter les listeners au besoin
+            self._connexion_middleware.enregistrer_listener(self.gestionnaire_commandes.initialiser_handler_mq)
+            self._connexion_middleware.enregistrer_listener(self.gestionnaire_applications.initialiser_handler_mq)
+
         except TypeError as te:
             self.__logger.exception("Erreur fatale configuration MQ, abandonner")
             self.fermer()

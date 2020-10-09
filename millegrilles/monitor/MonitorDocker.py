@@ -951,17 +951,31 @@ class GestionnaireModulesDocker:
         with open(src_path, 'rb') as fichier:
             container.put_archive(dst_path, fichier)
 
-    def save_archives(self, container_id: str, src_path: str, dest_path: str = '/tmp/monitorbackup', dest_prefix: str = 'backup'):
+    def save_archives(self, container_id: str, src_path: str,
+                      dest_path: str = '/tmp/monitorbackup',
+                      dest_prefix: str = 'backup') -> str:
+        """
+        Recupere un fichier a partir d'un container docker.
+        :param container_id:
+        :param src_path:
+        :param dest_path:
+        :param dest_prefix:
+        :return: Liste des fichiers extraits
+        """
         container = self.__docker.containers.get(container_id)
 
         os.makedirs(dest_path, exist_ok=True)
 
         archive_index = 0
         archive_name = '%s.%d.tar' % (dest_prefix, archive_index)
+        path_archive_backup = os.path.join(dest_path, archive_name)
         tar_data, stat_data = container.get_archive(src_path)
-        with open(os.path.join(dest_path, archive_name), 'wb') as output:
+
+        with open(path_archive_backup, 'wb') as output:
             for chunk in tar_data:
                 output.write(chunk)
+
+        return path_archive_backup
 
     def get_archive_bytes(self, container_id, src_path) -> bytes:
         container = self.__docker.containers.get(container_id)

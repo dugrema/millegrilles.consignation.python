@@ -1654,6 +1654,90 @@ class PikaSetupHandler:
             self.executer_exchange(handler)
 
 
+class TraitementMQRequetesBlocking(BaseCallback):
+    """
+    Permet de recevoir des reponses sur MQ pour le traitement des commandes
+    """
+
+    def __init__(self, contexte):
+        super().__init__(contexte)
+        self.__channel = None
+        self.queue_name = None
+
+        self.__event_attente = Event()
+        self.__reponse_correlation_id = None
+        self.__reponse = None
+
+        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        routing_key = method.routing_key
+        correlation_id = properties.correlation_id
+
+        self.__logger.debug("Message recu : %s" % message_dict)
+
+        if routing_key == self.queue_name:
+            # C'est une reponse
+            self.__reponse = message_dict
+            self.__event_attente.set()
+        else:
+            raise ValueError("Type message inconnu", correlation_id, routing_key)
+
+    def requete(self, domaine_action: str, params: dict = None):
+        """
+        Requete blocking - ne supporte pas plusieur requetes a la fois (lance exception)
+        :param domaine_action:
+        :param params:
+        :return:
+        """
+        correlation_id = 'requete_commande'
+        if self.__reponse_correlation_id is not None:
+            raise Exception("Requete deja en cours")
+
+        try:
+            if params is None:
+                params = dict()
+
+            self.__event_attente.clear()
+            self.__reponse_correlation_id = correlation_id
+
+            self.contexte.generateur_transactions.transmettre_requete(
+                params, domaine_action, correlation_id='requete_commande', reply_to=self.queue_name)
+
+            self.__event_attente.wait(15)
+
+            if self.__event_attente.is_set():
+                # On a recu une reponse
+                reponse = self.__reponse
+                return reponse
+            else:
+                raise ReponseTimeout(domaine_action)
+
+        finally:
+            self.__reponse_correlation_id = None
+            self.__reponse = None
+            self.__event_attente.clear()
+
+    def on_channel_open(self, channel):
+        self.__channel = channel
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=1)
+
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+
+    def queue_open(self, queue):
+        self.queue_name = queue.method.queue
+        self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+        self.queue_name = None
+
+    def is_channel_open(self):
+        return self.__channel is not None and not self.__channel.is_closed
+
+
 class ExceptionConnectionFermee(Exception):
     pass
 
@@ -1679,3 +1763,8 @@ class RoutingKeyInconnue(Exception):
     @property
     def routing_key(self):
         return self.__routing_key
+
+
+class ReponseTimeout(Exception):
+    """ Lance pour un timeout de requete/reponse """
+    pass
