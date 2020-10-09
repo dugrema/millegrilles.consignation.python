@@ -705,6 +705,8 @@ class ConstantesMaitreDesCles:
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP = 'cleGrosFichierBackup'
     TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS = '%s.cleBackupTransactions' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS_BACKUP = 'cleBackupTransactionsBackup'
+    TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION = '%s.cleBackupApplication' % DOMAINE_NOM
+    TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION_BACKUP = 'cleBackupApplicationBackup'
     TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.cleDocument' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_DOCUMENT_BACKUP = 'cleDocumentBackup'
     TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
@@ -1312,6 +1314,7 @@ class ConstantesBackup:
     TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE = '%s.catalogueHoraireHachageEntete' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_QUOTIDIEN = '%s.catalogueQuotidienFinaliser' % DOMAINE_NOM
     TRANSACTION_CATALOGUE_ANNUEL = '%s.catalogueAnnuelFinaliser' % DOMAINE_NOM
+    TRANSACTION_CATALOGUE_APPLICATION = '%s.catalogueApplication' % DOMAINE_NOM
 
     TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO = '%s.archiveQuotidienneInfo' % DOMAINE_NOM
     TRANSACTION_ARCHIVE_ANNUELLE_INFO = '%s.archiveAnnuelleInfo' % DOMAINE_NOM
@@ -1717,3 +1720,4 @@ class ConstantesCatalogueApplications:
     REQUETE_LISTE_APPLICATIONS = '%s.listeApplications' % DOMAINE_NOM
     REQUETE_INFO_DOMAINE = '%s.infoDomaine' % DOMAINE_NOM
     REQUETE_INFO_APPLICATION = '%s.infoApplication' % DOMAINE_NOM
+

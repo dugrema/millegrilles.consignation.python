@@ -6,6 +6,7 @@ import lzma
 import hashlib
 import requests
 import tarfile
+import os
 import tempfile
 
 from typing import Optional
@@ -56,11 +57,20 @@ class BackupUtil:
         ]
         certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
+
+        identificateurs_document = dict()
+        liste_identificateurs = [
+            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER,
+            ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER,
+        ]
+        for ident in liste_identificateurs:
+            try:
+                identificateurs_document[ident] = catalogue_backup[ident]
+            except KeyError:
+                pass
+
         transaction_maitredescles = {
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: catalogue_backup[
-                    ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
-            },
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'iv': iv,
             'cles': cles_chiffrees,
         }
@@ -992,15 +1002,77 @@ class HandlerBackupApplication:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.__backup_util = BackupUtil(self.__handler_requetes.contexte)
+        self.__generateur_transactions = self.__handler_requetes.contexte.generateur_transactions
 
     def upload_backup(self, nom_application, path_archive):
 
-        date_formattee = datetime.datetime.utcnow().strftime('%y%m%d%H%M')
-        nom_fichier_backup = 'application_%s_%s.tar.xz.mgs1' % (nom_application, date_formattee)
+        fichiers_temporaire = [path_archive]
+        try:
+            catalogue_backup = {
+                'application': nom_application,
+                'securite': Constantes.SECURITE_PROTEGE,
+            }
 
-        catalogue_backup = {
-            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: nom_fichier_backup
-        }
+            nom_fichier_backup, digest_archive, transaction_maitredescles = self._chiffrer_archive(
+                nom_application, path_archive, catalogue_backup)
+            fichiers_temporaire.append(nom_fichier_backup)  # Permet de supprimer le fichier a la fin
+            self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (nom_fichier_backup, digest_archive))
+            catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
+
+            fichiers_transactions = self._preparer_transactions_backup(nom_application, catalogue_backup, transaction_maitredescles)
+            fichiers_temporaire.extend(fichiers_transactions)
+
+        finally:
+            # Supprimer les archives
+            for fichier in fichiers_temporaire:
+                try:
+                    os.remove(fichier)
+                except FileNotFoundError as e:
+                    self.__logger.warning("Erreur nettoyage fichier " + str(e))
+
+    def _preparer_transactions_backup(self, nom_application: str, catalogue_backup: dict, transaction_maitredescles: dict, path_fichiers: str = '/tmp'):
+        """
+        Complete le contenu des transactions catalogue, maitre des cles. Les conserve dans des fichiers temporaires.
+        :param catalogue_backup:
+        :param transaction_maitredescles:
+        :return:
+        """
+
+        #     "application": "Application___",
+        #     "securite": "3.protege",
+        #     "catalogue_nomfichier": "application_app_catalogue_202010070000.json.xz",
+        #     "archive_nomfichier": "application_app_archive_2020100700.tar.xz.mgs1",
+        #     "archive_hachage": "sha512_b64:NZXajIM8OnHR505RynFyL7olyXxnw5ChqY8+Z391GzIRLsQEEiuGtK1iJ+4YIdlTUE/VxsPvOPZLt46PM7Cmew==",
+
+        # Signer les transactions
+        catalogue_backup = self.__generateur_transactions.preparer_enveloppe(
+            catalogue_backup,
+            ConstantesBackup.TRANSACTION_CATALOGUE_APPLICATION,
+            ajouter_certificats=True
+        )
+        transaction_maitredescles = self.__generateur_transactions.preparer_enveloppe(
+            transaction_maitredescles,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION,
+            ajouter_certificats=True)
+
+        fd_catalogue, tmpfile_catalogue = tempfile.mkstemp(dir=path_fichiers, prefix='transaction_', suffix='.json')
+        fp_catalogue = os.fdopen(fd_catalogue, 'w')
+        json.dump(catalogue_backup, fp_catalogue)
+        fp_catalogue.close()
+
+        fd_maitredescles, tmpfile_maitredescles = tempfile.mkstemp(dir=path_fichiers, prefix='transaction_', suffix='.json')
+        fp_maitredescles = os.fdopen(fd_maitredescles, 'w')
+        json.dump(transaction_maitredescles, fp_maitredescles)
+        fp_maitredescles.close()
+
+        return [tmpfile_catalogue, tmpfile_maitredescles]
+
+    def _chiffrer_archive(self, nom_application, path_archive, catalogue_backup: dict):
+        date_formattee = datetime.datetime.utcnow().strftime('%y%m%d%H%M')
+        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs1' % (nom_application, date_formattee)
+        nom_fichier_catalogue = 'application_%s_catalogue_%s.json' % (nom_application, date_formattee)
+        catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER] = nom_fichier_backup
+        catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER] = nom_fichier_catalogue
 
         # Faire requete pour obtenir les cles de chiffrage
         domaine_action = 'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
@@ -1011,13 +1083,12 @@ class HandlerBackupApplication:
             catalogue_backup, cles_chiffrage, nom_application=nom_application)
 
         basedir = path.dirname(path_archive)
-        output_name = path.join(basedir, path.basename(path_archive) + '.xz.mgs1')
-        self.__logger.debug("Compression et chiffrage de %s ver %s" % (path_archive, output_name))
+        self.__logger.debug("Compression et chiffrage de %s ver %s" % (path_archive, nom_fichier_backup))
 
+        # Compresser et chiffrer l'archive
         block_size = 64 * 1024
         with open(path_archive, 'rb') as input:
-
-            with open(output_name, 'wb') as output:
+            with open(nom_fichier_backup, 'wb') as output:
                 lzma_compressor = lzma.LZMACompressor()
                 output.write(cipher.start_encrypt())
 
@@ -1030,10 +1101,9 @@ class HandlerBackupApplication:
 
                 output.write(cipher.update(lzma_compressor.flush()))
                 output.write(cipher.finalize())
-
         digest_archive = cipher.digest
 
-        self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (output_name, digest_archive))
+        return nom_fichier_backup, digest_archive, transaction_maitredescles
 
 
 class WrapperDownload(RawIOBase):
