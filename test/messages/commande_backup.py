@@ -326,6 +326,17 @@ class MessagesSample(BaseCallback):
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
+    def trigger_restaurer_liensgrosfichiers(self):
+        commande = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            ConstantesBackup.COMMANDE_BACKUP_RESTAURER_GROSFICHIERS,
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_restauration'
+        )
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
@@ -339,7 +350,7 @@ class MessagesSample(BaseCallback):
 
         # sample.preparer_restauration()
         # sample.restaurer('MaitreDesCles')
-        sample.restaurer('GrosFichiers')
+        # sample.restaurer('GrosFichiers')
         # sample.requete_get_domaines()
 
         # sample.requete_restaurer_tout()
@@ -353,6 +364,8 @@ class MessagesSample(BaseCallback):
         # sample.trigger_quotidien('MaitreDesCles', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2020, month=10, day=9))
+
+        sample.trigger_restaurer_liensgrosfichiers()
 
 
 # --- MAIN ---
