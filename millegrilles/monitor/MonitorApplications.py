@@ -136,15 +136,17 @@ class GestionnaireApplications:
 
         nom_image_docker = commande.contenu['nom_application']
 
-        configuration_docker = commande.contenu.get('configuration')
-        if configuration_docker is None:
+        configuration_app = commande.contenu.get('configuration')
+        if configuration_app is None:
             # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
             gestionnaire_docker = self.__service_monitor.gestionnaire_docker
             configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
-            configuration_docker = json.loads(configuration_bytes)
-            commande.contenu['configuration'] = configuration_docker
+            configuration_app = json.loads(configuration_bytes)
+            commande.contenu['configuration'] = configuration_app
 
-        liste_configurations = self.charger_dependances_restauration(configuration_docker)
+        tar_scripts = self.preparer_script_file({'configuration': configuration_app})
+
+        liste_configurations = self.charger_dependances_restauration(configuration_app)
         # Conserver uniquement les images avec element backup, utiliser config.name comme nom de download
         liste_backup = list()
         for config in liste_configurations:
@@ -153,7 +155,6 @@ class GestionnaireApplications:
 
         # Restaurer chaque application avec backup
         for config in liste_backup:
-            tar_scripts = self.preparer_script_file({'configuration': config})
             nom_application = config['config']['name']
 
             # Preparer URL de connexion a consignationfichiers
@@ -204,18 +205,17 @@ class GestionnaireApplications:
 
                 gestionnaire_images_applications = GestionnaireImagesApplications(
                     self.__service_monitor.idmg, self.__service_monitor.docker)
-                gestionnaire_images_applications.set_configuration(configuration_docker)
+                gestionnaire_images_applications.set_configuration(configuration_app)
                 self.restore_dependance(
                     gestionnaire_images_applications, config, tar_scripts, tar_archive)
-
-                self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
             finally:
                 # Cleanup
-                try:
-                    os.remove(tar_archive)
-                except FileNotFoundError:
-                    pass
-
+                fichiers_nettoyage = [tar_archive, tar_scripts]
+                for fichier in fichiers_nettoyage:
+                    try:
+                        os.remove(fichier)
+                    except FileNotFoundError:
+                        pass
 
     def charger_dependances_restauration(self, configuration_docker):
         """
@@ -486,28 +486,28 @@ class GestionnaireApplications:
             self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
             raise Exception("Image non installee : " + nom_image_docker)
 
-    def effectuer_restore(self, nom_image_docker, configuration_docker, tar_scripts: str, tar_archive: str):
-        try:
-            gestionnaire_images_applications = GestionnaireImagesApplications(
-                self.__service_monitor.idmg, self.__service_monitor.docker)
-            gestionnaire_images_applications.set_configuration(configuration_docker)
-
-            for config_image in configuration_docker['dependances']:
-                if config_image.get('dependances'):
-                    # Sous dependances presentes, c'est une sous-config (recursif)
-                    nom_image_docker = config_image['nom']
-                    self.effectuer_restore(nom_image_docker, config_image, tar_scripts, tar_archive)
-                elif config_image.get('image'):
-                    if config_image.get('backup'):
-                        # C'est une image avec element de backup, on fait la restauration
-                        self.restore_dependance(
-                            gestionnaire_images_applications, config_image, tar_scripts, tar_archive)
-        finally:
-            # Cleanup scripts
-            try:
-                os.remove(tar_scripts)
-            except FileNotFoundError:
-                pass  # OK
+    # def effectuer_restore(self, nom_image_docker, configuration_docker, tar_scripts: str, tar_archive: str):
+    #     try:
+    #         gestionnaire_images_applications = GestionnaireImagesApplications(
+    #             self.__service_monitor.idmg, self.__service_monitor.docker)
+    #         gestionnaire_images_applications.set_configuration(configuration_docker)
+    #
+    #         for config_image in configuration_docker['dependances']:
+    #             if config_image.get('dependances'):
+    #                 # Sous dependances presentes, c'est une sous-config (recursif)
+    #                 nom_image_docker = config_image['nom']
+    #                 self.effectuer_restore(nom_image_docker, config_image, tar_scripts, tar_archive)
+    #             elif config_image.get('image'):
+    #                 if config_image.get('backup'):
+    #                     # C'est une image avec element de backup, on fait la restauration
+    #                     self.restore_dependance(
+    #                         gestionnaire_images_applications, config_image, tar_scripts, tar_archive)
+    #     finally:
+    #         # Cleanup scripts
+    #         try:
+    #             os.remove(tar_scripts)
+    #         except FileNotFoundError:
+    #             pass  # OK
 
     def restore_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts, tar_archive):
         nom_image_docker = config_image['image']
@@ -527,28 +527,27 @@ class GestionnaireApplications:
         container_id = self.__wait_start_service_container_id
         self.__wait_start_service_container_id = None
 
-        if self.__wait_container_event.is_set():
-            self.__logger.info("Executer script de restauration du container id : %s" % self.__wait_start_service_container_id)
-            self.__wait_container_event.clear()
+        try:
+            if self.__wait_container_event.is_set():
+                self.__logger.info("Executer script de restauration du container id : %s" % self.__wait_start_service_container_id)
+                self.__wait_container_event.clear()
 
-            # Injecter le contenu du fichier .tar de backup
-            path_archive = config_image['backup']['base_path']
-            # Le path archive inclus le repertoire injecte dans l'archive (e.g. /tmp/backup, on veut extraire sous /tmp)
-            path_archive = path.join('/', '/'.join(path_archive.split('/')[0:-1]))
+                # Injecter le contenu du fichier .tar de backup
+                path_archive = config_image['backup']['base_path']
+                # Le path archive inclus le repertoire injecte dans l'archive (e.g. /tmp/backup, on veut extraire sous /tmp)
+                path_archive = path.join('/', '/'.join(path_archive.split('/')[0:-1]))
 
-            self.__gestionnaire_modules_docker.put_archives(container_id, tar_archive, path_archive)
+                self.__gestionnaire_modules_docker.put_archives(container_id, tar_archive, path_archive)
 
-            try:
                 # Executer la restauration
                 commande_restore = backup_info.get('commande_restore')
                 if commande_restore:
                     self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_restore, tar_scripts)
-            finally:
-                self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
-
-        else:
-            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
-            raise Exception("Image non installee : " + nom_image_docker)
+                else:
+                    self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
+                    raise Exception("Image non installee : " + nom_image_docker)
+        finally:
+            self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 
     def initialiser_handler_mq(self, contexte):
         """
