@@ -228,6 +228,23 @@ class MessagesSample(BaseCallback):
             self.queue_name
         )
 
+    def requete_cle_backup_application(self):
+        requete_cert_maitredescles = {
+            'certificat': self.certificat_courant_pem,
+            'identificateurs_document': {
+                'archive_nomfichier': 'application_mariadb_redmine_client_archive_202010101721.tar.xz.mgs1'
+            },
+        }
+
+        print(requete_cert_maitredescles)
+
+        self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP,
+            'abcd-1234',
+            self.queue_name
+        )
+
     def commande_sauvegarder_cle(self):
         commande = {
             'domaine': 'Topologie',
@@ -619,8 +636,9 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_signer_csr()
         # self.commande_signer_csr_noeud_prive()
 
-        self.requete_cles_non_dechiffrables()
+        # self.requete_cles_non_dechiffrables()
         # self.requete_cle_backup()
+        self.requete_cle_backup_application()
         # self.commande_sauvegarder_cle()
 
 

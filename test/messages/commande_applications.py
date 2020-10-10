@@ -107,7 +107,7 @@ class MessagesSample(BaseCallback):
     def restore_application(self):
         commande = {
             'nom_application': 'redmine.mariadb',
-            'archive_tarfile': '/tmp/monitorbackup/mariadb_redmine_client.0.tar',
+            # 'archive_tarfile': '/tmp/monitorbackup/mariadb_redmine_client.0.tar',
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
             self.noeud_id, Constantes.ConstantesServiceMonitor.COMMANDE_RESTORE_APPLICATION)
@@ -125,8 +125,8 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # self.backup_application()
-        self.backup_applications()
-        # self.restore_application()
+        # self.backup_applications()
+        self.restore_application()
 
 
 # --- MAIN ---

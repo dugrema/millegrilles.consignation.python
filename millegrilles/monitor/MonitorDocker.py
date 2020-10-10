@@ -949,11 +949,17 @@ class GestionnaireModulesDocker:
 
         # La dernier ligne devrait etre le resultat avec code exit, en json
         if output_result:
-            resultat = json.loads(output_result)
-            if resultat.get('exit') != 0:
+            try:
+                resultat = json.loads(output_result)
+                if resultat.get('exit') != 0:
+                    raise ExceptionExecution(
+                        "Erreur demarrage application, exit : %d" % resultat.get('exit'),
+                        resultat=resultat
+                    )
+            except json.decoder.JSONDecodeError:
                 raise ExceptionExecution(
-                    "Erreur demarrage application, exit : %d" % resultat.get('exit'),
-                    resultat=resultat
+                    "Erreur output, format n'est pas JSON, exit",
+                    resultat=output_result
                 )
 
     def executer_script_blind(self, container_id: str, commande: str, environment: list = None):

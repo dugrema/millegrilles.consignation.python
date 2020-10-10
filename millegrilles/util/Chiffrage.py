@@ -35,6 +35,14 @@ class CipherMgs1:
         backend = default_backend()
         self._cipher = Cipher(algorithms.AES(self._password), modes.CBC(self._iv), backend=backend)
 
+    @property
+    def digest(self):
+        """
+        Digest calcule sur le resultat chiffre
+        :return:
+        """
+        return 'sha512_b64:' + b64encode(self._digest_result).decode('utf-8')
+
 
 class CipherMsg1Chiffrer(CipherMgs1):
     """
@@ -101,14 +109,6 @@ class CipherMsg1Chiffrer(CipherMgs1):
     @property
     def password(self):
         return self._password
-
-    @property
-    def digest(self):
-        """
-        Digest calcule sur le resultat chiffre
-        :return:
-        """
-        return 'sha512_b64:' + b64encode(self._digest_result).decode('utf-8')
 
 
 class CipherMsg1Dechiffrer(CipherMgs1):

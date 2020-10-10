@@ -16,12 +16,13 @@ from base64 import b64encode, b64decode
 from os import path
 from docker.errors import APIError
 
+from millegrilles import Constantes
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 from millegrilles.util.BackupModule import HandlerBackupApplication
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
-
+from millegrilles.util.Chiffrage import CipherMsg1Dechiffrer, DecipherStream
 
 class GestionnaireApplications:
     """
@@ -92,7 +93,7 @@ class GestionnaireApplications:
                 with open(tar_scripts, 'wb') as fichier:
                     fichier.write(tar_bytes)
         else:
-            tar_scripts = commande.contenu.get('scripts_tarfile')
+            tar_scripts = commande.get('scripts_tarfile')
         return tar_scripts
 
     def supprimer_application(self, commande: CommandeMonitor):
@@ -143,9 +144,96 @@ class GestionnaireApplications:
             configuration_docker = json.loads(configuration_bytes)
             commande.contenu['configuration'] = configuration_docker
 
-        tar_scripts = self.preparer_script_file(commande)
-        tar_archive = commande.contenu['archive_tarfile']
-        self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
+        liste_configurations = self.charger_dependances_restauration(configuration_docker)
+        # Conserver uniquement les images avec element backup, utiliser config.name comme nom de download
+        liste_backup = list()
+        for config in liste_configurations:
+            if config.get('backup'):
+                liste_backup.append(config)
+
+        # Restaurer chaque application avec backup
+        for config in liste_backup:
+            tar_scripts = self.preparer_script_file({'configuration': config})
+            nom_application = config['config']['name']
+
+            # Preparer URL de connexion a consignationfichiers
+            contexte = configuration = self.__handler_requetes.contexte
+            configuration = contexte.configuration
+            url_consignationfichiers = 'https://%s:%s' % (
+                configuration.serveur_consignationfichiers_host,
+                configuration.serveur_consignationfichiers_port
+            )
+
+            # Telecharger l'archive de backup la plus recente pour cette application
+            certfile = configuration.mq_certfile
+            keyfile = configuration.mq_keyfile
+
+            r = requests.get(
+                '%s/backup/application/%s' % (url_consignationfichiers, nom_application),
+                verify=configuration.mq_cafile,
+                cert=(certfile, keyfile)
+            )
+
+            archive_hachage = r.headers.get('archive_hachage')
+            archive_nomfichier = r.headers.get('archive_nomfichier')
+            archive_epoch = r.headers.get('estampille')
+
+            # Demander la cle pour dechiffrer l'archive
+            chaine_certs = contexte.signateur_transactions.chaine_certs
+            requete = {
+                'certificat': chaine_certs,
+                'identificateurs_document': {
+                    'archive_nomfichier': archive_nomfichier,
+                },
+            }
+            resultat_cle = self.__handler_requetes.requete('MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP, requete)
+            cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(resultat_cle['cle'])
+            decipher = CipherMsg1Dechiffrer(b64decode(resultat_cle['iv']), cle_dechiffree)
+
+            tar_archive = '/tmp/download.tar'
+            iter_response = r.iter_content(chunk_size=64*1024)
+            try:
+                with open(tar_archive, 'wb') as fichier:
+                    for data in iter_response:
+                        # Dechiffrer, verifier hachage
+                        data = decipher.update(data)
+                        fichier.write(data)
+                    fichier.write(decipher.finalize())
+
+                # digest_calcule = decipher.digest  # Note : pas bon, il faut calculer avant data
+
+                gestionnaire_images_applications = GestionnaireImagesApplications(
+                    self.__service_monitor.idmg, self.__service_monitor.docker)
+                gestionnaire_images_applications.set_configuration(configuration_docker)
+                self.restore_dependance(
+                    gestionnaire_images_applications, config, tar_scripts, tar_archive)
+
+                self.effectuer_restore(nom_image_docker, configuration_docker, tar_scripts, tar_archive)
+            finally:
+                # Cleanup
+                try:
+                    os.remove(tar_archive)
+                except FileNotFoundError:
+                    pass
+
+
+    def charger_dependances_restauration(self, configuration_docker):
+        """
+        Chargement recursif de toutes les configuration docker associees a une application
+        :param configuration_docker:
+        :return: Liste de toutes les configurations incluant dependances
+        """
+        liste_configuration = list()
+        # Restaurer toutes les dependances de l'application
+        for config_image in configuration_docker['dependances']:
+            if config_image.get('dependances'):
+                # Recursif
+                liste = self.charger_dependances_restauration(config_image)
+                liste_configuration.extend(liste)
+            elif config_image.get('image'):
+                liste_configuration.append(config_image)
+
+        return liste_configuration
 
     def preparer_installation(self, nom_application, configuration_docker, tar_scripts=None, **kwargs):
         gestionnaire_images_applications = GestionnaireImagesApplications(
@@ -417,8 +505,7 @@ class GestionnaireApplications:
         finally:
             # Cleanup scripts
             try:
-                pass
-                # remove(tar_scripts)
+                os.remove(tar_scripts)
             except FileNotFoundError:
                 pass  # OK
 
