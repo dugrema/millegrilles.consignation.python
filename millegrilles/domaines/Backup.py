@@ -582,12 +582,10 @@ class ProcessusAjouterCatalogueApplication(MGProcessusTransaction):
         nom_application = transaction[ConstantesBackup.LIBELLE_APPLICATION]
 
         self.__logger.debug("Transaction recue: %s" % str(transaction))
-        heure_backup = datetime.datetime.fromtimestamp(
+        timestamp_backup = datetime.datetime.fromtimestamp(
             transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE],
             tz=datetime.timezone.utc
         )
-
-        jour_backup = datetime.datetime(year=heure_backup.year, month=heure_backup.month, day=heure_backup.day)
 
         champs_fichier = [
             ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER,
@@ -599,15 +597,15 @@ class ProcessusAjouterCatalogueApplication(MGProcessusTransaction):
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
             Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
+            '%s.%s.%s' % (ConstantesBackup.LIBELLE_APPLICATIONS, nom_application, Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP): timestamp_backup,
         }
 
         for champ in champs_fichier:
             set_ops['%s.%s.%s' % (ConstantesBackup.LIBELLE_APPLICATIONS, nom_application, champ)] = transaction[champ]
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_APPLICATIONS,
             ConstantesBackup.LIBELLE_DOMAINE: 'Applications',
-            ConstantesBackup.LIBELLE_JOUR: jour_backup,
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),

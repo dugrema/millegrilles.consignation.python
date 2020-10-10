@@ -1358,6 +1358,7 @@ class ConstantesBackup:
     LIBVAL_CATALOGUE_HORAIRE = 'catalogue.horaire'
     LIBVAL_CATALOGUE_QUOTIDIEN = 'catalogue.quotidien'
     LIBVAL_CATALOGUE_ANNUEL = 'catalogue.annuel'
+    LIBVAL_CATALOGUE_APPLICATIONS = 'catalogue.applications'
     LIBVAL_RAPPORT_RESTAURATION = 'rapportRestauration'
 
     LIBELLE_SECURITE = 'securite'
