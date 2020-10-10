@@ -1328,12 +1328,13 @@ class ArchivesBackupParser:
         self.__logger.debug("Message cle de backup recu : %s", message_dict)
         self.__reponse_cle = message_dict
 
-        self.__cle_iv_transactions = {
-            'cle': message_dict['cle'],
-            'iv': message_dict['iv'],
-        }
-
-        self.__event_attente_reponse.set()
+        try:
+            self.__cle_iv_transactions = {
+                'cle': message_dict['cle'],
+                'iv': message_dict['iv'],
+            }
+        finally:
+            self.__event_attente_reponse.set()
 
     def parse_tar_stream(self):
         try:
@@ -1346,16 +1347,15 @@ class ArchivesBackupParser:
 
     def _process_tar_info(self, tar_info):
         path_fichier = tar_info.name
-        nom_fichier = path.basename(path_fichier)
 
-        type_archive = self.detecter_type_archive(nom_fichier)
+        type_archive = self.detecter_type_archive(path_fichier)
+        nom_fichier = path.basename(path_fichier)
 
         tar_fo = self.__tar_stream.extractfile(tar_info)
         if self.__path_output is not None:
             path_local = path.join(self.__path_output, nom_fichier)
             with open(path_local,  'wb') as fichier:
                 fichier.write(tar_fo.read())
-
             try:
                 with open(path_local, 'rb') as fichier:
                     self.__traiter_archive(type_archive, nom_fichier, fichier)
@@ -1380,6 +1380,8 @@ class ArchivesBackupParser:
             self._process_archive_horaire_catalogue(nom_fichier, file_object)
         elif type_archive == 'horaire_transactions':
             self._process_archive_horaire_transaction(nom_fichier, file_object)
+        elif type_archive == 'grosfichier':
+            pass  # Skip les fichiers
         else:
             raise TypeArchiveInconnue(type_archive)
 
@@ -1390,11 +1392,15 @@ class ArchivesBackupParser:
             self.__logger.debug("Liste contenu archive annuelle/quotidienne")
 
             for tarinfo_quotidien in tar_quotidienne:
-                nom_fichier = tarinfo_quotidien.name
-                basename = path.basename(nom_fichier)
-                type_archive = self.detecter_type_archive(basename)
+                path_fichier = tarinfo_quotidien.name
                 fo = tar_quotidienne.extractfile(tarinfo_quotidien)
-                self.__traiter_archive(type_archive, basename, fo)
+                try:
+                    type_archive = self.detecter_type_archive(path_fichier)
+                    nom_fichier = path.basename(path_fichier)
+                    self.__traiter_archive(type_archive, nom_fichier, fo)
+                except TypeArchiveInconnue:
+                    self.__logger.exception("Type d'archive inconnue, on skip")
+                    fo.read()  # Skip fichier complet
 
         except ValueError:
             self.__logger.exception("Erreur lecture archive quotidienne")
@@ -1494,8 +1500,15 @@ class ArchivesBackupParser:
         #     # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
         #     file_object.read()
 
-    def detecter_type_archive(self, nom_fichier):
+    def detecter_type_archive(self, path_fichier):
         # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot
+        nom_fichier = path.basename(path_fichier)
+
+        # Detecter grosfichier par le repertoire
+        dernier_folder = path.basename(path.dirname(path_fichier))
+        if dernier_folder == 'grosfichiers':
+            return 'grosfichier'
+
         nom_fichier_parts = nom_fichier.split('_')
         if len(nom_fichier_parts) == 3:
             date_fichier = nom_fichier_parts[1]

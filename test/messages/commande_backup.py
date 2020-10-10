@@ -226,7 +226,7 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_backup_reset'
         )
 
-    def requete_get_backups_horaire(self, domaine):
+    def restaurer(self, domaine):
         url = 'https://mg-dev4:3021/backup/restaurerDomaine/' + domaine
         cacert = self.configuration.mq_cafile
         certkey = (self.configuration.mq_certfile, self.configuration.mq_keyfile)
@@ -246,7 +246,7 @@ class MessagesSample(BaseCallback):
 
             parser = ArchivesBackupParser(
                 self.contexte,
-                resultat.iter_content(chunk_size=4 * 1024), '/home/mathieu/tmp/backup_test/')
+                resultat.iter_content(chunk_size=4 * 1024))  #, '/home/mathieu/tmp/backup_test/')
 
             # parser.parse_tar_stream()
             # parser.start().wait(30)
@@ -330,7 +330,7 @@ class MessagesSample(BaseCallback):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
-        sample.trigger_backup_global()
+        # sample.trigger_backup_global()
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
@@ -338,9 +338,8 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_snapshot_global()
 
         # sample.preparer_restauration()
-        # sample.requete_get_backups_horaire('MaitreDesCles')
-        # sample.requete_get_backups_horaire('MaitreDesComptes')
-        # sample.requete_get_backups_horaire('GrosFichiers')
+        # sample.restaurer('MaitreDesCles')
+        sample.restaurer('GrosFichiers')
         # sample.requete_get_domaines()
 
         # sample.requete_restaurer_tout()
