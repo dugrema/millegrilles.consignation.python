@@ -95,6 +95,7 @@ class ModeleConfiguration:
         if self.args.debug:
             self._logger.setLevel(logging.DEBUG)
             logging.getLogger('millegrilles').setLevel(logging.DEBUG)
+            logging.getLogger('events').setLevel(logging.WARNING)
         elif self.args.info:
             self._logger.setLevel(logging.INFO)
             logging.getLogger('millegrilles').setLevel(logging.INFO)

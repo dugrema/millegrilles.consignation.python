@@ -121,12 +121,16 @@ class ModeleConfiguration:
 
     def set_logging_level(self):
         """ Utilise args pour ajuster le logging level (debug, info) """
+        logging.getLogger('events').setLevel(logging.WARNING)
+        logging.getLogger('pika').setLevel(logging.WARNING)
+
         if self.args.debug:
             self._logger.setLevel(logging.DEBUG)
             logging.getLogger('millegrilles').setLevel(logging.DEBUG)
         elif self.args.info:
             self._logger.setLevel(logging.INFO)
             logging.getLogger('millegrilles').setLevel(logging.INFO)
+
 
     def main(self):
 

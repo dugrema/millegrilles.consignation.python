@@ -157,7 +157,7 @@ class GestionnaireApplications:
             nom_application = config['config']['name']
 
             # Preparer URL de connexion a consignationfichiers
-            contexte = configuration = self.__handler_requetes.contexte
+            contexte = self.__handler_requetes.contexte
             configuration = contexte.configuration
             url_consignationfichiers = 'https://%s:%s' % (
                 configuration.serveur_consignationfichiers_host,
