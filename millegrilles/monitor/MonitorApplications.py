@@ -72,15 +72,27 @@ class GestionnaireApplications:
     def installer_application(self, commande: CommandeMonitor):
         self.__logger.info("Installation application %s", str(commande))
 
-        nom_application = commande.contenu['nom_application']
-        configuration_docker = commande.contenu['configuration']
-        tar_scripts = self.preparer_script_file(commande.contenu)
-        self.preparer_installation(nom_application, configuration_docker, tar_scripts)
+        mq_properties = commande.mq_properties
+        reply_to = mq_properties.reply_to
+        correlation_id = mq_properties.correlation_id
+        reponse = {'ok': True}
+        try:
+            nom_application = commande.contenu['nom_application']
+            configuration_docker = commande.contenu['configuration']
+            tar_scripts = self.preparer_script_file(commande.contenu)
 
-        # Transmettre maj
-        self.__service_monitor.emettre_presence()
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=reply_to, correlation_id=correlation_id)
 
-        return {'ok': True}
+            self.preparer_installation(nom_application, configuration_docker, tar_scripts)
+
+            # Transmettre maj
+            self.__service_monitor.emettre_presence()
+        except Exception as e:
+            reponse['ok'] = False
+            reponse['err'] = str(e)
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=reply_to, correlation_id=correlation_id)
 
     def preparer_script_file(self, commande: dict):
         configuration = commande.get('configuration')
