@@ -314,11 +314,23 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_restauration'
         )
 
+    def trigger_quotidien(self, domaine, date_backup: datetime.datetime):
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_JOUR: int(date_backup.timestamp()),
+            ConstantesBackup.LIBELLE_DOMAINE: domaine,
+            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN.replace('_DOMAINE_', domaine),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
+        )
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
-        # sample.trigger_backup_global()
+        sample.trigger_backup_global()
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
@@ -326,7 +338,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_snapshot_global()
 
         # sample.preparer_restauration()
-        sample.requete_get_backups_horaire('MaitreDesCles')
+        # sample.requete_get_backups_horaire('MaitreDesCles')
         # sample.requete_get_backups_horaire('MaitreDesComptes')
         # sample.requete_get_backups_horaire('GrosFichiers')
         # sample.requete_get_domaines()
@@ -338,6 +350,10 @@ class MessagesSample(BaseCallback):
 
         # sample.trigger_restaurer_maitredescles()
         # sample.trigger_restaurer_global()
+
+        # sample.trigger_quotidien('MaitreDesCles', datetime.datetime(year=2020, month=10, day=8))
+        # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))
+        # sample.trigger_quotidien('Topologie', datetime.datetime(year=2020, month=10, day=9))
 
 
 # --- MAIN ---

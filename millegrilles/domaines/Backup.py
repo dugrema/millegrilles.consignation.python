@@ -370,6 +370,8 @@ class ProcessusFinaliserCatalogueQuotidien(MGProcessusTransaction):
 
         champs_copier = [
             ConstantesBackup.LIBELLE_FICHIERS_HORAIRE,
+            ConstantesBackup.LIBELLE_FUUID_GROSFICHIERS,
+            Constantes.DOCUMENT_INFODOC_SECURITE,
         ]
 
         set_ops = {
@@ -377,7 +379,10 @@ class ProcessusFinaliserCatalogueQuotidien(MGProcessusTransaction):
         }
 
         for champ in champs_copier:
-            set_ops[champ] = transaction[champ]
+            try:
+                set_ops[champ] = transaction[champ]
+            except KeyError:
+                pass
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_QUOTIDIEN,
