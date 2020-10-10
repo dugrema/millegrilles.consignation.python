@@ -74,7 +74,7 @@ class GestionnaireApplications:
 
         nom_application = commande.contenu['nom_application']
         configuration_docker = commande.contenu['configuration']
-        tar_scripts = self.preparer_script_file(commande)
+        tar_scripts = self.preparer_script_file(commande.contenu)
         self.preparer_installation(nom_application, configuration_docker, tar_scripts)
 
         # Transmettre maj

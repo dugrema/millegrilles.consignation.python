@@ -5,5 +5,7 @@
   "MG_MQ_CERTFILE": "/home/mathieu/mgdev/certs/pki.heb_maitrecles.cert",
   "MG_MQ_SSL": "on",
   "MG_MQ_AUTH_CERT": "on",
-  "MG_MONGO_SSL": "x509"
+  "MG_MONGO_SSL": "x509",
+  "MG_CONSIGNATIONFICHIERS_HOST": "mg-dev4",
+  "MG_CONSIGNATIONFICHIERS_PORT": 3021
 }

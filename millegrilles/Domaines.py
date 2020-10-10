@@ -187,21 +187,28 @@ class TraitementMessageCedule(TraitementMessageDomaine):
 
 class TraitementMessagesDomainesDynamiques(TraitementMessageCallback):
 
-    def __init__(self, message_dao, configuration, gestionnaire_domaines):
+    def __init__(self, message_dao, configuration, gestionnaire_domaines, generateur_transactions):
         super().__init__(message_dao, configuration)
         self._gestionnaire_domaines = gestionnaire_domaines
+        self.__generateur_transactions = generateur_transactions
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.')[-1]
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
 
+        reponse = None
         if domaine_action == ConstantesDomaines.COMMANDE_DOMAINE_DEMARRER:
-            self._gestionnaire_domaines.demarrer_domaine(message_dict)
+            reponse = self._gestionnaire_domaines.demarrer_domaine(message_dict)
         elif domaine_action == ConstantesDomaines.COMMANDE_DOMAINE_ARRETER:
             self._gestionnaire_domaines.arreter_domaine(message_dict)
         else:
             raise ValueError("Type de transaction inconnue: routing: %s, message: %s" % (routing_key, message_dict))
+
+        if reponse is not None:
+            reply_to = properties.reply_to
+            correlation_id = properties.correlation_id
+            self.__generateur_transactions.transmettre_reponse(reponse, replying_to=reply_to, correlation_id=correlation_id)
 
 
 class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
@@ -332,7 +339,7 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         self.__domaines_dynamiques = True
 
         self.__traitement_evenements = TraitementMessagesDomainesDynamiques(
-            self.contexte.message_dao, self.contexte.configuration, self)
+            self.contexte.message_dao, self.contexte.configuration, self, self.contexte.generateur_transactions)
         domaine_actions = [
             'commande.domaines.' + ConstantesDomaines.COMMANDE_DOMAINE_DEMARRER,
             'commande.domaines.' + ConstantesDomaines.COMMANDE_DOMAINE_ARRETER,
@@ -444,27 +451,40 @@ class GestionnaireDomainesMilleGrilles(ModeleConfiguration):
         module = commande['module']
         nom_classe = commande['classe']
 
-        gestionnaire, classe = self.trouver_gestionnaire(module, nom_classe)
-        if not gestionnaire:
-            self._logger.info("Demarrage domaine %s (%s)" % (classe, module))
-            gestionnaire = classe(self.contexte)
-            gestionnaire.configurer()
+        reponse = {
+            'demarre': False
+        }
+        try:
+            gestionnaire, classe = self.trouver_gestionnaire(module, nom_classe)
+            if not gestionnaire:
+                self._logger.info("Demarrage domaine %s (%s)" % (classe, module))
+                gestionnaire = classe(self.contexte)
+                gestionnaire.configurer()
 
-            # Demarrer le gestionnaire a l'aide d'une thread temporaire
-            thread = Thread(name="demarrer_domaine", target=gestionnaire.demarrer, daemon=True)
-            thread.start()
+                # Demarrer le gestionnaire a l'aide d'une thread temporaire
+                thread = Thread(name="demarrer_domaine", target=gestionnaire.demarrer, daemon=True)
+                thread.start()
+                reponse['demarre'] = True
 
-            self._gestionnaires.append(gestionnaire)
+                self._gestionnaires.append(gestionnaire)
 
-            # Transmettre transaction pour confirmer le demarrage
-            transaction = {
-                "noeud_id": self._contexte.configuration.noeud_id,
-                "nom": nom,
-                "module": module,
-                "classe": nom_classe
-            }
-            domaine_action = Constantes.ConstantesTopologie.TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE
-            self._contexte.generateur_transactions.soumettre_transaction(transaction, domaine_action)
+                # Transmettre transaction pour confirmer le demarrage
+                transaction = {
+                    "noeud_id": self._contexte.configuration.noeud_id,
+                    "nom": nom,
+                    "module": module,
+                    "classe": nom_classe
+                }
+                domaine_action = Constantes.ConstantesTopologie.TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE
+                confirmation = self._contexte.generateur_transactions.soumettre_transaction(transaction, domaine_action)
+                reponse['confirmation'] = confirmation
+            else:
+                reponse['demarre'] = True
+        except Exception as e:
+            self._logger.exception("Erreur demarrage domaine dynamique")
+            reponse['err'] = str(e)
+
+        return reponse
 
     def arreter_domaine(self, commande: dict):
         nom = commande['nom']
@@ -1967,7 +1987,11 @@ class RestaurationTransactions(MGProcessus):
         nom_domaine = gestionnaire.get_nom_domaine()
         configuration = self.controleur.configuration
 
-        hostname_fichiers = self.parametres.get('hostname_fichiers') or 'fichiers'
+        hostname_fichiers = self.parametres.get('hostname_fichiers')
+        if hostname_fichiers is None or hostname_fichiers == '':
+            host = self.controleur.configuration.serveur_consignationfichiers_host
+            port = self.controleur.configuration.serveur_consignationfichiers_port
+            hostname_fichiers = host + ':' + str(port)
 
         resultat_execution = False
         try:
