@@ -81,8 +81,8 @@ class GestionnaireApplications:
 
         return {'ok': True}
 
-    def preparer_script_file(self, commande):
-        configuration = commande.contenu.get('configuration')
+    def preparer_script_file(self, commande: dict):
+        configuration = commande.get('configuration')
         if configuration and configuration.get('tar_xz'):
             b64_script = configuration['tar_xz']
             if b64_script:
@@ -109,18 +109,26 @@ class GestionnaireApplications:
     def backup_application(self, commande: CommandeMonitor):
         self.__logger.info("Backup application %s", str(commande))
 
-        nom_image_docker = commande.contenu['nom_application']
+        applications = list()
+        try:
+            nom_image_docker = commande.contenu['nom_application']
+            configuration_docker = commande.contenu.get('configuration')
+            applications.append({'nom_application': nom_image_docker, 'configuration': configuration_docker})
+        except KeyError:
+            # On n'a pas d'application en particulier, lancer le backup de toutes les applications
+            applications = self.trouver_applications_backup(commande.contenu)
 
-        configuration_docker = commande.contenu.get('configuration')
-        if configuration_docker is None:
-            # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
-            gestionnaire_docker = self.__service_monitor.gestionnaire_docker
-            configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
-            configuration_docker = json.loads(configuration_bytes)
-            commande.contenu['configuration'] = configuration_docker
+        self.lancer_backup_applications(applications)
 
-        tar_scripts = self.preparer_script_file(commande)
-        self.effectuer_backup(nom_image_docker, configuration_docker, tar_scripts)
+        # if configuration_docker is None:
+        #     # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
+        #     gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+        #     configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
+        #     configuration_docker = json.loads(configuration_bytes)
+        #     commande.contenu['configuration'] = configuration_docker
+        #
+        # tar_scripts = self.preparer_script_file(commande)
+        # self.effectuer_backup(nom_image_docker, configuration_docker, tar_scripts)
 
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
@@ -304,6 +312,33 @@ class GestionnaireApplications:
 
         for service in dict_app['services']:
             service.remove()
+
+    def trouver_applications_backup(self, commande: dict):
+
+        configs = self.__gestionnaire_modules_docker.charger_configs('app.')
+
+        for config in configs:
+            config['configuration'] = json.loads(config['configuration'].decode('utf-8'))  # Parse json
+
+        return configs
+
+    def lancer_backup_applications(self, applications: list):
+        for app in applications:
+            configuration_docker = app.get('configuration')
+            nom_application = app.get('nom_application')
+
+            if nom_application is None:
+                nom_application = configuration_docker['nom']
+
+            if configuration_docker is None:
+                # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
+                gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+                configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_application)
+                configuration_docker = json.loads(configuration_bytes)
+                app['configuration'] = configuration_docker
+
+            tar_scripts = self.preparer_script_file(app)
+            self.effectuer_backup(nom_application, configuration_docker, tar_scripts)
 
     def effectuer_backup(self, nom_image_docker, configuration_docker, tar_scripts=None):
 

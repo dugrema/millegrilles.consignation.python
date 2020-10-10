@@ -544,6 +544,22 @@ class GestionnaireModulesDocker:
         configs = self.__docker.configs.list(filters=filtre)
         return b64decode(configs[0].attrs['Spec']['Data'])
 
+    def charger_configs(self, config_name):
+        """
+        Retourne une liste de configurations
+        :param config_name:
+        :return:
+        """
+        filtre = {'name': config_name}
+        configs = self.__docker.configs.list(filters=filtre)
+
+        config_list = list()
+        for config in configs:
+            configdict = b64decode(config.attrs['Spec']['Data'])
+            config_list.append({'name': config.name, 'configuration': configdict})
+
+        return config_list
+
     def sauvegarder_secret(self, secret_name: str, data: bytes, ajouter_date=False):
         date_courante = None
         if ajouter_date:

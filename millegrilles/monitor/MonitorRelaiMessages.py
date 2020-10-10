@@ -80,6 +80,11 @@ class TraitementMessagesMiddleware(BaseCallback):
             'commande.servicemonitor.desactiverHebergement',
             'evenement.presence.domaine',
             'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
+
+            # Backup
+            Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_', 'global'),
+            Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
+            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
         ]
 
         # Ajouter les routing keys

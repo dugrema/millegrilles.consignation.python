@@ -89,6 +89,21 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def backup_applications(self):
+        commande = {}
+        domaineAction = Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL
+
+        enveloppe = self.generateur.transmettre_commande(
+            commande,
+            domaineAction,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
+
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def restore_application(self):
         commande = {
             'nom_application': 'redmine.mariadb',
@@ -109,7 +124,8 @@ class MessagesSample(BaseCallback):
         return enveloppe
 
     def executer(self):
-        self.backup_application()
+        # self.backup_application()
+        self.backup_applications()
         # self.restore_application()
 
 
