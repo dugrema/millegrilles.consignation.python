@@ -346,7 +346,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
         # sample.trigger_backup_snapshot_grosfichiers()
-        # sample.trigger_backup_snapshot_global()
+        sample.trigger_backup_snapshot_global()
 
         # sample.preparer_restauration()
         # sample.restaurer('MaitreDesCles')
@@ -365,7 +365,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2020, month=10, day=9))
 
-        sample.trigger_restaurer_liensgrosfichiers()
+        # sample.trigger_restaurer_liensgrosfichiers()
 
 
 # --- MAIN ---

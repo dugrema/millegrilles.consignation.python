@@ -37,7 +37,7 @@ class TraitementMessageDomaineCommande(TraitementMessageDomaine):
         try:
             enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
             reponse = self.traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
-            if reponse is not None:
+            if reponse is not None and properties.reply_to is not None:
                 self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
