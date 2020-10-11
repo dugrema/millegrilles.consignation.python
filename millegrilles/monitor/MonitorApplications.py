@@ -146,105 +146,112 @@ class GestionnaireApplications:
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
 
-        # Transmettre reponse pour indiquer commande recue
-        mq_properties = commande.mq_properties
-        reply_to = mq_properties.reply_to
-        correlation_id = mq_properties.correlation_id
-        reponse = {'ok': True}
-        self.__service_monitor.generateur_transactions.transmettre_reponse(
-            reponse, replying_to=reply_to, correlation_id=correlation_id)
+        reponse_info = dict()
+        try:
+            # Transmettre reponse pour indiquer commande recue
+            mq_properties = commande.mq_properties
+            reply_to = mq_properties.reply_to
+            correlation_id = mq_properties.correlation_id
+            reponse = {'ok': True}
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=reply_to, correlation_id=correlation_id)
 
-        nom_image_docker = commande.contenu['nom_application']
-        configuration_app = commande.contenu.get('configuration')
-        if configuration_app is None:
-            # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
-            gestionnaire_docker = self.__service_monitor.gestionnaire_docker
-            configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
-            configuration_app = json.loads(configuration_bytes)
-            commande.contenu['configuration'] = configuration_app
+            nom_image_docker = commande.contenu['nom_application']
+            configuration_app = commande.contenu.get('configuration')
+            if configuration_app is None:
+                # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
+                gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+                configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
+                configuration_app = json.loads(configuration_bytes)
+                commande.contenu['configuration'] = configuration_app
 
-        tar_scripts = self.preparer_script_file({'configuration': configuration_app})
+            tar_scripts = self.preparer_script_file({'configuration': configuration_app})
 
-        liste_configurations = self.charger_dependances_restauration(configuration_app)
-        # Conserver uniquement les images avec element backup, utiliser config.name comme nom de download
-        liste_backup = list()
-        for config in liste_configurations:
-            if config.get('backup'):
-                liste_backup.append(config)
+            liste_configurations = self.charger_dependances_restauration(configuration_app)
+            # Conserver uniquement les images avec element backup, utiliser config.name comme nom de download
+            liste_backup = list()
+            for config in liste_configurations:
+                if config.get('backup'):
+                    liste_backup.append(config)
 
-        # Restaurer chaque application avec backup
-        for config in liste_backup:
-            nom_application = config['config']['name']
+            # Restaurer chaque application avec backup
+            for config in liste_backup:
+                nom_application = config['config']['name']
 
-            # Preparer URL de connexion a consignationfichiers
-            contexte = self.__handler_requetes.contexte
-            configuration = contexte.configuration
-            url_consignationfichiers = 'https://%s:%s' % (
-                configuration.serveur_consignationfichiers_host,
-                configuration.serveur_consignationfichiers_port
-            )
+                # Preparer URL de connexion a consignationfichiers
+                contexte = self.__handler_requetes.contexte
+                configuration = contexte.configuration
+                url_consignationfichiers = 'https://%s:%s' % (
+                    configuration.serveur_consignationfichiers_host,
+                    configuration.serveur_consignationfichiers_port
+                )
 
-            # Telecharger l'archive de backup la plus recente pour cette application
-            certfile = configuration.mq_certfile
-            keyfile = configuration.mq_keyfile
+                # Telecharger l'archive de backup la plus recente pour cette application
+                certfile = configuration.mq_certfile
+                keyfile = configuration.mq_keyfile
 
-            r = requests.get(
-                '%s/backup/application/%s' % (url_consignationfichiers, nom_application),
-                verify=configuration.mq_cafile,
-                cert=(certfile, keyfile)
-            )
+                r = requests.get(
+                    '%s/backup/application/%s' % (url_consignationfichiers, nom_application),
+                    verify=configuration.mq_cafile,
+                    cert=(certfile, keyfile),
+                    timeout=5.0
+                )
 
-            archive_hachage = r.headers.get('archive_hachage')
-            archive_nomfichier = r.headers.get('archive_nomfichier')
-            archive_epoch = r.headers.get('estampille')
-            cle_header = r.headers.get('cle')
-            iv_header = r.headers.get('iv')
+                archive_hachage = r.headers.get('archive_hachage')
+                archive_nomfichier = r.headers.get('archive_nomfichier')
+                archive_epoch = r.headers.get('estampille')
+                cle_header = r.headers.get('cle')
+                iv_header = r.headers.get('iv')
 
-            # Demander la cle pour dechiffrer l'archive
-            chaine_certs = contexte.signateur_transactions.chaine_certs
-            requete = {
-                'certificat': chaine_certs,
-                'identificateurs_document': {
-                    'archive_nomfichier': archive_nomfichier,
-                },
+                # Demander la cle pour dechiffrer l'archive
+                chaine_certs = contexte.signateur_transactions.chaine_certs
+                requete = {
+                    'certificat': chaine_certs,
+                    'identificateurs_document': {
+                        'archive_nomfichier': archive_nomfichier,
+                    },
 
-                # Ajouter params pour recuperation de la cle
-                'cle': cle_header, 'iv': iv_header, 'domaine': 'Applications',
-            }
-            resultat_cle = self.__handler_requetes.requete('MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP, requete)
-            cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(resultat_cle['cle'])
-            decipher = CipherMsg1Dechiffrer(b64decode(resultat_cle['iv']), cle_dechiffree)
+                    # Ajouter params pour recuperation de la cle
+                    'cle': cle_header, 'iv': iv_header, 'domaine': 'Applications',
+                }
+                resultat_cle = self.__handler_requetes.requete('MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP, requete)
+                cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(resultat_cle['cle'])
+                decipher = CipherMsg1Dechiffrer(b64decode(resultat_cle['iv']), cle_dechiffree)
 
-            tar_archive = '/tmp/download.tar'
-            iter_response = r.iter_content(chunk_size=64*1024)
-            try:
-                with open(tar_archive, 'wb') as fichier:
-                    for data in iter_response:
-                        # Dechiffrer, verifier hachage
-                        data = decipher.update(data)
-                        fichier.write(data)
-                    fichier.write(decipher.finalize())
+                tar_archive = '/tmp/download.tar'
+                iter_response = r.iter_content(chunk_size=64*1024)
+                try:
+                    with open(tar_archive, 'wb') as fichier:
+                        for data in iter_response:
+                            # Dechiffrer, verifier hachage
+                            data = decipher.update(data)
+                            fichier.write(data)
+                        fichier.write(decipher.finalize())
 
-                # digest_calcule = decipher.digest  # Note : pas bon, il faut calculer avant data
+                    # digest_calcule = decipher.digest  # Note : pas bon, il faut calculer avant data
 
-                gestionnaire_images_applications = GestionnaireImagesApplications(
-                    self.__service_monitor.idmg, self.__service_monitor.docker)
-                gestionnaire_images_applications.set_configuration(configuration_app)
-                self.restore_dependance(
-                    gestionnaire_images_applications, config, tar_scripts, tar_archive)
-            finally:
-                # Cleanup
-                fichiers_nettoyage = [tar_archive, tar_scripts]
-                for fichier in fichiers_nettoyage:
-                    try:
-                        os.remove(fichier)
-                    except FileNotFoundError:
-                        pass
+                    gestionnaire_images_applications = GestionnaireImagesApplications(
+                        self.__service_monitor.idmg, self.__service_monitor.docker)
+                    gestionnaire_images_applications.set_configuration(configuration_app)
+                    self.restore_dependance(
+                        gestionnaire_images_applications, config, tar_scripts, tar_archive)
+                finally:
+                    # Cleanup
+                    fichiers_nettoyage = [tar_archive, tar_scripts]
+                    for fichier in fichiers_nettoyage:
+                        try:
+                            os.remove(fichier)
+                        except FileNotFoundError:
+                            pass
+        except Exception as e:
+            self.__logger.exception("Erreur demarrage application")
+            reponse_info['err'] = str(e)
 
         self.transmettre_evenement_backup(
             commande.contenu['nom_application'],
             Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_TERMINEE,
-            type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION
+            type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
+            info=reponse_info
         )
 
     def charger_dependances_restauration(self, configuration_docker):
