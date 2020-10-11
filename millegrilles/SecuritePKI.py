@@ -707,12 +707,15 @@ class VerificateurCertificats(UtilCertificats):
         self.__workdir = self.contexte.validation_workdir_tmp
 
         # Initialiser le fichier untrusted avec le certificat local - devrait avoir le cert intermediaire courant
-        with open(contexte.configuration.mq_certfile, 'r') as fichier:
-            certfile = fichier.read()
-
         untrusted_cas_filename = os.path.join(self.__workdir, contexte.idmg + '.untrusted.cert.pem')
-        with open(untrusted_cas_filename, 'w') as fichier:
-            fichier.write(certfile)
+        with open(contexte.configuration.mq_certfile, 'r') as input:
+            with open(untrusted_cas_filename, 'w') as output:
+                output.write(input.read())
+
+        ca_filename = os.path.join(self.__workdir, contexte.idmg + 'racine.cert.pem')
+        with open(contexte.configuration.mq_cafile, 'r') as input:
+            with open(untrusted_cas_filename, 'w') as output:
+                output.write(input.read())
 
     def __del__(self):
         self.close()
