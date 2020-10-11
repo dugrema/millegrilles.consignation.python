@@ -146,8 +146,15 @@ class GestionnaireApplications:
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
 
-        nom_image_docker = commande.contenu['nom_application']
+        # Transmettre reponse pour indiquer commande recue
+        mq_properties = commande.mq_properties
+        reply_to = mq_properties.reply_to
+        correlation_id = mq_properties.correlation_id
+        reponse = {'ok': True}
+        self.__service_monitor.generateur_transactions.transmettre_reponse(
+            reponse, replying_to=reply_to, correlation_id=correlation_id)
 
+        nom_image_docker = commande.contenu['nom_application']
         configuration_app = commande.contenu.get('configuration')
         if configuration_app is None:
             # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
@@ -233,6 +240,12 @@ class GestionnaireApplications:
                         os.remove(fichier)
                     except FileNotFoundError:
                         pass
+
+        self.transmettre_evenement_backup(
+            commande.contenu['nom_application'],
+            Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_TERMINEE,
+            type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION
+        )
 
     def charger_dependances_restauration(self, configuration_docker):
         """
@@ -451,7 +464,8 @@ class GestionnaireApplications:
             self.transmettre_evenement_backup(nom_application,
                                               Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
 
-    def transmettre_evenement_backup(self, nom_application: str, action: str, info: dict = None):
+    def transmettre_evenement_backup(self, nom_application: str, action: str, info: dict = None,
+                                     type_event=Constantes.ConstantesBackup.EVENEMENT_BACKUP):
         evenement_contenu = {
             'nom_application': nom_application,
             'evenement': action,
@@ -459,7 +473,7 @@ class GestionnaireApplications:
         if info is not None:
             evenement_contenu['info'] = info
         self.__service_monitor.generateur_transactions.emettre_message(
-            evenement_contenu, Constantes.ConstantesBackup.EVENEMENT_BACKUP,
+            evenement_contenu, type_event,
             exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
         )
 
