@@ -76,6 +76,11 @@ class ModeleConfiguration:
         self.parser = argparse.ArgumentParser(description="Fonctionnalite MilleGrilles")
 
         self.parser.add_argument(
+            '--verbose', action="store_true", required=False,
+            help="Active le debugging verbose"
+        )
+
+        self.parser.add_argument(
             '--debug', action="store_true", required=False,
             help="Active le debugging (logger, tres verbose)"
         )
@@ -84,6 +89,7 @@ class ModeleConfiguration:
             '--info', action="store_true", required=False,
             help="Afficher davantage de messages (verbose)"
         )
+
 
     def print_help(self):
         self.parser.print_help()
@@ -131,6 +137,9 @@ class ModeleConfiguration:
             self._logger.setLevel(logging.INFO)
             logging.getLogger('millegrilles').setLevel(logging.INFO)
 
+        if self.args.verbose:
+            # Logging de messages frequents, tres verbose
+            logging.getLogger('trace.millegrilles').setLevel(logging.DEBUG)
 
     def main(self):
 
