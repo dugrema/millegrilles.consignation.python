@@ -659,6 +659,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
         super().__init__(args, docker_client, configuration_json)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -679,7 +680,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
                 self._attente_event.clear()
 
                 try:
-                    self.__logger.debug("Cycle entretien ServiceMonitor")
+                    self.__logger_verbose.debug("Cycle entretien ServiceMonitor")
 
                     self.verifier_load()
 
@@ -692,7 +693,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
-                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                    self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
                 except Exception:
                     self.__logger.exception("ServiceMonitor: erreur generique")
                 finally:
@@ -786,6 +787,7 @@ class ServiceMonitorDependant(ServiceMonitor):
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
         super().__init__(args, docker_client, configuration_json)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
         self.__event_attente = Event()
 
         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
@@ -975,7 +977,7 @@ class ServiceMonitorDependant(ServiceMonitor):
 
                 self._entretien_modules()
 
-                self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
             except Exception:
                 self.__logger.exception("ServiceMonitor: erreur generique")
             finally:
@@ -1023,6 +1025,7 @@ class ServiceMonitorPrive(ServiceMonitor):
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
         super().__init__(args, docker_client, configuration_json)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
     def _entretien_modules(self):
         if not self.limiter_entretien:
@@ -1084,7 +1087,7 @@ class ServiceMonitorPrive(ServiceMonitor):
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
-                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                    self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
                 except Exception:
                     self.__logger.exception("ServiceMonitor: erreur generique")
                 finally:
@@ -1161,6 +1164,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
         super().__init__(args, docker_client, configuration_json)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
         self.__event_attente = Event()
 
         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
@@ -1238,7 +1242,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
                     # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
                     self._gestionnaire_docker.entretien_services()
 
-                self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
             except Exception:
                 self.__logger.exception("ServiceMonitor: erreur generique")
             finally:
@@ -1503,6 +1507,7 @@ class ServiceMonitorExtension(ServiceMonitor):
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
         super().__init__(args, docker_client, configuration_json)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
     def run(self):
         self.__logger.info("Demarrage du ServiceMonitor")
@@ -1530,7 +1535,7 @@ class ServiceMonitorExtension(ServiceMonitor):
                         except BrokenBarrierError:
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
-                    self.__logger.debug("Fin cycle entretien ServiceMonitor")
+                    self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
                 except Exception:
                     self.__logger.exception("ServiceMonitor: erreur generique")
                 finally:

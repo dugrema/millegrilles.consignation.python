@@ -36,6 +36,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         self.queue_name = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.__logger_verbose = logging.getLogger('trace.%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -43,7 +44,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         correlation_id = properties.correlation_id
         exchange = method.exchange
 
-        self.__logger.debug("Message recu : %s" % message_dict)
+        self.__logger_verbose.debug("Message recu : %s" % message_dict)
 
         if routing_key.startswith('commande.'):
             action = routing_key.split('.')[-1]
@@ -106,7 +107,7 @@ class TraitementMessagesMiddleware(BaseCallback):
     def traiter_presence_domaine(self, message_dict):
         domaine = message_dict['domaine']
         exchanges_routing = message_dict['exchanges_routing']
-        self.__logger.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
+        self.__logger_verbose.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
         self.__gestionnaire_commandes.inscrire_domaine(domaine, exchanges_routing)
 
 
@@ -291,6 +292,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
         self.queue_name = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        self.__logger_verbose = logging.getLogger('trace.%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -347,7 +349,7 @@ class TraitementMessagesConnexionPrincipale(BaseCallback):
     def traiter_presence_domaine(self, message_dict):
         domaine = message_dict['domaine']
         exchanges_routing = message_dict['exchanges_routing']
-        self.__logger.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
+        self.__logger_verbose.debug("Presence domaine %s detectee : %s", domaine, str(message_dict))
         self._service_monitor.inscrire_domaine(domaine, exchanges_routing)
 
     # def enregistrer_domaine(self, nom_domaine: str, exchanges_routing: dict):

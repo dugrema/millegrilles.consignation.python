@@ -43,6 +43,7 @@ class GestionnaireModulesDocker:
 
         self.__insecure = kwargs.get('insecure') or False
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('trace.' + __name__ + '.' + self.__class__.__name__)
 
         fqdn = self.hostname
 
@@ -99,7 +100,7 @@ class GestionnaireModulesDocker:
         self.__logger.info("Debut ecouter events docker")
         self.__event_stream = self.__docker.events()
         for event in self.__event_stream:
-            self.__logger.debug("Event : %s", str(event))
+            self.__logger_verbose.debug("Event : %s", str(event))
             to_remove = list()
             for listener in self.__event_listeners:
                 try:
