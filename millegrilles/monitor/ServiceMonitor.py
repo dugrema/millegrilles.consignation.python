@@ -350,6 +350,15 @@ class ServiceMonitor:
             dict_infomillegrille['services'] = gestionnaire_docker.get_liste_services()
             dict_infomillegrille['containers'] = gestionnaire_docker.get_liste_containers()
 
+        # Charger la liste des applications configurees (config app.cfg.*)
+        apps = gestionnaire_docker.charger_configs('app.cfg.')
+        config_apps = list()
+        for app in apps:
+            app_config = json.loads(app['configuration'].decode('utf-8'))
+            config_apps.append({'nom': app_config['nom'], 'version': app_config['version']})
+
+        dict_infomillegrille['applications_configurees'] = config_apps
+
         return dict_infomillegrille
 
     def _charger_configuration(self):
