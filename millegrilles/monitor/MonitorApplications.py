@@ -442,8 +442,26 @@ class GestionnaireApplications:
                 configuration_docker = json.loads(configuration_bytes)
                 app['configuration'] = configuration_docker
 
+            self.transmettre_evenement_backup(nom_application,
+                                              Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_DEBUT)
+
             tar_scripts = self.preparer_script_file(app)
             self.effectuer_backup(nom_application, configuration_docker, tar_scripts)
+
+            self.transmettre_evenement_backup(nom_application,
+                                              Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
+
+    def transmettre_evenement_backup(self, nom_application: str, action: str, info: dict = None):
+        evenement_contenu = {
+            'nom_application': nom_application,
+            'evenement': action,
+        }
+        if info is not None:
+            evenement_contenu['info'] = info
+        self.__service_monitor.generateur_transactions.emettre_message(
+            evenement_contenu, Constantes.ConstantesBackup.EVENEMENT_BACKUP,
+            exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
+        )
 
     def effectuer_backup(self, nom_image_docker, configuration_docker, tar_scripts=None):
 
@@ -492,6 +510,9 @@ class GestionnaireApplications:
                 # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
                 path_archive = self.__gestionnaire_modules_docker.save_archives(
                     container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
+
+                # self.transmettre_evenement_backup(service_name,
+                #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
 
                 handler_backup = HandlerBackupApplication(self.__handler_requetes)
                 handler_backup.upload_backup(service_name, path_archive)

@@ -1340,6 +1340,8 @@ class ConstantesBackup:
 
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
 
+    EVENEMENT_BACKUP = 'evenement.backup.backupTransaction'
+
     EVENEMENT_BACKUP_HORAIRE_DEBUT = 'backupHoraireDebut'
     EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET = 'backupHoraireCataloguePret'
     EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME = 'backupHoraireUploadConfirme'
