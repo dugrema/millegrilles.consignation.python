@@ -706,15 +706,20 @@ class VerificateurCertificats(UtilCertificats):
         # self.__workdir = tempfile.mkdtemp(prefix='validation_', dir=self.configuration.pki_workdir)
         self.__workdir = self.contexte.validation_workdir_tmp
 
+        try:
+            os.mkdir(self.__workdir)
+        except FileExistsError:
+            pass
+
         # Initialiser le fichier untrusted avec le certificat local - devrait avoir le cert intermediaire courant
         untrusted_cas_filename = os.path.join(self.__workdir, contexte.idmg + '.untrusted.cert.pem')
         with open(contexte.configuration.mq_certfile, 'r') as input:
             with open(untrusted_cas_filename, 'w') as output:
                 output.write(input.read())
 
-        ca_filename = os.path.join(self.__workdir, contexte.idmg + 'racine.cert.pem')
+        ca_filename = os.path.join(self.__workdir, contexte.idmg + '.racine.cert.pem')
         with open(contexte.configuration.mq_cafile, 'r') as input:
-            with open(untrusted_cas_filename, 'w') as output:
+            with open(ca_filename, 'w') as output:
                 output.write(input.read())
 
     def __del__(self):
@@ -998,7 +1003,11 @@ class VerificateurCertificats(UtilCertificats):
 
     def close(self):
         # Supprimer tous les certificats mis sur le disque
-        shutil.rmtree(self.__workdir, ignore_errors=True)
+        self._logger.info("Fermeture VerificateurCertificats, suppression repertoire temporaire %s", self.__workdir)
+
+        # TROUBLESHOOTING : Probleme avec principal, processus force suppression du repertoire
+        # shutil.rmtree(self.__workdir, ignore_errors=True)
+        pass
 
 
 class EncryptionHelper():
