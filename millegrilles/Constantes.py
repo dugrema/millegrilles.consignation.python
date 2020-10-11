@@ -58,7 +58,7 @@ DEFAUT_CERTFILE = '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert'
 DEFAUT_CA_CERTS = '/opt/millegrilles/etc/millegrilles.RootCA.pem'
 DEFAUT_VAR_MILLEGRILLES = '/var/opt/millegrilles'
 
-DEFAUT_CONSIGNATIONFICHIERS_HOST = 'consignationfichiers'
+DEFAUT_CONSIGNATIONFICHIERS_HOST = 'fichiers'
 DEFAUT_CONSIGNATIONFICHIERS_PORT = '443'
 
 DEFAUT_BACKUP_WORKDIR = '/tmp/mgbackup'
