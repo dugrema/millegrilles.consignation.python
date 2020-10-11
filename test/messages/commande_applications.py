@@ -24,7 +24,7 @@ class MessagesSample(BaseCallback):
         self.channel = None
         self.event_recu = Event()
 
-        self.noeud_id = 'e2b12bbe-0292-4fa7-afce-bbf4788442ac'
+        self.noeud_id = '845d5b14-e317-474d-a879-bec87c147d59'
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue

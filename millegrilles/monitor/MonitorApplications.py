@@ -190,6 +190,8 @@ class GestionnaireApplications:
             archive_hachage = r.headers.get('archive_hachage')
             archive_nomfichier = r.headers.get('archive_nomfichier')
             archive_epoch = r.headers.get('estampille')
+            cle_header = r.headers.get('cle')
+            iv_header = r.headers.get('iv')
 
             # Demander la cle pour dechiffrer l'archive
             chaine_certs = contexte.signateur_transactions.chaine_certs
@@ -198,6 +200,9 @@ class GestionnaireApplications:
                 'identificateurs_document': {
                     'archive_nomfichier': archive_nomfichier,
                 },
+
+                # Ajouter params pour recuperation de la cle
+                'cle': cle_header, 'iv': iv_header, 'domaine': 'Applications',
             }
             resultat_cle = self.__handler_requetes.requete('MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP, requete)
             cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(resultat_cle['cle'])
