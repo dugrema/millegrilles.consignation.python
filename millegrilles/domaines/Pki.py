@@ -611,6 +611,10 @@ class PKIDocumentHelper:
 
 class ProcessusAjouterCertificat(MGProcessusTransaction):
 
+    def __init__(self, controleur: MGPProcesseur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
         fingerprint = transaction['fingerprint']

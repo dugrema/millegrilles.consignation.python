@@ -40,7 +40,12 @@ class MGPProcesseur:
         :raises ErreurProcessusInconnu: Si le processus est inconnu.
         """
         nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
-        resultats = nom_processus.split(':')
+        try:
+            resultats = nom_processus.split(':')
+        except AttributeError as e:
+            self.__logger.error("Erreur non reconciliable : %s\n%s", str(e), str(evenement))
+            return
+
         if len(resultats) == 2:
             routing = resultats[0]
             nom_module = resultats[0]

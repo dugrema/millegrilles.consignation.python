@@ -21,7 +21,7 @@ from threading import Thread, Event
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
-from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide
+from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -410,6 +410,7 @@ class HandlerBackupDomaine:
 
             self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_TERMINE, debut_backup)
         except Exception as e:
+            self.__logger.exception("Erreur traitement backup")
             info = {'err': str(e)}
             self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_TERMINE, debut_backup, info=info)
 
@@ -566,8 +567,9 @@ class HandlerBackupDomaine:
                     self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup de %s" % (uuid_transaction, nom_collection_mongo))
                     # Marquer la transaction comme invalide pour backup
                     liste_uuids_invalides.append(uuid_transaction)
-                except CertificatInvalide:
+                except (CertificatInvalide, CertificatInconnu):
                     self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
+                    liste_uuids_invalides.append(uuid_transaction)
 
             if cipher is not None:
                 fichier.write(cipher.update(lzma_compressor.flush()))
