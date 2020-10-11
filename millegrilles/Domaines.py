@@ -1133,6 +1133,13 @@ class GestionnaireDomaine:
         else:
             return self._contexte.signateur_transactions.chiffrage_asymmetrique(cle_secrete)
 
+    @property
+    def supporte_regenerer_global(self):
+        """
+        :return: True si le domaine repond a l'evenement regenerer global
+        """
+        return True
+
 
 class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
@@ -1166,6 +1173,7 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
         commande = method.routing_key.split('.')[-1]
         nom_domaine = self.gestionnaire.get_collection_transaction_nom()
 
+        resultat = None
         if routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL:
             resultat = self.gestionnaire.declencher_backup_horaire(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL:
@@ -1180,7 +1188,8 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", 'global'):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
         elif routing_key == ConstantesDomaines.COMMANDE_GLOBAL_REGENERER:
-            resultat = self.gestionnaire.regenerer_documents()
+            if self._gestionnaire.supporte_regenerer_global:
+                resultat = self.gestionnaire.regenerer_documents()
         elif commande == ConstantesDomaines.COMMANDE_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
 
@@ -1481,7 +1490,14 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         nom_classe = 'RestaurationTransactions'
         processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
 
+        domaine_action = declencheur['en-tete']['domaine']
+        action_globale = False
+        if domaine_action.split('.')[1] == 'global':
+            action_globale = True
+
         parametres = {
+            'domaine_action': domaine_action,
+            'global': action_globale,
             'reply_to': properties.reply_to,
             'correlation_id': properties.correlation_id,
         }
@@ -2023,21 +2039,33 @@ class RestaurationTransactions(MGProcessus):
             if resultat_execution is False:
                 evenement_fin_restauration['err'] = {'code': 1, 'message': 'Echec de restauration'}
             self.emettre_evenement_restauration(evenement_fin_restauration)
-        except:
-            self.__logger.exception("Erreur execution restauration")
+        finally:
+            # Conserver resultat, arreter traitement si erreur
+            reponse = {
+                'transactions_restaurees': resultat_execution,
+            }
 
-        # Conserver resultat, arreter traitement si erreur
-        reponse = {
-            'transactions_restaurees': resultat_execution,
-        }
+            if resultat_execution is True:
+                # Regenerer les documents du domaine
+                if self.parametres['global'] is True and self.controleur.gestionnaire.supporte_regenerer_global is False:
+                    self.__logger.info("Skip regeneration globale")
+                    reponse['action'] = 'restauration_terminee'
+                    reponse['documents_regeneres'] = False
+                    self.transmettre_reponse(reponse)
+                    self.emettre_evenement_restauration({
+                        'action': 'fin_regeneration',
+                        'documents_regeneres': True,
+                    })
 
-        if resultat_execution is True:
-            # Regenerer les documents du domaine
-            self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
-        else:
-            reponse['action'] = 'restauration_annulee'
-            reponse['err'] = {'code': 1, 'message': 'Echec de restauration'}
-            self.transmettre_reponse(reponse)
+                    self.set_etape_suivante()  # Termine
+                else:
+                    self.set_etape_suivante(RestaurationTransactions.regenerer.__name__)
+                    reponse['regeneration'] = True
+
+            else:
+                reponse['action'] = 'restauration_annulee'
+                reponse['err'] = {'code': 1, 'message': 'Echec de restauration'}
+                self.transmettre_reponse(reponse)
 
         return reponse
 

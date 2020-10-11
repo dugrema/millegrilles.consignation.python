@@ -1853,6 +1853,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return HandlerBackupDomaine(self._contexte, self.get_nom_domaine(), self.get_collection_transaction_nom(),
                                     self.get_collection(), Constantes.SECURITE_PRIVE)
 
+    @property
+    def supporte_regenerer_global(self):
+        """
+        :return: False, le maitre de cles ne supporte pas regeneration globale
+        """
+        return False
+
 
 class ProcessusReceptionCles(MGProcessusTransaction):
 
