@@ -20,3 +20,4 @@ zeroconf>=0.28.5
 bson>=0.5.10
 
 blynklib>=0.2.6,<0.3.0
+certvalidator>=0.11.1

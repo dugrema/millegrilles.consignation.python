@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
+from certvalidator import CertificateValidator, ValidationContext
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
@@ -269,19 +270,30 @@ class UtilCertificats:
         self._sign_hash_function = hashes.SHA512
         self._contenu_hash_function = hashes.SHA256
 
-        self._certificat = None
-        self._cle = None
+        self._certificat: Optional[str] = None
+        self._cle: Optional[str] = None
         self._enveloppe: Optional[EnveloppeCertificat] = None
         self._chaine: Optional[list] = None
 
+        self.__validation_context: Optional[ValidationContext] = None
+        self.__cert_millegrille: Optional[bytes] = None
+
     def initialiser(self):
+        # Charger le contexte de validation
+        with open(self._contexte.configuration.mq_cafile, 'rb') as fichier:
+            self.__cert_millegrille = fichier.read()
+        self.__validation_context = ValidationContext(trust_roots=[self.__cert_millegrille])
+
         self._charger_cle_privee()
         self._charger_certificat()
 
         # Verifier que le certificat peut bien etre utilise pour signer des transactions
         self._verifier_usage()
 
-        self._enveloppe = EnveloppeCertificat(self.certificat)
+        self._enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(self._chaine))
+
+        # Valider le certificat
+        self.valider_x509_enveloppe(self._enveloppe)
 
     def preparer_transaction_bytes(self, transaction_dict):
         """
@@ -439,11 +451,6 @@ class UtilCertificats:
         fingerprint = enveloppe.fingerprint_ascii
         fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
 
-        # for cert in chaine_pem[1:]:
-        #     enveloppe = EnveloppeCertificat(certificat_pem=cert)
-        #     fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
-        #     certificats_pem[fingerprint_sha256_b64] = cert
-
         message = {
             ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
             ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
@@ -455,6 +462,31 @@ class UtilCertificats:
         # Emet le certificat sur l'exchange par defaut
         routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
         self._contexte.generateur_transactions.emettre_message(message, routing)
+
+    def valider_x509_enveloppe(self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None):
+        """
+        Valide une enveloppe
+        :param enveloppe:
+        :param date_reference:
+        :return: True si certificat est valide
+        :raises certvalidator.errors.PathBuildingError: Si le path est invalide
+        """
+        cert_pem = enveloppe.certificat_pem.encode('utf-8')
+        inter_list = [cert_pem.encode('utf-8') for cert_pem in enveloppe.reste_chaine_pem[:-1]]
+
+        if date_reference is None:
+            # batir un contexte avec la date
+            validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
+        else:
+            validation_context = self.__validation_context
+
+        validator = CertificateValidator(
+            cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
+
+        # Verifier le certificat - noter qu'une exception est lancee en cas de probleme
+        resultat = validator.validate_usage({'digital_signature'})
+
+        self._logger.info("Resultat : %s", str(resultat))
 
     @property
     def certificat(self):
