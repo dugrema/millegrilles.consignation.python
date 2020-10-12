@@ -676,9 +676,8 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
                 }
                 self.generateur_transactions.transmettre_commande(commande_publier_certificat, 'commande.publicateur.publierCertificat')
 
-        except Exception as e:
-            self.__logger.warn("Certificat invalide: %s" % fingerprint)
-            self.__logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
+        except Exception:
+            self.__logger.exception("Certificat invalide: %s" % fingerprint)
 
         if valide:
             helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
