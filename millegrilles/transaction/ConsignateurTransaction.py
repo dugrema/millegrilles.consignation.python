@@ -708,7 +708,7 @@ class EntretienCollectionsDomaines(BaseCallback):
                             domaine = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
 
                             # Copier properties utiles
-                            self.contexte.message_dao.transmettre_evenement_persistance(
+                            self.contexte.generateur_transactions.transmettre_evenement_persistance(
                                 str(transaction_id), uuid_transaction, domaine, {})
                         else:
                             # La transaction a ete re-soumise trop de fois, on la met en erreur

@@ -735,6 +735,14 @@ class RegenerationContexteWrapper:
     def configuration(self):
         return self.__contexte.configuration
 
+    @property
+    def validation_workdir_tmp(self):
+        return self.__contexte.validation_workdir_tmp
+
+    @property
+    def idmg(self):
+        return self.__contexte.idmg
+
 
 class MGPProcesseurRegeneration(MGPProcesseur):
     """

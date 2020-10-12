@@ -719,8 +719,13 @@ class VerificateurCertificats(UtilCertificats):
 
         ca_filename = os.path.join(self.__workdir, contexte.idmg + '.racine.cert.pem')
         with open(contexte.configuration.mq_cafile, 'r') as input:
-            with open(ca_filename, 'w') as output:
-                output.write(input.read())
+            try:
+                with open(ca_filename, 'w') as output:
+                    output.write(input.read())
+            except PermissionError as pe:
+                # Verifier si l'erreur est parce que le fichier existe deja
+                if os.path.exists(ca_filename) is False:
+                    raise pe
 
     def __del__(self):
         self.close()

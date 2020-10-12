@@ -58,30 +58,14 @@ class MessagesSample(BaseCallback):
         print("Properties : " + str(properties))
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
-    def commande_regenerer(self):
-        domaines = [
-            # 'commande.Annuaire.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.MaitreDesComptes.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.Taches.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-        ]
-
-        commande = {
-        }
-        for domaine in domaines:
-            enveloppe_val = self.generateur.transmettre_commande(
-                commande, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
-            print("Commande regenerer domaine %s : %s" % (domaine, enveloppe_val))
+    def resoumettre_transactions(self):
+        transaction_id = '5f84595b7b2f10d75ecc77cc'
+        uuid_transaction = '705a425c-0c8e-11eb-ad9b-02420a000121'
+        domaine = 'Pki'
+        self.contexte.generateur_transactions.transmettre_evenement_persistance(transaction_id, uuid_transaction, domaine, {})
 
     def executer(self):
-        sample.commande_regenerer()
+        sample.resoumettre_transactions()
 
 
 # --- MAIN ---
