@@ -784,6 +784,9 @@ class VerificateurCertificats(UtilCertificats):
     def charger_certificat(self, fichier=None, fingerprint: str = None, enveloppe: EnveloppeCertificat = None):
         # Tenter de charger a partir d'une copie locale
         if fingerprint is not None:
+            # Split fingerprint au besoin
+            fingerprint = fingerprint.split(':')[-1]
+
             # Verifier si le certificat est deja charge
             enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
 
@@ -791,9 +794,8 @@ class VerificateurCertificats(UtilCertificats):
                 collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
                 document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint})
                 if document_cert is not None:
-                    enveloppe = EnveloppeCertificat(
-                        certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
-                    )
+                    pems = [document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in document_cert[ConstantesSecurityPki.LIBELLE_CHAINE]]
+                    enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(pems))
 
         elif fichier is not None and os.path.isfile(fichier):
             with open(fichier, 'r') as fichier:

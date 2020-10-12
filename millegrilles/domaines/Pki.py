@@ -130,11 +130,11 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIG_CERTDOCKER, ConstantesPki.DOCUMENT_CONFIG_CERTDOCKER)
 
-    def on_channel_open(self, channel):
-        super().on_channel_open(channel)
-
-        # Ajouter basicconsume pour Q certificats
-        self.inscrire_basicconsume(self.nom_queue_certificats, self.__handler_evenements_certificats.callbackAvecAck)
+    # def on_channel_open(self, channel):
+    #     super().on_channel_open(channel)
+    #
+    #     # Ajouter basicconsume pour Q certificats
+    #     self.inscrire_basicconsume(self.nom_queue_certificats, self.__handler_evenements_certificats.callbackAvecAck)
 
     def initialiser_mgprocesseur_evenements(self):
         """
@@ -159,6 +159,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_SECURE,
+                'callback': self.__handler_evenements_certificats.callbackAvecAck,
             },
             {
                 'nom': self.nom_queue_certificats,
@@ -167,6 +168,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PROTEGE,
+                'callback': self.__handler_evenements_certificats.callbackAvecAck,
             },
             {
                 'nom': self.nom_queue_certificats,
@@ -175,6 +177,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PRIVE,
+                'callback': self.__handler_evenements_certificats.callbackAvecAck,
             },
             {
                 'nom': self.nom_queue_certificats,
@@ -183,6 +186,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PUBLIC,
+                'callback': self.__handler_evenements_certificats.callbackAvecAck,
             },
             {
                 'nom': 'Pki.requete.1.public',
