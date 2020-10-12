@@ -105,7 +105,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 (ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64, 1)
             ],
             name='fingerprint_sha256_b64',
-            unique=True
+            unique=False,
         )
         # Index par chaine de certificat verifie
         collection_domaine.create_index(
@@ -493,22 +493,6 @@ class GestionnairePki(GestionnaireDomaineStandard):
         if correlation_csr is not None:
             document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
 
-        # if enveloppe.is_rootCA:
-        #     document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
-        #     document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
-        #     # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
-        #     document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
-        # else:
-        #     document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
-        #     if enveloppe.is_CA:
-        #         document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
-        #         # document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
-        #     else:
-        #         roles = enveloppe.get_roles
-        #         if ConstantesGenerateurCertificat.ROLE_BACKUP in roles:
-        #             document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
-        #             self.maj_liste_certificats_backup(fingerprint, document_cert)
-
         filtre = {
             ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64
         }
@@ -523,6 +507,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         result = collection.update_one(filtre, ops, upsert=True)
 
         if dirty:
+            # Transmettre la transaction pour conserver le certificat de maniere permanente
             document_cert[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = document_cert[
                 ConstantesPki.LIBELLE_NOT_VALID_BEFORE].timestamp()
             document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = document_cert[
@@ -536,29 +521,6 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         if result.matched_count != 1 and result.upserted_id is None:
             raise Exception("Erreur insertion nouveau certificat")
-            # # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
-            # # de maniere permanente
-            # transaction = {
-            #     ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
-            #     ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
-            #     ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
-            # }
-            # try:
-            #     self._contexte.generateur_transactions.soumettre_transaction(
-            #         transaction,
-            #         ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-            #     )
-            # except ErreurModeRegeneration:
-            #     # Mode de regeneration de document, rien a faire
-            #     pass
-
-        # # Demarrer validation des certificats
-        # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
-        # processus = "%s:%s" % (
-        #     ConstantesPki.DOMAINE_NOM,
-        #     ProcessusVerifierChaineCertificatsNonValides.__name__
-        # )
-        # self._mg_processus_demarreur.demarrer_processus(processus, dict())
 
     def confirmer_certificat(self, properties, message_dict):
         """
