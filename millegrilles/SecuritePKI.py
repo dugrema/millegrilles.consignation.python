@@ -657,20 +657,35 @@ class VerificateurTransaction(UtilCertificats):
                 for cert in certificats_inline:
                     # Emettre le certificat sur MQ
                     enveloppe_temp = EnveloppeCertificat(certificat_pem=cert)
-                    self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
+                    # self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
+                    self.emettre_certificat(certificats_inline)
 
                 enveloppe_temp = EnveloppeCertificat(certificat_pem=certificats_inline[0])
 
                 # Tenter de valider le certificat immediatement, peut echouer si la chaine n'a pas ete traitee
                 enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(enveloppe=enveloppe_temp)
             else:
-                fiche = dict_message.get('fiche_privee')
-                certs_signataires = dict_message.get('certificat_fullchain_signataire')
-                if fiche is not None:
-                    self._logger.info("Message avec une fichier privee, on charge les certificats")
-                    self._charger_fiche(fiche, certs_signataires)
-                    enveloppe_certificat = self._identifier_certificat(dict_message)
-                else:
+                # Verifier cas speciaux
+                enveloppe_certificat = None
+                entete = dict_message.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
+                if entete is not None:
+                    domaine_action = entete.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE)
+                    if domaine_action == Constantes.ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT:
+
+                        # C'est une transaction de certificats, on fait juste charger le contenu directement
+                        pems = [dict_message[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp]
+                                for fp in dict_message[ConstantesSecurityPki.LIBELLE_CHAINE]]
+
+                        enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(pems))
+
+                # fiche = dict_message.get('fiche_privee')
+                # certs_signataires = dict_message.get('certificat_fullchain_signataire')
+                # if fiche is not None:
+                #     self._logger.info("Message avec une fichier privee, on charge les certificats")
+                #     self._charger_fiche(fiche, certs_signataires)
+                #     enveloppe_certificat = self._identifier_certificat(dict_message)
+                # else:
+                if enveloppe_certificat is None:
                     self._logger.info("Certificat inconnu, requete MQ pour trouver %s" % ci.fingerprint)
                     routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
                     # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
@@ -680,7 +695,8 @@ class VerificateurTransaction(UtilCertificats):
                     )
                     raise ci  # On re-souleve l'erreur
 
-        self._logger.debug("Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_ascii)
+        self._logger.debug(
+            "Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_sha256_b64)
 
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
 

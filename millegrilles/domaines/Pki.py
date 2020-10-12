@@ -420,6 +420,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def inserer_certificat_pem(self, chaine_pem: list, correlation_csr: str = None, dirty=True):
         # def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None, transaction_faite=False):
+        chaine_pem = [pem.strip() for pem in chaine_pem]
         enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(chaine_pem))
         fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
 
@@ -434,6 +435,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
             ConstantesPki.LIBELLE_IDMG: idmg,
             ConstantesSecurityPki.LIBELLE_FINGERPRINT: enveloppe.fingerprint_ascii,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
             # ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
             ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
             ConstantesPki.LIBELLE_NOT_VALID_BEFORE: enveloppe.not_valid_before,
@@ -442,6 +444,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             ConstantesPki.LIBELLE_AUTHORITY_KEY: enveloppe.authority_key_identifier,
             ConstantesSecurityPki.LIBELLE_CHAINE: chaine_fingerprints,
             ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM: certs_pem_dict,
+            'dirty': dirty,
         }
 
         # Ajouter valeurs d'extension MilleGrilles - optionnel
@@ -480,8 +483,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
-            'dirty': dirty,
+            # ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
         }
 
         if correlation_csr is not None:
@@ -521,6 +523,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ConstantesPki.LIBELLE_NOT_VALID_BEFORE].timestamp()
             document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = document_cert[
                 ConstantesPki.LIBELLE_NOT_VALID_AFTER].timestamp()
+            del document_cert['dirty']
             self.generateur_transactions.soumettre_transaction(
                 document_cert,
                 ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT,
@@ -771,10 +774,14 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
 
         # Verifier si on a deja les certificats
         self.__logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
-        doc_id = self.controleur.gestionnaire.verifier_presence_certificat()
+        doc_id = self.controleur.gestionnaire.verifier_presence_certificat(fingerprint)
 
         if doc_id is None:
-            self.controleur.gestionnaire.inserer_certificat_pem()
+            # Ordonner PEMs selon la chaine
+            pems = [transaction[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in transaction[ConstantesSecurityPki.LIBELLE_CHAINE]]
+
+            # Reset dirty flag, on est en train de traiter la transaction
+            self.controleur.gestionnaire.inserer_certificat_pem(pems, dirty=False)
 
         self.set_etape_suivante()  # Termine
         return {ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint}
