@@ -63,7 +63,8 @@ class GenerateurTransaction:
     def soumettre_transaction(self, message_dict, domaine_action=None,
                               reply_to=None, correlation_id=None,
                               version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
-                              idmg_destination: str = None, retourner_enveloppe=False):
+                              idmg_destination: str = None, retourner_enveloppe=False,
+                              ajouter_certificats=False):
         """
         Transmet un message. La connexion doit etre ouverte.
 
@@ -77,7 +78,11 @@ class GenerateurTransaction:
         """
 
         # Preparer la structure du message reconnue par MilleGrilles
-        enveloppe = self.preparer_enveloppe(message_dict, domaine_action, version=version, idmg_destination=idmg_destination)
+        enveloppe = self.preparer_enveloppe(
+            message_dict, domaine_action,
+            version=version, idmg_destination=idmg_destination,
+            ajouter_certificats=ajouter_certificats
+        )
         # self.__logger.debug("Enveloppe message complet:\n%s" % str(enveloppe))
 
         # Extraire le UUID pour le retourner a l'invoqueur de la methode. Utilise pour retracer une soumission.
@@ -269,20 +274,21 @@ class GenerateurTransaction:
         return uuid_transaction
 
     def emettre_certificat(self, certificat_pem: str, fingerprint_ascii: str, correlation_csr: str = None):
-        message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
-        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = fingerprint_ascii
-        message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = certificat_pem
-
-        if correlation_csr is not None:
-            message_evenement[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
-
-        routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
-        self._contexte.message_dao.transmettre_message(
-            message_evenement, routing,
-        )
-        self._contexte.message_dao.transmettre_message_noeuds(
-            message_evenement, routing
-        )
+        raise NotImplemented("Remplace par SecuritePKI UtilCertificats.emettre_certificat() (verificateur ou signateur de tranactions)")
+        # message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
+        # message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = fingerprint_ascii
+        # message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = certificat_pem
+        #
+        # if correlation_csr is not None:
+        #     message_evenement[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
+        #
+        # routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
+        # self._contexte.message_dao.transmettre_message(
+        #     message_evenement, routing,
+        # )
+        # self._contexte.message_dao.transmettre_message_noeuds(
+        #     message_evenement, routing
+        # )
 
     def transmettre_evenement_persistance(self, id_document, id_transaction, domaine, properties_mq):
         message = {

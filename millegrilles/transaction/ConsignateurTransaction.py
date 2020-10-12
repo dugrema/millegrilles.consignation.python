@@ -15,8 +15,6 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles.util.X509Certificate import EnveloppeCleCert
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -76,6 +74,7 @@ class ConsignateurTransaction(ModeleConfiguration):
         self.__logger.info("Configuration et connection completee")
 
     def on_channel_open(self, channel):
+        super().on_channel_open(channel)
         channel.add_on_close_callback(self.__on_channel_close)
         channel.basic_qos(prefetch_count=5)
         self.__channel = channel
@@ -248,7 +247,7 @@ class ConsignateurTransactionCallback(BaseCallback):
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
         except CertificatInconnu:
-            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
             self._logger.warning(
                 "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
                     fingerprint, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -257,14 +256,14 @@ class ConsignateurTransactionCallback(BaseCallback):
             # Emettre demande pour le certificat manquant
             self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
 
-        certificats = enveloppe_transaction.get('_certificat')
+        chaine_certificat = enveloppe_transaction.get('_certificat')
         try:
             del enveloppe_transaction['_certificat']
         except KeyError:
             pass
 
-        if certificats:
-            self.__emettre_certificats(certificats)
+        if chaine_certificat:
+            self.__emettre_chaine(chaine_certificat)
 
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
@@ -286,13 +285,8 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         return doc_id, signature_valide
 
-    def __emettre_certificats(self, certs: list):
-        for cert in certs:
-            enveloppe = EnveloppeCleCert()
-            enveloppe.cert_from_pem_bytes(cert.encode('utf-8'))
-            fingerprint_ascii = enveloppe.fingerprint
-
-            self.contexte.generateur_transactions.emettre_certificat(cert, fingerprint_ascii)
+    def __emettre_chaine(self, certs: list):
+        self.contexte.signateur_transactions.emettre_certificat(certs)
 
     def sauvegarder_transaction_restauree(self, enveloppe_transaction):
 

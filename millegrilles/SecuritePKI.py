@@ -62,6 +62,10 @@ class EnveloppeCertificat:
         return certificat.fingerprint(hashes.SHA1())
 
     @staticmethod
+    def calculer_fingerprint_sha256(certificat):
+        return certificat.fingerprint(hashes.SHA256())
+
+    @staticmethod
     def calculer_fingerprint_ascii(certificat):
         return str(binascii.hexlify(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
 
@@ -84,6 +88,10 @@ class EnveloppeCertificat:
     @property
     def fingerprint_b64(self):
         return str(base64.b64encode(self.fingerprint), 'utf-8')
+
+    @property
+    def fingerprint_sha256_b64(self):
+        return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint_sha256(self._certificat)), 'utf-8')
 
     @property
     def fingerprint_base58(self):
@@ -383,7 +391,7 @@ class UtilCertificats:
         digest = hashes.Hash(hachage, backend=default_backend())
         digest.update(message_bytes)
         resultat_digest = digest.finalize()
-        digest_base64 = str(base64.b64encode(resultat_digest), 'utf-8')
+        digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
         self._logger.debug("Resultat hash contenu: %s" % digest_base64)
 
         return digest_base64
@@ -419,6 +427,34 @@ class UtilCertificats:
         )
 
         return contenu_dechiffre
+
+    def emettre_certificat(self, chaine_pem: list, correlation_csr: str = None):
+        """
+        Emet un certificat avec sa chaine comme evenement a etre capture par les modules interesses.
+        :param chaine_pem:
+        :param correlation_csr:
+        :return:
+        """
+        enveloppe = EnveloppeCertificat(certificat_pem=chaine_pem[0])
+        fingerprint = enveloppe.fingerprint_ascii
+        fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+
+        # for cert in chaine_pem[1:]:
+        #     enveloppe = EnveloppeCertificat(certificat_pem=cert)
+        #     fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+        #     certificats_pem[fingerprint_sha256_b64] = cert
+
+        message = {
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
+            ConstantesSecurityPki.LIBELLE_CHAINE_PEM: chaine_pem,
+        }
+        if correlation_csr is not None:
+            message[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
+
+        # Emet le certificat sur l'exchange par defaut
+        routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
+        self._contexte.generateur_transactions.emettre_message(message, routing)
 
     @property
     def certificat(self):
@@ -475,9 +511,9 @@ class SignateurTransaction(UtilCertificats):
         dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = en_tete
 
         # Ajouter information du certification dans l'en_tete
-        fingerprint_cert = self._enveloppe.fingerprint_ascii
-        self._logger.debug("Fingerprint: %s" % fingerprint_cert)
-        en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT] = fingerprint_cert
+        fingerprint_cert = self._enveloppe.fingerprint_sha256_b64
+        # self._logger.debug("Fingerprint: %s" % fingerprint_cert)
+        en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT] = 'sha256_b64:' + fingerprint_cert
 
         signature = self._produire_signature(dict_message_effectif)
         dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = signature
@@ -522,6 +558,19 @@ class SignateurTransaction(UtilCertificats):
         self._logger.debug("Signatures: %s" % signature_texte_utf8)
 
         return signature_texte_utf8
+
+    def emettre_certificat(self, chaine_pem: list = None, correlation_csr: str = None):
+        """
+        Emet la chaine de certificat
+        :param chaine_pem: Si None, emet le certificat du signateur
+        :param correlation_csr:
+        :return:
+        """
+        if chaine_pem is None:
+            # Charger la chaine de certificat de signature
+            chaine_pem = self.chaine_certs
+
+        super().emettre_certificat(chaine_pem, correlation_csr)
 
 
 class VerificateurTransaction(UtilCertificats):
@@ -661,7 +710,7 @@ class VerificateurTransaction(UtilCertificats):
         :return:
         """
 
-        fingerprint = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+        fingerprint = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
         self._logger.debug("Identifier certificat transaction, fingerprint %s" % fingerprint)
         verificateur_certificats = self._contexte.verificateur_certificats
 
@@ -1068,35 +1117,36 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         nom_queue = queue.method.queue
         self.__queue_reponse = nom_queue
 
-        exchange = self.contexte.configuration.exchange_defaut
-
         self.__logger.debug("Transmission certificat PKI a l'initialisation")
-        enveloppe = self.transmettre_certificat()
-        fingerprint = enveloppe.fingerprint_ascii
-        routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
+        self.contexte.signateur_transactions.emettre_certificat()
 
-        self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
-        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
-        self.__routing_cert = routing_key
+        # enveloppe = self.transmettre_certificat()
+        # fingerprint = enveloppe.fingerprint_ascii
+        # routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
+        #
+        # self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
+        # self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+        # self.__routing_cert = routing_key
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
 
-    def transmettre_certificat(self):
-        enveloppe = self.enveloppe_certificat_courant
-
-        message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
-        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii
-        message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = str(
-            enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
-        )
-
-        routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
-        self.contexte.message_dao.transmettre_message(
-            message_evenement, routing, channel=self.__channel, exchange='broadcast'
-        )
-
-        return enveloppe
+    # def transmettre_certificat(self):
+    #     enveloppe = self.enveloppe_certificat_courant
+    #
+    #     message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
+    #     message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii
+    #     message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = str(
+    #         enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
+    #     )
+    #
+    #     routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
+    #     self.contexte.signateur_transactions.emettre_certificat()
+    #         message_dao.transmettre_message(
+    #         message_evenement, routing, channel=self.__channel, exchange='broadcast'
+    #     )
+    #
+    #     return enveloppe
 
     def traiter_message(self, ch, method, properties, body):
         # Implementer la lecture de messages, specialement pour transmettre un certificat manquant

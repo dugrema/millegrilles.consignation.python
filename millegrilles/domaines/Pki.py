@@ -1,14 +1,15 @@
 # Domaine Public Key Infrastructure (PKI)
 
+from cryptography import x509
+
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
-from millegrilles.Erreurs import ErreurModeRegeneration
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementRequetesProtegees, MGPProcesseurTraitementEvenements
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-from millegrilles.MGProcessus import MGPProcesseur, MGProcessus, MGProcessusTransaction
-from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, VerificateurCertificats
-from millegrilles.util.X509Certificate import PemHelpers, ConstantesGenerateurCertificat
+from millegrilles.MGProcessus import MGPProcesseur, MGProcessusTransaction
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
+from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
 import logging
 import datetime
@@ -59,16 +60,14 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
             self.__logger.warning("Reception requete sans reply_to/correlation_id:\n%s", str(message_dict))
 
 
-class TraitementEvenementsPki(MGPProcesseurTraitementEvenements):
+class TraitementEvenementsPki(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         routing_key = method.routing_key
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
 
-        if routing_key == ConstantesPki.REQUETE_CERTIFICAT_EMIS:
-            message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        if routing_key == ConstantesPki.EVENEMENT_CERTIFICAT_EMIS:
             self.gestionnaire.recevoir_certificat(message_dict)
-        else:
-            super().traiter_message(ch, method, properties, body)
 
 
 class GestionnairePki(GestionnaireDomaineStandard):
@@ -77,11 +76,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
         super().__init__(contexte)
         self._logger = logging.getLogger("%s.%s" % (__name__, self.__class__.__name__))
 
-        self._pki_document_helper = None
+        # self._pki_document_helper = None
         self.__traitement_certificats = None
 
         handler_requetes_protegees = TraitementRequetesProtegeesPki(self)
         handler_requetes_publiques = TraitementRequetesPubliques(self)
+        self.__handler_evenements_certificats = TraitementEvenementsPki(self)
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_SECURE: handler_requetes_protegees,
@@ -92,19 +92,19 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def configurer(self):
         super().configurer()
-        self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
-        self.__traitement_certificats = TraitementRequeteCertificat(self, self._pki_document_helper)
+        # self._pki_document_helper = PKIDocumentHelper(self._contexte, self.demarreur_processus)
+        self.__traitement_certificats = TraitementRequeteCertificat(self)
 
-        self.initialiser_mgca()  # S'assurer que les certs locaux sont prets avant les premieres transactions
+        # self.initialiser_mgca()  # S'assurer que les certs locaux sont prets avant les premieres transactions
 
         # Index collection domaine
         collection_domaine = self.get_collection()
         # Index par fingerprint de certificat
         collection_domaine.create_index(
             [
-                (ConstantesPki.LIBELLE_FINGERPRINT, 1)
+                (ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64, 1)
             ],
-            name='fingerprinte',
+            name='fingerprint_sha256_b64',
             unique=True
         )
         # Index par chaine de certificat verifie
@@ -130,6 +130,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
         self.initialiser_document(ConstantesPki.LIBVAL_CONFIG_CERTDOCKER, ConstantesPki.DOCUMENT_CONFIG_CERTDOCKER)
 
+    def on_channel_open(self, channel):
+        super().on_channel_open(channel)
+
+        # Ajouter basicconsume pour Q certificats
+        self.inscrire_basicconsume(self.nom_queue_certificats, self.__handler_evenements_certificats.callbackAvecAck)
+
     def initialiser_mgprocesseur_evenements(self):
         """
         Factory pour traitement evenements du domaine
@@ -138,45 +144,42 @@ class GestionnairePki(GestionnaireDomaineStandard):
         return MGPProcesseurTraitementEvenements(
             self._contexte, self._stop_event, gestionnaire_domaine=self)
 
-    def traiter_cedule(self, evenement):
-        super().traiter_cedule(evenement)
-
-        indicateurs = evenement['indicateurs']
-        self._logger.debug("Cedule webPoll: %s" % str(indicateurs))
-
-        # Faire la liste des cedules a declencher
-        if 'heure' in indicateurs:
-            # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
-            processus = "%s:%s" % (
-                self.__module__.__name__,
-                ProcessusVerifierChaineCertificatsNonValides.__name__
-            )
-            self.demarrer_processus(processus, dict())
+    @property
+    def nom_queue_certificats(self):
+        return '.'.join([self.get_nom_queue(), 'certificats'])
 
     def get_queue_configuration(self):
         configuration = super().get_queue_configuration()
 
         configuration_pki = [
             {
-                'nom': '.'.join([self.get_nom_queue(), 'evenements']),
+                'nom': self.nom_queue_certificats,
                 'routing': [
-                    ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                    ConstantesPki.EVENEMENT_CERTIFICAT_EMIS,
+                ],
+                'ttl': 300000,
+                'exchange': Constantes.SECURITE_SECURE,
+            },
+            {
+                'nom': self.nom_queue_certificats,
+                'routing': [
+                    ConstantesPki.EVENEMENT_CERTIFICAT_EMIS,
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PROTEGE,
             },
             {
-                'nom': '.'.join([self.get_nom_queue(), 'evenements']),
+                'nom': self.nom_queue_certificats,
                 'routing': [
-                    ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                    ConstantesPki.EVENEMENT_CERTIFICAT_EMIS,
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PRIVE,
             },
             {
-                'nom': '.'.join([self.get_nom_queue(), 'evenements']),
+                'nom': self.nom_queue_certificats,
                 'routing': [
-                    ConstantesPki.REQUETE_CERTIFICAT_EMIS,
+                    ConstantesPki.EVENEMENT_CERTIFICAT_EMIS,
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PUBLIC,
@@ -228,40 +231,41 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def initialiser_mgca(self):
         """ Initialise les root CA et noeud middleware (ou local) """
-
-        verificateur = self._contexte.verificateur_certificats
-
-        with open(self.configuration.pki_cafile, 'r') as f:
-            contenu = f.read()
-            pems = PemHelpers.split_certificats(contenu)
-            self._logger.debug("Certificats ROOT configures: %s" % pems)
-
-        for cert in pems:
-            enveloppe = EnveloppeCertificat(certificat_pem=cert.encode('utf-8'))
-            self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
-            self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
-            verificateur.charger_certificat(enveloppe=enveloppe)
-
-        pki_certfile = self.configuration.pki_certfile
-        with open(pki_certfile, 'r') as f:
-            contenu_pem = f.read()
-        pems = PemHelpers.split_certificats(contenu_pem)
-        pems.reverse()  # Commencer par les certs intermediaires
-        for cert_pem in pems:
-            enveloppe = EnveloppeCertificat(certificat_pem=cert_pem.encode('utf-8'))
-            verificateur.charger_certificat(enveloppe=enveloppe)
-            self._logger.debug("Certificats noeud local: %s" % contenu)
-
-            # Verifier la chaine immediatement, permet d'ajouter le cert avec Trusted=True
-            self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
-
-        # Demarrer validation des certificats
-        # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
-        # processus = "%s:%s" % (
-        #     ConstantesPki.DOMAINE_NOM,
-        #     ProcessusVerifierChaineCertificatsNonValides.__name__
-        # )
-        # self.demarrer_processus(processus, dict())
+        raise NotImplemented("Deprecated")
+        #
+        # verificateur = self._contexte.verificateur_certificats
+        #
+        # with open(self.configuration.pki_cafile, 'r') as f:
+        #     contenu = f.read()
+        #     pems = PemHelpers.split_certificats(contenu)
+        #     self._logger.debug("Certificats ROOT configures: %s" % pems)
+        #
+        # for cert in pems:
+        #     enveloppe = EnveloppeCertificat(certificat_pem=cert.encode('utf-8'))
+        #     self._logger.debug("OUN pour cert = %s" % enveloppe.subject_organizational_unit_name)
+        #     self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
+        #     verificateur.charger_certificat(enveloppe=enveloppe)
+        #
+        # pki_certfile = self.configuration.pki_certfile
+        # with open(pki_certfile, 'r') as f:
+        #     contenu_pem = f.read()
+        # pems = PemHelpers.split_certificats(contenu_pem)
+        # pems.reverse()  # Commencer par les certs intermediaires
+        # for cert_pem in pems:
+        #     enveloppe = EnveloppeCertificat(certificat_pem=cert_pem.encode('utf-8'))
+        #     verificateur.charger_certificat(enveloppe=enveloppe)
+        #     self._logger.debug("Certificats noeud local: %s" % contenu)
+        #
+        #     # Verifier la chaine immediatement, permet d'ajouter le cert avec Trusted=True
+        #     self._pki_document_helper.inserer_certificat(enveloppe, trusted=True)
+        #
+        # # Demarrer validation des certificats
+        # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+        # # processus = "%s:%s" % (
+        # #     ConstantesPki.DOMAINE_NOM,
+        # #     ProcessusVerifierChaineCertificatsNonValides.__name__
+        # # )
+        # # self.demarrer_processus(processus, dict())
 
     def get_nom_domaine(self):
         return ConstantesPki.DOMAINE_NOM
@@ -305,11 +309,11 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         return certs
 
-    def get_certificat(self, fingerprint, properties=None, demander_si_inconnu=True):
+    def get_certificat(self, fingerprint_sha256_b64, properties=None, demander_si_inconnu=True):
         collection_pki = self.document_dao.get_collection(self.get_nom_collection())
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
-            ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+            # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
         }
         certificat = collection_pki.find_one(filtre)
 
@@ -320,12 +324,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
                     certificat_filtre[key] = value
         except AttributeError:
             if demander_si_inconnu:
-                self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint)
+                self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint_sha256_b64)
                 # Le certificat n'est pas connu, on fait une requete
-                self.demander_certificat_via_mq(fingerprint)
+                self.demander_certificat_via_mq(fingerprint_sha256_b64)
                 certificat_filtre = None  # Aucune reponse avant retour
             else:
-                self._logger.warning('Certificat %s inconnu' % fingerprint)
+                self._logger.warning('Certificat %s inconnu' % fingerprint_sha256_b64)
 
         return certificat_filtre
 
@@ -399,10 +403,155 @@ class GestionnairePki(GestionnaireDomaineStandard):
         return documents
 
     def recevoir_certificat(self, message_dict):
-        enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
-        correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
-        # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
-        self._pki_document_helper.inserer_certificat(enveloppe, correlation_csr=correlation_csr)
+        # Verifier si le certificat existe deja
+        fingerprint_sha256_b64 = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
+        document_existant = self.verifier_presence_certificat(fingerprint_sha256_b64)
+        if document_existant is None:
+            self._logger.debug('Ajout du certificat %s' % fingerprint_sha256_b64)
+            chaine_pem = message_dict[ConstantesSecurityPki.LIBELLE_CHAINE_PEM]
+            correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
+            self.inserer_certificat_pem(chaine_pem, correlation_csr=correlation_csr)
+
+    def verifier_presence_certificat(self, fingerprint_sha256_b64: str):
+        filtre = {ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64}
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+        document_existant = collection.find_one(filtre, projection={'_id': True})
+        return document_existant
+
+    def inserer_certificat_pem(self, chaine_pem: list, correlation_csr: str = None, dirty=True):
+        # def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None, transaction_faite=False):
+        enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(chaine_pem))
+        fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+
+        # Valider la chaine de certificats - lance exception si invalide
+        self._contexte.verificateur_certificats.verifier_chaine(enveloppe)
+
+        idmg = enveloppe.subject_organization_name
+        chaine_fingerprints = [fingerprint_sha256_b64]
+        certs_pem_dict = {fingerprint_sha256_b64: chaine_pem[0]}
+
+        document_cert = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
+            ConstantesPki.LIBELLE_IDMG: idmg,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: enveloppe.fingerprint_ascii,
+            # ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
+            ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
+            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: enveloppe.not_valid_before,
+            ConstantesPki.LIBELLE_NOT_VALID_AFTER: enveloppe.not_valid_after,
+            ConstantesPki.LIBELLE_SUBJECT_KEY: enveloppe.subject_key_identifier,
+            ConstantesPki.LIBELLE_AUTHORITY_KEY: enveloppe.authority_key_identifier,
+            ConstantesSecurityPki.LIBELLE_CHAINE: chaine_fingerprints,
+            ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM: certs_pem_dict,
+        }
+
+        # Ajouter valeurs d'extension MilleGrilles - optionnel
+        try:
+            document_cert[ConstantesPki.LIBELLE_ROLES]: enveloppe.get_roles
+        except x509.extensions.ExtensionNotFound:
+            pass
+        try:
+            document_cert[ConstantesPki.LIBELLE_EXCHANGES]: enveloppe.get_exchanges
+        except x509.extensions.ExtensionNotFound:
+            pass
+        try:
+            document_cert[ConstantesPki.LIBELLE_DOMAINES]: enveloppe.get_domaines
+        except x509.extensions.ExtensionNotFound:
+            pass
+
+        # document_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = enveloppe.certificat_pem
+        # ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM:
+        enveloppe_ca = None
+        for pem in chaine_pem[1:]:
+            enveloppe_ca = EnveloppeCertificat(certificat_pem=pem)
+            fingerprint_ca_sha256_b64 = enveloppe_ca.fingerprint_sha256_b64
+            chaine_fingerprints.append(fingerprint_ca_sha256_b64)
+            if enveloppe_ca.is_CA is not True:
+                raise Exception("Chaine de certificat invalide, cert suivants dans liste pas CA : " + fingerprint_ca_sha256_b64)
+            elif enveloppe.subject_organization_name != idmg:
+                raise Exception("Certificat dans la chain ne correspond pas au idmg : " + fingerprint_ca_sha256_b64)
+            certs_pem_dict[fingerprint_ca_sha256_b64] = pem
+
+        if enveloppe_ca is None:
+            raise Exception("Chaine incomplete")
+
+        if idmg != enveloppe_ca.idmg:  # Recalculer le idmg
+            raise Exception("Certificat racine fourni ne correspond pas au idmg")
+
+        maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
+            'dirty': dirty,
+        }
+
+        if correlation_csr is not None:
+            document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
+
+        # if enveloppe.is_rootCA:
+        #     document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
+        #     document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
+        #     # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
+        #     document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
+        # else:
+        #     document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
+        #     if enveloppe.is_CA:
+        #         document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+        #         # document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
+        #     else:
+        #         roles = enveloppe.get_roles
+        #         if ConstantesGenerateurCertificat.ROLE_BACKUP in roles:
+        #             document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
+        #             self.maj_liste_certificats_backup(fingerprint, document_cert)
+
+        filtre = {
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64
+        }
+
+        ops = {
+            '$set': document_cert,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+        result = collection.update_one(filtre, ops, upsert=True)
+
+        if dirty:
+            document_cert[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = document_cert[
+                ConstantesPki.LIBELLE_NOT_VALID_BEFORE].timestamp()
+            document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = document_cert[
+                ConstantesPki.LIBELLE_NOT_VALID_AFTER].timestamp()
+            self.generateur_transactions.soumettre_transaction(
+                document_cert,
+                ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT,
+                ajouter_certificats=True
+            )
+
+        if result.matched_count != 1 and result.upserted_id is None:
+            raise Exception("Erreur insertion nouveau certificat")
+            # # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
+            # # de maniere permanente
+            # transaction = {
+            #     ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
+            #     ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+            #     ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
+            # }
+            # try:
+            #     self._contexte.generateur_transactions.soumettre_transaction(
+            #         transaction,
+            #         ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+            #     )
+            # except ErreurModeRegeneration:
+            #     # Mode de regeneration de document, rien a faire
+            #     pass
+
+        # # Demarrer validation des certificats
+        # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+        # processus = "%s:%s" % (
+        #     ConstantesPki.DOMAINE_NOM,
+        #     ProcessusVerifierChaineCertificatsNonValides.__name__
+        # )
+        # self._mg_processus_demarreur.demarrer_processus(processus, dict())
 
     def confirmer_certificat(self, properties, message_dict):
         """
@@ -462,152 +611,152 @@ class GestionnairePki(GestionnaireDomaineStandard):
         collection_pki.update_one(filtre, {'$set': set_ops})
 
 
-class PKIDocumentHelper:
-
-    def __init__(self, contexte, mg_processus_demarreur):
-        self._contexte = contexte
-        # self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
-        self._mg_processus_demarreur = mg_processus_demarreur
-
-    def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None, transaction_faite=False):
-        document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
-        del document_cert[ConstantesPki.LIBELLE_FINGERPRINT]
-        fingerprint = enveloppe.fingerprint_ascii
-
-        maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
-        document_cert[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
-
-        document_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = enveloppe.certificat_pem
-        document_cert[ConstantesPki.LIBELLE_SUBJECT] = enveloppe.formatter_subject()
-        document_cert[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = enveloppe.not_valid_before
-        document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = enveloppe.not_valid_after
-        document_cert[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
-        document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
-
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
-            ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
-            ConstantesPki.LIBELLE_TRANSACTION_FAITE: transaction_faite,
-        }
-
-        if correlation_csr is not None:
-            document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
-
-        if enveloppe.is_rootCA:
-            document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
-            document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
-            # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
-            document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
-        else:
-            document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
-            if enveloppe.is_CA:
-                document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
-                # document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
-            else:
-                roles = enveloppe.get_roles
-                if ConstantesGenerateurCertificat.ROLE_BACKUP in roles:
-                    document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
-                    self.maj_liste_certificats_backup(fingerprint, document_cert)
-
-        filtre = {
-            ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
-        }
-
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        result = collection.update_one(filtre, {'$set': document_cert, '$setOnInsert': set_on_insert}, upsert=True)
-        if result.matched_count == 0:
-            # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
-            # de maniere permanente
-            transaction = {
-                ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
-                ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
-                ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
-            }
-            try:
-                self._contexte.generateur_transactions.soumettre_transaction(
-                    transaction,
-                    ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-                )
-            except ErreurModeRegeneration:
-                # Mode de regeneration de document, rien a faire
-                pass
-
-        # # Demarrer validation des certificats
-        # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
-        # processus = "%s:%s" % (
-        #     ConstantesPki.DOMAINE_NOM,
-        #     ProcessusVerifierChaineCertificatsNonValides.__name__
-        # )
-        # self._mg_processus_demarreur.demarrer_processus(processus, dict())
-
-    def maj_liste_certificats_backup(self, fingerprint, info_certificat):
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
-        }
-        set_ops = {
-            'certificats.%s' % fingerprint: info_certificat[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
-        }
-        set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
-        }
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        collection.update_one(filtre, {'$set': set_ops, '$setOnInsert': set_on_insert}, upsert=True)
-
-    def charger_certificat(self, fingerprint=None, subject=None):
-        filtre = dict()
-        if fingerprint is not None:
-            filtre[ConstantesPki.LIBELLE_FINGERPRINT] = fingerprint
-        if subject is not None:
-            filtre[ConstantesPki.LIBELLE_SUBJECT_KEY] = subject
-
-        # Lire les certificats et les charger dans des enveloppes
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        curseur = collection.find(filtre)
-        liste_certificats = list()
-        for certificat in curseur:
-            # Charger l'enveloppe
-            enveloppe = EnveloppeCertificat(certificat_pem=certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
-            liste_certificats.append(enveloppe)
-
-        return liste_certificats
-
-    def identifier_certificats_non_valide(self, authority_key=None):
-        """
-        Fait une liste des fingerprints de certificats qui ne sont pas encore valides.
-        :param authority_key: Optionnel, va charger tous les certificats pas encore valides associes a cette autorite.
-        :return: Liste de fingerprints
-        """
-        filtre = {
-            ConstantesPki.LIBELLE_CHAINE_COMPLETE: False
-        }
-
-        if authority_key is not None:
-            filtre[ConstantesPki.LIBELLE_AUTHORITY_KEY] = authority_key
-
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        curseur = collection.find(filtre)
-        fingerprints = list()
-        for certificat in curseur:
-            fingerprint = certificat[ConstantesPki.LIBELLE_FINGERPRINT]
-            fingerprints.append(fingerprint)
-
-        return fingerprints
-
-    def marquer_certificats_valides(self, fingerprints):
-
-        filtre = {
-            ConstantesPki.LIBELLE_FINGERPRINT: {'$in': fingerprints}
-        }
-
-        operation = {
-            '$set': {
-                ConstantesPki.LIBELLE_CHAINE_COMPLETE: True
-            }
-        }
-
-        collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        collection.update(filtre, operation, multi=True)
+# class PKIDocumentHelper:
+#
+#     def __init__(self, contexte, mg_processus_demarreur):
+#         self._contexte = contexte
+#         # self._mg_processus_demarreur = MGPProcessusDemarreur(self._contexte)
+#         self._mg_processus_demarreur = mg_processus_demarreur
+#
+#     def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None, transaction_faite=False):
+#         document_cert = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
+#         del document_cert[ConstantesPki.LIBELLE_FINGERPRINT]
+#         fingerprint = enveloppe.fingerprint_ascii
+#
+#         maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
+#         document_cert[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = maintenant
+#
+#         document_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = enveloppe.certificat_pem
+#         document_cert[ConstantesPki.LIBELLE_SUBJECT] = enveloppe.formatter_subject()
+#         document_cert[ConstantesPki.LIBELLE_NOT_VALID_BEFORE] = enveloppe.not_valid_before
+#         document_cert[ConstantesPki.LIBELLE_NOT_VALID_AFTER] = enveloppe.not_valid_after
+#         document_cert[ConstantesPki.LIBELLE_SUBJECT_KEY] = enveloppe.subject_key_identifier
+#         document_cert[ConstantesPki.LIBELLE_AUTHORITY_KEY] = enveloppe.authority_key_identifier
+#
+#         set_on_insert = {
+#             Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
+#             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+#             ConstantesPki.LIBELLE_TRANSACTION_FAITE: transaction_faite,
+#         }
+#
+#         if correlation_csr is not None:
+#             document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
+#
+#         if enveloppe.is_rootCA:
+#             document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_ROOT
+#             document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.idmg
+#             # Le certificat root est trusted implicitement quand il est charge a partir d'un fichier local
+#             document_cert[ConstantesPki.LIBELLE_CHAINE_COMPLETE] = True
+#         else:
+#             document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
+#             if enveloppe.is_CA:
+#                 document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_MILLEGRILLE
+#                 # document_cert[ConstantesPki.LIBELLE_IDMG] = enveloppe.subject_organization_name
+#             else:
+#                 roles = enveloppe.get_roles
+#                 if ConstantesGenerateurCertificat.ROLE_BACKUP in roles:
+#                     document_cert[Constantes.DOCUMENT_INFODOC_LIBELLE] = ConstantesPki.LIBVAL_CERTIFICAT_BACKUP
+#                     self.maj_liste_certificats_backup(fingerprint, document_cert)
+#
+#         filtre = {
+#             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint
+#         }
+#
+#         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+#         result = collection.update_one(filtre, {'$set': document_cert, '$setOnInsert': set_on_insert}, upsert=True)
+#         if result.matched_count == 0:
+#             # Le document vient d'etre insere, on va aussi transmettre une nouvelle transaction pour l'ajouter
+#             # de maniere permanente
+#             transaction = {
+#                 ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
+#                 ConstantesPki.LIBELLE_FINGERPRINT: fingerprint,
+#                 ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
+#             }
+#             try:
+#                 self._contexte.generateur_transactions.soumettre_transaction(
+#                     transaction,
+#                     ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+#                 )
+#             except ErreurModeRegeneration:
+#                 # Mode de regeneration de document, rien a faire
+#                 pass
+#
+#         # # Demarrer validation des certificats
+#         # # declencher workflow pour trouver les certificats dans MongoDB qui ne sont pas encore valides
+#         # processus = "%s:%s" % (
+#         #     ConstantesPki.DOMAINE_NOM,
+#         #     ProcessusVerifierChaineCertificatsNonValides.__name__
+#         # )
+#         # self._mg_processus_demarreur.demarrer_processus(processus, dict())
+#
+#     def maj_liste_certificats_backup(self, fingerprint, info_certificat):
+#         filtre = {
+#             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
+#         }
+#         set_ops = {
+#             'certificats.%s' % fingerprint: info_certificat[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
+#         }
+#         set_on_insert = {
+#             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+#             ConstantesSecurityPki.LIBELLE_FINGERPRINT: ConstantesPki.LIBVAL_LISTE_CERTIFICATS_BACKUP,
+#         }
+#         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+#         collection.update_one(filtre, {'$set': set_ops, '$setOnInsert': set_on_insert}, upsert=True)
+#
+#     def charger_certificat(self, fingerprint=None, subject=None):
+#         filtre = dict()
+#         if fingerprint is not None:
+#             filtre[ConstantesPki.LIBELLE_FINGERPRINT] = fingerprint
+#         if subject is not None:
+#             filtre[ConstantesPki.LIBELLE_SUBJECT_KEY] = subject
+#
+#         # Lire les certificats et les charger dans des enveloppes
+#         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+#         curseur = collection.find(filtre)
+#         liste_certificats = list()
+#         for certificat in curseur:
+#             # Charger l'enveloppe
+#             enveloppe = EnveloppeCertificat(certificat_pem=certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
+#             liste_certificats.append(enveloppe)
+#
+#         return liste_certificats
+#
+#     def identifier_certificats_non_valide(self, authority_key=None):
+#         """
+#         Fait une liste des fingerprints de certificats qui ne sont pas encore valides.
+#         :param authority_key: Optionnel, va charger tous les certificats pas encore valides associes a cette autorite.
+#         :return: Liste de fingerprints
+#         """
+#         filtre = {
+#             ConstantesPki.LIBELLE_CHAINE_COMPLETE: False
+#         }
+#
+#         if authority_key is not None:
+#             filtre[ConstantesPki.LIBELLE_AUTHORITY_KEY] = authority_key
+#
+#         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+#         curseur = collection.find(filtre)
+#         fingerprints = list()
+#         for certificat in curseur:
+#             fingerprint = certificat[ConstantesPki.LIBELLE_FINGERPRINT]
+#             fingerprints.append(fingerprint)
+#
+#         return fingerprints
+#
+#     def marquer_certificats_valides(self, fingerprints):
+#
+#         filtre = {
+#             ConstantesPki.LIBELLE_FINGERPRINT: {'$in': fingerprints}
+#         }
+#
+#         operation = {
+#             '$set': {
+#                 ConstantesPki.LIBELLE_CHAINE_COMPLETE: True
+#             }
+#         }
+#
+#         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+#         collection.update(filtre, operation, multi=True)
 
 
 class ProcessusAjouterCertificat(MGProcessusTransaction):
@@ -618,76 +767,17 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
-        fingerprint = transaction['fingerprint']
-        self.__logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
+        fingerprint = transaction[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
 
         # Verifier si on a deja les certificats
-        collection = self.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
-        certificat_existant = collection.find_one({'fingerprint': fingerprint})
+        self.__logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
+        doc_id = self.controleur.gestionnaire.verifier_presence_certificat()
 
-        if certificat_existant is None:
-            # Si on n'a pas le certificat, on le conserve et on lance la verification de chaine
-            enveloppe_certificat = EnveloppeCertificat(certificat_pem=bytes(transaction['certificat_pem'], 'utf-8'))
-            helper = PKIDocumentHelper(self.controleur.contexte, None)
-            helper.inserer_certificat(enveloppe_certificat, transaction_faite=True)
-
-            # Sauvegarder certificat #
-            # document_certificat = ConstantesPki.DOCUMENT_CERTIFICAT_NOEUD.copy()
-            # document_certificat[ConstantesPki.LIBELLE_CERTIFICAT_PEM] = transaction['certificat_pem']
-            # document_certificat[ConstantesPki.LIBELLE_FINGERPRINT] = enveloppe_certificat.fingerprint_ascii
-            #
-            # if enveloppe_certificat.is_rootCA:
-            #     idmg_certificat = enveloppe_certificat.idmg
-            # else:
-            #     idmg_certificat = enveloppe_certificat.subject_organization_name
-            # document_certificat[ConstantesPki.LIBELLE_IDMG] = idmg_certificat
-
-            # collection.insert_one(document_certificat)
-
-            self.set_etape_suivante(ProcessusAjouterCertificat.verifier_chaine.__name__)
-
-        else:
-            filtre = {'fingerprint': fingerprint}
-            operations = {'$set': {ConstantesPki.LIBELLE_TRANSACTION_FAITE: True}}
-            collection.update_one(filtre, operations)
-
-            if certificat_existant.get(ConstantesPki.LIBELLE_CHAINE_COMPLETE):
-                self.set_etape_suivante()  # Termine
-            else:
-                self.set_etape_suivante(ProcessusAjouterCertificat.verifier_chaine.__name__)
-
-        return {'fingerprint': fingerprint}
-
-    def verifier_chaine(self):
-        # Demarrer processus verification
-        verificateur = VerificateurCertificats(self._controleur.contexte)
-        fingerprint = self.parametres['fingerprint']
-
-        # Charger le certificat et verifier si on peut valider la chaine
-        valide = False
-        try:
-            enveloppe = verificateur.charger_certificat(fingerprint=fingerprint)
-            if enveloppe is not None:
-                verificateur.verifier_chaine(enveloppe)
-                valide = True
-
-                commande_publier_certificat = {
-                    ConstantesPki.LIBELLE_CERTIFICAT_PEM: enveloppe.certificat_pem,
-                }
-                self.generateur_transactions.transmettre_commande(commande_publier_certificat, 'commande.publicateur.publierCertificat')
-
-        except Exception:
-            self.__logger.exception("Certificat invalide: %s" % fingerprint)
-
-        if valide:
-            helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
-            helper.marquer_certificats_valides([fingerprint])
-
-        # Transmettre commande au publicateur pour inserer le certificat dans le repertoire certs
+        if doc_id is None:
+            self.controleur.gestionnaire.inserer_certificat_pem()
 
         self.set_etape_suivante()  # Termine
-
-        return {'valide': valide}
+        return {ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint}
 
     def get_collection_transaction_nom(self):
         return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
@@ -761,91 +851,10 @@ class ProcessusAjouterCertificatWeb(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusVerifierChaineCertificatsNonValides(MGProcessus):
-
-    PARAM_A_VERIFIER = 'fingerprints_a_verifier'
-    PARAM_VALIDE = 'fingerprints_valides'
-    PARAM_INVALIDE = 'fingerprints_invalides'
-
-    def __init__(self, controleur: MGPProcesseur, evenement):
-        super().__init__(controleur, evenement)
-        self._helper = PKIDocumentHelper(self._controleur.contexte, self._controleur.demarreur_processus)
-
-    def initiale(self):
-        liste_fingerprints = self._helper.identifier_certificats_non_valide()
-
-        resultat = {}
-        if len(liste_fingerprints) > 0:
-            resultat[ProcessusVerifierChaineCertificatsNonValides.PARAM_A_VERIFIER] = liste_fingerprints
-            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.verifier_chaines.__name__)
-        else:
-            self.set_etape_suivante()
-
-        return resultat
-
-    def verifier_chaines(self):
-
-        parametres = self.parametres
-        fingerprints = parametres.get(ProcessusVerifierChaineCertificatsNonValides.PARAM_A_VERIFIER)
-
-        verificateur = VerificateurCertificats(self._controleur.contexte)
-
-        liste_valide = list()
-        liste_invalide = list()
-        for fingerprint in fingerprints:
-            # Charger le certificat et verifier si on peut valider la chaine
-            try:
-                enveloppe = verificateur.charger_certificat(fingerprint=fingerprint)
-                if enveloppe is not None:
-                    verificateur.verifier_chaine(enveloppe)
-                    liste_valide.append(fingerprint)
-            except Exception as e:
-                self.__logger.warn("Certificat invalide: %s" % fingerprint)
-                self.__logger.debug("Certificat pas encore valide %s: %s" % (fingerprint, str(e)))
-
-            if fingerprint not in liste_valide:
-                liste_invalide.append(fingerprint)
-
-        resultat = {
-            ProcessusVerifierChaineCertificatsNonValides.PARAM_VALIDE: liste_valide,
-            ProcessusVerifierChaineCertificatsNonValides.PARAM_INVALIDE: liste_invalide
-        }
-
-        if len(liste_valide) > 0:
-            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.marquer_certificats_valides.__name__)
-        elif len(liste_invalide) > 0:
-            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.chercher_certificats_invalides.__name__)
-        else:
-            self.set_etape_suivante()
-
-        return resultat
-
-    def marquer_certificats_valides(self):
-        parametres = self.parametres
-
-        fingerprints = parametres.get(ProcessusVerifierChaineCertificatsNonValides.PARAM_VALIDE)
-        self._helper.marquer_certificats_valides(fingerprints)
-
-        if len(parametres[ProcessusVerifierChaineCertificatsNonValides.PARAM_INVALIDE]) > 0:
-            self.set_etape_suivante(ProcessusVerifierChaineCertificatsNonValides.chercher_certificats_invalides.__name__)
-        else:
-            self.set_etape_suivante()
-
-    def chercher_certificats_invalides(self):
-        self.set_etape_suivante()
-
-    def get_collection_transaction_nom(self):
-        return ConstantesPki.COLLECTION_TRANSACTIONS_NOM
-
-    def get_collection_processus_nom(self):
-        return ConstantesPki.COLLECTION_PROCESSUS_NOM
-
-
 class TraitementRequeteCertificat(TraitementMessageDomaine):
 
-    def __init__(self, gestionnaire_domaine, pki_document_helper):
+    def __init__(self, gestionnaire_domaine):
         super().__init__(gestionnaire_domaine)
-        self.__pki_document_helper = pki_document_helper
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def traiter_message(self, ch, method, properties, body):
@@ -856,7 +865,7 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
 
         routing_key = method.routing_key
 
-        if routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_EMIS):
+        if routing_key.startswith(ConstantesPki.EVENEMENT_CERTIFICAT_EMIS):
             self.recevoir_certificat(message_dict)
         elif routing_key.startswith(ConstantesPki.REQUETE_LISTE_CA):
             self.transmettre_liste_ca(properties, message_dict)
@@ -873,7 +882,8 @@ class TraitementRequeteCertificat(TraitementMessageDomaine):
         enveloppe = EnveloppeCertificat(certificat_pem=message_dict[ConstantesPki.LIBELLE_CERTIFICAT_PEM])
         correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
         # Enregistrer le certificat - le helper va verifier si c'est un nouveau certificat ou si on l'a deja
-        self.__pki_document_helper.inserer_certificat(enveloppe, correlation_csr=correlation_csr)
+        # self.__pki_document_helper.inserer_certificat(enveloppe, correlation_csr=correlation_csr)
+        self.gestionnaire.inserer_certificat()
 
     def confirmer_certificat(self, properties, message_dict):
         """

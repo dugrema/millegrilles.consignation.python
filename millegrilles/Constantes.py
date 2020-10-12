@@ -140,7 +140,7 @@ TRANSACTION_MESSAGE_LIBELLE_IDMG = CONFIG_IDMG
 TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION = 'destination'
 # TRANSACTION_MESSAGE_LIBELLE_SOURCE_SYSTEME = 'source-systeme'   # Remplace par idmg
 TRANSACTION_MESSAGE_LIBELLE_ID_MONGO = '_id-transaction'
-TRANSACTION_MESSAGE_LIBELLE_UUID = 'uuid-transaction'
+TRANSACTION_MESSAGE_LIBELLE_UUID = 'uuid_transaction'
 TRANSACTION_MESSAGE_LIBELLE_EVENEMENT = '_evenements'  # Precedemment evenements (sans underscore)
 TRANSACTION_MESSAGE_LIBELLE_ORIGINE = '_akid'
 TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE = 'estampille'
@@ -152,7 +152,8 @@ TRANSACTION_MESSAGE_LIBELLE_EN_TETE = 'en-tete'
 # TRANSACTION_MESSAGE_LIBELLE_CHARGE_UTILE = 'charge-utile'  # Deprecated
 TRANSACTION_MESSAGE_LIBELLE_DOMAINE = 'domaine'
 TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT = 'certificat'
-TRANSACTION_MESSAGE_LIBELLE_HACHAGE = 'hachage-contenu'
+TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT = 'fingerprint_certificat'
+TRANSACTION_MESSAGE_LIBELLE_HACHAGE = 'hachage_contenu'
 TRANSACTION_MESSAGE_LIBELLE_VERSION = 'version'
 TRANSACTION_MESSAGE_LIBELLE_VERSION_6 = 6
 TRANSACTION_MESSAGE_LIBELLE_VERSION_COURANTE = TRANSACTION_MESSAGE_LIBELLE_VERSION_6
@@ -429,7 +430,10 @@ class ConstantesSecurityPki:
 
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'
+    LIBELLE_FINGERPRINT_SHA256_B64 = 'fingerprint_sha256_b64'
     LIBELLE_CHAINE_PEM = 'chaine_pem'
+    LIBELLE_CHAINE = 'chaine'
+    LIBELLE_CERTIFICATS_PEM = 'certificats_pem'
     LIBELLE_CA_APPROUVE = 'ca_approuve'
     LIBELLE_IDMG = 'idmg'
     LIBELLE_CORRELATION_CSR = 'csr_correlation'
@@ -490,6 +494,7 @@ class ConstantesPki:
     LIBELLE_CLE_CRYPTEE = 'cle_cryptee'
     LIBELLE_ROLES = 'roles'
     LIBELLE_EXCHANGES = 'exchanges'
+    LIBELLE_DOMAINES = 'domaines'
     LIBELLE_CLE = 'cle'
 
     LIBVAL_CONFIGURATION = 'configuration'
@@ -506,7 +511,8 @@ class ConstantesPki:
     CHAMP_ROLES = 'roles'
 
     REQUETE_CONFIRMER_CERTIFICAT = 'confirmerCertificat'
-    REQUETE_CERTIFICAT_EMIS = 'evenement.Pki.infoCertificat'
+    # REQUETE_CERTIFICAT_EMIS = 'evenement.Pki.infoCertificat'
+    EVENEMENT_CERTIFICAT_EMIS = 'evenement.certificat.infoCertificat'
     REQUETE_CERTIFICAT_DEMANDE = 'requete.certificat'  # requete.certificat.__fingerprint__
     REQUETE_CERTIFICAT_BACKUP = 'certificatBackup'
     REQUETE_LISTE_CA = 'requete.Pki.ca'
