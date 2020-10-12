@@ -41,6 +41,11 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
             self._document_dao = MongoDAO(self._configuration)
             self._verificateur_transactions = VerificateurTransaction(self)
             self._verificateur_certificats = VerificateurCertificats(self)
+
+            # Preparer les certificats, validateurs
+            self._verificateur_transactions.initialiser()
+            self._verificateur_certificats.initialiser()
+
             if connecter:
                 self._document_dao.connecter()
 

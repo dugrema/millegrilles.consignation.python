@@ -424,7 +424,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
 
         # Valider la chaine de certificats - lance exception si invalide
-        self._contexte.verificateur_certificats.verifier_chaine(enveloppe)
+        self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
 
         idmg = enveloppe.subject_organization_name
         chaine_fingerprints = [fingerprint_sha256_b64]

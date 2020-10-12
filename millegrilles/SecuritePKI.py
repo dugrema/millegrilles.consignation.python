@@ -6,22 +6,17 @@ import base64
 import binascii
 import os
 import datetime
-import subprocess
-import tempfile
-import secrets
-import shutil
 
 from typing import Optional
-from cryptography.hazmat.primitives import serialization, asymmetric, padding
+from cryptography.hazmat.primitives import serialization, asymmetric
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from certvalidator import CertificateValidator, ValidationContext
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
-from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, JSONHelper
+from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from millegrilles.util.IdmgUtil import IdmgUtil
 
@@ -271,7 +266,7 @@ class UtilCertificats:
         self._contenu_hash_function = hashes.SHA256
 
         self._certificat: Optional[str] = None
-        self._cle: Optional[str] = None
+        self._cle = None
         self._enveloppe: Optional[EnveloppeCertificat] = None
         self._chaine: Optional[list] = None
 
@@ -459,9 +454,13 @@ class UtilCertificats:
         :raises certvalidator.errors.PathBuildingError: Si le path est invalide
         """
         cert_pem = enveloppe.certificat_pem.encode('utf-8')
-        inter_list = [cert_pem.encode('utf-8') for cert_pem in enveloppe.reste_chaine_pem[:-1]]
+        inter_list = list()
+        # self._logger.debug("CERT PEM :\n%s" % enveloppe.certificat_pem)
+        for pem in enveloppe.reste_chaine_pem:
+            # self._logger.debug("Chaine PEM :\n%s" % pem.strip())
+            inter_list.append(pem.strip().encode('utf-8'))
 
-        if date_reference is None:
+        if date_reference is not None:
             # batir un contexte avec la date
             validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
         else:
@@ -472,6 +471,7 @@ class UtilCertificats:
 
         # Verifier le certificat - noter qu'une exception est lancee en cas de probleme
         resultat = validator.validate_usage({'digital_signature'})
+        enveloppe.set_est_verifie(True)
 
         return resultat
 
@@ -498,6 +498,7 @@ class UtilCertificats:
         if self._chaine is not None:
             pem_millegrille = self._chaine[-1]
             return EnveloppeCertificat(certificat_pem=pem_millegrille)
+
         return None
 
     @property
@@ -642,8 +643,6 @@ class VerificateurTransaction(UtilCertificats):
                 del dict_message[cle]
                 self._logger.debug("Enlever cle: %s" % cle)
 
-        # self._logger.debug("Message nettoye: %s" % str(dict_message))
-
         # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
         # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.cert.pem) au besoin.
         # Retourne le idmg de la MilleGrille concernee.
@@ -750,9 +749,6 @@ class VerificateurTransaction(UtilCertificats):
 
         return enveloppes_certificats
 
-    def hacher_entete(self, entete):
-        bytes_entete = self.preparer_transaction_bytes(entete)
-
 
 class VerificateurCertificats(UtilCertificats):
     """
@@ -767,101 +763,9 @@ class VerificateurCertificats(UtilCertificats):
         super().__init__(contexte)
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-        self._cache_certificats_ca = dict()
         self._cache_certificats_fingerprint = dict()
-        self._liste_CAs_connus = []  # Fingerprint de tous les CAs connus, trusted et untrusted
 
-        # self.__workdir = tempfile.mkdtemp(prefix='validation_', dir=self.configuration.pki_workdir)
-        self.__workdir = self.contexte.validation_workdir_tmp
-
-        try:
-            os.mkdir(self.__workdir)
-        except FileExistsError:
-            pass
-
-        # Initialiser le fichier untrusted avec le certificat local - devrait avoir le cert intermediaire courant
-        untrusted_cas_filename = os.path.join(self.__workdir, contexte.idmg + '.untrusted.cert.pem')
-        with open(contexte.configuration.mq_certfile, 'r') as input:
-            with open(untrusted_cas_filename, 'w') as output:
-                output.write(input.read())
-
-        ca_filename = os.path.join(self.__workdir, contexte.idmg + '.racine.cert.pem')
-        with open(contexte.configuration.mq_cafile, 'r') as input:
-            try:
-                with open(ca_filename, 'w') as output:
-                    output.write(input.read())
-            except PermissionError as pe:
-                # Verifier si l'erreur est parce que le fichier existe deja
-                if os.path.exists(ca_filename) is False:
-                    raise pe
-
-    def __del__(self):
-        self.close()
-
-    def get_par_akid(self, akid):
-        return [cert for cert in self._cache_certificats_ca.values() if cert.subject_key_identifier == akid]
-
-    def charger_certificats_CA_millegrille(self, idmg: str):
-        """
-        Charge le certificat CA d'une MilleGrille tierce s'il est connu avec les certificats intermediaires.
-        Aucun effet si le certificat est deja charge.
-        """
-
-        file_ca_racine = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
-        if not os.path.isfile(file_ca_racine):
-            collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-
-            filtre = {
-                '$or': [
-                    {
-                        Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_RACINE,
-                        ConstantesSecurityPki.LIBELLE_IDMG: idmg
-                    },
-                    {
-                        Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesSecurityPki.LIBVAL_CERTIFICAT_MILLEGRILLE,
-                        'sujet.commonName': idmg,
-                    }
-                ]
-            }
-
-            certs = collection.find(filtre)
-
-            for cert in certs:
-                if cert[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesSecurityPki.LIBVAL_CERTIFICAT_RACINE and \
-                        cert[ConstantesSecurityPki.LIBELLE_IDMG] == idmg:
-                    # C'est le certificat racine, on re-verifie son fingerprint avant de le sauvegarder sur disque
-                    enveloppe_ca = EnveloppeCertificat(certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                    if enveloppe_ca.is_rootCA and enveloppe_ca.idmg == idmg:
-                        # Certificat racine est valide
-                        # self._liste_CAs_connus.append(enveloppe_ca)
-                        with open(file_ca_racine, 'w') as fichier:
-                            fichier.write(cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-
-                    else:
-                        raise CertificatInvalide("Le certificat racine de %s a ete altere (idmg != fingerprint)" % idmg)
-                else:
-                    # Certificat intermediaire, on l'ajoute au untrusted (pas besoin de verifier ici, c'est untrusted)
-                    enveloppe_ca = EnveloppeCertificat(
-                        certificat_pem=cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM])
-                    # self._liste_CAs_connus.append(enveloppe_ca)
-                    self._ajouter_untrusted_ca(enveloppe_ca)
-        else:
-            # Certificat racine pour la MilleGrille est deja charge
-            pass
-
-    def charger_certificat_par_akid(self, akid: str):
-        collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-        document_cert = collection.find_one({'subject_key': akid})
-
-        enveloppe = None
-        if document_cert is not None:
-            enveloppe = EnveloppeCertificat(
-                certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
-            )
-
-        return enveloppe
-
-    def charger_certificat(self, fichier=None, fingerprint=None, enveloppe=None):
+    def charger_certificat(self, fichier=None, fingerprint: str = None, enveloppe: EnveloppeCertificat = None):
         # Tenter de charger a partir d'une copie locale
         if fingerprint is not None:
             # Verifier si le certificat est deja charge
@@ -869,42 +773,26 @@ class VerificateurCertificats(UtilCertificats):
 
             if enveloppe is None:
                 collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-                document_cert = collection.find_one({'fingerprint': fingerprint})
+                document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint})
                 if document_cert is not None:
                     enveloppe = EnveloppeCertificat(
                         certificat_pem=document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM]
                     )
 
         elif fichier is not None and os.path.isfile(fichier):
-            certificat = self._charger_pem(fichier)
+            with open(fichier, 'r') as fichier:
+                certificat = fichier.read()
+            # certificat = self._charger_pem(fichier)
 
             if certificat is not None:
-                enveloppe = EnveloppeCertificat(certificat)
+                enveloppe = EnveloppeCertificat(certificat_pem=certificat)
 
         # Conserver l'enveloppe dans le cache
         if enveloppe is not None:
 
             if not enveloppe.est_verifie:
-
-                # S'assurer que le contexte pour cette MilleGrille est charge
-                idmg = enveloppe.subject_organization_name
-                self.charger_certificats_CA_millegrille(idmg)  # Aucun effet si le cert racine est deja charge
-
-                # Verifier la chaine de ce certificat
-                if enveloppe.is_rootCA:
-                    self._ajouter_racine(enveloppe)
-                else:
-                    if enveloppe.is_CA and not enveloppe.is_rootCA:
-                        # Ajouter dans le fichier temp des untrusted CAs pour openssl
-                        # Note: si le certificat est invalide, c'est possiblement parce que les autorites ne
-                        # sont pas chargees en ordre. On le conserve quand meme.
-                        if enveloppe.fingerprint_ascii not in self._liste_CAs_connus:
-                            self._logger.debug("Conserver cert CA dans untrusted: %s" % enveloppe.fingerprint_ascii)
-                            self._ajouter_untrusted_ca(enveloppe)
-
-                        self.verifier_chaine(enveloppe)
-
-                self._cache_certificats_fingerprint[enveloppe.fingerprint_ascii] = enveloppe
+                self.valider_x509_enveloppe(enveloppe)
+                self._cache_certificats_fingerprint[enveloppe.fingerprint_sha256_b64] = enveloppe
 
         else:
             raise CertificatInconnu("Certificat ne peut pas etre charge", fingerprint=fingerprint)
@@ -912,203 +800,10 @@ class VerificateurCertificats(UtilCertificats):
         return enveloppe
 
     def aligner_chaine_cas(self, enveloppe: EnveloppeCertificat):
-        liste_enveloppes_cas = list()
-        depth = 0
-
-        autorite = None
-        fingerprint = None
-        while not enveloppe.is_rootCA and depth < 10:
-            depth = depth + 1
-
-            fingerprint = enveloppe.fingerprint_ascii
-            autorite = enveloppe.authority_key_identifier
-            self._logger.debug("Trouver certificat autorite fingerprint %s" % autorite)
-            enveloppes = self._contexte.verificateur_certificats.get_par_akid(autorite)
-            if len(enveloppes) > 1:
-                raise ValueError("Bug - on ne supporte pas plusieurs cert par AKID - TO DO")
-            try:
-                enveloppe = enveloppes[0]
-            except IndexError:
-                # Le certificat n'est pas trouve, tenter de charger la chaine
-                enveloppe = self.charger_certificat_par_akid(autorite)
-                enveloppe = self.charger_certificat(enveloppe=enveloppe)
-                continue  # Recommencer la verification
-            finally:
-                liste_enveloppes_cas.append(enveloppe)
-                self._logger.debug("Certificat akid %s trouve, fingerprint %s" % (autorite, enveloppe.fingerprint_ascii))
-
-        if depth == 10:
-            raise ValueError("Limite de profondeur de chain de certificat atteint pour %s, autorite %s " % (
-                fingerprint, autorite))
-
+        liste_enveloppes_cas = [enveloppe]
+        for cert_pem in enveloppe.reste_chaine_pem:
+            liste_enveloppes_cas.append(EnveloppeCertificat(certificat_pem=cert_pem))
         return liste_enveloppes_cas
-
-    def _ajouter_racine(self, enveloppe: EnveloppeCertificat):
-
-        idmg = enveloppe.idmg
-
-        trusted_ca_filename = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
-        try:
-            with open(trusted_ca_filename, 'w') as writer:
-                writer.write(enveloppe.certificat_pem)
-
-            os.chmod(trusted_ca_filename, 0o444)
-        except PermissionError:
-            self._logger.info("Tentative de sauvegarder plusieurs fois le cert racine %s" % idmg)
-
-    def _ajouter_untrusted_ca(self, enveloppe: EnveloppeCertificat):
-
-        idmg = enveloppe.subject_organization_name
-
-        self._liste_CAs_connus.append(enveloppe.fingerprint_ascii)
-        untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
-        with open(untrusted_cas_filename, 'w+') as untrusted_cas_writer:
-            untrusted_cas_writer.write(enveloppe.certificat_pem)
-
-        os.chmod(untrusted_cas_filename, 0o644)
-
-    def verifier_chaine(self, enveloppe: EnveloppeCertificat):
-        """
-        Utilise les root CA et untrusted CAs pour verifier la chaine du certificat
-        :return: True si le certificat est valide selon la chaine de certification, date, etc (openssl).
-        """
-        idmg = enveloppe.subject_organization_name
-        untrusted_cas_filename = os.path.join(self.__workdir, idmg + '.untrusted.cert.pem')
-        if idmg == self.configuration.idmg:
-            # MilleGrille locale - on utilise le fichier CA pre-configure
-            trusted_ca_filename = self.configuration.pki_cafile
-        else:
-            # MilleGrille distante, on utilise un fichier CA recu
-            trusted_ca_filename = os.path.join(self.__workdir, idmg + '.racine.cert.pem')
-
-        nom_fichier_tmp = tempfile.mktemp(suffix='.cert.pem', dir=self.__workdir)
-        with open(nom_fichier_tmp, 'w') as output_cert_file:
-            output_cert_file.write(enveloppe.certificat_pem)
-
-            if enveloppe.reste_chaine_pem is not None:
-                for cert_pem in enveloppe.reste_chaine_pem:
-                    output_cert_file.write(cert_pem)
-
-                output_cert_file.write('\n')
-
-            # Flush le contenu, mais on garde le write lock sur le fichier pour eviter
-            # qu'il soit altere par un autre processus.
-            output_cert_file.flush()
-
-            self._logger.debug("Cert Racine: %s, untrusted: %s" % (trusted_ca_filename, untrusted_cas_filename))
-
-            commande_openssl = [
-                'openssl', 'verify',
-                '-CAfile', trusted_ca_filename,
-                '-untrusted', untrusted_cas_filename,
-                '-untrusted', nom_fichier_tmp,
-                nom_fichier_tmp,
-            ]
-
-            self._logger.debug("Commande openssl: %s" % str(commande_openssl))
-
-            process_output = subprocess.run(commande_openssl, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Travail avec le certificat termine, il est supprime.
-        os.unlink(nom_fichier_tmp)
-
-        resultat = process_output.returncode
-        output_txt = '%s\n%s' % (process_output.stderr.decode('utf8'), process_output.stdout.decode('utf8'))
-
-        if resultat != 0:
-            message = 'Certificat invalide. Output openssl: %s' % output_txt
-            self._logger.debug(message)
-            raise CertificatInvalide(message, key_subject_identifier=enveloppe.fingerprint_ascii)
-
-        enveloppe.set_est_verifie(True)
-
-        return resultat == 0, output_txt
-
-    def charger_fiche(self, fiche, certs_signataires: list = None):
-        """
-        Charge et valide des certificats provenant d'une fiche de MilleGrille tierce
-        """
-        certificats = list()  # Accumuler tous les certificats pour les re-emettre dans la MilleGrille
-        idmg_entete = fiche[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-
-        # Charger et valider le certificat racine
-        certificat_racine = fiche['certificat_racine']
-        enveloppe_racine = EnveloppeCertificat(certificat_pem=certificat_racine)
-        if enveloppe_racine.idmg != idmg_entete:
-            raise CertificatInvalide("Racine %s invalide, fiche contient idmg=%s" % (enveloppe_racine.idmg, idmg_entete))
-
-        self._ajouter_racine(enveloppe_racine)
-        certificats.append(enveloppe_racine)
-
-        # Charger et valider les certificats intermediaires
-        certificats_intermediaires = fiche['certificats_intermediaires']
-        for cert in certificats_intermediaires:
-            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=cert)
-            if enveloppe_intermediaire.subject_organization_name == idmg_entete:
-                self._ajouter_untrusted_ca(enveloppe_intermediaire)
-                certificats.append(enveloppe_intermediaire)
-            else:
-                self._logger.warning("Certificat intermediaire invalide, idmg=%s plutot que %s" % (enveloppe_intermediaire.idmg, idmg_entete))
-
-        # Charger et valider les autres certificats (leaf)
-        certificats_additionnels = fiche.get('certificats_additionnels')
-        certificat_correspondance = fiche.get('certificat')
-
-        cert_a_valider = list()
-        if certificats_additionnels is not None:
-            cert_a_valider.extend(certificats_additionnels)
-        if certificat_correspondance is not None:
-            cert_a_valider.append(certificat_correspondance)
-        if certs_signataires is not None:
-            cert_a_valider.extend(certs_signataires)
-
-        for cert in cert_a_valider:
-            enveloppe_leaf = EnveloppeCertificat(certificat_pem=cert)
-            if enveloppe_leaf.subject_organization_name == idmg_entete and not enveloppe_leaf.is_CA:
-                self.verifier_chaine(enveloppe_leaf)
-                certificats.append(enveloppe_leaf)
-            else:
-                self._logger.warning("Certificat leaf invalide, CA=%s, idmg=%s (source: %s)" % (
-                    enveloppe_leaf.is_CA, enveloppe_leaf.idmg, idmg_entete))
-
-        # Retourne les certificats qui sont valides
-        return certificats
-
-    def close(self):
-        # Supprimer tous les certificats mis sur le disque
-        self._logger.info("Fermeture VerificateurCertificats, suppression repertoire temporaire %s", self.__workdir)
-
-        # TROUBLESHOOTING : Probleme avec principal, processus force suppression du repertoire
-        # shutil.rmtree(self.__workdir, ignore_errors=True)
-        pass
-
-
-class EncryptionHelper():
-
-    def __init__(self, enveloppe_certificat: EnveloppeCertificat):
-        self.__enveloppe_certificat = enveloppe_certificat
-        self.__json_helper = JSONHelper()
-
-    def crypter_dict(self, contenu_dict: dict):
-
-        cert = self.__enveloppe_certificat.certificat
-        password_crypte, iv, padder, cipher = self.ouvrir_cipher(cert)
-
-        # Crypter contenu du dictionnaire (cle symmetrique)
-        encryptor = cipher.encryptor()
-
-        # padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
-        dict_bytes = self.__json_helper.dict_vers_json(contenu_dict, DateFormatEncoder).encode('utf-8')
-
-        # Inserer IV dans les premiers 16 bytes - pas vraiment le choix, c'est l'algo:
-        # https://stackoverflow.com/questions/26928012/wrong-16-bytes-in-decryption-using-aes
-        dict_bytes = iv + dict_bytes
-        dict_padded = padder.update(dict_bytes) + padder.finalize()
-        dict_crypte_bytes = encryptor.update(dict_padded) + encryptor.finalize()
-        dict_crypte_strbytes = base64.b64encode(dict_crypte_bytes)
-        dict_crypte_str = dict_crypte_strbytes.decode('utf-8')
-
-        return dict_crypte_str, password_crypte, iv
 
 
 class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
@@ -1137,15 +832,17 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         self.__queue_reponse = nom_queue
 
         self.__logger.debug("Transmission certificat PKI a l'initialisation")
-        self.contexte.signateur_transactions.emettre_certificat()
+        signateur_transactions =  self.contexte.signateur_transactions
+        signateur_transactions.emettre_certificat()
 
-        # enveloppe = self.transmettre_certificat()
-        # fingerprint = enveloppe.fingerprint_ascii
-        # routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
-        #
-        # self.__channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=routing_key, callback=None)
-        # self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
-        # self.__routing_cert = routing_key
+        enveloppe = signateur_transactions.enveloppe_certificat_courant
+        fingerprint = enveloppe.fingerprint_sha256_b64
+        routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
+
+        exchange_defaut = self.configuration.exchange_defaut
+        self.__channel.queue_bind(queue=nom_queue, exchange=exchange_defaut, routing_key=routing_key, callback=None)
+        self.__channel.basic_consume(self.callbackAvecAck, queue=nom_queue, no_ack=False)
+        self.__routing_cert = routing_key
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
@@ -1172,7 +869,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         routing_key = method.routing_key
         if routing_key == self.__routing_cert:
             # Transmettre notre certificat
-            self.transmettre_certificat()
+            self.contexte.signateur_transactions.emettre_certificat()
         else:
             raise Exception("Routing non gere: %s" % routing_key)
 
