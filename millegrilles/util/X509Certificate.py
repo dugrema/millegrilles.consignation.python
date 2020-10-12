@@ -10,7 +10,6 @@ import datetime
 import secrets
 import base64
 import logging
-import base58
 
 from millegrilles import Constantes
 from millegrilles.util.IdmgUtil import IdmgUtil
@@ -1639,35 +1638,35 @@ class GenerateurCertificateNoeud(GenerateurCertificateParRequest):
         return builder
 
 
-class GenerateurCertificatTiers(GenerateurCertificateParRequest):
-
-    def __init__(self, idmg_local, idmg_tiers, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
-        super().__init__(idmg_local, dict_ca, autorite)
-        self._idmg_tiers = idmg_tiers
-
-    def _preparer_builder_from_csr(self, csr_request, autorite_cert,
-                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_TIERS) -> x509.CertificateBuilder:
-
-        builder = x509.CertificateBuilder()
-        builder = builder.issuer_name(autorite_cert.subject)
-        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
-        builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_TIERS)
-        builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.public_key(csr_request.public_key())
-
-        # Modifier le nom
-        name = x509.Name([
-            x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
-            x509.NameAttribute(x509.name.NameOID.COMMON_NAME, self._idmg_tiers),
-        ])
-
-        builder = builder.subject_name(name)
-
-        return builder
-
-    def _get_keyusage(self, builder, **kwargs):
-        builder = super()._get_keyusage(builder, **kwargs)
-        return builder
+# class GenerateurCertificatTiers(GenerateurCertificateParRequest):
+#
+#     def __init__(self, idmg_local, idmg_tiers, dict_ca: dict = None, autorite: EnveloppeCleCert = None):
+#         super().__init__(idmg_local, dict_ca, autorite)
+#         self._idmg_tiers = idmg_tiers
+#
+#     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
+#                                    duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_TIERS) -> x509.CertificateBuilder:
+#
+#         builder = x509.CertificateBuilder()
+#         builder = builder.issuer_name(autorite_cert.subject)
+#         builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
+#         builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_TIERS)
+#         builder = builder.serial_number(x509.random_serial_number())
+#         builder = builder.public_key(csr_request.public_key())
+#
+#         # Modifier le nom
+#         name = x509.Name([
+#             x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self._idmg),
+#             x509.NameAttribute(x509.name.NameOID.COMMON_NAME, self._idmg_tiers),
+#         ])
+#
+#         builder = builder.subject_name(name)
+#
+#         return builder
+#
+#     def _get_keyusage(self, builder, **kwargs):
+#         builder = super()._get_keyusage(builder, **kwargs)
+#         return builder
 
 
 class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
@@ -1727,61 +1726,61 @@ class GenerateurCertificatBackup(GenerateurCertificateParClePublique):
         return builder
 
 
-class GenerateurCertificatHebergementXS(GenerateurCertificateParRequest):
-    """
-    Genere un certificat intermediaire par cross-signing avec la millegrille hote.
-    """
-
-    def __init__(self, cert: EnveloppeCleCert, autorite: EnveloppeCleCert = None):
-        """
-
-        :param cert: Certificat intermediaire existant pour lequel on veut appliquer le cross-signing d'hebergement.
-        :param autorite: Certificat intermediaire de la millegrille hote
-        """
-        idmg = cert.idmg
-        super().__init__(idmg, dict_ca=dict(), autorite=autorite)
-        self.__cert = cert
-
-    def _preparer_builder_from_csr(self, csr_request, autorite_cert,
-                                   duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_TIERS) -> x509.CertificateBuilder:
-
-        builder = x509.CertificateBuilder()
-        builder = builder.subject_name(csr_request.subject)   # Conserver le nom de la millegrille hebergee
-        builder = builder.issuer_name(autorite_cert.subject)  # Inserer nom de la millegrille hote
-        builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
-        builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_HERBERGEMENT_XS)
-        builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.public_key(csr_request.public_key())
-
-        return builder
-
-    def _get_keyusage(self, builder, **kwargs):
-        # Mettre pathlen=0 pour empecher de generer un CA avec le certificat XS (serait un probleme de securite).
-        builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=0),
-            critical=True,
-        )
-
-        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ConstantesGenerateurCertificat.ROLE_HEBERGEMENT.encode('utf-8')
-        builder = builder.add_extension(
-            x509.UnrecognizedExtension(custom_oid_roles, roles),
-            critical=False
-        )
-
-        return builder
-
-    def signer(self, csr=None) -> x509.Certificate:
-        cert: x509.Certificate = self.__cert.cert
-        key = self.__cert.private_key
-
-        if csr is None:
-            csr_builder = x509.CertificateSigningRequestBuilder()
-            subject = cert.subject
-            csr_builder = csr_builder.subject_name(subject)
-            csr = csr_builder.sign(key, hashes.SHA256(), backend=default_backend())
-
-        return super().signer(csr)
+# class GenerateurCertificatHebergementXS(GenerateurCertificateParRequest):
+#     """
+#     Genere un certificat intermediaire par cross-signing avec la millegrille hote.
+#     """
+#
+#     def __init__(self, cert: EnveloppeCleCert, autorite: EnveloppeCleCert = None):
+#         """
+#
+#         :param cert: Certificat intermediaire existant pour lequel on veut appliquer le cross-signing d'hebergement.
+#         :param autorite: Certificat intermediaire de la millegrille hote
+#         """
+#         idmg = cert.idmg
+#         super().__init__(idmg, dict_ca=dict(), autorite=autorite)
+#         self.__cert = cert
+#
+#     def _preparer_builder_from_csr(self, csr_request, autorite_cert,
+#                                    duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_TIERS) -> x509.CertificateBuilder:
+#
+#         builder = x509.CertificateBuilder()
+#         builder = builder.subject_name(csr_request.subject)   # Conserver le nom de la millegrille hebergee
+#         builder = builder.issuer_name(autorite_cert.subject)  # Inserer nom de la millegrille hote
+#         builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
+#         builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_HERBERGEMENT_XS)
+#         builder = builder.serial_number(x509.random_serial_number())
+#         builder = builder.public_key(csr_request.public_key())
+#
+#         return builder
+#
+#     def _get_keyusage(self, builder, **kwargs):
+#         # Mettre pathlen=0 pour empecher de generer un CA avec le certificat XS (serait un probleme de securite).
+#         builder = builder.add_extension(
+#             x509.BasicConstraints(ca=True, path_length=0),
+#             critical=True,
+#         )
+#
+#         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+#         roles = ConstantesGenerateurCertificat.ROLE_HEBERGEMENT.encode('utf-8')
+#         builder = builder.add_extension(
+#             x509.UnrecognizedExtension(custom_oid_roles, roles),
+#             critical=False
+#         )
+#
+#         return builder
+#
+#     def signer(self, csr=None) -> x509.Certificate:
+#         cert: x509.Certificate = self.__cert.cert
+#         key = self.__cert.private_key
+#
+#         if csr is None:
+#             csr_builder = x509.CertificateSigningRequestBuilder()
+#             subject = cert.subject
+#             csr_builder = csr_builder.subject_name(subject)
+#             csr = csr_builder.sign(key, hashes.SHA256(), backend=default_backend())
+#
+#         return super().signer(csr)
 
 
 class RenouvelleurCertificat:
@@ -1813,7 +1812,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE: GenererApplicationPrivee,
 
             # Hebergement
-            ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,
+            # ConstantesGenerateurCertificat.ROLE_HEBERGEMENT: GenerateurCertificatHebergementXS,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS: GenererHebergementTransactions,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_DOMAINES: GenererHebergementDomaines,
             ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_MAITREDESCLES: GenererHebergementMaitredescles,
@@ -1923,7 +1922,7 @@ class RenouvelleurCertificat:
         cert_dict = generateur_instance.generer()
         return cert_dict
 
-    def signer_navigateur(self, csr_pem: str, securite: str, **kwargs):
+    def signer_navigateur(self, csr_pem: bytes, securite: str, **kwargs):
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
         csr = x509.load_pem_x509_csr(csr_pem, backend=default_backend())
@@ -1938,67 +1937,67 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def signer_backup(self, public_key_pem: str, sujet: str):
-        generateur = GenerateurCertificatBackup(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
+    # def signer_backup(self, public_key_pem: str, sujet: str):
+    #     generateur = GenerateurCertificatBackup(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
+    #
+    #     builder = generateur.preparer_builder(public_key_pem, sujet)
+    #     certificat = generateur.signer(builder)
+    #     chaine = generateur.aligner_chaine(certificat)
+    #
+    #     clecert = EnveloppeCleCert(cert=certificat)
+    #     clecert.chaine = chaine
+    #
+    #     return clecert
 
-        builder = generateur.preparer_builder(public_key_pem, sujet)
-        certificat = generateur.signer(builder)
-        chaine = generateur.aligner_chaine(certificat)
-
-        clecert = EnveloppeCleCert(cert=certificat)
-        clecert.chaine = chaine
-
-        return clecert
-
-    def signer_connecteur_tiers(self, idmg_tiers: str, csr: str):
-        generateur = GenerateurCertificatTiers(self.__idmg, idmg_tiers, self.__dict_ca, self.__clecert_intermediaire)
-        csr_instance = x509.load_pem_x509_csr(csr.encode('utf-8'), default_backend())
-        certificat = generateur.signer(csr_instance)
-        return certificat
-
-    def generer_nouveau_idmg(self):
-        generateur = GenerateurInitial(None, None)
-        enveloppe_intermediaire = generateur.generer()
-        enveloppe_racine = generateur.autorite
-        idmg = enveloppe_racine.idmg
-
-        generateur_xs = GenerateurCertificatHebergementXS(enveloppe_intermediaire, autorite=self.__clecert_intermediaire)
-        certificat_xs = generateur_xs.signer()
-        enveloppe_hebergement_xs = EnveloppeCleCert(cert=certificat_xs)
-
-        # Generer mots de passe pour les cles de millegrille, intermediaire.
-        mot_de_passe_millegrille = enveloppe_racine.password
-        mot_de_passe_intermediaire = enveloppe_intermediaire.password
-
-        cle_privee_racine = str(enveloppe_racine.private_key_bytes, 'utf-8')
-        cle_privee_intermediaire = str(enveloppe_intermediaire.private_key_bytes, 'utf-8')
-
-        cert_hote = str(self.__clecert_intermediaire.cert_bytes, 'utf-8')
-        cert_racine = str(enveloppe_racine.cert_bytes, 'utf-8')
-        cert_intermediaire = str(enveloppe_intermediaire.cert_bytes, 'utf-8')
-        cert_hebergement = str(enveloppe_hebergement_xs.cert_bytes, 'utf-8')
-
-        trousseau = {
-            'idmg': idmg,
-            'millegrille': {
-                ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_racine,
-                'cle': cle_privee_racine,
-                'motdepasse': mot_de_passe_millegrille,
-                'fingerprint_b64': enveloppe_racine.fingerprint_b64,
-            },
-            'intermediaire': {
-                ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_intermediaire,
-                'cle': cle_privee_intermediaire,
-                'motdepasse': mot_de_passe_intermediaire,
-                'fingerprint_b64': enveloppe_intermediaire.fingerprint_b64,
-            },
-            'hebergement': {
-                ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_hebergement,
-                'hote_pem': cert_hote,
-            }
-        }
-
-        return trousseau
+    # def signer_connecteur_tiers(self, idmg_tiers: str, csr: str):
+    #     generateur = GenerateurCertificatTiers(self.__idmg, idmg_tiers, self.__dict_ca, self.__clecert_intermediaire)
+    #     csr_instance = x509.load_pem_x509_csr(csr.encode('utf-8'), default_backend())
+    #     certificat = generateur.signer(csr_instance)
+    #     return certificat
+    #
+    # def generer_nouveau_idmg(self):
+    #     generateur = GenerateurInitial(None, None)
+    #     enveloppe_intermediaire = generateur.generer()
+    #     enveloppe_racine = generateur.autorite
+    #     idmg = enveloppe_racine.idmg
+    #
+    #     generateur_xs = GenerateurCertificatHebergementXS(enveloppe_intermediaire, autorite=self.__clecert_intermediaire)
+    #     certificat_xs = generateur_xs.signer()
+    #     enveloppe_hebergement_xs = EnveloppeCleCert(cert=certificat_xs)
+    #
+    #     # Generer mots de passe pour les cles de millegrille, intermediaire.
+    #     mot_de_passe_millegrille = enveloppe_racine.password
+    #     mot_de_passe_intermediaire = enveloppe_intermediaire.password
+    #
+    #     cle_privee_racine = str(enveloppe_racine.private_key_bytes, 'utf-8')
+    #     cle_privee_intermediaire = str(enveloppe_intermediaire.private_key_bytes, 'utf-8')
+    #
+    #     cert_hote = str(self.__clecert_intermediaire.cert_bytes, 'utf-8')
+    #     cert_racine = str(enveloppe_racine.cert_bytes, 'utf-8')
+    #     cert_intermediaire = str(enveloppe_intermediaire.cert_bytes, 'utf-8')
+    #     cert_hebergement = str(enveloppe_hebergement_xs.cert_bytes, 'utf-8')
+    #
+    #     trousseau = {
+    #         'idmg': idmg,
+    #         'millegrille': {
+    #             ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_racine,
+    #             'cle': cle_privee_racine,
+    #             'motdepasse': mot_de_passe_millegrille,
+    #             'fingerprint_b64': enveloppe_racine.fingerprint_b64,
+    #         },
+    #         'intermediaire': {
+    #             ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_intermediaire,
+    #             'cle': cle_privee_intermediaire,
+    #             'motdepasse': mot_de_passe_intermediaire,
+    #             'fingerprint_b64': enveloppe_intermediaire.fingerprint_b64,
+    #         },
+    #         'hebergement': {
+    #             ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM: cert_hebergement,
+    #             'hote_pem': cert_hote,
+    #         }
+    #     }
+    #
+    #     return trousseau
 
 
 class DecryptionHelper:

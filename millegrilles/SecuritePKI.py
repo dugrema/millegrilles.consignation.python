@@ -287,12 +287,10 @@ class UtilCertificats:
         self._charger_cle_privee()
         self._charger_certificat()
 
-        # Verifier que le certificat peut bien etre utilise pour signer des transactions
-        self._verifier_usage()
-
         self._enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(self._chaine))
 
-        # Valider le certificat
+        # Verifier que le certificat peut bien etre utilise pour signer des transactions
+        # Valide aussi la chaine et les dates d'expiration
         self.valider_x509_enveloppe(self._enveloppe)
 
     def preparer_transaction_bytes(self, transaction_dict):
@@ -370,17 +368,6 @@ class UtilCertificats:
                 backend=default_backend()
             )
             self._cle = cle
-
-    def _verifier_usage(self):
-        # S'assurer que ce certificat set bien a signer
-        basic_constraints = self.certificat.extensions.get_extension_for_class(x509.BasicConstraints)
-        self._logger.debug("Basic Constraints: %s" % str(basic_constraints))
-        key_usage = self.certificat.extensions.get_extension_for_class(x509.KeyUsage).value
-        self._logger.debug("Key usage: %s" % str(key_usage))
-
-        supporte_signature_numerique = key_usage.digital_signature
-        if not supporte_signature_numerique:
-            raise Exception('Le certificat ne supporte pas les signatures numeriques')
 
     def hacher_contenu(self, dict_message, hachage=None):
         """
@@ -468,7 +455,7 @@ class UtilCertificats:
         Valide une enveloppe
         :param enveloppe:
         :param date_reference:
-        :return: True si certificat est valide
+        :return: Resultat de validation (toujours valide)
         :raises certvalidator.errors.PathBuildingError: Si le path est invalide
         """
         cert_pem = enveloppe.certificat_pem.encode('utf-8')
@@ -486,7 +473,7 @@ class UtilCertificats:
         # Verifier le certificat - noter qu'une exception est lancee en cas de probleme
         resultat = validator.validate_usage({'digital_signature'})
 
-        self._logger.info("Resultat : %s", str(resultat))
+        return resultat
 
     @property
     def certificat(self):
