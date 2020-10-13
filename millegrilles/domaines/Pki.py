@@ -44,7 +44,7 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
             reponse = None
             if domaine_routing_key == ConstantesPki.REQUETE_CONFIRMER_CERTIFICAT:
                 reponse = self.gestionnaire.confirmer_certificat(properties, message_dict)
-            elif domaine_routing_key.startswith('requete.certificat.'):
+            elif domaine_routing_key.startswith('certificat.'):
                 fingerprint = message_dict.get('fingerprint') or domaine_routing_key.split('.')[-1]
                 reponse = self.gestionnaire.get_certificat(fingerprint, properties, demander_si_inconnu=False)
             elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
@@ -186,7 +186,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 300000,
                 'exchange': Constantes.SECURITE_PUBLIC,
-                'callback': self.__handler_evenements_certificats.callbackAvecAck,
+                # 'callback': self.__handler_evenements_certificats.callbackAvecAck,
             },
             {
                 'nom': 'Pki.requete.1.public',
@@ -195,6 +195,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 20000,
                 'exchange': Constantes.SECURITE_PUBLIC,
+                # 'callback': self.__handler_requetes_noeuds[Constantes.SECURITE_PUBLIC].callbackAvecAck,
             },
             {
                 'nom': 'Pki.requete.2.prive',
@@ -203,6 +204,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 20000,
                 'exchange': Constantes.SECURITE_PRIVE,
+                # 'callback': self.__handler_requetes_noeuds[Constantes.SECURITE_PRIVE].callbackAvecAck,
             },
             {
                 'nom': 'Pki.requete.3.protege',
@@ -211,6 +213,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 ],
                 'ttl': 20000,
                 'exchange': Constantes.SECURITE_PROTEGE,
+                # 'callback': self.__handler_requetes_noeuds[Constantes.SECURITE_PROTEGE].callbackAvecAck,
             },
         ]
 

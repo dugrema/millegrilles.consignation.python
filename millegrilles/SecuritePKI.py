@@ -654,16 +654,18 @@ class VerificateurTransaction(UtilCertificats):
             certificats_inline = transaction.get('_certificats') or transaction.get('_certificat')
             if certificats_inline:
                 # Charger les nouveaux certificats associes au message
-                for cert in certificats_inline:
-                    # Emettre le certificat sur MQ
-                    enveloppe_temp = EnveloppeCertificat(certificat_pem=cert)
-                    # self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
-                    self.emettre_certificat(certificats_inline)
+                # for cert in certificats_inline:
+                #     # Emettre le certificat sur MQ
+                #     enveloppe_temp = EnveloppeCertificat(certificat_pem=cert)
+                #     # self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
+                #     # self.emettre_certificat(certificats_inline)
 
-                enveloppe_temp = EnveloppeCertificat(certificat_pem=certificats_inline[0])
+                enveloppe_temp = EnveloppeCertificat(certificat_pem='\n'.join(certificats_inline))
 
                 # Tenter de valider le certificat immediatement, peut echouer si la chaine n'a pas ete traitee
                 enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(enveloppe=enveloppe_temp)
+                self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
+
             else:
                 # Verifier cas speciaux
                 enveloppe_certificat = None
@@ -687,12 +689,9 @@ class VerificateurTransaction(UtilCertificats):
                 # else:
                 if enveloppe_certificat is None:
                     self._logger.info("Certificat inconnu, requete MQ pour trouver %s" % ci.fingerprint)
-                    routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
+                    # routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
                     # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
-                    self.contexte.generateur_transactions.emettre_commande_noeuds(
-                        dict(),
-                        routing,
-                    )
+                    self.contexte.message_dao.transmettre_demande_certificat(ci.fingerprint)
                     raise ci  # On re-souleve l'erreur
 
         self._logger.debug(

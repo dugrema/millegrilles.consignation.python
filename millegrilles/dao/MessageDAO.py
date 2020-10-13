@@ -888,8 +888,8 @@ class PikaDAO:
         self._in_error = False
 
     def transmettre_demande_certificat(self, fingerprint):
-        routing_key = 'requete.certificat.%s' % fingerprint
-        # Utiliser delivery mode 2 (persistent) pour les notifications
+        fingerprint_routing = fingerprint.split(':')[-1]
+        routing_key = 'requete.certificat.%s' % fingerprint_routing
 
         exchanges = [Constantes.SECURITE_PUBLIC]
         if self._exchange_default in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE]:
@@ -898,9 +898,12 @@ class PikaDAO:
             exchanges.append(Constantes.SECURITE_PROTEGE)
 
         for exchange in exchanges:
-            self.transmettre_message_exchange({'fingerprint': fingerprint}, routing_key, exchange=exchange, delivery_mode_v=2)
-
-        # self.transmettre_message_noeuds({'fingerprint': fingerprint}, routing_key, delivery_mode_v=2)
+            self.transmettre_message_exchange(
+                {'fingerprint': fingerprint},
+                routing_key,
+                exchange=exchange,
+                delivery_mode_v=2
+            )
 
     ''' 
     Transmet un evenement de ceduleur. Utilise par les gestionnaires (ou n'importe quel autre processus abonne)
@@ -1744,10 +1747,16 @@ class ExceptionConnectionFermee(Exception):
 
 class CertificatInconnu(Exception):
 
-    def __init__(self, message, errors=None, fingerprint=None):
+    def __init__(self, message, errors =None, fingerprint: str = None):
         super().__init__(message, errors)
         self.errors = errors
         self.__fingerprint = fingerprint
+
+        try:
+            self.__fingerprint.index(':')
+        except ValueError:
+            # Ajouter le type de hachage
+            self.__fingerprint = 'sha256_b64:' + self.__fingerprint
 
     @property
     def fingerprint(self):

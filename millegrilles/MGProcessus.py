@@ -9,7 +9,8 @@ import uuid
 
 from millegrilles import Constantes
 from millegrilles.Erreurs import ErreurModeRegeneration
-from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, TraitementMessageDomaine, TraitementMessageDomaineMiddleware
+from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, TraitementMessageDomaine, \
+    TraitementMessageDomaineMiddleware, CertificatInconnu
 from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from threading import Thread, Event, Barrier
@@ -1178,6 +1179,12 @@ class MGProcessus:
 
         except ErreurOptimisticLocking:
             self.__logger.info("Echec optimistic locking, on abandonne le travail pour cette thread")
+
+        except CertificatInconnu as ce:
+            fingerprint = ce.fingerprint
+            self.__logger.info("Certificat inconnu, on demande %s" % ce.fingerprint)
+            # Emettre demande pour le certificat manquant
+            self._controleur.contexte.message_dao.transmettre_demande_certificat(fingerprint)
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
