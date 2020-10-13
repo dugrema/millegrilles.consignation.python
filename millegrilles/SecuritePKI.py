@@ -850,7 +850,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         self.__queue_reponse = nom_queue
 
         self.__logger.debug("Transmission certificat PKI a l'initialisation")
-        signateur_transactions =  self.contexte.signateur_transactions
+        signateur_transactions = self.contexte.signateur_transactions
         signateur_transactions.emettre_certificat()
 
         enveloppe = signateur_transactions.enveloppe_certificat_courant

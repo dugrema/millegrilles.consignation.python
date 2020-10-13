@@ -26,7 +26,9 @@ class TraitementRequetesProtegeesMaitreComptes(TraitementRequetesProtegees):
 
         # Genere message reponse
         if reponse:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            correlation_id = properties.correlation_id
+            reply_to = properties.reply_to
+            self.transmettre_reponse(message_dict, reponse, replying_to=reply_to, correlation_id=correlation_id)
 
         return reponse
 
