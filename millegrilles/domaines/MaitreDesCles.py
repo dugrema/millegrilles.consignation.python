@@ -809,7 +809,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             raise Exception("certificat d'un format non supporte")
 
         enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_pem)
-        self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+        self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
 
         # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
         # enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
