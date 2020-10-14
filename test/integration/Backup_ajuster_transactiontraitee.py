@@ -114,10 +114,10 @@ def main():
     contexte = ContexteRessourcesDocumentsMilleGrilles()
     contexte.initialiser(init_document=True)
 
-    reset_dates(contexte, ['MaitreDesCles', 'GrosFichiers'], datetime.timedelta(hours=-24))
+    # reset_dates(contexte, ['MaitreDesCles', 'GrosFichiers'], datetime.timedelta(hours=-24))
     # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(hours=-2))
     # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(days=-7))
-    # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(days=-732))
+    reset_dates(contexte, ['MaitreDesCles', 'GrosFichiers'], datetime.timedelta(days=-732))
 
     # requete_transactions_moinsuneheure(contexte, 'MaitreDesCles', 'MaitreDesCles')
 

@@ -1092,6 +1092,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_METADATA_VIDEO = "data_video"
     DOCUMENT_FICHIER_MIMETYPE_PREVIEW = 'mimetype_preview'
     DOCUMENT_FICHIER_EXTENSION_PREVIEW = 'extension_preview'
+    DOCUMENT_FICHIER_HACHAGE_PREVIEW = 'hachage_preview'
     DOCUMENT_FICHIER_FUUID_480P = "fuuidVideo480p"
     DOCUMENT_FICHIER_MIMETYPE_480P = "mimetypeVideo480p"
     DOCUMENT_FICHIER_TAILLE_480P = "tailleVideo480p"

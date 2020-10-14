@@ -471,10 +471,12 @@ class ProcessusFinaliserCatalogueAnnuel(MGProcessusTransaction):
         transaction = self.charger_transaction()
 
         self.__logger.debug("Transaction catalogue mensuel : %s" % str(transaction))
+
         annee_backup = datetime.datetime.fromtimestamp(
             transaction[ConstantesBackup.LIBELLE_ANNEE],
             tz=datetime.timezone.utc
         )
+        annee_backup = datetime.datetime(year=annee_backup.year, month=1, day=1)
 
         champs_copier = [
             ConstantesBackup.LIBELLE_FICHIERS_QUOTIDIEN,
@@ -521,12 +523,11 @@ class ProcessusInformationArchiveAnnuelle(MGProcessusTransaction):
         transaction = self.charger_transaction()
 
         self.__logger.debug("Transaction information archive annuelle : %s" % str(transaction))
-        mois_backup = datetime.datetime.fromtimestamp(
+        annee_backup = datetime.datetime.fromtimestamp(
             transaction[ConstantesBackup.LIBELLE_ANNEE],
             tz=datetime.timezone.utc
         )
-
-        annee_backup = datetime.datetime(year=mois_backup.year, month=1, day=1)
+        annee_backup = datetime.datetime(year=annee_backup.year, month=1, day=1)
 
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: False,

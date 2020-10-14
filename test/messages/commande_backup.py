@@ -100,9 +100,9 @@ class MessagesSample(BaseCallback):
 
     def commande_regenerer(self):
         domaines = [
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', 'Annuaire'),
+            # ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', 'Annuaire'),
             # 'commande.millegrilles.domaines.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.millegrilles.domaines.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # # 'commande.millegrilles.domaines.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
@@ -341,8 +341,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
-        sample.trigger_backup_global()
-        # sample.trigger_backup_maitrecles()
+        # sample.trigger_backup_global()
+        sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
         # sample.trigger_backup_snapshot_grosfichiers()

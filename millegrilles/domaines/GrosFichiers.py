@@ -102,10 +102,10 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:
             # Ajouter information pour le backup du fichier de preview
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
+            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW]
             extension = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
 
-            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
+            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = {
                 'securite': securite,
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
                 'extension': extension,
