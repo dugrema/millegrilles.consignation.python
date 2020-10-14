@@ -827,15 +827,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         roles = enveloppe_certificat.get_roles
         if 'domaines' in roles:
             cert = evenement.get('_certificat_tiers')
-            cert_navi = cert[0]
-            cert_inter = cert[1]
 
-            enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
-            enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
-
-            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-            self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-            self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+            enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(cert))
+            # self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+            self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
 
             # Verifier si la validite de la permission de dechiffrage est expiree
             estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
