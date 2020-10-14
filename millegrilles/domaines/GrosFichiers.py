@@ -86,10 +86,24 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
         info_transaction['fuuid_grosfichiers'] = fuuid_dict
 
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
+            # Ajouter information pour le backup du fichier
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
             sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
             nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
             extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
+
+            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
+                'securite': securite,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
+                'extension': extension,
+                'heure': heure_str,
+            }
+
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:
+            # Ajouter information pour le backup du fichier de preview
+            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
+            extension = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
 
             fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
                 'securite': securite,

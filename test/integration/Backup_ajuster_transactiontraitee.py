@@ -42,18 +42,21 @@ class ModifierDateTransaction:
         curseur = collection.find(filtre)
 
         for doc in curseur:
-            filtre = {'_id': doc['_id']}
-            date_transaction = doc['_evenements']['signature_verifiee']
-            nouvelle_date = date_transaction + self.__offset
-            set_ops = {
-                '_evenements.backup_flag': False,
-                '_evenements.transaction_traitee': nouvelle_date,
-            }
-            ops = {
-                '$set': set_ops,
-                '$unset': {'_evenements.backup_horaire': True}
-            }
-            collection.update_one(filtre, ops)
+            try:
+                filtre = {'_id': doc['_id']}
+                date_transaction = doc['_evenements']['signature_verifiee']
+                nouvelle_date = date_transaction + self.__offset
+                set_ops = {
+                    '_evenements.backup_flag': False,
+                    '_evenements.transaction_traitee': nouvelle_date,
+                }
+                ops = {
+                    '$set': set_ops,
+                    '$unset': {'_evenements.backup_horaire': True}
+                }
+                collection.update_one(filtre, ops)
+            except Exception as e:
+                print("Erreur update _id:%s, ignorer" % doc['_id'])
 
 
 class TestRequetesMatchBackup:
@@ -111,7 +114,7 @@ def main():
     contexte = ContexteRessourcesDocumentsMilleGrilles()
     contexte.initialiser(init_document=True)
 
-    reset_dates(contexte, ['MaitreDesCles', 'GrosFichiers'], datetime.timedelta(hours=-48))
+    reset_dates(contexte, ['MaitreDesCles', 'GrosFichiers'], datetime.timedelta(hours=-24))
     # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(hours=-2))
     # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(days=-7))
     # reset_dates(contexte, ['MaitreDesCles'], datetime.timedelta(days=-732))
