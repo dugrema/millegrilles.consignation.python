@@ -17,6 +17,22 @@ import datetime
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+
+        # Verifier si la requete est pour un certificat
+        if routing_key and routing_key.startswith('requete.certificat.'):
+            fingerprint = routing_key.split('.')[-1]
+            certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
+            try:
+                self.gestionnaire.verificateur_transaction.emettre_certificat(
+                    certificat[ConstantesSecurityPki.LIBELLE_CHAINE_PEM])
+            except KeyError:
+                pass  # Certificat inconnu
+        else:
+            super().traiter_message(ch, method, properties, body)
+            return
+
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
 
@@ -35,6 +51,22 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
     def __init__(self, gestionnaire_domaine):
         super().__init__(gestionnaire_domaine)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def traiter_message(self, ch, method, properties, body):
+        routing_key = method.routing_key
+
+        # Verifier si la requete est pour un certificat
+        if routing_key and routing_key.startswith('requete.certificat.'):
+            fingerprint = routing_key.split('.')[-1]
+            certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
+            try:
+                self.gestionnaire.verificateur_transaction.emettre_certificat(
+                    certificat[ConstantesSecurityPki.LIBELLE_CHAINE_PEM])
+            except KeyError:
+                pass  # Certificat inconnu
+        else:
+            super().traiter_message(ch, method, properties, body)
+            return
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
