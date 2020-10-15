@@ -495,7 +495,7 @@ class UtilCertificats:
                     validator.validate_usage({'digital_signature'})
 
                     # Valide, on lance une exception pour indiquer la condition de validite (business rule)
-                    raise AutorisationConditionnelleDomaine(autorisation['domaines_permis'], idmg)
+                    raise AutorisationConditionnelleDomaine(autorisation['domaines_permis'], idmg, enveloppe)
 
         return resultat
 
@@ -670,6 +670,7 @@ class VerificateurTransaction(UtilCertificats):
         # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
         # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.cert.pem) au besoin.
         # Retourne le idmg de la MilleGrille concernee.
+        exception_si_valide = None  # Exception a lancer si la signature est valide mais que le certificat est conditionnellement valide
         try:
             enveloppe_certificat = self._identifier_certificat(dict_message)
         except CertificatInconnu as ci:
@@ -722,10 +723,21 @@ class VerificateurTransaction(UtilCertificats):
                     self.contexte.message_dao.transmettre_demande_certificat(ci.fingerprint)
                     raise ci  # On re-souleve l'erreur
 
+        except AutorisationConditionnelleDomaine as acd:
+            # Le certificat est valide, mais seulement pour certains domaines
+            # On verifie la signature de la transation. Si elle est valide, on relance l'exception
+            # Sinon on laise l'erreur de signature etre lancee
+            exception_si_valide = acd
+            enveloppe_certificat = acd.enveloppe
+
         self._logger.debug(
             "Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_sha256_b64)
 
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
+
+        if exception_si_valide is not None:
+            # On a une exception qui doit etre lancee uniquement quand la signature est valide
+            raise exception_si_valide
 
         return enveloppe_certificat
 
@@ -946,7 +958,8 @@ class AutorisationConditionnelleDomaine(Exception):
     locale (root) mais globalement valide pour les domaines dans la liste.
     """
 
-    def __init__(self, domaines, idmg):
-        super().__init__(domaines)
+    def __init__(self, domaines, idmg, enveloppe: EnveloppeCertificat):
+        super().__init__('AutorisationConditionnelleDomaine: %s' % str(domaines))
         self.domaines = domaines
         self.idmg = idmg
+        self.enveloppe = enveloppe

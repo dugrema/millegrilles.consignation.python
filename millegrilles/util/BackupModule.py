@@ -21,7 +21,7 @@ from threading import Thread, Event
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
-from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu
+from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu, AutorisationConditionnelleDomaine
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -702,7 +702,13 @@ class HandlerBackupDomaine:
         :param transaction:
         :return:
         """
-        enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
+        try:
+            enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
+        except AutorisationConditionnelleDomaine as acd:
+            # OK, c'est un backup d'une transaction deja sauvegardee. Le domaine va re-valider la permission
+            # sur restauration / regeneration
+            enveloppe_initial = acd.enveloppe
+
         enveloppe = enveloppe_initial
 
         liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_initial)
