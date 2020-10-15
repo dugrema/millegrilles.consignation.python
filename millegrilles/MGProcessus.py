@@ -4,6 +4,7 @@ import datetime
 import requests
 import hashlib
 
+from threading import Thread, Event, Barrier
 from bson.objectid import ObjectId
 import uuid
 
@@ -13,7 +14,7 @@ from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, Traitement
     TraitementMessageDomaineMiddleware, CertificatInconnu
 from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
-from threading import Thread, Event, Barrier
+from millegrilles.SecuritePKI import AutorisationConditionnelleDomaine
 
 
 class MGPProcesseur:
@@ -1545,7 +1546,12 @@ class MGProcessusTransaction(MGProcessus):
         info_transaction = self.trouver_id_transaction()
         id_transaction = info_transaction['id_transaction']
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
-        self._controleur.gestionnaire.verificateur_transaction.verifier(self._transaction)
+        try:
+            self._controleur.gestionnaire.verificateur_transaction.verifier(self._transaction)
+        except AutorisationConditionnelleDomaine as acd:
+            domaine = self._transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            if domaine not in acd.domaines:
+                raise acd
 
         if self._transaction_mapper is not None:
             # Faire le mapping de la transaction en fonction de sa version

@@ -12,13 +12,14 @@ from cryptography.hazmat.primitives import serialization, asymmetric
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
-from certvalidator import CertificateValidator, ValidationContext
+from certvalidator import CertificateValidator, ValidationContext, PathBuildingError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from millegrilles.util.IdmgUtil import IdmgUtil
+from millegrilles.config.Autorisations import autorisations_idmg
 
 
 class EnveloppeCertificat:
@@ -272,6 +273,7 @@ class UtilCertificats:
 
         self.__validation_context: Optional[ValidationContext] = None
         self.__cert_millegrille: Optional[bytes] = None
+        self.__autorisations_idmg = autorisations_idmg()  # Autorisations pour idmg tierces
 
     def initialiser(self):
         # Charger le contexte de validation
@@ -455,6 +457,7 @@ class UtilCertificats:
         """
         cert_pem = enveloppe.certificat_pem.encode('utf-8')
         inter_list = list()
+
         # self._logger.debug("CERT PEM :\n%s" % enveloppe.certificat_pem)
         for pem in enveloppe.reste_chaine_pem:
             # self._logger.debug("Chaine PEM :\n%s" % pem.strip())
@@ -466,12 +469,33 @@ class UtilCertificats:
         else:
             validation_context = self.__validation_context
 
-        validator = CertificateValidator(
-            cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
-
         # Verifier le certificat - noter qu'une exception est lancee en cas de probleme
-        resultat = validator.validate_usage({'digital_signature'})
-        enveloppe.set_est_verifie(True)
+        try:
+            validator = CertificateValidator(
+                cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
+            resultat = validator.validate_usage({'digital_signature'})
+            enveloppe.set_est_verifie(True)
+        except PathBuildingError as pbe:
+            # Verifier si on a une millegrille tierce
+            dernier_cert_pem = inter_list[-1]
+            dernier_cert = EnveloppeCertificat(certificat_pem=dernier_cert_pem)
+            if dernier_cert.is_rootCA:
+                idmg = dernier_cert.idmg
+                # Verifier si le idmg est dans la liste des idmg autorises
+                autorisation = self.__autorisations_idmg.get(idmg)
+                if autorisation is None:
+                    # Pas autorise, lancer l'exception
+                    raise pbe
+                elif autorisation.get('domaines_permis'):
+                    # Valider la chaine en fonction de la racine fournie
+                    validation_context = ValidationContext(trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+                    validator = CertificateValidator(
+                        cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
+
+                    validator.validate_usage({'digital_signature'})
+
+                    # Valide, on lance une exception pour indiquer la condition de validite (business rule)
+                    raise AutorisationConditionnelleDomaine(autorisation['domaines_permis'], idmg)
 
         return resultat
 
@@ -663,8 +687,12 @@ class VerificateurTransaction(UtilCertificats):
                 enveloppe_temp = EnveloppeCertificat(certificat_pem='\n'.join(certificats_inline))
 
                 # Tenter de valider le certificat immediatement, peut echouer si la chaine n'a pas ete traitee
-                enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(enveloppe=enveloppe_temp)
-                self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
+                try:
+                    enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(enveloppe=enveloppe_temp)
+                    self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
+                except AutorisationConditionnelleDomaine as acd:
+                    self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
+                    raise acd
 
             else:
                 # Verifier cas speciaux
@@ -910,3 +938,15 @@ class HachageInvalide(Exception):
     def __init__(self, message, errors=None):
         super().__init__(message, errors)
         self.errors = errors
+
+
+class AutorisationConditionnelleDomaine(Exception):
+    """
+    Lancee pour indiquer que le certificat/chaine recu sont invalides pour la MilleGrille
+    locale (root) mais globalement valide pour les domaines dans la liste.
+    """
+
+    def __init__(self, domaines, idmg):
+        super().__init__(domaines)
+        self.domaines = domaines
+        self.idmg = idmg

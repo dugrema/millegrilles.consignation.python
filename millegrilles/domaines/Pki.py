@@ -8,7 +8,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessage
     TraitementRequetesProtegees, MGPProcesseurTraitementEvenements
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessusTransaction
-from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, AutorisationConditionnelleDomaine
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
 import logging
@@ -464,7 +464,11 @@ class GestionnairePki(GestionnaireDomaineStandard):
         fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
 
         # Valider la chaine de certificats - lance exception si invalide
-        self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
+        try:
+            self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
+        except AutorisationConditionnelleDomaine:
+            # Le certificat est valide dans certains cas, on le conserve
+            pass
 
         idmg = enveloppe.subject_organization_name
         chaine_fingerprints = [fingerprint_sha256_b64]

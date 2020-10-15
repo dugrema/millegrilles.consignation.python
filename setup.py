@@ -26,6 +26,7 @@ setup(
         'mgdomaines',
         'mgdomaines.appareils',
         'millegrilles',
+        'millegrilles.config',
         'millegrilles.dao',
         'millegrilles.domaines',
         'millegrilles.extension',

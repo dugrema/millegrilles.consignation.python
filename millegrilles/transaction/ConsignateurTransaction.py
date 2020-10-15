@@ -15,6 +15,7 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.SecuritePKI import AutorisationConditionnelleDomaine
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -255,6 +256,12 @@ class ConsignateurTransactionCallback(BaseCallback):
             )
             # Emettre demande pour le certificat manquant
             self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+        except AutorisationConditionnelleDomaine as acd:
+            if domaine_transaction in acd.domaines:
+                signature_valide = True
+            else:
+                # Pas autorise
+                raise acd
 
         chaine_certificat = enveloppe_transaction.get('_certificat')
         try:
@@ -280,8 +287,25 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = evenements
 
-        resultat = collection_transactions.insert_one(enveloppe_transaction)
-        doc_id = resultat.inserted_id
+        try:
+            resultat = collection_transactions.insert_one(enveloppe_transaction)
+            doc_id = resultat.inserted_id
+        except DuplicateKeyError as dke:
+            # Verifier si la transaction a ete traite correctement - relancer le trigger de traitement sinon
+            uuid_transaction = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            filtre = {Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction}
+            doc_existant = collection_transactions.find_one(filtre)
+            date_traitement = doc_existant['_evenements'].get('transaction_traitee')
+            if date_traitement is None:
+                # La transaction n'a pas ete traitee avec succes, on relance le trigger
+                doc_id = doc_existant['_id']
+                collection_transactions.update_one(
+                    {'_id': doc_id},
+                    {'$set': {'_evenements.transaction_complete': False}}
+                )
+            else:
+                # Transaction deja traitee avec succes, on empeche l'execution subsequente
+                raise dke
 
         return doc_id, signature_valide
 
