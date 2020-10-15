@@ -103,7 +103,7 @@ class MessagesSample(BaseCallback):
             # ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', 'Annuaire'),
             # 'commande.millegrilles.domaines.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.millegrilles.domaines.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # # 'commande.millegrilles.domaines.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
@@ -298,7 +298,7 @@ class MessagesSample(BaseCallback):
         self._contexte.generateur_transactions.transmettre_commande(
             commande,
             'commande.MaitreDesCles.' + ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS,
-            exchange=Constantes.SECURITE_SECURE,
+            exchange=Constantes.SECURITE_PROTEGE,
             reply_to=self.queue_name,
             correlation_id='trigger_restauration'
         )
@@ -342,7 +342,7 @@ class MessagesSample(BaseCallback):
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
         # sample.trigger_backup_global()
-        sample.trigger_backup_maitrecles()
+        # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
         # sample.trigger_backup_snapshot_grosfichiers()
@@ -365,7 +365,7 @@ class MessagesSample(BaseCallback):
         # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2020, month=10, day=9))
 
-        # sample.trigger_restaurer_liensgrosfichiers()
+        sample.trigger_restaurer_liensgrosfichiers()
 
 
 # --- MAIN ---
