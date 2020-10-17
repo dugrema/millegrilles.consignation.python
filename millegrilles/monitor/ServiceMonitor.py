@@ -1376,9 +1376,38 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Forcer reconfiguration nginx
         gestionnaire_docker.maj_service('nginx')
 
-    def initialiser_noeud(self, commande):
+    def configurer_idmg(self, commande: CommandeMonitor):
+        """
+        Genere la configuration docker avec le niveau de securite et IDMG. Genere le certificat web SSL au besoin.
+        :param commande:
+        :return:
+        """
+        params = commande.contenu
+        idmg = params['idmg']
+        securite = params['securite']
+        domaine = params.get('domaine')
+
+        if domaine is not None:
+            self.__logger.info("Generer certificat web SSL pour " + domaine)
+            self.initialiser_domaine(commande)
+
+        self.sauvegarder_config_millegrille(idmg, securite)
+
+    def initialiser_noeud(self, commande: CommandeMonitor):
         if self.__logger.isEnabledFor(logging.DEBUG):
             self.__logger.debug("Commande initialiser noeud : %s", json.dumps(commande.contenu, indent=2))
+
+        params = commande.contenu
+        securite = params['securite']
+
+        if securite == Constantes.SECURITE_PROTEGE:
+            self.__initialiser_noeud_protege(commande)
+        elif securite == Constantes.SECURITE_PRIVE:
+            self.__initialiser_noeud_prive(commande)
+        else:
+            raise Exception("Type de noeud non supporte : " + securite)
+
+    def __initialiser_noeud_protege(self, commande: CommandeMonitor):
         params = commande.contenu
         gestionnaire_docker = self.gestionnaire_docker
 
@@ -1410,7 +1439,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
         # Verifier si on doit generer un certificat web SSL
-        domaine_web = commande.contenu.get('domaine')
+        domaine_web = params.get('domaine')
         if domaine_web is not None:
             self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
             self.initialiser_domaine(commande)
@@ -1436,7 +1465,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
                 certificat_pem
             )
             chaine_intermediaire = '\n'.join([certificat_pem, certificat_millegrille])
-            gestionnaire_docker.sauvegarder_config('pki.intermediaire.chain.' + str(secret_intermediaire['date']), chaine_intermediaire)
+            gestionnaire_docker.sauvegarder_config(
+                'pki.intermediaire.chain.' + str(secret_intermediaire['date']), chaine_intermediaire)
 
             # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
             self._gestionnaire_certificats.idmg = idmg
@@ -1488,23 +1518,50 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Terminer configuration swarm docker
         gestionnaire_docker.initialiser_noeud(idmg=idmg)
 
-        # Sauvegarder configuration.millegrille
-        configuration_millegrille = {
-            'securite': securite,
-            'idmg': idmg,
-        }
-        gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
+        self.sauvegarder_config_millegrille(idmg, securite)
 
         # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
         # Redemarrage est implicite (fait a la fin de la prep)
         self._gestionnaire_web.regenerer_configuration(mode_installe=True)
 
         # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
-        gestionnaire_docker.maj_service('nginx')
+        try:
+            gestionnaire_docker.maj_service('nginx')
+        except docker.errors.APIError as apie:
+            if apie.status_code == 500:
+                self.__logger.warning("Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
+                self.__event_attente.wait(15)
+                gestionnaire_docker.maj_service('nginx')
+            else:
+                raise apie
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
         gestionnaire_docker.configurer_monitor()
+
+        raise ForcerRedemarrage("Redemarrage")
+
+    def sauvegarder_config_millegrille(self, idmg, securite):
+        """
+        Sauvegarde la config docker millegrille.confuration
+        :param idmg:
+        :param securite:
+        :return:
+        """
+        # Sauvegarder configuration.millegrille
+        configuration_millegrille = {
+            'securite': securite,
+            'idmg': idmg,
+        }
+        self.gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
+
+    def __initialiser_noeud_prive(self, commande: CommandeMonitor):
+        """
+        Initialise un noeud protege avec un certificat
+        :param commande:
+        :return:
+        """
+
 
         raise ForcerRedemarrage("Redemarrage")
 

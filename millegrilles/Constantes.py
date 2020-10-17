@@ -1657,7 +1657,8 @@ class ConstantesServiceMonitor:
     DOCKER_CONFIG_NOEUD_ID = 'millegrilles.noeud.id'
 
     COMMANDE_CONFIGURER_DOMAINE = 'configurerDomaine'
-    COMMANDE_INITIALISER_NOEUD = 'initialiserNoeud'
+    COMMANDE_CONFIGURER_IDMG = 'configurerIdmg'
+    COMMANDE_INSTALLER_NOEUD = 'installerNoeud'
 
     COMMANDE_ACTIVER_HEBERGEMENT = 'activerHebergement'
     COMMANDE_DESACTIVER_HEBERGEMENT = 'desactiverHebergement'

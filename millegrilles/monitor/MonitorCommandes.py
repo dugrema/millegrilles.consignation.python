@@ -157,8 +157,11 @@ class GestionnaireCommandes:
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_DOMAINE:
             self._service_monitor.initialiser_domaine(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INITIALISER_NOEUD:
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD:
             self._service_monitor.initialiser_noeud(commande)
+
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_IDMG:
+            self._service_monitor.configurer_idmg(commande)
 
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_GET_INFORMATION_NOEUD:
             self._service_monitor.transmettre_info_acteur(commande)

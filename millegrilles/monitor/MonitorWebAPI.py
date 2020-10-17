@@ -87,8 +87,10 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         path_split = path_fichier.split('/')
         if path_split[3] == 'configurerDomaine':
             self.post_configurer_domaine(request_data)
-        elif path_split[3] == 'initialisation':
-            self.post_initialiser(request_data)
+        elif path_split[3] == 'installer':
+            self.post_installer(request_data)
+        elif path_split[3] == 'configurerIdmg':
+            self.post_configurer_idmg(request_data)
         else:
             self.error_404()
 
@@ -100,11 +102,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         gestionnaire_docker = self.service_monitor.gestionnaire_docker
         self.repondre_json(gestionnaire_docker.get_liste_services())
 
-    def post_initialiser(self, request_data):
+    def post_installer(self, request_data):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        logger.debug("POST recu\n%s", json.dumps(request_data, indent=2))
+        logger.debug("post_installer : recu\n%s", json.dumps(request_data, indent=2))
 
-        request_data['commande'] = ConstantesServiceMonitor.COMMANDE_INITIALISER_NOEUD
+        request_data['commande'] = ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD
         commande = CommandeMonitor(request_data)
         self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
 
@@ -122,6 +124,28 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             'domaine': request_data['domaine'],
         }
         self.repondre_json(reponse, status_code=200)
+
+    def post_configurer_idmg(self, request_data):
+        logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("post_configurer_idmg: POST recu\n%s", json.dumps(request_data, indent=2))
+
+        try:
+            # Valider input
+            reponse = {
+                'idmg': request_data['idmg'],
+                'securite': request_data['securite'],
+            }
+
+            request_data['commande'] = ConstantesServiceMonitor.COMMANDE_CONFIGURER_IDMG
+            commande = CommandeMonitor(request_data)
+            self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+
+            self.repondre_json(reponse, status_code=200)
+        except Exception as e:
+            self.__logger.exception("post_configurer_idmg: Erreur traitement")
+            reponse = {'err': str(e)}
+            self.repondre_json(reponse, status_code=500)
 
     def return_csr(self):
         csr_intermediaire = self.service_monitor.csr_intermediaire
