@@ -1409,6 +1409,12 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         if not clecert_recu.cle_correspondent():
             raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
+        # Verifier si on doit generer un certificat web SSL
+        domaine_web = commande.contenu.get('domaine')
+        if domaine_web is not None:
+            self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
+            self.initialiser_domaine(commande)
+
         cert_subject = clecert_recu.formatter_subject()
 
         # Verifier le type de certificat - il determine le type de noeud:
@@ -1493,12 +1499,12 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Redemarrage est implicite (fait a la fin de la prep)
         self._gestionnaire_web.regenerer_configuration(mode_installe=True)
 
+        # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
+        gestionnaire_docker.maj_service('nginx')
+
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
         gestionnaire_docker.configurer_monitor()
-
-        # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
-        gestionnaire_docker.maj_service('nginx')
 
         raise ForcerRedemarrage("Redemarrage")
 
