@@ -157,7 +157,7 @@ class InitialiserServiceMonitor:
 
             # Verifier si on a le cert de monitor - indique que noeud est configure et completement installe
             # Lance une exception si aucune configuration ne commence par pki.monitor.cert
-            monitor_cert = self.__docker.configs.get('pki.monitor.cert')
+            monitor_cert = self.__docker.configs.list(filters={'name': 'pki.monitor.cert'})[0]
 
             specialisation = configuration.get('specialisation')
             securite = configuration.get('securite')
@@ -175,7 +175,7 @@ class InitialiserServiceMonitor:
                 service_monitor_classe = ServiceMonitorPrincipal
             else:
                 raise ValueError("Noeud de type non reconnu")
-        except docker.errors.NotFound:
+        except (docker.errors.NotFound, IndexError):
             self.__logger.info("Config millegrille.configuration n'existe pas, le noeud est demarre en mode d'installation")
             service_monitor_classe = ServiceMonitorInstalleur
 
@@ -354,6 +354,7 @@ class ServiceMonitor:
         # Verifier si on a le certificat de monitor - indique que le noeud est installe
         try:
             monitor_cert = gestionnaire_docker.charger_config_recente('pki.monitor.cert')
+            monitor_cert = b64decode(monitor_cert['config'].attrs['Spec']['Data']).decode('utf-8')
             dict_infomillegrille['certificat'] = monitor_cert
         except (IndexError, AttributeError):
             self.__logger.info("Certificat de monitor n'existe pas")
