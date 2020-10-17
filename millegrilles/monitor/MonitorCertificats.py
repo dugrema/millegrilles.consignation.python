@@ -282,25 +282,12 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
         # Charger le certificat de millegrille
         self._charger_certificat_docker('pki.millegrille.cert')
 
-
     def generer_motsdepasse(self):
         """
         Genere les mots de passes pour composants internes de middleware
         :return:
         """
-        passwd_mq = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
-        self._passwd_mq = str(passwd_mq, 'utf-8')
-        label_passwd_mq = 'passwd.mq.' + self._date
-        self._docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
-
-        if self._mode_insecure:
-            try:
-                os.mkdir('/var/opt/millegrilles/secrets', 0o700)
-            except FileExistsError:
-                pass
-
-            with open('/var/opt/millegrilles/secrets/passwd.mq.txt', 'w') as fichiers:
-                fichiers.write(self._passwd_mq)
+        pass  # Aucuns mots de passe prive
 
 
 class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudPrive):

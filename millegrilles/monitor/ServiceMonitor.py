@@ -1575,6 +1575,101 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         :return:
         """
 
+        params = commande.contenu
+        gestionnaire_docker = self.gestionnaire_docker
+
+        gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
+            self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
+        gestionnaire_certs.generer_motsdepasse()
+
+        # Faire correspondre et sauvegarder certificat de noeud
+        secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
+            intermediaire_key_pem = fichier.read()
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt'), 'rb') as fichier:
+            intermediaire_passwd_pem = fichier.read()
+
+        certificat_pem = params['certificatPem']
+        certificat_millegrille = params['chainePem'][-1]
+        chaine = params['chainePem']
+
+        # Extraire IDMG
+        self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
+        clecert_millegrille = EnveloppeCleCert()
+        clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
+        idmg = clecert_millegrille.idmg
+
+        clecert_recu = EnveloppeCleCert()
+        clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
+        if not clecert_recu.cle_correspondent():
+            raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+
+        # Verifier si on doit generer un certificat web SSL
+        domaine_web = params.get('domaine')
+        if domaine_web is not None:
+            self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
+            self.initialiser_domaine(commande)
+
+        cert_subject = clecert_recu.formatter_subject()
+
+        # Verifier le type de certificat - il determine le type de noeud:
+        # intermediaire = noeud protege, prive = noeud prive, public = noeud public
+        self.__logger.debug("Certificat recu : %s", str(cert_subject))
+        subject_clecert_recu = clecert_recu.formatter_subject()
+        if subject_clecert_recu['organizationName'] != idmg:
+            raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
+
+        type_certificat_recu = subject_clecert_recu['organizationalUnitName']
+        if type_certificat_recu != 'prive':
+            raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
+
+        # Comencer sauvegarde
+        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
+
+        self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor prive")
+        securite = Constantes.SECURITE_PRIVE
+        clecert_recu.password = None
+        cle_monitor = clecert_recu.private_key_bytes.decode('utf-8')
+        secret_name, date_key = gestionnaire_docker.sauvegarder_secret('pki.monitor.key', cle_monitor,
+                                                                       ajouter_date=True)
+
+        if self._args.dev:
+            with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'w') as fichier:
+                fichier.write(cle_monitor)
+
+        gestionnaire_docker.sauvegarder_config(
+            'pki.monitor.cert.' + date_key,
+            '\n'.join(chaine)
+        )
+
+        # Supprimer le CSR
+        gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
+
+        # Terminer configuration swarm docker
+        gestionnaire_docker.initialiser_noeud(idmg=idmg)
+
+        self.sauvegarder_config_millegrille(idmg, securite)
+
+        # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
+        # Redemarrage est implicite (fait a la fin de la prep)
+        self._gestionnaire_web.regenerer_configuration(mode_installe=True)
+
+        # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
+        try:
+            gestionnaire_docker.maj_service('nginx')
+        except docker.errors.APIError as apie:
+            if apie.status_code == 500:
+                self.__logger.warning(
+                    "Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
+                self.__event_attente.wait(15)
+                gestionnaire_docker.maj_service('nginx')
+            else:
+                raise apie
+
+        # Redemarrer / reconfigurer le monitor
+        self.__logger.info("Configuration completee, redemarrer le monitor")
+        gestionnaire_docker.configurer_monitor()
 
         raise ForcerRedemarrage("Redemarrage")
 

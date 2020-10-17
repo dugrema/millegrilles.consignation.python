@@ -28,6 +28,17 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     def service_monitor(self):
         return self.server.service_monitor
 
+    def do_OPTIONS(self):
+        path_supportes = [
+            '/installation/api/installer'
+        ]
+        if self.path in path_supportes:
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "*")
+            self.send_header("Accept", "application/json, text/plain")
+            self.end_headers()
+
     def do_GET(self):
         path_request = self.path.split('/')
         try:
@@ -152,6 +163,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         if csr_intermediaire:
             self.send_response(200)
             self.send_header("Content-type", "text/ascii")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(csr_intermediaire)
         else:
@@ -174,6 +186,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         info_bytes = json.dumps(dict_message).encode('utf-8')
         self.send_response(status_code)
         self.send_header("Content-type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(info_bytes)
 
@@ -185,6 +198,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
         self.send_response(200)
         self.send_header("Content-type", "text/ascii")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(b"GET ADMINISTRATION, pas implemente")
 
