@@ -155,13 +155,17 @@ class InitialiserServiceMonitor:
             self._configuration_json = configuration
             self.__logger.debug("Configuration millegrille : %s" % configuration)
 
+            # Verifier si on a le cert de monitor - indique que noeud est configure et completement installe
+            # Lance une exception si aucune configuration ne commence par pki.monitor.cert
+            monitor_cert = self.__docker.configs.get('pki.monitor.cert')
+
             specialisation = configuration.get('specialisation')
             securite = configuration.get('securite')
             if securite == '1.public':
                 self.__logger.error("Noeud public, non supporte")
                 raise ValueError("Noeud de type non reconnu")
             elif securite == Constantes.SECURITE_PRIVE:
-                self.__logger.error("Noeud prive, non supporte")
+                self.__logger.error("Noeud prive")
                 service_monitor_classe = ServiceMonitorPrive
             elif securite == Constantes.SECURITE_PROTEGE and specialisation == 'dependant':
                 service_monitor_classe = ServiceMonitorDependant
@@ -343,8 +347,16 @@ class ServiceMonitor:
         try:
             configuration_millegrille = json.loads(gestionnaire_docker.charger_config('millegrille.configuration'))
             dict_infomillegrille['securite'] = configuration_millegrille['securite']
+            dict_infomillegrille['idmg'] = configuration_millegrille['idmg']
         except IndexError:
             pass
+
+        # Verifier si on a le certificat de monitor - indique que le noeud est installe
+        try:
+            monitor_cert = gestionnaire_docker.charger_config_recente('pki.monitor.cert')
+            dict_infomillegrille['certificat'] = monitor_cert
+        except (IndexError, AttributeError):
+            self.__logger.info("Certificat de monitor n'existe pas")
 
         if inclure_services:
             dict_infomillegrille['services'] = gestionnaire_docker.get_liste_services()
