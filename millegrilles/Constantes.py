@@ -403,7 +403,7 @@ class ConstantesPrincipale:
     # Document par defaut pour la configuration de l'interface principale
     DOCUMENT_DEFAUT = {
         DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
-        TRANSACTION_MESSAGE_LIBELLE_VERSION: 7,
+        TRANSACTION_MESSAGE_LIBELLE_VERSION: 6,
     }
 
     DOCUMENT_PROFIL_USAGER = {

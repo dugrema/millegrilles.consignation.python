@@ -47,11 +47,16 @@ class GestionnaireApplications:
         self.__handler_requetes: [TraitementMQRequetesBlocking] = None
 
     def event(self, event):
-        # self.__logger.debug("Event docker APPS : %s", str(event))
+        self.__logger.debug("Event docker APPS : %s", str(event))
+        event_json = json.loads(event.decode('utf-8'))
+
+        type = event_json.get('Type')
+        action = event_json.get('Action')
+        if type is not None and action is not None:
+            action = 'docker/' + type
+            self.__service_monitor.emettre_evenement(action, event_json)
 
         if self.__wait_start_service_name or self.__wait_start_container_name:
-            event_json = json.loads(event.decode('utf-8'))
-
             # Verifier si le container correspond au service
             if event_json.get('Type') == 'container' and event_json.get('status') == 'start' and event_json.get('Action') == 'start':
                 actor = event_json.get('Actor')
@@ -403,22 +408,33 @@ class GestionnaireApplications:
                 self.__gestionnaire_modules_docker.demarrer_container(nom_container_docker,
                                                                       nom_image=nom_image_docker,
                                                                       config=config_elem,
-                                                                      images=gestionnaire_images_applications)
+                                                                      images=gestionnaire_images_applications,
+                                                                      application=module_name)
             else:
                 self.__wait_start_service_name = module_name
                 self.__gestionnaire_modules_docker.demarrer_service(module_name,
                                                                     config=config_elem,
                                                                     images=gestionnaire_images_applications,
                                                                     nom_image=nom_image_docker,
-                                                                    nom_container=nom_container_docker)
+                                                                    nom_container=nom_container_docker,
+                                                                    application=module_name)
 
             self.__wait_container_event.wait(60)
+            self.__service_monitor.emettre_evenement('applicationDemarree', {'nom_application': module_name})
         except APIError as apie:
             if apie.status_code == 409:
                 self.__logger.info("Service %s deja demarre" % self.__wait_start_service_name)
                 self.__wait_container_event.set()
+                self.__service_monitor.emettre_evenement(
+                    'erreurDemarrageApplication',
+                    {'nom_application': module_name, 'code': apie.status_code, 'err': str(apie)}
+                )
             else:
                 self.__logger.exception("Erreur demarrage service %s" % self.__wait_start_service_name)
+                self.__service_monitor.emettre_evenement(
+                    'erreurDemarrageApplication',
+                    {'nom_application': module_name, 'code': apie.status_code, 'err': str(apie)}
+                )
                 raise apie
         finally:
             self.__wait_start_service_name = None  # Reset ecoute de l'evenement
@@ -434,9 +450,12 @@ class GestionnaireApplications:
                 container.remove()
             except:
                 pass  # Ok, container devrait se supprimer automatiquement
+            # self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': container.})
 
         for service in dict_app['services']:
             service.remove()
+            nom_application = service.attrs['Spec']['Labels']['application']
+            self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_application})
 
     def trouver_applications_backup(self, commande: dict):
 

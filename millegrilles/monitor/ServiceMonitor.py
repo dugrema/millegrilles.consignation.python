@@ -630,6 +630,19 @@ class ServiceMonitor:
         """
         self._connexion_middleware.emettre_presence()
 
+    def emettre_evenement(self, action: str, info: dict = None):
+        """
+        Emet un evenement de monitor. Insere le noeudId dans le routing
+        :return:
+        """
+        routing = 'evenement.servicemonitor.%s.%s' % (self.noeud_id, action)
+        if info is None:
+            info = dict()
+        try:
+            self._connexion_middleware.generateur_transactions.emettre_message(info, routing)
+        except Exception:
+            self.__logger.exception("Erreur transmission evenement monitor")
+
     @property
     def gestionnaire_mq(self):
         return self._gestionnaire_mq
@@ -716,8 +729,8 @@ class ServiceMonitorPrincipal(ServiceMonitor):
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-                except Exception:
-                    self.__logger.exception("ServiceMonitor: erreur generique")
+                except Exception as e:
+                    self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
                 finally:
                     self._attente_event.wait(30)
 
@@ -1000,8 +1013,8 @@ class ServiceMonitorDependant(ServiceMonitor):
                 self._entretien_modules()
 
                 self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-            except Exception:
-                self.__logger.exception("ServiceMonitor: erreur generique")
+            except Exception as e:
+                self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
             finally:
                 self._attente_event.wait(30)
 
@@ -1110,8 +1123,8 @@ class ServiceMonitorPrive(ServiceMonitor):
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-                except Exception:
-                    self.__logger.exception("ServiceMonitor: erreur generique")
+                except Exception as e:
+                    self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
                 finally:
                     self._attente_event.wait(30)
 
@@ -1265,8 +1278,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
                     self._gestionnaire_docker.entretien_services()
 
                 self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-            except Exception:
-                self.__logger.exception("ServiceMonitor: erreur generique")
+            except Exception as e:
+                self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
             finally:
                 self._attente_event.wait(30)
 
@@ -1696,8 +1709,8 @@ class ServiceMonitorExtension(ServiceMonitor):
                             self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
 
                     self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
-                except Exception:
-                    self.__logger.exception("ServiceMonitor: erreur generique")
+                except Exception as e:
+                    self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
                 finally:
                     self._attente_event.wait(30)
 

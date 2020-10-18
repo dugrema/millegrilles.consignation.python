@@ -218,7 +218,7 @@ class GestionnaireModulesDocker:
             service = dict_services.get(service_name)
             if not service:
                 try:
-                    self.demarrer_service(service_name, **params)
+                    self.demarrer_service(service_name, no_pull=True, **params)
                 except IndexError:
                     self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
                 entretien_compte_complete = False
@@ -266,12 +266,12 @@ class GestionnaireModulesDocker:
 
         configuration = dict()
         try:
-            image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+            image = gestionnaire_images.telecharger_image_docker(nom_image_docker, **kwargs)
 
             # Prendre un tag au hasard
             image_tag = image.tags[0]
 
-            configuration = self.__formatter_configuration_service(service_name, application=service_name)
+            configuration = self.__formatter_configuration_service(service_name, application=kwargs.get('application'))
 
             command = configuration_service.get('command')
 
@@ -512,6 +512,14 @@ class GestionnaireModulesDocker:
         if update_status is not None:
             update_state = update_status['State']
 
+        try:
+            mode_service = service.attrs['Spec']['Mode']
+            if mode_service['Replicated']['Replicas'] == 0:
+                # On a manuellement desactiver le service - skip
+                return
+        except KeyError:
+            pass  # OK, pas mode replicated
+
         # Compter le nombre de taches actives
         running = list()
 
@@ -672,7 +680,7 @@ class GestionnaireModulesDocker:
 
         return dict_config_docker
 
-    def __formatter_configuration_container(self, container_name, config: dict = None):
+    def __formatter_configuration_container(self, container_name, config: dict = None, **kwargs):
         config_container = config or json.loads(self.charger_config('docker.cfg.' + container_name))
         self.__logger.debug("Configuration container %s : %s", container_name, str(config_container))
 
@@ -708,6 +716,7 @@ class GestionnaireModulesDocker:
             })
 
         labels['mode_container'] = 'true'
+        labels['application'] = kwargs['application']
 
         return dict_config_docker
 
@@ -1135,7 +1144,7 @@ class GestionnaireImagesDocker:
             message = "Images non trouvees: %s" % str(images_non_trouvees)
             raise Exception(message)
 
-    def telecharger_image_docker(self, nom_service):
+    def telecharger_image_docker(self, nom_service, **kwargs):
         """
         S'assure d'avoir une version locale de chaque image - telecharge au besoin
         :return:
@@ -1145,7 +1154,7 @@ class GestionnaireImagesDocker:
         self.charger_versions()
 
         # Il est possible de definir des registre specifiquement pour un service
-        image = self.pull_image(nom_service, images_non_trouvees)
+        image = self.pull_image(nom_service, images_non_trouvees, **kwargs)
 
         if len(images_non_trouvees) > 0:
             message = "Images non trouvees: %s" % str(images_non_trouvees)
@@ -1153,7 +1162,7 @@ class GestionnaireImagesDocker:
 
         return image
 
-    def pull_image(self, service, images_non_trouvees):
+    def pull_image(self, service, images_non_trouvees, **kwargs):
         registries = self._versions_images.get('registries')
         images_info = self._versions_images['images']
         config = images_info[service]
@@ -1164,7 +1173,7 @@ class GestionnaireImagesDocker:
         if service_registries is None:
             service_registries = registries
         image_locale = self.get_image_locale(nom_image, tag)
-        if image_locale is None:
+        if image_locale is None and kwargs.get('no_pull') is None:
             image = None
             for registry in service_registries:
                 if registry != '':
@@ -1179,8 +1188,8 @@ class GestionnaireImagesDocker:
                     self.__logger.info("Image %s:%s sauvegardee avec succes" % (nom_image, tag))
                     return image  # On prend un tag au hasard
 
-            if image is None:
-                images_non_trouvees.append('%s:%s' % (nom_image, tag))
+        if image_locale is None:
+            images_non_trouvees.append('%s:%s' % (image_locale, tag))
 
         return image_locale
 
