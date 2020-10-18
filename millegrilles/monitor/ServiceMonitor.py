@@ -1471,59 +1471,39 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Comencer sauvegarde
         gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
 
-        if type_certificat_recu == 'intermediaire':
-            securite = Constantes.SECURITE_PROTEGE
-            gestionnaire_docker.sauvegarder_config(
-                'pki.intermediaire.cert.' + str(secret_intermediaire['date']),
-                certificat_pem
-            )
-            chaine_intermediaire = '\n'.join([certificat_pem, certificat_millegrille])
-            gestionnaire_docker.sauvegarder_config(
-                'pki.intermediaire.chain.' + str(secret_intermediaire['date']), chaine_intermediaire)
-
-            # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
-            self._gestionnaire_certificats.idmg = idmg
-            self._gestionnaire_certificats.set_clecert_millegrille(clecert_millegrille)
-            self._gestionnaire_certificats.set_clecert_intermediaire(clecert_recu)
-
-            # Generer nouveau certificat de monitor
-            # Charger CSR monitor
-            config_csr_monitor = self._gestionnaire_docker.charger_config_recente('pki.monitor.csr')
-            data_csr_monitor = b64decode(config_csr_monitor['config'].attrs['Spec']['Data'])
-            clecert_monitor = self._gestionnaire_certificats.signer_csr(data_csr_monitor)
-
-            # Sauvegarder certificat monitor
-            # Faire correspondre et sauvegarder certificat de noeud
-            secret_monitor = gestionnaire_docker.trouver_secret('pki.monitor.key')
-            gestionnaire_docker.sauvegarder_config(
-                'pki.monitor.cert.' + str(secret_monitor['date']),
-                '\n'.join(clecert_monitor.chaine)
-            )
-
-            # Supprimer le CSR
-            gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
-
-        elif type_certificat_recu == 'prive':
-            self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor prive")
-            securite = Constantes.SECURITE_PRIVE
-            clecert_recu.password = None
-            cle_monitor = clecert_recu.private_key_bytes.decode('utf-8')
-            secret_name, date_key = gestionnaire_docker.sauvegarder_secret('pki.monitor.key', cle_monitor, ajouter_date=True)
-
-            if self._args.dev:
-                with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'w') as fichier:
-                    fichier.write(cle_monitor)
-
-            gestionnaire_docker.sauvegarder_config(
-                'pki.monitor.cert.' + date_key,
-                '\n'.join(chaine)
-            )
-        elif type_certificat_recu == 'public':
-            self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor public")
-            securite = Constantes.SECURITE_PUBLIC
-            raise NotImplementedError()
-        else:
+        if type_certificat_recu != 'intermediaire':
             raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
+
+        securite = Constantes.SECURITE_PROTEGE
+        gestionnaire_docker.sauvegarder_config(
+            'pki.intermediaire.cert.' + str(secret_intermediaire['date']),
+            certificat_pem
+        )
+        chaine_intermediaire = '\n'.join([certificat_pem, certificat_millegrille])
+        gestionnaire_docker.sauvegarder_config(
+            'pki.intermediaire.chain.' + str(secret_intermediaire['date']), chaine_intermediaire)
+
+        # Configurer gestionnaire certificats avec clecert millegrille, intermediaire
+        self._gestionnaire_certificats.idmg = idmg
+        self._gestionnaire_certificats.set_clecert_millegrille(clecert_millegrille)
+        self._gestionnaire_certificats.set_clecert_intermediaire(clecert_recu)
+
+        # Generer nouveau certificat de monitor
+        # Charger CSR monitor
+        config_csr_monitor = self._gestionnaire_docker.charger_config_recente('pki.monitor.csr')
+        data_csr_monitor = b64decode(config_csr_monitor['config'].attrs['Spec']['Data'])
+        clecert_monitor = self._gestionnaire_certificats.signer_csr(data_csr_monitor)
+
+        # Sauvegarder certificat monitor
+        # Faire correspondre et sauvegarder certificat de noeud
+        secret_monitor = gestionnaire_docker.trouver_secret('pki.monitor.key')
+        gestionnaire_docker.sauvegarder_config(
+            'pki.monitor.cert.' + str(secret_monitor['date']),
+            '\n'.join(clecert_monitor.chaine)
+        )
+
+        # Supprimer le CSR
+        gestionnaire_docker.supprimer_config('pki.monitor.csr.' + str(secret_monitor['date']))
 
         # Supprimer le CSR
         gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))

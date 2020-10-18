@@ -287,7 +287,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
         Genere les mots de passes pour composants internes de middleware
         :return:
         """
-        pass  # Aucuns mots de passe prive
+        pass  # Aucun mot de passe prive
 
 
 class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudPrive):
@@ -305,6 +305,12 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
         :return:
         """
         super().generer_motsdepasse()
+
+        passwd_mq = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
+        self._passwd_mq = str(passwd_mq, 'utf-8')
+        label_passwd_mq = 'passwd.mq.' + self._date
+        self._docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
+
         passwd_mongo = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
         self.ajouter_secret('passwd.mongo', passwd_mongo)
         self._passwd_mongo = str(passwd_mongo, 'utf-8')
@@ -323,6 +329,14 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
                 fichiers.write(self._passwd_mongo)
             with open('/var/opt/millegrilles/secrets/passwd.mongoxpweb.txt', 'w') as fichiers:
                 fichiers.write(self._passwd_mongoxp)
+
+            try:
+                os.mkdir('/var/opt/millegrilles/secrets', 0o700)
+            except FileExistsError:
+                pass
+
+            with open('/var/opt/millegrilles/secrets/passwd.mq.txt', 'w') as fichiers:
+                fichiers.write(self._passwd_mq)
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
