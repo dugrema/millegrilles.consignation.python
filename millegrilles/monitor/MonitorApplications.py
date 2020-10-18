@@ -84,6 +84,14 @@ class GestionnaireApplications:
         try:
             nom_application = commande.contenu['nom_application']
             configuration_docker = commande.contenu['configuration']
+
+            if configuration_docker is None:
+                # Tenter de charger la configuration existante
+                configuration_existante = self.__gestionnaire_modules_docker.charger_config('app.cfg.' + nom_application)
+                configuration_docker = json.loads(configuration_existante.decode('utf-8'))
+                commande.contenu['configuration'] = configuration_docker
+                commande.contenu['configuration_courante'] = True
+
             tar_scripts = self.preparer_script_file(commande.contenu)
 
             self.__service_monitor.generateur_transactions.transmettre_reponse(
@@ -112,6 +120,48 @@ class GestionnaireApplications:
         else:
             tar_scripts = commande.get('scripts_tarfile')
         return tar_scripts
+
+    def configurer_application(self, commande: CommandeMonitor):
+        nom_app = commande.contenu['nom_application']
+        nom_configuration = 'app.cfg.' + nom_app
+        configuration = commande.contenu['configuration']
+
+        # Changer configuration existante
+        configuration_precendente = self.__gestionnaire_modules_docker.charger_config(nom_configuration)
+        self.__gestionnaire_modules_docker.supprimer_config(nom_configuration)
+        self.__gestionnaire_modules_docker.sauvegarder_config(nom_configuration, configuration)
+
+    def commande_demarrer_application(self, commande: CommandeMonitor):
+        self.__logger.info("Demarrer application %s", str(commande))
+
+        mq_properties = commande.mq_properties
+        reply_to = mq_properties.reply_to
+        correlation_id = mq_properties.correlation_id
+        reponse = {'ok': True}
+        try:
+            nom_application = commande.contenu['nom_application']
+
+            # Tenter de charger la configuration existante
+            configuration_existante = self.__gestionnaire_modules_docker.charger_config(
+                'app.cfg.' + nom_application)
+            configuration_docker = json.loads(configuration_existante.decode('utf-8'))
+            commande.contenu['configuration'] = configuration_docker
+            commande.contenu['configuration_courante'] = True
+
+            tar_scripts = self.preparer_script_file(commande.contenu)
+
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=reply_to, correlation_id=correlation_id)
+
+            self.preparer_installation(nom_application, configuration_docker, tar_scripts)
+
+            # Transmettre maj
+            self.__service_monitor.emettre_presence()
+        except Exception as e:
+            reponse['ok'] = False
+            reponse['err'] = str(e)
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=reply_to, correlation_id=correlation_id)
 
     def supprimer_application(self, commande: CommandeMonitor):
         self.__logger.info("Supprimer application %s", str(commande))
@@ -284,7 +334,8 @@ class GestionnaireApplications:
 
         config_name = 'app.cfg.' + nom_application
 
-        self.__gestionnaire_modules_docker.sauvegarder_config(config_name, configuration_docker)
+        if configuration_docker.get('configuration_courante') is not True:
+            self.__gestionnaire_modules_docker.sauvegarder_config(config_name, configuration_docker)
 
         # Installer toutes les dependances de l'application en ordre
         for config_image in configuration_docker['dependances']:
@@ -445,12 +496,14 @@ class GestionnaireApplications:
         # Trouver le service/container en faisant la recherche des labels
         dict_app = self.__gestionnaire_modules_docker.trouver_application(nom_image_docker)
         for container in dict_app['containers']:
+            nom_application = container.attrs['Config']['Labels']['application']
+
             container.stop()
             try:
                 container.remove()
             except:
                 pass  # Ok, container devrait se supprimer automatiquement
-            # self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': container.})
+            self.__service_monitor.emettre_evenement('applicationArretee', {'nom_application': nom_application})
 
         for service in dict_app['services']:
             service.remove()

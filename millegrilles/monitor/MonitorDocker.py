@@ -930,7 +930,7 @@ class GestionnaireModulesDocker:
         return container_trouve.id
 
     def trouver_application(self, nom_application):
-        containers = self.__docker.containers.list(filters={'label': 'application=' + nom_application})
+        containers = self.__docker.containers.list(all=True, filters={'label': 'application=' + nom_application})
         services = self.__docker.services.list(filters={'label': 'application=' + nom_application})
 
         resultat = {

@@ -557,6 +557,13 @@ class ServiceMonitor:
         information_systeme['commande'] = 'set_info'
         self._gestionnaire_commandes.transmettre_vers_acteur(information_systeme)
 
+    def get_configuration_application(self, commande: CommandeMonitor):
+        nom_app = commande.contenu['nom_application']
+        nom_config_app = 'app.cfg.' + nom_app
+        configuration_bytes = self._gestionnaire_docker.charger_config(nom_config_app)
+        configuration_dict = json.loads(configuration_bytes.decode('utf-8'))
+        return {'nom_application': nom_app, 'configuration': configuration_dict}
+
     def _get_info_noeud(self):
         information_systeme = {
             'noeud_id': self.noeud_id

@@ -20,8 +20,6 @@ class GestionnaireCommandes:
     """
     Execute les commandes transmissions au service monitor (via MQ, unix pipe, etc.)
     """
-
-    #def __init__(self, fermeture_event: Event, service_monitor: Union[ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal]):
     def __init__(self, fermeture_event: Event, service_monitor, path_fifo='/var/opt/millegrilles/monitor.socket'):
         self.__fermeture_event = fermeture_event
         self._service_monitor = service_monitor
@@ -168,6 +166,15 @@ class GestionnaireCommandes:
 
         elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
             self._service_monitor.transmettre_catalogue_local()
+
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_REQUETE_CONFIG_APPLICATION:
+            reponse = self._service_monitor.get_configuration_application(commande)
+
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_APPLICATION:
+            reponse = self._service_monitor.gestionnaire_applications.configurer_application(commande)
+
+        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DEMARRER_APPLICATION:
+            reponse = self._service_monitor.gestionnaire_applications.commande_demarrer_application(commande)
 
         else:
             self.__logger.error("Commande inconnue : %s", nom_commande)
