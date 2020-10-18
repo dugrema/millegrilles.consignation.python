@@ -385,7 +385,7 @@ class GestionnaireModulesDocker:
             # Prendre un tag au hasard
             image_tag = image.tags[0]
 
-            configuration = self.__formatter_configuration_container(container_name, config)
+            configuration = self.__formatter_configuration_container(container_name, config, application=container_name)
 
             self.__logger.debug("Configuration du container: %s" % configuration)
 
@@ -1055,7 +1055,7 @@ class GestionnaireModulesDocker:
         return dict_services
 
     def get_liste_containers(self):
-        containers = self.__docker.containers.list()
+        containers = self.__docker.containers.list(all=True)
 
         # Mapper services et etat
         dict_containers = dict()
@@ -1071,6 +1071,8 @@ class GestionnaireModulesDocker:
             info_container['running'] = state['Running']
             info_container['dead'] = state['Dead']
             info_container['finished_at'] = state['FinishedAt']
+
+            info_container['labels'] = attrs['Config']['Labels']
 
             dict_containers[attrs['Name']] = info_container
 
