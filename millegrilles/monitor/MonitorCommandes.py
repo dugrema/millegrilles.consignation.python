@@ -117,75 +117,79 @@ class GestionnaireCommandes:
         contenu = commande.contenu
 
         reponse = None
+        try:
 
-        if nom_commande == 'demarrer_service':
-            nom_service = contenu['nom_service']
-            gestionnaire_docker = self._service_monitor.gestionnaire_docker
-            gestionnaire_docker.demarrer_service(nom_service, **contenu)
+            if nom_commande == 'demarrer_service':
+                nom_service = contenu['nom_service']
+                gestionnaire_docker = self._service_monitor.gestionnaire_docker
+                gestionnaire_docker.demarrer_service(nom_service, **contenu)
 
-        elif nom_commande == 'supprimer_service':
-            nom_service = contenu['nom_service']
-            gestionnaire_docker = self._service_monitor.gestionnaire_docker
-            gestionnaire_docker.supprimer_service(nom_service)
+            elif nom_commande == 'supprimer_service':
+                nom_service = contenu['nom_service']
+                gestionnaire_docker = self._service_monitor.gestionnaire_docker
+                gestionnaire_docker.supprimer_service(nom_service)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE:
-            self.ajouter_comptes(contenu)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE:
+                self.ajouter_comptes(contenu)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT:
-            self.activer_hebergement(contenu)
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT:
-            self.desactiver_hebergement(contenu)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTIVER_HEBERGEMENT:
+                self.activer_hebergement(contenu)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DESACTIVER_HEBERGEMENT:
+                self.desactiver_hebergement(contenu)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION:
-            reponse = self._service_monitor.gestionnaire_applications.installer_application(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_APPLICATION:
+                reponse = self._service_monitor.gestionnaire_applications.installer_application(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION:
-            reponse = self._service_monitor.gestionnaire_applications.supprimer_application(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION:
+                reponse = self._service_monitor.gestionnaire_applications.supprimer_application(commande)
 
-        elif nom_commande in [
-            Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
-            Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.split('.')[-1],
-            Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL.split('.')[-1]
-        ]:
-            self._service_monitor.gestionnaire_applications.backup_application(commande)
+            elif nom_commande in [
+                Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
+                Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.split('.')[-1],
+                Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL.split('.')[-1]
+            ]:
+                self._service_monitor.gestionnaire_applications.backup_application(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RESTORE_APPLICATION:
-            self._service_monitor.gestionnaire_applications.restore_application(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_RESTORE_APPLICATION:
+                self._service_monitor.gestionnaire_applications.restore_application(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_DOMAINE:
-            self._service_monitor.initialiser_domaine(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_DOMAINE:
+                self._service_monitor.initialiser_domaine(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD:
-            self._service_monitor.initialiser_noeud(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD:
+                self._service_monitor.initialiser_noeud(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_IDMG:
-            self._service_monitor.configurer_idmg(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_IDMG:
+                self._service_monitor.configurer_idmg(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_GET_INFORMATION_NOEUD:
-            self._service_monitor.transmettre_info_acteur(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_GET_INFORMATION_NOEUD:
+                self._service_monitor.transmettre_info_acteur(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
-            self._service_monitor.transmettre_catalogue_local()
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
+                self._service_monitor.transmettre_catalogue_local()
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_REQUETE_CONFIG_APPLICATION:
-            reponse = self._service_monitor.get_configuration_application(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_REQUETE_CONFIG_APPLICATION:
+                reponse = self._service_monitor.get_configuration_application(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_APPLICATION:
-            reponse = self._service_monitor.gestionnaire_applications.configurer_application(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_APPLICATION:
+                reponse = self._service_monitor.gestionnaire_applications.configurer_application(commande)
 
-        elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DEMARRER_APPLICATION:
-            reponse = self._service_monitor.gestionnaire_applications.commande_demarrer_application(commande)
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DEMARRER_APPLICATION:
+                reponse = self._service_monitor.gestionnaire_applications.commande_demarrer_application(commande)
 
-        else:
-            self.__logger.error("Commande inconnue : %s", nom_commande)
-            return
+            else:
+                self.__logger.error("Commande inconnue : %s", nom_commande)
+                return
+        except Exception as err:
+            self.__logger.exception("Exception traitement commande")
+            reponse = {'err': str(err)}
 
         if reponse is not None and mq_properties is not None:
             # Transmettre la reponse a la commande / requete
             generateur_transactions = self._service_monitor.generateur_transactions
             reply_to = mq_properties.reply_to
             correlation_id = mq_properties.correlation_id
-            self._service_monitor.generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
+            generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']

@@ -230,13 +230,17 @@ class GenerateurTransaction:
     def emettre_message(
             self, message_dict, routing_key, exchanges: list = None, reply_to=None, correlation_id=None,
             headers: dict = None,
-            version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6, retourner_enveloppe=False):
+            version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6, retourner_enveloppe=False,
+            ajouter_certificats=False):
 
         if not message_dict.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION):
             enveloppe = self.preparer_enveloppe(message_dict, version=version)
         else:
             # Transmettre le message brut (c'est deja une enveloppe)
             enveloppe = message_dict
+
+        if ajouter_certificats:
+            enveloppe['_certificat'] = self.__formatteur_message.chaine_certificat
 
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(

@@ -603,7 +603,7 @@ class ConnexionMiddleware:
         info_monitor['securite'] = self._service_monitor.securite
         domaine_action = Constantes.ConstantesTopologie.EVENEMENT_PRESENCE_MONITOR
 
-        self.generateur_transactions.emettre_message(info_monitor, domaine_action)
+        self.generateur_transactions.emettre_message(info_monitor, domaine_action, ajouter_certificats=True)
 
     def ajouter_commande(self, commande):
         gestionnaire_commandes: GestionnaireCommandes = self._service_monitor.gestionnaire_commandes

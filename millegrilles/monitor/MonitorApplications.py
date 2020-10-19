@@ -131,6 +131,8 @@ class GestionnaireApplications:
         self.__gestionnaire_modules_docker.supprimer_config(nom_configuration)
         self.__gestionnaire_modules_docker.sauvegarder_config(nom_configuration, configuration)
 
+        return {'ok': True}
+
     def commande_demarrer_application(self, commande: CommandeMonitor):
         self.__logger.info("Demarrer application %s", str(commande))
 
