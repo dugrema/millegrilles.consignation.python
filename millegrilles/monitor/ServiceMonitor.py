@@ -1069,6 +1069,9 @@ class ServiceMonitorPrive(ServiceMonitor):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
 
+        self._configuration = TransactionConfiguration()
+        self._configuration.loadEnvironment()
+
     def _entretien_modules(self):
         if not self.limiter_entretien:
             # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
@@ -1083,10 +1086,8 @@ class ServiceMonitorPrive(ServiceMonitor):
         Lance une thread distincte pour s'occuper des messages.
         :return:
         """
-        configuration = TransactionConfiguration()
-
         self._connexion_middleware = ConnexionMiddlewarePrive(
-            configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+            self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
             secrets=self._args.secrets)
 
         try:
@@ -1182,14 +1183,17 @@ class ServiceMonitorPrive(ServiceMonitor):
         """
 
         if self.path_secrets == MonitorConstantes.PATH_SECRET_DEFAUT:
+            # Le monitor est deploye sous forme de service, on copie les secrets vers le repertoire partage
             path_secret_prives = '/var/opt/millegrilles_secrets'
+            self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
+
             if os.path.exists(path_secret_prives):
                 volume_secrets = '/var/opt/millegrilles_secrets'
                 self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
                 fichiers = [
-                    (os.path.join(volume_secrets, 'key.pem'), self._connexion_middleware.configuration.mq_keyfile),
-                    (os.path.join(volume_secrets, 'cert.pem'), self._connexion_middleware.configuration.mq_certfile),
-                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._connexion_middleware.configuration.mq_cafile)
+                    (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
+                    (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
+                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
                 ]
 
                 for fichier in fichiers:
