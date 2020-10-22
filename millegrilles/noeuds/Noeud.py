@@ -488,8 +488,11 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
                     nb_valeurs += 1
                     somme_valeurs += val_lecture
 
-            moyenne = round(somme_valeurs / nb_valeurs, 2)
-            app['avg'] = moyenne
+            try:
+                moyenne = round(somme_valeurs / nb_valeurs, 2)
+                app['avg'] = moyenne
+            except ZeroDivisionError:
+                app['avg'] = None
 
             # Sauvegarder la transaction
             timestamp = app['timestamp']
