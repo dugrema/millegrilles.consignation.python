@@ -402,6 +402,8 @@ class GatewayNoeud:
             for vpin in self.__vpins_read:
                 self.enregistrer_read(vpin)
 
+            self.enregistrer_write(20)
+
     def virtual_write(self, v_pin, val):
         self.__cache_valeurs[str(v_pin)] = val
         if self._blynk.connected():
@@ -420,6 +422,13 @@ class GatewayNoeud:
         def read_virtual_pin_handler(pin):
             valeur = self.__cache_valeurs[str(pin)]
             self._blynk.virtual_write(pin, valeur)
+
+    def enregistrer_write(self, v_pin):
+        blynk = self._blynk
+
+        @blynk.handle_event('write V' + str(v_pin))
+        def write_virtual_pin_handler(v_pin, value):
+            self.__logger.info("Virtual write sur pin %s: %s" % (v_pin, value))
 
     def set_property(self, v_pin, property_name, *val):
         self._blynk.set_property(v_pin, property_name, *val)
