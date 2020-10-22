@@ -204,11 +204,16 @@ class DemarreurNoeud(Daemon):
         # Charger la configuration et les DAOs
         self._logger.info("Setup modules")
         doit_connecter = not self._args.noconnect
-        self._contexte.initialiser(connecter=doit_connecter)
-        self._contexte.message_dao.register_channel_listener(self)
+        self._contexte.initialiser(init_message=doit_connecter)
+        
+        if doit_connecter:
+            self._contexte.message_dao.register_channel_listener(self)
 
-        self._producteur_transaction = ProducteurTransactionSenseursPassifs(
-            self._contexte, noeud_id=self._noeud_id, data_path=self._args.data)
+            self._producteur_transaction = ProducteurTransactionSenseursPassifs(
+                self._contexte, noeud_id=self._noeud_id, data_path=self._args.data)
+        else:
+            self._logger.info("Mode noconnect, les messages sont affiches dans le log uniquement")
+            self._producteur_transaction = ProducteurTransactionNoconnect(data_path=self._args.data)
 
         # Verifier les parametres
         self._intervalle_entretien = self._args.maint
@@ -478,8 +483,10 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
             somme_valeurs = 0.0
             nb_valeurs = 0
             for lecture in app['lectures']:
-                nb_valeurs += 1
-                somme_valeurs += lecture['valeur']
+                val_lecture = lecture.get('valeur')
+                if val_lecture is not None:
+                    nb_valeurs += 1
+                    somme_valeurs += val_lecture
 
             moyenne = round(somme_valeurs / nb_valeurs, 2)
             app['avg'] = moyenne
@@ -555,6 +562,18 @@ class ProducteurTransactionSenseursPassifs(GenerateurTransaction):
         os.write(self._fp_buffer, evenement)
 
         return enveloppe
+
+
+class ProducteurTransactionNoconnect(GenerateurTransaction):
+    
+    def __init__(self, data_path: str = None):
+        self.data_path = data_path
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+    
+    def transmettre_lecture_senseur(self, dict_lecture, version=6):
+        # Preparer le dictionnaire a transmettre pour la lecture
+        message = dict_lecture.copy()
+        self.__logger.warning("Lecture \n" + json.dumps(message, indent=2))
 
 
 # **** MAIN ****
