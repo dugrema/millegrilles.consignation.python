@@ -22,6 +22,22 @@ class GenerateurTransaction:
         self.__formatteur_message = FormatteurMessageMilleGrilles(self._contexte.idmg, self._contexte.signateur_transactions)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def get_liste_securite_downstream(self, securite: str) -> list:
+        """
+        Retourne la liste des exchanges sur lequel un message peut etre place en fonction
+        de son niveau de securite. Methode downstream, ou plus le niveau de securite est "bas", plus il est
+        place sur des exchanges differents (e.g. message protege reste sur protege, public va sur protege, prive et public)
+        :param securite: Niveau de securite de l'element
+        :return: List d'exchange permis pour le message
+        """
+        securite_liste = [Constantes.SECURITE_PROTEGE]
+        if securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
+            securite_liste.append(Constantes.SECURITE_PRIVE)
+        if securite == Constantes.SECURITE_PUBLIC:
+            securite_liste.append(Constantes.SECURITE_PUBLIC)
+
+        return securite_liste
+
     def preparer_enveloppe(self, message_dict, domaine=None, version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
                            idmg_destination: str = None, ajouter_certificats=False):
 
