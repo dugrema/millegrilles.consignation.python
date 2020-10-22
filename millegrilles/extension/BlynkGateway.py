@@ -3,6 +3,8 @@ Gateway entre Blynk et SenseursPassifs de MilleGrilles
 """
 import logging
 import json
+import datetime
+import pytz
 
 from blynklib import Blynk
 from threading import Thread, Event
@@ -23,6 +25,12 @@ class GatewayBlynk:
     Gestionnaire de gateway, supporte tous les noeuds prive configures pour Blynk
     """
 
+    COULEUR_BLYNK_GREEN = "#23C48E"
+    COULEUR_BLYNK_BLUE = "#04C0F8"
+    COULEUR_BLYNK_YELLOW = "#ED9D00"
+    COULEUR_BLYNK_RED = "#D3435C"
+    COULEUR_BLYNK_DARK_BLUE = "#5F7CD8"
+
     def __init__(self, contexte: ContexteRessourcesDocumentsMilleGrilles):
         self._contexte = contexte
 
@@ -37,6 +45,12 @@ class GatewayBlynk:
 
         self.__thread: Optional[Thread] = None
         self.__stop_event = Event()
+
+        self.__delai_jaune = datetime.timedelta(minutes=5)
+        self.__delai_rouge = datetime.timedelta(minutes=30)
+
+        self.__intervalle_entretien = datetime.timedelta(seconds=60)
+        self.__dernier_entretien = datetime.datetime.utcnow()
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -64,23 +78,25 @@ class GatewayBlynk:
         }
         senseurs_device = collection.find(filtre_senseurs)
         for doc_senseur in senseurs_device:
-            for type_senseur, senseur in doc_senseur['senseurs'].items():
-                vpin = senseur.get('blynk_vpin')
-                if vpin:
-                    # C'est un senseur associe a un vpin, on fait le mapping
-                    senseur_path = '/'.join([doc_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR], type_senseur])
-                    self.__logger.info("Blynk %s = vpin %d" % (senseur_path, vpin))
-                    self._senseur_devicevpin[senseur_path] = {'noeud_id': doc_senseur['noeud_id'], 'vpin': vpin}
+            senseurs = doc_senseur.get('senseurs')
+            if senseurs is not None:
+                for type_senseur, senseur in doc_senseur['senseurs'].items():
+                    vpin = senseur.get('blynk_vpin')
+                    if vpin:
+                        # C'est un senseur associe a un vpin, on fait le mapping
+                        senseur_path = '/'.join([doc_senseur[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR], type_senseur])
+                        self.__logger.info("Blynk %s = vpin %d" % (senseur_path, vpin))
+                        self._senseur_devicevpin[senseur_path] = {'noeud_id': doc_senseur['noeud_id'], 'vpin': vpin}
 
-                    noeud_id = doc_senseur[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
-                    blynk_device = self._blynk_devices.get(noeud_id)
-                    if blynk_device:
-                        blynk_device.enregistrer_read(vpin)
+                        noeud_id = doc_senseur[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+                        blynk_device = self._blynk_devices.get(noeud_id)
+                        if blynk_device:
+                            blynk_device.enregistrer_read(vpin)
 
-                        # Enregistrer derniere valeur dans le cache
-                        valeur = senseur.get('valeur')
-                        if valeur:
-                            blynk_device.virtual_write(vpin, valeur)
+                            # Enregistrer derniere valeur dans le cache
+                            valeur = senseur.get('valeur')
+                            if valeur:
+                                blynk_device.virtual_write(vpin, valeur)
 
         # Enregistrer MQ
         self._traitement_messages = TraitementMessages(self._contexte, self)
@@ -209,6 +225,15 @@ class GatewayBlynk:
                         blynk.run()
                     except Exception:
                         self.__logger.exception("Erreur blynk noeud_id: %s" % noeud_id)
+
+                    try:
+                        date_courante = datetime.datetime.utcnow()
+                        if self.__dernier_entretien + self.__intervalle_entretien < date_courante:
+                            self.__dernier_entretien = date_courante
+                            self.entretien_senseurs()
+                    except Exception as e:
+                        self.__logger.exception("Exception traitement entretien senseurs")
+
             else:
                 self.__stop_event.wait(5)
 
@@ -220,6 +245,27 @@ class GatewayBlynk:
 
         self.__logger.info("Fermeture Blynk gateway")
 
+    def entretien_senseurs(self):
+        date_courante = datetime.datetime.utcnow()
+
+        for cle, senseur_config in self._senseur_devicevpin.items():
+            noeud_id = senseur_config['noeud_id']
+            vpin = senseur_config['vpin']
+
+            blynk = self._blynk_devices.get(noeud_id)
+            derniere_ecriture = senseur_config.get('derniere_ecriture')
+
+            if blynk is not None and derniere_ecriture is not None:
+
+                if derniere_ecriture + self.__delai_rouge < date_courante:
+                    couleur = GatewayBlynk.COULEUR_BLYNK_RED
+                elif derniere_ecriture + self.__delai_jaune < date_courante:
+                    couleur = GatewayBlynk.COULEUR_BLYNK_YELLOW
+                else:
+                    couleur = GatewayBlynk.COULEUR_BLYNK_GREEN
+
+                blynk.set_property(vpin, 'color', couleur)
+
     def transmettre_lecture(self, uuid_senseur, type_senseur, valeur):
         cle = '/'.join([uuid_senseur, type_senseur])
         senseur_config = self._senseur_devicevpin.get(cle)
@@ -230,6 +276,14 @@ class GatewayBlynk:
             blynk = self._blynk_devices.get(noeud_id)
             if blynk:
                 blynk.virtual_write(vpin, valeur)
+                blynk.set_property(vpin, 'color', GatewayBlynk.COULEUR_BLYNK_GREEN)
+
+    def touch_senseur(self, uuid_senseur: str, type_senseur: str, date_activite: datetime.datetime = None):
+        cle = '/'.join([uuid_senseur, type_senseur])
+        senseur_config = self._senseur_devicevpin.get(cle)
+        if senseur_config:
+            # Conserver date de derniere ecriture - utilise pour alertes individuelles
+            senseur_config['derniere_ecriture'] = date_activite or datetime.datetime.utcnow()
 
     def maj_noeud(self, message_dict: dict):
         noeud_id = message_dict[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
@@ -367,6 +421,9 @@ class GatewayNoeud:
             valeur = self.__cache_valeurs[str(pin)]
             self._blynk.virtual_write(pin, valeur)
 
+    def set_property(self, v_pin, property_name, *val):
+        self._blynk.set_property(v_pin, property_name, *val)
+
     def run(self):
         self._blynk.run()
 
@@ -382,6 +439,8 @@ class TraitementMessages(BaseCallback):
     def __init__(self, contexte: ContexteRessourcesDocumentsMilleGrilles, gateway: GatewayBlynk):
         super().__init__(contexte)
         self._gateway = gateway
+
+        self.__timezone = pytz.timezone('America/Montreal')
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = json.loads(body.decode('utf-8'))
@@ -400,7 +459,28 @@ class TraitementMessages(BaseCallback):
         senseurs = message_dict.get('senseurs')
 
         if uuid_senseur and senseurs:
+
+            date_lecture_plusrecente = 0
             for type_senseur, senseur in senseurs.items():
+                date_lecture = senseur.get('timestamp')
+                date_lecture_plusrecente = max(date_lecture_plusrecente, date_lecture)
                 valeur = senseur.get('valeur')
                 if valeur:
                     self._gateway.transmettre_lecture(uuid_senseur, type_senseur, valeur)
+
+                if date_lecture is not None:
+                    self._gateway.touch_senseur(uuid_senseur, type_senseur, datetime.datetime.fromtimestamp(date_lecture))
+                else:
+                    self._gateway.touch_senseur(uuid_senseur, type_senseur)
+
+            try:
+                if date_lecture_plusrecente == 0:
+                    date_lecture_plusrecente = datetime.datetime.utcnow()
+
+                self._gateway.transmettre_lecture(uuid_senseur, 'derniere_lecture/epoch', date_lecture_plusrecente)
+
+                date_formattee = datetime.datetime.fromtimestamp(date_lecture_plusrecente, tz=self.__timezone).strftime('%Y/%m/%d %H:%M:%S')
+                self._gateway.transmettre_lecture(uuid_senseur, 'derniere_lecture/str', date_formattee)
+
+            except Exception as e:
+                self.__logger.info("Erreur traitement date senseur: " + str(e))

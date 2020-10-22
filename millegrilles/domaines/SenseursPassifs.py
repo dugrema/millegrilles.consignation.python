@@ -108,13 +108,25 @@ class TraitementMessageLecture(TraitementMessageDomaine):
             }
 
         # Verifier quels senseurs on met a jour
-        senseurs_actuels = doc_senseur['senseurs']
+        senseurs_actuels = doc_senseur.get('senseurs') or dict()
         set_ops = dict()
-        for cle, donnees in senseurs.items():
-            donnees_actuelles = senseurs_actuels.get(cle)
-            if donnees_actuelles is None or donnees_actuelles.get('timestamp') is None or donnees_actuelles['timestamp'] < donnees['timestamp']:
+        for nom_senseur, donnees in senseurs.items():
+            donnees_actuelles = senseurs_actuels.get(nom_senseur)
+            date_plus_recente = donnees['timestamp']
+            if donnees_actuelles is None or \
+                    donnees_actuelles.get('timestamp') is None or \
+                    donnees_actuelles['timestamp'] < donnees['timestamp']:
                 for key, value in donnees.items():
-                    set_ops['senseurs.' + cle + '.' + key] = value
+                    set_ops['senseurs.' + nom_senseur + '.' + key] = value
+
+            try:
+                set_ops['senseurs.derniere_lecture/epoch.valeur'] = date_plus_recente
+                set_ops['senseurs.derniere_lecture/epoch.type'] = 'epoch'
+                date_lecture = datetime.datetime.fromtimestamp(date_plus_recente)
+                set_ops['senseurs.derniere_lecture/str.valeur'] = date_lecture.strftime('%Y/%m/%d %H:%M:%S')
+                set_ops['senseurs.derniere_lecture/str.type'] = 'str'
+            except Exception as e:
+                self.__logger.warning("Erreur traitement date senseur: " + str(e))
 
         if len(set_ops.keys()) > 0:
             set_on_insert = {
@@ -672,7 +684,10 @@ class ProcessusMajSenseur(ProcessusSenseursPassifs):
         :param transaction:
         :return:
         """
-        noeud_id = transaction[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
+        noeud_id = transaction.get(SenseursPassifsConstantes.TRANSACTION_NOEUD_ID)
+        if noeud_id is None:
+            return  # Rien a faire, on ne sait pas a quel noeud la transaction appartient
+
         securite = transaction['securite']
         collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
 

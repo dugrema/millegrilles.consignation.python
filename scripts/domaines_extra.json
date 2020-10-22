@@ -1,8 +1,8 @@
 {
   "domaines": [
     {
-      "module": "millegrilles.domaines.GrosFichiers",
-      "classe": "GestionnaireGrosFichiers"
+      "module": "millegrilles.domaines.SenseursPassifs",
+      "classe": "GestionnaireSenseursPassifs"
     }
   ]
 }
