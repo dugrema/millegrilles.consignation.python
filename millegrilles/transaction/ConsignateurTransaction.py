@@ -843,6 +843,7 @@ class EntretienCollectionsDomaines(BaseCallback):
 
     def __traiter_presence_domaine(self, message_dict: dict, properties):
         domaine = message_dict['domaine']
+        exchanges = message_dict.get('exchanges_routing')
         info_domaine = self.__liste_domaines.get(domaine)
         if not info_domaine:
             # Ajouter routing key
@@ -853,6 +854,15 @@ class EntretienCollectionsDomaines(BaseCallback):
                 routing_key=routing,
                 callback=None
             )
+
+            if exchanges.get(Constantes.SECURITE_PRIVE) is not None:
+                # On a des messages sur l'exchange prive, on permet aussi les transactions a ce niveau
+                self.__channel.queue_bind(
+                    queue=Constantes.DEFAUT_QUEUE_NOUVELLES_TRANSACTIONS,
+                    exchange=Constantes.SECURITE_PRIVE,
+                    routing_key=routing,
+                    callback=None
+                )
 
             # Ajouter collection/indices
             self._setup_index_domaines(domaine)
