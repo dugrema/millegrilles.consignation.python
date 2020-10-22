@@ -177,7 +177,13 @@ class GatewayBlynk:
                 # Verifier si la configuration a changee
                 blynk_gateway.update_config(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile)
             else:
-                blynk_gateway = GatewayNoeud(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile)
+                # Creer callback pour operations write cote blynk
+                controleur = self
+
+                def callback_noeud(v_pin, value):
+                    controleur.callback_evenement_blynk(noeud_id, v_pin, value)
+
+                blynk_gateway = GatewayNoeud(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile, callback_noeud)
 
                 # Enregistrer vpins connus pour ce noeud
                 for senseur in self._senseur_devicevpin.values():
@@ -352,6 +358,24 @@ class GatewayBlynk:
             # Appliquer changements au mapping
             self._senseur_devicevpin = copie_devicemapping
 
+    def callback_evenement_blynk(self, uuid_noeud, v_pin, value):
+        self.__logger.info("Noeud %s virtual write sur pin %s: %s" % (uuid_noeud, v_pin, value))
+        evenement = {
+            'noeud_id': uuid_noeud,
+            'uuid_senseur': uuid_noeud + ':blynk',
+            'senseurs': {
+                'blynk/%d' % v_pin: {
+                    'valeur': value[0],
+                    'type': 'int',
+                    'timestamp': int(datetime.datetime.utcnow().timestamp()),
+                }
+            }
+        }
+        self._contexte.generateur_transactions.emettre_message(
+            evenement,
+            'evenement.' + Constantes.SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE
+        )
+
     @property
     def contexte(self):
         return self._contexte
@@ -362,12 +386,14 @@ class GatewayNoeud:
     Gateway et connexion pour un device Blynk associe a un noeud prive MilleGrille
     """
 
-    def __init__(self, auth_token: str, host: str, port: int, ca_file: str):
+    def __init__(self, auth_token: str, host: str, port: int, ca_file: str, callback_evenement):
         self.__auth_token = auth_token
 
         self.__host: Optional[str] = None
         self.__port: Optional[str] = None
         self.__ca_file: Optional[str] = None
+        self.__callback_evenement = callback_evenement  # Methode pour soumettre un evenement sur une VPIN
+
         self._blynk: Optional[Blynk] = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -424,11 +450,16 @@ class GatewayNoeud:
             self._blynk.virtual_write(pin, valeur)
 
     def enregistrer_write(self, v_pin):
+        """
+        Enregistre un event listener sur VPIN de blynk
+        :param v_pin:
+        :return:
+        """
         blynk = self._blynk
 
         @blynk.handle_event('write V' + str(v_pin))
         def write_virtual_pin_handler(v_pin, value):
-            self.__logger.info("Virtual write sur pin %s: %s" % (v_pin, value))
+            self.__callback_evenement(v_pin, value)
 
     def set_property(self, v_pin, property_name, *val):
         self._blynk.set_property(v_pin, property_name, *val)
