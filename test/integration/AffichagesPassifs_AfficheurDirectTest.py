@@ -1,4 +1,4 @@
-from mgdomaines.appareils.AffichagesPassifs import AfficheurDocumentMAJDirecte
+from mgdomaines.appareils.AffichagesPassifs import AfficheurDocumentMAJDirecte, AffichageAvecConfiguration
 from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRessourcesMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
 from bson import ObjectId
@@ -24,16 +24,54 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
         print("super.init")
         super().__init__(contexte, intervalle_secs=5)
 
-    def liste_senseurs(self):
-        return [2, 3, 17]
-
     def test(self):
         for document_id in self.get_documents():
             print("Document charge: %s" % str(self._documents[document_id]))
+        try:
+            print("Test debut")
+            test.start()
 
-    def test_deconnecter_reconnecter(self):
-        self.reconnecter()
-        self.reconnecter()
+            time.sleep(3600)  # Actif 1 heure
+
+            print("Test termine")
+        except Exception as e:
+            logger.exception("Erreur main: %s" % e)
+        finally:
+            self.fermer()
+
+
+class AffichageAvecConfigurationTest(AffichageAvecConfiguration):
+
+    def __init__(self):
+        contexte = ContexteRessourcesMilleGrilles()
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.__logger.info("contexte.initialiser()")
+        contexte.initialiser()
+
+        self.__logger.info("ioloop MQ")
+        self.thread_ioloop = Thread(name="MQ-ioloop", target=contexte.message_dao.run_ioloop)
+        self.thread_ioloop.start()
+
+        self.__logger.info("super.init")
+        super().__init__(contexte, intervalle_secs=5)
+
+    def maj_affichage(self, lignes_affichage):
+        super().maj_affichage(lignes_affichage)
+        for ligne in lignes_affichage:
+            print("LIGNE : '%s' (backlight:%s)" % (ligne, self._affichage_actif))
+
+    def test(self):
+        try:
+            self.__logger.info("Test debut")
+            test.start()
+            time.sleep(3600)  # Actif 1 heure
+            self.__logger.info("Test termine")
+        except Exception as e:
+            logger.exception("Erreur main")
+        finally:
+            self.fermer()
 
 
 # Demarrer test
@@ -43,20 +81,10 @@ logging.getLogger('mgdomaines.appareils').setLevel(logging.DEBUG)
 
 logger = logging.getLogger('__main__')
 
-test = AfficheurDocumentMAJDirecteTest()
-try:
-    print("Test debut")
-    test.start()
-    # test.test_deconnecter_reconnecter()
+# Test simple
+#test = AfficheurDocumentMAJDirecteTest()
+#test.test()
 
-    time.sleep(3600)  # Actif 1 heure
-
-    # for i in range(0, 30):
-    #     test.test()
-    #     time.sleep(1)
-
-    print("Test termine")
-except Exception as e:
-    logger.exception("Erreur main: %s" % e)
-finally:
-    test.fermer()
+# Test avec affichage simule dans log, thread
+test = AffichageAvecConfigurationTest()
+test.test()

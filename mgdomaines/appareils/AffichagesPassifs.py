@@ -33,7 +33,7 @@ class DocumentCallback(BaseCallback):
         self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, message_json))
 
         # Determiner type de message
-        if correlation_id == 'affichage_lcd':
+        if correlation_id == 'affichage_lcd' or action == 'majNoeudConfirmee':
             self.__logger.debug("Recu configuration LCD : %s", message_json)
             self.afficheur.maj_configuration(message_json)
         elif action in ['lecture', 'lectureConfirmee']:
@@ -102,6 +102,7 @@ class AfficheurDocumentMAJDirecte:
         routing_keys = [
             'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
             'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE_CONFIRMEE,
+            'evenement.' + SenseursPassifsConstantes.EVENEMENT_MAJ_NOEUD_CONFIRMEE,
         ]
         exchanges = [self._contexte.configuration.exchange_defaut]
         if exchanges[0] == Constantes.SECURITE_PROTEGE:
@@ -168,6 +169,25 @@ class AfficheurDocumentMAJDirecte:
             # Conserver app individuellement - les messages peuvent etre transmis separement pour un meme senseur
             for app_cle, valeur in senseurs.items():
                 senseurs_existants[app_cle] = valeur
+        else:
+            for app_cle, valeur in senseurs.items():
+                cle_split = app_cle.split('/')
+                if cle_split[0] == 'blynk':
+                    # C'est un bouton blynk, voir si on peut mapper l'action
+                    appareil = cle_split[-1]  # appareil = vpin
+                    self.traiter_action(appareil, valeur)
+
+    def traiter_action(self, appareil: str, valeur: dict):
+        if self._configuration_affichage_lcd.get('lcd_vpin_onoff') == appareil:
+            self.toggle_lcd_onoff(valeur['valeur'])
+        elif self._configuration_affichage_lcd.get('lcd_vpin_navigation') == appareil:
+            self.lcd_navigation(valeur['valeur'])
+
+    def toggle_lcd_onoff(self, valeur: str):
+        raise NotImplemented()
+
+    def lcd_navigation(self, valeur: str):
+        raise NotImplemented()
 
     def maj_configuration(self, configuration: dict):
         self._configuration_affichage_lcd = configuration
@@ -198,6 +218,159 @@ class AfficheurDocumentMAJDirecte:
     @property
     def contexte(self):
         return self._contexte
+
+
+class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
+
+    def __init__(self, contexte, noeud_id: str = None, timezone_horloge: str = None, intervalle_secs=30):
+        super().__init__(contexte, noeud_id, timezone_horloge, intervalle_secs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self._thread_affichage: Optional[Thread] = None
+        self._thread_horloge: Optional[Thread] = None
+        self._horloge_event = Event()  # Evenement pour synchroniser l'heure
+        self._lignes_ecran: Optional[list] = None  # Affichage actuel de l'ecran
+        self._affichage_actif = True
+
+    def start(self):
+        super().start()  # Demarre thread de lecture de documents
+        self._thread_horloge = Thread(target=self.set_horloge_event)
+        self._thread_horloge.start()
+
+        # Thread.start
+        self._thread_affichage = Thread(target=self.run_affichage)
+        self._thread_affichage.start()
+        logging.info("AfficheurDocumentMAJDirecte: thread demarree")
+
+    def set_horloge_event(self):
+        while not self._stop_event.is_set():
+            # logging.debug("Tick")
+            self._horloge_event.set()
+            self._stop_event.wait(1)
+
+    def maj_affichage(self, lignes_affichage):
+        self._lignes_ecran = lignes_affichage
+
+    def run_affichage(self):
+
+        while not self._stop_event.is_set():  # Utilise _stop_event de la superclasse pour synchroniser l'arret
+
+            try:
+                self._compteur_cycle += 1
+                if self._compteur_cycle > self._cycles_entre_rafraichissements:
+                    self._compteur_cycle = 0  # Reset compteur de cycles
+                    self.charger_documents()  # On recharge les documents
+
+                self.executer_affichage()
+
+                # Afficher heure et date pendant 5 secondes
+                self.afficher_heure()
+
+            except ConfigurationPasRecue:
+                self.__logger.warning("La configuration LCD n'est pas encore recue, on attend pour demarrer l'affichage")
+                self._stop_event.wait(5)
+            except Exception as e:
+                self.__logger.exception("Erreur durant affichage")
+
+                # Throttling
+                self._stop_event.wait(5)
+
+    def executer_affichage(self):
+        if not self._stop_event.is_set():
+            lignes = self.generer_lignes()
+            lignes.reverse()  # On utilise pop(), premieres lectures vont a la fin
+
+            while len(lignes) > 0:
+                lignes_affichage = [lignes.pop()]
+                if len(lignes) > 0:
+                    lignes_affichage.append(lignes.pop())
+
+                # Remplacer contenu ecran
+                self.maj_affichage(lignes_affichage)
+
+                logging.debug("Affichage: %s" % lignes_affichage)
+                self._stop_event.wait(5)
+
+    def afficher_heure(self):
+        nb_secs = 5
+        self._horloge_event.clear()
+        while not self._stop_event.is_set() and nb_secs > 0:
+            self._horloge_event.wait(1)
+            nb_secs -= 1
+
+            # Prendre heure courante, formatter
+            now = datetime.datetime.utcnow().astimezone(pytz.UTC)  # Set date a UTC
+            if self._timezone_horloge is not None:
+                now = now.astimezone(self._timezone_horloge)  # Converti vers timezone demande
+            datestring = now.strftime('%Y-%m-%d')
+            timestring = now.strftime('%H:%M:%S')
+
+            lignes_affichage = [datestring, timestring]
+            logging.debug("Horloge: %s" % str(lignes_affichage))
+            self.maj_affichage(lignes_affichage)
+
+            # Attendre 1 seconde
+            self._horloge_event.clear()
+            self._horloge_event.wait(1)
+
+    def generer_lignes(self) -> list:
+        """
+        Genere toutes les lignes de donnees en utilisant le formattage demande
+        :return:
+        """
+        lignes = []
+
+        try:
+            noeud_id = self._configuration_affichage_lcd['noeud_id']
+            formattage = self._configuration_affichage_lcd['lcd_affichage']
+
+        except (TypeError, KeyError):
+            raise ConfigurationPasRecue('lcd_affichage')
+
+        for ligne in formattage:
+            self.__logger.debug("Formatter ligne %s" % str(ligne))
+            lignes.append(self.formatter_ligne(noeud_id, ligne))
+
+        return lignes
+
+    def formatter_ligne(self, noeud_id: str, formattage: dict):
+        format = formattage['affichage']
+
+        uuid_senseur = formattage.get('uuid')
+        cle_senseur = noeud_id + '/' + uuid_senseur
+
+        cle_appareil = formattage.get('appareil')
+
+        # Si on a un senseur/cle, on va chercher la valeur dans le cache de documents
+        if uuid_senseur is not None and uuid_senseur != '' and \
+                cle_appareil is not None and cle_appareil != '':
+
+            try:
+                doc_senseur = self._documents[cle_senseur]
+                doc_appareil = doc_senseur['senseurs'][cle_appareil]
+                valeur = doc_appareil['valeur']
+            except KeyError:
+                # Noeud/senseur/appareil inconnu
+                self.__logger.warning("Noeud %s, senseur %s, appareil %s inconnu" % (noeud_id, uuid_senseur, cle_appareil))
+                return 'N/A'
+
+            try:
+                return format.format(valeur,)
+            except KeyError:
+                return '!' + format
+
+        else:
+            # Formattage libre avec valeurs systeme
+            return format
+
+    def toggle_lcd_onoff(self, valeur: str):
+        if valeur == '1':
+            self._affichage_actif = True
+        else:
+            self._affichage_actif = False
+
+    def lcd_navigation(self, valeur: str):
+        raise NotImplemented()
 
 
 # Classe qui charge des senseurs pour afficher temperature, humidite, pression/tendance
@@ -373,3 +546,6 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
         return lignes
 
 
+class ConfigurationPasRecue(Exception):
+    """ La configuration n'a pas encore ete recue """
+    pass

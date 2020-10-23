@@ -1296,6 +1296,7 @@ class SenseursPassifsConstantes:
     EVENEMENT_DOMAINE_LECTURE_CONFIRMEE = '%s.lectureConfirmee' % DOMAINE_NOM
 
     EVENEMENT_MAJ_SENSEUR_CONFIRMEE = '%s.majSenseurConfirmee' % DOMAINE_NOM
+    EVENEMENT_MAJ_NOEUD_CONFIRMEE = '%s.majNoeudConfirmee' % DOMAINE_NOM
 
     EVENEMENT_MAJ_HORAIRE = '%s.MAJHoraire' % DOMAINE_NOM
     EVENEMENT_MAJ_QUOTIDIENNE = '%s.MAJQuotidienne' % DOMAINE_NOM

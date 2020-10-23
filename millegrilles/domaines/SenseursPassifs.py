@@ -737,11 +737,28 @@ class ProcessusMajNoeud(ProcessusSenseursPassifs):
         }
 
         collection_transactions = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
-        resultat_update = collection_transactions.update_one(filtre, ops, upsert=True)
+        document_noeud = collection_transactions.find_one_and_update(filtre, ops, upsert=True)
 
-        if resultat_update.upserted_id is None and resultat_update.matched_count == 0:
+        if document_noeud is None:
             raise Exception("Erreur mise a jour document noeud id %s" % noeud_id)
+
+        self.relayer_evenement(document_noeud['securite'], transaction_filtree)
 
         # self.set_etape_suivante(ProcessusMajManuelle.modifier_noeud.__name__)  # Mettre a jour le noeud
         self.set_etape_suivante()  # Termine
 
+    def relayer_evenement(self, securite, transaction):
+        """
+        Relai l'evenement de lecture vers les bus appropries. Indique que l'evenement a ete trait (confirme)
+        :param securite:
+        :param transaction:
+        :return:
+        """
+
+        liste_securite = [Constantes.SECURITE_PROTEGE]
+        if securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
+            liste_securite.append(Constantes.SECURITE_PRIVE)
+
+        routing_key_relai = 'evenement.' + SenseursPassifsConstantes.EVENEMENT_MAJ_NOEUD_CONFIRMEE
+
+        self.generateur_transactions.emettre_message(transaction, routing_key_relai, liste_securite)

@@ -185,7 +185,18 @@ class GatewayBlynk:
 
                 blynk_gateway = GatewayNoeud(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile, callback_noeud)
 
-                # Enregistrer vpins connus pour ce noeud
+                # Enregistrer vpins connus pour ce noeud en write mode
+                lcd_vpin_navigation = noeud_doc.get('lcd_vpin_navigation')
+                if lcd_vpin_navigation is not None:
+                    self.__logger.info("Enregistrer vpin %d pour navigation LCD")
+                    blynk_gateway.enregistrer_write(lcd_vpin_navigation)
+
+                lcd_vpin_onoff = noeud_doc.get('lcd_vpin_onoff')
+                if lcd_vpin_onoff is not None:
+                    self.__logger.info("Enregistrer vpin %d pour LCD on/off (backlight)")
+                    blynk_gateway.enregistrer_write(lcd_vpin_onoff)
+
+                # Enregistrer vpins connus pour ce noeud en read mode
                 for senseur in self._senseur_devicevpin.values():
                     noeud_id_senseur = senseur['noeud_id']
                     if noeud_id_senseur == noeud_id:
