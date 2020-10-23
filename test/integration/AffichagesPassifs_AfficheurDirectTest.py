@@ -3,7 +3,11 @@ from millegrilles.dao.Configuration import TransactionConfiguration, ContexteRes
 from millegrilles.dao.DocumentDAO import MongoDAO
 from bson import ObjectId
 import time
+import logging
+
 from threading import Thread
+
+from millegrilles.Constantes import SenseursPassifsConstantes
 
 
 class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
@@ -12,7 +16,7 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
         contexte = ContexteRessourcesMilleGrilles()
 
         print("contexte.initialiser()")
-        contexte.initialiser(init_document=False)
+        contexte.initialiser()
         print("ioloop MQ")
         self.thread_ioloop = Thread(name="MQ-ioloop", target=contexte.message_dao.run_ioloop)
         self.thread_ioloop.start()
@@ -22,15 +26,6 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
 
     def liste_senseurs(self):
         return [2, 3, 17]
-
-    def get_filtre(self):
-        filtre = {
-            "_mg-libelle": "senseur.individuel",
-            "senseur": {
-                "$in": [int(senseur) for senseur in self.liste_senseurs()]
-            }
-        }
-        return filtre
 
     def test(self):
         for document_id in self.get_documents():
@@ -42,6 +37,11 @@ class AfficheurDocumentMAJDirecteTest(AfficheurDocumentMAJDirecte):
 
 
 # Demarrer test
+logging.basicConfig(level=logging.WARNING)
+logging.getLogger('millegrilles').setLevel(logging.INFO)
+logging.getLogger('mgdomaines.appareils').setLevel(logging.DEBUG)
+
+logger = logging.getLogger('__main__')
 
 test = AfficheurDocumentMAJDirecteTest()
 try:
@@ -49,12 +49,14 @@ try:
     test.start()
     # test.test_deconnecter_reconnecter()
 
-    for i in range(0, 30):
-        test.test()
-        time.sleep(1)
+    time.sleep(3600)  # Actif 1 heure
+
+    # for i in range(0, 30):
+    #     test.test()
+    #     time.sleep(1)
 
     print("Test termine")
 except Exception as e:
-    print("Erreur main: %s" % e)
+    logger.exception("Erreur main: %s" % e)
 finally:
     test.fermer()

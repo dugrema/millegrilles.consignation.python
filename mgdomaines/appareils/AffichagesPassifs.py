@@ -4,8 +4,12 @@ import datetime
 import logging
 import time
 import pytz
-from threading import Thread, Event
+import json
 
+from threading import Thread, Event
+from typing import Optional
+
+from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.dao.MessageDAO import BaseCallback
 
@@ -15,50 +19,47 @@ class DocumentCallback(BaseCallback):
     Sauvegarde le document recu s'il fait parti de la liste.
     """
 
-    def __init__(self, contexte, documents, liste_ids):
+    def __init__(self, contexte, afficheur):
         super().__init__(contexte)
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-        self.documents = documents
-        self.liste_ids = liste_ids
+        self.afficheur = afficheur
 
     def traiter_message(self, ch, method, properties, body):
         message_json = self.decoder_message_json(body)
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+        correlation_id = properties.correlation_id
 
-        self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, str(message_json)))
+        self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, message_json))
 
         # Determiner type de message
-        documents = list()
-        if routing_key.startswith('noeuds.source.millegrilles_domaines_SenseursPassifs.documents'):
+        if correlation_id == 'affichage_lcd':
+            self.__logger.debug("Recu configuration LCD : %s", message_json)
+            self.afficheur.maj_configuration(message_json)
+        elif action in ['lecture', 'lectureConfirmee']:
             # Probablement une mise a jour d'un document existant
-            documents = [message_json]
-            document_keys = self.documents.keys()
-            for document in documents:
-                doc_id = document.get("_id")
-                if doc_id in document_keys:
-                    self.__logger.debug("Accepte document _id:%s" % doc_id)
-                    self.documents[doc_id] = document
-        elif properties.correlation_id == 'etat_senseurs_initial':
-            self.__logger.info("Recu message d'etat des senseurs initial")
-            self.__logger.debug("%s" % str(message_json))
-            for reponse in message_json.get('resultats'):
-                for document in reponse:
-                    documents.append(document)
-                    self.documents[document.get('_id')] = document
+            noeud_id = message_json['noeud_id']
+            uuid_senseur = message_json['uuid_senseur']
+            senseurs = message_json['senseurs']
+            self.afficheur.traiter_lecture(noeud_id, uuid_senseur, senseurs)
 
 
 # Affichage qui se connecte a un ou plusieurs documents et recoit les changements live
 class AfficheurDocumentMAJDirecte:
 
     # :params intervalle_secs: Intervalle (secondes) entre rafraichissements si watch ne fonctionne pas.
-    def __init__(self, contexte, timezone_horloge: str = None, intervalle_secs=30):
+    def __init__(self, contexte, noeud_id: str = None, timezone_horloge: str = None, intervalle_secs=30):
         self._contexte = contexte
-        self._documents = dict()
+        self._noeud_id = noeud_id or self._contexte.configuration.noeud_id
+        self._documents = dict()  # Cache de documents utilise pour l'affichage
         self._intervalle_secs = intervalle_secs
         self._intervalle_erreurs_secs = 60  # Intervalle lors d'erreurs
         self._cycles_entre_rafraichissements = 20  # 20 Cycles
         self._age_donnee_expiree = 300  # Secondes pour considerer une lecture comme expiree (stale)
         self._stop_event = Event()  # Evenement qui indique qu'on arrete la thread
+
+        self._configuration_affichage_lcd: Optional[dict] = None
+        self._cles_senseurs_supportes = None
 
         # self._collection = None
         # self._curseur_changements = None  # Si None, on fonctionne par timer
@@ -77,11 +78,14 @@ class AfficheurDocumentMAJDirecte:
         if timezone_horloge is not None:
             self._timezone_horloge = pytz.timezone(timezone_horloge)
 
+        self._actif = False
+
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
     def start(self):
         # Enregistrer callback
-        self.traitement_callback = DocumentCallback(self._contexte, self._documents, self.get_filtre())
+        self._actif = True
+        self.traitement_callback = DocumentCallback(self._contexte, self)
         self.contexte.message_dao.register_channel_listener(self)   # Callback sur on_channel_open avec le channel
 
     def on_channel_open(self, channel):
@@ -94,25 +98,37 @@ class AfficheurDocumentMAJDirecte:
         nom_queue = queue.method.queue
         self._queue_reponse = nom_queue
         self.__logger.info("Resultat creation queue: %s" % nom_queue)
-        routing_key = "%s.#" % SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS
-        self.channel.queue_bind(queue=nom_queue, exchange=self._contexte.configuration.exchange_noeuds, routing_key=routing_key, callback=None)
+
+        routing_keys = [
+            'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
+            'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE_CONFIRMEE,
+        ]
+        exchanges = [self._contexte.configuration.exchange_defaut]
+        if exchanges[0] == Constantes.SECURITE_PROTEGE:
+            exchanges.append(Constantes.SECURITE_PRIVE)
+
+        for rk in routing_keys:
+            for exchange in exchanges:
+                self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=rk, callback=None)
+
         tag_queue = self.channel.basic_consume(self.traitement_callback.callbackAvecAck, queue=nom_queue, no_ack=False)
-        self.__logger.debug("Tag queue: %s" % tag_queue)
+        self.__logger.debug("Queue %s, tag queue: %s" % (queue.method.queue, tag_queue))
 
         self.initialiser_documents()
 
-    def reconnecter(self):
-        self.contexte.message_dao.deconnecter()
-        self._stop_event.set()
-        time.sleep(0.5)
-        self._stop_event.clear()
-        self._stop_event.wait(10)  # Attendre 10 secondes et ressayer du debut
-        self.contexte.message_dao.connecter()
-        self.start()
+    # def reconnecter(self):
+    #     self.contexte.message_dao.deconnecter()
+    #     self._stop_event.set()
+    #     time.sleep(0.5)
+    #     self._stop_event.clear()
+    #     self._stop_event.wait(10)  # Attendre 10 secondes et ressayer du debut
+    #     self.contexte.message_dao.connecter()
+    #     self.start()
 
     def fermer(self):
+        self._actif = False
         self._stop_event.set()
-        self._contexte.message_dao.deconnecter()
+        # self._contexte.message_dao.deconnecter()
 
     def get_filtre(self):
         raise NotImplemented('Doit etre implementee dans la sous-classe')
@@ -122,19 +138,59 @@ class AfficheurDocumentMAJDirecte:
 
     def charger_documents(self):
         # Charger la version la plus recente de chaque document
-        requete = {'requetes': [{
-            'type': 'mongodb',
-            "filtre": self.get_filtre()
-        }]}
+        requete = {'noeud_id': self._noeud_id}
 
         try:
             self._contexte.generateur_transactions.transmettre_requete(
                 requete,
-                'millegrilles.domaines.SenseursPassifs',
-                'etat_senseurs_initial',
-                self._queue_reponse)
+                'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD,
+                'affichage_lcd',
+                self._queue_reponse
+            )
         except Exception as e:
             self.__logger.exception("Erreur transmission requete documents", e)
+
+    def traiter_lecture(self, noeud_id: str, uuid_senseur: str, senseurs: dict):
+        cle_senseur = noeud_id + '/' + uuid_senseur
+        if cle_senseur in self._cles_senseurs_supportes:
+            try:
+                doc_noeud = self._documents[cle_senseur]
+            except KeyError:
+                doc_noeud = dict()
+                self._documents[cle_senseur] = doc_noeud
+
+            try:
+                senseurs_existants = doc_noeud['senseurs']
+            except KeyError:
+                senseurs_existants = dict()
+                doc_noeud['senseurs'] = senseurs_existants
+
+            # Conserver app individuellement - les messages peuvent etre transmis separement pour un meme senseur
+            for app_cle, valeur in senseurs.items():
+                senseurs_existants[app_cle] = valeur
+
+    def maj_configuration(self, configuration: dict):
+        self._configuration_affichage_lcd = configuration
+
+        actif = configuration.get('lcd_actif')
+        if actif is True:
+            self.__logger.debug("Recu nouvelle configuration avec lcd_actif is True, on s'assure que la thread est active")
+        elif actif is False:
+            self.__logger.debug("Recu nouvelle configuration avec lcd_actif is False, on ferme la thread")
+
+        noeud_id = configuration['noeud_id']
+
+        # Formatter l'affichage, compiler valeurs a ecouter/conserver
+        cles_senseurs_supportes = set()
+
+        lcd_affichage = configuration.get('lcd_affichage')
+        if lcd_affichage is not None:
+            for ligne in lcd_affichage:
+                uuid_senseur = ligne['uuid']
+                if uuid_senseur is not None and uuid_senseur != '':
+                    cles_senseurs_supportes.add(noeud_id + '/' + uuid_senseur)
+
+        self._cles_senseurs_supportes = list(cles_senseurs_supportes)
 
     def get_documents(self):
         return self._documents
@@ -156,8 +212,8 @@ class AfficheurSenseurPassifTemperatureHumiditePression(AfficheurDocumentMAJDire
     ligne_tph_format = "{location:<%d} {temperature}/{humidite}" % taille_titre_tph
     ligne_pression_format = "{titre:<%d} {pression:5.1f}kPa{tendance}" % taille_titre_press
 
-    def __init__(self, contexte, timezone_horloge: str = 'America/Toronto', senseur_ids: list = None, intervalle_secs=30):
-        super().__init__(contexte, timezone_horloge, intervalle_secs)
+    def __init__(self, contexte, noeud_id: str = None, timezone_horloge: str = 'America/Toronto', senseur_ids: list = None, intervalle_secs=30):
+        super().__init__(contexte, noeud_id, timezone_horloge, intervalle_secs)
         self._senseur_ids = senseur_ids
         self._thread_affichage = None
         self._thread_horloge = None

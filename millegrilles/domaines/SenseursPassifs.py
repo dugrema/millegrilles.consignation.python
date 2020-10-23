@@ -8,10 +8,9 @@ from typing import Optional
 from millegrilles import Constantes
 from millegrilles.Constantes import SenseursPassifsConstantes
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, TraitementRequetesProtegees
-from millegrilles.Domaines import ExchangeRouter, TraitementCommandesSecures
+from millegrilles.Domaines import TraitementCommandesSecures
 from millegrilles.MGProcessus import MGProcessusTransaction
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
-from millegrilles.transaction.GenerateurTransaction import TransactionOperations
 from bson.objectid import ObjectId
 
 
@@ -24,6 +23,8 @@ class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete
             reponse = {'resultats': self.gestionnaire.get_liste_noeuds()}
         elif routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
             reponse = self.gestionnaire.get_vitrine_dashboard()
+        elif routing_key == 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD:
+            reponse = self.gestionnaire.get_affichage_lcd_noeud(message_dict)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
@@ -41,6 +42,8 @@ class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_liste_senseurs_noeud(message_dict)}
         elif routing_key == 'requete.' + SenseursPassifsConstantes.REQUETE_VITRINE_DASHBOARD:
             reponse = self.gestionnaire.get_vitrine_dashboard()
+        elif routing_key == 'requete.SenseursPassifs.' + SenseursPassifsConstantes.REQUETE_AFFICHAGE_LCD_NOEUD:
+            reponse = self.gestionnaire.get_affichage_lcd_noeud(message_dict)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
             return
@@ -178,24 +181,6 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         self.gestionnaire.generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
 
-class SenseursPassifsExchangeRouter(ExchangeRouter):
-
-    def determiner_exchanges(self, document):
-        """
-        :return: Liste des echanges sur lesquels le document doit etre soumis
-        """
-        exchanges = set()
-        mg_libelle = document.get(Constantes.DOCUMENT_INFODOC_LIBELLE)
-        if mg_libelle in [SenseursPassifsConstantes.LIBVAL_VITRINE_DASHBOARD, SenseursPassifsConstantes.LIBVAL_DOCUMENT_SENSEUR]:
-            exchanges.add(self._exchange_public)
-            # exchanges.add(self._exchange_prive)
-            # exchanges.add(self._exchange_protege)
-        else:
-            exchanges.add(self._exchange_protege)
-
-        return list(exchanges)
-
-
 # Gestionnaire pour le domaine millegrilles.domaines.SenseursPassifs.
 class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
@@ -294,10 +279,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         if self.__gateway_blynk:
             self.__gateway_blynk.start()
 
-        # self.demarrer_watcher_collection(
-        #     SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM, SenseursPassifsConstantes.QUEUE_ROUTING_CHANGEMENTS,
-        #     SenseursPassifsExchangeRouter(self._contexte))
-
     def arreter(self):
         super().arreter()
         if self.__gateway_blynk:
@@ -382,6 +363,20 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         })
         return document_dashboard
 
+    def get_affichage_lcd_noeud(self, params: dict):
+        """
+        :return: Le document dashboard de vitrine
+        """
+        noeud_id = params['noeud_id']
+
+        collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
+        config_lcd_noeud = collection.find_one({
+            Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD,
+            'noeud_id': noeud_id,
+        })
+
+        return config_lcd_noeud
+
     def get_liste_noeuds(self):
         """
         :return: Le document dashboard de vitrine
@@ -396,7 +391,8 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE: 1,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
             'descriptif': 1,
-            'blynk_auth': 1, 'blynk_host': 1, 'blynk_port': 1,
+            'blynk_auth': 1, 'blynk_host': 1, 'blynk_port': 1, 'blynk_actif': 1,
+            'lcd_actif': 1, 'lcd_vpin_onoff': 1, 'lcd_vpin_navigation': 1, 'lcd_affichage': 1,
         }
 
         noeuds = list()

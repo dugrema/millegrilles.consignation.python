@@ -1263,7 +1263,7 @@ class SenseursPassifsConstantes:
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
     QUEUE_INTER_NOM = '%s.inter' % DOMAINE_NOM
-    QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
+    # QUEUE_ROUTING_CHANGEMENTS = 'noeuds.source.millegrilles_domaines_SenseursPassifs.documents'
 
     LIBVAL_DOCUMENT_SENSEUR = 'senseur'
     LIBVAL_DOCUMENT_NOEUD = 'noeud'
@@ -1286,6 +1286,7 @@ class SenseursPassifsConstantes:
     REQUETE_VITRINE_DASHBOARD = '%s.dashboard' % DOMAINE_NOM
     REQUETE_LISTE_NOEUDS = 'listeNoeuds'
     REQUETE_LISTE_SENSEURS_NOEUD = 'listeSenseursPourNoeud'
+    REQUETE_AFFICHAGE_LCD_NOEUD = 'affichageLcdNoeud'
 
     COMMANDE_RAPPORT_HEBDOMADAIRE = '%s.rapportHebdomadaire' % DOMAINE_NOM
     COMMANDE_RAPPORT_ANNUEL = '%s.rapportAnnuel' % DOMAINE_NOM
