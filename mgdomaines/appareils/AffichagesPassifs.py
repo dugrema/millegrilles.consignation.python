@@ -30,7 +30,15 @@ class DocumentCallback(BaseCallback):
         action = routing_key.split('.')[-1]
         correlation_id = properties.correlation_id
 
-        self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, message_json))
+        # De-dupe, ignorer message
+        uuid_message = message_json[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        if uuid_message != self.afficheur.dernier_evenement_uuid:
+            self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, message_json))
+            self.afficheur.dernier_evenement_uuid = message_json[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        else:
+            self.__logger.debug("Message duplique recu, on l'ignore : %s" % uuid_message)
 
         # Determiner type de message
         if correlation_id == 'affichage_lcd' or action == 'majNoeudConfirmee':
@@ -74,6 +82,7 @@ class AfficheurDocumentMAJDirecte:
         self._queue_reponse = None
 
         self.traitement_callback = None
+        self.dernier_evenement_uuid = None
 
         if timezone_horloge is not None:
             self._timezone_horloge = pytz.timezone(timezone_horloge)
@@ -232,6 +241,8 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
         self._lignes_ecran: Optional[list] = None  # Affichage actuel de l'ecran
         self._affichage_actif = True
 
+        self._user_event = Event()
+
     def start(self):
         super().start()  # Demarre thread de lecture de documents
         self._thread_horloge = Thread(target=self.set_horloge_event)
@@ -241,6 +252,10 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
         self._thread_affichage = Thread(target=self.run_affichage)
         self._thread_affichage.start()
         logging.info("AfficheurDocumentMAJDirecte: thread demarree")
+
+    def fermer(self):
+        super().fermer()
+        self._user_event.set()
 
     def set_horloge_event(self):
         while not self._stop_event.is_set():
@@ -268,12 +283,12 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
 
             except ConfigurationPasRecue:
                 self.__logger.warning("La configuration LCD n'est pas encore recue, on attend pour demarrer l'affichage")
-                self._stop_event.wait(5)
+                self._user_event.wait(5)
             except Exception as e:
                 self.__logger.exception("Erreur durant affichage")
 
                 # Throttling
-                self._stop_event.wait(5)
+                self._user_event.wait(5)
 
     def executer_affichage(self):
         if not self._stop_event.is_set():
@@ -289,13 +304,17 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
                 self.maj_affichage(lignes_affichage)
 
                 logging.debug("Affichage: %s" % lignes_affichage)
-                self._stop_event.wait(5)
+                self._user_event.clear()
+                self._user_event.wait(5)
 
     def afficher_heure(self):
         nb_secs = 5
         self._horloge_event.clear()
         while not self._stop_event.is_set() and nb_secs > 0:
-            self._horloge_event.wait(1)
+            if self._user_event.is_set():
+                # Sortir de la boucle horloge
+                break
+
             nb_secs -= 1
 
             # Prendre heure courante, formatter
@@ -370,7 +389,13 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
             self._affichage_actif = False
 
     def lcd_navigation(self, valeur: str):
-        raise NotImplemented()
+        if valeur == '1':  # Next
+            self._user_event.set()
+            self._horloge_event.set()
+        elif valeur == '0':  # Precedent
+            pass
+        elif valeur == '2':  # Refresh from top
+            pass
 
 
 # Classe qui charge des senseurs pour afficher temperature, humidite, pression/tendance
