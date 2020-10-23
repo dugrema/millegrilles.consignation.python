@@ -692,6 +692,10 @@ class ServiceMonitor:
     def path_secrets(self):
         return self._args.secrets
 
+    @property
+    def is_dev_mode(self):
+        return self._args.dev
+
 
 class ServiceMonitorPrincipal(ServiceMonitor):
     """

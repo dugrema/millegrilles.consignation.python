@@ -37,8 +37,9 @@ class GestionnaireWeb:
             self.__prochain_entretien = now + self.__intervalle_entretien
 
             try:
-                # S'assurer d'utiliser les certificats les plus recents avec NGINX
-                self.redeployer_nginx()
+                if not self.__service_monitor.is_dev_mode:
+                    # S'assurer d'utiliser les certificats les plus recents avec NGINX
+                    self.redeployer_nginx()
 
             except IndexError:
                 self.__logger.info("entretien web : NGINX n'est pas demarre")

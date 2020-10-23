@@ -396,7 +396,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE: 1,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
             'descriptif': 1,
-            'blynk_auth':1, 'blynk_host': 1, 'blynk_port': 1,
+            'blynk_auth': 1, 'blynk_host': 1, 'blynk_port': 1,
         }
 
         noeuds = list()
