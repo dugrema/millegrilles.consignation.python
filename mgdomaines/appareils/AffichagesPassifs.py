@@ -245,11 +245,11 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
 
     def start(self):
         super().start()  # Demarre thread de lecture de documents
-        self._thread_horloge = Thread(target=self.set_horloge_event)
+        self._thread_horloge = Thread(target=self.set_horloge_event, daemon=True)
         self._thread_horloge.start()
 
         # Thread.start
-        self._thread_affichage = Thread(target=self.run_affichage)
+        self._thread_affichage = Thread(target=self.run_affichage, daemon=True)
         self._thread_affichage.start()
         logging.info("AfficheurDocumentMAJDirecte: thread demarree")
 
