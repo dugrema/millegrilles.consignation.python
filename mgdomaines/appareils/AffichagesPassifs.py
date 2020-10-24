@@ -34,11 +34,11 @@ class DocumentCallback(BaseCallback):
         uuid_message = message_json[
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         if uuid_message != self.afficheur.dernier_evenement_uuid:
-            self.__logger.debug("Message recu: routing=%s, contenu=%s" % (routing_key, message_json))
+            self.__logger.info("Message recu: routing=%s, correlation_id=%s, contenu=%s" % (routing_key, correlation_id, message_json))
             self.afficheur.dernier_evenement_uuid = message_json[
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         else:
-            self.__logger.debug("Message duplique recu, on l'ignore : %s" % uuid_message)
+            self.__logger.info("Message duplique recu, on l'ignore : %s" % uuid_message)
 
         # Determiner type de message
         if correlation_id == 'affichage_lcd' or action == 'majNoeudConfirmee':
@@ -93,6 +93,7 @@ class AfficheurDocumentMAJDirecte:
 
     def start(self):
         # Enregistrer callback
+        self.__logger.debug("AfficheurDocumentMAJDirecte.start()")
         self._actif = True
         self.traitement_callback = DocumentCallback(self._contexte, self)
         self.contexte.message_dao.register_channel_listener(self)   # Callback sur on_channel_open avec le channel
@@ -106,7 +107,7 @@ class AfficheurDocumentMAJDirecte:
     def callback_inscrire(self, queue):
         nom_queue = queue.method.queue
         self._queue_reponse = nom_queue
-        self.__logger.info("Resultat creation queue: %s" % nom_queue)
+        self.__logger.info("AfficheurDocumentMAJDirecte: Resultat creation queue: %s" % nom_queue)
 
         routing_keys = [
             'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE,
@@ -117,7 +118,7 @@ class AfficheurDocumentMAJDirecte:
         if exchanges[0] == Constantes.SECURITE_PROTEGE:
             exchanges.append(Constantes.SECURITE_PRIVE)
 
-        self.__logger.debug("Binding q %s sur exchanges %s" % (nom_queue, exchanges))
+        self.__logger.info("Binding q %s sur exchanges %s" % (nom_queue, exchanges))
 
         for rk in routing_keys:
             for exchange in exchanges:
@@ -163,7 +164,7 @@ class AfficheurDocumentMAJDirecte:
             self.__logger.exception("Erreur transmission requete documents", e)
 
     def traiter_lecture(self, noeud_id: str, uuid_senseur: str, senseurs: dict):
-        cle_senseur = noeud_id + '/' + uuid_senseur
+        cle_senseur = uuid_senseur
         if cle_senseur in self._cles_senseurs_supportes:
             try:
                 doc_noeud = self._documents[cle_senseur]
@@ -201,6 +202,7 @@ class AfficheurDocumentMAJDirecte:
         raise NotImplemented()
 
     def maj_configuration(self, configuration: dict):
+        self.__logger.info("MAJ configuration : %s" % str(configuration))
         self._configuration_affichage_lcd = configuration
 
         actif = configuration.get('lcd_actif')
@@ -219,7 +221,7 @@ class AfficheurDocumentMAJDirecte:
             for ligne in lcd_affichage:
                 uuid_senseur = ligne['uuid']
                 if uuid_senseur is not None and uuid_senseur != '':
-                    cles_senseurs_supportes.add(noeud_id + '/' + uuid_senseur)
+                    cles_senseurs_supportes.add(uuid_senseur)
 
         self._cles_senseurs_supportes = list(cles_senseurs_supportes)
 
@@ -246,6 +248,7 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
         self._user_event = Event()
 
     def start(self):
+        self.__logger.info("AffichageAvecConfiguration.start()")
         super().start()  # Demarre thread de lecture de documents
         self._thread_horloge = Thread(target=self.set_horloge_event, daemon=True)
         self._thread_horloge.start()
@@ -253,7 +256,7 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
         # Thread.start
         self._thread_affichage = Thread(target=self.run_affichage, daemon=True)
         self._thread_affichage.start()
-        logging.info("AfficheurDocumentMAJDirecte: thread demarree")
+        self.__logger.info("AfficheurDocumentMAJDirecte: thread demarree")
 
     def fermer(self):
         super().fermer()
@@ -285,6 +288,8 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
 
             except ConfigurationPasRecue:
                 self.__logger.warning("La configuration LCD n'est pas encore recue, on attend pour demarrer l'affichage")
+                if self.__logger.isEnabledFor(logging.INFO):
+                    self.__logger.exception("Erreur configuration pas recue")
                 self._user_event.wait(5)
             except Exception as e:
                 self.__logger.exception("Erreur durant affichage")
@@ -358,7 +363,7 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
         format = formattage['affichage']
 
         uuid_senseur = formattage.get('uuid')
-        cle_senseur = noeud_id + '/' + uuid_senseur
+        cle_senseur = uuid_senseur
 
         cle_appareil = formattage.get('appareil')
 
@@ -398,7 +403,7 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
             pass
         elif valeur == '2':  # Refresh from top
             pass
-
+            
 
 # Classe qui charge des senseurs pour afficher temperature, humidite, pression/tendance
 # pour quelques senseurs passifs.
