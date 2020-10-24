@@ -31,14 +31,19 @@ class DocumentCallback(BaseCallback):
         correlation_id = properties.correlation_id
 
         # De-dupe, ignorer message
-        uuid_message = message_json[
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        if uuid_message != self.afficheur.dernier_evenement_uuid:
-            self.__logger.info("Message recu: routing=%s, correlation_id=%s, contenu=%s" % (routing_key, correlation_id, message_json))
-            self.afficheur.dernier_evenement_uuid = message_json[
+        try:
+            uuid_message = message_json[
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        else:
-            self.__logger.info("Message duplique recu, on l'ignore : %s" % uuid_message)
+            if uuid_message != self.afficheur.dernier_evenement_uuid:
+                self.__logger.info("Message recu: routing=%s, correlation_id=%s, contenu=%s" % (routing_key, correlation_id, message_json))
+                self.afficheur.dernier_evenement_uuid = message_json[
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            else:
+                self.__logger.info("Message duplique recu, on l'ignore : %s" % uuid_message)
+                return
+        except KeyError:
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Erreur verification duplication de message")
 
         # Determiner type de message
         if correlation_id == 'affichage_lcd' or action == 'majNoeudConfirmee':
