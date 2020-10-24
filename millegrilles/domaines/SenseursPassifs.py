@@ -193,8 +193,11 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+        requetes_publiques_handler = TraitementRequetesPubliquesSenseursPassifs(self)
+
         self.__handler_requetes_noeuds = {
-            Constantes.SECURITE_PUBLIC: TraitementRequetesPubliquesSenseursPassifs(self),
+            Constantes.SECURITE_PUBLIC: requetes_publiques_handler,
+            Constantes.SECURITE_PRIVE: requetes_publiques_handler,
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesSenseursPassifs(self)
         }
 

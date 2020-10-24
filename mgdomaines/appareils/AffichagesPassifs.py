@@ -117,6 +117,8 @@ class AfficheurDocumentMAJDirecte:
         if exchanges[0] == Constantes.SECURITE_PROTEGE:
             exchanges.append(Constantes.SECURITE_PRIVE)
 
+        self.__logger.debug("Binding q %s sur exchanges %s" % (nom_queue, exchanges))
+
         for rk in routing_keys:
             for exchange in exchanges:
                 self.channel.queue_bind(queue=nom_queue, exchange=exchange, routing_key=rk, callback=None)
