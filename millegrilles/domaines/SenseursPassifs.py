@@ -367,9 +367,6 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         return document_dashboard
 
     def get_affichage_lcd_noeud(self, params: dict):
-        """
-        :return: Le document dashboard de vitrine
-        """
         noeud_id = params['noeud_id']
 
         collection = self.document_dao.get_collection(SenseursPassifsConstantes.COLLECTION_DOCUMENTS_NOM)
