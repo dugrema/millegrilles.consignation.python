@@ -180,6 +180,8 @@ class GestionnaireCommandes:
             else:
                 self.__logger.error("Commande inconnue : %s", nom_commande)
                 return
+        except ForcerRedemarrage:
+            self._service_monitor.fermer()
         except Exception as err:
             self.__logger.exception("Exception traitement commande")
             reponse = {'err': str(err)}

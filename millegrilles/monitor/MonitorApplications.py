@@ -602,15 +602,20 @@ class GestionnaireApplications:
                 if commande_backup:
                     self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
 
-                # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
-                path_archive = self.__gestionnaire_modules_docker.save_archives(
-                    container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
+                    # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
+                    path_archive = self.__gestionnaire_modules_docker.save_archives(
+                        container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
 
-                # self.transmettre_evenement_backup(service_name,
-                #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
+                    # self.transmettre_evenement_backup(service_name,
+                    #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
+
+                volumes = backup_info.get('volumes')
+                if volumes is not None:
+                    pass
 
                 handler_backup = HandlerBackupApplication(self.__handler_requetes)
                 handler_backup.upload_backup(service_name, path_archive)
+
 
             finally:
                 self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])

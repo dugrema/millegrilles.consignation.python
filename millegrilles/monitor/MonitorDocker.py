@@ -4,7 +4,7 @@ import os
 import datetime
 import socket
 import docker
-import shutil
+from os import path
 
 from uuid import uuid4
 from base64 import b64decode
@@ -218,7 +218,7 @@ class GestionnaireModulesDocker:
             service = dict_services.get(service_name)
             if not service:
                 try:
-                    self.demarrer_service(service_name, no_pull=True, **params)
+                    self.demarrer_service(service_name, **params)
                 except IndexError:
                     self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
                 entretien_compte_complete = False
@@ -977,6 +977,39 @@ class GestionnaireModulesDocker:
         exit_code, output = container.exec_run(commande, stream=False, environment=environment)
         return exit_code, output
 
+    def executer_backup_volumes(self, volumes: list, dest_tarfile: str):
+        """
+        Utilise l'image Alpine (busybox) pour copier les volumes docker specifies dans une archive .tar
+        :param volumes:
+        :param dest_tarfile: Archive de destination pour sauvegarder le backup
+        :return:
+        """
+        commande_tar = 'tar -c -f /backup/blynk.backup.tar /mnt/' + ' /mnt/'.join(volumes)
+        bind_path = path.dirname(dest_tarfile)
+        mapping_volumes = {
+            bind_path: {'bind': '/backup', 'mode': 'rw'},
+            # 'blynk_data': {'bind': '/blynk/data', 'mode': 'ro'},
+        }
+        for volume in volumes:
+            mapping_volumes[volume] = {'bind': '/mnt/' + volume, 'mode': 'ro'}
+
+        try:
+            resultat = self.__docker.containers.run(
+                'alpine',
+                '/scripts/blynk_backup.sh',
+                name="backup_test",
+                volumes=volumes,
+                remove=True,
+                read_only=True,
+                stream=True
+            )
+            self.__logger.debug("Resultats : %s", str(resultat))
+        except docker.errors.APIError:
+            self.__logger.exception("Erreur backup")
+            self.__logger.debug("Suppression container backup_test")
+            self.client.containers.get('backup_test').remove()
+
+
     def put_archives(self, container_id: str, src_path: str, dst_path: str):
         container = self.__docker.containers.get(container_id)
 
@@ -1175,7 +1208,7 @@ class GestionnaireImagesDocker:
         if service_registries is None:
             service_registries = registries
         image_locale = self.get_image_locale(nom_image, tag)
-        if image_locale is None and kwargs.get('no_pull') is None:
+        if image_locale is None and kwargs.get('no_pull') is not True:
             image = None
             for registry in service_registries:
                 if registry != '':
