@@ -977,7 +977,7 @@ class GestionnaireModulesDocker:
         exit_code, output = container.exec_run(commande, stream=False, environment=environment)
         return exit_code, output
 
-    def executer_backup_volumes(self, volumes: list, dest_tarfile: str):
+    def executer_backup_volumes(self, volumes: list, dest_folder: str):
         """
         Utilise l'image Alpine (busybox) pour copier les volumes docker specifies dans une archive .tar
         :param volumes:
@@ -985,9 +985,8 @@ class GestionnaireModulesDocker:
         :return:
         """
         commande_tar = 'tar -c -f /backup/blynk.backup.tar /mnt/' + ' /mnt/'.join(volumes)
-        bind_path = path.dirname(dest_tarfile)
         mapping_volumes = {
-            bind_path: {'bind': '/backup', 'mode': 'rw'},
+            dest_folder: {'bind': '/backup', 'mode': 'rw'},
             # 'blynk_data': {'bind': '/blynk/data', 'mode': 'ro'},
         }
         for volume in volumes:
@@ -995,8 +994,8 @@ class GestionnaireModulesDocker:
 
         try:
             resultat = self.__docker.containers.run(
-                'alpine',
-                '/scripts/blynk_backup.sh',
+                'ubuntu',
+                'tar -cJf ',
                 name="backup_test",
                 volumes=volumes,
                 remove=True,

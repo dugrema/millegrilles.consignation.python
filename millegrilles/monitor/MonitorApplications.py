@@ -578,51 +578,64 @@ class GestionnaireApplications:
         nom_image_docker = config_image['image']
         backup_info = config_image['backup']
         config_elem = config_image['config']
-
         service_name = config_elem['name']
-        self.__wait_start_service_name = service_name
-        self.__wait_container_event.clear()
 
-        self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
-                                                            config=config_elem,
-                                                            images=gestionnaire_images_applications)
+        path_backup = backup_info['base_path']
 
-        self.__wait_container_event.wait(60)
-        self.__wait_start_service_name = None  # Reset ecoute de l'evenement
-        container_id = self.__wait_start_service_container_id
-        self.__wait_start_service_container_id = None
+        try:
+            commande_backup = backup_info.get('commande_backup')
+            if commande_backup is not None:
+                self.__wait_start_service_name = service_name
+                self.__wait_container_event.clear()
 
-        if self.__wait_container_event.is_set():
-            self.__logger.info("Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
-            self.__wait_container_event.clear()
+                self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
+                                                                    config=config_elem,
+                                                                    images=gestionnaire_images_applications)
 
-            try:
-                # Preparer les scripts dans un fichier .tar temporaire
-                commande_backup = backup_info.get('commande_backup')
-                if commande_backup:
-                    self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
+                self.__wait_container_event.wait(60)
+                self.__wait_start_service_name = None  # Reset ecoute de l'evenement
+                container_id = self.__wait_start_service_container_id
+                self.__wait_start_service_container_id = None
 
-                    # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
-                    path_archive = self.__gestionnaire_modules_docker.save_archives(
-                        container_id, backup_info['base_path'], dest_prefix=config_elem['name'])
+                if self.__wait_container_event.is_set():
+                    self.__logger.info(
+                        "Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
+                    self.__wait_container_event.clear()
 
-                    # self.transmettre_evenement_backup(service_name,
-                    #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
+                    # Preparer les scripts dans un fichier .tar temporaire
 
-                volumes = backup_info.get('volumes')
-                if volumes is not None:
-                    pass
+                    if commande_backup:
+                        self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
 
-                handler_backup = HandlerBackupApplication(self.__handler_requetes)
-                handler_backup.upload_backup(service_name, path_archive)
+                        # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
+                        path_archive = self.__gestionnaire_modules_docker.save_archives(
+                            container_id, path_backup, dest_prefix=config_elem['name'])
 
+                        # self.transmettre_evenement_backup(service_name,
+                        #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
 
-            finally:
-                self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
+                else:
+                    self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
+                    raise Exception("Image non installee : " + nom_image_docker)
 
-        else:
-            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
-            raise Exception("Image non installee : " + nom_image_docker)
+            volumes = backup_info.get('volumes')
+            if volumes is not None:
+                # Faire un backup de tous les volumes, generer un .tar.xz par volume
+                self.__gestionnaire_modules_docker.executer_backup_volumes(volumes, path_backup)
+
+            # Conserver toutes les archives generees dans un meme fichier .tar (pas compresse)
+            archive_globale = path.join(path_backup, service_name + '.tar')
+
+            fichier_tar = tarfile.open(archive_globale, mode='w')
+            for fichier in os.listdir(path_backup):
+                fichier_tar.add(path.join(path_backup, fichier))
+            fichier_tar.close()
+
+            handler_backup = HandlerBackupApplication(self.__handler_requetes)
+            handler_backup.upload_backup(service_name, archive_globale)
+
+        finally:
+            self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 
     # def effectuer_restore(self, nom_image_docker, configuration_docker, tar_scripts: str, tar_archive: str):
     #     try:
