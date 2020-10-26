@@ -49,6 +49,9 @@ class GestionnaireApplications:
         self.__wait_start_container_name = None
         self.__wait_start_service_container_id = None
 
+        self.__wait_die_service_container_id = None
+        self.__wait_event_die = Event()
+
         self.__handler_requetes: [TraitementMQRequetesBlocking] = None
 
     def event(self, event):
@@ -57,9 +60,18 @@ class GestionnaireApplications:
 
         type = event_json.get('Type')
         action = event_json.get('Action')
+        status = event_json.get('status')
         if type is not None and action is not None:
             action = 'docker/' + type
             self.__service_monitor.emettre_evenement(action, event_json)
+
+        if self.__wait_die_service_container_id is not None and status == 'die':
+            try:
+                service_id = event_json['Actor']['Attributes']['com.docker.swarm.service.id']
+                if self.__wait_die_service_container_id == service_id:
+                    self.__wait_event_die.set()
+            except KeyError:
+                pass
 
         if self.__wait_start_service_name or self.__wait_start_container_name:
             # Verifier si le container correspond au service
@@ -603,6 +615,9 @@ class GestionnaireApplications:
                 constraints=["node.labels.millegrilles.prive == true"]
             )
 
+            self.__wait_die_service_container_id = service.id
+            self.__wait_event_die.clear()
+
             # # Creer le container, injecter cle/cert et scripts
             # container = docker_client.containers.create(
             #     image_python.id,
@@ -631,11 +646,7 @@ class GestionnaireApplications:
             # container.reload()
             # self.__logger.debug("Backup %s complete, resultat : %s" % (nom_application, container.status))
 
-            self.__wait_container_event.wait(5)
-            service.update()
-            tasks = service.tasks()
-
-            pass
+            self.__wait_event_die.wait(30)
 
         finally:
             # try:
