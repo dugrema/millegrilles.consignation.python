@@ -554,6 +554,24 @@ class GestionnaireApplications:
         )
 
     def effectuer_backup(self, nom_application: str, configuration_docker):
+        commande = "-m millegrilles.util.BackupApplication"
+        try:
+            self.executer_commande(nom_application, configuration_docker, commande)
+            return {'ok': True}
+        except Exception as e:
+            self.__logger.exception("Erreur traitement backup")
+            return {'ok': False, 'err': str(e)}
+
+    def effectuer_restauration(self, nom_application: str, configuration_docker):
+        commande = "-m millegrilles.util.RestaurerApplication"
+        try:
+            self.executer_commande(nom_application, configuration_docker, commande)
+            return {'ok': True}
+        except Exception as e:
+            self.__logger.exception("Erreur traitement restauration")
+            return {'ok': False, 'err': str(e)}
+
+    def executer_commande(self, nom_application: str, configuration_docker, commande: str):
 
         configuration_backup = configuration_docker['backup']
         configuration = self.__service_monitor.connexion_middleware.configuration
@@ -607,7 +625,7 @@ class GestionnaireApplications:
                 volumes=volumes_mappes,
                 environment=var_env,
                 user="root",
-                command="-m millegrilles.util.BackupApplication",
+                command=commande,
                 network='millegrille_net'
             )
 
