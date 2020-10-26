@@ -516,7 +516,7 @@ class GestionnaireApplications:
         volumes = configuration_backup.get('volumes')
         if volumes is not None:
             volumes_mappes = {
-                '/tmp/container_backup': {'bind': '/backup', 'mode': 'rw'},
+                # '/tmp/container_backup': {'bind': '/backup', 'mode': 'rw'},
             }
             for volume in volumes:
                 volumes_mappes[volume] = {'bind': '/mnt/' + volume, 'mode': 'rw'}
