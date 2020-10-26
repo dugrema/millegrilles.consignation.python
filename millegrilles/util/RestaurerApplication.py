@@ -36,7 +36,7 @@ class RestaurerApplication(ModeleConfiguration):
         self.__cipher = None
         self.__lzma_compressor = None
         self.__tar_output = None
-        self.__path_output: str = None
+        self.__path_output: str = environ.get('PATH_RESTAURATION') or '/mnt'
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser()
@@ -133,10 +133,9 @@ class RestaurerApplication(ModeleConfiguration):
         # Extraire le script vers /tmp
 
     def extraire_archive(self, decipher_stream):
-        path_output = '/home/mathieu/tmp/restauration'
         with lzma.open(decipher_stream, 'r') as xz:
             with tarfile.open(fileobj=xz, mode='r|') as tar:
-                tar.extractall(path_output)
+                tar.extractall(self.__path_output)
 
 
 if __name__ == '__main__':
