@@ -155,8 +155,6 @@ class BackupApplication(ModeleConfiguration):
             self.__logger.info("Aucun script de backup fourni")
             return
 
-        # Extraire le script vers /tmp
-
     def archiver_volumes(self):
         try:
             volumes = self.__configuration_application['backup']['volumes']

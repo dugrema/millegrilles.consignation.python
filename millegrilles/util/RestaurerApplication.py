@@ -3,12 +3,14 @@ import logging
 import json
 import tarfile
 import lzma
-import datetime
+import subprocess
 import requests
+import sys
 
 from typing import Optional
-from os import environ, listdir, path
+from os import environ, path, makedirs
 from base64 import b64decode
+from io import BytesIO
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
 from millegrilles.util.BackupModule import BackupUtil, WrapperDownload
@@ -125,12 +127,24 @@ class RestaurerApplication(ModeleConfiguration):
         :return:
         """
         try:
-            script_tar_xz = self.__configuration_application['backup']['script']
+            configuration_backup = self.__configuration_application['backup']
+            script_tar_xz = configuration_backup['tar_xz']
+            makedirs('/tmp/scripts', exist_ok=True)
+
+            # Ecrire le script sous /tmp/script.sh
+            script_tar_xz = b64decode(script_tar_xz)
+            script_tar_xz = BytesIO(script_tar_xz)
+            with lzma.open(script_tar_xz, 'r') as xz:
+                with tarfile.open(fileobj=xz, mode='r') as tar:
+                    tar.extractall('/tmp/scripts')
+
+            # Executer script de backup
+            commande_backup = path.join('/tmp/scripts', configuration_backup['commande_restore'])
+            subprocess.run(commande_backup, stdout=sys.stdout, check=True)
+
         except KeyError:
             self.__logger.info("Aucun script de backup fourni")
             return
-
-        # Extraire le script vers /tmp
 
     def extraire_archive(self, decipher_stream):
         with lzma.open(decipher_stream, 'r') as xz:

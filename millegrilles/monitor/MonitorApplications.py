@@ -497,9 +497,9 @@ class GestionnaireApplications:
             return {'ok': False, 'err': str(e)}
 
     def effectuer_restauration(self, nom_application: str, configuration_docker):
-        commande = "-m millegrilles.util.RestaurerApplication"
+        commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
         try:
-            self.executer_commande(nom_application, configuration_docker['configuration'], commande)
+            self.executer_commande(nom_application, commande)
             return {'ok': True}
         except Exception as e:
             self.__logger.exception("Erreur traitement restauration")
@@ -576,13 +576,12 @@ class GestionnaireApplications:
         gestionnaire_images = GestionnaireImagesServices(configuration.idmg, docker_client)
         image_python = gestionnaire_images.telecharger_image_docker('mg-python')
 
-        fd, fichier_clecert = tempfile.mkstemp(suffix='.tar')
-        os.close(fd)
-        fd, fichier_app_config = tempfile.mkstemp(suffix='.json')
-        os.close(fd)
-
-        with open(fichier_app_config, 'w') as fichier:
-            json.dump(configuration_docker, fichier)
+        # fd, fichier_clecert = tempfile.mkstemp(suffix='.tar')
+        # os.close(fd)
+        # fd, fichier_app_config = tempfile.mkstemp(suffix='.json')
+        # os.close(fd)
+        # with open(fichier_app_config, 'w') as fichier:
+        #     json.dump(configuration_docker, fichier)
 
         try:
             service = docker_client.services.create(
@@ -598,6 +597,13 @@ class GestionnaireApplications:
                 restart_policy=RestartPolicy(condition='none', max_attempts=0),
                 constraints=configuration_backup.get('constraints')
             )
+
+            self.__wait_container_event.clear()
+            self.__wait_start_service_name = service.name
+            self.__wait_container_event.wait(10)
+
+            if self.__wait_container_event.is_set() is False:
+                raise Exception("Erreur demarrage service application backup/restaure")
 
             self.__wait_die_service_container_id = service.id
             self.__wait_event_die.clear()
