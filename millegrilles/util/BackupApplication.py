@@ -4,9 +4,13 @@ import json
 import tarfile
 import lzma
 import datetime
+import subprocess
+import sys
 
 from typing import Optional
-from os import environ, listdir, path
+from os import environ, listdir, path, makedirs
+from base64 import b64decode
+from io import BytesIO
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication
@@ -27,6 +31,8 @@ class BackupApplication(ModeleConfiguration):
         self.__nom_application: Optional[str] = None
         self.__catalogue_backup = dict()
         self.__transaction_maitredescles: Optional[dict] = None
+
+        self.__path_backup = '/tmp/backup'
 
         # Pipe d'output
         self.__output_stream = None
@@ -64,6 +70,9 @@ class BackupApplication(ModeleConfiguration):
     def charger_environnement(self):
         app_config_path = environ['CONFIG_APP']
 
+        if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.debug("Fichier de configuration\n%s", json.dumps(self.__configuration_application, indent=2))
+
         with open(app_config_path, 'r') as fichier:
             self.__configuration_application = json.load(fichier)
 
@@ -71,12 +80,11 @@ class BackupApplication(ModeleConfiguration):
         self.preparer_catalogue()
 
         self.__path_output = path.join(
-            '/backup',
+            self.__path_backup,
             self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
         )
 
-        if self.__logger.isEnabledFor(logging.DEBUG):
-            self.__logger.debug("Fichier de configuration\n%s", json.dumps(self.__configuration_application, indent=2))
+        makedirs(self.__path_backup, exist_ok=True)
 
     def preparer_catalogue(self):
         date_formattee = datetime.datetime.utcnow().strftime('%Y%m%d%H%M')
@@ -128,7 +136,21 @@ class BackupApplication(ModeleConfiguration):
         :return:
         """
         try:
-            script_tar_xz = self.__configuration_application['backup']['script']
+            configuration_backup = self.__configuration_application['backup']
+            script_tar_xz = configuration_backup['tar_xz']
+            makedirs('/tmp/scripts', exist_ok=True)
+
+            # Ecrire le script sous /tmp/script.sh
+            script_tar_xz = b64decode(script_tar_xz)
+            script_tar_xz = BytesIO(script_tar_xz)
+            with lzma.open(script_tar_xz, 'r') as xz:
+                with tarfile.open(fileobj=xz, mode='r') as tar:
+                    tar.extractall('/tmp/scripts')
+
+            # Executer script de backup
+            commande_backup = path.join('/tmp/scripts', configuration_backup['commande_backup'])
+            subprocess.run(commande_backup, stdout=sys.stdout, check=True)
+
         except KeyError:
             self.__logger.info("Aucun script de backup fourni")
             return

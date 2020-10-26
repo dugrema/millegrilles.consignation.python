@@ -18,6 +18,8 @@ from typing import cast
 from base64 import b64encode, b64decode
 from os import path
 from docker.errors import APIError
+from docker.types import SecretReference, NetworkAttachmentConfig, Resources, RestartPolicy, ServiceMode, \
+    ConfigReference, EndpointSpec, Mount
 
 from millegrilles import Constantes
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, GestionnaireImagesServices
@@ -455,7 +457,7 @@ class GestionnaireApplications:
             )
 
             # tar_scripts = self.preparer_script_file(app)
-            self.effectuer_backup(nom_application, configuration_docker)
+            self.effectuer_backup(nom_application)
 
             self.transmettre_evenement_backup(nom_application,
                                               Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
@@ -473,10 +475,10 @@ class GestionnaireApplications:
             exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
         )
 
-    def effectuer_backup(self, nom_application: str, configuration_docker):
-        commande = "-m millegrilles.util.BackupApplication"
+    def effectuer_backup(self, nom_application: str):
+        commande = "python3 -m millegrilles.util.BackupApplication --debug"
         try:
-            self.executer_commande(nom_application, configuration_docker, commande)
+            self.executer_commande(nom_application, commande)
             return {'ok': True}
         except Exception as e:
             self.__logger.exception("Erreur traitement backup")
@@ -491,35 +493,84 @@ class GestionnaireApplications:
             self.__logger.exception("Erreur traitement restauration")
             return {'ok': False, 'err': str(e)}
 
-    def executer_commande(self, nom_application: str, configuration_docker, commande: str):
+    def executer_commande(self, nom_application: str, commande: str):
 
+        configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config('app.cfg.' + nom_application)
+        configuration_docker = json.loads(configuration_docker_bytes)
         configuration_backup = configuration_docker['backup']
         configuration = self.__service_monitor.connexion_middleware.configuration
 
-        fichier_requis = [
-            (configuration.mq_keyfile, 'monitor.key'),
-            (configuration.mq_cafile, 'millegrilles.cert'),
-            (configuration.mq_certfile, 'monitor.cert'),
+        docker_secrets_requis = [
+            ('pki.monitor.key', 'pki.monitor.key'),
         ]
+        try:
+            secrets_recents = configuration_backup['secrets_plusrecents']
+            secrets_recents = [(s,s) for s in secrets_recents]
+            docker_secrets_requis.extend(secrets_recents)
+        except KeyError:
+            pass
+
+        docker_config_requis = [
+            ('pki.millegrille.cert', 'pki.millegrille.cert'),
+            ('pki.monitor.cert', 'pki.monitor.cert'),
+            ('app.cfg.' + nom_application, 'app.cfg.json'),
+        ]
+
+        # Identifier les secrets et configs
+        secrets = list()
+        for nom_secret in docker_secrets_requis:
+            secret = self.__service_monitor.gestionnaire_docker.trouver_secret(nom_secret[0])
+
+            # self.__logger.debug("Mapping secret %s" % secret)
+            # secret_name = secret['name']
+            # if secret.get('match_config'):
+            #     secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
+            # else:
+            #     secret_reference = self.trouver_secret(secret_name)
+
+            secret_reference = dict()
+            secret_reference['secret_id'] = secret['secret_id']
+            secret_reference['secret_name'] = secret['secret_name']
+            secret_reference['filename'] = '/run/secrets/' + nom_secret[1]
+            secret_reference['uid'] = 0
+            secret_reference['gid'] = 0
+            secret_reference['mode'] = 0o444
+
+            secrets.append(SecretReference(**secret_reference))
+
+        configs = list()
+        for nom_config in docker_config_requis:
+            config = self.__service_monitor.gestionnaire_docker.charger_config_recente(nom_config[0])
+
+            config_reference = config['config_reference']
+            #config_reference['config_id'] = config.id
+            #config_reference['config_name'] = config.name
+            config_reference['filename'] = '/run/secrets/' + nom_config[1]
+            config_reference['uid'] = 0
+            config_reference['gid'] = 0
+            config_reference['mode'] = 0o444
+            configs.append(ConfigReference(**config_reference))
 
         var_env = [
             "MG_MQ_HOST=" + configuration.mq_host,
             "MG_MQ_PORT=%d" % configuration.mq_port,
-            "MG_MQ_CA_CERTS=/tmp/millegrilles.cert",
-            "MG_MQ_KEYFILE=/tmp/monitor.key",
-            "MG_MQ_CERTFILE=/tmp/monitor.cert",
             "MG_MQ_SSL=on",
             "MG_MQ_AUTH_CERT=on",
-            "CONFIG_APP=/tmp/app.cfg.json"
+            "MG_MQ_CA_CERTS=/run/secrets/pki.millegrille.cert",
+            "MG_MQ_KEYFILE=/run/secrets/pki.monitor.key",
+            "MG_MQ_CERTFILE=/run/secrets/pki.monitor.cert",
+            "CONFIG_APP=/run/secrets/app.cfg.json"
         ]
 
         volumes = configuration_backup.get('volumes')
+        mounts = list()
         if volumes is not None:
             volumes_mappes = {
                 # '/tmp/container_backup': {'bind': '/backup', 'mode': 'rw'},
             }
             for volume in volumes:
                 volumes_mappes[volume] = {'bind': '/mnt/' + volume, 'mode': 'rw'}
+                mounts.append(':'.join([volume, '/mnt/' + volume, 'rw']))
             # var_env.append("VOLUMES=" + ' '.join(volumes))
         else:
             volumes_mappes = None
@@ -538,50 +589,72 @@ class GestionnaireApplications:
             json.dump(configuration_docker, fichier)
 
         try:
-            # Creer le container, injecter cle/cert et scripts
-            container = docker_client.containers.create(
+            service = docker_client.services.create(
                 image_python.id,
                 name="backup_application",
-                volumes=volumes_mappes,
-                environment=var_env,
-                user="root",
                 command=commande,
-                network='millegrille_net'
+                mounts=mounts,
+                env=var_env,
+                configs=configs,
+                secrets=secrets,
+                user="root",
+                networks=['millegrille_net'],
+                restart_policy=RestartPolicy(condition='none', max_attempts=0),
+                constraints=["node.labels.millegrilles.prive == true"]
             )
 
-            with tarfile.open(fichier_clecert, 'w') as tar_out:
-                for fichier, arcname in fichier_requis:
-                    tar_out.add(fichier, arcname=arcname)
-                tar_out.add(fichier_app_config, arcname='app.cfg.json')
-            with open(fichier_clecert, 'rb') as fichier:
-                container.put_archive('/tmp', fichier)
+            # # Creer le container, injecter cle/cert et scripts
+            # container = docker_client.containers.create(
+            #     image_python.id,
+            #     name="backup_application",
+            #     volumes=volumes_mappes,
+            #     environment=var_env,
+            #     user="root",
+            #     command=commande,
+            #     network='millegrille_net'
+            # )
+            #
+            # with tarfile.open(fichier_clecert, 'w') as tar_out:
+            #     for fichier, arcname in fichier_requis:
+            #         tar_out.add(fichier, arcname=arcname)
+            #     tar_out.add(fichier_app_config, arcname='app.cfg.json')
+            # with open(fichier_clecert, 'rb') as fichier:
+            #     container.put_archive('/tmp', fichier)
+            #
+            # # Cleanup fichiers temporaires - note que les fichiers sont supprimes a nouveau dans finally
+            # os.remove(fichier_clecert)
+            # os.remove(fichier_app_config)
+            #
+            # container.start()
+            # container.wait()
+            #
+            # container.reload()
+            # self.__logger.debug("Backup %s complete, resultat : %s" % (nom_application, container.status))
 
-            # Cleanup fichiers temporaires - note que les fichiers sont supprimes a nouveau dans finally
-            os.remove(fichier_clecert)
-            os.remove(fichier_app_config)
+            self.__wait_container_event.wait(5)
+            service.update()
+            tasks = service.tasks()
 
-            container.start()
-            container.wait()
-
-            container.reload()
-            self.__logger.debug("Backup %s complete, resultat : %s" % (nom_application, container.status))
+            pass
 
         finally:
-            try:
-                os.remove(fichier_clecert)
-            except:
-                self.__logger.exception("Erreur suppression fichier tmp clecert " + fichier_clecert)
-            try:
-                os.remove(fichier_app_config)
-            except:
-                self.__logger.exception("Erreur suppression fichier tmp app config" + fichier_app_config)
-
-            container = docker_client.containers.get('backup_application')
-            try:
-                container.stop()
-            except:
-                pass
-            container.remove()
+            # try:
+            #     os.remove(fichier_clecert)
+            # except:
+            #     self.__logger.exception("Erreur suppression fichier tmp clecert " + fichier_clecert)
+            # try:
+            #     os.remove(fichier_app_config)
+            # except:
+            #     self.__logger.exception("Erreur suppression fichier tmp app config" + fichier_app_config)
+            #
+            # container = docker_client.containers.get('backup_application')
+            # try:
+            #     container.stop()
+            # except:
+            #     pass
+            # container.remove()
+            service = self.__gestionnaire_modules_docker.get_service('backup_application')
+            service.remove()
 
     def restore_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts, tar_archive):
         nom_image_docker = config_image['image']
