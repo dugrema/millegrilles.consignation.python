@@ -572,6 +572,7 @@ class GestionnaireApplications:
             "MG_MQ_CERTFILE=/tmp/monitor.cert",
             "MG_MQ_SSL=on",
             "MG_MQ_AUTH_CERT=on",
+            "CONFIG_APP=/tmp/app.cfg.json"
         ]
 
         volumes = configuration_backup.get('volumes')
@@ -581,7 +582,7 @@ class GestionnaireApplications:
             }
             for volume in volumes:
                 volumes_mappes[volume] = {'bind': '/mnt/' + volume, 'mode': 'ro'}
-            var_env.append("VOLUMES=" + ' '.join(volumes))
+            # var_env.append("VOLUMES=" + ' '.join(volumes))
         else:
             volumes_mappes = None
 
@@ -605,8 +606,9 @@ class GestionnaireApplications:
                 name="backup_application",
                 volumes=volumes_mappes,
                 environment=var_env,
-                entrypoint="find",
-                command="/tmp"
+                user="root",
+                command="-m millegrilles.util.BackupApplication",
+                network='millegrille_net'
             )
 
             with tarfile.open(fichier_clecert, 'w') as tar_out:
