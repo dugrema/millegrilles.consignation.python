@@ -1667,11 +1667,13 @@ class TraitementMQRequetesBlocking(BaseCallback):
         self.__channel = None
         self.queue_name = None
 
+        self.__event_q_ready = Event()
         self.__event_attente = Event()
         self.__reponse_correlation_id = None
         self.__reponse = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+        contexte.message_dao.register_channel_listener(self)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -1694,6 +1696,11 @@ class TraitementMQRequetesBlocking(BaseCallback):
         :param params:
         :return:
         """
+        if not self.__event_q_ready.is_set():
+            self.__event_q_ready.wait(10)
+        if not self.__event_q_ready.is_set():
+            raise Exception("Q n'est pas prete")
+
         correlation_id = 'requete_commande'
         if self.__reponse_correlation_id is not None:
             raise Exception("Requete deja en cours")
@@ -1732,6 +1739,7 @@ class TraitementMQRequetesBlocking(BaseCallback):
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
         self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
+        self.__event_q_ready.set()
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None

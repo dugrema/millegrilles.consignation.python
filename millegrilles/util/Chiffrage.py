@@ -13,9 +13,10 @@ from base64 import b64decode
 from millegrilles.Constantes import ConstantesSecurityPki
 
 
-class CipherMgs1:
+class CipherMgs1(RawIOBase):
     """
     Cipher de chiffrage symmetrique avec les parametres de MilleGrilles, format mgs1
+    Implemente RawIOBase - permet d'utiliser le cipher comme fileobj (stream)
     """
 
     def __init__(self):
@@ -53,28 +54,38 @@ class CipherMsg1Chiffrer(CipherMgs1):
     Helper method : chiffrer_motdepasse pour chiffrer le secret avec la cle publique (cert)
     """
 
-    def __init__(self):
+    def __init__(self, output_stream=None):
+        """
+        :param output_stream: Optionnel - permet d'utiliser le cipher comme stream (fileobj)
+        """
         super().__init__()
+        self.__output_stream = output_stream
         self.__padder: Optional[padding.PaddingContext] = None
         self.__generer()
         self._ouvrir_cipher()
+
+        self.__start_encrypt()
 
     def __generer(self):
         self._password = secrets.token_bytes(32)  # AES-256 = 32 bytes
         self._iv = secrets.token_bytes(16)
 
-    def start_encrypt(self):
+    def __start_encrypt(self):
         self._context = self._cipher.encryptor()
         self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
 
         data = self._context.update(self.__padder.update(self._iv))
         self._digest.update(data)
 
+        if self.__output_stream is not None:
+            self.__output_stream.write(data)
+
         return data
 
     def update(self, data: bytes):
         data = self._context.update(self.__padder.update(data))
         self._digest.update(data)
+
         return data
 
     def finalize(self):
@@ -86,6 +97,25 @@ class CipherMsg1Chiffrer(CipherMgs1):
         self._digest_result = self._digest.finalize()
 
         return data_final
+
+    def write(self, __b) -> Optional[int]:
+        """
+        Methode de RawIOBase.
+        :param __b:
+        :return:
+        """
+        data = self.update(__b)
+        return self.__output_stream.write(data)
+
+    def close(self):
+        """
+        Methode de RawIOBase, finalize le cipher et ferme l'output stream.
+        :return:
+        """
+        data_final = self.finalize()
+        self.__output_stream.write(data_final)
+
+        self.__output_stream.close()
 
     def chiffrer_motdepasse_enveloppe(self, enveloppe):
         public_key = enveloppe.certificat.public_key()

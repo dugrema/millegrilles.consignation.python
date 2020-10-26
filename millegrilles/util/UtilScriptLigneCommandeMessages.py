@@ -28,7 +28,7 @@ class ModeleConfiguration:
         self.__certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
         self.__channel = None
 
-    def initialiser(self, init_document=True, init_message=True, connecter=True):
+    def initialiser(self, init_document=False, init_message=True, connecter=True):
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)

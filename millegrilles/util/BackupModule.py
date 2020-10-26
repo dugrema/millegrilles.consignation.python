@@ -28,21 +28,48 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback, TraitementMQRequetesBlocking
 
 
+class CipherIOWriter(RawIOBase):
+
+    def __init__(self, cipher: CipherMsg1Chiffrer, output_stream):
+        self.__cipher = cipher
+        self.__output_stream = output_stream
+
+        # Demarrer le chiffrage
+        self.__output_stream.write(self.__cipher.start_encrypt())
+
+    def write(self, __b) -> Optional[int]:
+
+        # Chiffrer
+        data_chiffre = self.__cipher.update(__b)
+
+        return self.__output_stream.write(data_chiffre)
+
+    def close(self):
+        # Finaliser cipher
+        self.__output_stream.write(self.__cipher.finalize())
+
+        self.__output_stream.close()
+
+    def digest(self):
+        return self.__cipher.digest
+
+
 class BackupUtil:
 
     def __init__(self, contexte):
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def preparer_cipher(self, catalogue_backup, info_cles: dict, nom_domaine: str = None, nom_application: str = None):
+    def preparer_cipher(self, catalogue_backup, info_cles: dict, nom_domaine: str = None, nom_application: str = None, output_stream=None):
         """
         Prepare un objet cipher pour chiffrer le fichier de transactions
 
         :param catalogue_backup:
         :param info_cles: Cles publiques (certs) retournees par le maitre des cles. Utilisees pour chiffrer cle secrete.
+        :param output_stream: Optionnel, stream/fichier d'output. Permet d'utiliser le cipher comme output stream dans un pipe.
         :return:
         """
-        cipher = CipherMsg1Chiffrer()
+        cipher = CipherMsg1Chiffrer(output_stream=output_stream)
         iv = b64encode(cipher.iv).decode('utf-8')
 
         # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
@@ -1017,15 +1044,22 @@ class HandlerBackupDomaine:
 
 class HandlerBackupApplication:
 
-    def __init__(self, handler_requetes: TraitementMQRequetesBlocking):
-        self.__handler_requetes = handler_requetes
+    def __init__(self, contexte):
+        # self.__handler_requetes = handler_requetes
+        self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-        self.__backup_util = BackupUtil(self.__handler_requetes.contexte)
-        self.__generateur_transactions = self.__handler_requetes.contexte.generateur_transactions
-        self.__configuration = self.__handler_requetes.contexte.configuration
+        self.__backup_util = BackupUtil(self.__contexte)
+        self.__generateur_transactions = self.__contexte.generateur_transactions
+        self.__configuration = self.__contexte.configuration
 
-    def upload_backup(self, nom_application, path_archive):
+    def upload_backup(self, nom_application: str, path_archives: str):
+        """
+
+        :param nom_application: Nom du service, utilise pour le nom du catalogue et upload path
+        :param path_archives: Repertoire avec toutes les archives a inclure dans le backup
+        :return:
+        """
 
         fichiers_temporaire = [path_archive]
         try:
