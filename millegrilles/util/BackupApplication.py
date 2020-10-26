@@ -53,9 +53,13 @@ class BackupApplication(ModeleConfiguration):
         self.__lzma_compressor.close()
         self.__cipher.close()
 
+        self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = self.__cipher.digest
+
+        self.upload()
+
     def upload(self):
-        handler_backup = HandlerBackupApplication(self.__handler_requetes)
-        handler_backup.upload_backup(self.__nom_application, self.__path_output)
+        handler_backup = HandlerBackupApplication(self.contexte)
+        handler_backup.upload_backup(self.__catalogue_backup, self.__transaction_maitredescles, self.__path_output)
 
     def charger_environnement(self):
         app_config_path = environ['CONFIG_APP']

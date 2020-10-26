@@ -1053,29 +1053,25 @@ class HandlerBackupApplication:
         self.__generateur_transactions = self.__contexte.generateur_transactions
         self.__configuration = self.__contexte.configuration
 
-    def upload_backup(self, nom_application: str, path_archives: str):
+    def upload_backup(self, catalogue_backup: dict, transaction_maitredescles: dict, path_archive: str):
         """
 
         :param nom_application: Nom du service, utilise pour le nom du catalogue et upload path
         :param path_archives: Repertoire avec toutes les archives a inclure dans le backup
         :return:
         """
+        nom_application = catalogue_backup['application']
 
         fichiers_temporaire = [path_archive]
         try:
-            catalogue_backup = {
-                'application': nom_application,
-                'securite': Constantes.SECURITE_PROTEGE,
-            }
+            # nom_fichier_backup, digest_archive, transaction_maitredescles = self._chiffrer_archive(
+            #     nom_application, path_archive, catalogue_backup)
+            # fichiers_temporaire.append(nom_fichier_backup)  # Permet de supprimer le fichier a la fin
+            # self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (nom_fichier_backup, digest_archive))
+            # catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
 
-            nom_fichier_backup, digest_archive, transaction_maitredescles = self._chiffrer_archive(
-                nom_application, path_archive, catalogue_backup)
-            fichiers_temporaire.append(nom_fichier_backup)  # Permet de supprimer le fichier a la fin
-            self.__logger.debug("Compression et chiffrage complete : %s\nDigest : %s" % (nom_fichier_backup, digest_archive))
-            catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
-
-            transactions = self._preparer_transactions_backup(nom_application, catalogue_backup, transaction_maitredescles)
-            self._put_backup(nom_application, transactions, nom_fichier_backup)
+            transactions = self._preparer_transactions_backup(catalogue_backup, transaction_maitredescles)
+            self._put_backup(nom_application, transactions, path_archive)
 
         finally:
             # Supprimer les archives
@@ -1127,7 +1123,7 @@ class HandlerBackupApplication:
         self.transmettre_evenement_backup(
             ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE, nom_application)
 
-    def _preparer_transactions_backup(self, nom_application: str, catalogue_backup: dict, transaction_maitredescles: dict, path_fichiers: str = '/tmp'):
+    def _preparer_transactions_backup(self, catalogue_backup: dict, transaction_maitredescles: dict):
         """
         Complete le contenu des transactions catalogue, maitre des cles. Les conserve dans des fichiers temporaires.
         :param catalogue_backup:
