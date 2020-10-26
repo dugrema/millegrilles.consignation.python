@@ -8,6 +8,8 @@ import tempfile
 import tarfile
 import io
 import requests
+import tempfile
+import lzma
 
 from typing import Optional
 from threading import Event
@@ -17,7 +19,7 @@ from os import path
 from docker.errors import APIError
 
 from millegrilles import Constantes
-from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker
+from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, GestionnaireImagesServices
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 from millegrilles.util.BackupModule import HandlerBackupApplication
@@ -189,16 +191,6 @@ class GestionnaireApplications:
             applications = self.trouver_applications_backup(commande.contenu)
 
         self.lancer_backup_applications(applications)
-
-        # if configuration_docker is None:
-        #     # Charger la configuration a partir de configuration docker (app.cfg.NOM_APP)
-        #     gestionnaire_docker = self.__service_monitor.gestionnaire_docker
-        #     configuration_bytes = gestionnaire_docker.charger_config('app.cfg.' + nom_image_docker)
-        #     configuration_docker = json.loads(configuration_bytes)
-        #     commande.contenu['configuration'] = configuration_docker
-        #
-        # tar_scripts = self.preparer_script_file(commande)
-        # self.effectuer_backup(nom_image_docker, configuration_docker, tar_scripts)
 
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
@@ -536,11 +528,13 @@ class GestionnaireApplications:
                 configuration_docker = json.loads(configuration_bytes)
                 app['configuration'] = configuration_docker
 
-            self.transmettre_evenement_backup(nom_application,
-                                              Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_DEBUT)
+            self.transmettre_evenement_backup(
+                nom_application,
+                Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_DEBUT
+            )
 
-            tar_scripts = self.preparer_script_file(app)
-            self.effectuer_backup(nom_application, configuration_docker, tar_scripts)
+            # tar_scripts = self.preparer_script_file(app)
+            self.effectuer_backup(nom_application, configuration_docker)
 
             self.transmettre_evenement_backup(nom_application,
                                               Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
@@ -558,107 +552,88 @@ class GestionnaireApplications:
             exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
         )
 
-    def effectuer_backup(self, nom_image_docker, configuration_docker, tar_scripts=None):
+    def effectuer_backup(self, nom_application: str, configuration_docker):
 
-        gestionnaire_images_applications = GestionnaireImagesApplications(
-            self.__service_monitor.idmg, self.__service_monitor.docker)
-        gestionnaire_images_applications.set_configuration(configuration_docker)
+        configuration_backup = configuration_docker['backup']
+        configuration = self.__service_monitor.connexion_middleware.configuration
 
-        for config_image in configuration_docker['dependances']:
-            if config_image.get('dependances'):
-                # Sous dependances presentes, c'est une sous-config (recursif)
-                nom_image_docker = config_image['nom']
-                self.effectuer_backup(nom_image_docker, config_image, tar_scripts)
-            elif config_image.get('image'):
-                # C'est une image, on l'installe
-                if config_image.get('backup'):
-                    self.backup_dependance(gestionnaire_images_applications, config_image, tar_scripts)
+        fichier_requis = [
+            (configuration.mq_keyfile, 'monitor.key'),
+            (configuration.mq_cafile, 'millegrilles.cert'),
+            (configuration.mq_certfile, 'monitor.cert'),
+        ]
 
-    def backup_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts=None):
-        nom_image_docker = config_image['image']
-        backup_info = config_image['backup']
-        config_elem = config_image['config']
-        service_name = config_elem['name']
+        var_env = [
+            "MG_MQ_HOST=" + configuration.mq_host,
+            "MG_MQ_PORT=%d" % configuration.mq_port,
+            "MG_MQ_CA_CERTS=/tmp/millegrilles.cert",
+            "MG_MQ_KEYFILE=/tmp/monitor.key",
+            "MG_MQ_CERTFILE=/tmp/monitor.cert",
+            "MG_MQ_SSL=on",
+            "MG_MQ_AUTH_CERT=on",
+        ]
 
-        path_backup = backup_info['base_path']
+        volumes = configuration_backup.get('volumes')
+        if volumes is not None:
+            volumes_mappes = {
+                '/tmp/container_backup': {'bind': '/backup', 'mode': 'rw'},
+            }
+            for volume in volumes:
+                volumes_mappes[volume] = {'bind': '/mnt/' + volume, 'mode': 'ro'}
+            var_env.append("VOLUMES=" + ' '.join(volumes))
+        else:
+            volumes_mappes = None
+
+        docker_client = self.__gestionnaire_modules_docker.docker_client
+
+        gestionnaire_images = GestionnaireImagesServices(configuration.idmg, docker_client)
+        image_python = gestionnaire_images.telecharger_image_docker('mg-python')
+
+        fd, fichier_clecert = tempfile.mkstemp(suffix='.tar')
+        os.close(fd)
 
         try:
-            commande_backup = backup_info.get('commande_backup')
-            if commande_backup is not None:
-                self.__wait_start_service_name = service_name
-                self.__wait_container_event.clear()
+            # Creer le container, injecter cle/cert et scripts
+            container = docker_client.containers.create(
+                image_python.id,
+                name="backup_application",
+                volumes=volumes_mappes,
+                environment=var_env,
+                entrypoint="find",
+                command="/tmp"
+            )
 
-                self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
-                                                                    config=config_elem,
-                                                                    images=gestionnaire_images_applications)
+            with tarfile.open(fichier_clecert, 'w') as tar_out:
+                for fichier, arcname in fichier_requis:
+                    tar_out.add(fichier, arcname=arcname)
+            with open(fichier_clecert, 'rb') as fichier:
+                container.put_archive('/tmp', fichier)
 
-                self.__wait_container_event.wait(60)
-                self.__wait_start_service_name = None  # Reset ecoute de l'evenement
-                container_id = self.__wait_start_service_container_id
-                self.__wait_start_service_container_id = None
+            # Injecter le script au besoin
+            with open('/home/mathieu/PycharmProjects/millegrilles.deployeur/test/docker/scripts.tar.xz', 'rb') as fichier:
+                contenu_bytes = fichier.read()
+            contenu_bytes = lzma.decompress(contenu_bytes)
+            container.put_archive('/tmp', contenu_bytes)
+            del contenu_bytes  # Free mem
 
-                if self.__wait_container_event.is_set():
-                    self.__logger.info(
-                        "Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
-                    self.__wait_container_event.clear()
+            container.start()
+            container.wait()
 
-                    # Preparer les scripts dans un fichier .tar temporaire
-
-                    if commande_backup:
-                        self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
-
-                        # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
-                        path_archive = self.__gestionnaire_modules_docker.save_archives(
-                            container_id, path_backup, dest_prefix=config_elem['name'])
-
-                        # self.transmettre_evenement_backup(service_name,
-                        #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
-
-                else:
-                    self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
-                    raise Exception("Image non installee : " + nom_image_docker)
-
-            volumes = backup_info.get('volumes')
-            if volumes is not None:
-                # Faire un backup de tous les volumes, generer un .tar.xz par volume
-                self.__gestionnaire_modules_docker.executer_backup_volumes(volumes, path_backup)
-
-            # Conserver toutes les archives generees dans un meme fichier .tar (pas compresse)
-            archive_globale = path.join(path_backup, service_name + '.tar')
-
-            fichier_tar = tarfile.open(archive_globale, mode='w')
-            for fichier in os.listdir(path_backup):
-                fichier_tar.add(path.join(path_backup, fichier))
-            fichier_tar.close()
-
-            handler_backup = HandlerBackupApplication(self.__handler_requetes)
-            handler_backup.upload_backup(service_name, archive_globale)
+            container.reload()
+            self.__logger.debug("Backup %s complete, resultat : %s" % (nom_application, container.status))
 
         finally:
-            self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
+            try:
+                os.remove(fichier_clecert)
+            except:
+                pass
 
-    # def effectuer_restore(self, nom_image_docker, configuration_docker, tar_scripts: str, tar_archive: str):
-    #     try:
-    #         gestionnaire_images_applications = GestionnaireImagesApplications(
-    #             self.__service_monitor.idmg, self.__service_monitor.docker)
-    #         gestionnaire_images_applications.set_configuration(configuration_docker)
-    #
-    #         for config_image in configuration_docker['dependances']:
-    #             if config_image.get('dependances'):
-    #                 # Sous dependances presentes, c'est une sous-config (recursif)
-    #                 nom_image_docker = config_image['nom']
-    #                 self.effectuer_restore(nom_image_docker, config_image, tar_scripts, tar_archive)
-    #             elif config_image.get('image'):
-    #                 if config_image.get('backup'):
-    #                     # C'est une image avec element de backup, on fait la restauration
-    #                     self.restore_dependance(
-    #                         gestionnaire_images_applications, config_image, tar_scripts, tar_archive)
-    #     finally:
-    #         # Cleanup scripts
-    #         try:
-    #             os.remove(tar_scripts)
-    #         except FileNotFoundError:
-    #             pass  # OK
+            container = docker_client.containers.get('backup_application')
+            try:
+                container.stop()
+            except:
+                pass
+            container.remove()
 
     def restore_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts, tar_archive):
         nom_image_docker = config_image['image']

@@ -977,38 +977,6 @@ class GestionnaireModulesDocker:
         exit_code, output = container.exec_run(commande, stream=False, environment=environment)
         return exit_code, output
 
-    def executer_backup_volumes(self, volumes: list, dest_folder: str):
-        """
-        Utilise l'image Alpine (busybox) pour copier les volumes docker specifies dans une archive .tar
-        :param volumes:
-        :param dest_tarfile: Archive de destination pour sauvegarder le backup
-        :return:
-        """
-        commande_tar = 'tar -c -f /backup/blynk.backup.tar /mnt/' + ' /mnt/'.join(volumes)
-        mapping_volumes = {
-            dest_folder: {'bind': '/backup', 'mode': 'rw'},
-            # 'blynk_data': {'bind': '/blynk/data', 'mode': 'ro'},
-        }
-        for volume in volumes:
-            mapping_volumes[volume] = {'bind': '/mnt/' + volume, 'mode': 'ro'}
-
-        try:
-            resultat = self.__docker.containers.run(
-                'ubuntu',
-                'tar -cJf ',
-                name="backup_test",
-                volumes=volumes,
-                remove=True,
-                read_only=True,
-                stream=True
-            )
-            self.__logger.debug("Resultats : %s", str(resultat))
-        except docker.errors.APIError:
-            self.__logger.exception("Erreur backup")
-            self.__logger.debug("Suppression container backup_test")
-            self.client.containers.get('backup_test').remove()
-
-
     def put_archives(self, container_id: str, src_path: str, dst_path: str):
         container = self.__docker.containers.get(container_id)
 
@@ -1144,6 +1112,9 @@ class GestionnaireModulesDocker:
     def get_configuration_services(self):
         return self.__configuration_services
 
+    @property
+    def docker_client(self):
+        return self.__docker
 
 class GestionnaireImagesDocker:
 
