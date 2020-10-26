@@ -11,6 +11,7 @@ import requests
 import tempfile
 import lzma
 
+from io import BytesIO
 from typing import Optional
 from threading import Event
 from typing import cast
@@ -591,6 +592,11 @@ class GestionnaireApplications:
 
         fd, fichier_clecert = tempfile.mkstemp(suffix='.tar')
         os.close(fd)
+        fd, fichier_app_config = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+
+        with open(fichier_app_config, 'w') as fichier:
+            json.dump(configuration_docker, fichier)
 
         try:
             # Creer le container, injecter cle/cert et scripts
@@ -606,15 +612,13 @@ class GestionnaireApplications:
             with tarfile.open(fichier_clecert, 'w') as tar_out:
                 for fichier, arcname in fichier_requis:
                     tar_out.add(fichier, arcname=arcname)
+                tar_out.add(fichier_app_config, arcname='app.cfg.json')
             with open(fichier_clecert, 'rb') as fichier:
                 container.put_archive('/tmp', fichier)
 
-            # Injecter le script au besoin
-            with open('/home/mathieu/PycharmProjects/millegrilles.deployeur/test/docker/scripts.tar.xz', 'rb') as fichier:
-                contenu_bytes = fichier.read()
-            contenu_bytes = lzma.decompress(contenu_bytes)
-            container.put_archive('/tmp', contenu_bytes)
-            del contenu_bytes  # Free mem
+            # Cleanup fichiers temporaires - note que les fichiers sont supprimes a nouveau dans finally
+            os.remove(fichier_clecert)
+            os.remove(fichier_app_config)
 
             container.start()
             container.wait()
@@ -626,7 +630,11 @@ class GestionnaireApplications:
             try:
                 os.remove(fichier_clecert)
             except:
-                pass
+                self.__logger.exception("Erreur suppression fichier tmp clecert " + fichier_clecert)
+            try:
+                os.remove(fichier_app_config)
+            except:
+                self.__logger.exception("Erreur suppression fichier tmp app config" + fichier_app_config)
 
             container = docker_client.containers.get('backup_application')
             try:
