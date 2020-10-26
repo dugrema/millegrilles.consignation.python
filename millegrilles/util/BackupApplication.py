@@ -9,7 +9,7 @@ from typing import Optional
 from os import environ, listdir, path
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
-from millegrilles.util.BackupModule import BackupUtil
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles import Constantes
 
@@ -29,10 +29,11 @@ class BackupApplication(ModeleConfiguration):
         self.__transaction_maitredescles: Optional[dict] = None
 
         # Pipe d'output
-        self.__output_file = None
+        self.__output_stream = None
         self.__cipher = None
         self.__lzma_compressor = None
         self.__tar_output = None
+        self.__path_output: str = None
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser()
@@ -52,6 +53,10 @@ class BackupApplication(ModeleConfiguration):
         self.__lzma_compressor.close()
         self.__cipher.close()
 
+    def upload(self):
+        handler_backup = HandlerBackupApplication(self.__handler_requetes)
+        handler_backup.upload_backup(self.__nom_application, self.__path_output)
+
     def charger_environnement(self):
         app_config_path = environ['CONFIG_APP']
 
@@ -60,6 +65,11 @@ class BackupApplication(ModeleConfiguration):
 
         self.__nom_application = self.__configuration_application['nom']
         self.preparer_catalogue()
+
+        self.__path_output = path.join(
+            '/backup',
+            self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
+        )
 
         if self.__logger.isEnabledFor(logging.DEBUG):
             self.__logger.debug("Fichier de configuration\n%s", json.dumps(self.__configuration_application, indent=2))
@@ -83,11 +93,11 @@ class BackupApplication(ModeleConfiguration):
         self.__logger.debug("Cles chiffrage recu : %s" % cles_chiffrage)
 
         # Creer un fichier .tar.xz.mgs1 pour streamer le backup
-        self.__output_file = open('/backup/output.tar.xz.mgs1', 'wb')
+        self.__output_stream = open(self.__path_output, 'wb')
 
         cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(
             self.__catalogue_backup, cles_chiffrage, nom_application=self.__nom_application,
-            output_stream=self.__output_file
+            output_stream=self.__output_stream
         )
 
         self.__logger.debug("Transaction maitredescles:\n%s", json.dumps(transaction_maitredescles, indent=2))
@@ -131,20 +141,11 @@ class BackupApplication(ModeleConfiguration):
         self.__logger.info("Volumes dans le backup : %s" % str(volumes))
 
         self.__logger.debug("-----")
-        self.__logger.debug("Directories sous /mnt")
-        for dir in listdir('/mnt'):
-            dir = path.join('/mnt', dir)
-            self.__logger.debug("- %s" % dir)
-
+        self.__logger.debug("Volumes")
         for volume in volumes:
             path_src = path.join('/mnt', volume)
+            self.__logger.debug("- %s" % path_src)
             self.__tar_output.add(path_src, arcname=volume, recursive=True)
-
-            # Creer un fichier .tar.xz pour le repertoire
-            # with lzma.open(path_tarxz, 'w') as xz:
-            #     with tarfile.open(fileobj=xz, mode='w|') as tar:
-            #         tar.add(path_src, arcname=volume, recursive=True)
-
         self.__logger.debug("-----")
 
     def upload_archive(self):
