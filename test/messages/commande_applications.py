@@ -73,7 +73,7 @@ class MessagesSample(BaseCallback):
 
     def backup_application(self):
         commande = {
-            'nom_application': 'blynk',
+            'nom_application': 'redmine',
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
             self.noeud_id, Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION)
@@ -124,9 +124,9 @@ class MessagesSample(BaseCallback):
         return enveloppe
 
     def executer(self):
-        # self.backup_application()
+        self.backup_application()
         # self.backup_applications()
-        self.restore_application()
+        # self.restore_application()
 
 
 # --- MAIN ---
