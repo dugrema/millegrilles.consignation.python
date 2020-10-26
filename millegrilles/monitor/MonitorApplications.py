@@ -533,13 +533,6 @@ class GestionnaireApplications:
         for nom_secret in docker_secrets_requis:
             secret = self.__service_monitor.gestionnaire_docker.trouver_secret(nom_secret[0])
 
-            # self.__logger.debug("Mapping secret %s" % secret)
-            # secret_name = secret['name']
-            # if secret.get('match_config'):
-            #     secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
-            # else:
-            #     secret_reference = self.trouver_secret(secret_name)
-
             secret_reference = dict()
             secret_reference['secret_id'] = secret['secret_id']
             secret_reference['secret_name'] = secret['secret_name']
@@ -555,8 +548,6 @@ class GestionnaireApplications:
             config = self.__service_monitor.gestionnaire_docker.charger_config_recente(nom_config[0])
 
             config_reference = config['config_reference']
-            #config_reference['config_id'] = config.id
-            #config_reference['config_name'] = config.name
             config_reference['filename'] = '/run/secrets/' + nom_config[1]
             config_reference['uid'] = 0
             config_reference['gid'] = 0
@@ -577,15 +568,8 @@ class GestionnaireApplications:
         volumes = configuration_backup.get('volumes')
         mounts = list()
         if volumes is not None:
-            volumes_mappes = {
-                # '/tmp/container_backup': {'bind': '/backup', 'mode': 'rw'},
-            }
             for volume in volumes:
-                volumes_mappes[volume] = {'bind': '/mnt/' + volume, 'mode': 'rw'}
                 mounts.append(':'.join([volume, '/mnt/' + volume, 'rw']))
-            # var_env.append("VOLUMES=" + ' '.join(volumes))
-        else:
-            volumes_mappes = None
 
         docker_client = self.__gestionnaire_modules_docker.docker_client
 
@@ -612,58 +596,18 @@ class GestionnaireApplications:
                 user="root",
                 networks=['millegrille_net'],
                 restart_policy=RestartPolicy(condition='none', max_attempts=0),
-                constraints=["node.labels.millegrilles.prive == true"]
+                constraints=configuration_backup.get('constraints')
             )
 
             self.__wait_die_service_container_id = service.id
             self.__wait_event_die.clear()
 
-            # # Creer le container, injecter cle/cert et scripts
-            # container = docker_client.containers.create(
-            #     image_python.id,
-            #     name="backup_application",
-            #     volumes=volumes_mappes,
-            #     environment=var_env,
-            #     user="root",
-            #     command=commande,
-            #     network='millegrille_net'
-            # )
-            #
-            # with tarfile.open(fichier_clecert, 'w') as tar_out:
-            #     for fichier, arcname in fichier_requis:
-            #         tar_out.add(fichier, arcname=arcname)
-            #     tar_out.add(fichier_app_config, arcname='app.cfg.json')
-            # with open(fichier_clecert, 'rb') as fichier:
-            #     container.put_archive('/tmp', fichier)
-            #
-            # # Cleanup fichiers temporaires - note que les fichiers sont supprimes a nouveau dans finally
-            # os.remove(fichier_clecert)
-            # os.remove(fichier_app_config)
-            #
-            # container.start()
-            # container.wait()
-            #
-            # container.reload()
-            # self.__logger.debug("Backup %s complete, resultat : %s" % (nom_application, container.status))
+            self.__wait_event_die.wait(600)  # Donner max de 10 minutes pour le backup
 
-            self.__wait_event_die.wait(30)
+            # Note - potentiellement verifier si la task est toujous en fonction pour eviter de couper un
+            # backup tres long.
 
         finally:
-            # try:
-            #     os.remove(fichier_clecert)
-            # except:
-            #     self.__logger.exception("Erreur suppression fichier tmp clecert " + fichier_clecert)
-            # try:
-            #     os.remove(fichier_app_config)
-            # except:
-            #     self.__logger.exception("Erreur suppression fichier tmp app config" + fichier_app_config)
-            #
-            # container = docker_client.containers.get('backup_application')
-            # try:
-            #     container.stop()
-            # except:
-            #     pass
-            # container.remove()
             service = self.__gestionnaire_modules_docker.get_service('backup_application')
             service.remove()
 
