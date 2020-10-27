@@ -385,7 +385,7 @@ class GestionnaireModulesDocker:
             # Prendre un tag au hasard
             image_tag = image.tags[0]
 
-            configuration = self.__formatter_configuration_container(container_name, config, application=container_name)
+            configuration = self.__formatter_configuration_container(container_name, config, application=kwargs.get('nom_application'))
 
             self.__logger.debug("Configuration du container: %s" % configuration)
 
@@ -569,15 +569,20 @@ class GestionnaireModulesDocker:
 
         return config_list
 
-    def sauvegarder_secret(self, secret_name: str, data: bytes, ajouter_date=False):
+    def sauvegarder_secret(self, secret_name: str, data: bytes, ajouter_date=False, labels: dict = None):
         date_courante = None
         if ajouter_date:
             date_courante = datetime.datetime.utcnow().strftime(MonitorConstantes.DOCKER_LABEL_TIME)
             secret_name = secret_name + '.' + date_courante
-        self.__docker.secrets.create(name=secret_name, data=data, labels={'idmg': self.__idmg})
+
+        labels_secret = {'idmg': self.__idmg}
+        if labels is not None:
+            labels_secret.update(labels)
+
+        self.__docker.secrets.create(name=secret_name, data=data, labels=labels_secret)
         return secret_name, date_courante
 
-    def sauvegarder_config(self, config_name, data):
+    def sauvegarder_config(self, config_name, data, labels: dict = None):
         filtre = {'name': config_name}
         configs = self.__docker.configs
         config_existante = configs.list(filters=filtre)
@@ -594,7 +599,7 @@ class GestionnaireModulesDocker:
             data_string = data
         else:
             raise ValueError("Type data non supporte")
-        configs.create(name=config_name, data=data_string)
+        configs.create(name=config_name, data=data_string, labels=labels)
 
     def supprimer_config(self, config_name):
         filtre = {'name': config_name}
@@ -1172,7 +1177,7 @@ class GestionnaireImagesDocker:
         images_info = self._versions_images['images']
         config = images_info[service]
         nom_image = config['image']
-        tag = config['version']
+        tag = config['version'] or kwargs.get('tag')
 
         service_registries = config.get('registries')
         if service_registries is None:

@@ -109,16 +109,15 @@ class GestionnaireApplications:
                 commande.contenu['configuration'] = configuration_docker
                 commande.contenu['configuration_courante'] = True
 
-            tar_scripts = self.preparer_script_file(commande.contenu)
-
             self.__service_monitor.generateur_transactions.transmettre_reponse(
                 reponse, replying_to=reply_to, correlation_id=correlation_id)
 
-            self.preparer_installation(nom_application, configuration_docker, tar_scripts)
+            self.preparer_installation(nom_application, configuration_docker)
 
             # Transmettre maj
             self.__service_monitor.emettre_presence()
         except Exception as e:
+            self.__logger.exception("Erreur installation application")
             reponse['ok'] = False
             reponse['err'] = str(e)
             self.__service_monitor.generateur_transactions.transmettre_reponse(
@@ -126,8 +125,8 @@ class GestionnaireApplications:
 
     def preparer_script_file(self, commande: dict):
         configuration = commande.get('configuration')
-        if configuration and configuration.get('tar_xz'):
-            b64_script = configuration['tar_xz']
+        if configuration and configuration.get('scripts'):
+            b64_script = configuration['scripts']
             if b64_script:
                 tar_bytes = b64decode(b64_script)
                 file_handle, tar_scripts = tempfile.mkstemp(prefix='monitor-script-', suffix='.tar')
@@ -172,7 +171,7 @@ class GestionnaireApplications:
             self.__service_monitor.generateur_transactions.transmettre_reponse(
                 reponse, replying_to=reply_to, correlation_id=correlation_id)
 
-            self.preparer_installation(nom_application, configuration_docker, tar_scripts)
+            self.preparer_installation(nom_application, configuration_docker)
 
             # Transmettre maj
             self.__service_monitor.emettre_presence()
@@ -256,7 +255,15 @@ class GestionnaireApplications:
 
         return liste_configuration
 
-    def preparer_installation(self, nom_application, configuration_docker, tar_scripts=None, **kwargs):
+    def preparer_installation(self, nom_application, configuration_docker, **kwargs):
+        """
+        Installe une nouvelle application.
+        :param nom_application:
+        :param configuration_docker:
+        :param tar_scripts:
+        :param kwargs:
+        :return:
+        """
         gestionnaire_images_applications = GestionnaireImagesApplications(
             self.__service_monitor.idmg, self.__service_monitor.docker)
         gestionnaire_images_applications.set_configuration(configuration_docker)
@@ -266,22 +273,23 @@ class GestionnaireApplications:
         if configuration_docker.get('configuration_courante') is not True:
             self.__gestionnaire_modules_docker.sauvegarder_config(config_name, configuration_docker)
 
+        # Verifier si on a des scripts d'installation
+        if configuration_docker.get('scripts'):
+            self._executer_service(
+                nom_application,
+                configuration_docker,
+                'python3 -m millegrilles.util.EntretienApplication --debug'
+            )
+
         # Installer toutes les dependances de l'application en ordre
         for config_image in configuration_docker['dependances']:
-            if config_image.get('dependances'):
-                mode_shared = config_image.get('shared')
-                # Sous dependances presentes, c'est une sous-config
-                nom_image_docker = config_image['nom']
-                self.preparer_installation(nom_image_docker, config_image, shared=mode_shared)
-            elif config_image.get('image'):
-                # C'est une image, on l'installe
-                try:
-                    self.installer_dependance(gestionnaire_images_applications, config_image, tar_scripts)
-                except APIError as api:
-                    if api.status_code == 409 and kwargs.get('shared'):
-                        pass  # OK
-                    else:
-                        raise api
+            try:
+                self.installer_dependance(gestionnaire_images_applications, configuration_docker, config_image, nom_application)
+            except APIError as api:
+                if api.status_code == 409 and kwargs.get('shared'):
+                    pass  # OK
+                else:
+                    raise api
 
         nginx_config = configuration_docker.get('nginx')
         if nginx_config:
@@ -289,7 +297,7 @@ class GestionnaireApplications:
             conf: Optional[str] = None
             if server_file:
                 # Charger le fichier a partir de l'archive tar
-                server_file_obj = io.BytesIO(b64decode(configuration_docker['tar_xz']))
+                server_file_obj = io.BytesIO(b64decode(configuration_docker['scripts']))
                 tar_content = tarfile.open(fileobj=server_file_obj)
                 conf_file_member = tar_content.getmember(server_file)
                 conf = tar_content.extractfile(conf_file_member).read().decode('utf-8')
@@ -317,13 +325,56 @@ class GestionnaireApplications:
             nom_service_nginx = 'nginx'
             self.__gestionnaire_modules_docker.force_update_service(nom_service_nginx)
 
-    def installer_dependance(self, gestionnaire_images_applications, config_image, tar_scripts=None):
+    def installer_dependance(self, gestionnaire_images_applications, config_docker, config_image, nom_application):
         nom_container_docker = config_image['config']['name']
         config_name = 'docker.cfg.' + nom_container_docker
         config_elem = config_image['config']
-        self.__gestionnaire_modules_docker.sauvegarder_config(config_name, config_elem)
+        self.__gestionnaire_modules_docker.sauvegarder_config(config_name, config_elem, {'application': nom_application})
 
         # Generer valeurs au besoin
+        self.generer_motsdepasse(config_image)
+
+        try:
+            self.demarrer_application(config_elem, config_image, gestionnaire_images_applications, nom_container_docker, nom_application)
+        except PkiCleNonTrouvee:
+            # La cle n'a pas ete trouvee, tenter de generer la cle/certificat et reessayer
+            self.__service_monitor.regenerer_certificat(
+                ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE,
+                nom_container_docker,
+                nomcle=nom_container_docker or config_elem['name']
+            )
+            self.demarrer_application(config_elem, config_image, gestionnaire_images_applications, nom_container_docker, nom_application)
+
+        config_installation = config_image.get('installation')
+        if config_installation:
+            try:
+                scripts_post_start = config_installation['post_start']
+                for script in scripts_post_start:
+                    configuration_script = config_docker['installation'][script]
+                    self.__logger.info(
+                        "Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
+
+                    # Les scripts ont eta installes dans le volume scripts_[appname] qui est inclus dans le service
+                    # self.__gestionnaire_modules_docker.executer_scripts(
+                    #     self.__wait_start_service_container_id, config_installation['commande'], tar_scripts)
+                    commande = configuration_script['command']
+
+                    image_info = config_docker['images'][configuration_script['image']]
+
+                    self._executer_service(nom_application, configuration_script, commande, image_info)
+            except KeyError:
+                pass  # Aucun script
+            except ExceptionExecution as ex:
+                codes_ok = config_installation.get('exit_codes_ok')
+                if not codes_ok or ex.resultat['exit'] not in codes_ok:
+                    raise ex
+
+        if config_image.get('etape_seulement'):
+            # C'est un service intermediaire pour l'installation/backup
+            # On supprime le service maintenant que la tache est terminee
+            self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
+
+    def generer_motsdepasse(self, config_image):
         valeurs_a_generer = config_image.get('generer')
         mots_de_passe = dict()
         if valeurs_a_generer:
@@ -339,45 +390,10 @@ class GestionnaireApplications:
                     motdepasse = b64encode(secrets.token_bytes(16))
                     # Conserver mot de passe en memoire pour generer script, au besoin
                     mots_de_passe[label_motdepasse] = motdepasse.decode('utf-8')
-                    self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse, ajouter_date=True)
+                    self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse,
+                                                                          ajouter_date=True)
 
-        try:
-            self.demarrer_application(config_elem, config_image, gestionnaire_images_applications, nom_container_docker)
-        except PkiCleNonTrouvee:
-            # La cle n'a pas ete trouvee, tenter de generer la cle/certificat et reessayer
-            self.__service_monitor.regenerer_certificat(
-                ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE,
-                nom_container_docker,
-                nomcle=nom_container_docker or config_elem['name']
-            )
-            self.demarrer_application(config_elem, config_image, gestionnaire_images_applications, nom_container_docker)
-
-        if self.__wait_container_event.is_set():
-            self.__logger.info("Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
-            self.__wait_container_event.clear()
-
-            # Preparer les scripts dans un fichier .tar temporaire
-            # path_script = '/home/mathieu/PycharmProjects/millegrilles.consignation.python/test/scripts.apps.tar'
-            # commande_script = '/tmp/apps/script.redmine.postgres.installation.sh'
-            config_installation = config_image.get('installation')
-            if config_installation:
-                try:
-                    self.__gestionnaire_modules_docker.executer_scripts(
-                        self.__wait_start_service_container_id, config_installation['commande'], tar_scripts)
-                except ExceptionExecution as ex:
-                    codes_ok = config_installation.get('exit_codes_ok')
-                    if not codes_ok or ex.resultat['exit'] not in codes_ok:
-                        raise ex
-        else:
-            self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_container_docker)
-            raise Exception("Container non installe : " + nom_container_docker)
-
-        if config_image.get('etape_seulement'):
-            # C'est un service intermediaire pour l'installation/backup
-            # On supprime le service maintenant que la tache est terminee
-            self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
-
-    def demarrer_application(self, config_elem, config_image, gestionnaire_images_applications, nom_container_docker):
+    def demarrer_application(self, config_elem, config_image, gestionnaire_images_applications, nom_container_docker, nom_application):
         # Preparer le demarrage du service, intercepter le demarrage du container
         module_name = config_elem['name']
         self.__wait_container_event.clear()
@@ -389,7 +405,7 @@ class GestionnaireApplications:
                                                                       nom_image=nom_image_docker,
                                                                       config=config_elem,
                                                                       images=gestionnaire_images_applications,
-                                                                      application=module_name)
+                                                                      application=nom_application)
             else:
                 self.__wait_start_service_name = module_name
                 self.__gestionnaire_modules_docker.demarrer_service(module_name,
@@ -397,9 +413,11 @@ class GestionnaireApplications:
                                                                     images=gestionnaire_images_applications,
                                                                     nom_image=nom_image_docker,
                                                                     nom_container=nom_container_docker,
-                                                                    application=module_name)
+                                                                    application=nom_application)
 
             self.__wait_container_event.wait(60)
+            if self.__wait_container_event.is_set() is False:
+                raise Exception("Erreur demarrage " + module_name)
             self.__service_monitor.emettre_evenement('applicationDemarree', {'nom_application': module_name})
         except APIError as apie:
             if apie.status_code == 409:
@@ -506,18 +524,24 @@ class GestionnaireApplications:
             return {'ok': False, 'err': str(e)}
 
     def executer_commande(self, nom_application: str, commande: str):
-
         configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config('app.cfg.' + nom_application)
         configuration_docker = json.loads(configuration_docker_bytes)
         configuration_backup = configuration_docker['backup']
-        configuration = self.__service_monitor.connexion_middleware.configuration
+
+        self._executer_service(nom_application, configuration_backup, commande)
+
+    def _executer_service(self, nom_application: str, configuration_commande: dict, commande: str, image: dict = None):
+
+        configuration_contexte = self.__service_monitor.connexion_middleware.configuration
 
         docker_secrets_requis = [
             ('pki.monitor.key', 'pki.monitor.key'),
         ]
+
+        # Ajouter mapping pour les secrets dans la configuration
         try:
-            secrets_recents = configuration_backup['secrets_plusrecents']
-            secrets_recents = [(s,s) for s in secrets_recents]
+            secrets_recents = configuration_commande['secrets']
+            secrets_recents = [(s['name'], s['filename']) for s in secrets_recents]
             docker_secrets_requis.extend(secrets_recents)
         except KeyError:
             pass
@@ -555,8 +579,8 @@ class GestionnaireApplications:
             configs.append(ConfigReference(**config_reference))
 
         var_env = [
-            "MG_MQ_HOST=" + configuration.mq_host,
-            "MG_MQ_PORT=%d" % configuration.mq_port,
+            "MG_MQ_HOST=" + configuration_contexte.mq_host,
+            "MG_MQ_PORT=%d" % configuration_contexte.mq_port,
             "MG_MQ_SSL=on",
             "MG_MQ_AUTH_CERT=on",
             "MG_MQ_CA_CERTS=/run/secrets/pki.millegrille.cert",
@@ -565,28 +589,34 @@ class GestionnaireApplications:
             "CONFIG_APP=/run/secrets/app.cfg.json"
         ]
 
-        volumes = configuration_backup.get('volumes')
-        mounts = list()
+        volumes = configuration_commande.get('volumes')
+        # Ajouter les volumes implicites de scripts et backup
+        mounts = [
+            'backup_%s:/backup:rw' % nom_application,
+            'scripts_%s:/scripts:rw' % nom_application,
+        ]
+
         if volumes is not None:
             for volume in volumes:
                 mounts.append(':'.join([volume, '/mnt/' + volume, 'rw']))
 
         docker_client = self.__gestionnaire_modules_docker.docker_client
 
-        gestionnaire_images = GestionnaireImagesServices(configuration.idmg, docker_client)
-        image_python = gestionnaire_images.telecharger_image_docker('mg-python')
+        # Aller chercher l'image docker pour l'execution du script
+        gestionnaire_images = GestionnaireImagesServices(configuration_contexte.idmg, docker_client)
+        try:
+            nom_image = image['image']
+            tag = image['version']
+        except (TypeError, KeyError):
+            nom_image = 'mg-python'
+            tag = None
 
-        # fd, fichier_clecert = tempfile.mkstemp(suffix='.tar')
-        # os.close(fd)
-        # fd, fichier_app_config = tempfile.mkstemp(suffix='.json')
-        # os.close(fd)
-        # with open(fichier_app_config, 'w') as fichier:
-        #     json.dump(configuration_docker, fichier)
+        image_python = gestionnaire_images.telecharger_image_docker(nom_image, tag=tag)
 
         try:
             service = docker_client.services.create(
                 image_python.id,
-                name="backup_application",
+                name="script_application",
                 command=commande,
                 mounts=mounts,
                 env=var_env,
@@ -595,26 +625,37 @@ class GestionnaireApplications:
                 user="root",
                 networks=['millegrille_net'],
                 restart_policy=RestartPolicy(condition='none', max_attempts=0),
-                constraints=configuration_backup.get('constraints')
+                constraints=configuration_commande.get('constraints'),
+                workdir="/scripts"
             )
 
             self.__wait_container_event.clear()
             self.__wait_start_service_name = service.name
+
+            # Donner 10 secondes pour demarrer le service. L'image existe deja localement, pas de prep a faire.
             self.__wait_container_event.wait(10)
 
             if self.__wait_container_event.is_set() is False:
-                raise Exception("Erreur demarrage service application backup/restaure")
+                raise ExceptionExecution("Erreur demarrage service script application pour " + nom_application)
 
             self.__wait_die_service_container_id = service.id
             self.__wait_event_die.clear()
 
             self.__wait_event_die.wait(600)  # Donner max de 10 minutes pour le backup
 
-            # Note - potentiellement verifier si la task est toujous en fonction pour eviter de couper un
-            # backup tres long.
+            # Verifier si la tache est en cours d'execution ou si elle a echoue
+            service.reload()
+            task = service.tasks()[0]
+            if task['Status']['State'] == 'failed':
+                exit_code = 'N/A'
+                try:
+                    exit_code = task['Status']['ContainerStatus']['ExitCode']
+                except KeyError:
+                    pass
+                raise ExceptionExecution("Echec d'execution du script : " + str(exit_code), resultat=exit_code)
 
         finally:
-            service = self.__gestionnaire_modules_docker.get_service('backup_application')
+            service = self.__gestionnaire_modules_docker.get_service('script_application')
             service.remove()
 
     def restore_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts, tar_archive):

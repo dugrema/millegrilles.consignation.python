@@ -32,7 +32,7 @@ class BackupApplication(ModeleConfiguration):
         self.__catalogue_backup = dict()
         self.__transaction_maitredescles: Optional[dict] = None
 
-        self.__path_backup = '/tmp/backup'
+        self.__path_backup = '/backup'
 
         # Pipe d'output
         self.__output_stream = None
@@ -48,9 +48,17 @@ class BackupApplication(ModeleConfiguration):
         # self.contexte.message_dao.register_channel_listener(self.__handler_requetes)
 
     def executer(self):
-        self.__logger.info("Debut execution backup application")
+        self.__logger.info("Debut execution preparation")
         self.charger_environnement()
+        self.extraire_scripts_inclus()
 
+        if environ.get('PHASE') == 'BACKUP_UPLOAD':
+            self.__logger.info("Debut execution backup application")
+            self.executer_backup()
+
+        self.__logger.info("Execution terminee")
+
+    def executer_backup(self):
         self.preparer_cipher()
         self.executer_script_inclus()
         self.archiver_volumes()
@@ -80,7 +88,7 @@ class BackupApplication(ModeleConfiguration):
         self.preparer_catalogue()
 
         self.__path_output = path.join(
-            self.__path_backup,
+            '/tmp',
             self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER]
         )
 
@@ -130,30 +138,35 @@ class BackupApplication(ModeleConfiguration):
         base_name = path.basename(file_path)
         self.__tar_output.add(file_path, arcname=base_name)
 
-    def executer_script_inclus(self):
+    def extraire_scripts_inclus(self):
         """
-        Execute le script inclus dans la configuration
+        Extrait les scripts inclus dans la configuration
         :return:
         """
         try:
-            configuration_backup = self.__configuration_application['backup']
-            script_tar_xz = configuration_backup['tar_xz']
-            makedirs('/tmp/scripts', exist_ok=True)
-
-            # Ecrire le script sous /tmp/script.sh
-            script_tar_xz = b64decode(script_tar_xz)
-            script_tar_xz = BytesIO(script_tar_xz)
-            with lzma.open(script_tar_xz, 'r') as xz:
-                with tarfile.open(fileobj=xz, mode='r') as tar:
-                    tar.extractall('/tmp/scripts')
-
-            # Executer script de backup
-            commande_backup = path.join('/tmp/scripts', configuration_backup['commande_backup'])
-            subprocess.run(commande_backup, stdout=sys.stdout, check=True)
-
+            script_tar_xz = self.__configuration_application['scripts']
         except KeyError:
             self.__logger.info("Aucun script de backup fourni")
             return
+
+        # makedirs('/tmp/scripts', exist_ok=True)
+
+        # Ecrire le script sous /tmp/script.sh
+        script_tar_xz = b64decode(script_tar_xz)
+        script_tar_xz = BytesIO(script_tar_xz)
+        with lzma.open(script_tar_xz, 'r') as xz:
+            with tarfile.open(fileobj=xz, mode='r') as tar:
+                tar.extractall('/scripts')
+
+    def executer_script_inclus(self):
+        """
+        Execute le script de backup
+        :return:
+        """
+        # Executer script de backup
+        configuration_backup = self.__configuration_application['backup']
+        commande_backup = path.join('/scripts', configuration_backup['commande_backup'])
+        subprocess.run(commande_backup, stdout=sys.stdout, check=True)
 
     def archiver_volumes(self):
         try:
@@ -167,7 +180,7 @@ class BackupApplication(ModeleConfiguration):
         self.__logger.debug("-----")
         self.__logger.debug("Volumes")
         for volume in volumes:
-            path_src = path.join('/mnt', volume)
+            path_src = path.join(self.__path_backup, volume)
             self.__logger.debug("- %s" % path_src)
             self.__tar_output.add(path_src, arcname=volume, recursive=True)
         self.__logger.debug("-----")

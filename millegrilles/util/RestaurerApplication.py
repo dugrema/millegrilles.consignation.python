@@ -128,23 +128,23 @@ class RestaurerApplication(ModeleConfiguration):
         """
         try:
             configuration_backup = self.__configuration_application['backup']
-            script_tar_xz = configuration_backup['tar_xz']
-            makedirs('/tmp/scripts', exist_ok=True)
-
-            # Ecrire le script sous /tmp/script.sh
-            script_tar_xz = b64decode(script_tar_xz)
-            script_tar_xz = BytesIO(script_tar_xz)
-            with lzma.open(script_tar_xz, 'r') as xz:
-                with tarfile.open(fileobj=xz, mode='r') as tar:
-                    tar.extractall('/tmp/scripts')
-
-            # Executer script de backup
-            commande_backup = path.join('/tmp/scripts', configuration_backup['commande_restore'])
-            subprocess.run(commande_backup, stdout=sys.stdout, check=True)
-
+            script_tar_xz = self.__configuration_application['scripts']
         except KeyError:
             self.__logger.info("Aucun script de backup fourni")
             return
+
+        makedirs('/tmp/scripts', exist_ok=True)
+
+        # Ecrire le script sous /tmp/script.sh
+        script_tar_xz = b64decode(script_tar_xz)
+        script_tar_xz = BytesIO(script_tar_xz)
+        with lzma.open(script_tar_xz, 'r') as xz:
+            with tarfile.open(fileobj=xz, mode='r') as tar:
+                tar.extractall('/tmp/scripts')
+
+        # Executer script de backup
+        commande_backup = path.join('/tmp/scripts', configuration_backup['commande_restore'])
+        subprocess.run(commande_backup, stdout=sys.stdout, check=True)
 
     def extraire_archive(self, decipher_stream):
         with lzma.open(decipher_stream, 'r') as xz:
