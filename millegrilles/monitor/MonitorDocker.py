@@ -1267,6 +1267,19 @@ class GestionnaireImagesDocker:
 
         return nom_image
 
+    def get_image(self, registry: str, tag: str):
+        """
+        Simple get/pull image.
+        :param registry:
+        :param tag:
+        :return:
+        """
+        try:
+            return self._docker.images.get(registry + ':' + tag)
+        except APIError as apie:
+            if apie.status_code == 404:
+                return self._docker.images.pull(registry, tag)
+
 
 class GestionnaireImagesServices(GestionnaireImagesDocker):
 

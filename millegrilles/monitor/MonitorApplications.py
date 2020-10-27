@@ -350,9 +350,12 @@ class GestionnaireApplications:
             try:
                 scripts_post_start = config_installation['post_start']
                 for script in scripts_post_start:
-                    configuration_script = config_docker['installation'][script]
-                    self.__logger.info(
-                        "Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
+                    try:
+                        configuration_script = config_docker['installation'][script]
+                        self.__logger.info(
+                            "Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
+                    except KeyError:
+                        continue  # Aucun script
 
                     # Les scripts ont eta installes dans le volume scripts_[appname] qui est inclus dans le service
                     # self.__gestionnaire_modules_docker.executer_scripts(
@@ -362,8 +365,6 @@ class GestionnaireApplications:
                     image_info = config_docker['images'][configuration_script['image']]
 
                     self._executer_service(nom_application, configuration_script, commande, image_info)
-            except KeyError:
-                pass  # Aucun script
             except ExceptionExecution as ex:
                 codes_ok = config_installation.get('exit_codes_ok')
                 if not codes_ok or ex.resultat['exit'] not in codes_ok:
@@ -608,10 +609,9 @@ class GestionnaireApplications:
             nom_image = image['image']
             tag = image['version']
         except (TypeError, KeyError):
-            nom_image = 'mg-python'
-            tag = None
-
-        image_python = gestionnaire_images.telecharger_image_docker(nom_image, tag=tag)
+            image_python = gestionnaire_images.telecharger_image_docker('mg-python')
+        else:
+            image_python = gestionnaire_images.get_image(nom_image, tag)
 
         try:
             service = docker_client.services.create(
