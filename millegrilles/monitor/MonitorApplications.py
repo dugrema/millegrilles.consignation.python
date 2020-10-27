@@ -503,7 +503,6 @@ class GestionnaireApplications:
         )
 
     def effectuer_backup(self, nom_application: str):
-        commande = "python3 -m millegrilles.util.EntretienApplication --debug --backup"
         try:
             configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
                 'app.cfg.' + nom_application)
@@ -514,9 +513,27 @@ class GestionnaireApplications:
             try:
                 dependances = configuration_backup['dependances']
             except KeyError:
-                pass
-            else:
                 # Aucunes dependances - on lance le backup avec volumes dans la liste
+                commande = "python3 -m millegrilles.util.EntretienApplication --debug --backup"
+                self._executer_service(nom_application, configuration_backup, commande)
+            else:
+                # On a des dependances, preparer les scripts
+                self.__logger.info("Preparer scripts de backup")
+                commande = "python3 -m millegrilles.util.EntretienApplication --debug"
+                self._executer_service(nom_application, configuration_backup, commande)
+
+                for dep in dependances:
+                    commande_backup = dep['commande_backup']
+                    try:
+                        image_info = configuration_docker['images'][dep['image']]
+                    except KeyError:
+                        image_info = None
+                    self.__logger.info("Executer script dependance " + commande_backup)
+                    self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
+                    self._executer_service(nom_application, dep, commande_backup, image_info)
+
+                self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
+                commande = "python3 -m millegrilles.util.EntretienApplication --debug --backup"
                 self._executer_service(nom_application, configuration_backup, commande)
 
             return {'ok': True}
@@ -598,16 +615,18 @@ class GestionnaireApplications:
             "CONFIG_APP=/run/secrets/app.cfg.json"
         ]
 
-        volumes = configuration_commande.get('volumes')
         # Ajouter les volumes implicites de scripts et backup
         mounts = [
             'backup_%s:/backup:rw' % nom_application,
             'scripts_%s:/scripts:rw' % nom_application,
         ]
-
-        if volumes is not None:
+        try:
+            volumes = configuration_commande['data']['volumes']
+        except KeyError:
+            pass
+        else:
             for volume in volumes:
-                mounts.append(':'.join([volume, '/mnt/' + volume, 'rw']))
+                mounts.append(':'.join([volume, '/backup/' + volume, 'rw']))
 
         docker_client = self.__gestionnaire_modules_docker.docker_client
 
@@ -644,7 +663,7 @@ class GestionnaireApplications:
             self.__wait_container_event.wait(10)
 
             if self.__wait_container_event.is_set() is False:
-                raise ExceptionExecution("Erreur demarrage service script application pour " + nom_application)
+                raise ExceptionExecution("Erreur demarrage service script application pour " + nom_application, resultat=None)
 
             self.__wait_die_service_container_id = service.id
             self.__wait_event_die.clear()
