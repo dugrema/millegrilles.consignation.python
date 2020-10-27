@@ -542,12 +542,38 @@ class GestionnaireApplications:
             return {'ok': False, 'err': str(e)}
 
     def effectuer_restauration(self, nom_application: str, configuration_docker):
-        commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
         try:
-            self.executer_commande(nom_application, commande)
+            configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
+                'app.cfg.' + nom_application)
+            configuration_docker = json.loads(configuration_docker_bytes)
+            configuration_backup = configuration_docker['backup']
+
+            # Restaurer les fichiers
+            commande = "python3 -m millegrilles.util.RestaurerApplication --debug"
+            self._executer_service(nom_application, configuration_backup, commande)
+
+            # Verifier si on a des dependances (scripts) de backup
+            try:
+                dependances = configuration_backup['dependances']
+            except KeyError:
+                # Aucunes dependances - rien a faire
+                pass
+            else:
+                # On a des dependances, les scripts ont deja ete prepares par la restauration des fichiers
+                dependances.reverse()  # On va executer les dependances dans l'ordre inverse du backup
+                for dep in dependances:
+                    commande_backup = dep['commande_restore']
+                    try:
+                        image_info = configuration_docker['images'][dep['image']]
+                    except KeyError:
+                        image_info = None
+                    self.__logger.info("Executer script dependance " + commande_backup)
+                    self.__logger.info("Chiffrer et uploader les s fichiers sous /backup")
+                    self._executer_service(nom_application, dep, commande_backup, image_info)
+
             return {'ok': True}
         except Exception as e:
-            self.__logger.exception("Erreur traitement restauration")
+            self.__logger.exception("Erreur traitement backup")
             return {'ok': False, 'err': str(e)}
 
     def executer_commande(self, nom_application: str, commande: str):

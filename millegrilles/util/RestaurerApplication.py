@@ -38,21 +38,21 @@ class RestaurerApplication(ModeleConfiguration):
         self.__cipher = None
         self.__lzma_compressor = None
         self.__tar_output = None
-        self.__path_output: str = environ.get('PATH_RESTAURATION') or '/mnt'
+        self.__path_output: str = environ.get('PATH_RESTAURATION') or '/backup'
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser()
         self.__handler_requetes = TraitementMQRequetesBlocking(self.contexte)
         self.__backup_util = BackupUtil(self.contexte)
-        # self.contexte.message_dao.register_channel_listener(self.__handler_requetes)
 
     def executer(self):
         self.__logger.info("Debut execution restauration application")
         self.charger_environnement()
+        self.extraire_scripts_inclus()
 
         decipher_stream = self.preparer_decipher()
         self.extraire_archive(decipher_stream)
-        self.executer_script_inclus()
+        # self.executer_script_inclus()
 
     def charger_environnement(self):
         app_config_path = environ['CONFIG_APP']
@@ -64,6 +64,24 @@ class RestaurerApplication(ModeleConfiguration):
 
         if self.__logger.isEnabledFor(logging.DEBUG):
             self.__logger.debug("Fichier de configuration\n%s", json.dumps(self.__configuration_application, indent=2))
+
+    def extraire_scripts_inclus(self):
+        """
+        Extrait les scripts inclus dans la configuration
+        :return:
+        """
+        try:
+            script_tar_xz = self.__configuration_application['scripts']
+        except KeyError:
+            self.__logger.info("Aucun script de backup fourni")
+            return
+
+        # Ecrire le script sous /tmp/script.sh
+        script_tar_xz = b64decode(script_tar_xz)
+        script_tar_xz = BytesIO(script_tar_xz)
+        with lzma.open(script_tar_xz, 'r') as xz:
+            with tarfile.open(fileobj=xz, mode='r') as tar:
+                tar.extractall('/scripts')
 
     def preparer_decipher(self):
         # Preparer URL de connexion a consignationfichiers
@@ -112,39 +130,39 @@ class RestaurerApplication(ModeleConfiguration):
 
         return decipher_stream
 
-    def ajouter_fichier(self, file_path: str):
-        """
-        Ajoute le fichier a l'archive .tar.xz.mgs1. Tronque le path.
-        :param file_path:
-        :return:
-        """
-        base_name = path.basename(file_path)
-        self.__tar_output.add(file_path, arcname=base_name)
-
-    def executer_script_inclus(self):
-        """
-        Execute le script inclus dans la configuration
-        :return:
-        """
-        try:
-            configuration_backup = self.__configuration_application['backup']
-            script_tar_xz = self.__configuration_application['scripts']
-        except KeyError:
-            self.__logger.info("Aucun script de backup fourni")
-            return
-
-        makedirs('/tmp/scripts', exist_ok=True)
-
-        # Ecrire le script sous /tmp/script.sh
-        script_tar_xz = b64decode(script_tar_xz)
-        script_tar_xz = BytesIO(script_tar_xz)
-        with lzma.open(script_tar_xz, 'r') as xz:
-            with tarfile.open(fileobj=xz, mode='r') as tar:
-                tar.extractall('/tmp/scripts')
-
-        # Executer script de backup
-        commande_backup = path.join('/tmp/scripts', configuration_backup['commande_restore'])
-        subprocess.run(commande_backup, stdout=sys.stdout, check=True)
+    # def ajouter_fichier(self, file_path: str):
+    #     """
+    #     Ajoute le fichier a l'archive .tar.xz.mgs1. Tronque le path.
+    #     :param file_path:
+    #     :return:
+    #     """
+    #     base_name = path.basename(file_path)
+    #     self.__tar_output.add(file_path, arcname=base_name)
+    #
+    # def executer_script_inclus(self):
+    #     """
+    #     Execute le script inclus dans la configuration
+    #     :return:
+    #     """
+    #     try:
+    #         configuration_backup = self.__configuration_application['backup']
+    #         script_tar_xz = self.__configuration_application['scripts']
+    #     except KeyError:
+    #         self.__logger.info("Aucun script de backup fourni")
+    #         return
+    #
+    #     makedirs('/tmp/scripts', exist_ok=True)
+    #
+    #     # Ecrire le script sous /tmp/script.sh
+    #     script_tar_xz = b64decode(script_tar_xz)
+    #     script_tar_xz = BytesIO(script_tar_xz)
+    #     with lzma.open(script_tar_xz, 'r') as xz:
+    #         with tarfile.open(fileobj=xz, mode='r') as tar:
+    #             tar.extractall('/tmp/scripts')
+    #
+    #     # Executer script de backup
+    #     commande_backup = path.join('/tmp/scripts', configuration_backup['commande_restore'])
+    #     subprocess.run(commande_backup, stdout=sys.stdout, check=True)
 
     def extraire_archive(self, decipher_stream):
         with lzma.open(decipher_stream, 'r') as xz:
