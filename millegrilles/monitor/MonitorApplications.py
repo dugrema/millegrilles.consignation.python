@@ -135,20 +135,6 @@ class GestionnaireApplications:
                     if apie.status_code != 404:
                         self.__logger.exception("Erreur nettoyage volume %s pour application %s" % (vol, nom_application))
 
-    def preparer_script_file(self, commande: dict):
-        configuration = commande.get('configuration')
-        if configuration and configuration.get('scripts'):
-            b64_script = configuration['scripts']
-            if b64_script:
-                tar_bytes = b64decode(b64_script)
-                file_handle, tar_scripts = tempfile.mkstemp(prefix='monitor-script-', suffix='.tar')
-                os.close(file_handle)
-                with open(tar_scripts, 'wb') as fichier:
-                    fichier.write(tar_bytes)
-        else:
-            tar_scripts = commande.get('scripts_tarfile')
-        return tar_scripts
-
     def configurer_application(self, commande: CommandeMonitor):
         nom_app = commande.contenu['nom_application']
         nom_configuration = 'app.cfg.' + nom_app
@@ -177,8 +163,6 @@ class GestionnaireApplications:
             configuration_docker = json.loads(configuration_existante.decode('utf-8'))
             commande.contenu['configuration'] = configuration_docker
             commande.contenu['configuration_courante'] = True
-
-            tar_scripts = self.preparer_script_file(commande.contenu)
 
             self.__service_monitor.generateur_transactions.transmettre_reponse(
                 reponse, replying_to=reply_to, correlation_id=correlation_id)
@@ -519,9 +503,22 @@ class GestionnaireApplications:
         )
 
     def effectuer_backup(self, nom_application: str):
-        commande = "python3 -m millegrilles.util.BackupApplication --debug"
+        commande = "python3 -m millegrilles.util.EntretienApplication --debug --backup"
         try:
-            self.executer_commande(nom_application, commande)
+            configuration_docker_bytes = self.__gestionnaire_modules_docker.charger_config(
+                'app.cfg.' + nom_application)
+            configuration_docker = json.loads(configuration_docker_bytes)
+            configuration_backup = configuration_docker['backup']
+
+            # Verifier si on a des dependances de backup
+            try:
+                dependances = configuration_backup['dependances']
+            except KeyError:
+                pass
+            else:
+                # Aucunes dependances - on lance le backup avec volumes dans la liste
+                self._executer_service(nom_application, configuration_backup, commande)
+
             return {'ok': True}
         except Exception as e:
             self.__logger.exception("Erreur traitement backup")
@@ -544,7 +541,6 @@ class GestionnaireApplications:
         self._executer_service(nom_application, configuration_backup, commande)
 
     def _executer_service(self, nom_application: str, configuration_commande: dict, commande: str, image: dict = None):
-
         configuration_contexte = self.__service_monitor.connexion_middleware.configuration
 
         docker_secrets_requis = [

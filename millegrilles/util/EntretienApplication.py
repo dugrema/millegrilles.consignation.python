@@ -39,28 +39,34 @@ class BackupApplication(ModeleConfiguration):
         self.__cipher = None
         self.__lzma_compressor = None
         self.__tar_output = None
-        self.__path_output: str = None
+        self.__path_output: Optional[str] = None
+
+    def configurer_parser(self):
+        super().configurer_parser()
+        self.parser.add_argument(
+            '--backup_upload', action="store_true", required=False,
+            help="Chiffre et upload le contenu de /backup"
+        )
 
     def initialiser(self, init_document=False, init_message=True, connecter=True):
         super().initialiser()
         self.__handler_requetes = TraitementMQRequetesBlocking(self.contexte)
         self.__backup_util = BackupUtil(self.contexte)
-        # self.contexte.message_dao.register_channel_listener(self.__handler_requetes)
 
     def executer(self):
         self.__logger.info("Debut execution preparation")
         self.charger_environnement()
         self.extraire_scripts_inclus()
 
-        if environ.get('PHASE') == 'BACKUP_UPLOAD':
-            self.__logger.info("Debut execution backup application")
+        if self.args.backup_upload:
+            self.__logger.info("Debut execution backup et upload application")
             self.executer_backup()
 
         self.__logger.info("Execution terminee")
 
     def executer_backup(self):
         self.preparer_cipher()
-        self.executer_script_inclus()
+        # self.executer_script_inclus()  # Le script est maintenant execute separement
         self.archiver_volumes()
 
         self.__tar_output.close()
@@ -149,8 +155,6 @@ class BackupApplication(ModeleConfiguration):
             self.__logger.info("Aucun script de backup fourni")
             return
 
-        # makedirs('/tmp/scripts', exist_ok=True)
-
         # Ecrire le script sous /tmp/script.sh
         script_tar_xz = b64decode(script_tar_xz)
         script_tar_xz = BytesIO(script_tar_xz)
@@ -164,94 +168,22 @@ class BackupApplication(ModeleConfiguration):
         :return:
         """
         # Executer script de backup
-        configuration_backup = self.__configuration_application['backup']
-        commande_backup = path.join('/scripts', configuration_backup['commande_backup'])
-        subprocess.run(commande_backup, stdout=sys.stdout, check=True)
+        try:
+            configuration_backup = self.__configuration_application['backup']
+            commande_backup = path.join('/scripts', configuration_backup['commande_backup'])
+        except KeyError:
+            self.__logger.warning("Aucun script de backup inclus")
+        else:
+            subprocess.run(commande_backup, stdout=sys.stdout, check=True)
 
     def archiver_volumes(self):
-        try:
-            volumes = self.__configuration_application['backup']['volumes']
-        except KeyError:
-            self.__logger.info("Aucun volume de backup fourni")
-            return
-
-        self.__logger.info("Volumes dans le backup : %s" % str(volumes))
-
         self.__logger.debug("-----")
-        self.__logger.debug("Volumes")
-        for volume in volumes:
-            path_src = path.join(self.__path_backup, volume)
+        self.__logger.debug("Backup directory/file")
+        for filedir in listdir(self.__path_backup):
+            path_src = path.join(self.__path_backup, filedir)
             self.__logger.debug("- %s" % path_src)
-            self.__tar_output.add(path_src, arcname=volume, recursive=True)
+            self.__tar_output.add(path_src, arcname=filedir, recursive=True)
         self.__logger.debug("-----")
-
-    def upload_archive(self):
-        # handler_backup = HandlerBackupApplication(self.__handler_requetes)
-        # handler_backup.upload_backup(nom_application, archive_globale)
-        pass
-
-    # def backup_dependance(self, gestionnaire_images_applications, config_image: dict, tar_scripts=None):
-    #     nom_image_docker = config_image['image']
-    #     backup_info = config_image['backup']
-    #     config_elem = config_image['config']
-    #     service_name = config_elem['name']
-    #
-    #     path_backup = backup_info['base_path']
-    #
-    #     try:
-    #         commande_backup = backup_info.get('commande_backup')
-    #         if commande_backup is not None:
-    #             self.__wait_start_service_name = service_name
-    #             self.__wait_container_event.clear()
-    #
-    #             self.__gestionnaire_modules_docker.demarrer_service(nom_image_docker,
-    #                                                                 config=config_elem,
-    #                                                                 images=gestionnaire_images_applications)
-    #
-    #             self.__wait_container_event.wait(60)
-    #             self.__wait_start_service_name = None  # Reset ecoute de l'evenement
-    #             container_id = self.__wait_start_service_container_id
-    #             self.__wait_start_service_container_id = None
-    #
-    #             if self.__wait_container_event.is_set():
-    #                 self.__logger.info(
-    #                     "Executer script d'installation du container id : %s" % self.__wait_start_service_container_id)
-    #                 self.__wait_container_event.clear()
-    #
-    #                 # Preparer les scripts dans un fichier .tar temporaire
-    #
-    #                 if commande_backup:
-    #                     self.__gestionnaire_modules_docker.executer_scripts(container_id, commande_backup, tar_scripts)
-    #
-    #                     # Fin d'execution des scripts, on effectue l'extraction des fichiers du repertoire de backup
-    #                     path_archive = self.__gestionnaire_modules_docker.save_archives(
-    #                         container_id, path_backup, dest_prefix=config_elem['name'])
-    #
-    #                     # self.transmettre_evenement_backup(service_name,
-    #                     #                                   Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET)
-    #
-    #             else:
-    #                 self.__logger.error("Erreur demarrage service (timeout) : %s" % nom_image_docker)
-    #                 raise Exception("Image non installee : " + nom_image_docker)
-    #
-    #         volumes = backup_info.get('volumes')
-    #         if volumes is not None:
-    #             # Faire un backup de tous les volumes, generer un .tar.xz par volume
-    #             self.__gestionnaire_modules_docker.executer_backup_volumes(volumes, path_backup)
-    #
-    #         # Conserver toutes les archives generees dans un meme fichier .tar (pas compresse)
-    #         archive_globale = path.join(path_backup, service_name + '.tar')
-    #
-    #         fichier_tar = tarfile.open(archive_globale, mode='w')
-    #         for fichier in os.listdir(path_backup):
-    #             fichier_tar.add(path.join(path_backup, fichier))
-    #         fichier_tar.close()
-    #
-    #         handler_backup = HandlerBackupApplication(self.__handler_requetes)
-    #         handler_backup.upload_backup(service_name, archive_globale)
-    #
-    #     finally:
-    #         self.__gestionnaire_modules_docker.supprimer_service(config_elem['name'])
 
 
 if __name__ == '__main__':
