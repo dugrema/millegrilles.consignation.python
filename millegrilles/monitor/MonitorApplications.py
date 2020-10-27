@@ -98,8 +98,9 @@ class GestionnaireApplications:
         reply_to = mq_properties.reply_to
         correlation_id = mq_properties.correlation_id
         reponse = {'ok': True}
+
+        nom_application = commande.contenu['nom_application']
         try:
-            nom_application = commande.contenu['nom_application']
             configuration_docker = commande.contenu['configuration']
 
             if configuration_docker is None:
@@ -122,6 +123,17 @@ class GestionnaireApplications:
             reponse['err'] = str(e)
             self.__service_monitor.generateur_transactions.transmettre_reponse(
                 reponse, replying_to=reply_to, correlation_id=correlation_id)
+        finally:
+            # Nettoyer les volumes docker transitifs potentiellement crees
+            docker_client = self.__gestionnaire_modules_docker.docker_client
+            volumes = ['scripts', 'backup']
+            for vol in volumes:
+                try:
+                    volume = docker_client.volumes.get(vol + '_' + nom_application)
+                    volume.remove()
+                except APIError as apie:
+                    if apie.status_code != 404:
+                        self.__logger.exception("Erreur nettoyage volume %s pour application %s" % (vol, nom_application))
 
     def preparer_script_file(self, commande: dict):
         configuration = commande.get('configuration')
@@ -156,9 +168,9 @@ class GestionnaireApplications:
         reply_to = mq_properties.reply_to
         correlation_id = mq_properties.correlation_id
         reponse = {'ok': True}
-        try:
-            nom_application = commande.contenu['nom_application']
+        nom_application = commande.contenu['nom_application']
 
+        try:
             # Tenter de charger la configuration existante
             configuration_existante = self.__gestionnaire_modules_docker.charger_config(
                 'app.cfg.' + nom_application)
