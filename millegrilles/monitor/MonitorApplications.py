@@ -63,6 +63,11 @@ class GestionnaireApplications:
         status = event_json.get('status')
         if type is not None and action is not None:
             action = 'docker/' + type
+            # Retirer timeNano, nombre long cause des problemes de parsing en javascript
+            try:
+                del event_json['timeNano']
+            except KeyError:
+                pass # Pas de timeNano
             self.__service_monitor.emettre_evenement(action, event_json)
 
         if self.__wait_die_service_container_id is not None and status == 'die':

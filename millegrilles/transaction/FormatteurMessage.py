@@ -3,6 +3,7 @@ from millegrilles.SecuritePKI import SignateurTransaction
 
 import uuid
 import datetime
+import json
 
 
 class FormatteurMessageMilleGrilles:
@@ -60,9 +61,21 @@ class FormatteurMessageMilleGrilles:
 
         enveloppe = message.copy()
         enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
+        try:
+            del enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        except KeyError:
+            pass  # L'entete n'existait pas
+
+        # Nettoyer le message, serialiser pour eliminer tous les objets
+        enveloppe_bytes = self.__signateur_transactions.preparer_transaction_bytes(enveloppe)
 
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_contenu(enveloppe)
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
+
+        # Recuperer le dict de message (deserialiser), ajouter l'entete pour signer le message
+        enveloppe = json.loads(enveloppe_bytes)
+        enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = meta
+
         message_signe = self.__signateur_transactions.signer(enveloppe)
 
         if ajouter_chaine_certs:

@@ -323,8 +323,6 @@ class UtilCertificats:
 
         message_bytes = bytes(message_json, 'utf-8')
 
-        # print(message_bytes)
-
         return message_bytes
 
     def _parse_float(self, f: str):
@@ -381,11 +379,30 @@ class UtilCertificats:
 
         message_bytes = self.preparer_transaction_bytes(dict_message_effectif)
 
+        print("MESSAGE **************\n" + message_bytes.decode('utf-8') + '\n*********************')
+
         if hachage is None:
             hachage = self._contenu_hash_function()
 
         digest = hashes.Hash(hachage, backend=default_backend())
         digest.update(message_bytes)
+        resultat_digest = digest.finalize()
+        digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
+        self._logger.debug("Resultat hash contenu: %s" % digest_base64)
+
+        return digest_base64
+
+    def hacher_bytes(self, enveloppe_bytes: bytes, hachage=None):
+        """
+        Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete et les elements commencant par _.
+        :param dict_message:
+        :return:
+        """
+        if hachage is None:
+            hachage = self._contenu_hash_function()
+
+        digest = hashes.Hash(hachage, backend=default_backend())
+        digest.update(enveloppe_bytes)
         resultat_digest = digest.finalize()
         digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
         self._logger.debug("Resultat hash contenu: %s" % digest_base64)
