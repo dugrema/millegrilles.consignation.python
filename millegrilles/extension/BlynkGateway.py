@@ -184,7 +184,11 @@ class GatewayBlynk:
                 def callback_noeud(v_pin, value):
                     controleur.callback_evenement_blynk(noeud_id, v_pin, value)
 
-                blynk_gateway = GatewayNoeud(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile, callback_noeud)
+                blynk_gateway = GatewayNoeud(
+                    blynk_auth, blynk_host, blynk_port,
+                    self._contexte.configuration.mq_cafile,
+                    callback_noeud
+                )
 
                 # Enregistrer vpins connus pour ce noeud en write mode
                 lcd_vpin_navigation = noeud_doc.get('lcd_vpin_navigation')
