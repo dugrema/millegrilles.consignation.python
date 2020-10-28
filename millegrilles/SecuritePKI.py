@@ -379,8 +379,6 @@ class UtilCertificats:
 
         message_bytes = self.preparer_transaction_bytes(dict_message_effectif)
 
-        print("MESSAGE **************\n" + message_bytes.decode('utf-8') + '\n*********************')
-
         if hachage is None:
             hachage = self._contenu_hash_function()
 

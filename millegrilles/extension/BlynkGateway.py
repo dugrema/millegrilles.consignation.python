@@ -166,11 +166,12 @@ class GatewayBlynk:
         blynk_gateway = self._blynk_devices.get(noeud_id)
 
         securite = noeud_doc.get(Constantes.DOCUMENT_INFODOC_SECURITE)
+        blynk_actif = noeud_doc.get('blynk_actif') is True
         blynk_auth = noeud_doc.get('blynk_auth')
         blynk_host = noeud_doc.get('blynk_host')
         blynk_port = noeud_doc.get('blynk_port')
 
-        if securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC] and \
+        if blynk_actif and securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC] and \
                 blynk_auth and blynk_host and blynk_port:
             # S'assurer que le gateway existe et est configure
             if blynk_gateway is not None:
