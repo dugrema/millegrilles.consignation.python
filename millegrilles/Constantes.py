@@ -1354,6 +1354,7 @@ class ConstantesBackup:
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
 
     EVENEMENT_BACKUP = 'evenement.backup.backupTransaction'
+    EVENEMENT_BACKUP_APPLICATION = 'evenement.backup.backupApplication'
     EVENEMENT_RESTAURATION_APPLICATION = 'evenement.backup.restaurationApplication'
 
     EVENEMENT_BACKUP_HORAIRE_DEBUT = 'backupHoraireDebut'
@@ -1370,6 +1371,7 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_APPLICATION_CATALOGUE_PRET = 'backupApplicationCataloguePret'
     EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME = 'backupApplicationUploadConfirme'
     EVENEMENT_BACKUP_APPLICATION_TERMINE = 'backupApplicationTermine'
+    EVENEMENT_BACKUP_APPLICATIONS_TERMINE = 'backupApplicationsTermine'
 
     EVENEMENT_RESTAURATION_TERMINEE = 'restaurationTerminee'
 

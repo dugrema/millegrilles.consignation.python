@@ -191,16 +191,47 @@ class GestionnaireApplications:
     def backup_application(self, commande: CommandeMonitor):
         self.__logger.info("Backup application %s", str(commande))
 
-        applications = list()
+        reponse_info = dict()
         try:
-            nom_image_docker = commande.contenu['nom_application']
-            configuration_docker = commande.contenu.get('configuration')
-            applications.append({'nom_application': nom_image_docker, 'configuration': configuration_docker})
-        except KeyError:
-            # On n'a pas d'application en particulier, lancer le backup de toutes les applications
-            applications = self.trouver_applications_backup(commande.contenu)
+            applications = list()
+            try:
+                # Transmettre reponse pour indiquer commande recue
+                mq_properties = commande.mq_properties
+                reply_to = mq_properties.reply_to
+                correlation_id = mq_properties.correlation_id
+                reponse = {'ok': True}
+                self.__service_monitor.generateur_transactions.transmettre_reponse(
+                    reponse, replying_to=reply_to, correlation_id=correlation_id)
 
-        self.lancer_backup_applications(applications)
+                nom_image_docker = commande.contenu['nom_application']
+                configuration_docker = commande.contenu.get('configuration')
+                applications.append({'nom_application': nom_image_docker, 'configuration': configuration_docker})
+            except KeyError:
+                # On n'a pas d'application en particulier, lancer le backup de toutes les applications
+                applications = self.trouver_applications_backup(commande.contenu)
+
+            try:
+                self.lancer_backup_applications(applications)
+                reponse_info['ok'] = True
+            except Exception as e:
+                reponse_info['ok'] = False
+                reponse_info['err'] = str(e)
+
+            self.transmettre_evenement_backup(
+                'global',
+                Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_TERMINE,
+                type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
+                info=reponse_info)
+
+        except Exception as e:
+            reponse_info['ok'] = False
+            reponse_info['err'] = str(e)
+
+            self.transmettre_evenement_backup(
+                'global',
+                Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATIONS_TERMINE,
+                type_event=Constantes.ConstantesBackup.EVENEMENT_RESTAURATION_APPLICATION,
+                info=reponse_info)
 
     def restore_application(self, commande: CommandeMonitor):
         self.__logger.info("Restore application %s", str(commande))
@@ -221,6 +252,7 @@ class GestionnaireApplications:
             configuration_docker = [a for a in applications if a['name'] == nom_config_app][0]
 
             self.effectuer_restauration(nom_application, configuration_docker)
+            reponse_info['ok'] = True
 
         except Exception as e:
             self.__logger.exception("Erreur demarrage application")
@@ -468,6 +500,9 @@ class GestionnaireApplications:
             configuration_docker = app.get('configuration')
             nom_application = app.get('nom_application')
 
+            self.transmettre_evenement_backup(
+                nom_application, Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_DEBUT)
+
             if nom_application is None:
                 nom_application = configuration_docker['nom']
 
@@ -490,7 +525,7 @@ class GestionnaireApplications:
                                               Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE)
 
     def transmettre_evenement_backup(self, nom_application: str, action: str, info: dict = None,
-                                     type_event=Constantes.ConstantesBackup.EVENEMENT_BACKUP):
+                                     type_event=Constantes.ConstantesBackup.EVENEMENT_BACKUP_APPLICATION):
         evenement_contenu = {
             'nom_application': nom_application,
             'evenement': action,

@@ -24,7 +24,7 @@ class MessagesSample(BaseCallback):
         self.channel = None
         self.event_recu = Event()
 
-        self.noeud_id = '3560fc77-ef9d-4638-bf0d-d94b0d56d950'
+        self.noeud_id = '6bee12f0-9284-42dc-83a2-52d50c69de4a'
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -73,7 +73,8 @@ class MessagesSample(BaseCallback):
 
     def backup_application(self):
         commande = {
-            'nom_application': 'redmine',
+            # 'nom_application': 'redmine',
+            'nom_application': 'blynk',
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
             self.noeud_id, Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION)
@@ -124,9 +125,9 @@ class MessagesSample(BaseCallback):
         return enveloppe
 
     def executer(self):
-        # self.backup_application()
+        self.backup_application()
         # self.backup_applications()
-        self.restore_application()
+        # self.restore_application()
 
 
 # --- MAIN ---
