@@ -30,6 +30,12 @@ class MGPProcesseur:
     def charger_transaction_par_id(self, id_transaction, nom_collection):
         return self.document_dao.charger_transaction_par_id(id_transaction, nom_collection)
 
+    def charger_transaction_par_uuid(self, uuid_transaction, nom_collection):
+        collection = self.document_dao.get_collection(nom_collection)
+        label_uuid = '.'.join(
+            [Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID])
+        return collection.find_one({label_uuid: uuid_transaction})
+
     def charger_document_processus(self, id_document_processus, nom_collection):
         return self.document_dao.charger_processus_par_id(
             id_document_processus, nom_collection)
@@ -1535,9 +1541,17 @@ class MGProcessusTransaction(MGProcessus):
 
     def trouver_id_transaction(self):
         parametres = self.parametres
-        id_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
         collection = self.get_collection_transaction_nom()
-        return {'id_transaction': id_transaction, 'nom_collection': collection}
+        transaction = None
+        try:
+            id_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
+        except KeyError:
+            uuid_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            transaction = self._controleur.charger_transaction_par_uuid(uuid_transaction, collection)
+            id_transaction = transaction['_id']
+            parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO] = id_transaction
+
+        return {'id_transaction': id_transaction, 'nom_collection': collection, 'transaction': transaction}
 
     def charger_transaction(self, nom_collection=None):
         if nom_collection is None:

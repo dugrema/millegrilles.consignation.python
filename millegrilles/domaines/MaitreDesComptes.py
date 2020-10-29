@@ -464,7 +464,6 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         return {Constantes.EVENEMENT_REPONSE: True}
 
 
-
 class ProcessusInscrireProprietaire(MGProcessusTransaction):
     """
     Permet au proprietaire de prendre possession de sa MilleGrille.
