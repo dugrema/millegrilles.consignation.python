@@ -385,7 +385,7 @@ class GestionnaireModulesDocker:
             # Prendre un tag au hasard
             image_tag = image.tags[0]
 
-            configuration = self.__formatter_configuration_container(container_name, config, application=kwargs.get('nom_application'))
+            configuration = self.__formatter_configuration_container(container_name, config, application=kwargs.get('application'))
 
             self.__logger.debug("Configuration du container: %s" % configuration)
 
