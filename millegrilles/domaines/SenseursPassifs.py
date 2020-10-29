@@ -28,7 +28,8 @@ class TraitementRequetesPubliquesSenseursPassifs(TraitementMessageDomaineRequete
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
-        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementRequetesProtegeesSenseursPassifs(TraitementRequetesProtegees):
@@ -85,6 +86,8 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         if self.__logger.isEnabledFor(logging.DEBUG):
             self.__logger.debug("Lecture recue : %s" % json.dumps(lecture, indent=2))
 
+        generateur_transactions = self.gestionnaire.generateur_transactions
+
         noeud_id = lecture[SenseursPassifsConstantes.TRANSACTION_NOEUD_ID]
         uuid_senseur = lecture[SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR]
         senseurs = lecture['senseurs']
@@ -118,13 +121,22 @@ class TraitementMessageLecture(TraitementMessageDomaine):
         }
         doc_senseur = collection.find_one(filter)
 
-        if not doc_senseur or doc_senseur.get('noeud_id') is None or doc_senseur['noeud_id'] != noeud_id:
+        if doc_senseur is None or doc_senseur.get('noeud_id') is None or doc_senseur['noeud_id'] != noeud_id:
             self.ajouter_senseur(lecture, exchange)
             # Creer un document sommaire qui va etre insere
             doc_senseur = {
                 SenseursPassifsConstantes.TRANSACTION_ID_SENSEUR: uuid_senseur,
                 'senseurs': dict()
             }
+        elif doc_noeud is None:
+            # Creer le document du noeud
+            # Transmettre transaction de noeud
+            transaction = {
+                SenseursPassifsConstantes.TRANSACTION_NOEUD_ID: noeud_id,
+                Constantes.DOCUMENT_INFODOC_SECURITE: securite,
+            }
+            domaine_action = SenseursPassifsConstantes.TRANSACTION_MAJ_NOEUD
+            generateur_transactions.soumettre_transaction(transaction, domaine_action)
 
         # Verifier quels senseurs on met a jour
         senseurs_actuels = doc_senseur.get('senseurs') or dict()
@@ -160,7 +172,6 @@ class TraitementMessageLecture(TraitementMessageDomaine):
             collection.update(filter, ops, upsert=True)
 
             # Relayer le message sur tous les bus permis selon le niveau de securite
-            generateur_transactions = self.gestionnaire.generateur_transactions
             exchanges = generateur_transactions.get_liste_securite_downstream(securite)
             generateur_transactions.emettre_message(
                 lecture,
@@ -374,6 +385,13 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD,
             'noeud_id': noeud_id,
         })
+
+        if config_lcd_noeud is None:
+            # Retourner document dummy pour confirmer chargement du LCD
+            return {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: SenseursPassifsConstantes.LIBVAL_DOCUMENT_NOEUD,
+                'noeud_id': noeud_id
+            }
 
         return config_lcd_noeud
 

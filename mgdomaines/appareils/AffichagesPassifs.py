@@ -353,16 +353,18 @@ class AffichageAvecConfiguration(AfficheurDocumentMAJDirecte):
 
         try:
             noeud_id = self._configuration_affichage_lcd['noeud_id']
-            formattage = self._configuration_affichage_lcd['lcd_affichage']
-
         except (TypeError, KeyError):
             raise ConfigurationPasRecue('lcd_affichage')
 
-        for ligne in formattage:
-            self.__logger.debug("Formatter ligne %s" % str(ligne))
-            lignes.append(self.formatter_ligne(noeud_id, ligne))
+        try:
+            formattage = self._configuration_affichage_lcd['lcd_affichage']
+            for ligne in formattage:
+                self.__logger.debug("Formatter ligne %s" % str(ligne))
+                lignes.append(self.formatter_ligne(noeud_id, ligne))
 
-        return lignes
+            return lignes
+        except KeyError:
+            return []  # Aucune configuration
 
     def formatter_ligne(self, noeud_id: str, formattage: dict):
         format = formattage['affichage']
