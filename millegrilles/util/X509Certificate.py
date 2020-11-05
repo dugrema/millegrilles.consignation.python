@@ -1419,6 +1419,28 @@ class GenererNoeudPrive(GenerateurNoeud):
         return builder
 
 
+class GenererNoeudPublic(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_exchanges = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = (','.join([Constantes.SECURITE_PUBLIC]).encode('utf-8'))
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_exchanges, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        return builder
+
+
 class GenererApplicationPrivee(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
@@ -1809,6 +1831,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,
             ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT: GenererMonitorDependant,
             ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE: GenererNoeudPrive,
+            ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC: GenererNoeudPublic,
             ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE: GenererApplicationPrivee,
 
             # Hebergement

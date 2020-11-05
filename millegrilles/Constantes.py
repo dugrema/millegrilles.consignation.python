@@ -1593,6 +1593,7 @@ class ConstantesGenerateurCertificat:
     ROLE_CONNECTEUR_TIERS = 'tiers'
     ROLE_BACKUP = 'backup'
     ROLE_NOEUD_PRIVE = 'prive'
+    ROLE_NOEUD_PUBLIC = 'public'
     ROLE_APPLICATION_PRIVEE = 'application'
     ROLE_HEBERGEMENT = 'hebergement'
     ROLE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'
