@@ -10,6 +10,16 @@ DOCKER_LABEL_TIME = '%Y%m%d%H%M%S'
 
 PATH_SECRET_DEFAUT = '/run/secrets'
 
+DICT_MODULES_PUBLICS = {
+    ConstantesServiceMonitor.MODULE_ACME: {
+        'nom': ConstantesServiceMonitor.MODULE_ACME
+    },
+    ConstantesServiceMonitor.MODULE_NGINX: {
+        'nom': ConstantesServiceMonitor.MODULE_NGINX,
+        'role': ConstantesGenerateurCertificat.ROLE_NGINX,
+    },
+}
+
 DICT_MODULES_PRIVES = {
     ConstantesServiceMonitor.MODULE_ACME: {
         'nom': ConstantesServiceMonitor.MODULE_ACME

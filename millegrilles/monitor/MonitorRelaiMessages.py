@@ -638,6 +638,44 @@ class ConnexionMiddleware:
         return self._service_monitor.securite
 
 
+class ConnexionMiddlewarePublic(ConnexionMiddleware):
+    """
+    Connexion au middleware de la MilleGrille en service pour un noeud public
+    """
+
+    def __init__(self, configuration: TransactionConfiguration, client_docker: docker.DockerClient,
+                 service_monitor, certificats: dict, **kwargs):
+        super().__init__(configuration, client_docker, service_monitor, certificats, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initialiser(self, init_document=False):
+        super().initialiser(init_document=init_document)
+
+    def get_mq_info(self):
+        self.__logger.debug("Demande services mdns pour idmg %s" % self._service_monitor.idmg)
+
+        services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
+
+        self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
+        for service in services:
+            self.__logger.debug("Service port %d, addresses : %s" % (service['port'], str(service['addresses'])))
+
+        service_retenu = services[0]
+        host = service_retenu['addresses'][0]
+        port = service_retenu['port']
+
+        return {'host': host, 'port': port}
+
+    def _contexte_additionnals(self) -> list:
+        additionnals = super()._contexte_additionnals()
+
+        additionnals.append({
+            'MG_' + Constantes.CONFIG_MQ_EXCHANGE_DEFAUT.upper(): Constantes.SECURITE_PUBLIC,
+        })
+
+        return additionnals
+
+
 class ConnexionMiddlewarePrive(ConnexionMiddleware):
     """
     Connexion au middleware de la MilleGrille en service pour un noeud prive

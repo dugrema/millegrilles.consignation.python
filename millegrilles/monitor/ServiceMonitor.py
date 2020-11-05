@@ -20,12 +20,13 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorCertificats import GestionnaireCertificats, \
     GestionnaireCertificatsNoeudProtegeDependant, GestionnaireCertificatsNoeudProtegePrincipal, \
-    GestionnaireCertificatsInstallation, GestionnaireCertificatsNoeudPrive
+    GestionnaireCertificatsInstallation, GestionnaireCertificatsNoeudPrive, GestionnaireCertificatsNoeudPublic
 from millegrilles.monitor.MonitorCommandes import GestionnaireCommandes, GestionnaireCommandesNoeudProtegeDependant
 from millegrilles.monitor.MonitorComptes import GestionnaireComptesMQ
 from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker
-from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, ConnexionMiddleware, ConnexionMiddlewarePrive, ConnexionMiddlewareProtege
+from millegrilles.monitor.MonitorRelaiMessages import ConnexionPrincipal, ConnexionMiddleware, \
+    ConnexionMiddlewarePrive, ConnexionMiddlewareProtege, ConnexionMiddlewarePublic
 from millegrilles.monitor.MonitorNetworking import GestionnaireWeb
 from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat
@@ -162,8 +163,8 @@ class InitialiserServiceMonitor:
             specialisation = configuration.get('specialisation')
             securite = configuration.get('securite')
             if securite == '1.public':
-                self.__logger.error("Noeud public, non supporte")
-                raise ValueError("Noeud de type non reconnu")
+                self.__logger.error("Noeud public")
+                service_monitor_classe = ServiceMonitorPublic
             elif securite == Constantes.SECURITE_PRIVE:
                 self.__logger.error("Noeud prive")
                 service_monitor_classe = ServiceMonitorPrive
@@ -1209,6 +1210,152 @@ class ServiceMonitorPrive(ServiceMonitor):
         raise Exception("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)
 
 
+class ServiceMonitorPublic(ServiceMonitor):
+    """
+    ServiceMonitor pour noeud public
+    """
+
+    def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
+        super().__init__(args, docker_client, configuration_json)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.__logger_verbose = logging.getLogger('verbose.' + __name__ + '.' + self.__class__.__name__)
+
+        self._configuration = TransactionConfiguration()
+        self._configuration.loadEnvironment()
+
+    def _entretien_modules(self):
+        if not self.limiter_entretien:
+            # S'assurer que les modules sont demarres - sinon les demarrer, en ordre.
+            self._gestionnaire_docker.entretien_services()
+
+            # Entretien web
+            self._gestionnaire_web.entretien()
+
+    def connecter_middleware(self):
+        """
+        Genere un contexte et se connecte a MQ et MongoDB.
+        Lance une thread distincte pour s'occuper des messages.
+        :return:
+        """
+        self._connexion_middleware = ConnexionMiddlewarePublic(
+            self._configuration, self._docker, self, self._gestionnaire_certificats.certificats,
+            secrets=self._args.secrets)
+
+        try:
+            self._connexion_middleware.initialiser()
+            self._connexion_middleware.start()
+        except TypeError as te:
+            self.__logger.exception("Erreur fatale configuration MQ, abandonner")
+            self.fermer()
+            raise te
+        except BrokenBarrierError:
+            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+            self._connexion_middleware.stop()
+            self._connexion_middleware = None
+
+    def run(self):
+        self.__logger.info("Demarrage du ServiceMonitor")
+
+        try:
+            self._charger_configuration()
+            self.configurer_millegrille()
+            self.preparer_gestionnaire_certificats()
+            self.preparer_gestionnaire_commandes()
+            self.preparer_gestionnaire_applications()
+            self.preparer_web_api()
+
+            while not self._fermeture_event.is_set():
+                self._attente_event.clear()
+
+                try:
+                    self.__logger.debug("Cycle entretien ServiceMonitor")
+
+                    self.verifier_load()
+
+                    self._entretien_modules()
+
+                    if not self._connexion_middleware:
+                        try:
+                            self.connecter_middleware()
+                            self.preparer_secrets()
+                        except BrokenBarrierError:
+                            self.__logger.warning("Erreur connexion MQ, on va reessayer plus tard")
+
+                    self.__logger_verbose.debug("Fin cycle entretien ServiceMonitor")
+                except Exception as e:
+                    self.__logger.exception("ServiceMonitor: erreur generique : " + str(e))
+                finally:
+                    self._attente_event.wait(30)
+
+        except ForcerRedemarrage:
+            self.__logger.info("Configuration initiale terminee, fermeture pour redemarrage")
+            self.exit_code = ConstantesServiceMonitor.EXIT_REDEMARRAGE
+
+        except Exception:
+            self.__logger.exception("Erreur demarrage ServiceMonitor, on abandonne l'execution")
+
+        self.__logger.info("Fermeture du ServiceMonitor")
+        self.fermer()
+
+        # Fermer le service monitor, retourne exit code pour shell script
+        sys.exit(self.exit_code)
+
+    def configurer_millegrille(self):
+        self._gestionnaire_docker = GestionnaireModulesDocker(
+            self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
+            self,
+            configuration_services=MonitorConstantes.DICT_MODULES_PUBLICS,
+            insecure=self._args.dev
+        )
+
+        self._gestionnaire_docker.start_events()
+        self._gestionnaire_docker.add_event_listener(self)
+
+        # Initialiser gestionnaire web
+        self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
+
+    def preparer_gestionnaire_commandes(self):
+        self._gestionnaire_commandes = GestionnaireCommandes(self._fermeture_event, self)
+        super().preparer_gestionnaire_commandes()  # Creer pipe et demarrer
+
+    def preparer_gestionnaire_certificats(self):
+        params = dict()
+        if self._args.dev:
+            params['insecure'] = True
+        if self._args.secrets:
+            params['secrets'] = self._args.secrets
+        self._gestionnaire_certificats = GestionnaireCertificatsNoeudPublic(self._docker, self, **params)
+        self._gestionnaire_certificats.charger_certificats()
+
+    def preparer_secrets(self):
+        """
+        Expose les certs/cle prive dans le volume secrets pour les containers
+        :return:
+        """
+
+        if self.path_secrets == MonitorConstantes.PATH_SECRET_DEFAUT:
+            # Le monitor est deploye sous forme de service, on copie les secrets vers le repertoire partage
+            path_secret_prives = '/var/opt/millegrilles_secrets'
+            self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
+
+            if os.path.exists(path_secret_prives):
+                volume_secrets = '/var/opt/millegrilles_secrets'
+                self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
+                fichiers = [
+                    (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
+                    (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
+                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
+                ]
+
+                for fichier in fichiers:
+                    with open(fichier[0], 'w') as cle_out:
+                        with open(fichier[1], 'r') as cle_in:
+                            cle_out.write(cle_in.read())
+
+    def ajouter_compte(self, certificat: str):
+        raise NotImplementedError("Ajouter compte PEM (**non implemente pour public**): %s" % certificat)
+
+
 class ServiceMonitorInstalleur(ServiceMonitor):
 
     def __init__(self, args, docker_client: docker.DockerClient, configuration_json: dict):
@@ -1445,6 +1592,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.__initialiser_noeud_protege(commande)
         elif securite == Constantes.SECURITE_PRIVE:
             self.__initialiser_noeud_prive(commande)
+        elif securite == Constantes.SECURITE_PUBLIC:
+            self.__initialiser_noeud_public(commande)
         else:
             raise Exception("Type de noeud non supporte : " + securite)
 
@@ -1677,6 +1826,111 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         # Redemarrer / reconfigurer le monitor
         self.__logger.info("Configuration completee, redemarrer le monitor")
+        gestionnaire_docker.configurer_monitor()
+
+        raise ForcerRedemarrage("Redemarrage")
+
+    def __initialiser_noeud_public(self, commande: CommandeMonitor):
+        """
+        Initialise un noeud public avec un certificat
+        :param commande:
+        :return:
+        """
+
+        params = commande.contenu
+        gestionnaire_docker = self.gestionnaire_docker
+
+        gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
+            self.docker, self, secrets=self._args.secrets, insecure=self._args.dev)
+        gestionnaire_certs.generer_motsdepasse()
+
+        # Faire correspondre et sauvegarder certificat de noeud
+        secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
+            intermediaire_key_pem = fichier.read()
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt'), 'rb') as fichier:
+            intermediaire_passwd_pem = fichier.read()
+
+        certificat_pem = params['certificatPem']
+        certificat_millegrille = params['chainePem'][-1]
+        chaine = params['chainePem']
+
+        # Extraire IDMG
+        self.__logger.debug("Certificat de la MilleGrille :\n%s" % certificat_millegrille)
+        clecert_millegrille = EnveloppeCleCert()
+        clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
+        idmg = clecert_millegrille.idmg
+
+        clecert_recu = EnveloppeCleCert()
+        clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
+        if not clecert_recu.cle_correspondent():
+            raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+
+        # Verifier si on doit generer un certificat web SSL
+        domaine_web = params.get('domaine')
+        if domaine_web is not None:
+            self.__logger.info("Generer certificat web SSL pour %s" % domaine_web)
+            self.initialiser_domaine(commande)
+
+        cert_subject = clecert_recu.formatter_subject()
+
+        # Verifier le type de certificat - il determine le type de noeud:
+        # intermediaire = noeud protege, prive = noeud prive, public = noeud public
+        self.__logger.debug("Certificat recu : %s", str(cert_subject))
+        subject_clecert_recu = clecert_recu.formatter_subject()
+        if subject_clecert_recu['organizationName'] != idmg:
+            raise Exception("IDMG %s ne correspond pas au certificat de monitor" % idmg)
+
+        type_certificat_recu = subject_clecert_recu['organizationalUnitName']
+        if type_certificat_recu != 'public':
+            raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
+
+        # Comencer sauvegarde
+        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
+
+        self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor public")
+        securite = Constantes.SECURITE_PUBLIC
+        clecert_recu.password = None
+        cle_monitor = clecert_recu.private_key_bytes.decode('utf-8')
+        secret_name, date_key = gestionnaire_docker.sauvegarder_secret('pki.monitor.key', cle_monitor,
+                                                                       ajouter_date=True)
+
+        if self._args.dev:
+            with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'w') as fichier:
+                fichier.write(cle_monitor)
+
+        gestionnaire_docker.sauvegarder_config(
+            'pki.monitor.cert.' + date_key,
+            '\n'.join(chaine)
+        )
+
+        # Supprimer le CSR
+        gestionnaire_docker.supprimer_config('pki.intermediaire.csr.' + str(secret_intermediaire['date']))
+
+        # Terminer configuration swarm docker
+        gestionnaire_docker.initialiser_noeud(idmg=idmg)
+
+        self.sauvegarder_config_millegrille(idmg, securite)
+
+        # Regenerer la configuraiton de NGINX (change defaut de /installation vers /vitrine)
+        # Redemarrage est implicite (fait a la fin de la prep)
+        self._gestionnaire_web.regenerer_configuration(mode_installe=True)
+
+        # Forcer reconfiguration nginx (ajout certificat de millegrille pour validation client ssl)
+        try:
+            gestionnaire_docker.maj_service('nginx')
+        except docker.errors.APIError as apie:
+            if apie.status_code == 500:
+                self.__logger.warning(
+                    "Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
+                self.__event_attente.wait(15)
+                gestionnaire_docker.maj_service('nginx')
+            else:
+                raise apie
+
+        # Redemarrer / reconfigurer le monitor
+        self.__logger.info("Configuration noeud public completee, redemarrer le monitor")
         gestionnaire_docker.configurer_monitor()
 
         raise ForcerRedemarrage("Redemarrage")
