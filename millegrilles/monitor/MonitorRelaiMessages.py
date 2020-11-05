@@ -660,7 +660,8 @@ class ConnexionMiddlewarePublic(ConnexionMiddleware):
         for service in services:
             self.__logger.debug("Service port %d, addresses : %s" % (service['port'], str(service['addresses'])))
 
-        service_retenu = services[0]
+        services_mq = [s for s in services if s.get('type') == '_mgamqps._tcp.local.']
+        service_retenu = services_mq[0]
         host = service_retenu['addresses'][0]
         port = service_retenu['port']
 
