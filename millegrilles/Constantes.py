@@ -1734,6 +1734,27 @@ class ConstantesTopologie:
     REQUETE_LISTE_APPLICATIONS_DEPLOYEES = '%s.listeApplicationsDeployees' % DOMAINE_NOM
 
 
+class ConstantesPublication:
+
+    DOMAINE_NOM = 'Publication'
+    COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
+    COLLECTION_NOEUDS_NOM = '%s/noeuds' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_POSTS_NOM = '%s/posts' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
+    QUEUE_NOM = DOMAINE_NOM
+
+    DOCUMENT_DEFAUT = {
+        DOCUMENT_INFODOC_LIBELLE: LIBVAL_CONFIGURATION,
+        TRANSACTION_MESSAGE_LIBELLE_VERSION: 6,
+    }
+
+    LIBVAL_NOEUD_CONFIG = 'noeudconfig'
+    LIBVAL_ACCUEIL = 'accueil'
+    LIBVAL_POST = 'post'
+
+    REQUETE_CONFIGURATION_NOEUDS = 'configurationNoeuds'
+
+
 class ConstantesCatalogueApplications:
 
     DOMAINE_NOM = 'CatalogueApplications'
