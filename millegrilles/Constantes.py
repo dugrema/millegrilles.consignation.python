@@ -1738,7 +1738,7 @@ class ConstantesPublication:
 
     DOMAINE_NOM = 'Publication'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
-    COLLECTION_NOEUDS_NOM = '%s/noeuds' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_SITES_NOM = '%s/sites' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_POSTS_NOM = '%s/posts' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
@@ -1748,11 +1748,23 @@ class ConstantesPublication:
         TRANSACTION_MESSAGE_LIBELLE_VERSION: 6,
     }
 
-    LIBVAL_NOEUD_CONFIG = 'noeudconfig'
+    LIBVAL_SITE_CONFIG = 'siteconfig'
     LIBVAL_ACCUEIL = 'accueil'
     LIBVAL_POST = 'post'
 
-    REQUETE_CONFIGURATION_NOEUDS = 'configurationNoeuds'
+    REQUETE_CONFIGURATION_SITE = 'configurationSite'
+    REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
+
+    TRANSACTION_MAJ_SITE = 'majSite'
+
+    CHAMP_SITE_ID = 'site_id'
+    CHAMP_TITRE = 'titre'
+    CHAMP_NOEUDS_URLS = 'noeuds_urls'
+    CHAMP_URLS = 'urls'
+    CHAMP_FICHIERS = 'fichiers'
+    CHAMP_ALBUMS = 'albums'
+    CHAMP_POST_ROWS = 'post_rows'
+    CHAMP_TOUTES_COLLECTIONS = 'toutes_collections'
 
 
 class ConstantesCatalogueApplications:
