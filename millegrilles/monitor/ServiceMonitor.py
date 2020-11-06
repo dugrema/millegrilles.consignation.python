@@ -411,6 +411,13 @@ class ServiceMonitor:
         # MAJ date pour creation de certificats
         self._gestionnaire_certificats.maj_date()
 
+        info_monitor = self.get_info_monitor()
+        fqdn_noeud = info_monitor['fqdn_detecte']
+        try:
+            domaine_noeud = info_monitor['domaine']
+        except KeyError:
+            domaine_noeud = fqdn_noeud
+
         prefixe_certificats = 'pki.'
         filtre = {'name': prefixe_certificats}
 
@@ -445,7 +452,8 @@ class ServiceMonitor:
         for nom_role, info_role in roles.items():
             if not info_role.get('expiration') or info_role.get('est_expire'):
                 self.__logger.debug("Generer nouveau certificat role %s", nom_role)
-                self._gestionnaire_certificats.generer_clecert_module(nom_role, self._nodename)
+                self._gestionnaire_certificats.generer_clecert_module(
+                    nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
 
     def configurer_millegrille(self):
         besoin_initialiser = not self._idmg

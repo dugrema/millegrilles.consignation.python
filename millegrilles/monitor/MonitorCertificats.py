@@ -248,7 +248,7 @@ class GestionnaireCertificats:
     def generer_nouveau_idmg(self):
         raise NotImplementedError()
 
-    def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None, liste_dns: list = None) -> EnveloppeCleCert:
         raise NotImplementedError()
 
 
@@ -434,11 +434,11 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
         self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
-    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None) -> EnveloppeCleCert:
+    def generer_clecert_module(self, role: str, common_name: str, nomcle: str = None, liste_dns: list = None) -> EnveloppeCleCert:
         if nomcle is None:
             nomcle = role
 
-        clecert = self.__renouvelleur.renouveller_par_role(role, common_name)
+        clecert = self.__renouvelleur.renouveller_par_role(role, common_name, liste_dns)
         chaine = list(clecert.chaine)
         chaine_certs = '\n'.join(chaine)
 

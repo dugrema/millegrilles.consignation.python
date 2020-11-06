@@ -1933,14 +1933,16 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def renouveller_par_role(self, role, common_name):
+    def renouveller_par_role(self, role, common_name, liste_dns: list = None):
         generateur = self.__generateurs_par_role[role]
         if issubclass(generateur, GenerateurNoeud):
             generateur_instance = generateur(
-                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire, generer_password=self.__generer_password)
+                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire,
+                domaines_publics=liste_dns, generer_password=self.__generer_password)
         else:
             generateur_instance = generateur(
-                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire)
+                self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire,
+                domaines_publics=liste_dns)
 
         cert_dict = generateur_instance.generer()
         return cert_dict
