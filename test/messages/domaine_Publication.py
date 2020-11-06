@@ -13,6 +13,13 @@ class TestPublication(DomaineTest):
         self.site_id = '09906262-206c-11eb-88cc-af560af5618f'
         self.noeud_id = '639e1d3b-fa5b-4a13-86b2-d3e6148c9d99'
 
+    def requete_liste_sites(self):
+        requete = dict()
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_LISTE_SITES
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
     def requete_config_site(self):
         requete = {'site_id': self.site_id}
         domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_CONFIGURATION_SITE
@@ -46,7 +53,8 @@ class TestPublication(DomaineTest):
     def executer(self):
         self.__logger.debug("Executer")
 
-        self.requete_config_site()
+        self.requete_liste_sites()
+        # self.requete_config_site()
         # self.requete_sites_pour_noeud()
         # self.maj_site()
 

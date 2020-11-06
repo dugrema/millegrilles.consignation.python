@@ -22,6 +22,9 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
             reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
+            reponse = self.gestionnaire.get_liste_sites()
+            reponse = {'resultats': reponse}
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -95,6 +98,25 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
     def get_nom_domaine(self):
         return ConstantesPublication.DOMAINE_NOM
+
+    def get_liste_sites(self):
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG
+        }
+        projection = [
+            ConstantesPublication.CHAMP_SITE_ID,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
+            ConstantesPublication.CHAMP_TITRE,
+        ]
+        collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        curseur = collection_site.find(filtre, projection=projection)
+
+        sites = list()
+        for site in curseur:
+            del site['_id']
+            sites.append(site)
+
+        return sites
 
     def get_configuration_site(self, params: dict):
         site_id = params['site_id']

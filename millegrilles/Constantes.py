@@ -1754,6 +1754,7 @@ class ConstantesPublication:
 
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
+    REQUETE_LISTE_SITES = 'listeSites'
 
     TRANSACTION_MAJ_SITE = 'majSite'
 
