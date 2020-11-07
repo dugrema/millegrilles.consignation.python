@@ -263,9 +263,9 @@ class ConsignateurTransactionCallback(BaseCallback):
                 # Pas autorise
                 raise acd
 
-        chaine_certificat = enveloppe_transaction.get('_certificat')
+        chaine_certificat = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
         try:
-            del enveloppe_transaction['_certificat']
+            del enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
         except KeyError:
             pass
 
