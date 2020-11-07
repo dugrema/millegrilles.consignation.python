@@ -177,10 +177,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
                 set_ops[key] = value
 
         ops = {
-            '$set': set_ops,
             '$setOnInsert': set_on_insert,
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
+        if len(set_ops) > 0:
+            ops['$set'] = set_ops
 
         resultat = collection_site.update_one(filtre, ops, upsert=True)
 
