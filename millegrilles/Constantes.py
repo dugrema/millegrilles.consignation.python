@@ -145,6 +145,7 @@ TRANSACTION_MESSAGE_LIBELLE_EVENEMENT = '_evenements'  # Precedemment evenements
 TRANSACTION_MESSAGE_LIBELLE_ORIGINE = '_akid'
 TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE = 'estampille'
 TRANSACTION_MESSAGE_LIBELLE_SIGNATURE = '_signature'
+TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS = '_certificat'
 TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURES = '_contresignatures'
 TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURE = 'signature'
 TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION = 'en-tete'  # Precedemment info-transaction
@@ -515,6 +516,7 @@ class ConstantesPki:
     EVENEMENT_CERTIFICAT_EMIS = 'evenement.certificat.infoCertificat'
     REQUETE_CERTIFICAT_DEMANDE = 'requete.certificat'  # requete.certificat.__fingerprint__
     REQUETE_CERTIFICAT_BACKUP = 'certificatBackup'
+    REQUETE_CERTIFICAT = 'requeteCertificat'
     REQUETE_LISTE_CA = 'requete.Pki.ca'
     REQUETE_LISTE_CERTS_CA = 'certificatsCA'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
@@ -1757,8 +1759,11 @@ class ConstantesPublication:
     REQUETE_LISTE_SITES = 'listeSites'
 
     TRANSACTION_MAJ_SITE = 'majSite'
+    TRANSACTION_MAJ_POST = 'majPost'
 
     CHAMP_SITE_ID = 'site_id'
+    CHAMP_POST_ID = 'post_id'
+    CHAMP_LANGUAGES = 'languages'
     CHAMP_TITRE = 'titre'
     CHAMP_NOEUDS_URLS = 'noeuds_urls'
     CHAMP_URLS = 'urls'

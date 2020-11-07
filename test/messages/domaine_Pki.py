@@ -123,10 +123,18 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_certificat(self):
+        requete = {
+            'fingerprint': 'sha256_b64:eju05mzQkl77M9XUJgJHMJjaxaHnSHa0moGHXCl9wxE='
+        }
+        domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
+        self.generateur.transmettre_requete(requete, domaine_action, correlation_id='abcd', reply_to=self.queue_name)
+
     def executer(self):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
-        self.requete_cert_noeuds()
+        # self.requete_cert_noeuds()
+        self.requete_certificat()
 
 
 # --- MAIN ---

@@ -71,6 +71,7 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         domaine_routing_key = routing_key.replace('requete.%s.' % ConstantesPki.DOMAINE_NOM, '')
+        domaine_action = routing_key.split('.').pop()
 
         if properties.reply_to and properties.correlation_id:
             reponse = None
@@ -79,6 +80,9 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
             elif domaine_routing_key.startswith('certificat.'):
                 fingerprint = message_dict.get('fingerprint') or domaine_routing_key.split('.')[-1]
                 reponse = self.gestionnaire.get_certificat(fingerprint, properties, demander_si_inconnu=False)
+            elif domaine_action == ConstantesPki.REQUETE_CERTIFICAT:
+                fingerprint = message_dict.get('fingerprint')
+                reponse = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
             elif domaine_routing_key == ConstantesPki.REQUETE_CERTIFICAT_BACKUP:
                 reponse = self.gestionnaire.get_certificats_backup()
             elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERTS_CA:
@@ -349,10 +353,14 @@ class GestionnairePki(GestionnaireDomaineStandard):
         return certs
 
     def get_certificat(self, fingerprint_sha256_b64, properties=None, demander_si_inconnu=True):
+
+        # S'assurer qu'on fait un match sur la partie fingerprint (si format est sha256_b64:abcd1234...)
+        fingerprint = fingerprint_sha256_b64.split(':').pop()
+
         collection_pki = self.document_dao.get_collection(self.get_nom_collection())
         filtre = {
             # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint,
         }
         certificat = collection_pki.find_one(filtre)
 

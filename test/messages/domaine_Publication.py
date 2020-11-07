@@ -37,8 +37,9 @@ class TestPublication(DomaineTest):
     def maj_site(self):
         info_site = {
             ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
+            ConstantesPublication.CHAMP_LANGUAGES: ['fr', 'en'],
             ConstantesPublication.CHAMP_NOEUDS_URLS: {
-                self.site_id: ["www.maple.com"]
+                self.site_id: ["mg-dev3.maple.maceroc.com"]
             },
             ConstantesPublication.CHAMP_FICHIERS: {
                 ConstantesPublication.CHAMP_TOUTES_COLLECTIONS: True
@@ -50,13 +51,23 @@ class TestPublication(DomaineTest):
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_SITE
         self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name)
 
+    def maj_post(self):
+        info_post = {
+            "post_id": "06c9b78a-20fe-11eb-b092-27db17f4ebb0",
+            "html_fr": "<h1>Mon post, en francais</h1><p>Un nouveau post</p>",
+            "html_en": "<h1>My post, in English</h1><p>A new post</p>",
+        }
+        domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_POST
+        self.generateur.soumettre_transaction(info_post, domaine_action, reply_to=self.queue_name)
+
     def executer(self):
         self.__logger.debug("Executer")
 
-        self.requete_liste_sites()
+        # self.requete_liste_sites()
         # self.requete_config_site()
         # self.requete_sites_pour_noeud()
         # self.maj_site()
+        self.maj_post()
 
 
 # --- MAIN ---

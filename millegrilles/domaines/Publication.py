@@ -75,6 +75,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         domaine_action = domaine_transaction.split('.').pop()
         if domaine_action == ConstantesPublication.TRANSACTION_MAJ_SITE:
             processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSite"
+        elif domaine_action == ConstantesPublication.TRANSACTION_MAJ_POST:
+            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -182,8 +184,56 @@ class GestionnairePublication(GestionnaireDomaineStandard):
 
         resultat = collection_site.update_one(filtre, ops, upsert=True)
 
-        if resultat.upserted_id is None and resultat.match_count != 1:
+        if resultat.upserted_id is None and resultat.matched_count != 1:
             raise Exception("Erreur maj site " + site_id)
+
+    def maj_post(self, transaction: dict):
+        collection_post = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
+
+        try:
+            post_id = transaction[ConstantesPublication.CHAMP_POST_ID]
+        except KeyError:
+            # Par defaut le site id est l'identificateur unique de la transaction
+            post_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
+        self.__logger.debug("Maj post id: %s" % post_id)
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_POST_ID: post_id
+        }
+
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow()
+        }
+        set_on_insert.update(filtre)
+
+        # Nettoyer la transaction de champs d'index, copier le reste dans le document
+        set_ops = dict()
+        for key, value in transaction.items():
+            if key not in [ConstantesPublication.CHAMP_POST_ID] and \
+                    key.startswith('_') is False:
+                set_ops[key] = value
+
+        # Ajouter signature, derniere_modification, certificat
+        estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        derniere_modification = datetime.datetime.fromtimestamp(estampille)
+        set_ops[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = derniere_modification
+        set_ops[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = transaction[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
+        set_ops[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = transaction[
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
+
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+        }
+
+        resultat = collection_post.update_one(filtre, ops, upsert=True)
+
+        if resultat.upserted_id is None and resultat.matched_count != 1:
+            raise Exception("Erreur maj post " + post_id)
 
 
 class ProcessusPublication(MGProcessusTransaction):
@@ -211,3 +261,47 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         transaction = self.transaction
         self.controleur.gestionnaire.maj_site(transaction)
         self.set_etape_suivante()  # Termine
+
+
+class ProcessusTransactionMajPost(MGProcessusTransaction):
+    """
+    Processus pour modifier la configuration d'un site
+    """
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+
+        # Verifier si on a _certificat ou si on doit l'ajouter
+        try:
+            transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
+        except KeyError:
+            domaine_requete = 'requete.Pki.' + Constantes.ConstantesPki.REQUETE_CERTIFICAT
+
+            fingerprint_certificat = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
+
+            params = {'fingerprint': fingerprint_certificat}
+            self.set_requete(domaine_requete, params)
+            self.set_etape_suivante(ProcessusTransactionMajPost.recevoir_certificat.__name__)  # Recevoir certificat
+        else:
+            self.controleur.gestionnaire.maj_post(transaction)
+            self.set_etape_suivante()  # Termine
+
+    def recevoir_certificat(self):
+        transaction = self.transaction
+
+        # Injecter certificat
+        certificat_info = self.parametres['reponse'][0]
+        certs_list = [certificat_info['certificats_pem'][c] for c in certificat_info['chaine']]
+        transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = certs_list
+
+        self.controleur.gestionnaire.maj_post(transaction)
+        self.set_etape_suivante()  # Termine
+
