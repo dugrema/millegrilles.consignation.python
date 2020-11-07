@@ -133,8 +133,8 @@ class MessagesSample(BaseCallback):
         print("Envoi metadata: %s" % enveloppe_val)
 
     def executer(self):
-        sample.requete_liste_domaines()
-        # sample.requete_liste_noeuds()
+        # sample.requete_liste_domaines()
+        sample.requete_liste_noeuds()
         # sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()

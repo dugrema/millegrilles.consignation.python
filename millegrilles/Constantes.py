@@ -1763,6 +1763,7 @@ class ConstantesPublication:
 
     CHAMP_SITE_ID = 'site_id'
     CHAMP_POST_ID = 'post_id'
+    CHAMP_NOM_SITE = 'nom_site'
     CHAMP_LANGUAGES = 'languages'
     CHAMP_TITRE = 'titre'
     CHAMP_NOEUDS_URLS = 'noeuds_urls'

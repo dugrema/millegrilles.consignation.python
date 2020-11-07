@@ -37,6 +37,7 @@ class TestPublication(DomaineTest):
     def maj_site(self):
         info_site = {
             ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
+            ConstantesPublication.CHAMP_NOM_SITE: 'Mon site',
             ConstantesPublication.CHAMP_LANGUAGES: ['fr', 'en'],
             ConstantesPublication.CHAMP_NOEUDS_URLS: {
                 self.site_id: ["mg-dev3.maple.maceroc.com"]
@@ -66,8 +67,8 @@ class TestPublication(DomaineTest):
         # self.requete_liste_sites()
         # self.requete_config_site()
         # self.requete_sites_pour_noeud()
-        # self.maj_site()
-        self.maj_post()
+        self.maj_site()
+        # self.maj_post()
 
 
 # --- MAIN ---

@@ -108,7 +108,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         projection = [
             ConstantesPublication.CHAMP_SITE_ID,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
-            ConstantesPublication.CHAMP_TITRE,
+            ConstantesPublication.CHAMP_NOM_SITE,
         ]
         collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
         curseur = collection_site.find(filtre, projection=projection)
