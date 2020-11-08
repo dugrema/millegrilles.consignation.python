@@ -1757,6 +1757,7 @@ class ConstantesPublication:
     REQUETE_CONFIGURATION_SITE = 'configurationSite'
     REQUETE_SITES_POUR_NOEUD = 'sitesPourNoeud'
     REQUETE_LISTE_SITES = 'listeSites'
+    REQUETE_POSTS = 'posts'
 
     TRANSACTION_MAJ_SITE = 'majSite'
     TRANSACTION_MAJ_POST = 'majPost'
@@ -1772,6 +1773,8 @@ class ConstantesPublication:
     CHAMP_ALBUMS = 'albums'
     CHAMP_POST_ROWS = 'post_rows'
     CHAMP_TOUTES_COLLECTIONS = 'toutes_collections'
+    CHAMP_POST_IDS = 'post_ids'
+    CHAMP_HTML = 'html'
 
 
 class ConstantesCatalogueApplications:

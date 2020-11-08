@@ -19,6 +19,9 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
 
         if domaine_action == ConstantesPublication.REQUETE_CONFIGURATION_SITE:
             reponse = self.gestionnaire.get_configuration_site(message_dict)
+        elif domaine_action == ConstantesPublication.REQUETE_POSTS:
+            reponse = self.gestionnaire.get_posts(message_dict)
+            reponse = {'resultats': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
             reponse = {'resultats': reponse}
@@ -147,6 +150,20 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             sites.append(site)
 
         return sites
+
+    def get_posts(self, params: dict):
+        post_ids = params[ConstantesPublication.CHAMP_POST_IDS]
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_POST,
+            ConstantesPublication.CHAMP_POST_ID: {'$in': post_ids}
+        }
+
+        collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
+        projection = [ConstantesPublication.CHAMP_POST_ID, ConstantesPublication.CHAMP_HTML]
+        curseur = collection_posts.find(filtre, projection=projection)
+
+        docs = [d for d in curseur]
+        return docs
 
     def maj_site(self, transaction: dict):
         collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)

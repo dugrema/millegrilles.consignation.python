@@ -22,6 +22,13 @@ class TestPublication(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def requete_liste_posts(self):
+        requete = {'post_ids': ['bffd9d16-6bfa-4f34-ac01-4eee1de6eb5f']}
+        domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_POSTS
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
     def requete_config_site(self):
         requete = {'site_id': self.site_id}
         domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_CONFIGURATION_SITE
@@ -70,10 +77,11 @@ class TestPublication(DomaineTest):
         self.__logger.debug("Executer")
 
         # self.requete_liste_sites()
+        self.requete_liste_posts()
         # self.requete_config_site()
         # self.requete_sites_pour_noeud()
         # self.maj_site()
-        self.maj_post()
+        # self.maj_post()
 
 
 # --- MAIN ---
