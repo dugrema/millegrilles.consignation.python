@@ -191,16 +191,12 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     def maj_post(self, transaction: dict):
         collection_post = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
 
-        try:
-            post_id = transaction[ConstantesPublication.CHAMP_POST_ID]
-        except KeyError:
-            # Par defaut le site id est l'identificateur unique de la transaction
-            post_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        post_id = transaction[ConstantesPublication.CHAMP_POST_ID]
 
         self.__logger.debug("Maj post id: %s" % post_id)
 
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_POST,
             ConstantesPublication.CHAMP_POST_ID: post_id
         }
 

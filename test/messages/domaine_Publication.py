@@ -1,5 +1,7 @@
 import logging
 
+from uuid import uuid4
+
 from millegrilles.util.BaseTestMessages import DomaineTest
 from millegrilles.Constantes import ConstantesPublication
 
@@ -54,9 +56,12 @@ class TestPublication(DomaineTest):
 
     def maj_post(self):
         info_post = {
-            "post_id": "06c9b78a-20fe-11eb-b092-27db17f4ebb0",
-            "html_fr": "<h1>Mon post, en francais</h1><p>Un nouveau post</p>",
-            "html_en": "<h1>My post, in English</h1><p>A new post</p>",
+            "post_id": "17b2430e-c6bc-4d0b-8dd1-9787e0b5bf2a",
+            # "post_id": str(uuid4()),
+            "html": {
+                "fr": "<h1>Mon post, en francais</h1><p>Un nouveau post</p>",
+                "en": "<h1>My post, in English</h1><p>A new post</p>",
+            }
         }
         domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_POST
         self.generateur.soumettre_transaction(info_post, domaine_action, reply_to=self.queue_name)
@@ -67,8 +72,8 @@ class TestPublication(DomaineTest):
         # self.requete_liste_sites()
         # self.requete_config_site()
         # self.requete_sites_pour_noeud()
-        self.maj_site()
-        # self.maj_post()
+        # self.maj_site()
+        self.maj_post()
 
 
 # --- MAIN ---
