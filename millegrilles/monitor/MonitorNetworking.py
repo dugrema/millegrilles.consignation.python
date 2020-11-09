@@ -158,6 +158,11 @@ class GestionnaireWeb:
 
         location_fichiers = """
             location /fichiers {
+              proxy_cache       cache_fichiers;
+              proxy_cache_lock  on;
+              proxy_cache_background_update on;
+              proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+
               set $upstream_fichiers https://fichiers:443;
               proxy_pass $upstream_fichiers;
             
@@ -228,6 +233,14 @@ class GestionnaireWeb:
 
         # Fichier qui relie la configuration de tous les modules
         modules_includes_content = """
+            # Configuration du cache NGINX pour les fichiers
+            proxy_cache_path /cache 
+                             levels=1:2 
+                             keys_zone=cache_fichiers:2m 
+                             max_size=2g
+                             inactive=60m 
+                             use_temp_path=off;
+
             include /etc/nginx/conf.d/server.include;
         """
         with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
