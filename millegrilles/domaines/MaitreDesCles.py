@@ -768,35 +768,45 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesGenerateurCertificat.ROLE_DOMAINES,
             ]
 
+        enveloppe_certificat = self.extraire_certificat(evenement)
+
+        # S'assurer que la permission a ete generee par un role valide
+        role_permission_ok = any([role in enveloppe_certificat.get_roles for role in roles_permis])
+
         temps_limite_demande = datetime.datetime.utcnow().timestamp() - 30  # 30 secondes max
         estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
 
-        if evenement.get('roles_permis'):
-            enveloppe_certificat, estampille, temps_limite_demande = self.verifier_roles_permis(
-                estampille, evenement, temps_limite_demande)
-        elif evenement.get('_certificat') is not None:
-            enveloppe_certificat = self.extraire_certificat(evenement)
-        elif evenement.get('certificat') is not None:
-            enveloppe_certificat = self.extraire_certificat_string(evenement)
+        if role_permission_ok is True:
+            if evenement.get('roles_permis'):
+                # Permission est OK (role correct), on verifie le role du certificat de rechiffrage
+                roles_permis = evenement['roles_permis']
+                enveloppe_certificat, estampille, temps_limite_demande = self.verifier_roles_permis(
+                    estampille, evenement, temps_limite_demande)
+            elif evenement.get('_certificat') is not None:
+                enveloppe_certificat = self.extraire_certificat(evenement)
+            elif evenement.get('certificat') is not None:
+                enveloppe_certificat = self.extraire_certificat_string(evenement)
+            else:
+                enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+
+            # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
+            # Verifier si on utilise un certificat different pour re-encrypter la cle
+            fingerprint_demande = evenement.get('fingerprint')
+            if fingerprint_demande is not None:
+                self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
+                try:
+                    enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
+                except CertificatInconnu:
+                    enveloppe_certificat = None
+            elif not enveloppe_certificat.est_verifie:
+                # S'assurer que le certificat est verifie
+                self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+            # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
+            role_inclus_permis = any([role in enveloppe_certificat.get_roles for role in roles_permis])
         else:
-            enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
-
-        # Aucune exception lancee, la signature de requete est valide et provient d'un certificat autorise et connu
-        # Verifier si on utilise un certificat different pour re-encrypter la cle
-        fingerprint_demande = evenement.get('fingerprint')
-        if fingerprint_demande is not None:
-            self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
-            try:
-                enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
-            except CertificatInconnu:
-                enveloppe_certificat = None
-        elif not enveloppe_certificat.est_verifie:
-            # S'assurer que le certificat est verifie
-            self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
-
-        # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-        role_inclus_permis = any([role in enveloppe_certificat.get_roles for role in roles_permis])
+            role_inclus_permis = False
 
         if role_inclus_permis is not True:
             self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
@@ -809,16 +819,22 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # cert_navi = '\n'.join(cert[0].split(';'))
         # cert_inter = '\n'.join(cert[1].split(';'))
 
-        cert = evenement['_certificat']
-        cert_join = '\n'.join(cert)
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
+        # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
+        copie_evenement = evenement.copy()
+        del copie_evenement['_certificat']
+
+        # cert = evenement['_certificat']
+        # cert_join = '\n'.join(cert)
+        # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
         #enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
         #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
         #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
         #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-        self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+        # self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
 
-        return enveloppe_certificat
+        return self.verificateur_transaction.verifier(evenement)
+
+        # return enveloppe_certificat
 
     def extraire_certificat_string(self, evenement):
         # cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
