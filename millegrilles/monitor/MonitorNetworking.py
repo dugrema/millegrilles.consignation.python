@@ -238,7 +238,7 @@ class GestionnaireWeb:
                              levels=1:2 
                              keys_zone=cache_fichiers:2m 
                              max_size=2g
-                             inactive=60m 
+                             inactive=4320m
                              use_temp_path=off;
 
             include /etc/nginx/conf.d/server.include;
