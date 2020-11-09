@@ -1180,8 +1180,8 @@ class ConstantesGrosFichiers:
     REQUETE_FAVORIS = '%s.favoris' % DOMAINE_NOM
     REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM
     REQUETE_DOCUMENTS_PAR_UUID = '%s.documentsParUuid' % DOMAINE_NOM
+    REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC = 'demandePermissionDechiffragePublic'
 
-    COMMANDE_DECRYPTER_FICHIER = 'commande.grosfichiers.decrypterFichier'
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers

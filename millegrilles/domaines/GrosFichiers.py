@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
-    RegenerateurDeDocuments, GroupeurTransactionsARegenerer
+    RegenerateurDeDocuments, GroupeurTransactionsARegenerer, TraitementCommandesSecures
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -36,6 +36,7 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         action = '.'.join(routing_key.split('.')[-2:])
+        domaine_action = routing_key.split('.').pop()
 
         if action == ConstantesGrosFichiers.REQUETE_ACTIVITE_RECENTE:
             reponse = {'resultats': self.gestionnaire.get_activite_recente(message_dict)}
@@ -49,6 +50,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_contenu_collection(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID:
             reponse = {'resultats': self.gestionnaire.get_documents_par_uuid(message_dict)}
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
+            reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_public(message_dict)
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
@@ -1871,6 +1874,42 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
         ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
         collection_domaine.update_one(filtre, ops)
+
+    def generer_permission_dechiffrage_fichier_public(self, params: dict):
+        fuuid = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        # Recuperer le fichier
+        filtre_fichier = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            'versions.' + fuuid: {'$exists': True},
+        }
+        projection_fichier = ['collections']
+        fichier = collection_domaine.find_one(filtre_fichier, projection=projection_fichier)
+
+        try:
+            liste_collections = fichier['collections']
+        except (TypeError, KeyError):
+            fichier_public = False
+        else:
+            # Verifier que le fichier est bien dans au moins une collection publique
+            filtre_collections = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': liste_collections},
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+            }
+            projection_collection = [Constantes.DOCUMENT_INFODOC_SECURITE]
+            curseur_collections = collection_domaine.find(filtre_collections, projection=projection_collection)
+
+            # Verifier qu'au moins une collection est de securite 1.public
+            fichier_public = any([s[Constantes.DOCUMENT_INFODOC_SECURITE] == Constantes.SECURITE_PUBLIC for s in curseur_collections])
+
+        if fichier_public:
+            return self.preparer_permission_dechiffrage_fichier(fuuid)
+
+        # Erreur, le fichier n'est pas public
+        return {'err': "Le fichier n'est pas public", 'fuuid': fuuid}
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):

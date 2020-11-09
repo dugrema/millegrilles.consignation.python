@@ -370,6 +370,20 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_permission_dechiffrage_fichier_public(self):
+        requete_cert_maitredescles = {
+            'fuuid': "47c767e0-2082-11eb-a751-8972c2e0927d"
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def requete_permission_decryptage_cle_fuuid(self):
         # mq_cert = self.configuration.mq_certfile
         # with open(mq_cert, 'r') as fichier:
@@ -428,7 +442,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_permission_decryptage_cle_fuuid()
         # sample.transaction_renommer_document()
         # sample.transaction_decrire_fichier()
-        sample.transaction_decrire_collection()
+        # sample.transaction_decrire_collection()
+        sample.requete_permission_dechiffrage_fichier_public()
 
         pass
 
