@@ -1617,12 +1617,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self._logger.debug("Set ops : %s\nUnset ops: %s" % (set_ops, unset_ops))
 
-    def preparer_permission_dechiffrage_fichier(self, fuuid):
+    def preparer_permission_dechiffrage_fichier(self, fuuid, uuid_fichier: str = None, info_version: dict = None):
         permission = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
         }
+
+        if uuid_fichier:
+            permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_fichier
+
+        try:
+            permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
+        except KeyError:
+            pass
 
         # Signer
         generateur_transactions = self._contexte.generateur_transactions
@@ -1883,9 +1891,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Recuperer le fichier
         filtre_fichier = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            'versions.' + fuuid: {'$exists': True},
+            'versions.' + fuuid: {'$exists': True}
         }
-        projection_fichier = ['collections']
+        projection_fichier = ['collections', 'uuid', 'versions.' + fuuid]
         fichier = collection_domaine.find_one(filtre_fichier, projection=projection_fichier)
 
         try:
@@ -1906,7 +1914,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             fichier_public = any([s[Constantes.DOCUMENT_INFODOC_SECURITE] == Constantes.SECURITE_PUBLIC for s in curseur_collections])
 
         if fichier_public:
-            return self.preparer_permission_dechiffrage_fichier(fuuid)
+            uuid_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+            try:
+                info_version = fichier['versions'][fuuid]
+            except KeyError:
+                info_version = None
+
+            permission = self.preparer_permission_dechiffrage_fichier(fuuid, uuid_fichier, info_version)
+            return permission
 
         # Erreur, le fichier n'est pas public
         return {'err': "Le fichier n'est pas public", 'fuuid': fuuid}

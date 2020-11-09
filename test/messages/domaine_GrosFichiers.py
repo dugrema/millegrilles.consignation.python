@@ -123,8 +123,8 @@ class MessagesSample(BaseCallback):
 
     def transaction_decrire_collection(self):
         transaction = {
-            "uuid": "3e107b6b-aaa0-4e31-b540-19a61345bbe6",
-            "nom_collection": "Nom collection maj",
+            "uuid": "201e1fb7-66bd-4901-b52a-116c65d7b0d9",
+            "nom_collection": "public",
             "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute.",
             "titre": {'en': 'Collection name in English', 'fr': 'Nom de collection en francais'},
             "description": {
@@ -372,7 +372,8 @@ class MessagesSample(BaseCallback):
 
     def requete_permission_dechiffrage_fichier_public(self):
         requete_cert_maitredescles = {
-            'fuuid': "47c767e0-2082-11eb-a751-8972c2e0927d"
+            # 'fuuid': 'd2f5ebf0-228c-11eb-b2e0-e1493ef37733',
+            'fuuid': 'd0fa9123-228c-11eb-8f98-5d3582e42c8c',
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
