@@ -195,6 +195,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         return self.__handler_requetes_noeuds
 
     def identifier_processus(self, domaine_transaction):
+        domaine_action = domaine_transaction.split('.').pop()
+
         # Fichiers
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleVersionMetadata"
@@ -214,6 +216,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
+        elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_DOCUMENT:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreDocument"
 
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
@@ -833,10 +837,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         else:
             self._logger.error('renommer_deplacer_fichier aucun document trouve pour uuid : %s' % uuid_doc)
 
-    def maj_commentaire_fichier(self, uuid_fichier, changements: dict):
+    def maj_description_fichier(self, uuid_fichier, transaction: dict):
+        """
+        Met a jour les champs de description (titre, description, commentaires)
+        :param uuid_fichier:
+        :param transaction:
+        :return:
+        """
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-        set_operation = changements
+        set_operation = dict()
+        champs = ['titre', 'description', 'commentaires']
+        for champ in champs:
+            try:
+                set_operation[champ] = transaction[champ]
+            except KeyError:
+                pass
+
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
@@ -844,7 +861,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         resultat = collection_domaine.update_one(filtre, {
             '$set': set_operation
         })
-        self._logger.debug('maj_commentaire_fichier resultat: %s' % str(resultat))
+        self._logger.debug('maj_description_fichier resultat: %s' % str(resultat))
 
     def maj_etiquettes(self, uuid_fichier, type_document, etiquettes: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -2169,7 +2186,7 @@ class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):
+class ProcessusTransactionDecricreDocument(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
@@ -2178,20 +2195,7 @@ class ProcessusTransactionCommenterFichier(ProcessusGrosFichiersActivite):
         transaction = self.charger_transaction()
         uuid_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
 
-        champs_multilingues = [
-            ConstantesGrosFichiers.DOCUMENT_COMMENTAIRES
-        ]
-
-        changements = dict()
-        for key, value in transaction.items():
-            for champ in champs_multilingues:
-                if key.startswith(champ):
-                    changements[key] = value
-
-        self._controleur.gestionnaire.maj_commentaire_fichier(uuid_fichier, changements)
-
-        # Met a jour les collections existantes avec ce fichier
-        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+        self._controleur.gestionnaire.maj_description_fichier(uuid_fichier, transaction)
 
         self.set_etape_suivante()  # Termine
 

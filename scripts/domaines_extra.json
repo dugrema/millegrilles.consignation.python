@@ -3,6 +3,10 @@
     {
       "module": "millegrilles.domaines.Publication",
       "classe": "GestionnairePublication"
+    },
+    {
+      "module": "millegrilles.domaines.GrosFichiers",
+      "classe": "GestionnaireGrosFichiers"
     }
   ]
 }

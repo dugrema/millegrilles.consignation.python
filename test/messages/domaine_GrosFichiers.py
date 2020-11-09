@@ -103,14 +103,20 @@ class MessagesSample(BaseCallback):
         print("Changer libelle complete: %s" % enveloppe_val)
         return enveloppe_val
 
-    def transaction_commenter_fichier(self):
+    def transaction_decrire_fichier(self):
         transaction = {
-            "uuid": "7b3724da-0be8-11ea-bb74-00155d011f09",
-            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute."
+            "uuid": "41548d46-c12b-41f6-b205-4c0ae7d64c16",
+            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute.",
+            "titre": {'en': 'Name in English', 'fr': 'Nom en francais'},
+            "description": {
+                'en': 'Complete description of the file',
+                'fr': 'Description complete du fichier',
+            }
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'millegrilles.domaines.GrosFichiers.commenterFichier',
-            reply_to=self.queue_name, correlation_id='abcd')
+            transaction, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_DOCUMENT,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
 
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
@@ -400,7 +406,8 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
         # sample.requete_permission_decryptage_cle_fuuid()
-        sample.transaction_renommer_document()
+        # sample.transaction_renommer_document()
+        sample.transaction_decrire_fichier()
 
         pass
 

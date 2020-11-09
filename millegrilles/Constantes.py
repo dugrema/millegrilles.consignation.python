@@ -1149,6 +1149,7 @@ class ConstantesGrosFichiers:
     TRANSACTION_ASSOCIER_THUMBNAIL = '%s.associerThumbnail' % DOMAINE_NOM
     TRANSACTION_ASSOCIER_VIDEO_TRANSCODE = '%s.associerVideo' % DOMAINE_NOM
     TRANSACTION_ASSOCIER_PREVIEW = '%s.associerPreview' % DOMAINE_NOM
+    TRANSACTION_DECRIRE_DOCUMENT = 'decrireDocument'
 
     TRANSACTION_NOUVELLE_COLLECTION = '%s.nouvelleCollection' % DOMAINE_NOM
     TRANSACTION_RENOMMER_COLLECTION = '%s.renommerCollection' % DOMAINE_NOM
