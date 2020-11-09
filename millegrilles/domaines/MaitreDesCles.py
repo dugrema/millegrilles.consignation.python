@@ -815,26 +815,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return enveloppe_certificat, estampille, temps_limite_demande
 
     def extraire_certificat(self, evenement):
-        # cert = self.verificateur_certificats.split_chaine_certificats(evenement['_certificat'])
-        # cert_navi = '\n'.join(cert[0].split(';'))
-        # cert_inter = '\n'.join(cert[1].split(';'))
-
         # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
         copie_evenement = evenement.copy()
-        del copie_evenement['_certificat']
-
-        # cert = evenement['_certificat']
-        # cert_join = '\n'.join(cert)
-        # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
-        #enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
-        #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
-        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-        # self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
-
+        try:
+            del copie_evenement['_certificat']
+        except KeyError:
+            pass
         return self.verificateur_transaction.verifier(evenement)
-
-        # return enveloppe_certificat
 
     def extraire_certificat_string(self, evenement):
         # cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
