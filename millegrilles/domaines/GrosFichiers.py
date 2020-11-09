@@ -1633,6 +1633,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = info_version[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL]
+            permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = info_version[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW] = info_version[
