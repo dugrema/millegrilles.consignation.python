@@ -555,25 +555,51 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     enveloppe_certificat.fingerprint_ascii))
             acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
 
+            liste_fuuid = [evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]]
+            try:
+                liste_fuuid.append(evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW])
+            except KeyError:
+                pass
+
             collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                    'fuuid': evenement['fuuid'],
+                '.'.join([ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 'fuuid']): {
+                    '$in': liste_fuuid
                 }
             }
-            document = collection_documents.find_one(filtre)
-            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
-            if document is not None:
-                self._logger.debug("Document de cles pour grosfichiers: %s" % str(document))
+            curseur = collection_documents.find(filtre)
+
+            cles_cert_par_fuuid = dict()
+            for doc_cle in curseur:
+                fuuid = doc_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+                cles_cert_par_fuuid[fuuid] = {
+                    'iv': doc_cle['iv'],
+                    'cles': doc_cle['cles']
+                }
+
+            # Note: si les cles ne sont pas trouvees, on repond acces refuse (obfuscation)
+            if len(cles_cert_par_fuuid) > 0:
+                self._logger.debug("Documents de cles pour grosfichiers: %s" % str(cles_cert_par_fuuid))
                 if acces_permis:
-                    cle_secrete = self.decrypter_cle(document['cles'])
+                    cles_par_fuuid = dict()
+                    # Dechiffrer toutes les cles, ajouter dans une collection indexee par fuuid
                     try:
-                        cle_secrete_reencryptee, fingerprint = self.crypter_cle(
-                            cle_secrete, enveloppe_certificat.certificat)
+                        for fuuid, cles_par_cert in cles_cert_par_fuuid.items():
+                            cle_secrete = self.decrypter_cle(cles_par_cert['cles'])
+                            cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+                                cle_secrete, enveloppe_certificat.certificat)
+                            cles_par_fuuid[fuuid] = {
+                                'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                                'iv': cles_par_cert['iv']
+                            }
+
+                        fuuid_fichier = evenement['fuuid']
+
                         reponse = {
-                            'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                            'iv': document['iv'],
+                            'cle': cles_par_fuuid[fuuid_fichier]['cle'],
+                            'iv': cles_par_fuuid[fuuid_fichier]['iv'],
+                            'cles_par_fuuid': cles_par_fuuid,
                             Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
                         }
                     except TypeError:
@@ -770,9 +796,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
 
         # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-        role_inclus_permis = [any(role in enveloppe_certificat.get_roles for role in roles_permis)]
+        role_inclus_permis = any([role in enveloppe_certificat.get_roles for role in roles_permis])
 
-        if role_inclus_permis is False:
+        if role_inclus_permis is not True:
             self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
             enveloppe_certificat = None
 
@@ -826,7 +852,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
         roles = enveloppe_certificat.get_roles
         if 'domaines' in roles:
-            cert = evenement.get('_certificat_tiers')
+            cert = evenement.get('_certificat_tiers') or evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
 
             enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(cert))
             # self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)

@@ -396,15 +396,16 @@ class MessagesSample(BaseCallback):
         # certs = signateur.split_chaine_certificats(mq_certfile)
 
         requete_cert_maitredescles = {
-            'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0",
+            'fuuid': "d0fa9123-228c-11eb-8f98-5d3582e42c8c",
+            'fuuid_preview': "d2f5ebf0-228c-11eb-b2e0-e1493ef37733",
             'roles_permis': ['domaines'],
-            '_certificat_tiers': certs
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
             'MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
             'abcd-1234',
-            self.queue_name
+            self.queue_name,
+            ajouter_certificats=True
         )
 
         print("Envoi requete: %s" % enveloppe_requete)
@@ -440,11 +441,11 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.requete_documents_par_uuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
-        # sample.requete_permission_decryptage_cle_fuuid()
+        sample.requete_permission_decryptage_cle_fuuid()
         # sample.transaction_renommer_document()
         # sample.transaction_decrire_fichier()
         # sample.transaction_decrire_collection()
-        sample.requete_permission_dechiffrage_fichier_public()
+        # sample.requete_permission_dechiffrage_fichier_public()
 
         pass
 
