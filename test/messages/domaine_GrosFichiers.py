@@ -121,6 +121,26 @@ class MessagesSample(BaseCallback):
         print("Renommer repertoire complete: %s" % enveloppe_val)
         return enveloppe_val
 
+    def transaction_decrire_collection(self):
+        transaction = {
+            "uuid": "3e107b6b-aaa0-4e31-b540-19a61345bbe6",
+            "nom_collection": "Nom collection maj",
+            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute.",
+            "titre": {'en': 'Collection name in English', 'fr': 'Nom de collection en francais'},
+            "description": {
+                'en': 'Complete description of the collection',
+                'fr': 'Description complete de la collection',
+            },
+            'securite': '1.public',
+        }
+        enveloppe_val = self.generateur.soumettre_transaction(
+            transaction, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
+
+        print("Renommer repertoire complete: %s" % enveloppe_val)
+        return enveloppe_val
+
     def transaction_supprimer_fichier(self):
         transaction = {
             ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [
@@ -407,7 +427,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_decryptage_cle_fuuid()
         # sample.requete_permission_decryptage_cle_fuuid()
         # sample.transaction_renommer_document()
-        sample.transaction_decrire_fichier()
+        # sample.transaction_decrire_fichier()
+        sample.transaction_decrire_collection()
 
         pass
 

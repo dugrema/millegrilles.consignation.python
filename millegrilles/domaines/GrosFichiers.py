@@ -218,6 +218,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
         elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_DOCUMENT:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreDocument"
+        elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreCollection"
 
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_DECRYPTER_FICHIER:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecrypterFichier"
@@ -859,9 +861,37 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER
         }
         resultat = collection_domaine.update_one(filtre, {
-            '$set': set_operation
+            '$set': set_operation,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         })
         self._logger.debug('maj_description_fichier resultat: %s' % str(resultat))
+
+    def maj_description_collection(self, uuid_collection, transaction: dict):
+        """
+        Met a jour les champs de description (titre, description, commentaires)
+        :param uuid_collection:
+        :param transaction:
+        :return:
+        """
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+
+        set_operation = dict()
+        champs = ['nom_collection', 'titre', 'description', 'commentaires', 'securite']
+        for champ in champs:
+            try:
+                set_operation[champ] = transaction[champ]
+            except KeyError:
+                pass
+
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_collection,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION
+        }
+        resultat = collection_domaine.update_one(filtre, {
+            '$set': set_operation,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        })
+        self._logger.debug('maj_description_collection resultat: %s' % str(resultat))
 
     def maj_etiquettes(self, uuid_fichier, type_document, etiquettes: list):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -2200,6 +2230,22 @@ class ProcessusTransactionDecricreDocument(ProcessusGrosFichiers):
         self.set_etape_suivante()  # Termine
 
         return {'uuid_fichier': uuid_fichier}
+
+
+class ProcessusTransactionDecricreCollection(ProcessusGrosFichiers):
+
+    def __init__(self, controleur: MGPProcesseur, evenement):
+        super().__init__(controleur, evenement)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+        uuid_collection = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
+
+        self._controleur.gestionnaire.maj_description_collection(uuid_collection, transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return {'uuid_collection': uuid_collection}
 
 
 class ProcessusTransactionChangerEtiquettesFichier(ProcessusGrosFichiersActivite):
