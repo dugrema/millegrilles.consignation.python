@@ -441,10 +441,10 @@ class MessagesSample(BaseCallback):
         # enveloppe = sample.requete_documents_par_uuid()
         # enveloppe = sample.transaction_associer_preview()
         # sample.requete_decryptage_cle_fuuid()
-        sample.requete_permission_decryptage_cle_fuuid()
+        # sample.requete_permission_decryptage_cle_fuuid()
         # sample.transaction_renommer_document()
         # sample.transaction_decrire_fichier()
-        # sample.transaction_decrire_collection()
+        sample.transaction_decrire_collection()
         # sample.requete_permission_dechiffrage_fichier_public()
 
         pass
