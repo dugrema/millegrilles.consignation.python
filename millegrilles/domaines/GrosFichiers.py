@@ -17,18 +17,25 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
-        if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
-            fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
-            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
-        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
-            fichiers_vitrine = self.gestionnaire.get_document_vitrine_albums()
-            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
-        elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_COLLECTION_FIGEE:
-            uuid_collection = message_dict.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
-            fichiers_vitrine = self.gestionnaire.get_collection_figee_recente_par_collection(uuid_collection)
-            self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        action = routing_key.split('.').pop()
+
+        # if routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
+        #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
+        #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_ALBUMS:
+        #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_albums()
+        #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_COLLECTION_FIGEE:
+        #     uuid_collection = message_dict.get(ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC)
+        #     fichiers_vitrine = self.gestionnaire.get_collection_figee_recente_par_collection(uuid_collection)
+        #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
+        if action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
+            reponse = self.gestionnaire.get_collections_publiques(message_dict)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
+
+        if reponse:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
@@ -52,6 +59,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_documents_par_uuid(message_dict)}
         elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
             reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_public(message_dict)
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
+            reponse = self.gestionnaire.get_collections_publiques(message_dict)
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
@@ -67,6 +76,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             return
 
         if reponse:
+            if not isinstance(reponse, dict):
+                reponse = {'resultat': reponse}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
@@ -1935,6 +1946,27 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Erreur, le fichier n'est pas public
         return {'err': "Le fichier n'est pas public", 'fuuid': fuuid}
 
+    def get_collections_publiques(self, params: dict):
+        """
+        Retourne liste de toutes les collections publiques
+        :param params:
+        :return:
+        """
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+        projection = ['uuid', 'nom_collection', 'titre', 'description']
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        curseur = collection_domaine.find(filtre, projection=projection)
+
+        colls = [c for c in curseur]
+        for c in colls:
+            del c['_id']  # Supprimer champ _id
+
+        return colls
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
 

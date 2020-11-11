@@ -411,6 +411,16 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_collections_publiques(self):
+        requete = {}
+        self.generateur.transmettre_requete(
+            requete,
+            'GrosFichiers.' + Constantes.ConstantesMaitreDesCles.REQUETE_COLLECTIONS_PUBLIQUES,
+            'abcd-1234',
+            self.queue_name,
+            ajouter_certificats=True
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -444,8 +454,9 @@ class MessagesSample(BaseCallback):
         # sample.requete_permission_decryptage_cle_fuuid()
         # sample.transaction_renommer_document()
         # sample.transaction_decrire_fichier()
-        sample.transaction_decrire_collection()
+        # sample.transaction_decrire_collection()
         # sample.requete_permission_dechiffrage_fichier_public()
+        sample.requete_collections_publiques()
 
         pass
 

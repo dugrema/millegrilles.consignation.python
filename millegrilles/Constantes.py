@@ -740,6 +740,7 @@ class ConstantesMaitreDesCles:
     REQUETE_TROUSSEAU_HEBERGEMENT = 'trousseauHebergement'
     REQUETE_CLES_NON_DECHIFFRABLES = 'clesNonDechiffrables'
     REQUETE_DECHIFFRAGE_BACKUP = 'dechiffrageBackup'
+    REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
 
     COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
     COMMANDE_RESTAURER_BACKUP_CLES = 'restaurerBackupCles'
@@ -1181,6 +1182,7 @@ class ConstantesGrosFichiers:
     REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM
     REQUETE_DOCUMENTS_PAR_UUID = '%s.documentsParUuid' % DOMAINE_NOM
     REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC = 'demandePermissionDechiffragePublic'
+    REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
 
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
 
