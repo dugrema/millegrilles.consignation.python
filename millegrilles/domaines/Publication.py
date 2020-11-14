@@ -137,7 +137,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
     def get_sites_par_noeud(self, params: dict) -> list:
         noeud_id = params['noeud_id']
         filtre = {
-            ConstantesPublication.CHAMP_NOEUDS_URLS: {'$exists': noeud_id}
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPublication.LIBVAL_SITE_CONFIG,
+            ConstantesPublication.CHAMP_NOEUDS_URLS + '.' + noeud_id: {'$exists': True}
         }
         hints = [(ConstantesPublication.CHAMP_NOEUDS_URLS, 1)]
 
