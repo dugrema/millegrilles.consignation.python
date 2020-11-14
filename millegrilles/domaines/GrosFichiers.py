@@ -37,7 +37,7 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
             raise Exception("Requete publique non supportee " + routing_key)
 
         if reponse:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
 
 
 class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
@@ -2018,6 +2018,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 del fichier_mappe['_id']
                 del fichier_mappe['collections']
                 del fichier_mappe['versions']
+                del fichier_mappe['fuuid_v_courante']
 
                 fuuid_v_courante = f['fuuid_v_courante']
                 fichier_mappe.update(f['versions'][fuuid_v_courante])
@@ -2033,7 +2034,15 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     except KeyError:
                         pass  # OK, la collection n'est pas dans la liste a remplir
 
-        return list(dict_collection_par_uuid.values())
+        liste_collections = list()
+        for c in dict_collection_par_uuid.values():
+            del c['_id']
+
+            # Signer chaque collection
+            enveloppe = self.generateur_transactions.preparer_enveloppe(c)
+            liste_collections.append(enveloppe)
+
+        return liste_collections
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
