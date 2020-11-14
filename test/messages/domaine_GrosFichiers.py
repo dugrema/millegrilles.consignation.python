@@ -114,7 +114,7 @@ class MessagesSample(BaseCallback):
             }
         }
         enveloppe_val = self.generateur.soumettre_transaction(
-            transaction, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_DOCUMENT,
+            transaction, 'GrosFichiers.' + ConstantesGrosFichiers.TRANSACTION_DECRIRE_FICHIER,
             reply_to=self.queue_name, correlation_id='abcd'
         )
 

@@ -230,8 +230,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionSupprimerFichier"
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_RECUPERER_FICHIER:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionRecupererFichier"
-        elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_DOCUMENT:
-            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreDocument"
+        elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_FICHIER:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreFichier"
         elif domaine_action == ConstantesGrosFichiers.TRANSACTION_DECRIRE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionDecricreCollection"
 
@@ -863,7 +863,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
         set_operation = dict()
-        champs = ['titre', 'description', 'commentaires']
+        champs = ['nom_fichier', 'titre', 'description', 'commentaires']
         for champ in champs:
             try:
                 set_operation[champ] = transaction[champ]
@@ -2311,7 +2311,7 @@ class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusTransactionDecricreDocument(ProcessusGrosFichiers):
+class ProcessusTransactionDecricreFichier(ProcessusGrosFichiers):
 
     def __init__(self, controleur: MGPProcesseur, evenement):
         super().__init__(controleur, evenement)
