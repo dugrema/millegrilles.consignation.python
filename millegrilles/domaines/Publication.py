@@ -21,10 +21,10 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
             reponse = self.gestionnaire.get_configuration_site(message_dict)
         elif domaine_action == ConstantesPublication.REQUETE_POSTS:
             reponse = self.gestionnaire.get_posts(message_dict)
-            reponse = {'resultats': reponse}
+            reponse = {'liste_posts': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
-            reponse = {'resultats': reponse}
+            reponse = {'liste_sites': reponse}
         elif domaine_action == ConstantesPublication.REQUETE_LISTE_SITES:
             reponse = self.gestionnaire.get_liste_sites()
             reponse = {'resultats': reponse}
@@ -149,7 +149,8 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         sites = list()
         for site in curseur:
             del site['_id']
-            sites.append(site)
+            enveloppe = self.generateur_transactions.preparer_enveloppe(site)
+            sites.append(enveloppe)
 
         return sites
 
