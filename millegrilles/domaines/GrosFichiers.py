@@ -33,6 +33,7 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
             reponse = self.gestionnaire.get_collections_publiques(message_dict)
         elif action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
             reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
+            reponse = {'liste_collections': reponse}
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
