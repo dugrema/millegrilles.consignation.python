@@ -1779,6 +1779,7 @@ class ConstantesPublication:
     CHAMP_TOUTES_COLLECTIONS = 'toutes_collections'
     CHAMP_POST_IDS = 'post_ids'
     CHAMP_HTML = 'html'
+    CHAMP_DATE_POST = 'date_post'
 
 
 class ConstantesCatalogueApplications:

@@ -163,7 +163,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         }
 
         collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
-        projection = [ConstantesPublication.CHAMP_POST_ID, ConstantesPublication.CHAMP_HTML]
+        projection = [
+            ConstantesPublication.CHAMP_POST_ID,
+            ConstantesPublication.CHAMP_HTML,
+            ConstantesPublication.CHAMP_DATE_POST,
+        ]
         curseur = collection_posts.find(filtre, projection=projection)
 
         docs = list()
@@ -241,15 +245,17 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         estampille = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
             Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
         derniere_modification = datetime.datetime.fromtimestamp(estampille)
-        set_ops[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION] = derniere_modification
         set_ops[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = transaction[
             Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
         set_ops[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = transaction[
             Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
 
+        set_ops[ConstantesPublication.CHAMP_DATE_POST] = estampille
+
         ops = {
             '$set': set_ops,
             '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
         resultat = collection_post.update_one(filtre, ops, upsert=True)

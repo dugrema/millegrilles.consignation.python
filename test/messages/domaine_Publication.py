@@ -23,7 +23,7 @@ class TestPublication(DomaineTest):
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
     def requete_liste_posts(self):
-        requete = {'post_ids': ['a5e34904-ffdb-4f50-a092-86e3058f9716', '5fce6672-a644-4f1b-94e0-3fa265b4affc']}
+        requete = {'post_ids': ['bf20add7-0355-40e7-86d4-5b0ab1fee873', 'a5e34904-ffdb-4f50-a092-86e3058f9716', '5fce6672-a644-4f1b-94e0-3fa265b4affc']}
         domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_POSTS
         correlation_id = 'test'
         self.generateur.transmettre_requete(
