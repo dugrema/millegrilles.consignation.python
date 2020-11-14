@@ -23,7 +23,7 @@ class TestPublication(DomaineTest):
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
     def requete_liste_posts(self):
-        requete = {'post_ids': ['bffd9d16-6bfa-4f34-ac01-4eee1de6eb5f']}
+        requete = {'post_ids': ['a5e34904-ffdb-4f50-a092-86e3058f9716', '5fce6672-a644-4f1b-94e0-3fa265b4affc']}
         domaine_action = 'requete.Publication.' + ConstantesPublication.REQUETE_POSTS
         correlation_id = 'test'
         self.generateur.transmettre_requete(
@@ -77,9 +77,9 @@ class TestPublication(DomaineTest):
         self.__logger.debug("Executer")
 
         # self.requete_liste_sites()
-        # self.requete_liste_posts()
+        self.requete_liste_posts()
         # self.requete_config_site()
-        self.requete_sites_pour_noeud()
+        # self.requete_sites_pour_noeud()
         # self.maj_site()
         # self.maj_post()
 

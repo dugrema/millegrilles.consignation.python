@@ -22,6 +22,9 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
         elif domaine_action == ConstantesPublication.REQUETE_POSTS:
             reponse = self.gestionnaire.get_posts(message_dict)
             reponse = {'resultats': reponse}
+            self.transmettre_reponse(
+                message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
+            return
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
             reponse = {'resultats': reponse}
@@ -163,7 +166,11 @@ class GestionnairePublication(GestionnaireDomaineStandard):
         projection = [ConstantesPublication.CHAMP_POST_ID, ConstantesPublication.CHAMP_HTML]
         curseur = collection_posts.find(filtre, projection=projection)
 
-        docs = [d for d in curseur]
+        docs = list()
+        for d in curseur:
+            doc_signe = self.generateur_transactions.preparer_enveloppe(d)
+            docs.append(doc_signe)
+
         return docs
 
     def maj_site(self, transaction: dict):

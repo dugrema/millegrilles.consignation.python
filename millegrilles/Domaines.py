@@ -161,12 +161,13 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
         return resultats
 
-    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None):
+    def transmettre_reponse(self, requete, resultats, replying_to, correlation_id=None, ajouter_certificats=False):
         # enveloppe_val = generateur.soumettre_transaction(requete, 'millegrilles.domaines.Principale.creerAlerte')
         if correlation_id is None:
             correlation_id = requete[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
-        self.gestionnaire.generateur_transactions.transmettre_reponse(resultats, replying_to, correlation_id)
+        self.gestionnaire.generateur_transactions.transmettre_reponse(
+            resultats, replying_to, correlation_id, ajouter_certificats=ajouter_certificats)
 
 
 class TraitementMessageCedule(TraitementMessageDomaine):
