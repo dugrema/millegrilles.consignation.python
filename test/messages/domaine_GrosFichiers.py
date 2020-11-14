@@ -421,6 +421,16 @@ class MessagesSample(BaseCallback):
             ajouter_certificats=True
         )
 
+    def requete_detail_collections_publiques(self):
+        requete = {}
+        self.generateur.transmettre_requete(
+            requete,
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES,
+            'abcd-1234',
+            self.queue_name,
+            ajouter_certificats=True
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -456,7 +466,8 @@ class MessagesSample(BaseCallback):
         # sample.transaction_decrire_fichier()
         # sample.transaction_decrire_collection()
         # sample.requete_permission_dechiffrage_fichier_public()
-        sample.requete_collections_publiques()
+        # sample.requete_collections_publiques()
+        sample.requete_detail_collections_publiques()
 
         pass
 

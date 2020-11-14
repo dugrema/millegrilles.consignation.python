@@ -22,9 +22,6 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
         elif domaine_action == ConstantesPublication.REQUETE_POSTS:
             reponse = self.gestionnaire.get_posts(message_dict)
             reponse = {'resultats': reponse}
-            self.transmettre_reponse(
-                message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
-            return
         elif domaine_action == ConstantesPublication.REQUETE_SITES_POUR_NOEUD:
             reponse = self.gestionnaire.get_sites_par_noeud(message_dict)
             reponse = {'resultats': reponse}
@@ -37,7 +34,8 @@ class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
             raise Exception("Requete publique non supportee " + routing_key)
 
         if reponse:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            self.transmettre_reponse(
+                message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
 
 
 class GestionnairePublication(GestionnaireDomaineStandard):

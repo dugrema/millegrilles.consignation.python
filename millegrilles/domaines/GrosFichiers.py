@@ -31,6 +31,8 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
         if action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
             reponse = self.gestionnaire.get_collections_publiques(message_dict)
+        elif action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
+            reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
         else:
             raise Exception("Requete publique non supportee " + routing_key)
 
@@ -61,6 +63,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_public(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
             reponse = self.gestionnaire.get_collections_publiques(message_dict)
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
+            reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
@@ -1967,6 +1971,70 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             del c['_id']  # Supprimer champ _id
 
         return colls
+
+    def get_detail_collections_publiques(self, params: dict):
+        """
+        Retourne liste de toutes les collections publiques
+        :param params:
+        :return:
+        """
+        filtre_collections = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+        projection_collection = ['uuid', 'nom_collection', 'titre', 'description']
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        curseur_collections = collection_domaine.find(filtre_collections, projection=projection_collection)
+
+        dict_collection_par_uuid = dict()
+        for c in curseur_collections:
+            # del c['_id']  # Supprimer champ _id
+            dict_collection_par_uuid[c['uuid']] = c
+
+        # Charger les fichiers pour toutes les collections
+        filtre_fichiers = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+        }
+
+        labels_collection_uuids = list()
+        for collection_uuid in dict_collection_par_uuid.keys():
+            labels_collection_uuids.append({'collections': collection_uuid})
+
+        if len(labels_collection_uuids) > 0:
+            filtre_fichiers['$or'] = labels_collection_uuids
+            projection_fichiers = [
+                'uuid', 'mimetype', 'uuid_preview', 'mimetype_preview',
+                'nom_fichier', 'titre', 'description', 'collections',
+                'versions', 'taille', 'fuuid_v_courante'
+            ]
+            curseur_fichiers = collection_domaine.find(filtre_fichiers, projection=projection_fichiers)
+
+            for f in curseur_fichiers:
+                # Placer le fichier dans toutes les collections correspondantes
+                fichier_mappe = f.copy()
+                del fichier_mappe['_id']
+                del fichier_mappe['collections']
+                del fichier_mappe['versions']
+
+                fuuid_v_courante = f['fuuid_v_courante']
+                fichier_mappe.update(f['versions'][fuuid_v_courante])
+
+                for uuid_collection_fichier in f.get('collections'):
+                    try:
+                        collection_fichier = dict_collection_par_uuid[uuid_collection_fichier]
+                        try:
+                            collection_fichier['fichiers'].append(fichier_mappe)
+                        except KeyError:
+                            # Initialiser nouvelle liste
+                            collection_fichier['fichiers'] = [fichier_mappe]
+                    except KeyError:
+                        pass  # OK, la collection n'est pas dans la liste a remplir
+
+        return list(dict_collection_par_uuid.values())
+
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
 
