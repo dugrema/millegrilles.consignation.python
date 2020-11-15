@@ -207,8 +207,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_PUBLICATION_FICHIERS
         })
 
-        self.demarrer_watcher_collection(
-            ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
+        # self.demarrer_watcher_collection(
+        #     ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM, ConstantesGrosFichiers.QUEUE_ROUTING_CHANGEMENTS)
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
@@ -1655,7 +1655,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW] = info_version[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
-        except KeyError:
+        except (KeyError, TypeError):
             pass
 
         # Signer
@@ -1984,6 +1984,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
+
+        try:
+            uuid_collections = params[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
+            filtre_collections[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = {'$in': uuid_collections}
+        except KeyError:
+            pass  # OK, on recupere toutes les collections
+
         projection_collection = ['uuid', 'nom_collection', 'titre', 'description']
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -2015,14 +2022,16 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
             for f in curseur_fichiers:
                 # Placer le fichier dans toutes les collections correspondantes
-                fichier_mappe = f.copy()
+                fuuid_v_courante = f['fuuid_v_courante']
+                fichier_mappe = f['versions'][fuuid_v_courante].copy()
+                fichier_mappe.update(f)
+
                 del fichier_mappe['_id']
                 del fichier_mappe['collections']
                 del fichier_mappe['versions']
                 del fichier_mappe['fuuid_v_courante']
 
-                fuuid_v_courante = f['fuuid_v_courante']
-                fichier_mappe.update(f['versions'][fuuid_v_courante])
+                # fichier_mappe.update(f['versions'][fuuid_v_courante])
 
                 for uuid_collection_fichier in f.get('collections'):
                     try:
@@ -2044,6 +2053,32 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             liste_collections.append(enveloppe)
 
         return liste_collections
+
+    def get_info_collections_fichier(self, uuid_fichier: str):
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+        }
+        collection_grosfichiers = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        fichier = collection_grosfichiers.find_one(filtre, projection=['collections'])
+
+        try:
+            collections_fichier = fichier[ConstantesGrosFichiers.DOCUMENT_COLLECTIONS]
+        except (KeyError, TypeError):
+            pass  # Pas de fichier ou de collections
+        else:
+            filtre = {
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: {'$in': collections_fichier},
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_COLLECTION,
+                Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_PUBLIC,
+            }
+            curseur_collections = collection_grosfichiers.find(filtre)
+            id_collections_publiques = [c[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] for c in curseur_collections]
+
+            if len(id_collections_publiques) > 0:
+                params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: id_collections_publiques}
+                detail_collections_publiques = self.get_detail_collections_publiques(params)
+                return detail_collections_publiques
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
@@ -2068,6 +2103,42 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
 
     def get_collection_processus_nom(self):
         return ConstantesGrosFichiers.COLLECTION_PROCESSUS_NOM
+
+    def evenement_maj_fichier_public(self, uuid_fichier: str):
+        """
+        Verifie si le changement a un impact sur les collections publiques et transmet un evenement
+        pour chaque collection publique affectee.
+        :param uuid_fichier: fichier qui a ete mis a jour
+        :return:
+        """
+        detail_collections_publiques = self.controleur.gestionnaire.get_info_collections_fichier(uuid_fichier)
+        # Emettre un evenement pour chaque collection publique
+        for c in detail_collections_publiques:
+            domaine_action = 'evenement.GrosFichiers.confirmationMajCollectionPublique'
+            self.generateur_transactions.emettre_message(
+                c,
+                domaine_action,
+                exchanges=[Constantes.SECURITE_PUBLIC],
+                ajouter_certificats=True
+            )
+
+    def evenement_maj_collection_publique(self, uuid_collection: str):
+        """
+        Verifie si le changement a un impact sur la collection. Si la colleciton est publique, emet les maj.
+        :param uuid_collection: collection modifiee
+        :return:
+        """
+        params = {ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS: [uuid_collection]}
+        detail_collections_publiques = self.controleur.gestionnaire.get_detail_collections_publiques(params)
+
+        for c in detail_collections_publiques:
+            domaine_action = 'evenement.GrosFichiers.confirmationMajCollectionPublique'
+            self.generateur_transactions.emettre_message(
+                c,
+                domaine_action,
+                exchanges=[Constantes.SECURITE_PUBLIC],
+                ajouter_certificats=True
+            )
 
 
 class ProcessusGrosFichiersActivite(ProcessusGrosFichiers):
@@ -2122,6 +2193,8 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             self._traiter_media(resultat)
 
         self.set_etape_suivante()  # Termine
+
+        self.evenement_maj_fichier_public(resultat['uuid'])
 
         return resultat
 
@@ -2386,6 +2459,8 @@ class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
 
         self._controleur.gestionnaire.renommer_document(uuid_doc, {'nom': nouveau_nom})
 
+        self.evenement_maj_fichier_public(uuid_doc)
+
         self.set_etape_suivante()  # Termine
 
 
@@ -2402,6 +2477,8 @@ class ProcessusTransactionDecricreFichier(ProcessusGrosFichiers):
 
         self.set_etape_suivante()  # Termine
 
+        self.evenement_maj_fichier_public(uuid_fichier)
+
         return {'uuid_fichier': uuid_fichier}
 
 
@@ -2417,6 +2494,8 @@ class ProcessusTransactionDecricreCollection(ProcessusGrosFichiers):
         self._controleur.gestionnaire.maj_description_collection(uuid_collection, transaction)
 
         self.set_etape_suivante()  # Termine
+
+        self.evenement_maj_collection_publique(uuid_collection)
 
         return {'uuid_collection': uuid_collection}
 
@@ -2453,6 +2532,9 @@ class ProcessusTransactionSupprimerFichier(ProcessusGrosFichiersActivite):
         self._controleur.gestionnaire.supprimer_fichier(uuids_documents)
 
         self.set_etape_suivante()  # Termine
+
+        for d in uuids_documents:
+            self.evenement_maj_fichier_public(d)
 
         return {'uuids_documents': uuids_documents}
 
