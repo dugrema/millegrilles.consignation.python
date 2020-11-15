@@ -1767,6 +1767,9 @@ class ConstantesPublication:
     TRANSACTION_MAJ_SITE = 'majSite'
     TRANSACTION_MAJ_POST = 'majPost'
 
+    EVENEMENT_CONFIRMATION_MAJ_SITE = 'confirmationMajSite'
+    EVENEMENT_CONFIRMATION_MAJ_POST = 'confirmationMajPost'
+
     CHAMP_SITE_ID = 'site_id'
     CHAMP_POST_ID = 'post_id'
     CHAMP_NOM_SITE = 'nom_site'

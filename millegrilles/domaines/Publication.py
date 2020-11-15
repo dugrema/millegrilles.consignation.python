@@ -287,7 +287,22 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         """
         transaction = self.transaction
         self.controleur.gestionnaire.maj_site(transaction)
+
+        self._transmettre_maj(transaction['site_id'])
+
         self.set_etape_suivante()  # Termine
+
+    def _transmettre_maj(self, site_id: str):
+        # Preparer evenement de confirmation, emission sur exchange 1.public
+        site_config = self.controleur.gestionnaire.get_configuration_site({'site_id': site_id})
+
+        # Retransmettre sur exchange 1.public pour maj live
+        self.generateur_transactions.emettre_message(
+            site_config,
+            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_SITE,
+            exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
+            ajouter_certificats=True
+        )
 
 
 class ProcessusTransactionMajPost(MGProcessusTransaction):
@@ -319,6 +334,7 @@ class ProcessusTransactionMajPost(MGProcessusTransaction):
             self.set_etape_suivante(ProcessusTransactionMajPost.recevoir_certificat.__name__)  # Recevoir certificat
         else:
             self.controleur.gestionnaire.maj_post(transaction)
+            self._transmettre_maj(transaction[ConstantesPublication.CHAMP_POST_ID])
             self.set_etape_suivante()  # Termine
 
     def recevoir_certificat(self):
@@ -330,5 +346,20 @@ class ProcessusTransactionMajPost(MGProcessusTransaction):
         transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = certs_list
 
         self.controleur.gestionnaire.maj_post(transaction)
+        self._transmettre_maj(transaction[ConstantesPublication.CHAMP_POST_ID])
         self.set_etape_suivante()  # Termine
 
+    def _transmettre_maj(self, post_id: str):
+        # Preparer evenement de confirmation, emission sur exchange 1.public
+        post = self.controleur.gestionnaire.get_posts(
+            {ConstantesPublication.CHAMP_POST_IDS: [post_id]})
+
+        message_posts = {'liste_posts': post}
+
+        # Retransmettre sur exchange 1.public pour maj live
+        self.generateur_transactions.emettre_message(
+            message_posts,
+            'evenement.Publication.' + ConstantesPublication.EVENEMENT_CONFIRMATION_MAJ_POST,
+            exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE],
+            ajouter_certificats=True
+        )
