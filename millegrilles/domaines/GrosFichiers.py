@@ -2807,6 +2807,8 @@ class ProcessusTransactionAjouterFichiersDansCollection(ProcessusGrosFichiers):
         self._controleur.gestionnaire.ajouter_documents_collection(collection_uuid, documents_uuids)
         self.set_etape_suivante()
 
+        self.evenement_maj_collection_publique(collection_uuid)
+
 
 class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
 
@@ -2819,6 +2821,8 @@ class ProcessusTransactionRetirerFichiersDeCollection(ProcessusGrosFichiers):
         documents_uuids = transaction[ConstantesGrosFichiers.DOCUMENT_LISTE_UUIDS]
         self._controleur.gestionnaire.retirer_fichiers_collection(collectionuuid, documents_uuids)
         self.set_etape_suivante()
+
+        self.evenement_maj_collection_publique(collectionuuid)
 
 
 class ProcessusTransactionChangerFavoris(ProcessusGrosFichiers):
