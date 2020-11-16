@@ -2113,14 +2113,17 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         """
         detail_collections_publiques = self.controleur.gestionnaire.get_info_collections_fichier(uuid_fichier)
         # Emettre un evenement pour chaque collection publique
-        for c in detail_collections_publiques:
-            domaine_action = 'evenement.GrosFichiers.confirmationMajCollectionPublique'
-            self.generateur_transactions.emettre_message(
-                c,
-                domaine_action,
-                exchanges=[Constantes.SECURITE_PUBLIC],
-                ajouter_certificats=True
-            )
+        try:
+            for c in detail_collections_publiques:
+                domaine_action = 'evenement.GrosFichiers.confirmationMajCollectionPublique'
+                self.generateur_transactions.emettre_message(
+                    c,
+                    domaine_action,
+                    exchanges=[Constantes.SECURITE_PUBLIC],
+                    ajouter_certificats=True
+                )
+        except TypeError:
+            pass  # None, pas de collections publiques
 
     def evenement_maj_collection_publique(self, uuid_collection: str):
         """
@@ -2194,7 +2197,10 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         self.set_etape_suivante()  # Termine
 
-        self.evenement_maj_fichier_public(resultat['uuid'])
+        try:
+            self.evenement_maj_fichier_public(resultat['uuid'])
+        except Exception:
+            self.__logger.exception("Erreur verification collection publique")
 
         return resultat
 
@@ -2459,7 +2465,9 @@ class ProcessusTransactionRenommerDocument(ProcessusGrosFichiersActivite):
 
         self._controleur.gestionnaire.renommer_document(uuid_doc, {'nom': nouveau_nom})
 
+        # Tenter de mettre a jour fichier et document
         self.evenement_maj_fichier_public(uuid_doc)
+        self.evenement_maj_collection_publique(uuid_doc)
 
         self.set_etape_suivante()  # Termine
 
