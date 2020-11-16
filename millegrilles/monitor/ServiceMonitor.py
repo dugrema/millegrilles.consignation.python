@@ -446,6 +446,9 @@ class ServiceMonitor:
                 self.__logger.debug("Generer nouveau certificat role %s", nom_role)
                 self._gestionnaire_certificats.generer_clecert_module(nom_role, self._nodename)
 
+                # Reconfigurer tous les services qui utilisent le nouveau certificat
+                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
     def configurer_millegrille(self):
         besoin_initialiser = not self._idmg
 
@@ -833,7 +836,7 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         date_expiration = not_valid_after - delta_expiration
 
         if date_expiration < datetime.datetime.utcnow():
-            self.__logger.debug("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
+            self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
             self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
             self._gestionnaire_docker.configurer_monitor()
             raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
