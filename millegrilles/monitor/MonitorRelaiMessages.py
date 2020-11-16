@@ -750,3 +750,7 @@ class ConnexionMiddlewareProtege(ConnexionMiddleware):
     @property
     def get_gestionnaire_comptes_mongo(self):
         return self.__mongo
+
+    @property
+    def certificat(self):
+        return self.__contexte.verificateur_certificats.certificat
