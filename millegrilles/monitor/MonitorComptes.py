@@ -1,5 +1,5 @@
 import logging
-from os import path
+from os import path, environ
 from threading import Event
 from typing import cast
 
@@ -25,7 +25,7 @@ class GestionnaireComptesMQ:
         self.__clecert_monitor = clecert_monitor
         self.__certificats = certificats
 
-        self.__host: str = kwargs.get('host') or 'mq'
+        self.__host: str = environ.get('MG_MQ_HOST') or kwargs.get('host') or 'mq'
         self.__path_secrets: str = kwargs.get('secrets') or '/run/secrets'
         self.__file_passwd: str = kwargs.get('passwd_file') or ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE
         self.__file_ca: str = kwargs.get('cert_ca') or ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT + '.pem'
