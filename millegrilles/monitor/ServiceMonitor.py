@@ -455,6 +455,9 @@ class ServiceMonitor:
                 self._gestionnaire_certificats.generer_clecert_module(
                     nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
 
+                # Reconfigurer tous les services qui utilisent le nouveau certificat
+                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
     def configurer_millegrille(self):
         besoin_initialiser = not self._idmg
 
@@ -828,6 +831,26 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         }
         commande = CommandeMonitor(commande_dict)
         self.gestionnaire_commandes.ajouter_commande(commande)
+
+    def _entretien_certificats(self):
+        """
+        Entretien certificats des services/modules et du monitor
+        :return:
+        """
+        clecert_monitor = self._gestionnaire_certificats.clecert_monitor
+        not_valid_after = clecert_monitor.not_valid_after
+        self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
+
+        delta_expiration = datetime.timedelta(days=3)
+        date_expiration = not_valid_after - delta_expiration
+
+        if date_expiration < datetime.datetime.utcnow():
+            self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
+            self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
+            self._gestionnaire_docker.configurer_monitor()
+            raise ForcerRedemarrage("Redemarrage apres configuration service monitor")
+
+        super()._entretien_certificats()
 
     @property
     def gestionnaire_mongo(self):

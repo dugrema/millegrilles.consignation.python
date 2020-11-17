@@ -416,18 +416,39 @@ class GestionnaireModulesDocker:
             gestionnaire_images = GestionnaireImagesServices(self.__idmg, self.__docker)
 
         nom_image_docker = kwargs.get('nom') or service_name
-        image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
+        # image = gestionnaire_images.telecharger_image_docker(nom_image_docker)
 
         # Prendre un tag au hasard
-        image_tag = image.tags[0]
+        # image_tag = image.tags[0]
 
         configuration = self.__formatter_configuration_service(service_name)
-        command = configuration_service.get('command')
+        # command = configuration_service.get('command')
         constraints = configuration.get('constraints')
         if constraints:
             self.__add_node_labels(constraints)
 
         service_inst.update(**configuration)
+
+    def maj_services_avec_certificat(self, nom_role_certificat: str):
+        nom_certificat = 'pki.%s.cert' % nom_role_certificat
+
+        # Trouver tous les services avec le certificat
+        liste_services = self.__docker.services.list()
+        services_a_reconfigurer = list()
+        for service in liste_services:
+            try:
+                container_spec = service.attrs['Spec']['TaskTemplate']['ContainerSpec']
+                configs = container_spec['Configs']
+                for c in configs:
+                    config_name = c['ConfigName']
+                    if config_name.startswith(nom_certificat):
+                        services_a_reconfigurer.append(service)
+            except KeyError:
+                pass  # OK, pas de configs
+
+        for s in services_a_reconfigurer:
+            service_name = s.name
+            self.maj_service(service_name)
 
     def creer_compte(self, label_cert_compte: str):
         certificat_compte = self.charger_config_recente(label_cert_compte)
