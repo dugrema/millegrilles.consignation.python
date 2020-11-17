@@ -23,8 +23,14 @@ def get_local_ips() -> dict:
 
 
 def get_ip(hostname):
+    if hostname is None or hostname == '':
+        hostname = 'localhost'
 
-    adresse_ip = socket.gethostbyname(hostname)
+    try:
+        adresse_ip = socket.gethostbyname(hostname)
+    except socket.gaierror:
+        adresse_ip = '127.0.0.1'  # Host inconnu, default a localhost
+
     if adresse_ip.startswith('127.') or adresse_ip.startswith('172.'):
         # On n'a pas trouve l'adresse, essayer d'ouvrir un socket pour laisser
         # la table de routage trouver la destination.
