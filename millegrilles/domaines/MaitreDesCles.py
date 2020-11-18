@@ -25,7 +25,7 @@ from typing import Optional
 import binascii
 import logging
 import datetime
-
+import pytz
 
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
@@ -790,7 +790,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
         #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
         #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-        self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+
+        # La date de reference pour la validation va etre l'estampille du document
+        date_validation = datetime.datetime.now(tz=pytz.UTC)
+
+        self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat, date_validation)
 
         return enveloppe_certificat
 
@@ -1781,7 +1785,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         ]
         for champ in champs_cles:
             try:
-                cles_document[champ] = transaction['champ']
+                cles_document[champ] = transaction[champ]
             except KeyError:
                 pass
 
@@ -1996,6 +2000,12 @@ class ProcessusReceptionCles(MGProcessusTransaction):
             'cles_recues': cles_recues,
             'iv': transaction['iv'],
         }
+
+        try:
+            nouveaux_params['domaine'] = transaction['domaine']
+        except KeyError:
+            pass  # OK
+
         non_dechiffrable = True
         try:
             cles_rechiffrees = self.recrypterCle(cles_recues)
