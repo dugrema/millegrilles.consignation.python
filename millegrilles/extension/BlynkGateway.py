@@ -263,7 +263,7 @@ class GatewayBlynk:
                             self.__dernier_entretien = date_courante
                             self.entretien_senseurs()
                     except Exception as e:
-                        self.__logger.exception("Exception traitement entretien senseurs")
+                        self.__logger.exception("Exception traitement entretien senseurs : %s" % str(e))
 
             else:
                 self.__stop_event.wait(5)
@@ -435,8 +435,11 @@ class GatewayNoeud:
                 self.__port != port or \
                 self.__ca_file != ca_file:
 
-            if self._blynk is not None:
-                self._blynk.disconnect()
+            try:
+                if self._blynk is not None:
+                    self._blynk.disconnect()
+            except Exception as ex:
+                self.__logger.info("Erreur deconnexion blynk : %s" % str(ex))
 
             self.__auth_token = auth_token
             self.__host = host
@@ -446,7 +449,7 @@ class GatewayNoeud:
             self._blynk = Blynk(
                 self.__auth_token, server=self.__host, port=self.__port,
                 ssl_cert=self.__ca_file,
-                heartbeat=10, rcv_buffer=1024, log=self.__logger.debug
+                heartbeat=10, rcv_buffer=1024, log=self.__logger.info
             )
 
             # Re-enregistrer evenements
