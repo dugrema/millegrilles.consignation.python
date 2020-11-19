@@ -225,6 +225,7 @@ class GestionnaireSenseursPassifs(GestionnaireDomaineStandard):
         # Section hook pour Blynk (optionnel)
         try:
             from millegrilles.extension.BlynkGateway import GatewayBlynk
+            self.__logger.info("Chargement gateway Blynk - import OK")
             self.__gateway_blynk = GatewayBlynk(self._contexte)
             self.__gateway_blynk.configurer()
         except ImportError:
