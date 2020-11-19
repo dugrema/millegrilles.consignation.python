@@ -515,7 +515,13 @@ class UtilCertificats:
                     raise pbe
                 elif autorisation.get('domaines_permis'):
                     # Valider la chaine en fonction de la racine fournie
-                    validation_context = ValidationContext(trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+                    if date_reference is not None:
+                        # batir un contexte avec la date
+                        validation_context = ValidationContext(moment=date_reference,
+                                                               trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+                    else:
+                        validation_context = ValidationContext(trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+
                     validator = CertificateValidator(
                         cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
 
