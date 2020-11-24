@@ -6,13 +6,15 @@ import base64
 import binascii
 import os
 import datetime
+import pytz
 
 from typing import Optional
 from cryptography.hazmat.primitives import serialization, asymmetric
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
-from certvalidator import CertificateValidator, ValidationContext, PathBuildingError
+from certvalidator import CertificateValidator, ValidationContext
+from certvalidator.errors import PathValidationError, PathBuildingError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
@@ -490,6 +492,16 @@ class UtilCertificats:
                 cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
             resultat = validator.validate_usage({'digital_signature'})
             enveloppe.set_est_verifie(True)
+        except PathValidationError as pve:
+            msg = pve.args[0]
+            if 'expired' in msg:
+                self._logger.info("Un des certificats est expire, verifier en fonction de la date de reference")
+
+            if self._logger.isEnabledFor(logging.DEBUG):
+                self._logger.exception("Erreur validation path certificat")
+            else:
+                self._logger.info("Erreur validation path certificat : %s", str(pve))
+            raise pve
         except PathBuildingError as pbe:
             # Verifier si on a une millegrille tierce
             dernier_cert_pem = inter_list[-1]
@@ -503,7 +515,13 @@ class UtilCertificats:
                     raise pbe
                 elif autorisation.get('domaines_permis'):
                     # Valider la chaine en fonction de la racine fournie
-                    validation_context = ValidationContext(trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+                    if date_reference is not None:
+                        # batir un contexte avec la date
+                        validation_context = ValidationContext(moment=date_reference,
+                                                               trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+                    else:
+                        validation_context = ValidationContext(trust_roots=[self.__cert_millegrille, dernier_cert_pem])
+
                     validator = CertificateValidator(
                         cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
 
@@ -699,12 +717,18 @@ class VerificateurTransaction(UtilCertificats):
                 #     enveloppe_temp = EnveloppeCertificat(certificat_pem=cert)
                 #     # self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
                 #     # self.emettre_certificat(certificats_inline)
+                try:
+                    epoch_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+                    date_reference = datetime.datetime.fromtimestamp(epoch_transaction, tz=pytz.UTC)
+                except KeyError:
+                    date_reference = datetime.datetime.now(tz=pytz.UTC)
 
                 enveloppe_temp = EnveloppeCertificat(certificat_pem='\n'.join(certificats_inline))
 
                 # Tenter de valider le certificat immediatement, peut echouer si la chaine n'a pas ete traitee
                 try:
-                    enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(enveloppe=enveloppe_temp)
+                    enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(
+                        enveloppe=enveloppe_temp, date_reference=date_reference)
                     self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
                 except AutorisationConditionnelleDomaine as acd:
                     self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
@@ -835,7 +859,8 @@ class VerificateurCertificats(UtilCertificats):
 
         self._cache_certificats_fingerprint = dict()
 
-    def charger_certificat(self, fichier=None, fingerprint: str = None, enveloppe: EnveloppeCertificat = None):
+    def charger_certificat(self, fichier=None, fingerprint: str = None, enveloppe: EnveloppeCertificat = None,
+                           date_reference: datetime.datetime = None):
         # Tenter de charger a partir d'une copie locale
         if fingerprint is not None:
             # Split fingerprint au besoin
@@ -863,7 +888,7 @@ class VerificateurCertificats(UtilCertificats):
         if enveloppe is not None:
 
             if not enveloppe.est_verifie:
-                self.valider_x509_enveloppe(enveloppe)
+                self.valider_x509_enveloppe(enveloppe, date_reference=date_reference)
                 self._cache_certificats_fingerprint[enveloppe.fingerprint_sha256_b64] = enveloppe
 
         else:

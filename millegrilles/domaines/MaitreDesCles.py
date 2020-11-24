@@ -25,7 +25,7 @@ from typing import Optional
 import binascii
 import logging
 import datetime
-
+import pytz
 
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
@@ -815,13 +815,30 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return enveloppe_certificat, estampille, temps_limite_demande
 
     def extraire_certificat(self, evenement):
-        # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
-        copie_evenement = evenement.copy()
-        try:
-            del copie_evenement['_certificat']
-        except KeyError:
-            pass
-        return self.verificateur_transaction.verifier(evenement)
+        # ----------- MERGE ME
+        # # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
+        # copie_evenement = evenement.copy()
+        # try:
+        #     del copie_evenement['_certificat']
+        # except KeyError:
+        #     pass
+        # return self.verificateur_transaction.verifier(evenement)
+        # ----------- MERGE ME
+
+        cert = evenement['_certificat']
+        cert_join = '\n'.join(cert)
+        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
+        #enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
+        #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
+        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
+        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
+
+        # La date de reference pour la validation va etre l'estampille du document
+        date_validation = datetime.datetime.now(tz=pytz.UTC)
+
+        self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat, date_validation)
+
+        return enveloppe_certificat
 
     def extraire_certificat_string(self, evenement):
         # cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
@@ -1810,7 +1827,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         ]
         for champ in champs_cles:
             try:
-                cles_document[champ] = transaction['champ']
+                cles_document[champ] = transaction[champ]
             except KeyError:
                 pass
 
@@ -2025,6 +2042,12 @@ class ProcessusReceptionCles(MGProcessusTransaction):
             'cles_recues': cles_recues,
             'iv': transaction['iv'],
         }
+
+        try:
+            nouveaux_params['domaine'] = transaction['domaine']
+        except KeyError:
+            pass  # OK
+
         non_dechiffrable = True
         try:
             cles_rechiffrees = self.recrypterCle(cles_recues)

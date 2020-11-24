@@ -162,6 +162,8 @@ class GatewayBlynk:
         :param noeud_doc:
         :return:
         """
+        self.__logger.debug("Configuration gateway Blynk %s" % str(noeud_doc))
+
         noeud_id = noeud_doc['noeud_id']
         blynk_gateway = self._blynk_devices.get(noeud_id)
 
@@ -172,12 +174,14 @@ class GatewayBlynk:
         blynk_port = noeud_doc.get('blynk_port')
 
         if blynk_actif and securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC] and \
-                blynk_auth and blynk_host and blynk_port:
+                blynk_auth is not None and blynk_host is not None and blynk_port is not None:
+
             # S'assurer que le gateway existe et est configure
             if blynk_gateway is not None:
                 # Verifier si la configuration a changee
                 blynk_gateway.update_config(blynk_auth, blynk_host, blynk_port, self._contexte.configuration.mq_cafile)
             else:
+                self.__logger.info("Demarrer gestionnaire gateway Blynk sur noeud %s host=%s, port=%s" % (noeud_id, blynk_host, blynk_port))
                 # Creer callback pour operations write cote blynk
                 controleur = self
 
@@ -213,10 +217,15 @@ class GatewayBlynk:
                 copie_dict_devices[noeud_id] = blynk_gateway
                 self._blynk_devices = copie_dict_devices
 
+            self.__logger.debug("Liste des Blynk Gateway par noeud : %s" % str(self._blynk_devices.keys()))
+
         elif blynk_gateway is not None:
-            # Le device existe - il faut l'envelever (securite n'est pas prive/public ou configuration retiree)
-            self.__logger.info("Blynk: Desactiver gateway %s" % noeud_id)
-            blynk_gateway.fermer()
+            # Le device existe - il faut l'enlever (securite n'est pas prive/public ou configuration retiree)
+            self.__logger.info("Blynk: Desactiver gestionnaire Blynk gateway %s" % noeud_id)
+            try:
+                blynk_gateway.fermer()
+            except:
+                self.__logger.exception("Erreur fermeture d'un Blynk Gateway sur %s" % noeud_id)
 
             # Faire copie du dict pour eviter erreur de mutation (RuntimeError)
             copie_dict_devices = dict(self._blynk_devices)
@@ -254,7 +263,7 @@ class GatewayBlynk:
                             self.__dernier_entretien = date_courante
                             self.entretien_senseurs()
                     except Exception as e:
-                        self.__logger.exception("Exception traitement entretien senseurs")
+                        self.__logger.exception("Exception traitement entretien senseurs : %s" % str(e))
 
             else:
                 self.__stop_event.wait(5)
@@ -426,8 +435,11 @@ class GatewayNoeud:
                 self.__port != port or \
                 self.__ca_file != ca_file:
 
-            if self._blynk is not None:
-                self._blynk.disconnect()
+            try:
+                if self._blynk is not None:
+                    self._blynk.disconnect()
+            except Exception as ex:
+                self.__logger.info("Erreur deconnexion blynk : %s" % str(ex))
 
             self.__auth_token = auth_token
             self.__host = host
@@ -437,7 +449,7 @@ class GatewayNoeud:
             self._blynk = Blynk(
                 self.__auth_token, server=self.__host, port=self.__port,
                 ssl_cert=self.__ca_file,
-                heartbeat=10, rcv_buffer=1024, log=self.__logger.debug
+                heartbeat=10, rcv_buffer=1024, log=self.__logger.info
             )
 
             # Re-enregistrer evenements
