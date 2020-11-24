@@ -238,6 +238,7 @@ class GestionnaireModulesDocker:
             filters={'status': 'exited', 'label': 'application'})
         for container in liste_applications_arretees:
             try:
+                self.__logger.info("Redemarrer container application " + container.name)
                 container.start()
             except APIError:
                 self.__logger.exception("Erreur redemarrage container application : " + container.name)
