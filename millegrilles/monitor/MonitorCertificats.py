@@ -129,7 +129,7 @@ class GestionnaireCertificats:
         name_list.append(x509.NameAttribute(x509.name.NameOID.COMMON_NAME, noeud_id))
 
         if self.idmg:
-            name_list.append(x509.NameAttribute(x509.name.NameOID.OID_ORGANIZATION_NAME, self.idmg))
+            name_list.append(x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, self.idmg))
         name = x509.Name(name_list)
         builder = builder.subject_name(name)
 
