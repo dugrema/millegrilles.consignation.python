@@ -233,6 +233,15 @@ class GestionnaireModulesDocker:
                     except:
                         entretien_compte_complete = False
 
+        # Liste des applications container (sans service)
+        liste_applications_arretees = self.__docker.containers.list(
+            filters={'status': 'exited', 'label': 'application'})
+        for container in liste_applications_arretees:
+            try:
+                container.start()
+            except APIError:
+                self.__logger.exception("Erreur redemarrage container application : " + container.name)
+
         if entretien_compte_complete:
             self.__derniere_creation_comptes = datetime.datetime.utcnow()
 
