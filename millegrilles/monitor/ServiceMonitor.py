@@ -1656,7 +1656,13 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             raise Exception("Type de certificat inconnu : %s" % type_certificat_recu)
 
         # Comencer sauvegarde
-        gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
+        try:
+            gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
+        except APIError as apie:
+            if apie.status_code == 400:
+                self.__logger.info("pki.millegrille.cert deja present, on ne le change pas : " + str(apie))
+            else:
+                raise apie
 
         self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor prive")
         securite = Constantes.SECURITE_PRIVE
