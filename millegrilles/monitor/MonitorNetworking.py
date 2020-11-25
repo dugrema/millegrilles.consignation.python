@@ -201,10 +201,9 @@ class GestionnaireWeb:
         ]
         location_priv_prot_paths = [
             "/coupdoeil",
-            "/posteur",
-            "/messagerie",
             "/senseurspassifs",
             "/grosfichiers",
+            "/publication",
         ]
         location_installation_paths = [
             "/installation",
