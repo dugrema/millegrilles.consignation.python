@@ -161,7 +161,10 @@ class GestionnaireWeb:
               proxy_cache       cache_fichiers;
               proxy_cache_lock  on;
               proxy_cache_background_update on;
-              proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+              proxy_cache_use_stale error timeout updating
+                                    http_500 http_502 http_503 http_504;
+            
+              proxy_headers_hash_bucket_size 64;
 
               set $upstream_fichiers https://fichiers:443;
               proxy_pass $upstream_fichiers;
@@ -174,7 +177,8 @@ class GestionnaireWeb:
               proxy_ssl_verify       on;
               proxy_ssl_verify_depth 1;
             
-              include /etc/nginx/conf.d/component_base_auth.include;
+              include /etc/nginx/conf.d/auth_public.include;
+              include /etc/nginx/conf.d/component_base.include;
             }
         """
 
@@ -204,6 +208,7 @@ class GestionnaireWeb:
             "/senseurspassifs",
             "/grosfichiers",
             "/publication",
+            "/vitrine",
         ]
         location_installation_paths = [
             "/installation",
@@ -246,9 +251,6 @@ class GestionnaireWeb:
             fichier.write(modules_includes_content)
 
         try:
-            # self.redemarrer_nginx()
-            # self.redeployer_nginx()  # Tenter mise a jour de la configuration (si nouvelle cle disponible)
-
             # Supprimer nginx - docker va recreer les certs/cles pki.nginx et redeployer nginx automatiquement
             self.redeployer_nginx()
         except IndexError:
