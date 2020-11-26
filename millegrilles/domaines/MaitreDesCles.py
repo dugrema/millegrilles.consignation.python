@@ -809,36 +809,35 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             role_inclus_permis = False
 
         if role_inclus_permis is not True:
-            self._logger.warning("Refus decrryptage cle avec fingerprint %s" % fingerprint_demande)
+            uuid_message = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            self._logger.warning("Refus decrryptage cle demande %s" % uuid_message)
             enveloppe_certificat = None
 
         return enveloppe_certificat, estampille, temps_limite_demande
 
     def extraire_certificat(self, evenement):
         # ----------- MERGE ME
-        # # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
-        # copie_evenement = evenement.copy()
-        # try:
-        #     del copie_evenement['_certificat']
-        # except KeyError:
-        #     pass
-        # return self.verificateur_transaction.verifier(evenement)
+        # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
+        copie_evenement = evenement.copy()
+        try:
+            del copie_evenement['_certificat']
+        except KeyError:
+            pass
+        return self.verificateur_transaction.verifier(evenement)
         # ----------- MERGE ME
 
-        cert = evenement['_certificat']
-        cert_join = '\n'.join(cert)
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
-        #enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert[0])
-        #enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert[1])
-        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat_inter)
-        #self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-
-        # La date de reference pour la validation va etre l'estampille du document
-        date_validation = datetime.datetime.now(tz=pytz.UTC)
-
-        self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat, date_validation)
-
-        return enveloppe_certificat
+        # try:
+        #     cert = evenement['_certificat']
+        #     cert_join = '\n'.join(cert)
+        #     enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
+        #     # La date de reference pour la validation va etre l'estampille du document
+        #     date_validation = datetime.datetime.now(tz=pytz.UTC)
+        #
+        #     self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat, date_validation)
+        # except KeyError:
+        #     enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+        #
+        # return enveloppe_certificat
 
     def extraire_certificat_string(self, evenement):
         # cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])
