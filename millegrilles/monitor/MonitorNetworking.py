@@ -208,7 +208,6 @@ class GestionnaireWeb:
             "/senseurspassifs",
             "/grosfichiers",
             "/publication",
-            "/vitrine",
         ]
         location_installation_paths = [
             "/installation",
