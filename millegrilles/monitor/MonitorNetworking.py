@@ -5,6 +5,7 @@ import datetime
 from os import path
 # from typing import Union
 
+from millegrilles import Constantes
 # from millegrilles.monitor.ServiceMonitor import ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal
 
 
@@ -83,20 +84,20 @@ class GestionnaireWeb:
         #     fichier.write(server_content)
 
         error_pages = """
-            error_page 401 = @error401;
-            
-            # If the user is not logged in, redirect them to the login URL
-            location @error401 {
-              return 307 https://{hostname}/millegrilles;
-            }
+error_page 401 = @error401;
+
+# If the user is not logged in, redirect them to the login URL
+location @error401 {
+  return 307 https://{hostname}/millegrilles;
+}
         """
         error_pages = error_pages.replace('{hostname}', params['hostname'])
         with open(path.join(self.__repertoire_modules, 'error_page.conf.include'), 'w') as fichier:
             fichier.write(error_pages)
 
         proxypass = """
-            set $upstream https://web_protege:443; 
-            proxy_pass $upstream;
+set $upstream_protege https://web_protege:443; 
+proxy_pass $upstream_protege;
         """
         with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
             fichier.write(proxypass)
@@ -105,101 +106,129 @@ class GestionnaireWeb:
         if self.__mode_dev:
             domaine_installeur = self.__service_monitor.nodename
 
-        # if not self.__mode_dev:
-        #     proxypass_installation = """
-        #         set $upstream https://%s:8444;
-        #         proxy_pass $upstream;
-        #     """ % domaine_installeur
-        # else:
         proxypass_installation = """
-            set $upstream http://%s:8080;
-            proxy_pass $upstream;
+set $upstream_installation http://%s:8080;
+proxy_pass $upstream_installation;
         """ % domaine_installeur
-
         with open(path.join(self.__repertoire_modules, 'proxypass_installation.include'), 'w') as fichier:
             fichier.write(proxypass_installation)
 
+        proxypass_vitrine = """
+set $upstream_vitrine https://vitrine:443;
+proxy_pass $upstream_vitrine;
+        """
+        with open(path.join(self.__repertoire_modules, 'proxypass_vitrine.include'), 'w') as fichier:
+                fichier.write(proxypass_vitrine)
+
         resolver = """
-            resolver 127.0.0.11 valid=30s;
+resolver 127.0.0.11 valid=30s;
         """
         with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
             fichier.write(resolver)
 
         ssl_certs_content = """
-            ssl_certificate       /run/secrets/webcert.pem;
-            ssl_certificate_key   /run/secrets/webkey.pem;
-            ssl_stapling          on;
-            ssl_stapling_verify   on;
-            
-            ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
-            ssl_verify_client      optional;
-            ssl_verify_depth       1;
+ssl_certificate       /run/secrets/webcert.pem;
+ssl_certificate_key   /run/secrets/webkey.pem;
+ssl_stapling          on;
+ssl_stapling_verify   on;
+
+ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+ssl_verify_client      optional;
+ssl_verify_depth       1;
         """
         with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
             fichier.write(ssl_certs_content)
 
-        if self.__service_monitor.idmg or mode_installe:
+        cache_content = """
+# Configuration du cache NGINX pour les fichiers
+proxy_cache_path /cache 
+                 levels=1:2 
+                 keys_zone=cache_fichiers:2m 
+                 max_size=2g
+                 inactive=4320m
+                 use_temp_path=off;
+        """
+        with open(path.join(self.__repertoire_modules, 'cache.conf.include'), 'w') as fichier:
+            fichier.write(cache_content)
+
+        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
+            # Noeud public, rediriger vers vitrine
+            redirect_defaut = 'vitrine'
+        elif self.__service_monitor.idmg or mode_installe:
+            # Noeud prive ou protege, rediriger vers portail local millegrilles
             redirect_defaut = 'millegrilles'
         else:
             # Nouvelle installation, defaut vers installeur
             redirect_defaut = 'installation'
 
+        # Redirection temporaire (307) vers le site approprie
         location_redirect_installation = """
-            location = / {
-              return 302 https://$http_host/%s;
-            }
+location = / {
+  return 307 https://$http_host/%s;
+}
         """ % redirect_defaut
 
         location_data_vitrine = """
-            location /vitrine/data {
-                alias /var/opt/millegrilles/nginx/data;
-            }
+location /vitrine/sites {
+  alias /var/opt/millegrilles/nginx/data/vitrine/sites;
+}
+location /vitrine/posts {
+  alias /var/opt/millegrilles/nginx/data/vitrine/posts;
+}
+location /vitrine/collections {
+  alias /var/opt/millegrilles/nginx/data/vitrine/collections;
+}
         """
 
         location_fichiers = """
-            location /fichiers {
-              proxy_cache       cache_fichiers;
-              proxy_cache_lock  on;
-              proxy_cache_background_update on;
-              proxy_cache_use_stale error timeout updating
-                                    http_500 http_502 http_503 http_504;
-            
-              proxy_headers_hash_bucket_size 64;
+location /fichiers {
+  proxy_cache       cache_fichiers;
+  proxy_cache_lock  on;
+  proxy_cache_background_update on;
+  proxy_cache_use_stale error timeout updating
+                        http_500 http_502 http_503 http_504;
 
-              set $upstream_fichiers https://fichiers:443;
-              proxy_pass $upstream_fichiers;
-            
-              # Mapping certificat client pour connexion consignation fichiers
-              proxy_ssl_certificate     /run/secrets/nginx.cert.pem;
-              proxy_ssl_certificate_key /run/secrets/nginx.key.pem;
-            
-              proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
-              proxy_ssl_verify       on;
-              proxy_ssl_verify_depth 1;
-            
-              include /etc/nginx/conf.d/auth_public.include;
-              include /etc/nginx/conf.d/component_base.include;
-            }
+  proxy_headers_hash_bucket_size 64;
+
+  set $upstream_fichiers https://fichiers:443;
+  proxy_pass $upstream_fichiers;
+
+  # Mapping certificat client pour connexion consignation fichiers
+  proxy_ssl_certificate         /run/secrets/nginx.cert.pem;
+  proxy_ssl_certificate_key     /run/secrets/nginx.key.pem;
+  proxy_ssl_trusted_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
+
+  proxy_ssl_verify       on;
+  proxy_ssl_verify_depth 1;
+
+  include /etc/nginx/conf.d/auth_public.include;
+  include /etc/nginx/conf.d/component_base.include;
+}
         """
 
         location_public_component = """
-            location %s {
-                include /etc/nginx/conf.d/modules/proxypass.include;
-                include /etc/nginx/conf.d/component_base.include;
-            }
+location %s {
+    include /etc/nginx/conf.d/modules/proxypass_vitrine.include;
+    include /etc/nginx/conf.d/component_base.include;
+}
         """
         location_priv_prot_component = """
-            location %s {
-                include /etc/nginx/conf.d/modules/proxypass.include;
-                include /etc/nginx/conf.d/component_base_auth.include;
-            }
+location %s {
+    include /etc/nginx/conf.d/modules/proxypass.include;
+    include /etc/nginx/conf.d/component_base_auth.include;
+}
         """
         location_installation_component = """
-            location %s {
-                include /etc/nginx/conf.d/modules/proxypass_installation.include;
-                include /etc/nginx/conf.d/component_base.include;
-            }
+location %s {
+    include /etc/nginx/conf.d/modules/proxypass_installation.include;
+    include /etc/nginx/conf.d/component_base.include;
+}
         """
+
+        location_installation_paths = [
+            "/installation",
+            "/administration",
+        ]
         location_public_paths = [
             "/vitrine",
         ]
@@ -209,15 +238,11 @@ class GestionnaireWeb:
             "/grosfichiers",
             "/publication",
         ]
-        location_installation_paths = [
-            "/installation",
-            "/administration",
-        ]
 
         certificats = """
-            location /certs {
-              root /usr/share/nginx/files;
-            }
+location /certs {
+  root /usr/share/nginx/files;
+}
         """
 
         locations_list = list()
@@ -236,15 +261,8 @@ class GestionnaireWeb:
 
         # Fichier qui relie la configuration de tous les modules
         modules_includes_content = """
-            # Configuration du cache NGINX pour les fichiers
-            proxy_cache_path /cache 
-                             levels=1:2 
-                             keys_zone=cache_fichiers:2m 
-                             max_size=2g
-                             inactive=4320m
-                             use_temp_path=off;
-
-            include /etc/nginx/conf.d/server.include;
+include /etc/nginx/conf.d/modules/cache.conf.include;
+include /etc/nginx/conf.d/server.include;
         """
         with open(path.join(self.__repertoire_modules, 'modules_include.conf'), 'w') as fichier:
             fichier.write(modules_includes_content)

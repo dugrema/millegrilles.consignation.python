@@ -64,10 +64,10 @@ class GestionnaireModulesDocker:
             'HOSTNAME': fqdn,
             'HOSTNAME_DOMAINE': hostname_domaine,
             'NGINX_CONFIG_VOLUME': '/var/opt/millegrilles/nginx/modules',
-            'NGINX_HTML_VOLUME': '/var/opt/millegrilles/nginx/html',
-            'NGINX_DATA_VOLUME': '/var/opt/millegrilles/nginx/data',
-            'MQ_HOST': '',
-            'MQ_PORT': '',
+            'NGINX_HTML_VOLUME': 'nginx-html',
+            'NGINX_DATA_VOLUME': 'nginx-data',
+            # 'MQ_HOST': '',  # Ajoute automatiquement
+            # 'MQ_PORT': '',  # Ajoute automatiquement
         }
 
         if self.__insecure:
@@ -270,7 +270,13 @@ class GestionnaireModulesDocker:
                 configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
                 certificat_compte_cle = configuration_service_json.get('certificat_compte')
                 if certificat_compte_cle:
-                    self.creer_compte(certificat_compte_cle)
+                    try:
+                        self.creer_compte(certificat_compte_cle)
+                    except AttributeError:
+                        self.__logger.info("Le certificat n'existe pas, on va le creer : %s" % certificat_compte_cle)
+                        enveloppe = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(
+                            cle_config_service, self.__service_monitor.noeud_id)
+                        self.creer_compte(certificat_compte_cle)
 
         nom_image_docker = kwargs.get('nom_image') or service_name
 
@@ -680,9 +686,12 @@ class GestionnaireModulesDocker:
             secret_name_split = secret_name.split('.')[0:2]
             secret_name_split.append('cert')
             config_name = '.'.join(secret_name_split)
-            try:
-                date_secret = date_secrets[config_name]
+            date_secret = None
+            for key, value in date_secrets.items():
+                if config_name in key.split(';'):
+                    date_secret = value
 
+            if date_secret is not None:
                 nom_filtre = secret_name + '.' + date_secret
                 filtre = {'name': nom_filtre}
                 secrets = self.__docker.secrets.list(filters=filtre)
@@ -690,16 +699,17 @@ class GestionnaireModulesDocker:
                 if len(secrets) != 1:
                     raise ValueError("Le secret_name ne correspond pas a un secret : %s", nom_filtre)
 
-                secret = secrets[0]
+                try:
+                    secret = secrets[0]
 
-                return {
-                    'secret_id': secret.attrs['ID'],
-                    'secret_name': secret.name,
-                    'date': date_secret,
-                }
+                    return {
+                        'secret_id': secret.attrs['ID'],
+                        'secret_name': secret.name,
+                        'date': date_secret,
+                    }
 
-            except KeyError:
-                continue
+                except KeyError:
+                    continue
 
     def __mapping(self, valeur: str):
         for cle, valeur_mappee in self.__mappings.items():
@@ -804,9 +814,12 @@ class GestionnaireModulesDocker:
             else:
                 config_env = list()
 
-            # Toujours ajouter l'id du noeud et le IDMG
+            # Toujours ajouter l'id du noeud, le IDMG, MQ connexion params
             config_env.append("MG_NOEUD_ID=" + self.__service_monitor.noeud_id)
             config_env.append("MG_IDMG=" + self.__service_monitor.idmg)
+            connexion_mq = self.__service_monitor.get_info_connexion_mq(nowait=True)
+            for key, value in connexion_mq.items():
+                config_env.append(key + "=" + str(value))
 
             dict_config_docker[nom_elem_environment] = config_env
 

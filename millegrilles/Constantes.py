@@ -1594,6 +1594,7 @@ class ConstantesGenerateurCertificat:
     ROLE_WEB_PRIVE = 'web_prive'
     ROLE_WEB_PUBLIC = 'web_public'
     ROLE_NGINX = 'nginx'
+    ROLE_VITRINE = 'vitrine'
     ROLE_CONNECTEUR = 'connecteur'
     ROLE_MONITOR = 'monitor'
     ROLE_MONITOR_DEPENDANT = 'monitor_dependant'

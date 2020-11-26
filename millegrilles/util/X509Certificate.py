@@ -1397,6 +1397,43 @@ class GenererNginx(GenerateurNoeud):
         return builder
 
 
+class GenererVitrine(GenerateurNoeud):
+
+    def _get_keyusage(self, builder, **kwargs):
+        builder = super()._get_keyusage(builder, **kwargs)
+
+        custom_oid_permis = ConstantesGenerateurCertificat.MQ_EXCHANGES_OID
+        exchanges = ('%s' % Constantes.DEFAUT_MQ_EXCHANGE_PUBLIC).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
+        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_VITRINE).encode('utf-8')
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_roles, roles),
+            critical=False
+        )
+
+        liste_dns = [
+            x509.DNSName(u'www'),
+            x509.DNSName(u'vitrine'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
+        ]
+
+        if self._domaines_publics is not None:
+            for domaine in self._domaines_publics:
+                liste_dns.append(x509.DNSName(u'%s' % domaine))
+                liste_dns.append(x509.DNSName(u'www.%s' % domaine))
+
+        # Ajouter noms DNS valides pour MQ
+        builder = builder.add_extension(x509.SubjectAlternativeName(liste_dns), critical=False)
+
+        return builder
+
+
 class GenererNoeudPrive(GenerateurNoeud):
 
     def _get_keyusage(self, builder, **kwargs):
@@ -1826,6 +1863,7 @@ class RenouvelleurCertificat:
             ConstantesGenerateurCertificat.ROLE_MONGOEXPRESS: GenererMongoexpress,
             ConstantesGenerateurCertificat.ROLE_NGINX: GenererNginx,
             ConstantesGenerateurCertificat.ROLE_CONNECTEUR: GenererConnecteur,
+            ConstantesGenerateurCertificat.ROLE_VITRINE: GenererVitrine,
 
             # Monitors de service pour noeuds middleware
             ConstantesGenerateurCertificat.ROLE_MONITOR: GenererMonitor,

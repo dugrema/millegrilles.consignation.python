@@ -177,6 +177,7 @@ class GestionnaireApplications:
             # Transmettre maj
             self.__service_monitor.emettre_presence()
         except Exception as e:
+            self.__logger.exception("Erreur demarrer application")
             reponse['ok'] = False
             reponse['err'] = str(e)
             self.__service_monitor.generateur_transactions.transmettre_reponse(

@@ -591,20 +591,21 @@ class ServiceMonitor:
 
         return information_systeme
 
-    def get_info_connexion_mq(self):
+    def get_info_connexion_mq(self, nowait=False):
         info_mq = dict()
         try:
             info_mq['MQ_HOST'] = self._connexion_middleware.configuration.mq_host
             info_mq['MQ_PORT'] = self._connexion_middleware.configuration.mq_port
         except:
             # Connexion middleware pas chargee, on tente d'utiliser mdns
-            self._attente_event.wait(2)
-            # services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
-            services = self._gestionnaire_commandes.requete_mdns_acteur(self.idmg)
-            if len(services) > 0:
-                service = services[0]
-                info_mq['MQ_HOST'] = service['addresses'][0]
-                info_mq['MQ_PORT'] = service['port']
+            if not nowait:
+                self._attente_event.wait(2)
+                # services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
+                services = self._gestionnaire_commandes.requete_mdns_acteur(self.idmg)
+                if len(services) > 0:
+                    service = services[0]
+                    info_mq['MQ_HOST'] = service['addresses'][0]
+                    info_mq['MQ_PORT'] = service['port']
 
         return info_mq
 
@@ -1541,7 +1542,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         params_secrets = list()
         mode_dns = False
         if params.get('modeCreation') == 'dns_cloudns':
-            methode_validation = '--dns dns_cloudns'
+            # Utiliser dnssleep, la detection de presence du record TXT marche rarement
+            dnssleep = params.get('dnssleep') or 240
+            methode_validation = '--dns dns_cloudns --dnssleep %s' % str(dnssleep)
             params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['cloudnsSubid'])
             params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['cloudnsPassword'])
             mode_dns = True
