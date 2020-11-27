@@ -4,6 +4,7 @@ import datetime, time
 import json
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.dao.ConfigurationDocument import ContexteRessourcesDocumentsMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles import Constantes
@@ -21,7 +22,7 @@ from base64 import b64encode
 from uuid import uuid4
 
 
-contexte = ContexteRessourcesMilleGrilles()
+contexte = ContexteRessourcesDocumentsMilleGrilles()
 contexte.initialiser()
 
 
@@ -700,6 +701,20 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_cle_backup_application()
         # self.commande_sauvegarder_cle()
 
+
+def reset_docs_cles():
+    collection_docs = contexte.document_dao.get_collection('MaitreDesCles/documents')
+    fingerprint = 'fEyOXQqJ4nYQavH1dYpckMcxWUU='
+    filtre = {
+        '_mg-libelle': 'cles.grosFichiers',
+        'cles.%s' % fingerprint: {'$exists': True}
+    }
+    ops = {
+        '$unset': {'cles.%s' % fingerprint: True}
+    }
+    collection_docs.update_many(filtre, ops)
+
+# reset_docs_cles()
 
 # --- MAIN ---
 sample = MessagesSample()
