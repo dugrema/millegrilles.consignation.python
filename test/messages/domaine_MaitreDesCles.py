@@ -654,7 +654,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         fingerprint_maitrecles = self.certificat_maitredescles.fingerprint_b64
 
         requete_cle_racine = {
-            'fingerprints_actifs': ['DUMMY'],
+            # 'fingerprints_actifs': ['DUMMY'],
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cle_racine,

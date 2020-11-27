@@ -60,7 +60,7 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         if domaine_routing_key == ConstantesMaitreDesCles.REQUETE_CLE_RACINE:
             reponse = self.gestionnaire.transmettre_cle_racine(properties, message_dict)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
-            self.gestionnaire.transmettre_cle_grosfichier(message_dict, properties)
+            reponse = self.gestionnaire.transmettre_cle_grosfichier(message_dict, properties)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
             self.gestionnaire.transmettre_cle_document(message_dict, properties)
         elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP:
@@ -589,6 +589,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     try:
                         for fuuid, cles_par_cert in cles_cert_par_fuuid.items():
                             cle_secrete = self.decrypter_cle(cles_par_cert['cles'])
+                            if cle_secrete is None:
+                                # raise CleNonDechiffrableException("Fuuid " + fuuid)
+                                return {'err': 'Cle non dechiffrable', 'fuuid': fuuid}
                             cle_secrete_reencryptee, fingerprint = self.crypter_cle(
                                 cle_secrete, enveloppe_certificat.certificat)
                             cles_par_fuuid[fuuid] = {
@@ -609,10 +612,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                         reponse = {
                             Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
                         }
-
-        self.generateur_transactions.transmettre_reponse(
-            reponse, properties.reply_to, properties.correlation_id
-        )
+        return reponse
+        # self.generateur_transactions.transmettre_reponse(
+        #     reponse, properties.reply_to, properties.correlation_id
+        # )
 
     def transmettre_cle_document(self, evenement, properties):
         """
@@ -3010,3 +3013,7 @@ class ProcessusHebergementSupprimer(MGProcessusTransaction):
         self.controleur.gestionnaire.supprimer_trousseau_hebergement(idmg)
 
         self.set_etape_suivante()  #Termine
+
+
+class CleNonDechiffrableException(Exception):
+    pass
