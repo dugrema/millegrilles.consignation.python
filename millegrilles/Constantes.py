@@ -739,6 +739,7 @@ class ConstantesMaitreDesCles:
     REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
     REQUETE_TROUSSEAU_HEBERGEMENT = 'trousseauHebergement'
     REQUETE_CLES_NON_DECHIFFRABLES = 'clesNonDechiffrables'
+    REQUETE_COMPTER_CLES_NON_DECHIFFRABLES = 'compterClesNonDechiffrables'
     REQUETE_DECHIFFRAGE_BACKUP = 'dechiffrageBackup'
     REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
 

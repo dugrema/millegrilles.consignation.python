@@ -71,6 +71,8 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
             self.gestionnaire.transmettre_certificat(properties)
         elif action == ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES:
             reponse = self.gestionnaire.transmettre_cles_non_dechiffrables(message_dict)
+        elif action == ConstantesMaitreDesCles.REQUETE_COMPTER_CLES_NON_DECHIFFRABLES:
+            reponse = self.gestionnaire.compter_cles_non_dechiffrables(message_dict)
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -984,15 +986,27 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             reponse, properties.reply_to, properties.correlation_id
         )
 
-    def transmettre_cles_non_dechiffrables(self, message_dict: dict):
+    def compter_cles_non_dechiffrables(self, message_dict: dict):
         """
         Recupere une batch de cles qui ne sont pas dechiffrables par le maitre des cles.
         Transmet cettre batch pour qu'elle soit dechiffree et retournee sous forme de transactions.
         :param message_dict: taille/int, cle_dechiffrage/str_base64
         :return:
         """
-        taille_bacth = message_dict.get('taille') or 100
         fingerprint_b64_dechiffrage = message_dict.get('fingerprint_b64_dechiffrage')
+
+        # Fingerprints qui doivent exister pour considerer dechiffrable
+        fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
+        # Ajouter fingerprint du maitre des cles local
+        fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
+        if fingerprint_b64_local not in fingerprint_b64_actifs:
+            fingerprint_b64_actifs.append(fingerprint_b64_local)
+
+        condition_actif = [
+            {'non_dechiffrable': True,}
+        ]
+        for fp in fingerprint_b64_actifs:
+            condition_actif.append({'cles.%s' % fp: {'$exists': False}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
@@ -1000,7 +1014,46 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         filtre = {
-            'non_dechiffrable': True,
+            '$or': condition_actif,
+            'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
+        }
+        compte = collection.count(filtre)
+        reponse = {
+            'compte': compte,
+        }
+
+        return reponse
+
+    def transmettre_cles_non_dechiffrables(self, message_dict: dict):
+        """
+        Recupere une batch de cles qui ne sont pas dechiffrables par le maitre des cles.
+        Transmet cettre batch pour qu'elle soit dechiffree et retournee sous forme de transactions.
+        :param message_dict: taille/int, cle_dechiffrage/str_base64
+        :return:
+        """
+        taille_bacth = message_dict.get('taille') or 1000
+        fingerprint_b64_dechiffrage = message_dict.get('fingerprint_b64_dechiffrage')
+
+        # Fingerprints qui doivent exister pour considerer dechiffrable
+        fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
+        # Ajouter fingerprint du maitre des cles local
+        fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
+        if fingerprint_b64_local not in fingerprint_b64_actifs:
+            fingerprint_b64_actifs.append(fingerprint_b64_local)
+
+        condition_actif = [
+            {'non_dechiffrable': True,}
+        ]
+        for fp in fingerprint_b64_actifs:
+            condition_actif.append({'cles.%s' % fp: {'$exists': False}})
+
+        if not fingerprint_b64_dechiffrage:
+            # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
+            fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint_b64
+
+        collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        filtre = {
+            '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
         }
         sort_order = [(Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)]

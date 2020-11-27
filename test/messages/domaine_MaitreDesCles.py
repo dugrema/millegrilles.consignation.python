@@ -76,7 +76,9 @@ class MessagesSample(BaseCallback):
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
         # self.event_recu.set()
-        self.executer()
+        self.requete_cert_maitredescles()
+        thread_executer = Thread(name="exec", target=self.executer)
+        thread_executer.start()
 
     # def run_ioloop(self):
     #     self.contexte.message_dao.run_ioloop()
@@ -93,8 +95,9 @@ class MessagesSample(BaseCallback):
         if certificat_pem is not None:
             cert = EnveloppeCleCert()
             try:
-                cert.cert_from_pem_bytes(certificat_pem.encode('utf-8'))
+                cert.cert_from_pem_bytes(certificat_pem[0].encode('utf-8'))
                 self.certificat_maitredescles = cert
+                print("Recu certificat %s" % cert.fingerprint_b64)
             except:
                 print("Erreur traitement certificat_pem")
             self.cert_maitredescles_recu.set()
@@ -608,6 +611,59 @@ BMz4ginADdtNs9ARr3DcwG4=
         )
         return enveloppe_requete
 
+    def requete_cles_non_dechiffrables_verifmaitrecles(self):
+        self.cert_maitredescles_recu.wait(5)  # Attendre reception cert maitredescles
+
+        # Prendre le fingerprint du cert maitre des cles - devrait retourner 0 cles non chiffrees
+        fingerprint_maitrecles = self.certificat_maitredescles.fingerprint_b64
+
+        requete_cle_racine = {
+            'taille': 2,
+            'fingerprints_actifs': [fingerprint_maitrecles],
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cle_racine,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES,
+            'abcd-1234',
+            self.queue_name
+        )
+        return enveloppe_requete
+
+    def requete_cles_non_dechiffrables_verifcledummy(self):
+        self.cert_maitredescles_recu.wait(5)  # Attendre reception cert maitredescles
+
+        # Prendre le fingerprint du cert maitre des cles - devrait retourner 0 cles non chiffrees
+        fingerprint_maitrecles = self.certificat_maitredescles.fingerprint_b64
+
+        requete_cle_racine = {
+            'taille': 2,
+            'fingerprints_actifs': ['DUMMY'],
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cle_racine,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES,
+            'abcd-1234',
+            self.queue_name
+        )
+        return enveloppe_requete
+
+    def requete_compter_cles_non_dechiffrables_verifcledummy(self):
+        self.cert_maitredescles_recu.wait(5)  # Attendre reception cert maitredescles
+
+        # Prendre le fingerprint du cert maitre des cles - devrait retourner 0 cles non chiffrees
+        fingerprint_maitrecles = self.certificat_maitredescles.fingerprint_b64
+
+        requete_cle_racine = {
+            'fingerprints_actifs': ['DUMMY'],
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cle_racine,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_COMPTER_CLES_NON_DECHIFFRABLES,
+            'abcd-1234',
+            self.queue_name
+        )
+        return enveloppe_requete
+
     def executer(self):
         # self.event_recu.wait(5)
         # self.event_recu.clear()
@@ -637,8 +693,11 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_signer_csr_noeud_prive()
 
         # self.requete_cles_non_dechiffrables()
+        # self.requete_cles_non_dechiffrables_verifmaitrecles()
+        # self.requete_cles_non_dechiffrables_verifcledummy()
+        self.requete_compter_cles_non_dechiffrables_verifcledummy()
         # self.requete_cle_backup()
-        self.requete_cle_backup_application()
+        # self.requete_cle_backup_application()
         # self.commande_sauvegarder_cle()
 
 
