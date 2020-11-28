@@ -656,10 +656,11 @@ class EntretienCollectionsDomaines(BaseCallback):
             # _evenements.backup_horaire
             collection.create_index(
                 [
+                    ('_evenements.transaction_traitee', 1),
                     (champ_complete, 1),
                     (champ_backup_flag, 1)
                 ],
-                name='transaction_backup_flag'
+                name='transaction_backup_flag2'
             )
 
         except Exception:

@@ -713,6 +713,7 @@ class HandlerBackupDomaine:
             ('_evenements.transaction_traitee', 1)
         ]
         hint = [
+            ('_evenements.transaction_traitee', 1),
             (label_tran, 1),
             (label_backup, 1),
         ]
