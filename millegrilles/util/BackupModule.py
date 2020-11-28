@@ -562,8 +562,8 @@ class HandlerBackupDomaine:
         with open(path_fichier_backup, 'wb') as fichier:
             lzma_compressor = lzma.LZMACompressor()
 
-            if cipher is not None:
-                fichier.write(cipher.start_encrypt())
+            # if cipher is not None:
+            #     fichier.write(cipher.start_encrypt())
 
             for transaction in curseur:
                 uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
