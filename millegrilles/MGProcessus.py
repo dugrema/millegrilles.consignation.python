@@ -702,15 +702,22 @@ class StubMessageDao:
 
 class StubGenerateurTransactions:
 
-    def soumettre_transaction(self, message_dict, domaine=None,
-                              reply_to=None, correlation_id=None,
-                              version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6):
+    def soumettre_transaction(self, *args, **kwargs):
         pass
 
-    def emettre_commande_noeuds(self, message_dict, routing_key):
+    def emettre_commande_noeuds(self, *args, **kwargs):
+        pass
+
+    def transmettre_requete(self, *args, **kwargs):
         pass
 
     def transmettre_commande(self, *args, **kwargs):
+        pass
+
+    def transmettre_reponse(self, *args, **kwargs):
+        pass
+
+    def emettre_message(self, *args, **kwargs):
         pass
 
 
