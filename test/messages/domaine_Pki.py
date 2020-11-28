@@ -51,20 +51,6 @@ class MessagesSample(BaseCallback):
         print("Properties : " + str(properties))
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
-    def requete_verifier_cert_parfingerprint(self):
-        requete_cert_maitredescles = {
-            'fingerprint': 'fe4e7c9b64a4f2f31b7f8c54102573d14c8894d0'
-        }
-        enveloppe_requete = self.generateur.transmettre_requete(
-            requete_cert_maitredescles,
-            ConstantesPki.TRANSACTION_CONFIRMER_CERTIFICAT,
-            'abcd-1234',
-            self.queue_name
-        )
-
-        print("Envoi requete: %s" % enveloppe_requete)
-        return enveloppe_requete
-
     def requete_cert_fingerprint(self):
         requete_cert = {
             'fingerprint': 'fe4e7c9b64a4f2f31b7f8c54102573d14c8894d0'
@@ -85,19 +71,6 @@ class MessagesSample(BaseCallback):
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert,
             '%s.%s' % (ConstantesPki.DOMAINE_NOM, ConstantesPki.REQUETE_CERTIFICAT_BACKUP),
-            'abcd-1234',
-            self.queue_name,
-            securite=Constantes.SECURITE_PROTEGE,
-        )
-
-        print("Envoi requete: %s" % enveloppe_requete)
-        return enveloppe_requete
-
-    def requete_cert_noeuds(self):
-        requete_cert = {}
-        enveloppe_requete = self.generateur.transmettre_requete(
-            requete_cert,
-            'Pki.' + ConstantesPki.REQUETE_LISTE_CERT_COMPTES_NOEUDS,
             'abcd-1234',
             self.queue_name,
             securite=Constantes.SECURITE_PROTEGE,

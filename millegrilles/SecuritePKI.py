@@ -39,10 +39,16 @@ class EnveloppeCertificat:
         self._est_verifie = False  # Flag qui est change une fois la chaine verifiee
 
         if certificat_pem is not None:
+            chaine_cert = None
             if isinstance(certificat_pem, str):
                 chaine_cert = self.__split_chaine_certificats(certificat_pem)
+            elif isinstance(certificat_pem, list):
+                chaine_cert = certificat_pem
+
+            if chaine_cert is not None:
                 certificat_pem = bytes(chaine_cert[0], 'utf-8')
                 self.reste_chaine_pem = chaine_cert[1:]
+
             self._certificat = x509.load_pem_x509_certificate(
                 certificat_pem,
                 backend=default_backend()
@@ -464,11 +470,14 @@ class UtilCertificats:
         routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
         self._contexte.generateur_transactions.emettre_message(message, routing)
 
-    def valider_x509_enveloppe(self, enveloppe: EnveloppeCertificat, date_reference: datetime.datetime = None):
+    def valider_x509_enveloppe(self, enveloppe: EnveloppeCertificat,
+                               date_reference: datetime.datetime = None,
+                               ignorer_date=False):
         """
         Valide une enveloppe
         :param enveloppe:
         :param date_reference:
+        :param ignorer_date: Charger le certificat en utilisation date courante ou fin de periode de validite
         :return: Resultat de validation (toujours valide)
         :raises certvalidator.errors.PathBuildingError: Si le path est invalide
         """
@@ -480,7 +489,11 @@ class UtilCertificats:
             # self._logger.debug("Chaine PEM :\n%s" % pem.strip())
             inter_list.append(pem.strip().encode('utf-8'))
 
-        if date_reference is not None:
+        if date_reference is not None or ignorer_date:
+            if ignorer_date:
+                # Le certificat est expire, on fait la validation pour la fin de la periode de validite
+                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+
             # batir un contexte avec la date
             validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
         else:
@@ -515,7 +528,11 @@ class UtilCertificats:
                     raise pbe
                 elif autorisation.get('domaines_permis'):
                     # Valider la chaine en fonction de la racine fournie
-                    if date_reference is not None:
+                    if date_reference is not None or ignorer_date:
+                        if ignorer_date:
+                            # Le certificat est expire, on fait la validation pour la fin de la periode de validite
+                            date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+
                         # batir un contexte avec la date
                         validation_context = ValidationContext(moment=date_reference,
                                                                trust_roots=[self.__cert_millegrille, dernier_cert_pem])
