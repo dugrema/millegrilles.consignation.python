@@ -48,11 +48,7 @@ class MGPProcesseur:
         :raises ErreurProcessusInconnu: Si le processus est inconnu.
         """
         nom_processus = evenement.get(Constantes.PROCESSUS_DOCUMENT_LIBELLE_PROCESSUS)
-        try:
-            resultats = nom_processus.split(':')
-        except AttributeError as e:
-            self.__logger.error("Erreur non reconciliable : %s\n%s", str(e), str(evenement))
-            return
+        resultats = nom_processus.split(':')
 
         if len(resultats) == 2:
             routing = resultats[0]
@@ -437,6 +433,7 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
                 message = {
                     'evenement_dict': evenement_dict,
                     'evenement_type': evenement_type,
+                    'routing_key': routing_key,
                 }
                 if properties.correlation_id is not None:
                     message['correlation_id'] = properties.correlation_id
@@ -488,7 +485,13 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
             else:
                 id_doc_processus = evenement_dict.get(Constantes.PROCESSUS_MESSAGE_LIBELLE_ID_DOC_PROCESSUS)
                 logging.debug("Recu evenement processus: %s" % str(evenement_dict))
-                self.traiter_evenement(evenement_dict)
+                try:
+                    self.traiter_evenement(evenement_dict)
+                except AttributeError as e:
+                    self.__logger.error(
+                        "Erreur non reconciliable, mauvais type evenement : %s\n%s",
+                        str(e), str(message))
+                    raise e
         except Exception as e:
             # Mettre le message d'erreur sur la Q erreur processus
             self.erreur_fatale(id_doc_processus, str(message), e)

@@ -1011,7 +1011,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
         condition_actif = [
-            {'non_dechiffrable': True,}
+            {'non_dechiffrable': True}
         ]
         for fp in fingerprint_b64_actifs:
             condition_actif.append({'cles.%s' % fp: {'$exists': False}})
@@ -1024,6 +1024,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         filtre = {
             '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
+            'domaine': {'$exists': True},
         }
         compte = collection.count(filtre)
         reponse = {
