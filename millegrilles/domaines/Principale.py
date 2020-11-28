@@ -251,6 +251,10 @@ class GestionnairePrincipale(GestionnaireDomaineStandard):
 
         return docs
 
+    @property
+    def version_domaine(self):
+        return 7
+
 
 class TraitementMessagePrincipale(TraitementMessageDomaine):
 

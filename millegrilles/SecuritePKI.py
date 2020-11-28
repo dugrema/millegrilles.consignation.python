@@ -471,8 +471,7 @@ class UtilCertificats:
         self._contexte.generateur_transactions.emettre_message(message, routing)
 
     def valider_x509_enveloppe(self, enveloppe: EnveloppeCertificat,
-                               date_reference: datetime.datetime = None,
-                               ignorer_date=False):
+                               date_reference: datetime.datetime = None):
         """
         Valide une enveloppe
         :param enveloppe:
@@ -489,11 +488,7 @@ class UtilCertificats:
             # self._logger.debug("Chaine PEM :\n%s" % pem.strip())
             inter_list.append(pem.strip().encode('utf-8'))
 
-        if date_reference is not None or ignorer_date:
-            if ignorer_date:
-                # Le certificat est expire, on fait la validation pour la fin de la periode de validite
-                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
-
+        if date_reference is not None:
             # batir un contexte avec la date
             validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
         else:
@@ -509,12 +504,27 @@ class UtilCertificats:
             msg = pve.args[0]
             if 'expired' in msg:
                 self._logger.info("Un des certificats est expire, verifier en fonction de la date de reference")
-
-            if self._logger.isEnabledFor(logging.DEBUG):
-                self._logger.exception("Erreur validation path certificat")
+                # Le certificat est expire, on fait la validation pour la fin de la periode de validite
+                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+                validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
+                validator = CertificateValidator(
+                    cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
+                try:
+                    resultat = validator.validate_usage({'digital_signature'})
+                    enveloppe.set_est_verifie(True)
+                    raise CertificatExpire()  # La chaine est valide pour une date anterieure
+                except PathValidationError as pve:
+                    if self._logger.isEnabledFor(logging.DEBUG):
+                        self._logger.exception("Erreur validation path certificat")
+                    else:
+                        self._logger.info("Erreur validation path certificat : %s", str(pve))
             else:
-                self._logger.info("Erreur validation path certificat : %s", str(pve))
-            raise pve
+                if self._logger.isEnabledFor(logging.DEBUG):
+                    self._logger.exception("Erreur validation path certificat")
+                else:
+                    self._logger.info("Erreur validation path certificat : %s", str(pve))
+                raise pve
+
         except PathBuildingError as pbe:
             # Verifier si on a une millegrille tierce
             dernier_cert_pem = inter_list[-1]
@@ -528,11 +538,7 @@ class UtilCertificats:
                     raise pbe
                 elif autorisation.get('domaines_permis'):
                     # Valider la chaine en fonction de la racine fournie
-                    if date_reference is not None or ignorer_date:
-                        if ignorer_date:
-                            # Le certificat est expire, on fait la validation pour la fin de la periode de validite
-                            date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
-
+                    if date_reference is not None:
                         # batir un contexte avec la date
                         validation_context = ValidationContext(moment=date_reference,
                                                                trust_roots=[self.__cert_millegrille, dernier_cert_pem])
@@ -1027,3 +1033,7 @@ class AutorisationConditionnelleDomaine(Exception):
         self.domaines = domaines
         self.idmg = idmg
         self.enveloppe = enveloppe
+
+
+class CertificatExpire(Exception):
+    pass

@@ -8,7 +8,7 @@ from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessage
     TraitementRequetesProtegees, MGPProcesseurTraitementEvenements
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessusTransaction
-from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, AutorisationConditionnelleDomaine
+from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, AutorisationConditionnelleDomaine, CertificatExpire
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
 import logging
@@ -473,9 +473,15 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         # Valider la chaine de certificats - lance exception si invalide
         try:
+            # Charger le certificat en ignorant la date d'expiration - valide la chaine sur la date d'expiration
+            # Les certificats expires restent necessaires pour valider la signature des transactions et documents
             self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
         except AutorisationConditionnelleDomaine:
             # Le certificat est valide dans certains cas, on le conserve
+            pass
+        except CertificatExpire:
+            # La chaine est expiree mais valide en date de l'expiration, on conserve le certificat pour
+            # valider la signature de transactions et documents
             pass
 
         idmg = enveloppe.subject_organization_name

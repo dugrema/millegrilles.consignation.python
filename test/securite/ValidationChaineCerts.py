@@ -1,9 +1,12 @@
 import logging
+import pytz
+import datetime
+
 from threading import Event
 
 from millegrilles import Constantes
 from millegrilles.util.BaseTestMessages import DomaineTest
-from millegrilles.SecuritePKI import VerificateurCertificats, EnveloppeCertificat
+from millegrilles.SecuritePKI import VerificateurCertificats, EnveloppeCertificat, CertificatExpire
 
 racine = "-----BEGIN CERTIFICATE-----\nMIIDKDCCAhCgAwIBAgIKAWM2MBd5gxR1ADANBgkqhkiG9w0BAQ0FADAnMQ8wDQYD\nVQQDEwZSYWNpbmUxFDASBgNVBAoTC01pbGxlR3JpbGxlMB4XDTIwMDkwODIzMTEx\nN1oXDTIxMDkwODIzMTExN1owJzEPMA0GA1UEAxMGUmFjaW5lMRQwEgYDVQQKEwtN\naWxsZUdyaWxsZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALi6muAN\nrWerhvDAa8OSjGUi9M5/f4yJuIX2SVe4oszKVxvJMSggNNPTnpZCZBSWUSrEpijE\n1MMdFVNrDOS1j4ZxvvYNMvNTOS3m+TJfRL8qwPEMSsu7t9MOHG9FHB0/anPjVeOq\nXC8egzLWkJnXOLtl00BMXVxU8eOLn3KGuHxiKpp/4GbZ8xY7v6G+eUiPoc9uYPI2\nDjrzvZdKVDEgD7kdvoFs68Pj0cJ3bKxp4nds8xNEwguHE6sqElMwEUNJJORjkhzn\n6QTmzDMDaZmndjdG8KiZZKAir9eelS0OZLDIV/UpGo2g2BAxjQekOHPA1aww+KAC\n0B+Q03FBjt/2qpsCAwEAAaNWMFQwEgYDVR0TAQH/BAgwBgEB/wIBBTAdBgNVHQ4E\nFgQUvHQ3HhbAOqkmXTxc0AHjx80EGggwHwYDVR0jBBgwFoAUvHQ3HhbAOqkmXTxc\n0AHjx80EGggwDQYJKoZIhvcNAQENBQADggEBADq5K9FYVVqKwxbInDxvnJ4IsLWD\nQDk/SzCpY15BFm0UFefWRB2hHHuG1/2LvFGvokgh6hzrgjB5qAMGGc5kWL2Pe6Ne\n8/FJE6wGDnqHuTaiq1kOfqP4o3TVb0XDNi6nRZaUGy2NyJAhe7jNS/HG8TtLRZBa\nzPTmIuXxIJt0zWCAmiGCvcYaNDscCOL7Hmt+5w6+4SePnRgWmT8p5sfbLFspKQ8z\n3BFtpLTZYzzdCp4VAzCSfURgvO1WQ6W45gylNGhm7KSBL5fHcj72LhdlAjY3WQoI\nFw9K8maPLpu2cJrA1lt1+fzyF3i0Wv08nSAeFFJbKvwUEPoVxCLDdgQ/FHs=\n-----END CERTIFICATE-----"
 
@@ -39,7 +42,18 @@ class ValiderCertTest(DomaineTest):
 
     def verifier_vieux_cert(self):
         enveloppe = EnveloppeCertificat(certificat_pem=cert_3)
-        self.verificateur.valider_x509_enveloppe(enveloppe, ignorer_date=True)
+        date_future = enveloppe.not_valid_after + datetime.timedelta(days=1)
+        date_future = pytz.UTC.localize(date_future)
+
+        self.verificateur.valider_x509_enveloppe(enveloppe)
+        self.__logger.debug("OK, certificat valide presentement")
+
+        try:
+            self.verificateur.valider_x509_enveloppe(enveloppe, date_reference=date_future)
+        except CertificatExpire:
+            self.__logger.debug("OK, verification expiration cert")
+        else:
+            raise Exception("Echec verification certificat expire")
 
     def executer(self):
         self.verifier_vieux_cert()
