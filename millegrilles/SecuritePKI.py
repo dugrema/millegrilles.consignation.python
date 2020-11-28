@@ -826,7 +826,14 @@ class VerificateurTransaction(UtilCertificats):
         self._logger.debug("Identifier certificat transaction, fingerprint %s" % fingerprint)
         verificateur_certificats = self._contexte.verificateur_certificats
 
-        enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+        try:
+            epoch_transaction = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+            date_reference = datetime.datetime.fromtimestamp(epoch_transaction, tz=pytz.UTC)
+        except KeyError:
+            date_reference = datetime.datetime.now(tz=pytz.UTC)
+
+        enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint, date_reference=date_reference)
 
         return enveloppe_certificat
 
