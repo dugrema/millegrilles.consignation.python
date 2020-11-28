@@ -563,12 +563,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             except KeyError:
                 pass
 
+            # S'assurer de trouver un document qui correspond a la cle locale
+            enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
+            fingerprint_courant = enveloppe.fingerprint_b64
+
             collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
             filtre = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
                 '.'.join([ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 'fuuid']): {
                     '$in': liste_fuuid
-                }
+                },
+                'cles.%s' % fingerprint_courant: {'$exists': True}
             }
             curseur = collection_documents.find(filtre)
 

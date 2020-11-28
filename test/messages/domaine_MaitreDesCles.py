@@ -704,7 +704,7 @@ BMz4ginADdtNs9ARr3DcwG4=
 
 def reset_docs_cles():
     collection_docs = contexte.document_dao.get_collection('MaitreDesCles/documents')
-    fingerprint = 'fEyOXQqJ4nYQavH1dYpckMcxWUU='
+    fingerprint = '/kUFlugeL7ezzdoT/rHc9yGIo4Y='
     filtre = {
         '_mg-libelle': 'cles.grosFichiers',
         'cles.%s' % fingerprint: {'$exists': True}

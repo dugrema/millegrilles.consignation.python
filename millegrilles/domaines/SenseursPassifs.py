@@ -620,7 +620,7 @@ class ProcessusTransactionSenseursPassifsLecture(ProcessusSenseursPassifs):
                 '$gte': timestamp_min,
             }
         }
-        collection.delete_many(filtre)
+        # collection.delete_many(filtre)  # DEBUG probleme crash mongo sur maple
 
 
 class ProcessusMajSenseur(ProcessusSenseursPassifs):
