@@ -25,7 +25,6 @@ from millegrilles import Constantes
 from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, GestionnaireImagesServices
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
-from millegrilles.util.BackupModule import HandlerBackupApplication
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles.util.Chiffrage import CipherMsg1Dechiffrer, DecipherStream
 

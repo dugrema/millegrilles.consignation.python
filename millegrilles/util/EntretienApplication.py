@@ -13,7 +13,7 @@ from base64 import b64decode
 from io import BytesIO
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
-from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication
+from millegrilles.util.BackupModule import BackupUtil
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles import Constantes
 
