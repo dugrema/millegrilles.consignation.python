@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
-    RegenerateurDeDocuments, GroupeurTransactionsARegenerer, TraitementCommandesSecures
+    RegenerateurDeDocuments, GroupeurTransactionsARegenerer, TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -84,6 +84,18 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             if not isinstance(reponse, dict):
                 reponse = {'resultat': reponse}
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+
+
+class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
+        routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesGrosFichiers.COMMANDE_REGENERER_PREVIEWS:
+            return self.gestionnaire.regenerer_previews()
+        else:
+            return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
 
 class HandlerBackupGrosFichiers(HandlerBackupDomaine):
@@ -184,6 +196,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.SECURITE_PROTEGE: TraitementRequetesProtegeesGrosFichiers(self)
         }
 
+        self.__handler_commandes = super().get_handler_commandes()
+        self.__handler_commandes[Constantes.SECURITE_PROTEGE] = GrosfichiersTraitementCommandesProtegees(self)
+
         self.__handler_backup = HandlerBackupGrosFichiers(self._contexte)
 
     @staticmethod
@@ -212,6 +227,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
+
+    def get_handler_commandes(self) -> dict:
+        return self.__handler_commandes
 
     def identifier_processus(self, domaine_transaction):
         domaine_action = domaine_transaction.split('.').pop()
@@ -1575,6 +1593,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         filtre_doc_media = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA}
         collection_documents = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_conversion_media = collection_documents.find_one(filtre_doc_media)
+        self._logger.debug("Resoumettre les conversions manquantes : %s" % str(document_conversion_media))
 
         # Si le debut de resoumission depasse ce timestamp, on abandonne
         ts_limite_resoumission = datetime.datetime.utcnow() - datetime.timedelta(minutes=2)
@@ -1877,7 +1896,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ]},
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_document
         }
-        set_ops_fichier = dict()
+        set_ops_fichier = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: True,
+        }
         for key in [
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
@@ -2080,6 +2101,74 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 detail_collections_publiques = self.get_detail_collections_publiques(params)
                 return detail_collections_publiques
 
+    def regenerer_previews(self):
+        """
+        Regenere les previews manquants sur les fichiers de media (video, images)
+        :return:
+        """
+        collection_documents = self.get_collection()
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            '$or': [
+                {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: False},
+                {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: {'$exists': False}},
+            ],
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: {'$regex': '^(video|image)'},
+        }
+        curseur = collection_documents.find(filtre)
+
+        for f in curseur:
+            self._logger.debug("Media sans preview : %s" % str(f))
+
+            # Aplatir document avec fuuid courant
+            info = f.copy()
+            fuuid_courant = f[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE]
+            info.update(f[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid_courant])
+
+            mimetype = info['mimetype'].split('/')[0]
+            commande_preview = self.preparer_generer_preview(info)
+
+            if mimetype == 'video':
+                domaine_action = 'commande.fichiers.genererPreviewVideo'
+            elif mimetype == 'image':
+                domaine_action = 'commande.fichiers.genererPreviewImage'
+            else:
+                continue  # Type inconnu
+
+            self.message_dao.transmettre_commande(commande_preview, domaine_action)
+
+        # Transmettre commande pour commencer le traitement
+        self.resoumettre_conversions_manquantes()
+
+    def preparer_generer_preview(self, info: dict):
+        """
+        Transmettre une commande de transcodage
+        :param info:
+        :return:
+        """
+
+        securite = info['securite']
+        fuuid = info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+
+        # Sauvegarder demande conversion
+        self.ajouter_conversion_media(info)
+
+        commande_preview = info.copy()
+
+        if securite == Constantes.SECURITE_PROTEGE:
+            # Creer une permission de dechiffrage pour recuperer la cle du fichier
+            commande_permission = self.preparer_permission_dechiffrage_fichier(fuuid)
+            commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+
+        mimetype = info['mimetype'].split('/')[0]
+
+        return commande_preview
+
+        # if mimetype == 'video':
+        #     self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
+        # elif mimetype == 'image':
+        #     self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
+
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
 
@@ -2205,21 +2294,23 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         return resultat
 
     def _traiter_media(self, info: dict):
-        # Transmettre une commande de transcodage
-        securite = info['securite']
-        fuuid = info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
-
-        # Sauvegarder demande conversion
-        self.controleur.gestionnaire.ajouter_conversion_media(info)
-
-        commande_preview = info.copy()
-
-        if securite == Constantes.SECURITE_PROTEGE:
-            # Creer une permission de dechiffrage pour recuperer la cle du fichier
-            commande_permission = self.controleur.gestionnaire.preparer_permission_dechiffrage_fichier(fuuid)
-            commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+        # # Transmettre une commande de transcodage
+        # securite = info['securite']
+        # fuuid = info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        #
+        # # Sauvegarder demande conversion
+        # self.controleur.gestionnaire.ajouter_conversion_media(info)
+        #
+        # commande_preview = info.copy()
+        #
+        # if securite == Constantes.SECURITE_PROTEGE:
+        #     # Creer une permission de dechiffrage pour recuperer la cle du fichier
+        #     commande_permission = self.controleur.gestionnaire.preparer_permission_dechiffrage_fichier(fuuid)
+        #     commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+        #
 
         mimetype = info['mimetype'].split('/')[0]
+        commande_preview = self.controleur.gestionnaire.preparer_generer_preview(info)
         if mimetype == 'video':
             self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
         elif mimetype == 'image':

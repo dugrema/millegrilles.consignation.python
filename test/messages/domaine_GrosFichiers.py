@@ -431,6 +431,15 @@ class MessagesSample(BaseCallback):
             ajouter_certificats=True
         )
 
+    def commande_regenerer_previews(self):
+        requete = {}
+        self.generateur.transmettre_commande(
+            requete,
+            'commande.GrosFichiers.' + Constantes.ConstantesGrosFichiers.COMMANDE_REGENERER_PREVIEWS,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -467,7 +476,8 @@ class MessagesSample(BaseCallback):
         # sample.transaction_decrire_collection()
         # sample.requete_permission_dechiffrage_fichier_public()
         # sample.requete_collections_publiques()
-        sample.requete_detail_collections_publiques()
+        # sample.requete_detail_collections_publiques()
+        sample.commande_regenerer_previews()
 
         pass
 

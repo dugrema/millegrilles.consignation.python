@@ -1102,6 +1102,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_TAILLE_480P = "tailleVideo480p"
     DOCUMENT_FICHIER_SHA256_480P = "sha256Video480p"
     DOCUMENT_FICHIER_COMMANDE_PERMISSION = 'permission'
+    DOCUMENT_FICHIER_FLAG_PREVIEW = 'preview_traite'
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'
@@ -1187,6 +1188,7 @@ class ConstantesGrosFichiers:
     REQUETE_DETAIL_COLLECTIONS_PUBLIQUES = 'detailCollectionsPubliques'
 
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
+    COMMANDE_REGENERER_PREVIEWS = 'regenererPreviews'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {
