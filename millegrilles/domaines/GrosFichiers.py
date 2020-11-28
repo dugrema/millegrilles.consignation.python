@@ -2140,6 +2140,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Transmettre commande pour commencer le traitement
         self.resoumettre_conversions_manquantes()
 
+        return {'ok': True}
+
     def preparer_generer_preview(self, info: dict):
         """
         Transmettre une commande de transcodage
