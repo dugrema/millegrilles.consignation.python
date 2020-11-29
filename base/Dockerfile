@@ -8,7 +8,6 @@ ENV BUILD_FOLDER=/opt/millegrilles/build \
     PYTHONPATH=/opt/millegrilles/dist \
     MG_DOMAINES_JSON=$BUNDLE_FOLDER/domaines.json
 
-COPY certs/ $MG_CERTS_FOLDER
 COPY scripts/ $BUILD_FOLDER/scripts
 COPY requirements.txt $BUILD_FOLDER
 
