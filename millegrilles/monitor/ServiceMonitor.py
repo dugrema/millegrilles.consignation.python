@@ -602,10 +602,13 @@ class ServiceMonitor:
                 self._attente_event.wait(2)
                 # services = self._gestionnaire_mdns.get_service(self.idmg, '_mgamqps._tcp')
                 services = self._gestionnaire_commandes.requete_mdns_acteur(self.idmg)
-                if len(services) > 0:
-                    service = services[0]
+                services_mq = [s for s in services if s.get('type') is not None and s['type'].startswith('_mgamqps._tcp')]
+                try:
+                    service = services_mq[0]
                     info_mq['MQ_HOST'] = service['addresses'][0]
                     info_mq['MQ_PORT'] = service['port']
+                except IndexError:
+                    pass  # Aucun service disponible
 
         return info_mq
 
