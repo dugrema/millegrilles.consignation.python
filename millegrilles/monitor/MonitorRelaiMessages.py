@@ -463,8 +463,38 @@ class ConnexionMiddleware:
         return additionnals
 
     def get_mq_info(self):
-        node_name = self._docker.info()['Name']
-        return {'host': node_name, 'port': 5673}
+        self.__logger.debug("Demande services mdns pour idmg %s" % self._service_monitor.idmg)
+
+        try:
+            services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
+        except Exception:
+            self.__logger.warning("Erreur acces MDNS pour host MQ, tentative utilisation host/port env")
+            host = self.configuration.mq_host
+            port = self.configuration.mq_port
+        else:
+            self.__logger.debug("Services MDNS detectes : %d" % len(services))
+            for service in services:
+                self.__logger.debug("Service %s port %d, addresses : %s" % (service['type'], service['port'], str(service['addresses'])))
+
+            services_mq = [s for s in services if s.get('type') == '_mgamqps._tcp.local.']
+            self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
+            for service_mq in services_mq:
+                self.__logger.debug("Service %s port %d, addresses : %s" % (service_mq['type'], service_mq['port'], str(service_mq['addresses'])))
+
+            try:
+                service_retenu = services_mq[0]
+                host = service_retenu['addresses'][0]
+                port = service_retenu['port']
+            except IndexError:
+                # Utiliser configuration fourni
+                self.__logger.info("Information MDNS non disponible, fallback sur configuration environnement")
+                host = self.configuration.mq_host
+                port = self.configuration.mq_port
+
+        info_mq = {'host': host, 'port': port}
+        self.__logger.info("Service MDNS MQ detecte : %s" % str(info_mq))
+
+        return info_mq
 
     def set_relai(self, connexion_relai: ConnexionPrincipal):
         if not self.__transfert_local_handler:
@@ -651,29 +681,6 @@ class ConnexionMiddlewarePublic(ConnexionMiddleware):
     def initialiser(self, init_document=False):
         super().initialiser(init_document=init_document)
 
-    def get_mq_info(self):
-        self.__logger.debug("Demande services mdns pour idmg %s" % self._service_monitor.idmg)
-
-        services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
-
-        self.__logger.debug("Services MDNS detectes : %d" % len(services))
-        for service in services:
-            self.__logger.debug("Service %s port %d, addresses : %s" % (service['type'], service['port'], str(service['addresses'])))
-
-        services_mq = [s for s in services if s.get('type') == '_mgamqps._tcp.local.']
-        self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
-        for service_mq in services_mq:
-            self.__logger.debug("Service %s port %d, addresses : %s" % (service_mq['type'], service_mq['port'], str(service_mq['addresses'])))
-
-        service_retenu = services_mq[0]
-        host = service_retenu['addresses'][0]
-        port = service_retenu['port']
-
-        info_mq = {'host': host, 'port': port}
-        self.__logger.info("Service MDNS MQ detecte : %s" % str(info_mq))
-
-        return info_mq
-
     def _contexte_additionnals(self) -> list:
         additionnals = super()._contexte_additionnals()
 
@@ -696,21 +703,6 @@ class ConnexionMiddlewarePrive(ConnexionMiddleware):
 
     def initialiser(self, init_document=False):
         super().initialiser(init_document=init_document)
-
-    def get_mq_info(self):
-        self.__logger.debug("Demande services mdns pour idmg %s" % self._service_monitor.idmg)
-
-        services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
-
-        self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
-        for service in services:
-            self.__logger.debug("Service port %d, addresses : %s" % (service['port'], str(service['addresses'])))
-
-        service_retenu = services[0]
-        host = service_retenu['addresses'][0]
-        port = service_retenu['port']
-
-        return {'host': host, 'port': port}
 
     def _contexte_additionnals(self) -> list:
         additionnals = super()._contexte_additionnals()
@@ -744,12 +736,20 @@ class ConnexionMiddlewareProtege(ConnexionMiddleware):
 
         self.__prochaine_verification_comptes_noeuds = datetime.datetime.utcnow().timestamp()
 
-    def initialiser(self):
-        super().initialiser()
+    def initialiser(self, init_document=True):
+        super().initialiser(init_document=init_document)
 
     def _entretien(self):
         self.__mongo.entretien()
         super()._entretien()
+
+    def get_mq_info(self):
+        """
+        Connexion MQ pour noeud protege - necessairement locale
+        :return:
+        """
+        node_name = self.configuration.mq_host or 'mq'
+        return {'host': node_name, 'port': 5673}
 
     def _contexte_additionnals(self) -> list:
         additionnals = super()._contexte_additionnals()
