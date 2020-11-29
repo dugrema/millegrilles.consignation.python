@@ -1,0 +1,4 @@
+Probleme avec bson - erreur abc. Doit desinstaller et reinstaller.
+
+lxml>=4.3,<5
+Problem sur RPi, utilise package debian/ubuntu
