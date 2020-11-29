@@ -656,16 +656,23 @@ class ConnexionMiddlewarePublic(ConnexionMiddleware):
 
         services = self._service_monitor.gestionnaire_commandes.requete_mdns_acteur(self._service_monitor.idmg)
 
-        self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
+        self.__logger.debug("Services MDNS detectes : %d" % len(services))
         for service in services:
-            self.__logger.debug("Service port %d, addresses : %s" % (service['port'], str(service['addresses'])))
+            self.__logger.debug("Service %s port %d, addresses : %s" % (service['type'], service['port'], str(service['addresses'])))
 
         services_mq = [s for s in services if s.get('type') == '_mgamqps._tcp.local.']
+        self.__logger.debug("Services MDNS MQ detectes : %d" % len(services))
+        for service_mq in services_mq:
+            self.__logger.debug("Service %s port %d, addresses : %s" % (service_mq['type'], service_mq['port'], str(service_mq['addresses'])))
+
         service_retenu = services_mq[0]
         host = service_retenu['addresses'][0]
         port = service_retenu['port']
 
-        return {'host': host, 'port': port}
+        info_mq = {'host': host, 'port': port}
+        self.__logger.info("Service MDNS MQ detecte : %s" % str(info_mq))
+
+        return info_mq
 
     def _contexte_additionnals(self) -> list:
         additionnals = super()._contexte_additionnals()
