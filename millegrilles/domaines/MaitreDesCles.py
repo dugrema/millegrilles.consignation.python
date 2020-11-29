@@ -27,6 +27,7 @@ import logging
 import datetime
 import pytz
 
+
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
     def __init__(self, gestionnaire):
@@ -1024,7 +1025,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         filtre = {
             '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
-            'domaine': {'$exists': True},
+            'domaine': {'$ne': None},
         }
         compte = collection.count(filtre)
         reponse = {
@@ -1064,6 +1065,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         filtre = {
             '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
+            'domaine': {'$ne': None},
         }
         sort_order = [(Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)]
 
@@ -1888,7 +1890,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         ]
         for champ in champs_cles:
             try:
-                cles_document[champ] = transaction[champ]
+                if transaction[champ] is not None:
+                    cles_document[champ] = transaction[champ]
             except KeyError:
                 pass
 
@@ -1943,7 +1946,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self._logger.debug("Operations: %s" % str({'filtre': cles_document, 'operation': operations_mongo}))
 
         resultat_update = collection_documents.update_one(filter=cles_document, update=operations_mongo, upsert=True)
-        self._logger.info("_id du nouveau document MaitreDesCles: %s" % str(resultat_update.upserted_id))
+        if resultat_update.upserted_id is not None:
+            self._logger.debug("_id du document MaitreDesCles: %s" % str(resultat_update.upserted_id))
         if resultat_update.upserted_id is None and resultat_update.matched_count != 1:
             raise Exception("Erreur insertion cles")
 
