@@ -211,7 +211,7 @@ class GenerateurTransaction:
                              exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS, idmg_destination: str = None,
                              reply_to=None, correlation_id=None):
 
-        enveloppe = self.preparer_enveloppe(commande_dict, idmg_destination=idmg_destination)
+        enveloppe = self.preparer_enveloppe(commande_dict, domaine=routing_key, idmg_destination=idmg_destination)
 
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(

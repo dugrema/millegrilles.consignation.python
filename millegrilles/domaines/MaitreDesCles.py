@@ -1094,6 +1094,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT
             elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS:
                 domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
+            elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION:
+                domaine_transaction = self.get_nom_domaine() + '.' + ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION
             else:
                 self._logger.warning("Type de cle inconnu pour rechiffrage : %s" % mg_libelle)
                 continue

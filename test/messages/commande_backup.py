@@ -303,6 +303,17 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_restauration'
         )
 
+    def trigger_restaurer_grosfichiers(self):
+        commande = {
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.GrosFichiers.' + ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS,
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='trigger_restauration'
+        )
+
     def trigger_restaurer_global(self):
         commande = {
         }
@@ -358,14 +369,15 @@ class MessagesSample(BaseCallback):
         # thread = Thread(target=sample.requete_restaurer_tout)
         # thread.start()
 
-        # sample.trigger_restaurer_maitredescles()
         # sample.trigger_restaurer_global()
+        sample.trigger_restaurer_maitredescles()
+        # sample.trigger_restaurer_grosfichiers()
 
         # sample.trigger_quotidien('MaitreDesCles', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2020, month=10, day=9))
 
-        sample.trigger_restaurer_liensgrosfichiers()
+        # sample.trigger_restaurer_liensgrosfichiers()
 
 
 # --- MAIN ---

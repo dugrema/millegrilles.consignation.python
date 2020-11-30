@@ -480,6 +480,7 @@ class HandlerBackupDomaine:
             {'$sort': sort},
         ]
         hint = {
+            '_evenements.transaction_traitee': 1,
             '_evenements.transaction_complete': 1,
             '_evenements.%s' % Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG: 1,
         }
