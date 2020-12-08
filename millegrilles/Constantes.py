@@ -1625,6 +1625,8 @@ class ConstantesServiceMonitor:
 
     EXIT_REDEMARRAGE = 2
 
+    DOCKER_LIBVAL_CONFIG_IDMG = 'millegrille.idmg'
+    DOCKER_LIBVAL_CONFIG_SECURITE = 'millegrille.securite'
     DOCKER_LIBVAL_CONFIG = 'millegrille.configuration'
 
     MODULE_ACME = 'acme'
@@ -1674,7 +1676,7 @@ class ConstantesServiceMonitor:
     DOCKER_CONFIG_MONITOR_CERT = DOCKER_CONFIG_NAME_MONITOR + CERT_SUFFIX
     DOCKER_CONFIG_MONITOR_KEY = DOCKER_CONFIG_NAME_MONITOR + KEY_SUFFIX
     DOCKER_CONFIG_MONITOR_DEPENDANT_KEY = DOCKER_CONFIG_NAME_MONITOR_DEPENDANT + KEY_SUFFIX
-    DOCKER_CONFIG_NOEUD_ID = 'millegrilles.noeud.id'
+    DOCKER_CONFIG_NOEUD_ID = 'millegrille.noeud_id'
 
     COMMANDE_CONFIGURER_DOMAINE = 'configurerDomaine'
     COMMANDE_CONFIGURER_IDMG = 'configurerIdmg'

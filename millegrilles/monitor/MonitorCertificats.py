@@ -56,9 +56,6 @@ class GestionnaireCertificats:
         else:
             # Tenter de charger le certificat a partir de millegrille.configuration
             try:
-                config = self._docker.configs.get('millegrille.configuration')
-                config_json = json.loads(b64decode(config.attrs['Spec']['Data']))
-
                 millegrille_pem_config = self._docker.configs.get('pki.millegrille.cert')
                 json_millegrille = b64decode(millegrille_pem_config.attrs['Spec']['Data'])
                 self._clecert_millegrille = EnveloppeCleCert()

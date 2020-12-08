@@ -370,8 +370,8 @@ class MessagesSample(BaseCallback):
         # thread.start()
 
         # sample.trigger_restaurer_global()
-        sample.trigger_restaurer_maitredescles()
-        # sample.trigger_restaurer_grosfichiers()
+        # sample.trigger_restaurer_maitredescles()
+        sample.trigger_restaurer_grosfichiers()
 
         # sample.trigger_quotidien('MaitreDesCles', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))

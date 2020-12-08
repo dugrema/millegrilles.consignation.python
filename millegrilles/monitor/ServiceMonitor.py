@@ -151,27 +151,20 @@ class InitialiserServiceMonitor:
         self.__connecter_docker()
 
         try:
-            config_item = self.__docker.configs.get('millegrille.configuration')
-            configuration = json.loads(b64decode(config_item.attrs['Spec']['Data']))
-            self._configuration_json = configuration
-            self.__logger.debug("Configuration millegrille : %s" % configuration)
+            config_securite = self.__docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE)
+            securite = b64decode(config_securite.attrs['Spec']['Data']).decode('utf-8').strip()
+            self.__logger.debug("Niveau de securite millegrille : %s" % securite)
 
             # Verifier si on a le cert de monitor - indique que noeud est configure et completement installe
             # Lance une exception si aucune configuration ne commence par pki.monitor.cert
             monitor_cert = self.__docker.configs.list(filters={'name': 'pki.monitor.cert'})[0]
 
-            specialisation = configuration.get('specialisation')
-            securite = configuration.get('securite')
             if securite == '1.public':
-                self.__logger.error("Noeud public")
+                self.__logger.info("Noeud public")
                 service_monitor_classe = ServiceMonitorPublic
             elif securite == Constantes.SECURITE_PRIVE:
-                self.__logger.error("Noeud prive")
+                self.__logger.info("Noeud prive")
                 service_monitor_classe = ServiceMonitorPrive
-            elif securite == Constantes.SECURITE_PROTEGE and specialisation == 'dependant':
-                service_monitor_classe = ServiceMonitorDependant
-            elif securite == Constantes.SECURITE_PROTEGE and specialisation == 'principal':
-                service_monitor_classe = ServiceMonitorPrincipal
             elif securite == Constantes.SECURITE_PROTEGE:
                 service_monitor_classe = ServiceMonitorPrincipal
             else:
@@ -333,11 +326,18 @@ class ServiceMonitor:
         dict_infomillegrille['ip_detectee'] = ip_address
         dict_infomillegrille['noeud_id'] = self.noeud_id
 
+        gestionnaire_docker = self.gestionnaire_docker
+
         idmg = self.idmg
         if idmg:
             dict_infomillegrille['idmg'] = idmg
-
-        gestionnaire_docker = self.gestionnaire_docker
+        else:
+            try:
+                idmg = gestionnaire_docker.charger_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG).decode(
+                    'utf-8').strip()
+                dict_infomillegrille['idmg'] = idmg
+            except IndexError:
+                pass
 
         try:
             configuration_acme = json.loads(gestionnaire_docker.charger_config('acme.configuration'))
@@ -346,9 +346,8 @@ class ServiceMonitor:
             pass
 
         try:
-            configuration_millegrille = json.loads(gestionnaire_docker.charger_config('millegrille.configuration'))
-            dict_infomillegrille['securite'] = configuration_millegrille['securite']
-            dict_infomillegrille['idmg'] = configuration_millegrille['idmg']
+            securite = gestionnaire_docker.charger_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE).decode('utf-8').strip()
+            dict_infomillegrille['securite'] = securite
         except IndexError:
             pass
 
@@ -383,18 +382,21 @@ class ServiceMonitor:
             data = b64decode(configuration_docker.attrs['Spec']['Data'])
             self._noeud_id = data.decode('utf-8')
         except docker.errors.NotFound as he:
-            self.__logger.debug("Configuration %s n'existe pas" % ConstantesServiceMonitor.DOCKER_CONFIG_NOEUD_ID)
+            self.__logger.info("configuration: Noeud Id n'existe pas")
 
         try:
-            configuration_docker = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
-            data = b64decode(configuration_docker.attrs['Spec']['Data'])
-            configuration_json = json.loads(data)
-            self._idmg = configuration_json[Constantes.CONFIG_IDMG]
-            self._securite = configuration_json[Constantes.DOCUMENT_INFODOC_SECURITE]
+            idmg_config = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG)
+            self._idmg = b64decode(idmg_config.attrs['Spec']['Data']).decode('utf-8').strip()
+        except docker.errors.NotFound:
+            self.__logger.info("configuration: IDMG n'est pas encore configure")
 
-            self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
-        except docker.errors.NotFound as he:
-            self.__logger.debug("Configuration %s n'existe pas" % ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG)
+        try:
+            securite_config = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE)
+            self._securite = b64decode(securite_config.attrs['Spec']['Data']).decode('utf-8').strip()
+        except docker.errors.NotFound:
+            self.__logger.info("configuration: Niveau de securite n'est pas encore configure")
+
+        self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
 
     def _classe_configuration(self):
         """
@@ -1755,12 +1757,27 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         :param securite:
         :return:
         """
-        # Sauvegarder configuration.millegrille
-        configuration_millegrille = {
-            'securite': securite,
-            'idmg': idmg,
-        }
-        self.gestionnaire_docker.sauvegarder_config('millegrille.configuration', configuration_millegrille)
+        # Sauvegarder niveau securite
+        try:
+            securite_config = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE)
+            securite_existant = b64decode(securite_config.attrs['Spec']['Data']).decode('utf-8').strip()
+            # On ne change pas le idmg
+            if securite is not None and securite != securite_existant:
+                self.__logger.warning("Securite existant (%s) ne correspond pas au IDMG fourni (%s) - on conserve le niveau existant" % (securite_existant, securite))
+        except docker.errors.NotFound:
+            self.__logger.info("Sauvegarder securite sous %s : %s" % (ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE, idmg))
+            self.gestionnaire_docker.sauvegarder_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE,
+                                                        securite)
+
+        try:
+            idmg_config = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG)
+            idmg_existant = b64decode(idmg_config.attrs['Spec']['Data']).decode('utf-8').strip()
+            # On ne change pas le idmg
+            if idmg is not None and idmg != idmg_existant:
+                self.__logger.warning("IDMG existant (%s) ne correspond pas au IDMG fourni (%s) - on conserve le IDMG existant" % (idmg_existant, idmg))
+        except docker.errors.NotFound:
+            self.__logger.info("Sauvegarder IDMG sous %s : %s" % (ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG, idmg))
+            self.gestionnaire_docker.sauvegarder_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG, idmg)
 
     def __initialiser_noeud_prive(self, commande: CommandeMonitor):
         """
