@@ -107,13 +107,17 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                 # S'assurer que la commande est correctement signee
                 verificateur_transactions = self.service_monitor.verificateur_transactions
                 verificateur_transactions.verifier(request_data)
+
         except (AttributeError, KeyError):
+            # Non autorise, erreur dans la validation de la commande/signature
             self.repondre_json({'ok': False}, 401)
         else:
             if path_split[3] == 'configurerDomaine':
                 self.post_configurer_domaine(request_data)
             elif path_split[3] == 'configurerIdmg':
                 self.post_configurer_idmg(request_data)
+            elif path_split[3] == 'configurerMQ':
+                self.post_configurer_mq(request_data)
             else:
                 self.error_404()
 
@@ -172,6 +176,27 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.repondre_json(reponse, status_code=200)
         except Exception as e:
             self.__logger.exception("post_configurer_idmg: Erreur traitement")
+            reponse = {'err': str(e)}
+            self.repondre_json(reponse, status_code=500)
+
+    def post_configurer_mq(self, request_data):
+        logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("post_configurer_mq: POST recu\n%s", json.dumps(request_data, indent=2))
+
+        try:
+            # Valider input
+            if request_data.get('host') and request_data.get('port') or request_data.get('supprimer_params_mq'):
+                request_data['commande'] = ConstantesServiceMonitor.COMMANDE_CONFIGURER_MQ
+                commande = CommandeMonitor(request_data)
+                self.service_monitor.gestionnaire_commandes.ajouter_commande(commande)
+
+                self.repondre_json({'ok': True}, status_code=200)
+            else:
+                self.repondre_json({'ok': False, 'message': 'Params incomplets'}, status_code=500)
+
+        except Exception as e:
+            self.__logger.exception("post_configurer_mq: Erreur traitement")
             reponse = {'err': str(e)}
             self.repondre_json(reponse, status_code=500)
 

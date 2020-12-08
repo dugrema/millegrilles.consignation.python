@@ -438,6 +438,13 @@ class GestionnaireModulesDocker:
         # image_tag = image.tags[0]
 
         configuration = self.__formatter_configuration_service(service_name)
+
+        if kwargs.get('env'):
+            # Ajouter toutes les variables d'environnement. Doit etre une liste format ['KEY=VAL', ...]
+            list_env = configuration.get('env') or list()
+            configuration['env'] = list_env
+            list_env.extend(kwargs.get('env'))
+
         # command = configuration_service.get('command')
         constraints = configuration.get('constraints')
         if constraints:

@@ -162,6 +162,9 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_IDMG:
                 self._service_monitor.configurer_idmg(commande)
 
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_CONFIGURER_MQ:
+                self._service_monitor.configurer_mq(commande)
+
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_ACTEUR_GET_INFORMATION_NOEUD:
                 self._service_monitor.transmettre_info_acteur(commande)
 

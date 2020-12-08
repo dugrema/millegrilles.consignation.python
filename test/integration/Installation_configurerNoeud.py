@@ -172,11 +172,27 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
         print("Configuration domaine %s" % domaine)
         resultat.raise_for_status()
 
+    def configurer_mq(self, host: str = 'mg-dev4.maple.maceroc.com', port: str = '5673'):
+        info_configuration = {
+            # 'host': host,
+            # 'port': port,
+            'supprimer_params_mq': True,
+        }
+
+        resultat = requests.post(
+            'https://%s/installation/api/configurerMQ' % serveur,
+            json=info_configuration,
+            verify=False
+        )
+        print("Configuration MQ host:port : %s:%s" % (host, port))
+        resultat.raise_for_status()
+
     def executer(self):
         # csr = get_csr()
         # self.configurer_noeud_prive(csr)
         # self.test_reconfigurer_idmg('')
-        self.configurer_domaine()
+        # self.configurer_domaine()
+        self.configurer_mq()
 
 
 # ------- MAIN --------
