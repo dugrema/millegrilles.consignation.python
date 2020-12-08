@@ -795,6 +795,30 @@ class ServiceMonitor:
         # Forcer reconfiguration nginx
         gestionnaire_docker.maj_service('nginx')
 
+    def configurer_mq(self, commande: CommandeMonitor):
+        """
+        Modifie la configuration de MQ, permet d'ajouter le host/port manuellement
+        :param commande:
+        :return:
+        """
+        params = commande.contenu
+        inst_service = self._gestionnaire_docker.get_service('monitor')
+
+        try:
+            if params['supprimer_params_mq']:
+                self.__logger.info("Suppression manual override pour MQ")
+                liste_valeurs = list()
+                inst_service.update(env=liste_valeurs)
+        except KeyError:
+            host = params['host']
+            port = params['port']
+            liste_valeurs = [
+                'MG_MQ_HOST=' + host,
+                'MG_MQ_PORT=' + port,
+            ]
+            self.__logger.info("MAJ connexion MQ avec %s" + str(liste_valeurs))
+            inst_service.update(env=liste_valeurs)
+
 
 class ServiceMonitorPrincipal(ServiceMonitor):
     """
@@ -1515,7 +1539,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         try:
             self._idmg = self._gestionnaire_docker.charger_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG).decode('utf-8').strip()
-        except docker.errors.NotFound:
+        except (IndexError, docker.errors.NotFound):
             self.__logger.info("IDMG non initialise")
 
         # Initialiser gestionnaire web
@@ -1638,30 +1662,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.initialiser_domaine(commande)
 
         self.sauvegarder_config_millegrille(idmg, securite)
-
-    def configurer_mq(self, commande: CommandeMonitor):
-        """
-        Modifie la configuration de MQ, permet d'ajouter le host/port manuellement
-        :param commande:
-        :return:
-        """
-        params = commande.contenu
-        inst_service = self._gestionnaire_docker.get_service('monitor')
-
-        try:
-            if params['supprimer_params_mq']:
-                self.__logger.info("Suppression manual override pour MQ")
-                liste_valeurs = list()
-                inst_service.update(env=liste_valeurs)
-        except KeyError:
-            host = params['host']
-            port = params['port']
-            liste_valeurs = [
-                'MG_MQ_HOST=' + host,
-                'MG_MQ_PORT=' + port,
-            ]
-            self.__logger.info("MAJ connexion MQ avec %s" + str(liste_valeurs))
-            inst_service.update(env=liste_valeurs)
 
     def initialiser_noeud(self, commande: CommandeMonitor):
         if self.__logger.isEnabledFor(logging.DEBUG):

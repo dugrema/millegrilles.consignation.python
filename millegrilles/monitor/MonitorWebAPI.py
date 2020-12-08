@@ -106,7 +106,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             if self.service_monitor.est_verouille:
                 # S'assurer que la commande est correctement signee
                 verificateur_transactions = self.service_monitor.verificateur_transactions
-                verificateur_transactions.verifier(request_data)
+                cert = verificateur_transactions.verifier(request_data)
+
+                # S'assurer que le certificat est au moins de niveau protege
+                if not any([s in ['3.protege', '4.secure'] for s in cert.get_exchanges]):
+                    return self.repondre_json({'ok': False, 'message': 'Certificat non autorise'}, 401)
 
         except (AttributeError, KeyError):
             # Non autorise, erreur dans la validation de la commande/signature

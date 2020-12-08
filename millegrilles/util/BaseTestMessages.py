@@ -12,13 +12,12 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from threading import Event
 
 
-contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser()
-
-
 class DomaineTest(BaseCallback):
 
-    def __init__(self):
+    def __init__(self, connecter=True):
+        contexte = ContexteRessourcesMilleGrilles()
+        contexte.initialiser(connecter=connecter)
+
         super().__init__(contexte)
         self.contexte.message_dao.register_channel_listener(self)
         self.generateur = GenerateurTransaction(self.contexte)

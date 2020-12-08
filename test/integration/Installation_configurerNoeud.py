@@ -1,8 +1,10 @@
 # Tests de configuration d'un noeud
 import requests
 import os
+import logging
 
 from millegrilles.util.X509Certificate import GenerateurInitial, GenererNoeudPrive, EnveloppeCleCert, RenouvelleurCertificat
+from millegrilles.util.BaseTestMessages import DomaineTest
 
 serveur = "192.168.2.131"
 
@@ -152,6 +154,18 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
         if resultat.status_code != 403:
             raise Exception('Attendu : error 403')
 
+    def executer(self):
+        csr = get_csr()
+        self.configurer_noeud_prive(csr)
+        # self.test_reconfigurer_idmg('')
+
+
+class TransmettreCommandeSignee(DomaineTest):
+
+    def __init__(self):
+        super().__init__(connecter=False)
+        self.__logger = logging.getLogger(self.__class__.__name__)
+
     def configurer_domaine(self, domaine: str = 'mg-dev4.maple.maceroc.com'):
         info_configuration = {
             'domaine': domaine,
@@ -179,18 +193,19 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
             'supprimer_params_mq': True,
         }
 
+        # Signer la requete
+        generateur = self.contexte.generateur_transactions
+        enveloppe = generateur.preparer_enveloppe(info_configuration, ajouter_certificats=True)
+
         resultat = requests.post(
             'https://%s/installation/api/configurerMQ' % serveur,
-            json=info_configuration,
+            json=enveloppe,
             verify=False
         )
         print("Configuration MQ host:port : %s:%s" % (host, port))
         resultat.raise_for_status()
 
     def executer(self):
-        # csr = get_csr()
-        # self.configurer_noeud_prive(csr)
-        # self.test_reconfigurer_idmg('')
         # self.configurer_domaine()
         self.configurer_mq()
 
@@ -198,7 +213,8 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
 # ------- MAIN --------
 def main():
     # generer_cert_millegrille()
-    SignatureCert().executer()
+    # SignatureCert().executer()
+    TransmettreCommandeSignee().executer()
 
 
 if __name__ == '__main__':
