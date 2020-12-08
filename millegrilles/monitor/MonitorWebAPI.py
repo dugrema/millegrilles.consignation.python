@@ -94,16 +94,28 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.error_404()
 
     def _traiter_post_api(self, request_data):
+
         path_fichier = self.path
         path_split = path_fichier.split('/')
-        if path_split[3] == 'configurerDomaine':
-            self.post_configurer_domaine(request_data)
-        elif path_split[3] == 'installer':
+
+        if path_split[3] == 'installer':
             self.post_installer(request_data)
-        elif path_split[3] == 'configurerIdmg':
-            self.post_configurer_idmg(request_data)
+            return
+
+        try:
+            if self.service_monitor.est_verouille:
+                # S'assurer que la commande est correctement signee
+                verificateur_transactions = self.service_monitor.verificateur_transactions
+                verificateur_transactions.verifier(request_data)
+        except (AttributeError, KeyError):
+            self.repondre_json({'ok': False}, 401)
         else:
-            self.error_404()
+            if path_split[3] == 'configurerDomaine':
+                self.post_configurer_domaine(request_data)
+            elif path_split[3] == 'configurerIdmg':
+                self.post_configurer_idmg(request_data)
+            else:
+                self.error_404()
 
     def return_info_monitor(self):
         dict_infomillegrille = self.service_monitor.get_info_monitor()
@@ -125,7 +137,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def post_configurer_domaine(self, request_data):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        logger.debug("POST recu\n%s", json.dumps(request_data, indent=2))
+        logger.debug("POST recu configuration domaine\n%s", json.dumps(request_data, indent=2))
 
         request_data['commande'] = ConstantesServiceMonitor.COMMANDE_CONFIGURER_DOMAINE
         commande = CommandeMonitor(request_data)
@@ -140,6 +152,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("post_configurer_idmg: POST recu\n%s", json.dumps(request_data, indent=2))
+
+        # S'assurer que le IDMG n'est pas deja configure
+        if self.service_monitor.idmg is not None and self.service_monitor.securite is not None:
+            logger.error("IDMG et securite deja configure, retourner erreur 403")
+            return self.repondre_json({'ok': False, 'idmg': self.service_monitor.idmg}, status_code=403)
 
         try:
             # Valider input

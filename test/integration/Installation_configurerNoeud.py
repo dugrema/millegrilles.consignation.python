@@ -1,5 +1,6 @@
 # Tests de configuration d'un noeud
 import requests
+import os
 
 from millegrilles.util.X509Certificate import GenerateurInitial, GenererNoeudPrive, EnveloppeCleCert, RenouvelleurCertificat
 
@@ -121,7 +122,6 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
 
     def configurer_noeud_prive(self, csr):
         clecert = self.renouvelleur.renouveller_avec_csr('prive', 'AAAA', csr.encode('utf-8'))
-
         certificat = clecert.cert_bytes.decode('utf-8')
         chaine = list(clecert.chaine)
 
@@ -137,14 +137,52 @@ PZgCLivK4AyUNpjfeOyrmio+GqiRKt6aVCA4Ht5Az8c5j1atiZM=
         )
         print("Inscription noeud prive : %s" % str(resultat))
 
+    def test_reconfigurer_idmg(self, csr):
+        message = {
+            'chainePem': 'dummy',
+            'certificatPem': 'dummy'
+        }
+
+        resultat = requests.post(
+            'https://%s/installation/api/configurerIdmg' % serveur,
+            json=message,
+            verify=False
+        )
+        print("Inscription noeud prive %d : %s" % (resultat.status_code, str(resultat.json())))
+        if resultat.status_code != 403:
+            raise Exception('Attendu : error 403')
+
+    def configurer_domaine(self, domaine: str = 'mg-dev4.maple.maceroc.com'):
+        info_configuration = {
+            'domaine': domaine,
+            'modeTest': True,
+            'modeCreation': 'webroot',
+
+            # 'modeCreation': 'dns_cloudns',
+            # 'dnssleep': '240',
+            # 'cloudnsSubid': '1409',
+            # 'cloudnsPassword': os.env['CLOUDNS_PASSWORD'],
+        }
+
+        resultat = requests.post(
+            'https://%s/installation/api/configurerDomaine' % serveur,
+            json=info_configuration,
+            verify=False
+        )
+        print("Configuration domaine %s" % domaine)
+        resultat.raise_for_status()
+
+    def executer(self):
+        # csr = get_csr()
+        # self.configurer_noeud_prive(csr)
+        # self.test_reconfigurer_idmg('')
+        self.configurer_domaine()
+
 
 # ------- MAIN --------
 def main():
     # generer_cert_millegrille()
-    csr = get_csr()
-    signateur = SignatureCert()
-    signateur.configurer_noeud_prive(csr)
-
+    SignatureCert().executer()
 
 
 if __name__ == '__main__':

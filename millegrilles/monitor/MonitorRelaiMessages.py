@@ -667,6 +667,10 @@ class ConnexionMiddleware:
     def exchange(self):
         return self._service_monitor.securite
 
+    @property
+    def verificateur_transactions(self):
+        return self._contexte.verificateur_transaction
+
 
 class ConnexionMiddlewarePublic(ConnexionMiddleware):
     """

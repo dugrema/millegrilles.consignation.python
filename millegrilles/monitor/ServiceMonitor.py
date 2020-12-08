@@ -689,6 +689,10 @@ class ServiceMonitor:
         return self._connexion_middleware.generateur_transactions
 
     @property
+    def verificateur_transactions(self):
+        return self._connexion_middleware.verificateur_transactions
+
+    @property
     def gestionnaire_applications(self):
         return self._gestionnaire_applications
 
@@ -704,7 +708,7 @@ class ServiceMonitor:
 
     @property
     def securite(self):
-        return self._securite or Constantes.SECURITE_PRIVE
+        return self._securite  # or Constantes.SECURITE_PRIVE
 
     @property
     def path_secrets(self):
@@ -713,6 +717,83 @@ class ServiceMonitor:
     @property
     def is_dev_mode(self):
         return self._args.dev
+
+    @property
+    def est_verouille(self):
+        """
+        Un noeud verrouille est un noeud qui ne repond qu'a des commandes signees.
+        Le noeud est deverouille durant l'installation si le type (securite) et l'IDMG ne sont pas fournis.
+        :return:
+        """
+        return self._securite is not None and self._idmg is not None
+
+    def initialiser_domaine(self, commande):
+        params = commande.contenu
+        gestionnaire_docker = self.gestionnaire_docker
+
+        # Aller chercher le certificat SSL de LetsEncrypt
+        domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
+        mode_test = self._args.dev or params.get('modeTest')
+
+        params_environnement = list()
+        params_secrets = list()
+        mode_dns = False
+        if params.get('modeCreation') == 'dns_cloudns':
+            # Utiliser dnssleep, la detection de presence du record TXT marche rarement
+            dnssleep = params.get('dnssleep') or 240
+            methode_validation = '--dns dns_cloudns --dnssleep %s' % str(dnssleep)
+            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['cloudnsSubid'])
+            params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['cloudnsPassword'])
+            mode_dns = True
+        else:
+            methode_validation = '--webroot /usr/share/nginx/html'
+
+        configuration_acme = {
+            'domain': domaine_noeud,
+            'methode': {
+                'commande': methode_validation,
+                'mode_test': mode_test,
+                'params_environnement': params_environnement,
+            }
+        }
+
+        commande_acme = methode_validation
+        if mode_test:
+            commande_acme = '--test ' + methode_validation
+
+        params_combines = list(params_environnement)
+        params_combines.extend(params_secrets)
+
+        acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
+        commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
+        if mode_dns:
+            self.__logger.info("Mode DNS, on ajoute wildcard *.%s" % domaine_noeud)
+            commande_acme = commande_acme + " -d '*.%s'" % domaine_noeud
+        resultat_acme, output_acme = gestionnaire_docker.executer_script_blind(
+            acme_container_id,
+            commande_acme,
+            environment=params_combines
+        )
+        if resultat_acme != 0:
+            self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
+            #raise Exception("Erreur creation certificat avec ACME")
+        cert_bytes = gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
+        io_buffer = io.BytesIO(cert_bytes)
+        with tarfile.open(fileobj=io_buffer) as tar_content:
+            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
+            key_bytes = tar_content.extractfile(member_key).read()
+            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
+            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
+
+        # Inserer certificat, cle dans docker
+        secret_name, date_secret = gestionnaire_docker.sauvegarder_secret(
+            'pki.web.key', key_bytes, ajouter_date=True)
+
+        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
+        gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
+
+        # Forcer reconfiguration nginx
+        gestionnaire_docker.maj_service('nginx')
 
 
 class ServiceMonitorPrincipal(ServiceMonitor):
@@ -1432,6 +1513,11 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         except APIError:
             self.__logger.info("Docker.initialiser_noeud: Noeud deja initialise")
 
+        try:
+            self._idmg = self._gestionnaire_docker.charger_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG).decode('utf-8').strip()
+        except docker.errors.NotFound:
+            self.__logger.info("IDMG non initialise")
+
         # Initialiser gestionnaire web
         self._gestionnaire_web = GestionnaireWeb(self, mode_dev=self._args.dev)
         self._gestionnaire_web.entretien()
@@ -1535,74 +1621,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
                 else:
                     self.__logger.warning("Erreur valeur monitor : %s" % ve)
 
-    def initialiser_domaine(self, commande):
-        params = commande.contenu
-        gestionnaire_docker = self.gestionnaire_docker
-
-        # Aller chercher le certificat SSL de LetsEncrypt
-        domaine_noeud = params['domaine']  # 'mg-dev4.maple.maceroc.com'
-        mode_test = self._args.dev or params.get('modeTest')
-
-        params_environnement = list()
-        params_secrets = list()
-        mode_dns = False
-        if params.get('modeCreation') == 'dns_cloudns':
-            # Utiliser dnssleep, la detection de presence du record TXT marche rarement
-            dnssleep = params.get('dnssleep') or 240
-            methode_validation = '--dns dns_cloudns --dnssleep %s' % str(dnssleep)
-            params_environnement.append("CLOUDNS_SUB_AUTH_ID=" + params['cloudnsSubid'])
-            params_secrets.append("CLOUDNS_AUTH_PASSWORD=" + params['cloudnsPassword'])
-            mode_dns = True
-        else:
-            methode_validation = '--webroot /usr/share/nginx/html'
-
-        configuration_acme = {
-            'domain': domaine_noeud,
-            'methode': {
-                'commande': methode_validation,
-                'mode_test': mode_test,
-                'params_environnement': params_environnement,
-            }
-        }
-
-        commande_acme = methode_validation
-        if mode_test:
-            commande_acme = '--test ' + methode_validation
-
-        params_combines = list(params_environnement)
-        params_combines.extend(params_secrets)
-
-        acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
-        commande_acme = "acme.sh --issue %s -d %s" % (commande_acme, domaine_noeud)
-        if mode_dns:
-            self.__logger.info("Mode DNS, on ajoute wildcard *.%s" % domaine_noeud)
-            commande_acme = commande_acme + " -d '*.%s'" % domaine_noeud
-        resultat_acme, output_acme = gestionnaire_docker.executer_script_blind(
-            acme_container_id,
-            commande_acme,
-            environment=params_combines
-        )
-        if resultat_acme != 0:
-            self.__logger.error("Erreur ACME, code : %d\n%s", resultat_acme, output_acme.decode('utf-8'))
-            #raise Exception("Erreur creation certificat avec ACME")
-        cert_bytes = gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
-        io_buffer = io.BytesIO(cert_bytes)
-        with tarfile.open(fileobj=io_buffer) as tar_content:
-            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
-            key_bytes = tar_content.extractfile(member_key).read()
-            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
-            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
-
-        # Inserer certificat, cle dans docker
-        secret_name, date_secret = gestionnaire_docker.sauvegarder_secret(
-            'pki.web.key', key_bytes, ajouter_date=True)
-
-        gestionnaire_docker.sauvegarder_config('acme.configuration', json.dumps(configuration_acme).encode('utf-8'))
-        gestionnaire_docker.sauvegarder_config('pki.web.cert.' + date_secret, fullchain_bytes)
-
-        # Forcer reconfiguration nginx
-        gestionnaire_docker.maj_service('nginx')
-
     def configurer_idmg(self, commande: CommandeMonitor):
         """
         Genere la configuration docker avec le niveau de securite et IDMG. Genere le certificat web SSL au besoin.
@@ -1611,6 +1629,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         """
         params = commande.contenu
         idmg = params['idmg']
+        self._idmg = idmg
         securite = params['securite']
         domaine = params.get('domaine')
 
@@ -1768,6 +1787,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
             self.__logger.info("Sauvegarder securite sous %s : %s" % (ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE, idmg))
             self.gestionnaire_docker.sauvegarder_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE,
                                                         securite)
+            self._securite = securite
 
         try:
             idmg_config = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG)
@@ -1778,6 +1798,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         except docker.errors.NotFound:
             self.__logger.info("Sauvegarder IDMG sous %s : %s" % (ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG, idmg))
             self.gestionnaire_docker.sauvegarder_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG, idmg)
+            self._idmg = idmg
 
     def __initialiser_noeud_prive(self, commande: CommandeMonitor):
         """
@@ -1810,6 +1831,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         clecert_millegrille = EnveloppeCleCert()
         clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
         idmg = clecert_millegrille.idmg
+
+        if self.idmg != idmg:
+            raise ValueError("Le IDMG du certificat (%s) ne correspond pas a celui du noeud (%s)", (idmg, self.idmg))
 
         clecert_recu = EnveloppeCleCert()
         clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
@@ -1921,6 +1945,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         clecert_millegrille = EnveloppeCleCert()
         clecert_millegrille.cert_from_pem_bytes(certificat_millegrille.encode('utf-8'))
         idmg = clecert_millegrille.idmg
+
+        if self.idmg is not None and self.idmg != idmg:
+            raise ValueError("Le IDMG du certificat (%s) ne correspond pas a celui du noeud (%s)", (idmg, self.idmg))
 
         clecert_recu = EnveloppeCleCert()
         clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
