@@ -2,7 +2,7 @@ import logging
 import os
 import datetime
 
-from os import path
+from os import path, environ
 # from typing import Union
 
 from millegrilles import Constantes
@@ -39,11 +39,19 @@ class GestionnaireWeb:
 
             if self.__service_monitor.securite != Constantes.SECURITE_PROTEGE:
                 try:
-                    config_mq = self.__service_monitor.get_info_connexion_mq()
+                    config_mq = self.__service_monitor.get_info_connexion_mq(nowait=True)
                     hostname = config_mq['MQ_HOST']
-                    self.__maj_proxypass_fichiers(hostname)
-                except AttributeError:
-                    pass
+                except KeyError:
+                    try:
+                        hostname = os.environ['MG_MQ_HOST']
+                    except KeyError:
+                        hostname = None
+
+                if hostname is not None:
+                    try:
+                        self.__maj_proxypass_fichiers(hostname)
+                    except AttributeError:
+                        self.__logger.exception("Erreur configuration proxypass_fichiers")
 
             try:
                 if not self.__service_monitor.is_dev_mode:
