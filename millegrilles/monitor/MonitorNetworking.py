@@ -102,6 +102,13 @@ proxy_pass $upstream_protege;
         with open(path.join(self.__repertoire_modules, 'proxypass.include'), 'w') as fichier:
             fichier.write(proxypass)
 
+        proxypass_fichiers = """
+set $upstream_fichiers https://fichiers:443; 
+proxy_pass $upstream_fichiers;
+"""
+        with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'w') as fichier:
+            fichier.write(proxypass_fichiers)
+
         domaine_installeur = 'monitor'
         if self.__mode_dev:
             domaine_installeur = self.__service_monitor.nodename
@@ -203,8 +210,7 @@ location /fichiers {
 
   proxy_headers_hash_bucket_size 64;
 
-  set $upstream_fichiers https://fichiers:443;
-  proxy_pass $upstream_fichiers;
+  include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
 
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
@@ -221,8 +227,7 @@ location /fichiers {
 
   proxy_headers_hash_bucket_size 64;
 
-  set $upstream_fichiers https://fichiers:443;
-  proxy_pass $upstream_fichiers;
+  include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
 
   # Mapping certificat client pour connexion consignation fichiers
   proxy_ssl_certificate         /run/secrets/nginx.cert.pem;

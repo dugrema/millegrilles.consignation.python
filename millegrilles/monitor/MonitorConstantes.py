@@ -220,3 +220,10 @@ class ExceptionExecution(Exception):
 
 class PkiCleNonTrouvee(Exception):
     pass
+
+
+class GenerationCertificatNonSupporteeException(Exception):
+    """
+    Indique qu'il n'est pas possible de generer un certificat sur ce noeud
+    """
+    pass

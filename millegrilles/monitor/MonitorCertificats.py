@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives import asymmetric, hashes
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
-from millegrilles.monitor.MonitorConstantes import ForcerRedemarrage
+from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
 # from millegrilles.monitor.ServiceMonitor import DOCKER_LABEL_TIME, GestionnaireModulesDocker
 from millegrilles.util.X509Certificate import EnveloppeCleCert, RenouvelleurCertificat, ConstantesGenerateurCertificat, \
     GenerateurInitial, GenerateurCertificat, GenerateurCertificatNginxSelfsigned
@@ -246,7 +246,7 @@ class GestionnaireCertificats:
         raise NotImplementedError()
 
     def generer_clecert_module(self, role: str, node_name: str, nomcle: str = None, liste_dns: list = None) -> EnveloppeCleCert:
-        raise NotImplementedError()
+        raise GenerationCertificatNonSupporteeException()
 
 
 class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
@@ -622,3 +622,4 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
                 pass
 
         return clecert
+

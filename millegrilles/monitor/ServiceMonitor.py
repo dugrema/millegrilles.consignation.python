@@ -1669,6 +1669,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         params = commande.contenu
         securite = params['securite']
+        self._securite = securite
 
         if securite == Constantes.SECURITE_PROTEGE:
             self.__initialiser_noeud_protege(commande)

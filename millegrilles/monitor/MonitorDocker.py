@@ -18,7 +18,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
 from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
-
+from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
 
 class GestionnaireModulesDocker:
 
@@ -274,9 +274,13 @@ class GestionnaireModulesDocker:
                         self.creer_compte(certificat_compte_cle)
                     except AttributeError:
                         self.__logger.info("Le certificat n'existe pas, on va le creer : %s" % certificat_compte_cle)
-                        enveloppe = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(
-                            cle_config_service, self.__service_monitor.noeud_id)
-                        self.creer_compte(certificat_compte_cle)
+                        try:
+                            enveloppe = self.__service_monitor.gestionnaire_certificats.generer_clecert_module(
+                                cle_config_service, self.__service_monitor.noeud_id)
+                        except GenerationCertificatNonSupporteeException:
+                            self.__logger.warning("Application installee sans generer un certificat (noeud prive ou public)")
+                        else:
+                            self.creer_compte(certificat_compte_cle)
 
         nom_image_docker = kwargs.get('nom_image') or service_name
 
@@ -704,7 +708,8 @@ class GestionnaireModulesDocker:
                 secrets = self.__docker.secrets.list(filters=filtre)
 
                 if len(secrets) != 1:
-                    raise ValueError("Le secret_name ne correspond pas a un secret : %s", nom_filtre)
+                    continue  # Tenter prochain secret
+                    #raise ValueError("Le secret_name ne correspond pas a un secret : %s" % nom_filtre)
 
                 try:
                     secret = secrets[0]
@@ -717,6 +722,8 @@ class GestionnaireModulesDocker:
 
                 except KeyError:
                     continue
+
+        raise ValueError("Aucun secrets %s ne correspond a une config" % str(secret_names))
 
     def __mapping(self, valeur: str):
         for cle, valeur_mappee in self.__mappings.items():

@@ -108,8 +108,11 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             service_monitor = self.service_monitor
             if service_monitor.est_verouille:
                 # S'assurer que la commande est correctement signee
-                connexion_middleware = service_monitor.connexion_middleware
-                verificateur_transactions = connexion_middleware.verificateur_transactions
+                try:
+                    connexion_middleware = service_monitor.connexion_middleware
+                    verificateur_transactions = connexion_middleware.verificateur_transactions
+                except AttributeError:
+                    verificateur_transactions = service_monitor.verificateur_transactions
 
                 cert = verificateur_transactions.verifier(request_data)
 
