@@ -105,9 +105,12 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             return
 
         try:
-            if self.service_monitor.est_verouille:
+            service_monitor = self.service_monitor
+            if service_monitor.est_verouille:
                 # S'assurer que la commande est correctement signee
-                verificateur_transactions = self.service_monitor.verificateur_transactions
+                connexion_middleware = service_monitor.connexion_middleware
+                verificateur_transactions = connexion_middleware.verificateur_transactions
+
                 cert = verificateur_transactions.verifier(request_data)
 
                 # S'assurer que le certificat est au moins de niveau protege ou de type navigateur
