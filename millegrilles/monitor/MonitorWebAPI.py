@@ -30,7 +30,9 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         path_supportes = [
-            '/installation/api/installer'
+            '/installation/api/installer',
+            '/installation/api/configurerMQ',
+            '/installation/api/configurerDomaine',
         ]
         if self.path in path_supportes:
             self.send_response(HTTPStatus.OK)
@@ -108,12 +110,14 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                 verificateur_transactions = self.service_monitor.verificateur_transactions
                 cert = verificateur_transactions.verifier(request_data)
 
-                # S'assurer que le certificat est au moins de niveau protege
-                if not any([s in ['3.protege', '4.secure'] for s in cert.get_exchanges]):
+                # S'assurer que le certificat est au moins de niveau protege ou de type navigateur
+                if 'navigateur' not in cert.get_roles and not any([s in ['3.protege', '4.secure'] for s in cert.get_exchanges]):
                     return self.repondre_json({'ok': False, 'message': 'Certificat non autorise'}, 401)
 
         except (AttributeError, KeyError):
             # Non autorise, erreur dans la validation de la commande/signature
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                self.__logger.exception("Erreur traitement commande")
             self.repondre_json({'ok': False}, 401)
         else:
             if path_split[3] == 'configurerDomaine':

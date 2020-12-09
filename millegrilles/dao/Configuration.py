@@ -13,7 +13,7 @@ from cryptography import x509
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles.SecuritePKI import SignateurTransaction
+from millegrilles.SecuritePKI import SignateurTransaction, VerificateurTransaction, VerificateurCertificats
 
 
 class TransactionConfiguration:
@@ -452,6 +452,8 @@ class ContexteRessourcesMilleGrilles:
 
         self._email_dao = None
         self._signateur_transactions = None
+        self._verificateur_certificats = None
+        self._verificateur_transactions = None
         self._generateur_transactions = None
 
         self.validation_workdir_tmp = None
@@ -477,6 +479,13 @@ class ContexteRessourcesMilleGrilles:
             self._message_dao = PikaDAO(self._configuration)
             self._signateur_transactions = SignateurTransaction(self)
             self._signateur_transactions.initialiser()
+
+            # Preparer les certificats, validateurs
+            self._verificateur_transactions = VerificateurTransaction(self)
+            self._verificateur_transactions.initialiser()
+            self._verificateur_certificats = VerificateurCertificats(self)
+            self._verificateur_certificats.initialiser()
+
             if connecter:
                 self._message_dao.connecter()
 
@@ -523,5 +532,14 @@ class ContexteRessourcesMilleGrilles:
         return self._signateur_transactions
 
     @property
+    def verificateur_transaction(self) -> VerificateurTransaction:
+        return self._verificateur_transactions
+
+    @property
+    def verificateur_certificats(self) -> VerificateurCertificats:
+        return self._verificateur_certificats
+
+    @property
     def idmg(self) -> str:
         return self._configuration.idmg
+

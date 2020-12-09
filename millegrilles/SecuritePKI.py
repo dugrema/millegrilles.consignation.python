@@ -899,7 +899,7 @@ class VerificateurCertificats(UtilCertificats):
             # Verifier si le certificat est deja charge
             enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
 
-            if enveloppe is None:
+            if enveloppe is None and self._contexte.document_dao is not None:
                 collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
                 document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint})
                 if document_cert is not None:

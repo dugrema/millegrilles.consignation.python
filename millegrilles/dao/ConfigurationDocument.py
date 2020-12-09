@@ -2,7 +2,6 @@
 
 from typing import cast
 
-from millegrilles.SecuritePKI import VerificateurTransaction, VerificateurCertificats
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.DocumentDAO import MongoDAO
 
@@ -22,9 +21,6 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
         super().__init__(configuration, message_dao, additionals)
         self._document_dao: MongoDAO = cast(MongoDAO, document_dao)
 
-        self._verificateur_certificats = None
-        self._verificateur_transactions = None
-
     def initialiser(self, init_message=True, init_document=True, connecter=True):
         """
         Initialise/reinitialise le contexte et connecte les DAOs.
@@ -39,12 +35,6 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
 
         if init_document:
             self._document_dao = MongoDAO(self._configuration)
-            self._verificateur_transactions = VerificateurTransaction(self)
-            self._verificateur_certificats = VerificateurCertificats(self)
-
-            # Preparer les certificats, validateurs
-            self._verificateur_transactions.initialiser()
-            self._verificateur_certificats.initialiser()
 
             if connecter:
                 self._document_dao.connecter()
@@ -76,12 +66,3 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
     @document_dao.setter
     def document_dao(self, document_dao):
         self._document_dao = document_dao
-
-    @property
-    def verificateur_transaction(self) -> VerificateurTransaction:
-        return self._verificateur_transactions
-
-    @property
-    def verificateur_certificats(self) -> VerificateurCertificats:
-        return self._verificateur_certificats
-
