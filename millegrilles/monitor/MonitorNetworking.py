@@ -123,10 +123,18 @@ proxy_pass $upstream_vitrine;
         resolver = """
 resolver 127.0.0.11 valid=30s;
         """
-        with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
-            fichier.write(resolver)
 
-        ssl_certs_content = """
+        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
+            # Pas de certificat client SSL pour noeud public
+            ssl_certs_content = """
+ssl_certificate       /run/secrets/webcert.pem;
+ssl_certificate_key   /run/secrets/webkey.pem;
+ssl_stapling          on;
+ssl_stapling_verify   on;
+            """
+        else:
+            # Mode prive ou protege - on ajoute les certs SSL client en option
+            ssl_certs_content = """
 ssl_certificate       /run/secrets/webcert.pem;
 ssl_certificate_key   /run/secrets/webkey.pem;
 ssl_stapling          on;
@@ -135,9 +143,7 @@ ssl_stapling_verify   on;
 ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
 ssl_verify_client      optional;
 ssl_verify_depth       1;
-        """
-        with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
-            fichier.write(ssl_certs_content)
+            """
 
         cache_content = """
 # Configuration du cache NGINX pour les fichiers
@@ -148,8 +154,6 @@ proxy_cache_path /cache
                  inactive=4320m
                  use_temp_path=off;
         """
-        with open(path.join(self.__repertoire_modules, 'cache.conf.include'), 'w') as fichier:
-            fichier.write(cache_content)
 
         if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
             # Noeud public, rediriger vers vitrine
@@ -160,6 +164,14 @@ proxy_cache_path /cache
         else:
             # Nouvelle installation, defaut vers installeur
             redirect_defaut = 'installation'
+
+        # Sauvegarder les fichiers de configuration prets
+        with open(path.join(self.__repertoire_modules, 'ssl_certs.conf.include'), 'w') as fichier:
+            fichier.write(ssl_certs_content)
+        with open(path.join(self.__repertoire_modules, 'resolver.conf'), 'w') as fichier:
+            fichier.write(resolver)
+        with open(path.join(self.__repertoire_modules, 'cache.conf.include'), 'w') as fichier:
+            fichier.write(cache_content)
 
         # Redirection temporaire (307) vers le site approprie
         location_redirect_installation = """
@@ -180,7 +192,26 @@ location /vitrine/collections {
 }
         """
 
-        location_fichiers = """
+        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
+            location_fichiers = """
+location /fichiers {
+  proxy_cache       cache_fichiers;
+  proxy_cache_lock  on;
+  proxy_cache_background_update on;
+  proxy_cache_use_stale error timeout updating
+                        http_500 http_502 http_503 http_504;
+
+  proxy_headers_hash_bucket_size 64;
+
+  set $upstream_fichiers https://fichiers:443;
+  proxy_pass $upstream_fichiers;
+
+  include /etc/nginx/conf.d/auth_public.include;
+  include /etc/nginx/conf.d/component_base.include;
+}
+            """
+        else:
+            location_fichiers = """
 location /fichiers {
   proxy_cache       cache_fichiers;
   proxy_cache_lock  on;
@@ -204,7 +235,7 @@ location /fichiers {
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
 }
-        """
+            """
 
         location_public_component = """
 location %s {
@@ -251,7 +282,8 @@ location /certs {
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
-        locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
+        if self.__service_monitor.securite != Constantes.SECURITE_PUBLIC:
+            locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
 
         locations_content = '\n'.join(locations_list)
