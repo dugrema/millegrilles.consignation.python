@@ -473,6 +473,7 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
                 'securite': 1,
                 'fqdn_detecte': 1,
                 'ip_detectee': 1,
+                'domaine': 1,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
             }
 
