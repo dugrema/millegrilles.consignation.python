@@ -37,7 +37,7 @@ class GestionnaireWeb:
         if self.__prochain_entretien < now:
             self.__prochain_entretien = now + self.__intervalle_entretien
 
-            if self.__service_monitor.securite != Constantes.SECURITE_PROTEGE:
+            if self.__service_monitor.securite is not None and self.__service_monitor.securite != Constantes.SECURITE_PROTEGE:
                 try:
                     config_mq = self.__service_monitor.get_info_connexion_mq(nowait=True)
                     hostname = config_mq['MQ_HOST']
