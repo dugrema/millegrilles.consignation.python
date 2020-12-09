@@ -37,6 +37,14 @@ class GestionnaireWeb:
         if self.__prochain_entretien < now:
             self.__prochain_entretien = now + self.__intervalle_entretien
 
+            if self.__service_monitor.securite != Constantes.SECURITE_PROTEGE:
+                try:
+                    config_mq = self.__service_monitor.get_info_connexion_mq()
+                    hostname = config_mq['MQ_HOST']
+                    self.__maj_proxypass_fichiers(hostname)
+                except AttributeError:
+                    pass
+
             try:
                 if not self.__service_monitor.is_dev_mode:
                     # S'assurer d'utiliser les certificats les plus recents avec NGINX
@@ -62,6 +70,27 @@ class GestionnaireWeb:
                 os.makedirs(rep, mode=0o775)
             except FileExistsError:
                 self.__logger.debug("Repertoire %s existe, ok" % self.__repertoire_modules)
+
+    def __maj_proxypass_fichiers(self, hostname: str = 'fichiers', port: str = '443'):
+        """
+        Compare et met a jour le fichiers proxypass_fichiers au besoin. Redemarre nginx s'il y a un changement.
+        :param hostname:
+        :param port:
+        :return:
+        """
+        with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'r') as fichier:
+            contenu_courant = fichier.read()
+
+        config_proxypass = 'https://%s:%s' % (hostname, port)
+        if config_proxypass not in contenu_courant:
+            self.__logger.info("Reconfigurer proxypass_fichiers avec %s" % config_proxypass)
+            configuration = """
+set $upstream_fichiers %s; 
+proxy_pass $upstream_fichiers;
+            """ % config_proxypass
+            with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'w') as fichier:
+                fichier.write(configuration)
+            self.redemarrer_nginx()
 
     def __generer_fichiers_configuration(self, mode_installe=False):
         """
