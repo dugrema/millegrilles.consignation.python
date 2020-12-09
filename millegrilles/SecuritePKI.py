@@ -18,7 +18,7 @@ from certvalidator.errors import PathValidationError, PathBuildingError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
-from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu
+from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, ExceptionConnectionFermee
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from millegrilles.util.IdmgUtil import IdmgUtil
 from millegrilles.config.Autorisations import autorisations_idmg
@@ -756,6 +756,8 @@ class VerificateurTransaction(UtilCertificats):
                 except AutorisationConditionnelleDomaine as acd:
                     self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
                     raise acd
+                except ExceptionConnectionFermee:
+                    pass  # Ok, on peut travailler hors ligne
 
             else:
                 # Verifier cas speciaux
