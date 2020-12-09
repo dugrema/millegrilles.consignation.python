@@ -212,7 +212,6 @@ location /fichiers {
 
   include /etc/nginx/conf.d/modules/proxypass_fichiers.include;
 
-  include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
 }
             """
