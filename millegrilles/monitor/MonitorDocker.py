@@ -20,6 +20,7 @@ from millegrilles.monitor import MonitorConstantes
 from millegrilles.monitor.MonitorConstantes import ImageNonTrouvee, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.monitor.MonitorConstantes import GenerationCertificatNonSupporteeException
 
+
 class GestionnaireModulesDocker:
 
     def __init__(self,
@@ -639,6 +640,10 @@ class GestionnaireModulesDocker:
                 if conf.name == config_name:
                     conf.remove()
 
+        labels_config = {'idmg': self.__idmg}
+        if labels is not None:
+            labels_config.update(labels)
+
         if isinstance(data, dict):
             data_string = json.dumps(data).encode('utf-8')
         elif isinstance(data, str):
@@ -647,7 +652,7 @@ class GestionnaireModulesDocker:
             data_string = data
         else:
             raise ValueError("Type data non supporte")
-        configs.create(name=config_name, data=data_string, labels=labels)
+        configs.create(name=config_name, data=data_string, labels=labels_config)
 
     def supprimer_config(self, config_name):
         filtre = {'name': config_name}

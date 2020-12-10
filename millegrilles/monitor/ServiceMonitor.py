@@ -819,6 +819,27 @@ class ServiceMonitor:
             self.__logger.info("MAJ connexion MQ avec %s" + str(liste_valeurs))
             inst_service.update(env=liste_valeurs)
 
+    def get_certificat_acme(self, domaine_noeud: str = None):
+
+        if domaine_noeud is None:
+            info_monitor = self.get_info_monitor()
+            domaine_noeud = info_monitor['domaine']
+
+        gestionnaire_docker = self._gestionnaire_docker
+        acme_container_id = gestionnaire_docker.trouver_container_pour_service('acme')
+        cert_bytes = gestionnaire_docker.get_archive_bytes(acme_container_id, '/acme.sh/%s' % domaine_noeud)
+        io_buffer = io.BytesIO(cert_bytes)
+        with tarfile.open(fileobj=io_buffer) as tar_content:
+            member_key = tar_content.getmember('%s/%s.key' % (domaine_noeud, domaine_noeud))
+            key_bytes = tar_content.extractfile(member_key).read()
+            member_fullchain = tar_content.getmember('%s/fullchain.cer' % domaine_noeud)
+            fullchain_bytes = tar_content.extractfile(member_fullchain).read()
+
+        return {
+            'cle': key_bytes,
+            'chain': fullchain_bytes,
+        }
+
 
 class ServiceMonitorPrincipal(ServiceMonitor):
     """

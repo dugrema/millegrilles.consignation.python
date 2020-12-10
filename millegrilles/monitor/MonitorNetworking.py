@@ -3,9 +3,12 @@ import os
 import datetime
 
 from os import path, environ
+from base64 import b64decode
 # from typing import Union
 
 from millegrilles import Constantes
+from millegrilles.SecuritePKI import EnveloppeCertificat
+from millegrilles.monitor import MonitorConstantes
 # from millegrilles.monitor.ServiceMonitor import ServiceMonitor, ServiceMonitorDependant, ServiceMonitorPrincipal
 
 
@@ -54,12 +57,38 @@ class GestionnaireWeb:
                         self.__logger.exception("Erreur configuration proxypass_fichiers")
 
             try:
-                if not self.__service_monitor.is_dev_mode:
-                    # S'assurer d'utiliser les certificats les plus recents avec NGINX
-                    self.redeployer_nginx()
+                # if not self.__service_monitor.is_dev_mode:
+                if True:
+
+                    try:
+                        info_acme = self.__service_monitor.get_certificat_acme()
+                    except KeyError:
+                        pass
+                    else:
+                        cert_acme_bytes = info_acme['chain']
+                        key_bytes = info_acme['cle']
+                        enveloppe_acme = EnveloppeCertificat(certificat_pem=cert_acme_bytes)
+
+                        # Comparer certificat avec le plus recent dans docker
+                        gestionnaire_docker = self.__service_monitor.gestionnaire_docker
+                        cert_actuel_docker = gestionnaire_docker.charger_config_recente('pki.web.cert')
+                        cert_actuel = b64decode(cert_actuel_docker['config'].attrs['Spec']['Data'].encode('utf-8'))
+                        enveloppe_actuel = EnveloppeCertificat(certificat_pem=cert_actuel)
+
+                        # Comparer les deux certificats via fingerprints
+                        if enveloppe_acme.fingerprint_sha256_b64 != enveloppe_actuel.fingerprint_sha256_b64:
+                            self.__logger.info("Ajouter un nouveau certificat ACME a docker")
+                            date_courante = datetime.datetime.utcnow().strftime(MonitorConstantes.DOCKER_LABEL_TIME)
+                            gestionnaire_docker.sauvegarder_config('pki.web.cert.%s' % date_courante, cert_acme_bytes)
+                            gestionnaire_docker.sauvegarder_secret('pki.web.key.%s' % date_courante, key_bytes)
+
+                        # S'assurer d'utiliser les certificats les plus recents avec NGINX
+                        gestionnaire_docker.maj_services_avec_certificat('web')
 
             except IndexError:
                 self.__logger.info("entretien web : NGINX n'est pas demarre")
+            except Exception:
+                self.__logger.exception("Erreur entretien certificats web")
 
     def regenerer_configuration(self, mode_installe):
         self.__generer_fichiers_configuration(mode_installe=mode_installe)
