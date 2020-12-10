@@ -15,7 +15,7 @@ class TestConsignationFichiers(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.__fuuid = '3a4ad9e0-3af3-11eb-8020-63f97e3a189c'
+        self.__fuuid = '0617e5e0-3b3f-11eb-a514-01471259bf93'
         self.event_termine = Event()
 
     def commande_restaurerGrosFichiers(self):
@@ -30,6 +30,7 @@ class TestConsignationFichiers(DomaineTest):
         params = {
             'permission': permission,
             'fuuid': self.__fuuid,
+            'resolution': '480p',
         }
         domaine = 'commande.fichiers.transcoderVideo'
         self.generateur.transmettre_commande(

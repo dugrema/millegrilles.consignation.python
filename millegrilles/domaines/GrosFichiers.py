@@ -3200,6 +3200,12 @@ class ProcessusTransactionAssocierPreview(ProcessusGrosFichiers):
     def initiale(self):
         transaction = self.charger_transaction()
         self.controleur.gestionnaire.associer_preview(transaction)
+
+        try:
+            self.evenement_maj_fichier_public(transaction['uuid'])
+        except Exception:
+            self.__logger.exception("Erreur verification collection publique")
+
         self.set_etape_suivante()
 
 
@@ -3467,5 +3473,11 @@ class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
 
     def initiale(self):
         transaction = self.transaction
+
         self.controleur.gestionnaire.associer_video_transcode(transaction)
+        try:
+            self.evenement_maj_fichier_public(transaction['uuid'])
+        except Exception:
+            self.__logger.exception("Erreur verification collection publique")
+
         self.set_etape_suivante()  # Termine
