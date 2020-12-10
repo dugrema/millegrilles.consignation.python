@@ -9,7 +9,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
-from threading import Event
+from threading import Event, Thread
 
 
 class DomaineTest(BaseCallback):
@@ -23,6 +23,7 @@ class DomaineTest(BaseCallback):
         self.generateur = GenerateurTransaction(self.contexte)
         self.channel = None
         self.event_recu = Event()
+        self.messages = list()
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -34,7 +35,10 @@ class DomaineTest(BaseCallback):
         print("Queue: %s" % str(self.queue_name))
 
         self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        self.executer()
+
+        thread = Thread(name="executer", target=self.executer)
+        thread.start()
+        # self.executer()
 
     def run_ioloop(self):
         self.contexte.message_dao.run_ioloop()
@@ -43,12 +47,15 @@ class DomaineTest(BaseCallback):
         self.contexte.message_dao.deconnecter()
 
     def traiter_message(self, ch, method, properties, body):
+        contenu = json.loads(body.decode('utf-8'))
+        self.messages.append(contenu)
         print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(json.dumps(json.loads(body.decode('utf-8')), indent=4))
+        print(json.dumps(contenu, indent=4))
         print("Channel : " + str(ch))
         print("Method : " + str(method))
         print("Properties : " + str(properties))
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
+        self.event_recu.set()
 
     def executer(self):
         raise NotImplementedError()

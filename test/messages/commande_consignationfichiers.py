@@ -1,62 +1,22 @@
 # Script de test pour transmettre message de transaction
-import datetime
-import time
-import json
-import requests
-import tarfile
 import logging
-import sys
 
-from io import BufferedReader, RawIOBase
+from uuid import uuid4
+from threading import Event
 
-from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.dao.MessageDAO import BaseCallback
-from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
+from millegrilles.util.BaseTestMessages import DomaineTest
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesDomaines, ConstantesBackup
-from millegrilles.domaines.Principale import ConstantesPrincipale
-from threading import Thread, Event
-from millegrilles.util.BackupModule import ArchivesBackupParser
-
-contexte = ContexteRessourcesMilleGrilles()
-contexte.initialiser()
+from millegrilles.Constantes import ConstantesGrosFichiers
 
 
-class MessagesSample(BaseCallback):
+class TestConsignationFichiers(DomaineTest):
 
     def __init__(self):
-        super().__init__(contexte)
-        self.contexte.message_dao.register_channel_listener(self)
-        self.generateur = GenerateurTransaction(self.contexte)
+        super().__init__()
+        self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.channel = None
-        self.event_recu = Event()
-
-    def on_channel_open(self, channel):
-        # Enregistrer la reply-to queue
-        self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open_local)
-
-    def queue_open_local(self, queue):
-        self.queue_name = queue.method.queue
-        print("Queue: %s" % str(self.queue_name))
-
-        self.channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
-        self.executer()
-
-    def run_ioloop(self):
-        self.contexte.message_dao.run_ioloop()
-
-    def deconnecter(self):
-        self.contexte.message_dao.deconnecter()
-
-    def traiter_message(self, ch, method, properties, body):
-        print("Message recu, correlationId: %s" % properties.correlation_id)
-        print(json.dumps(json.loads(body.decode('utf-8')), indent=4))
-        print("Channel : " + str(ch))
-        print("Method : " + str(method))
-        print("Properties : " + str(properties))
-        print("Channel virtual host : " + str(ch.connection.params.virtual_host))
+        self.__fuuid = '3a4ad9e0-3af3-11eb-8020-63f97e3a189c'
+        self.event_termine = Event()
 
     def commande_restaurerGrosFichiers(self):
         params = {
@@ -65,17 +25,66 @@ class MessagesSample(BaseCallback):
         self.generateur.transmettre_commande(
             params, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
 
-    def executer(self):
-        sample.commande_restaurerGrosFichiers()
+    def commande_transcoderVideo(self):
+        permission = self.preparer_permission_dechiffrage_fichier(self.__fuuid)
+        params = {
+            'permission': permission,
+            'fuuid': self.__fuuid,
+        }
+        domaine = 'commande.fichiers.transcoderVideo'
+        self.generateur.transmettre_commande(
+            params, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
 
+    def executer(self):
+        self.__logger.debug("Executer")
+        # self.commande_restaurerGrosFichiers()
+        self.commande_transcoderVideo()
+
+    # def demander_permission(self, fuuid):
+    #     requete_cert_maitredescles = {
+    #         'fuuid': fuuid,
+    #         'permission': self.preparer_permission_dechiffrage_fichier(self.__fuuid)
+    #     }
+    #
+    #     enveloppe_requete = self.generateur.transmettre_commande(
+    #         requete_cert_maitredescles,
+    #         'fichiers.',
+    #         correlation_id='abcd-1234',
+    #         reply_to=self.queue_name
+    #     )
+    #
+    #     print("Envoi requete: %s" % enveloppe_requete)
+    #     self.event_recu.wait(3)
+    #     if self.event_recu.is_set():
+    #         self.event_recu.clear()
+    #         return self.messages.pop()
+    #
+    #     raise Exception("Permission non recue")
+
+    def preparer_permission_dechiffrage_fichier(self, fuuid):
+        permission = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
+        }
+        # Signer
+        generateur_transactions = self._contexte.generateur_transactions
+        commande_permission = generateur_transactions.preparer_enveloppe(
+            permission,
+            '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+                      Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
+        )
+
+        return commande_permission
 
 # --- MAIN ---
-logging.basicConfig()
-logging.getLogger('millegrilles').setLevel(logging.DEBUG)
-sample = MessagesSample()
+if __name__ == '__main__':
+    logging.basicConfig()
+    logging.getLogger('millegrilles').setLevel(logging.DEBUG)
+    logging.getLogger('TestConsignationFichiers').setLevel(logging.DEBUG)
+    test = TestConsignationFichiers()
+    # TEST
 
-# TEST
-
-# FIN TEST
-sample.event_recu.wait(240)
-sample.deconnecter()
+    # FIN TEST
+    test.event_termine.wait(10)
+    test.deconnecter()

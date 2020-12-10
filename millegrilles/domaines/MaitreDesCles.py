@@ -560,7 +560,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
             liste_fuuid = [evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]]
             try:
-                liste_fuuid.append(evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW])
+                liste_fuuid.extend(evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_ASSOCIES])
             except KeyError:
                 pass
 

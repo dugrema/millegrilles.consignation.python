@@ -60,6 +60,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_contenu_collection(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID:
             reponse = {'resultats': self.gestionnaire.get_documents_par_uuid(message_dict)}
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_DOCUMENT_PAR_FUUID:
+            reponse = self.gestionnaire.get_document_par_fuuid(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
             reponse = self.gestionnaire.generer_permission_dechiffrage_fichier_public(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTIONS_PUBLIQUES:
@@ -268,8 +270,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierPreview"
         # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_THUMBNAIL:
         #     processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionAssocierThumbnail"
-        # elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
-        #     processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
+        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_VIDEO_TRANSCODE:
+            processus = "millegrilles_domaines_GrosFichiers:ProcessusAssocierVideoTranscode"
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLE_COLLECTION:
             processus = "millegrilles_domaines_GrosFichiers:ProcessusTransactionNouvelleCollection"
@@ -645,6 +647,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         documents = self.mapper_fichier_version(curseur_documents)
 
         return documents
+
+    def get_document_par_fuuid(self, params: dict):
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        fuuid = params[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        filtre = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS + '.' + fuuid: {'$exists': True},
+        }
+
+        document_fuuid = collection_domaine.find_one(filtre)
+        if document_fuuid is not None:
+            # Aplatir liste de versions, conserver seulement celle qui est demandee
+            document_fuuid['versions'] = {fuuid: document_fuuid['versions'][fuuid]}
+            return document_fuuid
+
+        return {'ok': False, 'fuuid': fuuid, 'err': 'Non trouve'}
 
     def get_torrent_par_collection(self, uuid_collection):
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
@@ -1407,16 +1424,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         }
 
     def associer_video_transcode(self, transaction):
-        prefixe_version = '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, transaction['fuuid'])
+        uuid_fichier = transaction['uuid']
+        fuuid_fichier = transaction['fuuid']
+        resolution = transaction['height'] + 'p'
+        info_video = {
+            'fuuid': transaction['fuuidVideo'],
+            'mimetype': transaction['mimetypeVideo'],
+            'hachage': transaction['hachage'],
+            'taille': transaction['tailleFichier'],
+        }
+
         set_ops = {
-            '%s.%s' % (prefixe_version, ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P): transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_480P],
-            '%s.%s' % (prefixe_version, ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P): transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_480P],
-            '%s.%s' % (prefixe_version, ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA_VIDEO): transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA_VIDEO],
+            'versions.%s.video.%s' % (fuuid_fichier, resolution): info_video,
         }
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-            prefixe_version: {'$exists': True},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
         }
 
         ops = {
@@ -1426,6 +1450,17 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
         document_fichier = collection_domaine.find_one_and_update(filtre, ops)
+
+        # MAJ document medias, retirer la demande de video (complete)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+        }
+        unset_ops = {
+            ConstantesGrosFichiers.DOCUMENT_VIDEO + '.' + fuuid_fichier: True
+        }
+        ops = {'$unset': unset_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
+        collection_domaine.update_one(filtre, ops)
+
         return document_fichier
 
     def enregistrer_image_info(self, image_info):
@@ -1664,6 +1699,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC] = uuid_fichier
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER] = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
 
+        fuuid_associes = list()
+
         try:
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = info_version[
@@ -1674,8 +1711,21 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW] = info_version[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
+
+            fuuid_associes.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW])
         except (KeyError, TypeError):
             pass
+
+        # Ajouter permissions fichiers attaches/directement lies (video)
+        try:
+            video = info_version['video']
+            for value_dict in video.values():
+                fuuid_associes.append(value_dict['fuuid'])
+        except (KeyError, TypeError):
+            pass
+
+        if len(fuuid_associes) > 0:
+            permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_ASSOCIES] = fuuid_associes
 
         # Signer
         generateur_transactions = self._contexte.generateur_transactions
@@ -1865,7 +1915,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection_domaine.update_one(
             {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_VITRINE_ALBUMS}, ops)
 
-    def ajouter_conversion_media(self, info: dict):
+    def ajouter_conversion_preview(self, info: dict):
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
@@ -1875,6 +1925,23 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         info_copy['derniere_activite'] = datetime.datetime.utcnow()
         set_ops = {
             ConstantesGrosFichiers.DOCUMENT_PREVIEWS + '.' + info['fuuid']: info_copy
+        }
+
+        ops = {'$set': set_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
+
+        collection_domaine = self.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
+        collection_domaine.update_one(filtre, ops)
+
+    def ajouter_conversion_video(self, info: dict):
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_CONVERSION_MEDIA
+        }
+
+        info_copy = info.copy()
+        info_copy['derniere_activite'] = datetime.datetime.utcnow()
+        set_ops = {
+            ConstantesGrosFichiers.DOCUMENT_VIDEO + '.' + info['fuuid']: info_copy
         }
 
         ops = {'$set': set_ops, '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}}
@@ -2153,7 +2220,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fuuid = info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
 
         # Sauvegarder demande conversion
-        self.ajouter_conversion_media(info)
+        self.ajouter_conversion_preview(info)
 
         commande_preview = info.copy()
 
@@ -3400,7 +3467,5 @@ class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
 
     def initiale(self):
         transaction = self.transaction
-        document_fichier = self.controleur.gestionnaire.associer_video_transcode(transaction)
-        uuid_fichier = document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC]
-        self.controleur.gestionnaire.maj_fichier_dans_collection(uuid_fichier)
+        self.controleur.gestionnaire.associer_video_transcode(transaction)
         self.set_etape_suivante()  # Termine

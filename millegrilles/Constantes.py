@@ -1103,6 +1103,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_SHA256_480P = "sha256Video480p"
     DOCUMENT_FICHIER_COMMANDE_PERMISSION = 'permission'
     DOCUMENT_FICHIER_FLAG_PREVIEW = 'preview_traite'
+    DOCUMENT_FICHIER_FUUID_ASSOCIES = 'fuuid_associes'
 
     DOCUMENT_FICHIER_FUUID_DECRYPTE = 'fuuid_decrypte'
     DOCUMENT_LISTE_UUIDS = 'uuids_documents'
@@ -1120,6 +1121,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FAVORIS = 'favoris'
     DOCUMENT_UUID_PARENT = 'uuid_parent'
     DOCUMENT_PREVIEWS = 'previews'
+    DOCUMENT_VIDEO = 'video'
     DOCUMENT_TRANSCODAGE = 'transcodage'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
@@ -1183,6 +1185,7 @@ class ConstantesGrosFichiers:
     REQUETE_FAVORIS = '%s.favoris' % DOMAINE_NOM
     REQUETE_CONTENU_COLLECTION = '%s.contenuCollection' % DOMAINE_NOM
     REQUETE_DOCUMENTS_PAR_UUID = '%s.documentsParUuid' % DOMAINE_NOM
+    REQUETE_DOCUMENT_PAR_FUUID = 'documentsParFuuid'
     REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC = 'demandePermissionDechiffragePublic'
     REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
     REQUETE_DETAIL_COLLECTIONS_PUBLIQUES = 'detailCollectionsPubliques'

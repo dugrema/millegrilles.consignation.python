@@ -440,6 +440,20 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name
         )
 
+    def requete_fichier_par_fuuid(self):
+        requete_cert_maitredescles = {
+            'fuuid': '3a4ad9e0-3af3-11eb-8020-63f97e3a189c',
+        }
+        enveloppe_requete = self.generateur.transmettre_requete(
+            requete_cert_maitredescles,
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_DOCUMENT_PAR_FUUID,
+            'abcd-1234',
+            self.queue_name
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -477,7 +491,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_permission_dechiffrage_fichier_public()
         # sample.requete_collections_publiques()
         # sample.requete_detail_collections_publiques()
-        sample.commande_regenerer_previews()
+        # sample.commande_regenerer_previews()
+        sample.requete_fichier_par_fuuid()
 
         pass
 
