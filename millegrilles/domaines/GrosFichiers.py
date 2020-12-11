@@ -96,6 +96,8 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
 
         if action == ConstantesGrosFichiers.COMMANDE_REGENERER_PREVIEWS:
             return self.gestionnaire.regenerer_previews()
+        if action == ConstantesGrosFichiers.COMMANDE_TRANSCODER_VIDEO:
+            return self.gestionnaire.declencher_transcodage_video(message_dict, properties)
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -1702,6 +1704,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         fuuid_associes = list()
 
         try:
+            if info_version is None:
+                info_version = fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE] = info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = info_version[
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL]
@@ -1940,6 +1944,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         info_copy = info.copy()
         info_copy['derniere_activite'] = datetime.datetime.utcnow()
+        # info_copy['progres'] = 0
         set_ops = {
             ConstantesGrosFichiers.DOCUMENT_VIDEO + '.' + info['fuuid']: info_copy
         }
@@ -2237,6 +2242,45 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         #     self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewVideo', commande_preview)
         # elif mimetype == 'image':
         #     self.ajouter_commande_a_transmettre('commande.fichiers.genererPreviewImage', commande_preview)
+
+    def declencher_transcodage_video(self, commande: dict, properties=None):
+        """
+        Declenche le transcodage d'un video.
+        :param commande:
+        :return:
+        """
+
+        fuuid = commande['fuuid']
+        collection_fichiers = self.get_collection()
+
+        # Preparer permission
+        filtre_fichier = {
+            'versions.%s' % fuuid: {'$exists': True},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+        }
+        info_fichier = collection_fichiers.find_one(filtre_fichier)
+        if info_fichier is None:
+            return {'ok': False, 'fuuid': fuuid, 'err': 'Fichier inconnu'}
+
+        info_version = info_fichier['versions'][fuuid]
+
+        permission = self.preparer_permission_dechiffrage_fichier(
+            fuuid, fichier=info_fichier, info_version=info_version)
+
+        # Marquer document media
+        self.ajouter_conversion_video(info_version)
+
+        # Transmettre commande a consignation_fichiers
+        commande = {
+            'permission': permission,
+            'fuuid': fuuid,
+        }
+
+        domaine_action = 'commande.fichiers.transcoderVideo'
+        reply_to = properties.reply_to
+        correlation_id = properties.correlation_id
+        self.generateur_transactions.transmettre_commande(
+            commande, domaine_action, reply_to=reply_to, correlation_id=correlation_id)
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):

@@ -454,6 +454,17 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def commande_transcoder_video(self):
+        requete = {
+            'fuuid': '45342220-3bc6-11eb-9405-f97484a4f21f'
+        }
+        self.generateur.transmettre_commande(
+            requete,
+            'commande.GrosFichiers.' + Constantes.ConstantesGrosFichiers.COMMANDE_TRANSCODER_VIDEO,
+            correlation_id='abcd-1234',
+            reply_to=self.queue_name
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -492,7 +503,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_collections_publiques()
         # sample.requete_detail_collections_publiques()
         # sample.commande_regenerer_previews()
-        sample.requete_fichier_par_fuuid()
+        # sample.requete_fichier_par_fuuid()
+        sample.commande_transcoder_video()
 
         pass
 
