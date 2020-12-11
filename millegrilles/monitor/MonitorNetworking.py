@@ -57,8 +57,7 @@ class GestionnaireWeb:
                         self.__logger.exception("Erreur configuration proxypass_fichiers")
 
             try:
-                # if not self.__service_monitor.is_dev_mode:
-                if True:
+                if not self.__service_monitor.is_dev_mode:
 
                     try:
                         info_acme = self.__service_monitor.get_certificat_acme()
