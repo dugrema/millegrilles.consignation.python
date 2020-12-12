@@ -113,6 +113,7 @@ class GestionnairePublication(GestionnaireDomaineStandard):
             ConstantesPublication.CHAMP_SITE_ID,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION,
             ConstantesPublication.CHAMP_NOM_SITE,
+            ConstantesPublication.CHAMP_LANGUAGES,
         ]
         collection_site = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
         curseur = collection_site.find(filtre, projection=projection)

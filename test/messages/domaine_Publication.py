@@ -76,10 +76,10 @@ class TestPublication(DomaineTest):
     def executer(self):
         self.__logger.debug("Executer")
 
-        # self.requete_liste_sites()
+        self.requete_liste_sites()
         # self.requete_liste_posts()
         # self.requete_config_site()
-        self.requete_sites_pour_noeud()
+        # self.requete_sites_pour_noeud()
         # self.maj_site()
         # self.maj_post()
 

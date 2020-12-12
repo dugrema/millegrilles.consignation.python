@@ -106,11 +106,11 @@ class MessagesSample(BaseCallback):
     def transaction_decrire_fichier(self):
         transaction = {
             "uuid": "41548d46-c12b-41f6-b205-4c0ae7d64c16",
-            "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute.",
+            # "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute.",
             "titre": {'en': 'Name in English', 'fr': 'Nom en francais'},
             "description": {
-                'en': 'Complete description of the file',
-                'fr': 'Description complete du fichier',
+                'en': '<p>Complete description of the file</p>',
+                'fr': '<p>Description complete du fichier</p>',
             }
         }
         enveloppe_val = self.generateur.soumettre_transaction(
@@ -124,12 +124,12 @@ class MessagesSample(BaseCallback):
     def transaction_decrire_collection(self):
         transaction = {
             "uuid": "201e1fb7-66bd-4901-b52a-116c65d7b0d9",
-            "nom_collection": "public",
+            # "nom_collection": "public",
             "commentaires": "J'ai un commentaire. Ye! Pis on en rajoute.",
             "titre": {'en': 'Collection name in English', 'fr': 'Nom de collection en francais'},
             "description": {
-                'en': 'Complete description of the collection',
-                'fr': 'Description complete de la collection',
+                'en': '<p>Complete description of the file</p>',
+                'fr': '<p>Description complete du fichier</p>',
             },
             'securite': '1.public',
         }
