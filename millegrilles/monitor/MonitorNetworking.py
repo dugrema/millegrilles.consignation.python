@@ -270,11 +270,17 @@ location /vitrine/section {
         if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
             location_fichiers = """
 location /fichiers {
+  slice 5m;
   proxy_cache       cache_fichiers;
   proxy_cache_lock  on;
   proxy_cache_background_update on;
   proxy_cache_use_stale error timeout updating
                         http_500 http_502 http_503 http_504;
+
+  proxy_cache_key   $uri$is_args$args$slice_range;
+  proxy_set_header  Range $slice_range;
+  proxy_cache_valid 200 201 206 30d;
+  proxy_cache_valid 401 403 404 500 502 503 504 1m;
 
   proxy_headers_hash_bucket_size 64;
 
@@ -286,11 +292,17 @@ location /fichiers {
         else:
             location_fichiers = """
 location /fichiers {
+  slice 5m;
   proxy_cache       cache_fichiers;
   proxy_cache_lock  on;
   proxy_cache_background_update on;
   proxy_cache_use_stale error timeout updating
                         http_500 http_502 http_503 http_504;
+
+  proxy_cache_key   $uri$is_args$args$slice_range;
+  proxy_set_header  Range $slice_range;
+  proxy_cache_valid 200 201 206 30d;
+  proxy_cache_valid 401 403 404 500 502 503 504 1m;
 
   proxy_headers_hash_bucket_size 64;
 
