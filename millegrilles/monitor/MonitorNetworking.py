@@ -262,6 +262,9 @@ location /vitrine/posts {
 location /vitrine/collections {
   alias /var/opt/millegrilles/nginx/data/vitrine/collections;
 }
+location /vitrine/section {
+  rewrite ^(.*)$ /vitrine/index.html;
+}
         """
 
         if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
