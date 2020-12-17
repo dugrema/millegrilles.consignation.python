@@ -64,13 +64,14 @@ class CipherMsg1Chiffrer(CipherMgs1):
         self.__generer()
         self._ouvrir_cipher()
 
-        self.__start_encrypt()
+        if output_stream:
+            self.start_encrypt()
 
     def __generer(self):
         self._password = secrets.token_bytes(32)  # AES-256 = 32 bytes
         self._iv = secrets.token_bytes(16)
 
-    def __start_encrypt(self):
+    def start_encrypt(self):
         self._context = self._cipher.encryptor()
         self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
 
@@ -162,9 +163,9 @@ class CipherMsg1Dechiffrer(CipherMgs1):
 
     def update(self, data: bytes):
         data = self.__unpadder.update(self._context.update(data))
-        if self.__skip_iv:
-            self.__skip_iv = False
-            data = data[16:]
+        # if self.__skip_iv:
+        #     self.__skip_iv = False
+        #     data = data[16:]
         return data
 
     def finalize(self):
