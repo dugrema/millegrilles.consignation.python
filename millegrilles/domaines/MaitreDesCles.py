@@ -815,7 +815,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
 
             # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
-            role_inclus_permis = any([role in enveloppe_certificat.get_roles for role in roles_permis])
+            roles_rechiffrage = evenement.get('roles_permis') or roles_permis
+            role_inclus_permis = any([role in enveloppe_certificat.get_roles for role in roles_rechiffrage])
         else:
             role_inclus_permis = False
 
@@ -882,7 +883,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
         roles = enveloppe_certificat.get_roles
         if 'domaines' in roles:
-            cert = evenement.get('_certificat_tiers') or evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
+            cert = evenement.get('_certificat_tiers') or evenement.get('certificat_tiers') or evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
 
             enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(cert))
             # self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)

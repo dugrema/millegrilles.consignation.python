@@ -614,8 +614,10 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
                 requete_rechiffrer = {
                     'identificateurs_document': requete['identificateurs_document'],
                     'domaine': 'Topologie',
-                    'certificat': requete['_certificat'],
+                    '_certificat_tiers': requete['_certificat'],
+                    'certificat_tiers': requete['_certificat'],
                 }
+                requete_rechiffrer.update(permission)
                 self.generateur_transactions.transmettre_requete(
                     requete_rechiffrer,
                     domaine_action,
