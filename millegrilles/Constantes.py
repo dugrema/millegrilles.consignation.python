@@ -1741,6 +1741,7 @@ class ConstantesTopologie:
     TRANSACTION_MONITOR = '%s.monitor' % DOMAINE_NOM
     TRANSACTION_AJOUTER_DOMAINE_DYNAMIQUE = '%s.ajouterDomaineDynamique' % DOMAINE_NOM
     TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE = '%s.supprimerDomaineDynamique' % DOMAINE_NOM
+    TRANSACTION_CONFIGURER_CONSIGNATION_WEB = 'configurerConsignationWeb'
 
     EVENEMENT_PRESENCE_DOMAINE = 'evenement.presence.domaine'
     EVENEMENT_PRESENCE_MONITOR = 'evenement.presence.monitor'
@@ -1750,7 +1751,20 @@ class ConstantesTopologie:
     REQUETE_INFO_DOMAINE = '%s.infoDomaine' % DOMAINE_NOM
     REQUETE_INFO_NOEUD = '%s.infoNoeud' % DOMAINE_NOM
     REQUETE_LISTE_APPLICATIONS_DEPLOYEES = '%s.listeApplicationsDeployees' % DOMAINE_NOM
+    REQUETE_PERMISSION = 'permissionDechiffrage'
 
+    CHAMP_NOEUDID = 'noeud_id'
+    CHAMP_CONSIGNATION_WEB = 'consignation_web'
+    CHAMP_CONSIGNATION_WEB_MODE = 'modeConsignation'
+    CHAMP_AWSS3_CREDENTIALS_ACCESSID = 'credentialsAccessKeyId'
+    CHAMP_AWSS3_CREDENTIALS_ACCESSKEY = 'credentialsSecretAccessKey'
+    CHAMP_AWSS3_CREDENTIALS_REGION = 'credentialsRegion'
+    CHAMP_AWSS3_BUCKET_REGION = 'bucketRegion'
+    CHAMP_AWSS3_BUCKET_NAME = 'bucketName'
+    CHAMP_AWSS3_BUCKET_DIRFICHIER = 'bucketDirfichier'
+
+    VALEUR_AWSS3_CONSIGNATION_WEB_NGINX = 'cachenginx'
+    VALEUR_AWSS3_CONSIGNATION_WEB_AWSS3 = 'awss3'
 
 class ConstantesPublication:
 

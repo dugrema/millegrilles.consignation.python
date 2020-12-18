@@ -17,6 +17,8 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
+
         if routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_DOMAINES:
             reponse = {'resultats': self.gestionnaire.get_liste_domaines()}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_LISTE_NOEUDS:
@@ -27,11 +29,14 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_liste_applications_deployees(message_dict)}
         elif routing_key == 'requete.' + ConstantesTopologie.REQUETE_INFO_NOEUD:
             reponse = self.gestionnaire.get_info_noeud(message_dict)
+        elif action == ConstantesTopologie.REQUETE_PERMISSION:
+            reponse = self.gestionnaire.preparer_permission_dechiffrage_secret(message_dict, properties)
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
             return
 
-        self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+        if reponse is not None:
+            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
 
 
 class TraitementCommandeTopologie(TraitementCommandesProtegees):
@@ -231,6 +236,8 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         return ConstantesTopologie.COLLECTION_DOCUMENTS_NOM
 
     def identifier_processus(self, domaine_transaction):
+        action = domaine_transaction.split('.')[-1]
+
         if domaine_transaction == ConstantesTopologie.TRANSACTION_DOMAINE:
             processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterDomaine"
         elif domaine_transaction == ConstantesTopologie.TRANSACTION_MONITOR:
@@ -239,6 +246,8 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_Topologie:ProcessusTransactionAjouterDomaineDynamique"
         elif domaine_transaction == ConstantesTopologie.TRANSACTION_SUPPRIMER_DOMAINE_DYNAMIQUE:
             processus = "millegrilles_domaines_Topologie:ProcessusTransactionSupprimerDomaineDynamique"
+        elif action == ConstantesTopologie.TRANSACTION_CONFIGURER_CONSIGNATION_WEB:
+            processus = "millegrilles_domaines_Topologie:ProcessusTransactionConfigurerConsignationWeb"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -437,6 +446,47 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
         collection.update_one(filtre, ops)
 
+    def configurer_consignation_web(self, transaction: dict):
+        """
+        Met a jour la configuration de la consignation web (nginx) du noeud
+        :param transaction:
+        :return:
+        """
+        noeud_id = transaction[ConstantesTopologie.CHAMP_NOEUDID]
+        filtre = {
+            ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+        }
+
+        champs = [
+            ConstantesTopologie.CHAMP_CONSIGNATION_WEB_MODE,
+            ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSID,
+            ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
+            ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_REGION,
+            ConstantesTopologie.CHAMP_AWSS3_BUCKET_REGION,
+            ConstantesTopologie.CHAMP_AWSS3_BUCKET_NAME,
+            ConstantesTopologie.CHAMP_AWSS3_BUCKET_DIRFICHIER,
+        ]
+        set_ops = {}
+        for champ in champs:
+            try:
+                champ_set = ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + champ
+                set_ops[champ_set] = transaction[champ]
+            except KeyError:
+                pass  # OK, champ non fourni
+
+        if len(set_ops) == 0:
+            raise Exception("Aucun champ recu pour configurer_consignation_web")
+
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+
+        ops = {
+            '$set': set_ops,
+        }
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur mise a jour configuration consignation web, noeud inexistant : %s" % noeud_id)
+
     def get_liste_domaines(self):
         collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
         filtre = {
@@ -550,6 +600,32 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
 
         return noeud
 
+    def preparer_permission_dechiffrage_secret(self, requete: dict = None, properties=None):
+        permission = {
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['domaines', 'fichiers'],
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
+        }
+
+        # Verifier si on "bounce" la requete vers le maitre des cles pour reponse via tiers
+        if requete is not None and requete.get('_certificat') is not None:
+            if requete.get('identificateurs_document') is not None:
+                # Generer une commande de dechiffrage vers le maitre des cles
+                domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT
+                requete_rechiffrer = {
+                    'identificateurs_document': requete['identificateurs_document'],
+                    'domaine': 'Topologie',
+                    'certificat': requete['_certificat'],
+                }
+                self.generateur_transactions.transmettre_requete(
+                    requete_rechiffrer,
+                    domaine_action,
+                    reply_to=properties.reply_to,
+                    correlation_id=properties.correlation_id,
+                )
+                return
+
+        return permission
+
 
 class ProcessusTopologie(MGProcessusTransaction):
 
@@ -626,3 +702,21 @@ class ProcessusTransactionSupprimerDomaineDynamique(ProcessusTopologie):
         self._controleur.gestionnaire.supprimer_domaine_dynamique(transaction)
 
         self.set_etape_suivante()  # Terminer
+
+
+class ProcessusTransactionConfigurerConsignationWeb(ProcessusTopologie):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        transaction = self.charger_transaction()
+
+        try:
+            self._controleur.gestionnaire.configurer_consignation_web(transaction)
+        except Exception as e:
+            self.__logger.exception("Erreur traitement ProcessusTransactionConfigurerConsignationWeb")
+            return {'err': True, 'message': str(e)}
+        finally:
+            self.set_etape_suivante()  # Terminer

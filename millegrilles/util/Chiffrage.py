@@ -1,8 +1,9 @@
 import secrets
+import json
 
+from uuid import uuid4
 from io import RawIOBase
-from base64 import b64encode
-
+from base64 import b64encode, b64decode
 from typing import Optional
 from cryptography.hazmat.primitives import serialization, asymmetric, padding
 from cryptography.hazmat.primitives import hashes
@@ -10,7 +11,10 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, Ci
 from cryptography.hazmat.backends import default_backend
 from base64 import b64decode
 
+from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
+from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class CipherMgs1(RawIOBase):
@@ -163,9 +167,12 @@ class CipherMsg1Dechiffrer(CipherMgs1):
 
     def update(self, data: bytes):
         data = self.__unpadder.update(self._context.update(data))
-        # if self.__skip_iv:
-        #     self.__skip_iv = False
-        #     data = data[16:]
+        if self.__skip_iv:
+            self.__skip_iv = False
+            iv_dechiffre = data[:16]
+            if iv_dechiffre != self._iv:
+                raise Exception("Erreur dechiffrage, IV ne correspond pas")
+            return data[16:]
         return data
 
     def finalize(self):
@@ -229,3 +236,71 @@ class DecipherStream(DigestStream):
             return self.__decipher.finalize()
         else:
             return self.__decipher.update(data)
+
+
+class ChiffrerChampDict:
+
+    def __init__(self, contexte):
+        self.__contexte = contexte
+
+    def chiffrer(self, cert_maitrecles: dict, domaine: str, identificateurs_document: dict, valeur):
+
+        env_maitrecles = EnveloppeCertificat(certificat_pem=cert_maitrecles['certificat'][0])
+        env_millegrille = EnveloppeCertificat(certificat_pem=cert_maitrecles['certificat_millegrille'])
+
+        if isinstance(valeur, dict):
+            valeur = json.dumps(valeur)
+        elif not isinstance(valeur, str):
+            raise TypeError('Valeur doit etre : dict ou str')
+
+        valeur_bytes = valeur.encode('utf-8')
+
+        cipher = CipherMsg1Chiffrer()
+        valeur_chiffree = cipher.start_encrypt() + cipher.update(valeur_bytes) + cipher.finalize()
+        cle_secrete = cipher.password
+
+        domaine_action_requete = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
+        # cert_maitrecles = self.__message_handler.requete(domaine_action_requete)
+
+        cles = dict()
+        envs = [env_maitrecles, env_millegrille]
+        for env in envs:
+            cles[env.fingerprint_b64] = b64encode(env.chiffrage_asymmetrique(cle_secrete)[0]).decode('utf-8')
+
+        msg_maitredescles = {
+            'identificateurs_document': identificateurs_document,
+            'domaine': domaine,
+            'version': str(uuid4()),
+            "iv": b64encode(cipher.iv).decode('utf-8'),
+            "cles": cles,
+        }
+
+        msg_maitrecles_signe = self.__contexte.generateur_transactions.preparer_enveloppe(
+            msg_maitredescles, Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT)
+
+        contenu = {
+            'chiffrement': 'mgs1',
+            'uuid_transaction': msg_maitrecles_signe[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+            'identificateurs_document': identificateurs_document,
+            'secret_chiffre': b64encode(valeur_chiffree).decode('utf-8'),
+        }
+
+        return {
+            'maitrecles': msg_maitrecles_signe,
+            'contenu': contenu,
+        }
+
+
+class DechiffrerChampDict:
+
+    def __init__(self, contexte):
+        self.__contexte = contexte
+
+    def dechiffrer(self, contenu_chiffre: dict, iv_base64: str, cle_bytes: bytes) -> str:
+        iv_bytes = b64decode(iv_base64.encode('utf-8'))
+        decipher = CipherMsg1Dechiffrer(iv_bytes, cle_bytes)
+        contenu_bytes = b64decode(contenu_chiffre['secret_chiffre'].encode('utf-8'))
+
+        valeur = decipher.update(contenu_bytes) + decipher.finalize()
+
+        return valeur

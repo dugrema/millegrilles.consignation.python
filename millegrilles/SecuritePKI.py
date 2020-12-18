@@ -263,6 +263,19 @@ class EnveloppeCertificat:
 
         return sujet_dict
 
+    def chiffrage_asymmetrique(self, cle_secrete):
+        public_key = self.certificat.public_key()
+        cle_secrete_backup = public_key.encrypt(
+            cle_secrete,
+            asymmetric.padding.OAEP(
+                mgf=asymmetric.padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        fingerprint = self.fingerprint_ascii
+        return cle_secrete_backup, fingerprint
+
 
 class UtilCertificats:
 
