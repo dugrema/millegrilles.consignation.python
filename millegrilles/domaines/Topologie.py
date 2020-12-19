@@ -518,12 +518,13 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
         projection = None
         if not params.get('all_info'):
             projection = {
-                'noeud_id': 1,
+                ConstantesTopologie.CHAMP_NOEUDID: 1,
                 'parent_noeud_id': 1,
-                'securite': 1,
+                Constantes.DOCUMENT_INFODOC_SECURITE: 1,
                 'fqdn_detecte': 1,
                 'ip_detectee': 1,
                 'domaine': 1,
+                ConstantesTopologie.CHAMP_CONSIGNATION_WEB: 1,
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: 1,
             }
 

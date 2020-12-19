@@ -7,6 +7,7 @@ import datetime
 import time
 import json
 import base64
+import binascii
 
 from millegrilles import Constantes
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -141,7 +142,7 @@ class MessagesSample(DomaineTest):
         access_key = 'DADAXXXAAABBBCCCC000DADA'
 
         indicateurs_document = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'libelle': ConstantesTopologie.LIBVAL_NOEUD,
             ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
             'champ': ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
         }
@@ -190,7 +191,7 @@ class MessagesSample(DomaineTest):
 
         noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
         identificateurs_document = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            'libelle': ConstantesTopologie.LIBVAL_NOEUD,
             ConstantesTopologie.CHAMP_NOEUDID: noeud_id,
             'champ': ConstantesTopologie.CHAMP_CONSIGNATION_WEB + '.' + ConstantesTopologie.CHAMP_AWSS3_CREDENTIALS_ACCESSKEY,
         }
@@ -211,10 +212,11 @@ class MessagesSample(DomaineTest):
         iv_base64 = permission['iv']
         secret_base64 = permission['cle']
         password_bytes = signateur.dechiffrage_asymmetrique(secret_base64)
+        # password_bytes = binascii.unhexlify(password_bytes)
 
         # Dechiffrer secret
         contenu = {
-            'secret_chiffre': 'N5jbR7LaqCfyZDbeQZVeakggLA7fNl7LcPk/96FCwmdQ37Vv/oH9AbpOjkrkblDWWJoA/67uqxzNkBMRORxM/g=='
+            'secret_chiffre': "s8PvG7YfVEdwjoH2LR63wkGfihYGdlomEkdn8echLGhmwNwk8YjlLBSrAogtSFFw"
         }
 
         dechiffreur = DechiffrerChampDict(self.contexte)
@@ -231,8 +233,8 @@ class MessagesSample(DomaineTest):
         # sample.requete_info_noeud()
         # sample.transaction_ajouter_domaine()
         # sample.transaction_supprimer_domaine()
-        self.transaction_consignation_web()
-        # self.dechiffrer_secret_consignation_web()
+        # self.transaction_consignation_web()
+        self.dechiffrer_secret_consignation_web()
 
 # --- MAIN ---
 sample = MessagesSample()
