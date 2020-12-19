@@ -138,7 +138,7 @@ class MessagesSample(DomaineTest):
 
     def transaction_consignation_web(self):
         noeud_id = '5e9e7984-7828-4a1d-8740-74fbf9676e0c'
-        access_key = '0T0Y4dCwIXCiqVWivMQyQAIFmneqU7j1W+NoUutx'
+        access_key = 'DADAXXXAAABBBCCCC000DADA'
 
         indicateurs_document = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
