@@ -1920,8 +1920,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: {'$type': 'date'},
         }
 
+        version_courante = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_UUID_ORIGINAL) or \
+                           transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                               Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         contenu_set = {
-            'version_courante': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+            'version_courante': version_courante,
         }
 
         if non_dechiffrable is not None:
@@ -2063,6 +2066,7 @@ class ProcessusReceptionCles(MGProcessusTransaction):
                 'cle': cle,
                 'iv': transaction['iv'],
                 'sujet': sujet,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_UUID_ORIGINAL: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
             }
             self.ajouter_transaction_a_soumettre(sous_domaine, transaction_cle)
 

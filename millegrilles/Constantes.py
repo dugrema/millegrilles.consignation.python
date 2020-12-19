@@ -777,6 +777,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_ROLES_PERMIS = 'roles_permis'
     TRANSACTION_CHAMP_CERTIFICAT_TIERS = '_certificat_tiers'
     TRANSACTION_CHAMP_DUREE_PERMISSION = 'duree'
+    TRANSACTION_CHAMP_UUID_ORIGINAL = 'uuid_original'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 

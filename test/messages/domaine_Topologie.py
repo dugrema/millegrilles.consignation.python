@@ -231,8 +231,8 @@ class MessagesSample(DomaineTest):
         # sample.requete_info_noeud()
         # sample.transaction_ajouter_domaine()
         # sample.transaction_supprimer_domaine()
-        # self.transaction_consignation_web()
-        self.dechiffrer_secret_consignation_web()
+        self.transaction_consignation_web()
+        # self.dechiffrer_secret_consignation_web()
 
 # --- MAIN ---
 sample = MessagesSample()
