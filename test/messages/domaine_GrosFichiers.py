@@ -465,6 +465,31 @@ class MessagesSample(BaseCallback):
             reply_to=self.queue_name
         )
 
+    def evenement_progres_fichier(self):
+        evenement = {
+            'noeud_id': '5e9e7984-7828-4a1d-8740-74fbf9676e0c',
+            'fuuid': '89122e80-4227-11eb-a00c-0bb29e75acbg',
+            'progres': 17,
+        }
+        enveloppe_val = self.generateur.emettre_message(
+            evenement, 'evenement.fichiers.publicAwsS3',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        return enveloppe_val
+
+    def evenement_echec_fichier(self):
+        evenement = {
+            'noeud_id': '5e9e7984-7828-4a1d-8740-74fbf9676e0c',
+            'fuuid': '89122e80-4227-11eb-a00c-0bb29e75acbg',
+            'progres': -1,
+            'etat': 'echec',
+        }
+        enveloppe_val = self.generateur.emettre_message(
+            evenement, 'evenement.fichiers.publicAwsS3',
+            reply_to=self.queue_name, correlation_id='abcd')
+
+        return enveloppe_val
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -504,7 +529,9 @@ class MessagesSample(BaseCallback):
         # sample.requete_detail_collections_publiques()
         # sample.commande_regenerer_previews()
         # sample.requete_fichier_par_fuuid()
-        sample.commande_transcoder_video()
+        # sample.commande_transcoder_video()
+        # sample.evenement_progres_fichier()
+        sample.evenement_echec_fichier()
 
         pass
 

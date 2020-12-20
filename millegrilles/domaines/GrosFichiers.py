@@ -2486,7 +2486,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3
         }
         pull_ops_tracking = {
-            ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: {'fuuid': fuuid}
+            ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: {'fuuid': fuuid, 'noeud_id': noeud_id}
         }
         ops_tracking = {
             '$pull': pull_ops_tracking,
@@ -2495,10 +2495,57 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection.update_one(filtre_tracking, ops_tracking)
 
     def echec_upload_awss3(self, evenement: dict):
-        pass
+        # Mettre a jour le document de tracking
+        fuuid = evenement['fuuid']
+        noeud_id = evenement['noeud_id']
+        filtre_tracking = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3,
+            ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: {
+                '$elemMatch': {'fuuid': fuuid, 'noeud_id': noeud_id}
+            }
+        }
+        set_ops_tracking = {
+            'upload_list.$.derniere_activite': datetime.datetime.utcnow(),
+            'upload_list.$.progres': -1,
+            'upload_list.$.etat': 'echec',
+        }
+        ops_tracking = {
+            '$set': set_ops_tracking,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection = self.get_collection()
+        resultat = collection.update_one(filtre_tracking, ops_tracking)
+
+        if resultat.matched_count != 1:
+            raise Exception("Erreur traitement mise a jour evenement (echec) AWS S3 - fichier tracking non trouve")
 
     def marquer_progres_awss3(self, evenement: dict):
-        pass
+        # Mettre a jour le document de tracking
+        fuuid = evenement['fuuid']
+        noeud_id = evenement['noeud_id']
+        etat = evenement.get('etat') or 'N/A'
+        filtre_tracking = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3,
+            ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: {
+                '$elemMatch': {'fuuid': fuuid, 'noeud_id': noeud_id}
+            }
+        }
+        set_ops_tracking = {
+            'upload_list.$.derniere_activite': datetime.datetime.utcnow(),
+            'upload_list.$.progres': evenement['progres'],
+            'upload_list.$.etat': etat,
+        }
+        ops_tracking = {
+            '$set': set_ops_tracking,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        collection = self.get_collection()
+        resultat = collection.update_one(filtre_tracking, ops_tracking)
+
+        if resultat.matched_count != 1:
+            raise Exception("Erreur traitement mise a jour evenement progres AWS S3 - fichier tracking non trouve")
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
