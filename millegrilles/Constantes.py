@@ -1201,6 +1201,7 @@ class ConstantesGrosFichiers:
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
     COMMANDE_REGENERER_PREVIEWS = 'regenererPreviews'
     COMMANDE_TRANSCODER_VIDEO = 'transcoderVideo'
+    COMMANDE_RESET_FICHIERS_PUBLIES = 'resetFichiersPublies'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {

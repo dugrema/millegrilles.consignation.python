@@ -110,8 +110,10 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
 
         if action == ConstantesGrosFichiers.COMMANDE_REGENERER_PREVIEWS:
             return self.gestionnaire.regenerer_previews()
-        if action == ConstantesGrosFichiers.COMMANDE_TRANSCODER_VIDEO:
+        elif action == ConstantesGrosFichiers.COMMANDE_TRANSCODER_VIDEO:
             return self.gestionnaire.declencher_transcodage_video(message_dict, properties)
+        elif action == ConstantesGrosFichiers.COMMANDE_RESET_FICHIERS_PUBLIES:
+            return self.gestionnaire.reset_fichiers_publies(message_dict)
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -2354,7 +2356,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Identifier tous les fichiers qui font partie de la collection et qui ne sont pas publies sur tous les noeuds
         or_noeud_ids = list()
         for noeud_id in noeud_ids:
-            valeur = {ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES + '.' + noeud_id: {'$exists': False}}
+            valeur = {ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES: {'$not': {'$all': [noeud_id]}}}
             or_noeud_ids.append(valeur)
 
         filtre_documents_non_publies = {
@@ -2546,6 +2548,27 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         if resultat.matched_count != 1:
             raise Exception("Erreur traitement mise a jour evenement progres AWS S3 - fichier tracking non trouve")
+
+    def reset_fichiers_publies(self, commande: dict):
+        """
+        Reset la valeur noeuds_ids_publies pour un noeud.
+        :param commande:
+        :return:
+        """
+        noeud_id = commande['noeud_id']
+        collection = self.get_collection()
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES: {'$all': [noeud_id]},
+        }
+        pull_ops = {
+            ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES: noeud_id
+        }
+        ops = {
+            '$pull': pull_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection.update_many(filtre, ops)
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):

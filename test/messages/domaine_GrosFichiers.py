@@ -488,7 +488,13 @@ class MessagesSample(BaseCallback):
             evenement, 'evenement.fichiers.publicAwsS3',
             reply_to=self.queue_name, correlation_id='abcd')
 
-        return enveloppe_val
+    def commande_reset_fichiers_publies(self):
+        evenement = {
+            'noeud_id': '5e9e7984-7828-4a1d-8740-74fbf9676e0c',
+        }
+        self.generateur.transmettre_commande(
+            evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_RESET_FICHIERS_PUBLIES,
+            reply_to=self.queue_name, correlation_id='abcd')
 
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
@@ -531,7 +537,8 @@ class MessagesSample(BaseCallback):
         # sample.requete_fichier_par_fuuid()
         # sample.commande_transcoder_video()
         # sample.evenement_progres_fichier()
-        sample.evenement_echec_fichier()
+        # sample.evenement_echec_fichier()
+        sample.commande_reset_fichiers_publies()
 
         pass
 
