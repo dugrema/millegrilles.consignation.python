@@ -106,7 +106,7 @@ class MessagesSample(DomaineTest):
         print("Envoi metadata: %s" % enveloppe_val)
 
     def requete_info_noeud(self):
-        requete = {'noeud_id': '5ee16193-49a3-443f-ae4e-894a65de647d'}
+        requete = {'noeud_id': '5e9e7984-7828-4a1d-8740-74fbf9676e0c'}
         domaine_action = ConstantesTopologie.REQUETE_INFO_NOEUD
         enveloppe_val = self.generateur.transmettre_requete(
             requete, domaine_action,
@@ -237,12 +237,12 @@ class MessagesSample(DomaineTest):
         # sample.requete_liste_applications()
         # sample.requete_liste_noeud_detail()
         # sample.requete_info_domaine()
-        # sample.requete_info_noeud()
+        sample.requete_info_noeud()
         # sample.transaction_ajouter_domaine()
         # sample.transaction_supprimer_domaine()
         # self.transaction_consignation_web()
         # self.dechiffrer_secret_consignation_web()
-        self.requete_neuds_awss3()
+        # self.requete_neuds_awss3()
 
 # --- MAIN ---
 sample = MessagesSample()

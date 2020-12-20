@@ -49,6 +49,8 @@ class TraitementEvenementProtege(TraitementMessageDomaineEvenement):
 
         if action == ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE:
             self.gestionnaire.maj_collection_publique(message_dict)
+        elif action == 'publicAwsS3':
+            self.gestionnaire.traiter_evenement_awss3(message_dict)
         else:
             raise Exception("GrosFichiers evenement protege inconnu : " + routing_key)
 
@@ -239,6 +241,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             'nom': '%s.%s' % (self.get_nom_queue(), 'evenements_proteges'),
             'routing': [
                 'evenements.%s.#.*' % self.get_nom_domaine(),
+                'evenement.fichiers.publicAwsS3',
             ],
             'exchange': self.configuration.exchange_protege,
             'ttl': 300000,
@@ -453,6 +456,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC, 1),
             ],
             name='document-uuid'
+        )
+
+        # Index fuuid version courante
+        collection_domaine.create_index(
+            [
+                (ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE, 1),
+            ],
+            name='document-fuuid-vcourante'
         )
 
     def get_nom_domaine(self):
@@ -936,7 +947,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         """
 
         # Declencher processus d'entretien - va publier fichiers sur noeuds publics
-        # routing = 'GestionnaireGrosFichiers'
         nom_module = 'millegrilles_domaines_GrosFichiers'
         nom_classe = 'ProcessusEntretienCollectionPublique'
         processus = "%s:%s" % (nom_module, nom_classe)
@@ -2364,6 +2374,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             upload_list_existante = list()
 
         ajouter_documents = list()
+        info_commande_upload = list()
 
         curseur = collection_fichiers.find(filtre_documents_non_publies)
         for fichier in curseur:
@@ -2386,7 +2397,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                         ConstantesGrosFichiers.DOCUMENT_PROGRES: 0,
                     })
 
-                    self.commande_upload_fichier_awss3(noeud_id, fichier)
+                    info_commande_upload.append({
+                        'noeud_id': noeud_id,
+                        'fichier': fichier,
+                    })
+                    # self.commande_upload_fichier_awss3(noeud_id, fichier)
 
         if len(ajouter_documents) > 0:
             push_opts = {
@@ -2407,6 +2422,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             if resultat.matched_count != 1 and resultat.upserted_id is None:
                 raise Exception("Erreur maj fichier tracking upload AWS S3")
 
+            for info in info_commande_upload:
+                self.commande_upload_fichier_awss3(info['noeud_id'], info['fichier'])
+
         self._logger.debug("Fin uploader_fichiers_manquants_awss3")
 
     def commande_upload_fichier_awss3(self, noeud_id: str, fichier_info: dict):
@@ -2425,6 +2443,62 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         domaine_action = 'commande.fichiers.publierAwsS3'
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
+
+    def traiter_evenement_awss3(self, evenement: dict):
+        """
+        Permet de suivre le progres d'upload de fichiers avec AWS S3
+        :param evenement:
+        :return:
+        """
+        etat = evenement.get('etat')
+        if etat == 'succes':
+            # Upload termine avec succes, on marque le fuuid comme
+            self.terminer_upload_awss3(evenement)
+        elif etat == 'echec':
+            # Echec d'upload
+            self.echec_upload_awss3(evenement)
+        else:
+            # Upload en cours, on met a jour le document de tracking AWS S3
+            self.marquer_progres_awss3(evenement)
+
+    def terminer_upload_awss3(self, evenement: dict):
+        fuuid = evenement['fuuid']
+        noeud_id = evenement['noeud_id']
+        collection = self.get_collection()
+
+        # Marquer le document de fichiers (et sa version fuuid) comme uploade pour noeud
+        filtre_fichier = {
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE: fuuid,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+        }
+        addtoset_ops_fichier = {
+            ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES: noeud_id,
+            'versions.%s.%s' % (fuuid, ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES): noeud_id,
+        }
+        ops_fichier = {
+            '$addToSet': addtoset_ops_fichier,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection.update_one(filtre_fichier, ops_fichier)
+
+        # Mettre a jour le document de tracking
+        filtre_tracking = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3
+        }
+        pull_ops_tracking = {
+            ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: {'fuuid': fuuid}
+        }
+        ops_tracking = {
+            '$pull': pull_ops_tracking,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        collection.update_one(filtre_tracking, ops_tracking)
+
+    def echec_upload_awss3(self, evenement: dict):
+        pass
+
+    def marquer_progres_awss3(self, evenement: dict):
+        pass
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
