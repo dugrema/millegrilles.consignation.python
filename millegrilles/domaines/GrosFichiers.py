@@ -3,7 +3,7 @@ from pymongo.errors import DuplicateKeyError
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
-    RegenerateurDeDocuments, GroupeurTransactionsARegenerer, TraitementCommandesProtegees
+    RegenerateurDeDocuments, GroupeurTransactionsARegenerer, TraitementCommandesProtegees, TraitementMessageDomaineEvenement
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -39,6 +39,18 @@ class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
 
         if reponse:
             self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id, ajouter_certificats=True)
+
+
+class TraitementEvenementProtege(TraitementMessageDomaineEvenement):
+
+    def traiter_evenement(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        routing_key = method.routing_key
+        action = routing_key.split('.').pop()
+
+        if action == ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE:
+            self.gestionnaire.maj_collection_publique(message_dict)
+        else:
+            raise Exception("GrosFichiers evenement protege inconnu : " + routing_key)
 
 
 class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
@@ -203,6 +215,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.__handler_commandes = super().get_handler_commandes()
         self.__handler_commandes[Constantes.SECURITE_PROTEGE] = GrosfichiersTraitementCommandesProtegees(self)
 
+        self.__handler_evenements_proteges = TraitementEvenementProtege(self)
+
         self.__handler_backup = HandlerBackupGrosFichiers(self._contexte)
 
     @staticmethod
@@ -213,6 +227,25 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
     def configurer(self):
         super().configurer()
         self.creer_index()  # Creer index dans MongoDB
+
+    def get_queue_configuration(self) -> list:
+        """
+        :return: Liste de configuration pour les Q du domaine
+        """
+
+        queues_config = super().get_queue_configuration()
+
+        queues_config.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'evenements_proteges'),
+            'routing': [
+                'evenements.%s.#.*' % self.get_nom_domaine(),
+            ],
+            'exchange': self.configuration.exchange_protege,
+            'ttl': 300000,
+            'callback': self.__handler_evenements_proteges.callbackAvecAck
+        })
+
+        return queues_config
 
     def demarrer(self):
         super().demarrer()
@@ -894,6 +927,20 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 raise Exception("Erreur renommer fichier/collection, mismatch count : %d" % resultat.matched_count)
         else:
             self._logger.error('renommer_deplacer_fichier aucun document trouve pour uuid : %s' % uuid_doc)
+
+    def maj_collection_publique(self, evenement: dict):
+        """
+        Met a jour une collection publique - s'assure que les fichiers sont deployes au besoin
+        :param evenement:
+        :return:
+        """
+
+        # Declencher processus d'entretien - va publier fichiers sur noeuds publics
+        # routing = 'GestionnaireGrosFichiers'
+        nom_module = 'millegrilles_domaines_GrosFichiers'
+        nom_classe = 'ProcessusEntretienCollectionPublique'
+        processus = "%s:%s" % (nom_module, nom_classe)
+        self.demarrer_processus(processus, evenement)
 
     def maj_description_fichier(self, uuid_fichier, transaction: dict):
         """
@@ -1689,11 +1736,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self._logger.debug("Set ops : %s\nUnset ops: %s" % (set_ops, unset_ops))
 
-    def preparer_permission_dechiffrage_fichier(self, fuuid, fichier: dict = None, info_version: dict = None):
+    def preparer_permission_dechiffrage_fichier(self, fuuid, fichier: dict = None, info_version: dict = None, duree: int = 120):
         permission = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: (2 * 60),  # 2 minutes
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: duree,
         }
 
         if fichier:
@@ -2038,7 +2085,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             except KeyError:
                 info_version = None
 
-            permission = self.preparer_permission_dechiffrage_fichier(fuuid, fichier, info_version)
+            duree_12h = 12*60*60
+            permission = self.preparer_permission_dechiffrage_fichier(fuuid, fichier, info_version, duree=duree_12h)
             return permission
 
         # Erreur, le fichier n'est pas public
@@ -2282,6 +2330,102 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.generateur_transactions.transmettre_commande(
             commande, domaine_action, reply_to=reply_to, correlation_id=correlation_id)
 
+    def uploader_fichiers_manquants_awss3(self, uuid_collection, noeud_ids):
+        """
+        Extrait la liste des fichiers qui n'ont pas encore ete publies vers AWS S3 pour une collection
+        :param uuid_collection:
+        :param noeud_ids:
+        :return:
+        """
+
+        # Charger document de tracking d'upload de fichiers
+        collection_fichiers = self.get_collection()
+
+        # Identifier tous les fichiers qui font partie de la collection et qui ne sont pas publies sur tous les noeuds
+        or_noeud_ids = list()
+        for noeud_id in noeud_ids:
+            valeur = {ConstantesGrosFichiers.DOCUMENT_NOEUD_IDS_PUBLIES + '.' + noeud_id: {'$exists': False}}
+            or_noeud_ids.append(valeur)
+
+        filtre_documents_non_publies = {
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$in': [uuid_collection]},
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
+            '$or': or_noeud_ids,
+        }
+
+        filtre_document_upload = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3,
+        }
+        try:
+            info_fichier = collection_fichiers.find_one(filtre_document_upload)
+            upload_list_existante = info_fichier.get(ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST) or list()
+        except AttributeError:
+            upload_list_existante = list()
+
+        ajouter_documents = list()
+
+        curseur = collection_fichiers.find(filtre_documents_non_publies)
+        for fichier in curseur:
+            # Verifier si le fichier est deja en cours d'upload
+            uuid_fichier = fichier['uuid']
+            for noeud_id in noeud_ids:
+                # Verifier si le fichier/noeud_id est deja dans la liste
+                fichier_deja_dans_liste = [f for f in upload_list_existante if f['fuuid'] == fichier['fuuid_v_courante'] and f['noeud_id'] == noeud_id]
+                if len(fichier_deja_dans_liste) == 0:
+                    self._logger.debug("Uploader fichier %s vers noeud_id %s" % (uuid_fichier, noeud_id))
+
+                    # Mettre a jour le document d'upload
+                    ajouter_documents.append({
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fichier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUIDVCOURANTE],
+                        ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: fichier[
+                            ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC],
+                        ConstantesGrosFichiers.DOCUMENT_DERNIERE_ACTIVITE: datetime.datetime.utcnow(),
+                        'noeud_id': noeud_id,
+                        ConstantesGrosFichiers.DOCUMENT_PROGRES: 0,
+                    })
+
+                    self.commande_upload_fichier_awss3(noeud_id, fichier)
+
+        if len(ajouter_documents) > 0:
+            push_opts = {
+                ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: {'$each': ajouter_documents},
+            }
+            setoninsert_document_upload = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            }
+            ops = {
+                '$push': push_opts,
+                '$setOnInsert': setoninsert_document_upload,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+            }
+
+            resultat = collection_fichiers.update_one(filtre_document_upload, ops, upsert=True)
+
+            if resultat.matched_count != 1 and resultat.upserted_id is None:
+                raise Exception("Erreur maj fichier tracking upload AWS S3")
+
+        self._logger.debug("Fin uploader_fichiers_manquants_awss3")
+
+    def commande_upload_fichier_awss3(self, noeud_id: str, fichier_info: dict):
+
+        fuuid = fichier_info['fuuid_v_courante']
+        commande = fichier_info.copy()
+        del commande['versions']
+        commande.update(fichier_info['versions'][fuuid])
+        self._logger.debug("Commande update : " + str(commande))
+
+        # Ajouter permission pour dechiffrer le fichier local - c'est un fichier public, on met une longue permission
+        # pour permettre traitement de grosses batch
+        permission = self.generer_permission_dechiffrage_fichier_public({'fuuid': fuuid})
+        commande['permission'] = permission
+        commande['noeud_id'] = noeud_id
+
+        domaine_action = 'commande.fichiers.publierAwsS3'
+        self.generateur_transactions.transmettre_commande(commande, domaine_action)
+
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
 
@@ -2317,11 +2461,11 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         # Emettre un evenement pour chaque collection publique
         try:
             for c in detail_collections_publiques:
-                domaine_action = 'evenement.GrosFichiers.confirmationMajCollectionPublique'
+                domaine_action = 'evenements.GrosFichiers.' + ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE
                 self.generateur_transactions.emettre_message(
                     c,
                     domaine_action,
-                    exchanges=[Constantes.SECURITE_PUBLIC],
+                    exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_SECURE],
                     ajouter_certificats=True
                 )
         except TypeError:
@@ -2337,11 +2481,11 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
         detail_collections_publiques = self.controleur.gestionnaire.get_detail_collections_publiques(params)
 
         for c in detail_collections_publiques:
-            domaine_action = 'evenement.GrosFichiers.confirmationMajCollectionPublique'
+            domaine_action = 'evenements.GrosFichiers.' + ConstantesGrosFichiers.EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE
             self.generateur_transactions.emettre_message(
                 c,
                 domaine_action,
-                exchanges=[Constantes.SECURITE_PUBLIC],
+                exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
                 ajouter_certificats=True
             )
 
@@ -3523,5 +3667,30 @@ class ProcessusAssocierVideoTranscode(ProcessusGrosFichiers):
             self.evenement_maj_fichier_public(transaction['uuid'])
         except Exception:
             self.__logger.exception("Erreur verification collection publique")
+
+        self.set_etape_suivante()  # Termine
+
+
+class ProcessusEntretienCollectionPublique(ProcessusGrosFichiers):
+    """
+    Effectue l'entretien d'une colleciton publique incluant la publication des fichiers manquants (sync)
+    """
+
+    def initiale(self):
+        # Faire la liste des noeuds Amazon Web Services S3
+        domaine_requete = 'Topologie.listerNoeudsAWSS3'
+        self.set_requete(domaine_requete, dict())
+        self.set_etape_suivante(ProcessusEntretienCollectionPublique.publier_fichiers_awss3.__name__)
+
+    def publier_fichiers_awss3(self):
+        parametres = self.parametres
+
+        uuid_collection = parametres['uuid']
+        reponse_noeuds_awss3 = parametres['reponse'][0]
+
+        noeud_ids = reponse_noeuds_awss3['noeud_ids']
+
+        # Pour chaque noeud, verifier s'il y a des fichiers qui n'ont pas encore ete telecharge vers AWS S3
+        self.controleur.gestionnaire.uploader_fichiers_manquants_awss3(uuid_collection, noeud_ids)
 
         self.set_etape_suivante()  # Termine

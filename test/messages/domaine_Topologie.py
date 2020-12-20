@@ -113,6 +113,13 @@ class MessagesSample(DomaineTest):
             reply_to=self.queue_name, correlation_id='efgh')
         print("Envoi metadata: %s" % enveloppe_val)
 
+    def requete_neuds_awss3(self):
+        domaine_action = 'requete.Topologie.' + ConstantesTopologie.REQUETE_LISTE_NOEUDS_AWSS3
+        enveloppe_val = self.generateur.transmettre_requete(
+            dict(), domaine_action,
+            reply_to=self.queue_name, correlation_id='efgh')
+        print("Envoi metadata: %s" % enveloppe_val)
+
     def transaction_ajouter_domaine(self):
         requete = {
             'noeud_id': '5ee16193-49a3-443f-ae4e-894a65de647d',
@@ -234,7 +241,8 @@ class MessagesSample(DomaineTest):
         # sample.transaction_ajouter_domaine()
         # sample.transaction_supprimer_domaine()
         # self.transaction_consignation_web()
-        self.dechiffrer_secret_consignation_web()
+        # self.dechiffrer_secret_consignation_web()
+        self.requete_neuds_awss3()
 
 # --- MAIN ---
 sample = MessagesSample()

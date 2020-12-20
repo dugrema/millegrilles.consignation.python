@@ -31,6 +31,8 @@ class TraitementRequetesProtegeesTopologie(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_info_noeud(message_dict)
         elif action == ConstantesTopologie.REQUETE_PERMISSION:
             reponse = self.gestionnaire.preparer_permission_dechiffrage_secret(message_dict, properties)
+        elif action == ConstantesTopologie.REQUETE_LISTE_NOEUDS_AWSS3:
+            reponse = self.gestionnaire.get_noeuds_awss3()
         else:
             super().traiter_requete(ch, method, properties, body, message_dict)
             return
@@ -628,6 +630,27 @@ class GestionnaireTopologie(GestionnaireDomaineStandard):
                 return
 
         return permission
+
+    def get_noeuds_awss3(self):
+        collection = self.document_dao.get_collection(ConstantesTopologie.COLLECTION_DOCUMENTS_NOM)
+        champ_web_awss3 = '.'.join([
+            ConstantesTopologie.CHAMP_CONSIGNATION_WEB,
+            ConstantesTopologie.CHAMP_CONSIGNATION_WEB_MODE,
+        ])
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesTopologie.LIBVAL_NOEUD,
+            champ_web_awss3: ConstantesTopologie.VALEUR_AWSS3_CONSIGNATION_WEB_AWSS3,
+        }
+        projection = {
+            ConstantesTopologie.CHAMP_NOEUDID: 1
+        }
+
+        curseur = collection.find(filtre, projection=projection)
+        noeuds = list()
+        for noeud in curseur:
+            noeuds.append(noeud['noeud_id'])
+
+        return {'noeud_ids': noeuds}
 
 
 class ProcessusTopologie(MGProcessusTransaction):

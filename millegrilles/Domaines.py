@@ -56,6 +56,25 @@ class TraitementMessageDomaineCommande(TraitementMessageDomaine):
         self.gestionnaire.generateur_transactions.transmettre_reponse(message_resultat, replying_to, correlation_id)
 
 
+class TraitementMessageDomaineEvenement(TraitementMessageDomaine):
+    """
+    Traite un evenement du domaine
+    """
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+        try:
+            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            self.traiter_evenement(enveloppe_certificat, ch, method, properties, body, message_dict)
+        except CertificatInconnu as ci:
+            fingerprint = ci.fingerprint
+            self.message_dao.transmettre_demande_certificat(fingerprint)
+
+    def traiter_evenement(self, enveloppe_certificat, ch, method, properties, body, message_dict):
+        raise NotImplementedError()
+
+
 class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
     def __init__(self, gestionnaire_domaine):

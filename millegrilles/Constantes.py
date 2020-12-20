@@ -1063,6 +1063,7 @@ class ConstantesGrosFichiers:
     LIBVAL_RAPPORT_ACTIVITE = 'rapport.activite'
     LIBVAL_CONVERSION_MEDIA = 'conversionMedia'
     LIBVAL_PUBLICATION_FICHIERS = 'publicationFichiers'
+    LIBVAL_UPLOAD_AWSS3 = 'uploadAwss3'
 
     LIBVAL_VITRINE_FICHIERS = 'vitrine.fichiers'
     LIBVAL_VITRINE_ALBUMS = 'vitrine.albums'
@@ -1124,6 +1125,10 @@ class ConstantesGrosFichiers:
     DOCUMENT_PREVIEWS = 'previews'
     DOCUMENT_VIDEO = 'video'
     DOCUMENT_TRANSCODAGE = 'transcodage'
+    DOCUMENT_NOEUD_IDS_PUBLIES = 'noeud_ids_publies'
+    DOCUMENT_DERNIERE_ACTIVITE = 'derniere_activite'
+    DOCUMENT_PROGRES = 'progres'
+    DOCUMENT_UPLOAD_LIST = 'upload_list'
 
     DOCUMENT_FAVORIS_LISTE = 'favoris'
 
@@ -1176,6 +1181,8 @@ class ConstantesGrosFichiers:
     TRANSACTION_TORRENT_SEEDING = '%s.seedingTorrent' % DOMAINE_NOM
 
     TRANSACTION_PUBLIER_COLLECTION = '%s.publierCollection' % DOMAINE_NOM
+
+    EVENEMENTS_CONFIRMATION_MAJ_COLLECTIONPUBLIQUE = 'confirmationMajCollectionPublique'
 
     REQUETE_VITRINE_FICHIERS = '%s.vitrineFichiers' % DOMAINE_NOM
     REQUETE_VITRINE_ALBUMS = '%s.vitrineAlbums' % DOMAINE_NOM
@@ -1753,6 +1760,7 @@ class ConstantesTopologie:
     REQUETE_INFO_NOEUD = '%s.infoNoeud' % DOMAINE_NOM
     REQUETE_LISTE_APPLICATIONS_DEPLOYEES = '%s.listeApplicationsDeployees' % DOMAINE_NOM
     REQUETE_PERMISSION = 'permissionDechiffrage'
+    REQUETE_LISTE_NOEUDS_AWSS3 = 'listerNoeudsAWSS3'
 
     CHAMP_NOEUDID = 'noeud_id'
     CHAMP_CONSIGNATION_WEB = 'consignation_web'

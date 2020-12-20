@@ -1556,10 +1556,14 @@ class MGProcessusTransaction(MGProcessus):
         try:
             id_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO]
         except KeyError:
-            uuid_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            transaction = self._controleur.charger_transaction_par_uuid(uuid_transaction, collection)
-            id_transaction = transaction['_id']
-            parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO] = id_transaction
+            try:
+                uuid_transaction = parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                transaction = self._controleur.charger_transaction_par_uuid(uuid_transaction, collection)
+                id_transaction = transaction['_id']
+                parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_ID_MONGO] = id_transaction
+            except KeyError:
+                # Le processus n'est pas pour une transaction
+                return {'nom_collection': collection, 'transaction': transaction}
 
         return {'id_transaction': id_transaction, 'nom_collection': collection, 'transaction': transaction}
 
