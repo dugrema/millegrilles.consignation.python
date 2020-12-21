@@ -267,8 +267,7 @@ location /vitrine/section {
 }
         """
 
-        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
-            location_fichiers = """
+        location_fichiers_public = """
 location /fichiers {
   slice 5m;
   proxy_cache       cache_fichiers;
@@ -288,9 +287,12 @@ location /fichiers {
 
   include /etc/nginx/conf.d/component_base.include;
 }
-            """
-        else:
-            location_fichiers = """
+        """
+
+        with open(path.join(self.__repertoire_modules, 'fichiers_public.include'), 'w') as fichier:
+            fichier.write(location_fichiers_public)
+
+        location_fichiers_protege = """
 location /fichiers {
   slice 5m;
   proxy_cache       cache_fichiers;
@@ -319,7 +321,28 @@ location /fichiers {
   include /etc/nginx/conf.d/auth_public.include;
   include /etc/nginx/conf.d/component_base.include;
 }
-            """
+        """
+        with open(path.join(self.__repertoire_modules, 'fichiers_protege.include'), 'w') as fichier:
+            fichier.write(location_fichiers_protege)
+
+        location_fichiers_redirect = """
+location /fichiers/public {
+  if ($args ~* "preview=1") {
+    rewrite ^/fichiers/(public/[0-9a-f\-]+).*$ https://${HOST}/${IDMG}/$1_preview_$arg_preview? redirect;
+  }
+  if ($args ~* "video=[0-9p]+") {
+    rewrite ^/fichiers/(public/[0-9a-f\-]+).*$ https://${HOST}/${IDMG}/$1_video_$arg_video? redirect;
+  }
+  rewrite ^/fichiers/(public/.*)$ https://${HOST}/${IDMG}/$1 redirect;
+}
+        """
+        with open(path.join(self.__repertoire_modules, 'fichiers_redirect.include'), 'w') as fichier:
+            fichier.write(location_fichiers_redirect)
+
+        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
+            location_fichiers = "include /etc/nginx/conf.d/modules/fichiers_public.include;"
+        else:
+            location_fichiers = "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
 
         location_public_component = """
 location %s {
