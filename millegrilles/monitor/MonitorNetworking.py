@@ -339,10 +339,13 @@ location /fichiers/public {
         with open(path.join(self.__repertoire_modules, 'fichiers_redirect.include'), 'w') as fichier:
             fichier.write(location_fichiers_redirect)
 
+        # On a plusieurs options - une configuration par type de noeud (exclusif) et une qui permet
+        # de rediriger les requetes sous /public vers un serveur tiers (e.g. AWS CloudFront)
+        location_fichiers = "# include /etc/nginx/conf.d/modules/fichiers_rediriges.include;\n"
         if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
-            location_fichiers = "include /etc/nginx/conf.d/modules/fichiers_public.include;"
+            location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_public.include;"
         else:
-            location_fichiers = "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
+            location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
 
         location_public_component = """
 location %s {
