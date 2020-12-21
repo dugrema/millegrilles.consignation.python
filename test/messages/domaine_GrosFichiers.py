@@ -547,7 +547,7 @@ class MessagesSample(BaseCallback):
         # sample.transaction_decrire_fichier()
         # sample.transaction_decrire_collection()
         # sample.requete_permission_dechiffrage_fichier_public()
-        # sample.requete_collections_publiques()
+        sample.requete_collections_publiques()
         # sample.requete_detail_collections_publiques()
         # sample.commande_regenerer_previews()
         # sample.requete_fichier_par_fuuid()
@@ -556,7 +556,7 @@ class MessagesSample(BaseCallback):
         # sample.evenement_echec_fichier()
         # sample.commande_reset_fichiers_publies()
         # sample.requete_transferts_en_cours()
-        sample.commande_clear_fichier_publie()
+        # sample.commande_clear_fichier_publie()
 
         pass
 

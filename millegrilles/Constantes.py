@@ -1204,6 +1204,7 @@ class ConstantesGrosFichiers:
     COMMANDE_TRANSCODER_VIDEO = 'transcoderVideo'
     COMMANDE_RESET_FICHIERS_PUBLIES = 'resetFichiersPublies'
     COMMANDE_CLEAR_FICHIER_PUBLIE = 'clearFichierPublie'
+    COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES = 'uploadCollectionsPubliques'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {

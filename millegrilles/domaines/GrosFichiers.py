@@ -119,6 +119,9 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
             return self.gestionnaire.reset_fichiers_publies(message_dict)
         elif action == ConstantesGrosFichiers.COMMANDE_CLEAR_FICHIER_PUBLIE:
             return self.gestionnaire.clear_fichier_publie(message_dict)
+        elif action == ConstantesGrosFichiers.COMMANDE_UPLOAD_COLLECTIONS_PUBLIQUES:
+            self.gestionnaire.maj_collection_publique(message_dict)
+            return {'ok': True}
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -2588,7 +2591,12 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         collection.update_many(filtre, ops)
 
     def clear_fichier_publie(self, commande: dict):
-        self.terminer_upload_awss3(commande)
+        try:
+            self.terminer_upload_awss3(commande)
+        except Exception as e:
+            return {'ok': False, 'err': str(e)}
+        else:
+            return {'ok': True}
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
@@ -3849,13 +3857,28 @@ class ProcessusEntretienCollectionPublique(ProcessusGrosFichiers):
 
     def publier_fichiers_awss3(self):
         parametres = self.parametres
+        try:
+            uuid_collection = parametres['uuid']
+        except KeyError:
+            domaine_requete = 'GrosFichiers.' + Constantes.ConstantesMaitreDesCles.REQUETE_COLLECTIONS_PUBLIQUES
+            self.set_requete(domaine_requete, dict())
+            self.set_etape_suivante(ProcessusEntretienCollectionPublique.publier_toutes_collections.__name__)
+        else:
+            self._uploader_collection(uuid_collection)
+            self.set_etape_suivante()  # Termine
 
-        uuid_collection = parametres['uuid']
-        reponse_noeuds_awss3 = parametres['reponse'][0]
+    def publier_toutes_collections(self):
+        reponse_noeuds_awss3 = self.parametres['reponse'][1]
+        collections_publiques = reponse_noeuds_awss3['resultat']
 
+        for collection_publique in collections_publiques:
+            uuid_collection = collection_publique['uuid']
+            self._uploader_collection(uuid_collection)
+
+    def _uploader_collection(self, uuid_collection):
+        reponse_noeuds_awss3 = self.parametres['reponse'][0]
         noeud_ids = reponse_noeuds_awss3['noeud_ids']
 
         # Pour chaque noeud, verifier s'il y a des fichiers qui n'ont pas encore ete telecharge vers AWS S3
         self.controleur.gestionnaire.uploader_fichiers_manquants_awss3(uuid_collection, noeud_ids)
 
-        self.set_etape_suivante()  # Termine
