@@ -2609,7 +2609,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
                 self.generateur_transactions.emettre_message(
                     c,
                     domaine_action,
-                    exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_SECURE],
+                    exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE],
                     ajouter_certificats=True
                 )
         except TypeError:
@@ -2684,13 +2684,14 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         mimetype = self.transaction['mimetype'].split('/')[0]
         if mimetype in ['video', 'image']:
             self._traiter_media(resultat)
+        elif document_uuid is not None:
+            # Le fichier pourrait avoir ete ajoute dans une collection publique
+            try:
+                self.evenement_maj_fichier_public(resultat['uuid'])
+            except Exception:
+                self.__logger.exception("Erreur verification collection publique")
 
         self.set_etape_suivante()  # Termine
-
-        try:
-            self.evenement_maj_fichier_public(resultat['uuid'])
-        except Exception:
-            self.__logger.exception("Erreur verification collection publique")
 
         return resultat
 
