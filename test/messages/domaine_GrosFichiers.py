@@ -496,6 +496,22 @@ class MessagesSample(BaseCallback):
             evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_RESET_FICHIERS_PUBLIES,
             reply_to=self.queue_name, correlation_id='abcd')
 
+    def commande_clear_fichier_publie(self):
+        evenement = {
+            'noeud_id': '5e9e7984-7828-4a1d-8740-74fbf9676e0c',
+            'fuuid': '89122e80-4227-11eb-a00c-0bb29e75acbf',
+        }
+        self.generateur.transmettre_commande(
+            evenement, 'commande.GrosFichiers.' + ConstantesGrosFichiers.COMMANDE_CLEAR_FICHIER_PUBLIE,
+            reply_to=self.queue_name, correlation_id='abcd')
+
+    def requete_transferts_en_cours(self):
+        self.generateur.transmettre_requete(
+            dict(),
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_TRANSFERTS_EN_COURS,
+            reply_to=self.queue_name, correlation_id='abcd'
+        )
+
     def executer(self):
         # enveloppe = sample.requete_profil_usager()
 
@@ -538,7 +554,9 @@ class MessagesSample(BaseCallback):
         # sample.commande_transcoder_video()
         # sample.evenement_progres_fichier()
         # sample.evenement_echec_fichier()
-        sample.commande_reset_fichiers_publies()
+        # sample.commande_reset_fichiers_publies()
+        # sample.requete_transferts_en_cours()
+        sample.commande_clear_fichier_publie()
 
         pass
 

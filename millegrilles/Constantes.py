@@ -1197,11 +1197,13 @@ class ConstantesGrosFichiers:
     REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC = 'demandePermissionDechiffragePublic'
     REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
     REQUETE_DETAIL_COLLECTIONS_PUBLIQUES = 'detailCollectionsPubliques'
+    REQUETE_TRANSFERTS_EN_COURS = 'transfertsEnCours'
 
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
     COMMANDE_REGENERER_PREVIEWS = 'regenererPreviews'
     COMMANDE_TRANSCODER_VIDEO = 'transcoderVideo'
     COMMANDE_RESET_FICHIERS_PUBLIES = 'resetFichiersPublies'
+    COMMANDE_CLEAR_FICHIER_PUBLIE = 'clearFichierPublie'
 
     # Document par defaut pour la configuration de l'interface GrosFichiers
     DOCUMENT_DEFAUT = {

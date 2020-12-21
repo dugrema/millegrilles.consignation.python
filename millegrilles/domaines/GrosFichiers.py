@@ -2,8 +2,9 @@ from pymongo.errors import DuplicateKeyError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGrosFichiers, ConstantesParametres
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete, HandlerBackupDomaine, \
-    RegenerateurDeDocuments, GroupeurTransactionsARegenerer, TraitementCommandesProtegees, TraitementMessageDomaineEvenement
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
+    TraitementMessageDomaineRequete, HandlerBackupDomaine, RegenerateurDeDocuments, GroupeurTransactionsARegenerer, \
+    TraitementCommandesProtegees, TraitementMessageDomaineEvenement
 from millegrilles.MGProcessus import MGProcessusTransaction, MGPProcesseur
 
 import os
@@ -82,6 +83,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = self.gestionnaire.get_collections_publiques(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_DETAIL_COLLECTIONS_PUBLIQUES:
             reponse = self.gestionnaire.get_detail_collections_publiques(message_dict)
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_TRANSFERTS_EN_COURS:
+            reponse = self.gestionnaire.get_transferts_en_cours()
         # elif routing_key == 'requete.' + ConstantesGrosFichiers.REQUETE_VITRINE_FICHIERS:
         #     fichiers_vitrine = self.gestionnaire.get_document_vitrine_fichiers()
         #     self.transmettre_reponse(message_dict, fichiers_vitrine, properties.reply_to, properties.correlation_id)
@@ -114,6 +117,8 @@ class GrosfichiersTraitementCommandesProtegees(TraitementCommandesProtegees):
             return self.gestionnaire.declencher_transcodage_video(message_dict, properties)
         elif action == ConstantesGrosFichiers.COMMANDE_RESET_FICHIERS_PUBLIES:
             return self.gestionnaire.reset_fichiers_publies(message_dict)
+        elif action == ConstantesGrosFichiers.COMMANDE_CLEAR_FICHIER_PUBLIE:
+            return self.gestionnaire.clear_fichier_publie(message_dict)
         else:
             return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -2207,6 +2212,18 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         return liste_collections
 
+    def get_transferts_en_cours(self):
+        """
+        Retourne le document de transferts en cours (AWS S3, ...)
+        :return:
+        """
+        collection = self.get_collection()
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_UPLOAD_AWSS3,
+        }
+        doc_transferts = collection.find_one(filtre)
+        return {ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST: doc_transferts.get(ConstantesGrosFichiers.DOCUMENT_UPLOAD_LIST)}
+
     def get_info_collections_fichier(self, uuid_fichier: str):
         filtre = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_UUID_DOC: uuid_fichier,
@@ -2569,6 +2586,9 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
         collection.update_many(filtre, ops)
+
+    def clear_fichier_publie(self, commande: dict):
+        self.terminer_upload_awss3(commande)
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):
