@@ -2637,7 +2637,7 @@ class ProcessusGrosFichiers(MGProcessusTransaction):
                 self.generateur_transactions.emettre_message(
                     c,
                     domaine_action,
-                    exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE],
+                    exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE],
                     ajouter_certificats=True
                 )
         except TypeError:
@@ -2695,7 +2695,7 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
 
         # Vierifier si le document de fichier existe deja
         fuuid = transaction['fuuid']
-        document_uuid = transaction.get('document_uuid')  # Represente la collection, si present
+        document_uuid = transaction.get(ConstantesGrosFichiers.DOCUMENT_COLLECTION_UUID)   # Represente la collection, si present
         nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
         extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
         resultat = {
