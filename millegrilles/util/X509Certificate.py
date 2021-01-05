@@ -1921,7 +1921,7 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def signer_csr(self, csr_bytes: bytes, role: str = None):
+    def signer_csr(self, csr_bytes: bytes, role: str = None, duree: datetime.timedelta = None):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
         sujet_dict = dict()
         for elem in csr.subject:
@@ -1931,9 +1931,9 @@ class RenouvelleurCertificat:
         role = role or sujet_dict.get('organizationalUnitName')
         common_name = sujet_dict['commonName']
 
-        return self.renouveller_avec_csr(role, common_name, csr_bytes)
+        return self.renouveller_avec_csr(role, common_name, csr_bytes, duree=duree)
 
-    def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes):
+    def renouveller_avec_csr(self, role, node_name, csr_bytes: bytes, duree: datetime.timedelta = None):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
 
         # Extraire les extensions pour alt names
@@ -1951,7 +1951,7 @@ class RenouvelleurCertificat:
             domaines_publics=domaines_publics
         )
 
-        certificat = generateur_instance.signer(csr, role)
+        certificat = generateur_instance.signer(csr, role, duree=duree)
         chaine = generateur_instance.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)

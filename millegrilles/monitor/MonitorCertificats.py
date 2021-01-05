@@ -510,56 +510,56 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         mounts = path.join('/var/opt/millegrilles', self.idmg, 'mounts')
         os.makedirs(mounts, mode=0o770)
 
-    def generer_nouveau_idmg(self) -> str:
-        """
-        Generer nouveau trousseau de MilleGrille, incluant cle/cert de MilleGrille, intermediaire et monitor.
-        Insere les entrees de configs et secrets dans docker.
-        :return: idmg
-        """
-        generateur_initial = GenerateurInitial(None)
-        clecert_intermediaire = generateur_initial.generer()
-        clecert_millegrille = generateur_initial.autorite
-
-        self._clecert_millegrille = clecert_millegrille
-        self._clecert_intermediaire = clecert_intermediaire
-        self.idmg = clecert_millegrille.idmg
-
-        # Preparer repertoires locaux pour le noeud
-        self.preparer_repertoires()
-
-        # Conserver la configuration de base pour ServiceMonitor
-        configuration = {
-            Constantes.CONFIG_IDMG: self.idmg,
-            'pem': str(clecert_millegrille.cert_bytes, 'utf-8'),
-            Constantes.DOCUMENT_INFODOC_SECURITE: '3.protege',
-        }
-        configuration_bytes = json.dumps(configuration).encode('utf-8')
-        self._docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
-
-        # Sauvegarder certificats, cles et mots de passe dans docker
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY, clecert_millegrille.private_key_bytes)
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD, clecert_millegrille.password)
-        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT, clecert_millegrille.cert_bytes)
-
-        chaine_certs = '\n'.join(clecert_intermediaire.chaine).encode('utf-8')
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY, clecert_intermediaire.private_key_bytes)
-        self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD, clecert_intermediaire.password)
-        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT, clecert_intermediaire.cert_bytes)
-        self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CHAIN, chaine_certs)
-
-        # Initialiser le renouvelleur de certificats avec le nouveau trousseau
-        self.__charger_renouvelleur()
-
-        # Generer certificat pour monitor
-        self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self._nodename)
-
-        if self._mode_insecure:
-            self.sauvegarder_secrets()
-
-        # Generer mots de passes
-        self.generer_motsdepasse()
-
-        return self.idmg
+    # def generer_nouveau_idmg(self) -> str:
+    #     """
+    #     Generer nouveau trousseau de MilleGrille, incluant cle/cert de MilleGrille, intermediaire et monitor.
+    #     Insere les entrees de configs et secrets dans docker.
+    #     :return: idmg
+    #     """
+    #     generateur_initial = GenerateurInitial(None)
+    #     clecert_intermediaire = generateur_initial.generer()
+    #     clecert_millegrille = generateur_initial.autorite
+    #
+    #     self._clecert_millegrille = clecert_millegrille
+    #     self._clecert_intermediaire = clecert_intermediaire
+    #     self.idmg = clecert_millegrille.idmg
+    #
+    #     # Preparer repertoires locaux pour le noeud
+    #     self.preparer_repertoires()
+    #
+    #     # Conserver la configuration de base pour ServiceMonitor
+    #     configuration = {
+    #         Constantes.CONFIG_IDMG: self.idmg,
+    #         'pem': str(clecert_millegrille.cert_bytes, 'utf-8'),
+    #         Constantes.DOCUMENT_INFODOC_SECURITE: '3.protege',
+    #     }
+    #     configuration_bytes = json.dumps(configuration).encode('utf-8')
+    #     self._docker.configs.create(name='millegrille.configuration', data=configuration_bytes, labels={'idmg': self.idmg})
+    #
+    #     # Sauvegarder certificats, cles et mots de passe dans docker
+    #     self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY, clecert_millegrille.private_key_bytes)
+    #     self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD, clecert_millegrille.password)
+    #     self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_CERT, clecert_millegrille.cert_bytes)
+    #
+    #     chaine_certs = '\n'.join(clecert_intermediaire.chaine).encode('utf-8')
+    #     self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY, clecert_intermediaire.private_key_bytes)
+    #     self.ajouter_secret(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD, clecert_intermediaire.password)
+    #     self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CERT, clecert_intermediaire.cert_bytes)
+    #     self.ajouter_config(ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_CHAIN, chaine_certs)
+    #
+    #     # Initialiser le renouvelleur de certificats avec le nouveau trousseau
+    #     self.__charger_renouvelleur()
+    #
+    #     # Generer certificat pour monitor
+    #     self.clecert_monitor = self.generer_clecert_module(ConstantesGenerateurCertificat.ROLE_MONITOR, self._nodename)
+    #
+    #     if self._mode_insecure:
+    #         self.sauvegarder_secrets()
+    #
+    #     # Generer mots de passes
+    #     self.generer_motsdepasse()
+    #
+    #     return self.idmg
 
     def sauvegarder_secrets(self):
         """
@@ -613,7 +613,16 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
 
     def signer_csr(self, csr: bytes):
         generateur = RenouvelleurCertificat(self.idmg, dict(), self._clecert_intermediaire, ca_autorite=self._clecert_millegrille)
-        clecert = generateur.signer_csr(csr)
+
+        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = int(duree_certs)
+
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+
+        duree_intervalle = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+        clecert = generateur.signer_csr(csr, duree=duree_intervalle)
+
         return clecert
 
     def generer_certificat_nginx_selfsigned(self, insecure=False):
