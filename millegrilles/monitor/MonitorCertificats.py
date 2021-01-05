@@ -27,6 +27,7 @@ class GestionnaireCertificats:
 
     MONITOR_CERT_PATH = 'monitor_cert_path'
     MONITOR_KEY_FILE = 'monitor_key_file'
+    MONITOR_KEY_FILENAME = 'pki.monitor.key'
 
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         self._docker = docker_client
@@ -89,6 +90,15 @@ class GestionnaireCertificats:
     def ajouter_secret(self, name: str, data: bytes):
         name_tronque = self.__preparer_label(name)
         self._docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+
+        if self._mode_insecure:
+            try:
+                os.mkdir('/var/opt/millegrilles/secrets', 0o755)
+            except FileExistsError:
+                pass
+        with open('/var/opt/millegrilles/secrets/' + name, 'wb') as fichiers:
+            fichiers.write(data)
+
         return name_tronque
 
     def __generer_private_key(self, generer_password=False, keysize=2048, public_exponent=65537):
@@ -261,7 +271,7 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
 
         # Charger information certificat monitor
         cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'rb') as fichiers:
+        with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME), 'rb') as fichiers:
             key_pem = fichiers.read()
         clecert_monitor = EnveloppeCleCert()
         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
@@ -269,7 +279,7 @@ class GestionnaireCertificatsNoeudPublic(GestionnaireCertificats):
 
         # Conserver reference au cert monitor pour middleware
         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor.key.pem'
+        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME
 
         # Charger le certificat de millegrille
         self._charger_certificat_docker('pki.millegrille.cert')
@@ -294,7 +304,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
         # Charger information certificat monitor
         cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'rb') as fichiers:
+        with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME), 'rb') as fichiers:
             key_pem = fichiers.read()
         clecert_monitor = EnveloppeCleCert()
         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
@@ -302,7 +312,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
         # Conserver reference au cert monitor pour middleware
         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor.key.pem'
+        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME
 
         # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
         #     self._passwd_mongo = fichiers.read()
@@ -475,28 +485,31 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         clecert_intermediaire.password = None  # Effacer mot de passe
         self._clecert_intermediaire = clecert_intermediaire
 
-        # Charger information certificat monitor
-        cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-        with open(path.join(secret_path, 'pki.monitor.key.pem'), 'rb') as fichiers:
-            key_pem = fichiers.read()
-        clecert_monitor = EnveloppeCleCert()
-        clecert_monitor.from_pem_bytes(key_pem, cert_pem)
-        self.clecert_monitor = clecert_monitor
-
-        # Conserver reference au cert monitor pour middleware
-        self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = 'pki.monitor.key.pem'
-
-        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
-        #     self._passwd_mongo = fichiers.read()
-        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
-        #     self._passwd_mq = fichiers.read()
-
-        # Charger le certificat de millegrille, chaine pour intermediaire
-        self._charger_certificat_docker('pki.intermediaire.chain')
+        # Valider existence des certificats/chaines de base
         self._charger_certificat_docker('pki.millegrille.cert')
+        self._charger_certificat_docker('pki.intermediaire.chain')
 
         self.__charger_renouvelleur()
+
+        try:
+            # Charger information certificat monitor
+            cert_pem = self._charger_certificat_docker('pki.monitor.cert')
+            with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME), 'rb') as fichiers:
+                key_pem = fichiers.read()
+            clecert_monitor = EnveloppeCleCert()
+            clecert_monitor.from_pem_bytes(key_pem, cert_pem)
+            self.clecert_monitor = clecert_monitor
+
+            # Conserver reference au cert monitor pour middleware
+            self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
+            self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME
+
+            # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
+            #     self._passwd_mongo = fichiers.read()
+            # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
+            #     self._passwd_mq = fichiers.read()
+        except Exception:
+            self.__logger.exception("Erreur chargement certificat monitor, il va etre regenere")
 
     def __charger_renouvelleur(self):
         dict_ca = {
