@@ -5,7 +5,7 @@ import os
 import secrets
 import tempfile
 from base64 import b64decode, b64encode
-from os import path
+from os import path, environ
 from typing import cast
 
 import docker
@@ -435,7 +435,13 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         if nomcle is None:
             nomcle = role
 
-        clecert = self.__renouvelleur.renouveller_par_role(role, common_name, liste_dns)
+        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = int(duree_certs)
+
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+
+        clecert = self.__renouvelleur.renouveller_par_role(role, common_name, liste_dns, duree_certs, duree_certs_heures)
         chaine = list(clecert.chaine)
         chaine_certs = '\n'.join(chaine)
 
@@ -606,7 +612,7 @@ class GestionnaireCertificatsInstallation(GestionnaireCertificats):
         :return:
         """
         generateur = GenerateurCertificatNginxSelfsigned()
-        clecert = generateur.generer('nanana')
+        clecert = generateur.generer('Installation')
 
         cle_pem_bytes = clecert.private_key_bytes
 

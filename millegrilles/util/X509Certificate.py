@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
 from ipaddress import IPv4Address, IPv6Address
+from os import environ
 
 import datetime
 import secrets
@@ -18,15 +19,25 @@ from millegrilles.SecuritePKI import ConstantesSecurityPki
 
 class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
 
-    DUREE_CERT_ROOT = datetime.timedelta(days=3655)
-    DUREE_CERT_BACKUP = datetime.timedelta(days=3655)
-    DUREE_CERT_MILLEGRILLE = datetime.timedelta(days=730)
-    DUREE_CERT_NOEUD = datetime.timedelta(days=366)
-    DUREE_CERT_NAVIGATEUR = datetime.timedelta(weeks=6)
-    DUREE_CERT_TIERS = datetime.timedelta(weeks=4)
-    DUREE_CERT_HERBERGEMENT_XS = datetime.timedelta(days=90)
-    DUREE_CERT_INSTALLATION = datetime.timedelta(days=1)
-    ONE_DAY = datetime.timedelta(1, 0, 0)
+    DUREE_CERT_ROOT = datetime.timedelta(days=7)
+    DUREE_CERT_BACKUP = datetime.timedelta(hours=3)
+    DUREE_CERT_MILLEGRILLE = datetime.timedelta(hours=3)
+    DUREE_CERT_NOEUD = datetime.timedelta(hours=3)
+    DUREE_CERT_NAVIGATEUR = datetime.timedelta(hours=3)
+    DUREE_CERT_TIERS = datetime.timedelta(hours=3)
+    DUREE_CERT_HERBERGEMENT_XS = datetime.timedelta(hours=3)
+    DUREE_CERT_INSTALLATION = datetime.timedelta(hours=3)
+    ONE_DAY = datetime.timedelta(hours=2)
+
+    # DUREE_CERT_ROOT = datetime.timedelta(days=3655)
+    # DUREE_CERT_BACKUP = datetime.timedelta(days=3655)
+    # DUREE_CERT_MILLEGRILLE = datetime.timedelta(days=730)
+    # DUREE_CERT_NOEUD = datetime.timedelta(days=366)
+    # DUREE_CERT_NAVIGATEUR = datetime.timedelta(weeks=6)
+    # DUREE_CERT_TIERS = datetime.timedelta(weeks=4)
+    # DUREE_CERT_HERBERGEMENT_XS = datetime.timedelta(days=90)
+    # DUREE_CERT_INSTALLATION = datetime.timedelta(days=1)
+    # ONE_DAY = datetime.timedelta(1, 0, 0)
 
     ROLES_ACCES_MONGO = [
         Constantes.ConstantesGenerateurCertificat.ROLE_MONGO,
@@ -635,8 +646,7 @@ class GenerateurCertificateParRequest(GenerateurCertificat):
 
     def signer(self, csr: x509.CertificateSigningRequest, role: str = None, **kwargs) -> x509.Certificate:
         cert_autorite = self._autorite.cert
-        duree_jours = kwargs.get('duree') or 31
-        duree = datetime.timedelta(days=duree_jours)
+        duree = kwargs.get('duree') or datetime.timedelta(days=31)
         builder = self._preparer_builder_from_csr(
             csr, cert_autorite, duree, role=role, **kwargs)
 
@@ -895,12 +905,13 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
 class GenerateurNoeud(GenerateurCertificateParRequest):
 
     def __init__(self, idmg, organization_nom, common_name, dict_ca: dict, autorite: EnveloppeCleCert = None,
-                 domaines_publics: list = None, generer_password=False):
+                 domaines_publics: list = None, generer_password=False, duree=31, duree_heures=0):
         super().__init__(idmg, dict_ca, autorite, domaines_publics)
         self._organization_name = organization_nom
         self._common_name = common_name
         self._domaines_publics = domaines_publics
         self._generer_password = generer_password
+        self._duree = datetime.timedelta(days=duree, hours=duree_heures)
 
     def generer(self) -> EnveloppeCleCert:
         # Preparer une nouvelle cle et CSR pour la millegrille
@@ -912,7 +923,8 @@ class GenerateurNoeud(GenerateurCertificateParRequest):
 
         # Signer avec l'autorite pour obtenir le certificat de MilleGrille
         csr_millegrille = clecert.csr
-        certificate = self.signer(csr_millegrille)
+
+        certificate = self.signer(csr_millegrille, duree=self._duree)
         clecert.set_cert(certificate)
 
         chaine = self.aligner_chaine(certificate)
@@ -1970,12 +1982,13 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def renouveller_par_role(self, role, common_name, liste_dns: list = None):
+    def renouveller_par_role(self, role, common_name, liste_dns: list = None, duree: int = None, duree_heures: int = None):
         generateur = self.__generateurs_par_role[role]
         if issubclass(generateur, GenerateurNoeud):
             generateur_instance = generateur(
                 self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire,
-                domaines_publics=liste_dns, generer_password=self.__generer_password)
+                domaines_publics=liste_dns, generer_password=self.__generer_password,
+                duree=duree, duree_heures=duree_heures)
         else:
             generateur_instance = generateur(
                 self.__idmg, role, common_name, self.__dict_ca, self.__clecert_intermediaire,
