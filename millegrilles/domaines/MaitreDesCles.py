@@ -374,26 +374,26 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJDocumentCles"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_MAJ_MOTDEPASSE:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusMAJMotdepasse"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_SIGNER_CERTIFICAT_NOEUD:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCertificatNoeud"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatNavigateur"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_RENOUVELLEMENT_CERTIFICAT:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusRenouvellerCertificat"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_SIGNER_CERTIFICAT_NOEUD:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusSignerCertificatNoeud"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatNavigateur"
         elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_DECLASSER_CLE_GROSFICHIER:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusDeclasserCleGrosFichier"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_DEMANDE_INSCRIPTION:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererDemandeInscription"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatPourTiers"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementNouveauTrousseau"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMajTrousseau"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMotdepasseCle"
-        elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_SUPPRIMER:
-            processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementSupprimer"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_DEMANDE_INSCRIPTION:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererDemandeInscription"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusGenererCertificatPourTiers"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementNouveauTrousseau"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMajTrousseau"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementMotdepasseCle"
+        #elif domaine_transaction == ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_SUPPRIMER:
+        #    processus = "millegrilles_domaines_MaitreDesCles:ProcessusHebergementSupprimer"
 
         elif domaine_action == ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP:
             processus = "millegrilles_domaines_MaitreDesCles:ProcessusCleGrosfichierBackup"
@@ -476,57 +476,57 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return reponse
 
-    def generer_certificat_connecteur(self, idmg_tiers, csr) -> EnveloppeCleCert:
-        # Trouver generateur pour le role
-        renouvelleur = self.renouvelleur_certificat
-        certificat = renouvelleur.signer_connecteur_tiers(idmg_tiers, csr)
-        clecert = EnveloppeCleCert(cert=certificat)
+    # def generer_certificat_connecteur(self, idmg_tiers, csr) -> EnveloppeCleCert:
+    #     # Trouver generateur pour le role
+    #     renouvelleur = self.renouvelleur_certificat
+    #     certificat = renouvelleur.signer_connecteur_tiers(idmg_tiers, csr)
+    #     clecert = EnveloppeCleCert(cert=certificat)
+    #
+    #     return clecert
 
-        return clecert
-
-    def transmettre_cle_racine(self, properties, message_dict: dict):
-        self._logger.debug("Preparation transmission de la cle Racine, requete : %s" % str(message_dict))
-
-        # Verifier que le demandeur a l'autorisation de se faire transmettre la cle racine
-        en_tete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-        fingerprint_demandeur = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
-        certificat_demandeur = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demandeur)
-        exchanges_certificat = certificat_demandeur.get_exchanges
-        roles_certificat = certificat_demandeur.get_roles
-
-        exchanges_acceptes = [ConstantesSecurite.EXCHANGE_PROTEGE, ConstantesSecurite.EXCHANGE_SECURE]
-        roles_acceptes = [
-            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL
-        ]
-        if not any(exchange in exchanges_acceptes for exchange in exchanges_certificat):
-            raise Exception("Certificat %s non autorise a recevoir cle racine (exchange)" % fingerprint_demandeur)
-        if not any(exchange in roles_acceptes for exchange in roles_certificat):
-            raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
-
-        with open(self.configuration.pki_cafile, 'r') as fichier:
-            fichier_cert_racine = fichier.read()
-
-        with open(self.configuration.pki_keymillegrille, 'rb') as fichier:
-            fichier_key_racine = fichier.read()
-
-        with open(self.configuration.pki_password_millegrille, 'rb') as fichier:
-            password_millegrille = fichier.read()
-
-        clecert = EnveloppeCleCert()
-        clecert.key_from_pem_bytes(fichier_key_racine, password_millegrille)
-
-        # Dechiffrer le mot de passe demande pour le retour de la cle privee chiffree
-        mot_de_passe_chiffre = message_dict['mot_de_passe_chiffre']
-        mot_de_passe_dechiffre = self.decrypter_contenu(mot_de_passe_chiffre)
-        clecert.password = mot_de_passe_dechiffre
-        cle_privee_chiffree = clecert.private_key_bytes
-
-        return {
-            'cle_racine': cle_privee_chiffree.decode('utf-8'),
-            'cert_racine': fichier_cert_racine,
-        }
+    # def transmettre_cle_racine(self, properties, message_dict: dict):
+    #     self._logger.debug("Preparation transmission de la cle Racine, requete : %s" % str(message_dict))
+    #
+    #     # Verifier que le demandeur a l'autorisation de se faire transmettre la cle racine
+    #     en_tete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+    #     fingerprint_demandeur = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+    #     certificat_demandeur = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demandeur)
+    #     exchanges_certificat = certificat_demandeur.get_exchanges
+    #     roles_certificat = certificat_demandeur.get_roles
+    #
+    #     exchanges_acceptes = [ConstantesSecurite.EXCHANGE_PROTEGE, ConstantesSecurite.EXCHANGE_SECURE]
+    #     roles_acceptes = [
+    #         ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+    #         ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR,
+    #         ConstantesGenerateurCertificat.ROLE_COUPDOEIL
+    #     ]
+    #     if not any(exchange in exchanges_acceptes for exchange in exchanges_certificat):
+    #         raise Exception("Certificat %s non autorise a recevoir cle racine (exchange)" % fingerprint_demandeur)
+    #     if not any(exchange in roles_acceptes for exchange in roles_certificat):
+    #         raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
+    #
+    #     with open(self.configuration.pki_cafile, 'r') as fichier:
+    #         fichier_cert_racine = fichier.read()
+    #
+    #     with open(self.configuration.pki_keymillegrille, 'rb') as fichier:
+    #         fichier_key_racine = fichier.read()
+    #
+    #     with open(self.configuration.pki_password_millegrille, 'rb') as fichier:
+    #         password_millegrille = fichier.read()
+    #
+    #     clecert = EnveloppeCleCert()
+    #     clecert.key_from_pem_bytes(fichier_key_racine, password_millegrille)
+    #
+    #     # Dechiffrer le mot de passe demande pour le retour de la cle privee chiffree
+    #     mot_de_passe_chiffre = message_dict['mot_de_passe_chiffre']
+    #     mot_de_passe_dechiffre = self.decrypter_contenu(mot_de_passe_chiffre)
+    #     clecert.password = mot_de_passe_dechiffre
+    #     cle_privee_chiffree = clecert.private_key_bytes
+    #
+    #     return {
+    #         'cle_racine': cle_privee_chiffree.decode('utf-8'),
+    #         'cert_racine': fichier_cert_racine,
+    #     }
 
     def transmettre_cle_grosfichier(self, evenement, properties):
         """
@@ -907,94 +907,94 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             enveloppe_certificat = None  # Va forcer le refus de la requete
         return enveloppe_certificat, estampille, temps_limite_demande
 
-    def transmettre_trousseau_hebergement(self, evenement: dict, properties):
-        """
-        Charge et transmet le trousseau de cle-cert de millegrilles hebergees, avec mot de passe chiffre.
-        :param evenement:
-        :param properties:
-        :return:
-        """
-        fingerprint = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
-        certificat_destinataire: EnveloppeCertificat = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
-        certificat = certificat_destinataire.certificat
-
-        # Identifier le role a extraire des trousseaux / mots de passe
-        roles = certificat_destinataire.get_roles
-        # role = 'transaction'
-        # role = roles[0]
-
-        roles = [role.replace('heb_', '') for role in roles if role.startswith('heb_')]
-        if len(roles) == 1:
-            role = roles[0]
-        else:
-            raise ValueError("Plusieurs roles d'hebergement trouve : %s" % roles)
-
-        if role == ConstantesGenerateurCertificat.ROLE_MAITREDESCLES:
-            # Ajouter le mot de passe et cle intermediaire
-            roles.append('intermediaire')
-
-        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        liste_idmg = evenement['idmg']
-
-        # Charger mots de passe, rechiffrer pour destination
-        filtre_motsdepasses = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.idmg': {'$in': liste_idmg},
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.role': {'$in': roles},
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
-        }
-        curseur_motsdepasse = collection.find(filtre_motsdepasses)
-        dict_motsdepasse_paridmg = dict()
-        dict_motsdepasse_intermediaire_paridmg = dict()
-        for motdepasse_info in curseur_motsdepasse:
-            idmg = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['idmg']
-            role_motdepasse = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['role']
-            motdepasse_dechiffre = self.decrypter_motdepasse(motdepasse_info['motdepasse'])
-            motdepasse_chiffre, fingerprint = self.crypter_cle(motdepasse_dechiffre, cert=certificat)
-
-            if role_motdepasse == 'intermediaire':
-                dict_motsdepasse_intermediaire_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
-            else:
-                dict_motsdepasse_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
-
-        filtre = {
-            'identificateurs_document.idmg': {'$in': liste_idmg},
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
-        }
-        curseur_trousseaux = collection.find(filtre)
-
-        resultats = []
-        for doc in curseur_trousseaux:
-            # Charger trousseaux
-            idmg = doc['idmg']
-            info_millegrille = {
-                'idmg': idmg,
-                'certificats': {
-                    'millegrille': doc['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
-                    'intermediaire': doc['intermediaire'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT:
-                        doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT][
-                            ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_HOTE_PEM:
-                        doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT][
-                            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HOTE_PEM],
-                },
-                'motdepasse_chiffre': dict_motsdepasse_paridmg[idmg],
-            }
-            info_millegrille.update(doc[role])
-
-            motdepasse_intermediaire = dict_motsdepasse_intermediaire_paridmg.get(idmg)
-            if motdepasse_intermediaire:
-                info_millegrille['intermediaire_passwd'] = motdepasse_intermediaire
-                info_millegrille['intermediaire_cle'] = doc['intermediaire']['cle']
-
-            resultats.append(info_millegrille)
-
-        reponse = {
-            'resultats': resultats
-        }
-        self.generateur_transactions.transmettre_reponse(
-            reponse, properties.reply_to, properties.correlation_id
-        )
+    # def transmettre_trousseau_hebergement(self, evenement: dict, properties):
+    #     """
+    #     Charge et transmet le trousseau de cle-cert de millegrilles hebergees, avec mot de passe chiffre.
+    #     :param evenement:
+    #     :param properties:
+    #     :return:
+    #     """
+    #     fingerprint = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+    #     certificat_destinataire: EnveloppeCertificat = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint)
+    #     certificat = certificat_destinataire.certificat
+    #
+    #     # Identifier le role a extraire des trousseaux / mots de passe
+    #     roles = certificat_destinataire.get_roles
+    #     # role = 'transaction'
+    #     # role = roles[0]
+    #
+    #     roles = [role.replace('heb_', '') for role in roles if role.startswith('heb_')]
+    #     if len(roles) == 1:
+    #         role = roles[0]
+    #     else:
+    #         raise ValueError("Plusieurs roles d'hebergement trouve : %s" % roles)
+    #
+    #     if role == ConstantesGenerateurCertificat.ROLE_MAITREDESCLES:
+    #         # Ajouter le mot de passe et cle intermediaire
+    #         roles.append('intermediaire')
+    #
+    #     collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+    #     liste_idmg = evenement['idmg']
+    #
+    #     # Charger mots de passe, rechiffrer pour destination
+    #     filtre_motsdepasses = {
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.idmg': {'$in': liste_idmg},
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.role': {'$in': roles},
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
+    #     }
+    #     curseur_motsdepasse = collection.find(filtre_motsdepasses)
+    #     dict_motsdepasse_paridmg = dict()
+    #     dict_motsdepasse_intermediaire_paridmg = dict()
+    #     for motdepasse_info in curseur_motsdepasse:
+    #         idmg = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['idmg']
+    #         role_motdepasse = motdepasse_info[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['role']
+    #         motdepasse_dechiffre = self.decrypter_motdepasse(motdepasse_info['motdepasse'])
+    #         motdepasse_chiffre, fingerprint = self.crypter_cle(motdepasse_dechiffre, cert=certificat)
+    #
+    #         if role_motdepasse == 'intermediaire':
+    #             dict_motsdepasse_intermediaire_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
+    #         else:
+    #             dict_motsdepasse_paridmg[idmg] = str(b64encode(motdepasse_chiffre), 'utf-8')
+    #
+    #     filtre = {
+    #         'identificateurs_document.idmg': {'$in': liste_idmg},
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+    #     }
+    #     curseur_trousseaux = collection.find(filtre)
+    #
+    #     resultats = []
+    #     for doc in curseur_trousseaux:
+    #         # Charger trousseaux
+    #         idmg = doc['idmg']
+    #         info_millegrille = {
+    #             'idmg': idmg,
+    #             'certificats': {
+    #                 'millegrille': doc['millegrille'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+    #                 'intermediaire': doc['intermediaire'][ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+    #                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT:
+    #                     doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT][
+    #                         ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM],
+    #                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_HOTE_PEM:
+    #                     doc[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT][
+    #                         ConstantesMaitreDesCles.TRANSACTION_CHAMP_HOTE_PEM],
+    #             },
+    #             'motdepasse_chiffre': dict_motsdepasse_paridmg[idmg],
+    #         }
+    #         info_millegrille.update(doc[role])
+    #
+    #         motdepasse_intermediaire = dict_motsdepasse_intermediaire_paridmg.get(idmg)
+    #         if motdepasse_intermediaire:
+    #             info_millegrille['intermediaire_passwd'] = motdepasse_intermediaire
+    #             info_millegrille['intermediaire_cle'] = doc['intermediaire']['cle']
+    #
+    #         resultats.append(info_millegrille)
+    #
+    #     reponse = {
+    #         'resultats': resultats
+    #     }
+    #     self.generateur_transactions.transmettre_reponse(
+    #         reponse, properties.reply_to, properties.correlation_id
+    #     )
 
     def compter_cles_non_dechiffrables(self, message_dict: dict):
         """
@@ -1124,72 +1124,72 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return reponse
 
-    def signer_cle_backup(self, properties, message_dict):
-        self._logger.debug("Signer cle de backup : %s" % str(message_dict))
-
-        # Verifier que le demandeur a l'autorisation de se faire transmettre la cle racine
-        en_tete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-        fingerprint_demandeur = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
-        certificat_demandeur = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demandeur)
-        exchanges_certificat = certificat_demandeur.get_exchanges
-        roles_certificat = certificat_demandeur.get_roles
-
-        exchanges_acceptes = [ConstantesSecurite.EXCHANGE_PROTEGE, ConstantesSecurite.EXCHANGE_SECURE]
-        roles_acceptes = [
-            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL
-        ]
-        if not any(exchange in exchanges_acceptes for exchange in exchanges_certificat):
-            raise Exception("Certificat %s non autorise a recevoir cle racine (exchange)" % fingerprint_demandeur)
-        if not any(exchange in roles_acceptes for exchange in roles_certificat):
-            raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
-
-        public_key_str = message_dict['cle_publique']
-        if 'BEGIN PUBLIC KEY' not in public_key_str:
-            public_key_str = PemHelpers.wrap_public_key(public_key_str)
-        sujet = 'Backup'
-
-        # Trouver generateur pour le role
-        renouvelleur = self.renouvelleur_certificat
-        clecert = renouvelleur.signer_backup(public_key_str, sujet)
-
-        # Generer nouvelle transaction pour sauvegarder le certificat
-        transaction = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
-            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
-            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
-            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
-            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
-            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
-            ConstantesPki.LIBELLE_ROLES: clecert.get_roles
-        }
-
-        self.generateur_transactions.soumettre_transaction(
-            transaction,
-            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-        )
-
-        # Ajouter certificat a la liste des certs de backup
-        enveloppe = EnveloppeCertificat(certificat_pem=clecert.cert_bytes)
-        fingerprint_backup = EnveloppeCertificat.calculer_fingerprint_b64(enveloppe.certificat)
-        self.__certificats_backup[fingerprint_backup] = enveloppe
-
-        # Rechiffrer toutes les cles avec ce nouveau certificat de backup
-        processus = "millegrilles_domaines_MaitreDesCles:ProcessusTrouverClesBackupManquantes"
-        fingerprints_backup = {'fingerprints_base64': list(self.__certificats_backup.keys())}
-        self.demarrer_processus(processus, fingerprints_backup)
-
-        # Creer une reponse pour coupdoeil
-        info_cert = transaction.copy()
-        del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
-
-        return {
-            'certificat_info': info_cert,
-            'cert': clecert.cert_bytes.decode('utf-8'),
-            'fullchain': clecert.chaine,
-        }
+    # def signer_cle_backup(self, properties, message_dict):
+    #     self._logger.debug("Signer cle de backup : %s" % str(message_dict))
+    #
+    #     # Verifier que le demandeur a l'autorisation de se faire transmettre la cle racine
+    #     en_tete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+    #     fingerprint_demandeur = en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+    #     certificat_demandeur = self._contexte.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demandeur)
+    #     exchanges_certificat = certificat_demandeur.get_exchanges
+    #     roles_certificat = certificat_demandeur.get_roles
+    #
+    #     exchanges_acceptes = [ConstantesSecurite.EXCHANGE_PROTEGE, ConstantesSecurite.EXCHANGE_SECURE]
+    #     roles_acceptes = [
+    #         ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+    #         ConstantesGenerateurCertificat.ROLE_COUPDOEIL_NAVIGATEUR,
+    #         ConstantesGenerateurCertificat.ROLE_COUPDOEIL
+    #     ]
+    #     if not any(exchange in exchanges_acceptes for exchange in exchanges_certificat):
+    #         raise Exception("Certificat %s non autorise a recevoir cle racine (exchange)" % fingerprint_demandeur)
+    #     if not any(exchange in roles_acceptes for exchange in roles_certificat):
+    #         raise Exception("Certificat %s non autorise a recevoir cle racine (role)" % fingerprint_demandeur)
+    #
+    #     public_key_str = message_dict['cle_publique']
+    #     if 'BEGIN PUBLIC KEY' not in public_key_str:
+    #         public_key_str = PemHelpers.wrap_public_key(public_key_str)
+    #     sujet = 'Backup'
+    #
+    #     # Trouver generateur pour le role
+    #     renouvelleur = self.renouvelleur_certificat
+    #     clecert = renouvelleur.signer_backup(public_key_str, sujet)
+    #
+    #     # Generer nouvelle transaction pour sauvegarder le certificat
+    #     transaction = {
+    #         ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+    #         ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+    #         ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+    #         ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+    #         ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+    #         ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+    #         ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+    #         ConstantesPki.LIBELLE_ROLES: clecert.get_roles
+    #     }
+    #
+    #     self.generateur_transactions.soumettre_transaction(
+    #         transaction,
+    #         ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+    #     )
+    #
+    #     # Ajouter certificat a la liste des certs de backup
+    #     enveloppe = EnveloppeCertificat(certificat_pem=clecert.cert_bytes)
+    #     fingerprint_backup = EnveloppeCertificat.calculer_fingerprint_b64(enveloppe.certificat)
+    #     self.__certificats_backup[fingerprint_backup] = enveloppe
+    #
+    #     # Rechiffrer toutes les cles avec ce nouveau certificat de backup
+    #     processus = "millegrilles_domaines_MaitreDesCles:ProcessusTrouverClesBackupManquantes"
+    #     fingerprints_backup = {'fingerprints_base64': list(self.__certificats_backup.keys())}
+    #     self.demarrer_processus(processus, fingerprints_backup)
+    #
+    #     # Creer une reponse pour coupdoeil
+    #     info_cert = transaction.copy()
+    #     del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+    #
+    #     return {
+    #         'certificat_info': info_cert,
+    #         'cert': clecert.cert_bytes.decode('utf-8'),
+    #         'fullchain': clecert.chaine,
+    #     }
 
     def sauvegarder_cle(self, message_dict: dict):
         """
@@ -1313,176 +1313,176 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
-    def signer_csr(self, properties, message_dict):
-        """
-        Signer des requetes (CSR) et retourner les certificats
-        :param properties:
-        :param message_dict:
-        :return:
-        """
-        # Verifier si le demandeur est autorise
-        enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
-        roles_permis = [
-            ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
-            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-        ]
-        roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self.configuration.idmg and \
-            any([role in roles_cert] for role in roles_permis):
+    # def signer_csr(self, properties, message_dict):
+    #     """
+    #     Signer des requetes (CSR) et retourner les certificats
+    #     :param properties:
+    #     :param message_dict:
+    #     :return:
+    #     """
+    #     # Verifier si le demandeur est autorise
+    #     enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
+    #     roles_permis = [
+    #         ConstantesGenerateurCertificat.ROLE_MONITOR_DEPENDANT,
+    #         ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+    #         ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+    #     ]
+    #     roles_cert = enveloppe_cert.get_roles
+    #     if enveloppe_cert.subject_organization_name == self.configuration.idmg and \
+    #         any([role in roles_cert] for role in roles_permis):
+    #
+    #         # Generer certificats
+    #         pems = list()
+    #         chaines = list()
+    #         for pem in message_dict['liste_csr']:
+    #             clecert = self.__renouvelleur_certificat.signer_csr(pem.encode('utf-8'), role=message_dict.get('role'))
+    #             pems.append(str(clecert.cert_bytes, 'utf-8'))
+    #
+    #             chaine = {
+    #                 'pems': clecert.chaine
+    #             }
+    #             chaines.append(chaine)
+    #
+    #             # Soumettre transaction du nouveau certificat
+    #             self.soumettre_transaction_certificat(clecert)
+    #
+    #         # Transmettre certificats en reponse
+    #         reponse = {
+    #             'certificats_pem': pems,
+    #             'chaines': chaines,
+    #         }
+    #         return reponse
+    #         # self.generateur_transactions.transmettre_reponse(
+    #         #     reponse, replying_to=properties.reply_to, correlation_id=properties.correlation_id)
+    #     else:
+    #         raise Exception("Certificat non autorise pour signature de CSR : %s" % str(roles_cert))
 
-            # Generer certificats
-            pems = list()
-            chaines = list()
-            for pem in message_dict['liste_csr']:
-                clecert = self.__renouvelleur_certificat.signer_csr(pem.encode('utf-8'), role=message_dict.get('role'))
-                pems.append(str(clecert.cert_bytes, 'utf-8'))
+    # def signer_csr_navigateur(self, properties, message_dict):
+    #     """
+    #     Signer des requetes (CSR) et retourner les certificats
+    #     :param properties:
+    #     :param message_dict:
+    #     :return:
+    #     """
+    #     # Verifier si le demandeur est autorise
+    #     enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
+    #     roles_permis = [
+    #         ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+    #         ConstantesGenerateurCertificat.ROLE_DOMAINES,
+    #     ]
+    #     roles_cert = enveloppe_cert.get_roles
+    #     if enveloppe_cert.subject_organization_name == self.configuration.idmg and \
+    #         any(any([role in roles_cert]) for role in roles_permis):
+    #         pass
+    #     else:
+    #         raise Exception("Role non permis pour signer un certificat de navigateur : %s" % str(roles_cert))
+    #
+    #     # Generer certificats
+    #     pem_csr = message_dict['csr']
+    #
+    #     niveau_securite = Constantes.SECURITE_PRIVE
+    #     est_proprietaire = message_dict.get('estProprietaire')
+    #     if est_proprietaire:
+    #         niveau_securite = Constantes.SECURITE_PROTEGE
+    #
+    #     clecert = self.__renouvelleur_certificat.signer_navigateur(
+    #         pem_csr.encode('utf-8'),
+    #         securite=niveau_securite,
+    #         est_proprietaire=est_proprietaire
+    #     )
+    #     chaine = clecert.chaine
+    #
+    #     # Soumettre transaction du nouveau certificat
+    #     self.soumettre_transaction_certificat(clecert)
+    #
+    #     # Transmettre certificats en reponse
+    #     pem_cert = clecert.cert_bytes.decode('utf-8')
+    #
+    #     reponse = {
+    #         'certificat_pem': pem_cert,
+    #         'chaine': chaine,
+    #     }
+    #     return reponse
 
-                chaine = {
-                    'pems': clecert.chaine
-                }
-                chaines.append(chaine)
+    # def sauvegarder_trousseau_hebergement(self, transaction):
+    #     """
+    #     Conserve le trousseau (certs, cles) dans un document d'hebergement
+    #     :param transaction:
+    #     :return:
+    #     """
+    #     idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+    #
+    #     set_ops = {
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE: transaction[
+    #             ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE],
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE: transaction[
+    #             ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE],
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT: transaction[
+    #             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT],
+    #     }
+    #     contenu_on_insert = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+    #         Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+    #         Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_SECURE,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+    #             Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg
+    #         }
+    #     }
+    #     ops = {
+    #         '$set': set_ops,
+    #         '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+    #         '$setOnInsert': contenu_on_insert,
+    #     }
+    #
+    #     filtre = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+    #     }
+    #
+    #     collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+    #     collection.update_one(filtre, ops, upsert=True)
 
-                # Soumettre transaction du nouveau certificat
-                self.soumettre_transaction_certificat(clecert)
+    # def maj_trousseau_hebergement(self, idmg, cles):
+    #     """
+    #     Conserve le trousseau (certs, cles) dans un document d'hebergement
+    #     :param idmg:
+    #     :param cles:
+    #     :return:
+    #     """
+    #     set_ops = cles
+    #     ops = {
+    #         '$set': set_ops,
+    #         '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+    #     }
+    #
+    #     filtre = {
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+    #     }
+    #
+    #     collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+    #     collection.update_one(filtre, ops)
 
-            # Transmettre certificats en reponse
-            reponse = {
-                'certificats_pem': pems,
-                'chaines': chaines,
-            }
-            return reponse
-            # self.generateur_transactions.transmettre_reponse(
-            #     reponse, replying_to=properties.reply_to, correlation_id=properties.correlation_id)
-        else:
-            raise Exception("Certificat non autorise pour signature de CSR : %s" % str(roles_cert))
-
-    def signer_csr_navigateur(self, properties, message_dict):
-        """
-        Signer des requetes (CSR) et retourner les certificats
-        :param properties:
-        :param message_dict:
-        :return:
-        """
-        # Verifier si le demandeur est autorise
-        enveloppe_cert = self.verificateur_transaction.verifier(message_dict)
-        roles_permis = [
-            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-            ConstantesGenerateurCertificat.ROLE_DOMAINES,
-        ]
-        roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self.configuration.idmg and \
-            any(any([role in roles_cert]) for role in roles_permis):
-            pass
-        else:
-            raise Exception("Role non permis pour signer un certificat de navigateur : %s" % str(roles_cert))
-
-        # Generer certificats
-        pem_csr = message_dict['csr']
-
-        niveau_securite = Constantes.SECURITE_PRIVE
-        est_proprietaire = message_dict.get('estProprietaire')
-        if est_proprietaire:
-            niveau_securite = Constantes.SECURITE_PROTEGE
-
-        clecert = self.__renouvelleur_certificat.signer_navigateur(
-            pem_csr.encode('utf-8'),
-            securite=niveau_securite,
-            est_proprietaire=est_proprietaire
-        )
-        chaine = clecert.chaine
-
-        # Soumettre transaction du nouveau certificat
-        self.soumettre_transaction_certificat(clecert)
-
-        # Transmettre certificats en reponse
-        pem_cert = clecert.cert_bytes.decode('utf-8')
-
-        reponse = {
-            'certificat_pem': pem_cert,
-            'chaine': chaine,
-        }
-        return reponse
-
-    def sauvegarder_trousseau_hebergement(self, transaction):
-        """
-        Conserve le trousseau (certs, cles) dans un document d'hebergement
-        :param transaction:
-        :return:
-        """
-        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-
-        set_ops = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE: transaction[
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_MILLEGRILLE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE: transaction[
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_INTERMEDIAIRE],
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT: transaction[
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HEBERGEMENT],
-        }
-        contenu_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
-            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            Constantes.DOCUMENT_INFODOC_SECURITE: Constantes.SECURITE_SECURE,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg
-            }
-        }
-        ops = {
-            '$set': set_ops,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-            '$setOnInsert': contenu_on_insert,
-        }
-
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
-        }
-
-        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        collection.update_one(filtre, ops, upsert=True)
-
-    def maj_trousseau_hebergement(self, idmg, cles):
-        """
-        Conserve le trousseau (certs, cles) dans un document d'hebergement
-        :param idmg:
-        :param cles:
-        :return:
-        """
-        set_ops = cles
-        ops = {
-            '$set': set_ops,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
-        }
-
-        filtre = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
-        }
-
-        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        collection.update_one(filtre, ops)
-
-    def supprimer_trousseau_hebergement(self, idmg):
-        """
-        Supprimer le trousseau d'une MilleGrille hebergee
-        :param idmg:
-        :param cles:
-        :return:
-        """
-        filtre = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
-            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
-                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
-                ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
-            ]}
-        }
-
-        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-        collection.delete_many(filtre)
+    # def supprimer_trousseau_hebergement(self, idmg):
+    #     """
+    #     Supprimer le trousseau d'une MilleGrille hebergee
+    #     :param idmg:
+    #     :param cles:
+    #     :return:
+    #     """
+    #     filtre = {
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: Constantes.ConstantesHebergement.DOMAINE_NOM,
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+    #             ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+    #             ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
+    #         ]}
+    #     }
+    #
+    #     collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+    #     collection.delete_many(filtre)
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
@@ -1749,92 +1749,92 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return transactions
 
-    def creer_cles_modules_heberges(self, idmg: str, noms_roles: list):
-        collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-
-        filtre_trousseau = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
-        }
-        trousseau = collection.find_one(filtre_trousseau)
-
-        info_roles_cles = dict()  # Roles pour lesquels on charge la cle
-        fingerprint_intermediaire = None
-        clecerts = dict()
-        dict_ca = dict()  # Liste de clecert CA par skid, utilise par RenouvelleurCertificats
-        for cle, valeur in trousseau.items():
-            if isinstance(valeur, dict):
-                fingerprint = valeur.get(ConstantesPki.LIBELLE_FINGERPRINT)
-
-                if fingerprint:
-                    clecert = EnveloppeCleCert()
-                    clecert.cert_from_pem_bytes(valeur[ConstantesPki.LIBELLE_CERTIFICAT_PEM].encode('utf-8'))
-                    clecerts[fingerprint] = clecert
-
-                    # Ajouter cert dans la liste des autorites connues
-                    dict_ca[clecert.skid] = clecert.cert
-
-                    if cle in ['intermediaire']:  # Role pour lesquels on charge la cle
-                        fingerprint = valeur[ConstantesPki.LIBELLE_FINGERPRINT]
-                        info_roles_cles[fingerprint] = valeur
-
-                    if cle == 'intermediaire':
-                        fingerprint_intermediaire = fingerprint
-
-        filtre_motsdepasse = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + "." + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + "." + ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(info_roles_cles.keys())},
-        }
-        curseur_mots_de_passe = collection.find(filtre_motsdepasse)
-        for doc_motdepasse in curseur_mots_de_passe:
-            fingerprint = doc_motdepasse[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesPki.LIBELLE_FINGERPRINT]
-            motdepasse = self.decrypter_motdepasse(doc_motdepasse[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE])
-
-            info_role_courant = info_roles_cles[fingerprint]
-            key_pem = info_role_courant[ConstantesPki.LIBELLE_CLE].encode('utf-8')
-
-            clecert = clecerts[fingerprint]
-            clecert.key_from_pem_bytes(key_pem, motdepasse)
-
-        # Preparer le generateur de certicats. Toujours generer cles privees avec mots de passe.
-        clecert_intermediaire = clecerts[fingerprint_intermediaire]
-        renouvelleur_certificat_hebergement = RenouvelleurCertificat(
-            idmg, dict_ca, clecert_intermediaire=clecert_intermediaire, generer_password=True)
-
-        transaction_trousseau = {
-            'idmg': idmg,
-            'securite': Constantes.SECURITE_SECURE,
-        }
-        transactions_motsdepasse = list()
-        for role in noms_roles:
-            clecert = renouvelleur_certificat_hebergement.renouveller_par_role(role, 'heberge')
-            motdepasse_cle_chiffre, fingerprint = self.crypter_cle(b64decode(clecert.password))
-            motdepasse_cle_chiffre = str(b64encode(motdepasse_cle_chiffre), 'utf-8')
-            fingerprint_b64 = clecert.fingerprint_b64
-
-            transaction_trousseau[role] = {
-                ConstantesPki.LIBELLE_CERTIFICAT_PEM: str(clecert.cert_bytes, 'utf-8'),
-                ConstantesPki.LIBELLE_CLE: str(clecert.private_key_bytes, 'utf-8'),
-                ConstantesPki.LIBELLE_FINGERPRINT: fingerprint_b64,
-            }
-
-            transactions_motsdepasse.append({
-                'domaine': 'millegrilles.domaines.Hebergement',
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                    'idmg': idmg,
-                    'role': role,
-                    'fingerprint': fingerprint_b64,
-                },
-                'sujet': 'motdepasse.cleprivee',
-                'motdepasse': motdepasse_cle_chiffre,
-                'securite': Constantes.SECURITE_SECURE,
-            })
-
-        return {
-            'trousseau': transaction_trousseau,
-            'motsdepasse': transactions_motsdepasse,
-        }
+    # def creer_cles_modules_heberges(self, idmg: str, noms_roles: list):
+    #     collection = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+    #
+    #     filtre_trousseau = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU,
+    #         Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+    #     }
+    #     trousseau = collection.find_one(filtre_trousseau)
+    #
+    #     info_roles_cles = dict()  # Roles pour lesquels on charge la cle
+    #     fingerprint_intermediaire = None
+    #     clecerts = dict()
+    #     dict_ca = dict()  # Liste de clecert CA par skid, utilise par RenouvelleurCertificats
+    #     for cle, valeur in trousseau.items():
+    #         if isinstance(valeur, dict):
+    #             fingerprint = valeur.get(ConstantesPki.LIBELLE_FINGERPRINT)
+    #
+    #             if fingerprint:
+    #                 clecert = EnveloppeCleCert()
+    #                 clecert.cert_from_pem_bytes(valeur[ConstantesPki.LIBELLE_CERTIFICAT_PEM].encode('utf-8'))
+    #                 clecerts[fingerprint] = clecert
+    #
+    #                 # Ajouter cert dans la liste des autorites connues
+    #                 dict_ca[clecert.skid] = clecert.cert
+    #
+    #                 if cle in ['intermediaire']:  # Role pour lesquels on charge la cle
+    #                     fingerprint = valeur[ConstantesPki.LIBELLE_FINGERPRINT]
+    #                     info_roles_cles[fingerprint] = valeur
+    #
+    #                 if cle == 'intermediaire':
+    #                     fingerprint_intermediaire = fingerprint
+    #
+    #     filtre_motsdepasse = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_MOTDEPASSE,
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + "." + Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG: idmg,
+    #         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS + "." + ConstantesPki.LIBELLE_FINGERPRINT: {'$in': list(info_roles_cles.keys())},
+    #     }
+    #     curseur_mots_de_passe = collection.find(filtre_motsdepasse)
+    #     for doc_motdepasse in curseur_mots_de_passe:
+    #         fingerprint = doc_motdepasse[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesPki.LIBELLE_FINGERPRINT]
+    #         motdepasse = self.decrypter_motdepasse(doc_motdepasse[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE])
+    #
+    #         info_role_courant = info_roles_cles[fingerprint]
+    #         key_pem = info_role_courant[ConstantesPki.LIBELLE_CLE].encode('utf-8')
+    #
+    #         clecert = clecerts[fingerprint]
+    #         clecert.key_from_pem_bytes(key_pem, motdepasse)
+    #
+    #     # Preparer le generateur de certicats. Toujours generer cles privees avec mots de passe.
+    #     clecert_intermediaire = clecerts[fingerprint_intermediaire]
+    #     renouvelleur_certificat_hebergement = RenouvelleurCertificat(
+    #         idmg, dict_ca, clecert_intermediaire=clecert_intermediaire, generer_password=True)
+    #
+    #     transaction_trousseau = {
+    #         'idmg': idmg,
+    #         'securite': Constantes.SECURITE_SECURE,
+    #     }
+    #     transactions_motsdepasse = list()
+    #     for role in noms_roles:
+    #         clecert = renouvelleur_certificat_hebergement.renouveller_par_role(role, 'heberge')
+    #         motdepasse_cle_chiffre, fingerprint = self.crypter_cle(b64decode(clecert.password))
+    #         motdepasse_cle_chiffre = str(b64encode(motdepasse_cle_chiffre), 'utf-8')
+    #         fingerprint_b64 = clecert.fingerprint_b64
+    #
+    #         transaction_trousseau[role] = {
+    #             ConstantesPki.LIBELLE_CERTIFICAT_PEM: str(clecert.cert_bytes, 'utf-8'),
+    #             ConstantesPki.LIBELLE_CLE: str(clecert.private_key_bytes, 'utf-8'),
+    #             ConstantesPki.LIBELLE_FINGERPRINT: fingerprint_b64,
+    #         }
+    #
+    #         transactions_motsdepasse.append({
+    #             'domaine': 'millegrilles.domaines.Hebergement',
+    #             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+    #                 'idmg': idmg,
+    #                 'role': role,
+    #                 'fingerprint': fingerprint_b64,
+    #             },
+    #             'sujet': 'motdepasse.cleprivee',
+    #             'motdepasse': motdepasse_cle_chiffre,
+    #             'securite': Constantes.SECURITE_SECURE,
+    #         })
+    #
+    #     return {
+    #         'trousseau': transaction_trousseau,
+    #         'motsdepasse': transactions_motsdepasse,
+    #     }
 
     def soumettre_transaction_certificat(self, clecert):
         transaction = {
@@ -1882,7 +1882,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         elif domaine_action in ['cleBackupApplication', 'cleBackupApplicationBackup']:
             libval = ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION
         else:
-            raise Exception("Type transaction non supportee")
+            raise Exception("Type transaction non supportee : " + domaine_action)
 
         identificateurs_documents = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
         # Extraire les cles de document de la transaction (par processus d'elimination)
@@ -2284,253 +2284,253 @@ class ProcessusNouvelleCleBackupApplicationBackup(ProcessusReceptionCles):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusRenouvellerCertificat(MGProcessusTransaction):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    # def traitement_regenerer(self, id_transaction, parametres_processus):
-    #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
-    #     pass
-
-    def initiale(self):
-        transaction = self.transaction
-        role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
-        altdomains = transaction.get(ConstantesPki.CHAMP_ALT_DOMAINS)
-        node = transaction['node']
-
-        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
-        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
-        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
-        roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
-            'deployeur' in roles_cert or 'maitredescles' in roles_cert:
-            # Le deployeur et le maitre des cles ont l'autorisation de renouveller n'importe quel certificat
-            # Coupdoeil a tous les acces au niveau secure
-            self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
-        else:
-            self.set_etape_suivante(ProcessusRenouvellerCertificat.refuser_generation.__name__)
-            return {
-                'autorise': False,
-                'role': role,
-                'altdomains': altdomains,
-                'description': 'demandeur non autorise a renouveller ce certificat',
-                'roles_demandeur': roles_cert
-            }
-
-        return {
-            'autorise': True,
-            'role': role,
-            'altdomains': altdomains,
-            'roles_demandeur': roles_cert,
-            'node': node,
-        }
-
-    def generer_cert(self):
-        """
-        Generer cert et creer nouvelle transaction pour PKI
-        :return:
-        """
-        transaction = self.transaction
-        role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
-        node_name = self.parametres['node']
-        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
-
-        # Trouver generateur pour le role
-        generateur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = generateur.renouveller_avec_csr(role, node_name, csr_bytes)
-
-        # Generer nouvelle transaction pour sauvegarder le certificat
-        self.controleur.gestionnaire.soumettre_transaction_certificat(clecert)
-
-        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
-
-        return {
-            'cert': clecert.cert_bytes.decode('utf-8'),
-            'fullchain': clecert.chaine,
-        }
-
-    def refuser_generation(self):
-        """
-        Refuser la creation d'un nouveau certificat.
-        :return:
-        """
-        # Repondre au demandeur avec le refus
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    # def traitement_regenerer(self, id_transaction, parametres_processus):
-    #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
-    #     pass
-
-    def initiale(self):
-        transaction = self.transaction
-        domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
-
-        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
-        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
-        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
-        roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
-            'coupdoeil' in roles_cert or 'deployeur' in roles_cert:
-            # Le coupdoeil a l'autorisation de signer n'importe quel certificat
-            self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
-        else:
-            self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
-            return {
-                'autorise': False,
-                'domaines': domaines,
-                'description': 'demandeur non autorise a signer ce certificat',
-                'roles_demandeur': roles_cert
-            }
-
-        return {
-            'autorise': True,
-            'domaines': domaines,
-            'roles_demandeur': roles_cert,
-        }
-
-    def generer_cert(self):
-        """
-        Generer cert et creer nouvelle transaction pour PKI
-        :return:
-        """
-        transaction = self.transaction
-        domaines = self.parametres['domaines']
-        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
-
-        # Trouver generateur pour le role
-        renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = renouvelleur.signer_noeud(csr_bytes)
-
-        # Generer nouvelle transaction pour sauvegarder le certificat
-        transaction = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
-            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
-            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
-            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
-            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
-            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
-        }
-        self._controleur.generateur_transactions.soumettre_transaction(
-            transaction,
-            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-        )
-
-        # Creer une commande pour que le monitor genere le compte sur RabbitMQ
-        commande_creation_compte = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-        }
-        self._controleur.generateur_transactions.transmettre_commande(
-            commande_creation_compte,
-            'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE
-        )
-
-        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
-
-        return {
-            'cert': clecert.cert_bytes.decode('utf-8'),
-            'fullchain': clecert.chaine,
-        }
-
-    def refuser_generation(self):
-        """
-        Refuser la creation d'un nouveau certificat.
-        :return:
-        """
-        # Repondre au demandeur avec le refus
-
-        self.set_etape_suivante()  # Termine
+# class ProcessusRenouvellerCertificat(MGProcessusTransaction):
+#
+#     def __init__(self, controleur, evenement):
+#         super().__init__(controleur, evenement)
+#         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+#
+#     # def traitement_regenerer(self, id_transaction, parametres_processus):
+#     #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+#     #     pass
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+#         altdomains = transaction.get(ConstantesPki.CHAMP_ALT_DOMAINS)
+#         node = transaction['node']
+#
+#         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+#         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+#         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+#         roles_cert = enveloppe_cert.get_roles
+#         if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
+#             'deployeur' in roles_cert or 'maitredescles' in roles_cert:
+#             # Le deployeur et le maitre des cles ont l'autorisation de renouveller n'importe quel certificat
+#             # Coupdoeil a tous les acces au niveau secure
+#             self.set_etape_suivante(ProcessusRenouvellerCertificat.generer_cert.__name__)
+#         else:
+#             self.set_etape_suivante(ProcessusRenouvellerCertificat.refuser_generation.__name__)
+#             return {
+#                 'autorise': False,
+#                 'role': role,
+#                 'altdomains': altdomains,
+#                 'description': 'demandeur non autorise a renouveller ce certificat',
+#                 'roles_demandeur': roles_cert
+#             }
+#
+#         return {
+#             'autorise': True,
+#             'role': role,
+#             'altdomains': altdomains,
+#             'roles_demandeur': roles_cert,
+#             'node': node,
+#         }
+#
+#     def generer_cert(self):
+#         """
+#         Generer cert et creer nouvelle transaction pour PKI
+#         :return:
+#         """
+#         transaction = self.transaction
+#         role = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLE_CERTIFICAT]
+#         node_name = self.parametres['node']
+#         csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+#
+#         # Trouver generateur pour le role
+#         generateur = self._controleur.gestionnaire.renouvelleur_certificat
+#         clecert = generateur.renouveller_avec_csr(role, node_name, csr_bytes)
+#
+#         # Generer nouvelle transaction pour sauvegarder le certificat
+#         self.controleur.gestionnaire.soumettre_transaction_certificat(clecert)
+#
+#         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+#
+#         return {
+#             'cert': clecert.cert_bytes.decode('utf-8'),
+#             'fullchain': clecert.chaine,
+#         }
+#
+#     def refuser_generation(self):
+#         """
+#         Refuser la creation d'un nouveau certificat.
+#         :return:
+#         """
+#         # Repondre au demandeur avec le refus
+#
+#         self.set_etape_suivante()  # Termine
 
 
-class ProcessusSignerCSRCADependant(MGProcessusTransaction):
+# class ProcessusSignerCertificatNoeud(MGProcessusTransaction):
+#
+#     def __init__(self, controleur, evenement):
+#         super().__init__(controleur, evenement)
+#         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+#
+#     # def traitement_regenerer(self, id_transaction, parametres_processus):
+#     #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+#     #     pass
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#         domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
+#
+#         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+#         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+#         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+#         roles_cert = enveloppe_cert.get_roles
+#         if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
+#             'coupdoeil' in roles_cert or 'deployeur' in roles_cert:
+#             # Le coupdoeil a l'autorisation de signer n'importe quel certificat
+#             self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
+#         else:
+#             self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
+#             return {
+#                 'autorise': False,
+#                 'domaines': domaines,
+#                 'description': 'demandeur non autorise a signer ce certificat',
+#                 'roles_demandeur': roles_cert
+#             }
+#
+#         return {
+#             'autorise': True,
+#             'domaines': domaines,
+#             'roles_demandeur': roles_cert,
+#         }
+#
+#     def generer_cert(self):
+#         """
+#         Generer cert et creer nouvelle transaction pour PKI
+#         :return:
+#         """
+#         transaction = self.transaction
+#         domaines = self.parametres['domaines']
+#         csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+#
+#         # Trouver generateur pour le role
+#         renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
+#         clecert = renouvelleur.signer_noeud(csr_bytes)
+#
+#         # Generer nouvelle transaction pour sauvegarder le certificat
+#         transaction = {
+#             ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+#             ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+#             ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+#             ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+#             ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+#             ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+#             ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+#         }
+#         self._controleur.generateur_transactions.soumettre_transaction(
+#             transaction,
+#             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+#         )
+#
+#         # Creer une commande pour que le monitor genere le compte sur RabbitMQ
+#         commande_creation_compte = {
+#             ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+#         }
+#         self._controleur.generateur_transactions.transmettre_commande(
+#             commande_creation_compte,
+#             'commande.' + Constantes.ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE
+#         )
+#
+#         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+#
+#         return {
+#             'cert': clecert.cert_bytes.decode('utf-8'),
+#             'fullchain': clecert.chaine,
+#         }
+#
+#     def refuser_generation(self):
+#         """
+#         Refuser la creation d'un nouveau certificat.
+#         :return:
+#         """
+#         # Repondre au demandeur avec le refus
+#
+#         self.set_etape_suivante()  # Termine
 
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
-    # def traitement_regenerer(self, id_transaction, parametres_processus):
-    #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
-    #     pass
-
-    def initiale(self):
-        transaction = self.transaction
-        domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
-
-        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
-        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
-        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
-        roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
-            'monitor_dependant' in roles_cert:
-            self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
-        else:
-            self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
-            return {
-                'autorise': False,
-                'domaines': domaines,
-                'description': 'demandeur non autorise a signer ce certificat',
-                'roles_demandeur': roles_cert
-            }
-
-        return {
-            'autorise': True,
-            'domaines': domaines,
-            'roles_demandeur': roles_cert,
-        }
-
-    def generer_cert(self):
-        """
-        Generer cert et creer nouvelle transaction pour PKI
-        :return:
-        """
-        transaction = self.transaction
-        csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
-
-        # Trouver generateur pour le role
-        renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = renouvelleur.signer_ca(csr_bytes)
-
-        # Generer nouvelle transaction pour sauvegarder le certificat
-        transaction = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
-            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
-            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
-            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
-            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
-            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
-        }
-        self._controleur.generateur_transactions.soumettre_transaction(
-            transaction,
-            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-        )
-
-        # Creer une commande pour que le monitor genere le compte sur RabbitMQ
-        self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
-
-        return {
-            'cert': clecert.cert_bytes.decode('utf-8'),
-            'fullchain': clecert.chaine,
-        }
-
-    def refuser_generation(self):
-        """
-        Refuser la creation d'un nouveau certificat.
-        :return:
-        """
-        # Repondre au demandeur avec le refus
-
-        self.set_etape_suivante()  # Termine
+# class ProcessusSignerCSRCADependant(MGProcessusTransaction):
+#
+#     def __init__(self, controleur, evenement):
+#         super().__init__(controleur, evenement)
+#         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+#
+#     # def traitement_regenerer(self, id_transaction, parametres_processus):
+#     #     """ Aucun traitement necessaire, le nouveau cert est re-sauvegarde sous une nouvelle transaction dans PKI """
+#     #     pass
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#         domaines = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINES]
+#
+#         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+#         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+#         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+#         roles_cert = enveloppe_cert.get_roles
+#         if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
+#             'monitor_dependant' in roles_cert:
+#             self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
+#         else:
+#             self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
+#             return {
+#                 'autorise': False,
+#                 'domaines': domaines,
+#                 'description': 'demandeur non autorise a signer ce certificat',
+#                 'roles_demandeur': roles_cert
+#             }
+#
+#         return {
+#             'autorise': True,
+#             'domaines': domaines,
+#             'roles_demandeur': roles_cert,
+#         }
+#
+#     def generer_cert(self):
+#         """
+#         Generer cert et creer nouvelle transaction pour PKI
+#         :return:
+#         """
+#         transaction = self.transaction
+#         csr_bytes = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR].encode('utf-8')
+#
+#         # Trouver generateur pour le role
+#         renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
+#         clecert = renouvelleur.signer_ca(csr_bytes)
+#
+#         # Generer nouvelle transaction pour sauvegarder le certificat
+#         transaction = {
+#             ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+#             ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+#             ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+#             ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+#             ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+#             ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+#             ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+#         }
+#         self._controleur.generateur_transactions.soumettre_transaction(
+#             transaction,
+#             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+#         )
+#
+#         # Creer une commande pour que le monitor genere le compte sur RabbitMQ
+#         self.set_etape_suivante()  # Termine - va repondre automatiquement au deployeur dans finale()
+#
+#         return {
+#             'cert': clecert.cert_bytes.decode('utf-8'),
+#             'fullchain': clecert.chaine,
+#         }
+#
+#     def refuser_generation(self):
+#         """
+#         Refuser la creation d'un nouveau certificat.
+#         :return:
+#         """
+#         # Repondre au demandeur avec le refus
+#
+#         self.set_etape_suivante()  # Termine
 
 
 class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
@@ -2564,159 +2564,159 @@ class ProcessusDeclasserCleGrosFichier(MGProcessusTransaction):
         self.set_etape_suivante()  # Termine
 
 
-class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
-    """
-    Generer un certificat pour un navigateur a partir d'une cle publique.
-    """
+# class ProcessusGenererCertificatNavigateur(MGProcessusTransaction):
+#     """
+#     Generer un certificat pour un navigateur a partir d'une cle publique.
+#     """
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#
+#         # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
+#         # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
+#         enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
+#         roles_cert = enveloppe_cert.get_roles
+#         if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
+#                 'coupdoeil' in roles_cert:
+#             # Le coupdoeil peut demander un certificat de navigateur
+#             self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
+#         else:
+#             self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
+#             return {
+#                 'autorise': False,
+#                 'description': 'demandeur non autorise a demander la signateur de ce certificat',
+#                 'roles_demandeur': roles_cert
+#             }
+#
+#         return {
+#             'autorise': True,
+#             'roles_demandeur': roles_cert,
+#         }
+#
+#     def generer_cert(self):
+#         """
+#         Generer cert et creer nouvelle transaction pour PKI
+#         :return:
+#         """
+#         transaction = self.transaction
+#         public_key_str = transaction['cle_publique']
+#         wrapped_public_key = PemHelpers.wrap_public_key(public_key_str)
+#
+#         sujet = transaction['sujet']
+#
+#         # Trouver generateur pour le role
+#         renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
+#         clecert = renouvelleur.signer_navigateur(wrapped_public_key, sujet)
+#
+#         # Generer nouvelle transaction pour sauvegarder le certificat
+#         transaction = {
+#             ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+#             ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+#             ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+#             ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+#             ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+#             ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+#             ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+#         }
+#         self._controleur.generateur_transactions.soumettre_transaction(
+#             transaction,
+#             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
+#         )
+#
+#         # Creer une reponse pour coupdoeil
+#         info_cert = transaction.copy()
+#         del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
+#
+#         self.set_etape_suivante()  # Termine - va repondre automatiquement
+#
+#         return {
+#             'certificat_info': info_cert,
+#             'cert': clecert.cert_bytes.decode('utf-8'),
+#             'fullchain': clecert.chaine,
+#         }
+#
+#     def refuser_generation(self):
+#         """
+#         Refuser la creation d'un nouveau certificat.
+#         :return:
+#         """
+#         # Repondre au demandeur avec le refus
+#
+#         self.set_etape_suivante()  # Termine
 
-    def initiale(self):
-        transaction = self.transaction
 
-        # Reverifier la signature de la transaction (eviter alteration dans la base de donnees)
-        # Extraire certificat et verifier type. Doit etre: maitredescles ou deployeur.
-        enveloppe_cert = self._controleur.verificateur_transaction.verifier(transaction)
-        roles_cert = enveloppe_cert.get_roles
-        if enveloppe_cert.subject_organization_name == self._controleur.configuration.idmg and \
-                'coupdoeil' in roles_cert:
-            # Le coupdoeil peut demander un certificat de navigateur
-            self.set_etape_suivante(ProcessusSignerCertificatNoeud.generer_cert.__name__)
-        else:
-            self.set_etape_suivante(ProcessusSignerCertificatNoeud.refuser_generation.__name__)
-            return {
-                'autorise': False,
-                'description': 'demandeur non autorise a demander la signateur de ce certificat',
-                'roles_demandeur': roles_cert
-            }
-
-        return {
-            'autorise': True,
-            'roles_demandeur': roles_cert,
-        }
-
-    def generer_cert(self):
-        """
-        Generer cert et creer nouvelle transaction pour PKI
-        :return:
-        """
-        transaction = self.transaction
-        public_key_str = transaction['cle_publique']
-        wrapped_public_key = PemHelpers.wrap_public_key(public_key_str)
-
-        sujet = transaction['sujet']
-
-        # Trouver generateur pour le role
-        renouvelleur = self._controleur.gestionnaire.renouvelleur_certificat
-        clecert = renouvelleur.signer_navigateur(wrapped_public_key, sujet)
-
-        # Generer nouvelle transaction pour sauvegarder le certificat
-        transaction = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
-            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
-            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
-            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
-            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
-            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
-        }
-        self._controleur.generateur_transactions.soumettre_transaction(
-            transaction,
-            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT
-        )
-
-        # Creer une reponse pour coupdoeil
-        info_cert = transaction.copy()
-        del info_cert[ConstantesPki.LIBELLE_CERTIFICAT_PEM]
-
-        self.set_etape_suivante()  # Termine - va repondre automatiquement
-
-        return {
-            'certificat_info': info_cert,
-            'cert': clecert.cert_bytes.decode('utf-8'),
-            'fullchain': clecert.chaine,
-        }
-
-    def refuser_generation(self):
-        """
-        Refuser la creation d'un nouveau certificat.
-        :return:
-        """
-        # Repondre au demandeur avec le refus
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusGenererDemandeInscription(MGProcessusTransaction):
-    """
-    Generer une nouvelle transaction pour l'Annuaire, va servir a demander l'acces a une MilleGrille tierce
-    """
-
-    def initiale(self):
-        """
-        Effecuter une requete pour obtenir la plus recente fiche privee
-        """
-        domaine = ConstantesAnnuaire.REQUETE_FICHE_PRIVEE
-        self.set_requete(domaine, {})
-
-        self.set_etape_suivante(ProcessusGenererDemandeInscription.demander_csr_connecteurs.__name__)
-
-    def demander_csr_connecteurs(self):
-        """
-        Demander de nouveaux CSR aupres des connecteurs
-        """
-
-        domaine = 'inter.genererCsr'
-        self.set_requete(domaine, {})
-
-        self.set_etape_suivante(ProcessusGenererDemandeInscription.generer_transaction_annuaire.__name__)
-
-    def generer_transaction_annuaire(self):
-        """
-        Generer la transaction signee pour l'Annuaire.
-        """
-        transaction = self.transaction
-
-        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-        fiche_privee = self.parametres['reponse'][0]
-        csr_reponse = self.parametres['reponse'][1]
-
-        csr = csr_reponse['csr']
-        csr_correlation = csr_reponse['correlation']
-
-        certificats_existants = list()
-        certificats_existants.append(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE])
-        certificats_existants.append(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT])
-        try:
-            certificats_existants.extend(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES])
-        except TypeError:
-            pass  # Array vide, OK
-        try:
-            certificats_existants.extend(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_ADDITIONNELS])
-        except TypeError:
-            pass  # Array vide, OK
-
-        with open(self.controleur.configuration.pki_certfile, 'r') as fichier:
-            certfile_fullchain = fichier.read()
-            certs_chain = list()
-            for cert in certfile_fullchain.split('-----END CERTIFICATE-----\n'):
-                if cert != '' and cert not in certificats_existants:
-                    cert = cert + '-----END CERTIFICATE-----\n'
-                    certs_chain.append(cert)
-
-        nouvelle_transaction = {
-            ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: idmg,
-            ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR: csr,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR_CORRELATION: csr_correlation,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TYPEDEMANDE: ConstantesMaitreDesCles.TYPE_DEMANDE_INSCRIPTION,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FULLCHAIN: certs_chain,
-        }
-
-        # Transmettre la transaction. La correlation permet au domaine de savoir que la transaction
-        # doit etre sauvegardee et non actionnee (certificat signe)
-        domaine = ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION
-        self.generateur_transactions.soumettre_transaction(nouvelle_transaction, domaine)
-
-        self.set_etape_suivante()  # Termine
+# class ProcessusGenererDemandeInscription(MGProcessusTransaction):
+#     """
+#     Generer une nouvelle transaction pour l'Annuaire, va servir a demander l'acces a une MilleGrille tierce
+#     """
+#
+#     def initiale(self):
+#         """
+#         Effecuter une requete pour obtenir la plus recente fiche privee
+#         """
+#         domaine = ConstantesAnnuaire.REQUETE_FICHE_PRIVEE
+#         self.set_requete(domaine, {})
+#
+#         self.set_etape_suivante(ProcessusGenererDemandeInscription.demander_csr_connecteurs.__name__)
+#
+#     def demander_csr_connecteurs(self):
+#         """
+#         Demander de nouveaux CSR aupres des connecteurs
+#         """
+#
+#         domaine = 'inter.genererCsr'
+#         self.set_requete(domaine, {})
+#
+#         self.set_etape_suivante(ProcessusGenererDemandeInscription.generer_transaction_annuaire.__name__)
+#
+#     def generer_transaction_annuaire(self):
+#         """
+#         Generer la transaction signee pour l'Annuaire.
+#         """
+#         transaction = self.transaction
+#
+#         idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+#         fiche_privee = self.parametres['reponse'][0]
+#         csr_reponse = self.parametres['reponse'][1]
+#
+#         csr = csr_reponse['csr']
+#         csr_correlation = csr_reponse['correlation']
+#
+#         certificats_existants = list()
+#         certificats_existants.append(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_RACINE])
+#         certificats_existants.append(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT])
+#         try:
+#             certificats_existants.extend(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICATS_INTERMEDIAIRES])
+#         except TypeError:
+#             pass  # Array vide, OK
+#         try:
+#             certificats_existants.extend(fiche_privee[ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT_ADDITIONNELS])
+#         except TypeError:
+#             pass  # Array vide, OK
+#
+#         with open(self.controleur.configuration.pki_certfile, 'r') as fichier:
+#             certfile_fullchain = fichier.read()
+#             certs_chain = list()
+#             for cert in certfile_fullchain.split('-----END CERTIFICATE-----\n'):
+#                 if cert != '' and cert not in certificats_existants:
+#                     cert = cert + '-----END CERTIFICATE-----\n'
+#                     certs_chain.append(cert)
+#
+#         nouvelle_transaction = {
+#             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: idmg,
+#             ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee,
+#             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR: csr,
+#             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CSR_CORRELATION: csr_correlation,
+#             ConstantesMaitreDesCles.TRANSACTION_CHAMP_TYPEDEMANDE: ConstantesMaitreDesCles.TYPE_DEMANDE_INSCRIPTION,
+#             ConstantesMaitreDesCles.TRANSACTION_CHAMP_FULLCHAIN: certs_chain,
+#         }
+#
+#         # Transmettre la transaction. La correlation permet au domaine de savoir que la transaction
+#         # doit etre sauvegardee et non actionnee (certificat signe)
+#         domaine = ConstantesAnnuaire.TRANSACTION_DEMANDER_INSCRIPTION
+#         self.generateur_transactions.soumettre_transaction(nouvelle_transaction, domaine)
+#
+#         self.set_etape_suivante()  # Termine
 
 
 class TransactionDocumentMajClesVersionMapper:
@@ -2771,70 +2771,70 @@ class TransactionDocumentMajClesVersionMapper:
         pass
 
 
-class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
-    """
-    Genere un certificat de connexion pour un tiers
-    """
-
-    def initiale(self):
-        domaine = ConstantesAnnuaire.REQUETE_FICHE_PRIVEE
-        self.set_requete(domaine, {})
-
-        self.set_etape_suivante(ProcessusGenererCertificatPourTiers.signer_demande.__name__)
-
-    def signer_demande(self):
-        """
-        Extrait le CSR et genere un nouveau certificat de connecteur.
-        """
-        fiche_privee = self.parametres['reponse'][0]
-
-        transaction = self.transaction
-        fiche_privee_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE]
-        idmg_tiers = fiche_privee_tiers[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-        csr = transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CSR]
-
-        clecert = self.controleur.gestionnaire.generer_certificat_connecteur(idmg_tiers, csr)
-
-        # Sauvegarder certificat pour tiers et transmettre vers tiers
-        self._transmettre_a_pki(clecert)
-        self._transmettre_a_annuaire(transaction, idmg_tiers, clecert, fiche_privee)
-
-        self.set_etape_suivante()
-
-    def _transmettre_a_annuaire(self, transaction, idmg_tiers, clecert: EnveloppeCleCert, fiche_privee: dict):
-
-        fiche_privee_filtree = DocElemFilter.retirer_champs_doc_transaction(fiche_privee)
-
-        with open(self.controleur.configuration.pki_certfile, 'r') as fichier:
-            cert_fullchain = PemHelpers.split_certificats(fichier.read())
-
-        nouvelle_transaction_annuaire = {
-            ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
-            ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: int(clecert.not_valid_after.timestamp()),
-            ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: clecert.cert_bytes.decode('utf-8'),
-            ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
-            ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee_filtree,
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FULLCHAIN: cert_fullchain,
-        }
-        self._controleur.generateur_transactions.soumettre_transaction(
-            nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS,
-            idmg_destination=idmg_tiers)
-
-    def _transmettre_a_pki(self, clecert):
-        # Generer nouvelle transaction pour sauvegarder le certificat
-        transaction = {
-            ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
-            ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
-            ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
-            ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
-            ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
-            ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
-            ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
-        }
-        self._controleur.generateur_transactions.soumettre_transaction(
-            transaction,
-            ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT,
-        )
+# class ProcessusGenererCertificatPourTiers(MGProcessusTransaction):
+#     """
+#     Genere un certificat de connexion pour un tiers
+#     """
+#
+#     def initiale(self):
+#         domaine = ConstantesAnnuaire.REQUETE_FICHE_PRIVEE
+#         self.set_requete(domaine, {})
+#
+#         self.set_etape_suivante(ProcessusGenererCertificatPourTiers.signer_demande.__name__)
+#
+#     def signer_demande(self):
+#         """
+#         Extrait le CSR et genere un nouveau certificat de connecteur.
+#         """
+#         fiche_privee = self.parametres['reponse'][0]
+#
+#         transaction = self.transaction
+#         fiche_privee_tiers = transaction[ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE]
+#         idmg_tiers = fiche_privee_tiers[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+#         csr = transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CSR]
+#
+#         clecert = self.controleur.gestionnaire.generer_certificat_connecteur(idmg_tiers, csr)
+#
+#         # Sauvegarder certificat pour tiers et transmettre vers tiers
+#         self._transmettre_a_pki(clecert)
+#         self._transmettre_a_annuaire(transaction, idmg_tiers, clecert, fiche_privee)
+#
+#         self.set_etape_suivante()
+#
+#     def _transmettre_a_annuaire(self, transaction, idmg_tiers, clecert: EnveloppeCleCert, fiche_privee: dict):
+#
+#         fiche_privee_filtree = DocElemFilter.retirer_champs_doc_transaction(fiche_privee)
+#
+#         with open(self.controleur.configuration.pki_certfile, 'r') as fichier:
+#             cert_fullchain = PemHelpers.split_certificats(fichier.read())
+#
+#         nouvelle_transaction_annuaire = {
+#             ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE: transaction[ConstantesAnnuaire.LIBELLE_DOC_IDMG_SOLLICITE],
+#             ConstantesAnnuaire.LIBELLE_DOC_EXPIRATION: int(clecert.not_valid_after.timestamp()),
+#             ConstantesAnnuaire.LIBELLE_DOC_CERTIFICAT: clecert.cert_bytes.decode('utf-8'),
+#             ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION: transaction[ConstantesAnnuaire.LIBELLE_DOC_DEMANDES_CORRELATION],
+#             ConstantesAnnuaire.LIBELLE_DOC_FICHE_PRIVEE: fiche_privee_filtree,
+#             ConstantesMaitreDesCles.TRANSACTION_CHAMP_FULLCHAIN: cert_fullchain,
+#         }
+#         self._controleur.generateur_transactions.soumettre_transaction(
+#             nouvelle_transaction_annuaire, ConstantesAnnuaire.TRANSACTION_SIGNATURE_INSCRIPTION_TIERS,
+#             idmg_destination=idmg_tiers)
+#
+#     def _transmettre_a_pki(self, clecert):
+#         # Generer nouvelle transaction pour sauvegarder le certificat
+#         transaction = {
+#             ConstantesPki.LIBELLE_CERTIFICAT_PEM: clecert.cert_bytes.decode('utf-8'),
+#             ConstantesPki.LIBELLE_FINGERPRINT: clecert.fingerprint,
+#             ConstantesPki.LIBELLE_SUBJECT: clecert.formatter_subject(),
+#             ConstantesPki.LIBELLE_NOT_VALID_BEFORE: int(clecert.not_valid_before.timestamp()),
+#             ConstantesPki.LIBELLE_NOT_VALID_AFTER: int(clecert.not_valid_after.timestamp()),
+#             ConstantesPki.LIBELLE_SUBJECT_KEY: clecert.skid,
+#             ConstantesPki.LIBELLE_AUTHORITY_KEY: clecert.akid,
+#         }
+#         self._controleur.generateur_transactions.soumettre_transaction(
+#             transaction,
+#             ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT,
+#         )
 
 
 class ProcessusTrouverClesBackupManquantes(MGProcessus):
@@ -2897,139 +2897,139 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
         return collection_documents.find(filtre)
 
 
-class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
-    """
-    Genere les cles et certificats pour une nouvelle MilleGrille herbergee.
-    """
-
-    def __init__(self, controleur, evenement):
-        super().__init__(controleur, evenement)
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-    def initiale(self):
-        transactions = self.controleur.gestionnaire.creer_cles_millegrille_hebergee(self.parametres)
-
-        transaction_paires = transactions['paires']
-        idmg = transaction_paires['idmg']
-        transaction_cle_millegrille = transactions['transaction_cle_millegrille']
-        transaction_cle_intermediaire = transactions['transaction_cle_intermediaire']
-
-        # Soumettre transactions immediatement, emettre tokens attente
-        uuid_transaction_paires = self.controleur.generateur_transactions.soumettre_transaction(
-            transaction_paires, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU)
-
-        uuid_transaction_cle_millegrille = self.controleur.generateur_transactions.soumettre_transaction(
-            transaction_cle_millegrille, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
-
-        uuid_transaction_cle_intermediaire = self.controleur.generateur_transactions.soumettre_transaction(
-            transaction_cle_intermediaire, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
-
-        # Emettre tokens attente
-        tokens_attente = [
-            'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction_paires,
-            'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction_cle_millegrille,
-            'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction_cle_intermediaire,
-        ]
-        # uuids = [uuid_transaction_paires, uuid_transaction_cle_millegrille, uuid_transaction_cle_intermediaire]
-        # tokens_attente = ['ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction for uuid_transaction in uuids]
-        self.set_etape_suivante(ProcessusCreerClesMilleGrilleHebergee.creer_cles_modules.__name__, tokens_attente)
-
-        return {
-            'idmg': idmg,
-        }
-
-    def creer_cles_modules(self):
-        """
-        Generer cles et certificats pour les modules de la MilleGrille
-        :return:
-        """
-        idmg = self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-        roles = [
-            ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
-            ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-            ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
-            ConstantesGenerateurCertificat.ROLE_FICHIERS,
-            ConstantesGenerateurCertificat.ROLE_DOMAINES,
-        ]
-
-        transactions = self.controleur.gestionnaire.creer_cles_modules_heberges(idmg, roles)
-
-        # Emettre tokens attente
-        transaction_trousseau = transactions['trousseau']
-        uuid_transaction_trousseau = self.generateur_transactions.soumettre_transaction(
-            transaction_trousseau,
-            ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU
-        )
-
-        tokens_attente = [
-            'ProcessusCreerClesMilleGrilleHebergee_maj_trousseau:' + uuid_transaction_trousseau,
-        ]
-
-        transactions_motsdepasse = transactions['motsdepasse']
-        for transaction_motdepasse in transactions_motsdepasse:
-            uuid_transaction = self.generateur_transactions.soumettre_transaction(
-                transaction_motdepasse,
-                ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE
-            )
-            tokens_attente.append('ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction)
-
-        self.set_etape_suivante(
-            ProcessusCreerClesMilleGrilleHebergee.transmettre_transaction_hebergement.__name__,
-            tokens_attente
-        )
-
-    def transmettre_transaction_hebergement(self):
-        idmg = self.parametres['idmg']
-
-        transaction_hebergement = {
-            'idmg': idmg,
-        }
-        domaine = Constantes.ConstantesHebergement.TRANSACTION_NOUVEAU_IDMG
-        self.ajouter_transaction_a_soumettre(domaine, transaction_hebergement)
-
-        self.set_etape_suivante()  # Termine
-
-
-class ProcessusHebergementNouveauTrousseau(MGProcessusTransaction):
-
-    def initiale(self):
-        transaction = self.transaction
-        uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction
-
-        # Conserver information du trousseau dans le document d'herbergement sous le maitre des cles
-        self.controleur.gestionnaire.sauvegarder_trousseau_hebergement(transaction)
-
-        self.resumer_processus([token_resumer])
-        self.set_etape_suivante()  #Termine
+# class ProcessusCreerClesMilleGrilleHebergee(MGProcessus):
+#     """
+#     Genere les cles et certificats pour une nouvelle MilleGrille herbergee.
+#     """
+#
+#     def __init__(self, controleur, evenement):
+#         super().__init__(controleur, evenement)
+#         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+#
+#     def initiale(self):
+#         transactions = self.controleur.gestionnaire.creer_cles_millegrille_hebergee(self.parametres)
+#
+#         transaction_paires = transactions['paires']
+#         idmg = transaction_paires['idmg']
+#         transaction_cle_millegrille = transactions['transaction_cle_millegrille']
+#         transaction_cle_intermediaire = transactions['transaction_cle_intermediaire']
+#
+#         # Soumettre transactions immediatement, emettre tokens attente
+#         uuid_transaction_paires = self.controleur.generateur_transactions.soumettre_transaction(
+#             transaction_paires, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU)
+#
+#         uuid_transaction_cle_millegrille = self.controleur.generateur_transactions.soumettre_transaction(
+#             transaction_cle_millegrille, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
+#
+#         uuid_transaction_cle_intermediaire = self.controleur.generateur_transactions.soumettre_transaction(
+#             transaction_cle_intermediaire, ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE)
+#
+#         # Emettre tokens attente
+#         tokens_attente = [
+#             'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction_paires,
+#             'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction_cle_millegrille,
+#             'ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction_cle_intermediaire,
+#         ]
+#         # uuids = [uuid_transaction_paires, uuid_transaction_cle_millegrille, uuid_transaction_cle_intermediaire]
+#         # tokens_attente = ['ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction for uuid_transaction in uuids]
+#         self.set_etape_suivante(ProcessusCreerClesMilleGrilleHebergee.creer_cles_modules.__name__, tokens_attente)
+#
+#         return {
+#             'idmg': idmg,
+#         }
+#
+#     def creer_cles_modules(self):
+#         """
+#         Generer cles et certificats pour les modules de la MilleGrille
+#         :return:
+#         """
+#         idmg = self.parametres[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+#         roles = [
+#             ConstantesGenerateurCertificat.ROLE_TRANSACTIONS,
+#             ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
+#             ConstantesGenerateurCertificat.ROLE_COUPDOEIL,
+#             ConstantesGenerateurCertificat.ROLE_FICHIERS,
+#             ConstantesGenerateurCertificat.ROLE_DOMAINES,
+#         ]
+#
+#         transactions = self.controleur.gestionnaire.creer_cles_modules_heberges(idmg, roles)
+#
+#         # Emettre tokens attente
+#         transaction_trousseau = transactions['trousseau']
+#         uuid_transaction_trousseau = self.generateur_transactions.soumettre_transaction(
+#             transaction_trousseau,
+#             ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU
+#         )
+#
+#         tokens_attente = [
+#             'ProcessusCreerClesMilleGrilleHebergee_maj_trousseau:' + uuid_transaction_trousseau,
+#         ]
+#
+#         transactions_motsdepasse = transactions['motsdepasse']
+#         for transaction_motdepasse in transactions_motsdepasse:
+#             uuid_transaction = self.generateur_transactions.soumettre_transaction(
+#                 transaction_motdepasse,
+#                 ConstantesMaitreDesCles.TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE
+#             )
+#             tokens_attente.append('ProcessusCreerClesMilleGrilleHebergee_clemotpasse:' + uuid_transaction)
+#
+#         self.set_etape_suivante(
+#             ProcessusCreerClesMilleGrilleHebergee.transmettre_transaction_hebergement.__name__,
+#             tokens_attente
+#         )
+#
+#     def transmettre_transaction_hebergement(self):
+#         idmg = self.parametres['idmg']
+#
+#         transaction_hebergement = {
+#             'idmg': idmg,
+#         }
+#         domaine = Constantes.ConstantesHebergement.TRANSACTION_NOUVEAU_IDMG
+#         self.ajouter_transaction_a_soumettre(domaine, transaction_hebergement)
+#
+#         self.set_etape_suivante()  # Termine
 
 
-class ProcessusHebergementMajTrousseau(MGProcessusTransaction):
+# class ProcessusHebergementNouveauTrousseau(MGProcessusTransaction):
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#         uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+#         token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_nouveauidmg:' + uuid_transaction
+#
+#         # Conserver information du trousseau dans le document d'herbergement sous le maitre des cles
+#         self.controleur.gestionnaire.sauvegarder_trousseau_hebergement(transaction)
+#
+#         self.resumer_processus([token_resumer])
+#         self.set_etape_suivante()  #Termine
 
-    def initiale(self):
-        transaction = self.transaction
-        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-        uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-        token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_maj_trousseau:' + uuid_transaction
 
-        # Conserver information du trousseau dans le document d'herbergement sous le maitre des cles
-        self.controleur.gestionnaire.maj_trousseau_hebergement(idmg, self.transaction_filtree)
+# class ProcessusHebergementMajTrousseau(MGProcessusTransaction):
+#
+#     def initiale(self):
+#         transaction = self.transaction
+#         idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+#         uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+#         token_resumer = 'ProcessusCreerClesMilleGrilleHebergee_maj_trousseau:' + uuid_transaction
+#
+#         # Conserver information du trousseau dans le document d'herbergement sous le maitre des cles
+#         self.controleur.gestionnaire.maj_trousseau_hebergement(idmg, self.transaction_filtree)
+#
+#         self.resumer_processus([token_resumer])
+#         self.set_etape_suivante()  #Termine
 
-        self.resumer_processus([token_resumer])
-        self.set_etape_suivante()  #Termine
 
-
-class ProcessusHebergementSupprimer(MGProcessusTransaction):
-    """
-    Supprime le trousseau d'une MilleGrille hebergee
-    """
-    def initiale(self):
-        transaction = self.transaction
-        idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
-
-        self.controleur.gestionnaire.supprimer_trousseau_hebergement(idmg)
-
-        self.set_etape_suivante()  #Termine
+# class ProcessusHebergementSupprimer(MGProcessusTransaction):
+#     """
+#     Supprime le trousseau d'une MilleGrille hebergee
+#     """
+#     def initiale(self):
+#         transaction = self.transaction
+#         idmg = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+#
+#         self.controleur.gestionnaire.supprimer_trousseau_hebergement(idmg)
+#
+#         self.set_etape_suivante()  #Termine
 
 
 class CleNonDechiffrableException(Exception):

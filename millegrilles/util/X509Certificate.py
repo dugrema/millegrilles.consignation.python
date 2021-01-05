@@ -25,6 +25,7 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
     DUREE_CERT_NAVIGATEUR = datetime.timedelta(weeks=6)
     DUREE_CERT_TIERS = datetime.timedelta(weeks=4)
     DUREE_CERT_HERBERGEMENT_XS = datetime.timedelta(days=90)
+    DUREE_CERT_INSTALLATION = datetime.timedelta(days=1)
     ONE_DAY = datetime.timedelta(1, 0, 0)
 
     ROLES_ACCES_MONGO = [
@@ -707,12 +708,10 @@ class GenerateurCertificatNginxSelfsigned:
         clecert = EnveloppeCleCert()
         clecert.generer_private_key(generer_password=False, keysize=2048)
 
-        duree_cert_installation = datetime.timedelta(days=1)  # Une journee pour l'installation
-
         public_key = clecert.private_key.public_key()
         builder = x509.CertificateBuilder()
         builder = builder.not_valid_before(datetime.datetime.today() - ConstantesGenerateurCertificat.ONE_DAY)
-        builder = builder.not_valid_after(datetime.datetime.today() + duree_cert_installation)
+        builder = builder.not_valid_after(datetime.datetime.today() + ConstantesGenerateurCertificat.DUREE_CERT_INSTALLATION)
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.public_key(public_key)
 
