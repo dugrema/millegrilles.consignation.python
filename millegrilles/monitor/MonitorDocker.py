@@ -558,6 +558,7 @@ class GestionnaireModulesDocker:
         # S'assurer que le compte MQ existe
         update_state = None
         update_status = service.attrs.get('UpdateStatus')
+        last_updating = None
         if update_status is not None:
             update_state = update_status['State']
 
@@ -578,7 +579,7 @@ class GestionnaireModulesDocker:
             desired_state = task['DesiredState']
             if state == 'running' or desired_state == 'running' or update_state == 'updating':
                 # Le service est actif
-                running.append(running)
+                running.append(task)
 
         if len(running) == 0:
             # Redemarrer
