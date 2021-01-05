@@ -428,8 +428,8 @@ class ServiceMonitor:
         for role in [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]:
             roles[role] = dict()
 
-        # Charger la configuration existante
-        date_renouvellement = datetime.datetime.utcnow() + datetime.timedelta(days=21)
+        date_courante = datetime.datetime.utcnow()
+
         for config in self._docker.configs.list(filters=filtre):
             self.__logger.debug("Config : %s", str(config))
             nom_config = config.name.split('.')
@@ -442,10 +442,15 @@ class ServiceMonitor:
                 clecert.cert_from_pem_bytes(pem)
                 date_expiration = clecert.not_valid_after
 
-                expiration_existante = role_info.get('expiration')
-                if not expiration_existante or expiration_existante < date_expiration:
+                if date_expiration:
+                    # Calculer 2/3 de la duree du certificat
+                    not_valid_before = clecert.not_valid_before
+                    delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
+                    epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+                    date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+
                     role_info['expiration'] = date_expiration
-                    if date_expiration < date_renouvellement:
+                    if date_renouvellement < date_courante:
                         role_info['est_expire'] = True
                     else:
                         role_info['est_expire'] = False
@@ -970,13 +975,16 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         :return:
         """
         clecert_monitor = self._gestionnaire_certificats.clecert_monitor
+        not_valid_before = clecert_monitor.not_valid_before
         not_valid_after = clecert_monitor.not_valid_after
         self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
 
-        delta_expiration = datetime.timedelta(days=3)
-        date_expiration = not_valid_after - delta_expiration
+        # Calculer 2/3 de la duree du certificat
+        delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
+        epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+        date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
 
-        if date_expiration < datetime.datetime.utcnow():
+        if date_renouvellement < datetime.datetime.utcnow():
             self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
             self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
             self._gestionnaire_docker.configurer_monitor()

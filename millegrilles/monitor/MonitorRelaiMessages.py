@@ -76,11 +76,10 @@ class TraitementMessagesMiddleware(BaseCallback):
 
         routing_keys = [
             'commande.servicemonitor.%s.#' % self._noeud_id,
-            'commande.servicemonitor.ajouterCompte',
-            'commande.servicemonitor.activerHebergement',
-            'commande.servicemonitor.desactiverHebergement',
             'evenement.presence.domaine',
+            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
             'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
+            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
 
             # Backup
             Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_', 'global'),

@@ -180,6 +180,9 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_DEMARRER_APPLICATION:
                 reponse = self._service_monitor.gestionnaire_applications.commande_demarrer_application(commande)
 
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR:
+                reponse = self._service_monitor.gestionnaire_certificats.commande_signer_navigateur(commande)
+
             else:
                 self.__logger.error("Commande inconnue : %s", nom_commande)
                 return

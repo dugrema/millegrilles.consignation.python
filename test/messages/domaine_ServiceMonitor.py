@@ -38,6 +38,7 @@ class MessagesSample(BaseCallback):
         self.cert_maitredescles_recu = Event()
 
         self.mot_de_passe = 'sjdpo-1824-JWAZ'
+        self.noeud_id = 'a1199776-264f-4525-9f10-6eb02332f9e1'
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
@@ -127,13 +128,46 @@ class MessagesSample(BaseCallback):
         print("Envoi commande: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def transaction_signer_certificat_navigateur(self):
+        public_key_str = """
+-----BEGIN CERTIFICATE REQUEST-----
+MIICfTCCAWUCAQAwODESMBAGA1UEAxMJbm9tVXNhZ2VyMRMwEQYDVQQLEwpOYXZp
+Z2F0ZXVyMQ0wCwYDVQQKEwRpZG1nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+CgKCAQEAwDlWi2KJsccrDJKHq8xLYjCqndu+Oh4GNsbRypPctuu+oU6PNkwwjSIN
+xNuJret+ZVr2mw2MNbt9JYANriltYwvFWkF63NTIGXstaegNCkj6vqa4KdtXK7uu
+NREtMLEhEu+ZWYcR2hWzVEN9GyIPwEgPNYQwUjjjLADUnaZ73t9Bk+fivgll0JbJ
+reSw8DHqvdcmB28AnXltch6Wh34EGiYPbJqDm+NnCHHZ2EumbPRkN5/bqZTmpUDw
+qqt+6cTcgAtdIuzYm3sPQt/Zf3EJwDT9dBxVrdbBnNFG4js3lauy49hog78zwwNP
+/i3DZU3VDDCDeT4POKfEHXtwxTLF4QIDAQABoAAwDQYJKoZIhvcNAQENBQADggEB
+AKBdiHJamlXfevloSBhehrf5g7lRbISGEsyY5HOXvVMLbip75QcGMcz8jnEJxYFk
+8mDPuxlR3VOkyDiPGpLloN9hOgk50igwtRmFXcGCENbaJX2FZdho0yyx/yS03WXR
+HXkje/v1Z6x1gitAxACbvvywo4qtIQoBSwP08D0JIGtD2GWPvzd1+PSgsdqQsmxz
+EMkpLW0RZ2y1fCZyXbXPfAI4rnCL5Lb3CW7e4sbdH2XkcV4fBPEDGo03TE8648XV
+6PCY9G7vw3iPiAhicMp1nI9bx+N/IapZvWmqR8vOURfFHYB1ilnli7S3MNXpDC9Q
+BMz4ginADdtNs9ARr3DcwG4=
+-----END CERTIFICATE REQUEST-----
+        """
+
+        commande = {
+            'est_proprietaire': True,
+            'csr': public_key_str,
+        }
+
+        self.generateur.transmettre_commande(
+            commande,
+            'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
     def executer(self):
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
         # self.transaction_activer_millegrille_hebergee()
         # self.commande_ajouter_compte()
-        self.commande_activer_hebergement()
+        # self.commande_activer_hebergement()
         # self.commande_desactiver_hebergement()
+        self.transaction_signer_certificat_navigateur()
 
 
 # --- MAIN ---

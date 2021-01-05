@@ -428,6 +428,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
     def __init__(self, docker_client: docker.DockerClient, service_monitor, **kwargs):
         super().__init__(docker_client, service_monitor, **kwargs)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__renouvelleur: RenouvelleurCertificat = cast(RenouvelleurCertificat, None)
         self._clecert_intermediaire: EnveloppeCleCert = cast(EnveloppeCleCert, None)
 
@@ -583,6 +584,15 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Sauvegarder information certificat monitor
         with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
             fichiers.write(self.clecert_monitor.private_key_bytes)
+
+    def commande_signer_navigateur(self, commande):
+        """
+        Signe la demande de certificat d'un navigateur
+        :param commande:
+        :return:
+        """
+        self.__logger.debug("Commande signature certificat : %s" % str(commande))
+        pass
 
 
 class GestionnaireCertificatsInstallation(GestionnaireCertificats):
