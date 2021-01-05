@@ -179,9 +179,10 @@ def trouver_config(config_name: str, docker_client):
 
 class CommandeMonitor:
 
-    def __init__(self, contenu: dict, mq_properties=None):
+    def __init__(self, contenu: dict, mq_properties=None, message: dict = None):
         self.__contenu = contenu
         self.__mq_properties = mq_properties
+        self.__message = message
 
     @property
     def contenu(self):
@@ -194,6 +195,10 @@ class CommandeMonitor:
     @property
     def nom_commande(self):
         return self.__contenu['commande']
+
+    @property
+    def message(self):
+        return self.__message
 
 
 class ImageNonTrouvee(Exception):

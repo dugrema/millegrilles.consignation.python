@@ -149,7 +149,7 @@ BMz4ginADdtNs9ARr3DcwG4=
         """
 
         commande = {
-            'est_proprietaire': True,
+            'estProprietaire': True,
             'csr': public_key_str,
         }
 

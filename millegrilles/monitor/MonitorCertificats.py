@@ -592,7 +592,47 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         :return:
         """
         self.__logger.debug("Commande signature certificat : %s" % str(commande))
-        pass
+
+        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = int(duree_certs)
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+        duree_delta = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+
+        # Valider la signature, s'assurer que le certificat permet de faire une demande de signature de certificat
+        contenu = commande.contenu
+        message_commande = commande.message
+        enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
+        idmg = self._service_monitor.idmg
+        roles_cert = enveloppe_cert.get_roles
+
+        roles_permis = [
+            ConstantesGenerateurCertificat.ROLE_DOMAINES,
+            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+        ]
+        test_roles = any([r in roles_permis for r in roles_cert])
+
+        if enveloppe_cert.subject_organization_name == idmg and test_roles:
+            pass
+        else:
+            return {
+                'autorise': False,
+                'description': 'demandeur non autorise a demander la signateur de ce certificat',
+                'roles_demandeur': roles_cert
+            }
+
+        csr = contenu['csr'].encode('utf-8')
+        est_proprietaire = contenu.get('estProprietaire')
+        if est_proprietaire:
+            securite = Constantes.SECURITE_PROTEGE
+        else:
+            securite = Constantes.SECURITE_PRIVE
+
+        clecert = self.__renouvelleur.signer_navigateur(csr, securite, duree=duree_delta)
+        return {
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
 
 
 class GestionnaireCertificatsInstallation(GestionnaireCertificats):
