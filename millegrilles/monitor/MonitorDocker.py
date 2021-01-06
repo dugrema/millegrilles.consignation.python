@@ -558,13 +558,14 @@ class GestionnaireModulesDocker:
         # S'assurer que le compte MQ existe
         update_state = None
         update_status = service.attrs.get('UpdateStatus')
-        last_updating = None
         if update_status is not None:
             update_state = update_status['State']
+        nombre_replicas_demandes = 1
 
         try:
             mode_service = service.attrs['Spec']['Mode']
-            if mode_service['Replicated']['Replicas'] == 0:
+            nombre_replicas_demandes = mode_service['Replicated']['Replicas']
+            if nombre_replicas_demandes == 0:
                 # On a manuellement desactiver le service - skip
                 return
         except KeyError:
@@ -581,7 +582,7 @@ class GestionnaireModulesDocker:
                 # Le service est actif
                 running.append(task)
 
-        if len(running) == 0:
+        if len(running) < nombre_replicas_demandes:
             # Redemarrer
             self.__logger.info("Redemarrer service %s", service.name)
 
