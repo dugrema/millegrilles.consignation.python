@@ -489,6 +489,48 @@ class ServiceMonitor:
         # Nettoyer certificats monitor
         self._supprimer_certificats_expires(['monitor'])
 
+        # Entretien certificats applications
+        self._entretien_certificats_applications()
+
+    def _entretien_certificats_applications(self):
+        prefixe_certificats = 'pki.'
+        filtre = {
+            'name': prefixe_certificats,
+            'label': ['mg_type=pki', 'role=application']
+        }
+        nom_applications = dict()
+        for config in self._docker.configs.list(filters=filtre):
+            labels = config.attrs['Spec']['Labels']
+            app_name = labels['common_name']
+            nom_applications[app_name] = labels
+
+        # Supprimer les certificats expires, renouveller si possible (ok si echec)
+        liste_apps = list(nom_applications.keys())
+        resultat_suppression = self._supprimer_certificats_expires(liste_apps)
+
+        info_monitor = self.get_info_monitor()
+        fqdn_noeud = info_monitor['fqdn_detecte']
+        try:
+            domaine_noeud = info_monitor['domaine']
+        except KeyError:
+            domaine_noeud = fqdn_noeud
+
+        # Renouveller certificats expires
+        # Generer certificats expires et manquants
+        for nom_role, info_role in resultat_suppression.items():
+            if not info_role.get('expiration') or info_role.get('est_expire'):
+            # if True:
+                self.__logger.debug("Generer nouveau certificat role %s", nom_role)
+                self._gestionnaire_certificats.generer_clecert_module(
+                    ConstantesGenerateurCertificat.ROLE_APPLICATION_PRIVEE,
+                    nom_role,
+                    nom_role,
+                    liste_dns=[fqdn_noeud, domaine_noeud, nom_role + '.' + domaine_noeud]
+                )
+
+                # Reconfigurer tous les services qui utilisent le nouveau certificat
+                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
     def _supprimer_certificats_expires(self, roles_entretien: list):
         prefixe_certificats = 'pki.'
         filtre = {'name': prefixe_certificats}
