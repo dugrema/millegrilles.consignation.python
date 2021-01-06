@@ -174,14 +174,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().configurer()
 
         self.charger_ca_chaine()
-        self.__clecert_intermediaire = self.charger_clecert_intermediaire()
-        self.__certificat_intermediaires_pem = self.__clecert_intermediaire.cert_bytes.decode('utf-8')
+        # self.__clecert_intermediaire = self.charger_clecert_intermediaire()
+        #self.__certificat_intermediaires_pem = self.__clecert_intermediaire.cert_bytes.decode('utf-8')
 
-        self.__renouvelleur_certificat = RenouvelleurCertificat(
-            self.configuration.idmg,
-            self.__dict_ca,
-            clecert_intermediaire=self.__clecert_intermediaire
-        )
+        # self.__renouvelleur_certificat = RenouvelleurCertificat(
+        #     self.configuration.idmg,
+        #     self.__dict_ca,
+        #     clecert_intermediaire=self.__clecert_intermediaire
+        # )
 
         # try:
         #     self.charger_certificat_courant()
@@ -234,28 +234,28 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
                 self.__dict_ca[skid] = x509_cert
 
-    def charger_clecert_intermediaire(self) -> EnveloppeCleCert:
-        """
-        Charge le certificat et la cle intermediaire. Permet de signer des certificats au nom de la MilleGrille.
-        :return:
-        """
-        clecert = self.configuration.pki_config.get(Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE)
-
-        if not clecert:
-            password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
-            with open(password_intermediaire_path, 'rb') as fichier:
-                password_intermediaire = fichier.read()
-
-            cert_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE]
-            key_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE]
-            clecert = EnveloppeCleCert()
-            clecert.from_files(
-                key_millegrille,
-                cert_millegrille,
-                password_intermediaire,
-            )
-
-        return clecert
+    # def charger_clecert_intermediaire(self) -> EnveloppeCleCert:
+    #     """
+    #     Charge le certificat et la cle intermediaire. Permet de signer des certificats au nom de la MilleGrille.
+    #     :return:
+    #     """
+    #     clecert = self.configuration.pki_config.get(Constantes.CONFIG_PKI_CLECERT_INTERMEDIAIRE)
+    #
+    #     if not clecert:
+    #         password_intermediaire_path = self.configuration.pki_config[Constantes.CONFIG_PKI_PASSWORD_INTERMEDIAIRE]
+    #         with open(password_intermediaire_path, 'rb') as fichier:
+    #             password_intermediaire = fichier.read()
+    #
+    #         cert_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_CERT_INTERMEDIAIRE]
+    #         key_millegrille = self.configuration.pki_config[Constantes.CONFIG_PKI_KEY_INTERMEDIAIRE]
+    #         clecert = EnveloppeCleCert()
+    #         clecert.from_files(
+    #             key_millegrille,
+    #             cert_millegrille,
+    #             password_intermediaire,
+    #         )
+    #
+    #     return clecert
 
     # def creer_certificat_maitredescles(self):
     #     self._logger.info("Generation de nouveau certificat de maitre des cles")
