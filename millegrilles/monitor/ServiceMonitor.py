@@ -426,13 +426,79 @@ class ServiceMonitor:
         except KeyError:
             domaine_noeud = fqdn_noeud
 
+        # prefixe_certificats = 'pki.'
+        # filtre = {'name': prefixe_certificats}
+        #
+        # # Generer tous les certificas qui peuvent etre utilises
+        # roles = dict()
+        # for role in [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]:
+        #     roles[role] = dict()
+        #
+        # date_courante = datetime.datetime.utcnow()
+        #
+        # for config in self._docker.configs.list(filters=filtre):
+        #     self.__logger.debug("Config : %s", str(config))
+        #     nom_config = config.name.split('.')
+        #     nom_role = nom_config[1]
+        #     if nom_config[2] == 'cert' and nom_role in roles.keys():
+        #         role_info = roles[nom_role]
+        #         self.__logger.debug("Verification cert %s date %s", nom_role, nom_config[3])
+        #         pem = b64decode(config.attrs['Spec']['Data'])
+        #         clecert = EnveloppeCleCert()
+        #         clecert.cert_from_pem_bytes(pem)
+        #         date_expiration = clecert.not_valid_after
+        #
+        #         if date_expiration:
+        #             role_info['expiration'] = date_expiration
+        #
+        #             # Calculer 2/3 de la duree du certificat
+        #             not_valid_before = clecert.not_valid_before
+        #             delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
+        #             epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+        #             date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+        #
+        #             # Verifier si on renouvelle
+        #             if date_renouvellement < date_courante:
+        #                 role_info['est_expire'] = True
+        #             else:
+        #                 role_info['est_expire'] = False
+        #
+        #             # Verifier si on supprime
+        #             if date_expiration < date_courante:
+        #                 # Le certificat n'est plus valide, on le supprime immediatement
+        #                 try:
+        #                     config.remove()
+        #                     self.__logger.info("Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
+        #                 except Exception:
+        #                     self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (date_expiration, config.name))
+
+        # Entretien des certificats services
+        roles = [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]
+        resultat_entretien_certificats = self._supprimer_certificats_expires(roles)
+
+        # Generer certificats expires et manquants
+        for nom_role, info_role in resultat_entretien_certificats.items():
+            if not info_role.get('expiration') or info_role.get('est_expire'):
+                self.__logger.debug("Generer nouveau certificat role %s", nom_role)
+                self._gestionnaire_certificats.generer_clecert_module(
+                    nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
+
+                # Reconfigurer tous les services qui utilisent le nouveau certificat
+                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
+        # Nettoyer certificats monitor
+        self._supprimer_certificats_expires(['monitor'])
+
+    def _supprimer_certificats_expires(self, roles_entretien: list):
         prefixe_certificats = 'pki.'
         filtre = {'name': prefixe_certificats}
 
         # Generer tous les certificas qui peuvent etre utilises
         roles = dict()
-        for role in [info['role'] for info in MonitorConstantes.DICT_MODULES_PROTEGES.values() if info.get('role')]:
-            roles[role] = dict()
+        for role in roles_entretien:
+            roles[role] = {
+                'est_expire': True,
+            }
 
         date_courante = datetime.datetime.utcnow()
 
@@ -440,7 +506,7 @@ class ServiceMonitor:
             self.__logger.debug("Config : %s", str(config))
             nom_config = config.name.split('.')
             nom_role = nom_config[1]
-            if nom_config[2] == 'cert' and nom_role in roles.keys():
+            if nom_config[2] == 'cert' and nom_role in roles_entretien:
                 role_info = roles[nom_role]
                 self.__logger.debug("Verification cert %s date %s", nom_role, nom_config[3])
                 pem = b64decode(config.attrs['Spec']['Data'])
@@ -448,7 +514,7 @@ class ServiceMonitor:
                 clecert.cert_from_pem_bytes(pem)
                 date_expiration = clecert.not_valid_after
 
-                if date_expiration:
+                if date_expiration is not None:
                     role_info['expiration'] = date_expiration
 
                     # Calculer 2/3 de la duree du certificat
@@ -468,19 +534,16 @@ class ServiceMonitor:
                         # Le certificat n'est plus valide, on le supprime immediatement
                         try:
                             config.remove()
-                            self.__logger.info("Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
+                            self.__logger.info(
+                                "Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
                         except Exception:
-                            self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (date_expiration, config.name))
+                            self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (
+                            date_expiration, config.name))
+                else:
+                    # Le certificat n'a pas de date d'expiration (invalide)
+                    role_info['est_expire'] = True
 
-        # Generer certificats expires et manquants
-        for nom_role, info_role in roles.items():
-            if not info_role.get('expiration') or info_role.get('est_expire'):
-                self.__logger.debug("Generer nouveau certificat role %s", nom_role)
-                self._gestionnaire_certificats.generer_clecert_module(
-                    nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
-
-                # Reconfigurer tous les services qui utilisent le nouveau certificat
-                self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+        return roles
 
     def _entretien_secrets_pki(self, prefixe_filtre='pki.'):
         """

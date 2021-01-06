@@ -424,8 +424,9 @@ class GestionnaireApplications:
                     motdepasse = b64encode(secrets.token_bytes(16))
                     # Conserver mot de passe en memoire pour generer script, au besoin
                     mots_de_passe[label_motdepasse] = motdepasse.decode('utf-8')
+                    labels = {'mg_type': 'password'}
                     self.__gestionnaire_modules_docker.sauvegarder_secret(label_motdepasse, motdepasse,
-                                                                          ajouter_date=True)
+                                                                          ajouter_date=True, labels=labels)
 
     def demarrer_application(self, config_elem, config_image, gestionnaire_images_applications, nom_container_docker, nom_application):
         # Preparer le demarrage du service, intercepter le demarrage du container

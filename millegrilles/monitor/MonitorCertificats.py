@@ -83,13 +83,29 @@ class GestionnaireCertificats:
         name_docker = '%(name)s.%(date)s' % params
         return name_docker[0:64]  # Max 64 chars pour name docker
 
-    def ajouter_config(self, name: str, data: bytes, date: str = None):
-        name_tronque = self.__preparer_label(name, date)
-        self._docker.configs.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+    def ajouter_config(self, name: str, data: bytes, date: str = None, labels: dict = None):
+        if labels is not None:
+            labels_config = labels.copy()
+        else:
+            labels_config = dict()
+        labels_config['idmg'] = self.idmg
+        labels_config['nom'] = name
+        if date is not None:
+            labels_config['date'] = date
 
-    def ajouter_secret(self, name: str, data: bytes):
+        name_tronque = self.__preparer_label(name, date)
+        self._docker.configs.create(name=name_tronque, data=data, labels=labels_config)
+
+    def ajouter_secret(self, name: str, data: bytes, labels: dict = None):
         name_tronque = self.__preparer_label(name)
-        self._docker.secrets.create(name=name_tronque, data=data, labels={'idmg': self.idmg})
+        if labels is not None:
+            labels_config = labels.copy()
+        else:
+            labels_config = dict()
+        labels_config['idmg'] = self.idmg
+        labels_config['nom'] = name
+
+        self._docker.secrets.create(name=name_tronque, data=data, labels=labels)
 
         if self._mode_insecure:
             try:
@@ -464,8 +480,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             secret_str.extend(clecert.chaine)
             secret = '\n'.join(secret_str).encode('utf-8')
 
-        self.ajouter_secret('pki.%s.key' % nomcle, secret)
-        self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'))
+        labels = {'mg_type': 'pki', 'role': role}
+
+        self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
+        self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
 
         return clecert
 
