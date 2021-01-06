@@ -449,17 +449,28 @@ class ServiceMonitor:
                 date_expiration = clecert.not_valid_after
 
                 if date_expiration:
+                    role_info['expiration'] = date_expiration
+
                     # Calculer 2/3 de la duree du certificat
                     not_valid_before = clecert.not_valid_before
                     delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
                     epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
                     date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
 
-                    role_info['expiration'] = date_expiration
+                    # Verifier si on renouvelle
                     if date_renouvellement < date_courante:
                         role_info['est_expire'] = True
                     else:
                         role_info['est_expire'] = False
+
+                    # Verifier si on supprime
+                    if date_expiration < date_courante:
+                        # Le certificat n'est plus valide, on le supprime immediatement
+                        try:
+                            config.remove()
+                            self.__logger.info("Certificat expire (%s) a ete supprime : %s" % (date_expiration, config.name))
+                        except Exception:
+                            self.__logger.exception("Erreur suppression certificat expire (%s) de config : %s" % (date_expiration, config.name))
 
         # Generer certificats expires et manquants
         for nom_role, info_role in roles.items():
@@ -470,6 +481,28 @@ class ServiceMonitor:
 
                 # Reconfigurer tous les services qui utilisent le nouveau certificat
                 self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
+    def _entretien_secrets_pki(self, prefixe_filtre='pki.'):
+        """
+        Supprime les secrets qui ne sont plus associes a une config pki.MODULE.cert.DATE
+        :return:
+        """
+        filtre = {'name': prefixe_filtre}
+        for secret in self._docker.secrets.list(filters=filtre):
+            name_secret = secret.name
+            name_split = name_secret.split('.')
+            nom_module = name_split[1]
+            date_secret = name_split[3]
+
+            nom_config = '.'.join(['pki', nom_module, 'cert', date_secret])
+            try:
+                self._docker.configs.get(nom_config)
+            except docker.errors.NotFound:
+                try:
+                    secret.remove()
+                    self.__logger.debug("Secret non associe a config, supprimer : %s" % name_secret)
+                except Exception:
+                    self.__logger.exception("Erreur suppression secret non associe a config : %s" % name_secret)
 
     def configurer_millegrille(self):
         besoin_initialiser = not self._idmg
@@ -512,8 +545,10 @@ class ServiceMonitor:
             # Entretien des certificats du monitor, services
             if self._certificats_entretien_date is None or \
                     self._certificats_entretien_date + self._certificats_entretien_frequence < datetime.datetime.utcnow():
+
                 self._certificats_entretien_date = datetime.datetime.utcnow()
                 self._entretien_certificats()
+                self._entretien_secrets_pki()
 
     def run(self):
         raise NotImplementedError()
