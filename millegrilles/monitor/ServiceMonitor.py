@@ -221,6 +221,12 @@ class ServiceMonitor:
 
         self._nodename = self._docker.info()['Name']            # Node name de la connexion locale dans Docker
 
+        # Delais entretien pour differents modules et services
+        self._certificats_entretien_date = None
+        self._certificats_entretien_frequence = datetime.timedelta(minutes=5)
+        self._web_entretien_date = None
+        self._web_entretien_frequence = datetime.timedelta(minutes=2)
+
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
         signal.signal(signal.SIGTERM, self.fermer)
@@ -498,7 +504,16 @@ class ServiceMonitor:
             self._gestionnaire_mq.entretien()
 
             # Entretien web
-            self._gestionnaire_web.entretien()
+            if self._web_entretien_date is None or \
+                    self._web_entretien_date + self._web_entretien_frequence < datetime.datetime.utcnow():
+                self._web_entretien_date = datetime.datetime.utcnow()
+                self._gestionnaire_web.entretien()
+
+            # Entretien des certificats du monitor, services
+            if self._certificats_entretien_date is None or \
+                    self._certificats_entretien_date + self._certificats_entretien_frequence < datetime.datetime.utcnow():
+                self._certificats_entretien_date = datetime.datetime.utcnow()
+                self._entretien_certificats()
 
     def run(self):
         raise NotImplementedError()
