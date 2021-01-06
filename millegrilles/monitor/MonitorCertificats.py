@@ -480,7 +480,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             secret_str.extend(clecert.chaine)
             secret = '\n'.join(secret_str).encode('utf-8')
 
-        labels = {'mg_type': 'pki', 'role': role}
+        labels = {'mg_type': 'pki', 'role': role, 'common_name': common_name}
 
         self.ajouter_secret('pki.%s.key' % nomcle, secret, labels=labels)
         self.ajouter_config('pki.%s.cert' % nomcle, chaine_certs.encode('utf-8'), labels=labels)
