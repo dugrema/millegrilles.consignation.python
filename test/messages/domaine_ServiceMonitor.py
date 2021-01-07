@@ -160,6 +160,39 @@ BMz4ginADdtNs9ARr3DcwG4=
             correlation_id='efgh'
         )
 
+    def transaction_signer_certificat_noeud(self):
+        public_key_str = """
+-----BEGIN CERTIFICATE REQUEST-----
+MIICnTCCAYUCAQAwRzEWMBQGA1UECwwNaW50ZXJtZWRpYWlyZTEtMCsGA1UEAwwk
+YTU4YTIwZjItNjlmZC00ZGVhLTllMTUtNjViMzM1YjkzMzVjMIIBIjANBgkqhkiG
+9w0BAQEFAAOCAQ8AMIIBCgKCAQEArUOclSFJO7JLbJjn0sruXdEcJ3LnmL9iP0Uj
+VkleJP2JBABj6u6pqppo5NIf0RErDpSS90G/IiooZT9/cYRnlS9c11RauuOij2+a
+Kyjxa3zRA2fJpBnmVRA3NvmOG8BOs3SuVDr7HpGZmYLEvibh2dnu3FQqNM2O0RXV
+u/t6NjtuUPfhMo3H4+hm5jQYZYD5s1erUfbU/Nn93klksa/91A5t5hvHV1eLsd7S
+0jy2Ka1TA1i6k6DTAHlRiOIwg772p1cYGRMZXor3hHXsvWop7aD7TRsBvryzYAvs
+WeMNFbccu8KvP4MTVo1UkS58UlYtbtiNxtUmQLM+PrsF/yzI+wIDAQABoBEwDwYJ
+KoZIhvcNAQkOMQIwADANBgkqhkiG9w0BAQsFAAOCAQEAPEi/ZcZH+zT1akCG5Q7R
+UbafVqHS2/f2KVZxJmBgEvg9d3jBzdDQZ7RTjs4PsvZsK9ZcJUKSRlHOivPPTCpo
+7fWHLS4EcDtTkj2kFHSo6h7qm8AmJKyk8+2yXoTk0QwTtDd6z1mt+3im9QkNRFgK
+P7PokGpmtnuhKogsSf5azeI3IXs0uwivwbcvNv2Idhzw8mxwC0OeNIaluoR5a05M
+MIq/Y6qs3UTqyg6T3tadWCalSKwklKnSOr/L7jKdw6kKkaWE0N6c7zsUmCVeRVAH
+g8Se0WuSZcFzpRhGqxJeQHRLu9s258MOOEP7+BtiT2s1/iXUcpBodQykmQWTX1fu
+BA==
+-----END CERTIFICATE REQUEST-----
+        """
+
+        commande = {
+            'csr': public_key_str,
+            'securite': '2.prive',
+        }
+
+        self.generateur.transmettre_commande(
+            commande,
+            'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+            reply_to=self.queue_name,
+            correlation_id='efgh'
+        )
+
     def executer(self):
         # self.commande_creer_millegrille_hebergee()
         # self.transaction_desactiver_millegrille_hebergee()
@@ -167,7 +200,8 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.commande_ajouter_compte()
         # self.commande_activer_hebergement()
         # self.commande_desactiver_hebergement()
-        self.transaction_signer_certificat_navigateur()
+        # self.transaction_signer_certificat_navigateur()
+        self.transaction_signer_certificat_noeud()
 
 
 # --- MAIN ---

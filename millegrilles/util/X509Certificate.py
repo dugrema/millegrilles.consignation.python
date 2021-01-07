@@ -1959,7 +1959,7 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def signer_noeud(self, csr_bytes: bytes, domaines: list = None):
+    def signer_noeud(self, csr_bytes: bytes, domaines: list = None, role_in: str = None):
         csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
         if not csr.is_signature_valid:
             raise ValueError("Signature invalide")
@@ -1976,7 +1976,7 @@ class RenouvelleurCertificat:
             sujet_dict = dict()
             for elem in sujet:
                 sujet_dict[elem.oid._name] = elem.value
-            role = sujet_dict['organizationalUnitName']
+            role = role_in or sujet_dict['organizationalUnitName']
             common_name = sujet_dict['commonName']
             clecert = self.renouveller_avec_csr(role, common_name, csr_bytes)
 

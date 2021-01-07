@@ -1711,6 +1711,7 @@ class ConstantesServiceMonitor:
     COMMANDE_CONFIGURER_APPLICATION = 'configurerApplication'
     COMMANDE_DEMARRER_APPLICATION = 'demarrerApplication'
     COMMANDE_SIGNER_NAVIGATEUR = 'signerNavigateur'
+    COMMANDE_SIGNER_NOEUD = 'signerNoeud'
 
     COMMANDE_REQUETE_CONFIG_APPLICATION = 'requeteConfigurationApplication'
 

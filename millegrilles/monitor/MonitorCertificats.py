@@ -665,6 +665,59 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             'fullchain': clecert.chaine,
         }
 
+    def commande_signer_noeud(self, commande):
+        """
+        Signe la demande de certificat d'un noeud 2.prive ou 1.public
+        :param commande:
+        :return:
+        """
+        self.__logger.debug("Commande signature certificat : %s" % str(commande))
+
+        duree_certs = environ.get('CERT_DUREE') or '31'  # Default 31 jours
+        duree_certs = int(duree_certs)
+        duree_certs_heures = environ.get('CERT_DUREE_HEURES') or '0'  # Default 0 heures de plus
+        duree_certs_heures = int(duree_certs_heures)
+        duree_delta = datetime.timedelta(days=duree_certs, hours=duree_certs_heures)
+
+        # Valider la signature, s'assurer que le certificat permet de faire une demande de signature de certificat
+        contenu = commande.contenu
+        message_commande = commande.message
+        enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
+        idmg = self._service_monitor.idmg
+        roles_cert = enveloppe_cert.get_roles
+
+        roles_permis = [
+            ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
+            ConstantesGenerateurCertificat.ROLE_DOMAINES,
+        ]
+        test_roles = any([r in roles_permis for r in roles_cert])
+
+        csr_bytes = contenu['csr'].encode('utf-8')
+        # csr = x509.load_pem_x509_csr(csr_bytes, backend=default_backend())
+
+        if enveloppe_cert.subject_organization_name == idmg and test_roles:
+            # On utilise le niveau de securite demande
+            role_noeud = contenu['securite'].split('.')[1]
+        elif ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE in roles_cert:
+            # On utilise le niveau de securite dans le certificat signateur (prive)
+            role_noeud = ConstantesGenerateurCertificat.ROLE_NOEUD_PRIVE
+        elif ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC in roles_cert:
+            # On utilise le niveau de securite dans le certificat signateur (public)
+            role_noeud = ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC
+        else:
+            return {
+                'autorise': False,
+                'description': 'demandeur non autorise a demander la signateur de ce certificat',
+                'roles_demandeur': roles_cert
+            }
+
+        clecert = self.__renouvelleur.signer_noeud(csr_bytes, role_in=role_noeud)
+
+        return {
+            'cert': clecert.cert_bytes.decode('utf-8'),
+            'fullchain': clecert.chaine,
+        }
+
 
 class GestionnaireCertificatsInstallation(GestionnaireCertificats):
 
