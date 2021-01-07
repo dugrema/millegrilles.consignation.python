@@ -215,15 +215,23 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             self.repondre_json(reponse, status_code=500)
 
     def return_csr(self):
-        csr_intermediaire = self.service_monitor.csr_intermediaire
-        if csr_intermediaire:
-            self.send_response(200)
-            self.send_header("Content-type", "text/ascii")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(csr_intermediaire)
-        else:
-            self.send_error(410)
+        try:
+            csr_intermediaire = self.service_monitor.csr_intermediaire
+            if csr_intermediaire:
+                self.send_response(200)
+                self.send_header("Content-type", "text/ascii")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(csr_intermediaire)
+                return
+        except AttributeError:
+            pass
+
+        self.send_response(410)
+        self.send_header("Content-type", "text/ascii")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.finish()
 
     def return_etat_certificat_web(self):
         gestionnaire_docker = self.service_monitor.gestionnaire_docker

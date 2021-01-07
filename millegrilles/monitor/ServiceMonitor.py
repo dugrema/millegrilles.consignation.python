@@ -1533,6 +1533,7 @@ class ServiceMonitorPrive(ServiceMonitor):
                 volume_secrets = '/var/opt/millegrilles_secrets'
                 self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
                 fichiers = [
+                    # (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
                     (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
                     (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
                     (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
@@ -2037,9 +2038,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         # Faire correspondre et sauvegarder certificat de noeud
         secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
 
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key.pem'), 'rb') as fichier:
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key'), 'rb') as fichier:
             intermediaire_key_pem = fichier.read()
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd.txt'), 'rb') as fichier:
+        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd'), 'rb') as fichier:
             intermediaire_passwd_pem = fichier.read()
 
         certificat_pem = params['certificatPem']
@@ -2096,7 +2097,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
                                                                        ajouter_date=True)
 
         if self._args.dev:
-            with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'w') as fichier:
+            with open(os.path.join(self._args.secrets, 'pki.monitor.key'), 'w') as fichier:
                 fichier.write(cle_monitor)
 
         gestionnaire_docker.sauvegarder_config(
@@ -2203,8 +2204,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         secret_name, date_key = gestionnaire_docker.sauvegarder_secret('pki.monitor.key', cle_monitor,
                                                                        ajouter_date=True)
 
-        if self._args.dev:
-            with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'w') as fichier:
+        if self._args.secrets is not None:
+            with open(os.path.join(self._args.secrets, 'pki.monitor.key'), 'w') as fichier:
                 fichier.write(cle_monitor)
 
         gestionnaire_docker.sauvegarder_config(

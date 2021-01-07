@@ -183,7 +183,8 @@ class GestionnaireCertificats:
             except FileExistsError:
                 pass
 
-            key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
+            # key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
+            key_path = path.join(self.secret_path, 'pki.%s.key' % type_cle)
             try:
                 with open(key_path, 'xb') as fichier:
                     fichier.write(cle_pem)
