@@ -7,6 +7,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 from json.decoder import JSONDecodeError
+from base64 import b64decode
 
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
@@ -217,21 +218,29 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     def return_csr(self):
         try:
             csr_intermediaire = self.service_monitor.csr_intermediaire
-            if csr_intermediaire:
-                self.send_response(200)
-                self.send_header("Content-type", "text/ascii")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(csr_intermediaire)
-                return
         except AttributeError:
-            pass
+            # On est probablement dans un monitor instancie, charger avec docker
+            try:
+                csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+                # Decoder
+                csr_b64 = csr_intermediaire_docker['config'].attrs['Spec']['Data'].encode('utf-8')
+                csr_intermediaire = b64decode(csr_b64)
+            except Exception:
+                # Configuration non trouvee
+                csr_intermediaire = None
 
-        self.send_response(410)
-        self.send_header("Content-type", "text/ascii")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.finish()
+        if csr_intermediaire is not None:
+            self.send_response(200)
+            self.send_header("Content-type", "text/ascii")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(csr_intermediaire)
+        else:
+            self.send_response(410)
+            self.send_header("Content-type", "text/ascii")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.finish()
 
     def return_etat_certificat_web(self):
         gestionnaire_docker = self.service_monitor.gestionnaire_docker
