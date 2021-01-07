@@ -1150,7 +1150,7 @@ class ServiceMonitor:
             if apie.status_code == 500:
                 self.__logger.warning(
                     "Erreur mise a jour, probablement update concurrentes. On attend 15 secondes puis on reessaie")
-                self.__event_attente.wait(15)
+                Event().wait(15)
                 gestionnaire_docker.maj_service('nginx')
             else:
                 raise apie
