@@ -688,7 +688,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         roles_cert = enveloppe_cert.get_roles
 
         roles_permis = [
-            ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
+            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
             ConstantesGenerateurCertificat.ROLE_DOMAINES,
         ]
         test_roles = any([r in roles_permis for r in roles_cert])
@@ -712,7 +712,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
                 'roles_demandeur': roles_cert
             }
 
-        clecert = self.__renouvelleur.signer_noeud(csr_bytes, role_in=role_noeud)
+        clecert = self.__renouvelleur.signer_noeud(csr_bytes, role_in=role_noeud, duree=duree_delta)
 
         return {
             'cert': clecert.cert_bytes.decode('utf-8'),
