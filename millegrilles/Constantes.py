@@ -1671,6 +1671,8 @@ class ConstantesServiceMonitor:
     FICHIER_MONGO_MOTDEPASSE = 'passwd.mongo.txt'
     FICHIER_MONGOXPWEB_MOTDEPASSE = 'passwd.mongoxpweb.txt'
     FICHIER_MQ_MOTDEPASSE = 'passwd.mq.txt'
+    PKI_MONITOR_KEY = 'pki.monitor.key'
+    PKI_MONITOR_CERT = 'pki.monitor.cert'
 
     CERT_SUFFIX = '.cert'
     CHAIN_SUFFIX = '.chain'

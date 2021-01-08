@@ -618,7 +618,10 @@ class ServiceMonitor:
 
         self._gestionnaire_docker = GestionnaireModulesDocker(
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_PRIMAIRE.copy(),
-            self, insecure=self._args.dev)
+            self,
+            insecure=self._args.dev,
+            secrets=self._args.secrets
+        )
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
 
@@ -1113,11 +1116,12 @@ class ServiceMonitor:
         clecert_recu.password = None
         cle_monitor = clecert_recu.private_key_bytes.decode('utf-8')
         secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
-            'pki.monitor.key', cle_monitor, ajouter_date=True)
+            ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
 
-        if self._args.dev:
-            with open(os.path.join(self._args.secrets, 'pki.monitor.key'), 'w') as fichier:
-                fichier.write(cle_monitor)
+        # if self._args.dev:
+        #     nom_key = ConstantesServiceMonitor.PKI_MONITOR_KEY + date_key
+        #     with open(os.path.join(self._args.secrets, nom_key), 'w') as fichier:
+        #         fichier.write(cle_monitor)
 
         gestionnaire_docker.sauvegarder_config(
             'pki.monitor.cert.' + date_key,
@@ -1349,7 +1353,7 @@ class ServiceMonitorDependant(ServiceMonitor):
         self._charger_configuration()
         self._gestionnaire_docker = GestionnaireModulesDocker(
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_DEPENDANT.copy(),
-            self, insecure=self._args.dev)
+            self, insecure=self._args.dev, secrets=self._args.secrets)
         self._gestionnaire_docker.start_events()
         self._gestionnaire_docker.add_event_listener(self)
         self.preparer_gestionnaire_certificats()
@@ -1668,7 +1672,8 @@ class ServiceMonitorPrive(ServiceMonitor):
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
             self,
             configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
-            insecure=self._args.dev
+            insecure=self._args.dev,
+            secrets=self._args.secrets
         )
 
         self._gestionnaire_docker.start_events()
@@ -1871,7 +1876,8 @@ class ServiceMonitorPublic(ServiceMonitor):
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(),
             self,
             configuration_services=MonitorConstantes.DICT_MODULES_PUBLICS,
-            insecure=self._args.dev
+            insecure=self._args.dev,
+            secrets=self._args.secrets
         )
 
         self._gestionnaire_docker.start_events()
@@ -1953,7 +1959,8 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self._gestionnaire_docker = GestionnaireModulesDocker(
             self._idmg, self._docker, self._fermeture_event, MonitorConstantes.MODULES_REQUIS_INSTALLATION.copy(), self,
             configuration_services=MonitorConstantes.DICT_MODULES_PRIVES,
-            insecure=self._args.dev
+            insecure=self._args.dev,
+            secrets=self._args.secrets
         )
 
         try:

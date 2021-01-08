@@ -43,6 +43,8 @@ class GestionnaireModulesDocker:
         self.__configuration_services = configuration_services
 
         self.__insecure = kwargs.get('insecure') or False
+        self.__secrets = kwargs.get('secrets')  # Repertoire des secrets
+        self.__rep_nginx = '/var/opt/millegrilles/nginx'  # Repertoire dev nginx, mode insecure
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__logger_verbose = logging.getLogger('trace.' + __name__ + '.' + self.__class__.__name__)
 
@@ -57,8 +59,6 @@ class GestionnaireModulesDocker:
 
         self.__mappings = {
             'IDMG': self.__idmg,
-            'IDMGLOWER': self.__idmg.lower(),
-            'IDMGTRUNCLOWER': self.idmg_tronque,
             'MONGO_INITDB_ROOT_USERNAME': 'admin',
             'MOUNTS': '/var/opt/millegrilles/mounts',
             'NODENAME': self.nodename,
@@ -72,9 +72,9 @@ class GestionnaireModulesDocker:
         }
 
         if self.__insecure:
-            self.__mappings['NGINX_CONFIG_VOLUME'] = '/var/opt/millegrilles/nginx/modules'
-            self.__mappings['NGINX_HTML_VOLUME'] = '/var/opt/millegrilles/nginx/html'
-            self.__mappings['NGINX_DATA_VOLUME'] = '/var/opt/millegrilles/nginx/data'
+            self.__mappings['NGINX_CONFIG_VOLUME'] = path.join(self.__rep_nginx, 'modules')
+            self.__mappings['NGINX_HTML_VOLUME'] = path.join(self.__rep_nginx, 'html')
+            self.__mappings['NGINX_DATA_VOLUME'] = path.join(self.__rep_nginx, 'data')
 
         self.__event_listeners = list()
 
@@ -188,8 +188,23 @@ class GestionnaireModulesDocker:
         filtre = {'name': 'monitor'}
         services_list = self.__docker.services.list(filters=filtre)
         try:
+            if self.__insecure:
+                # Mettre a jour les symlinks pour les fichiers sous /secrets
+                for s in liste_secrets:
+                    secret_name = s.get('SecretName')
+                    path_original = path.join(self.__secrets, secret_name)
+                    path_symlink = path.join(self.__secrets, s.get('File')['Name'])
+
+                    try:
+                        os.remove(path_symlink)
+                    except FileNotFoundError:
+                        pass  # OK
+
+                    os.symlink(path_original, path_symlink)
+
             service_monitor = services_list[0]
             service_monitor.update(secrets=liste_secrets)
+
         except IndexError:
             self.__logger.error("Erreur configuration service monitor avec nouvelles valeurs (OK si dev)")
 
@@ -631,6 +646,13 @@ class GestionnaireModulesDocker:
             labels_secret.update(labels)
 
         self.__docker.secrets.create(name=secret_name, data=data, labels=labels_secret)
+
+        if self.__insecure:
+            # Sauvegarder le secret sur disque
+            path_secret = path.join(self.__secrets, secret_name)
+            with open(path_secret, 'wb') as fichier:
+                fichier.write(data)
+
         return secret_name, date_courante
 
     def sauvegarder_config(self, config_name, data, labels: dict = None):
@@ -673,6 +695,7 @@ class GestionnaireModulesDocker:
         secret_names = secret_name.split(';')
         secrets = None
         for secret_name_val in secret_names:
+            # Utiliser mode docker
             filtre = {'name': secret_name_val}
             secrets = self.__docker.secrets.list(filters=filtre)
             if len(secrets) > 0:
@@ -1361,3 +1384,10 @@ class GestionnaireImagesServices(GestionnaireImagesDocker):
         except IndexError:
             self.__logger.error(
                 "Configurations de modules MilleGrille (docker.versions) ne sont pas chargee dans docker")
+
+
+class DummySecret:
+
+    def __init__(self, nom_secret):
+        self.name = nom_secret
+        self.attrs = {'ID': nom_secret}

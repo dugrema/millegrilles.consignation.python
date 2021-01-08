@@ -109,10 +109,10 @@ class GestionnaireCertificats:
 
         if self._mode_insecure:
             try:
-                os.mkdir('/var/opt/millegrilles/secrets', 0o755)
+                os.mkdir(self.secret_path, 0o755)
             except FileExistsError:
                 pass
-        with open('/var/opt/millegrilles/secrets/' + name, 'wb') as fichiers:
+        with open(path.join(self.secret_path, name_tronque), 'wb') as fichiers:
             fichiers.write(data)
 
         return name_tronque
@@ -177,27 +177,27 @@ class GestionnaireCertificats:
             label_csr_inter = 'pki.%s.csr' % type_cle
             self.ajouter_config(label_csr_inter, data=request_pem)
 
-        if insecure:  # Mode insecure
-            try:
-                os.mkdir(self.secret_path, 0o755)
-            except FileExistsError:
-                pass
-
-            # key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
-            key_path = path.join(self.secret_path, 'pki.%s.key' % type_cle)
-            try:
-                with open(key_path, 'xb') as fichier:
-                    fichier.write(cle_pem)
-            except FileExistsError:
-                pass
-
-            if cle_passwd:
-                passwd_path = path.join(self.secret_path, 'pki.%s.passwd.txt' % type_cle)
-                try:
-                    with open(passwd_path, 'xb') as fichier:
-                        fichier.write(cle_passwd)
-                except FileExistsError:
-                    pass
+        # if insecure:  # Mode insecure
+        #     try:
+        #         os.mkdir(self.secret_path, 0o755)
+        #     except FileExistsError:
+        #         pass
+        #
+        #     # key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
+        #     key_path = path.join(self.secret_path, 'pki.%s.key' % type_cle)
+        #     try:
+        #         with open(key_path, 'xb') as fichier:
+        #             fichier.write(cle_pem)
+        #     except FileExistsError:
+        #         pass
+        #
+        #     if cle_passwd:
+        #         passwd_path = path.join(self.secret_path, 'pki.%s.passwd.txt' % type_cle)
+        #         try:
+        #             with open(passwd_path, 'xb') as fichier:
+        #                 fichier.write(cle_passwd)
+        #         except FileExistsError:
+        #             pass
 
         return info_cle
 
@@ -364,9 +364,10 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
         super().generer_motsdepasse()
 
         passwd_mq = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
+        self.ajouter_secret('passwd.mq', passwd_mq)
         self._passwd_mq = str(passwd_mq, 'utf-8')
-        label_passwd_mq = 'passwd.mq.' + self._date
-        self._docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
+        # label_passwd_mq = 'passwd.mq.' + self._date
+        # self._docker.secrets.create(name=label_passwd_mq, data=passwd_mq, labels={'millegrille': self.idmg})
 
         passwd_mongo = b64encode(secrets.token_bytes(32)).replace(b'=', b'')
         self.ajouter_secret('passwd.mongo', passwd_mongo)
@@ -376,24 +377,24 @@ class GestionnaireCertificatsNoeudProtegeDependant(GestionnaireCertificatsNoeudP
         self.ajouter_secret('passwd.mongoxpweb', passwd_mongoxpweb)
         self._passwd_mongoxp = str(passwd_mongoxpweb, 'utf-8')
 
-        if self._mode_insecure:
-            try:
-                os.mkdir('/var/opt/millegrilles/secrets', 0o755)
-            except FileExistsError:
-                pass
-
-            with open('/var/opt/millegrilles/secrets/passwd.mongo.txt', 'w') as fichiers:
-                fichiers.write(self._passwd_mongo)
-            with open('/var/opt/millegrilles/secrets/passwd.mongoxpweb.txt', 'w') as fichiers:
-                fichiers.write(self._passwd_mongoxp)
-
-            try:
-                os.mkdir('/var/opt/millegrilles/secrets', 0o700)
-            except FileExistsError:
-                pass
-
-            with open('/var/opt/millegrilles/secrets/passwd.mq.txt', 'w') as fichiers:
-                fichiers.write(self._passwd_mq)
+        # if self._mode_insecure:
+        #     try:
+        #         os.mkdir('/var/opt/millegrilles/secrets', 0o755)
+        #     except FileExistsError:
+        #         pass
+        #
+        #     with open('/var/opt/millegrilles/secrets/passwd.mongo.txt', 'w') as fichiers:
+        #         fichiers.write(self._passwd_mongo)
+        #     with open('/var/opt/millegrilles/secrets/passwd.mongoxpweb.txt', 'w') as fichiers:
+        #         fichiers.write(self._passwd_mongoxp)
+        #
+        #     try:
+        #         os.mkdir('/var/opt/millegrilles/secrets', 0o700)
+        #     except FileExistsError:
+        #         pass
+        #
+        #     with open('/var/opt/millegrilles/secrets/passwd.mq.txt', 'w') as fichiers:
+        #         fichiers.write(self._passwd_mq)
 
     def charger_certificats(self):
         secret_path = path.abspath(self.secret_path)
@@ -513,7 +514,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         try:
             # Charger information certificat monitor
             cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-            with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME), 'rb') as fichiers:
+            with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
                 key_pem = fichiers.read()
             clecert_monitor = EnveloppeCleCert()
             clecert_monitor.from_pem_bytes(key_pem, cert_pem)
@@ -521,7 +522,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
             # Conserver reference au cert monitor pour middleware
             self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-            self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME
+            self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
 
             # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
             #     self._passwd_mongo = fichiers.read()
@@ -593,29 +594,29 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
     #
     #     return self.idmg
 
-    def sauvegarder_secrets(self):
-        """
-        Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
-        :return:
-        """
-        secret_path = path.abspath(self.secret_path)
-        os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
-
-        # Sauvegarder information certificat intermediaire
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self._clecert_millegrille.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD + '.txt'), 'wb') as fichiers:
-            fichiers.write(self._clecert_millegrille.password)
-
-        # Sauvegarder information certificat intermediaire
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self._clecert_intermediaire.private_key_bytes)
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt'), 'wb') as fichiers:
-            fichiers.write(self._clecert_intermediaire.password)
-
-        # Sauvegarder information certificat monitor
-        with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
-            fichiers.write(self.clecert_monitor.private_key_bytes)
+    # def sauvegarder_secrets(self):
+    #     """
+    #     Sauvegarder le certificat de millegrille sous 'args.secrets' - surtout utilise pour dev (insecure)
+    #     :return:
+    #     """
+    #     secret_path = path.abspath(self.secret_path)
+    #     os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
+    #
+    #     # Sauvegarder information certificat intermediaire
+    #     with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_KEY + '.pem'), 'wb') as fichiers:
+    #         fichiers.write(self._clecert_millegrille.private_key_bytes)
+    #     with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MILLEGRILLE_PASSWD + '.txt'), 'wb') as fichiers:
+    #         fichiers.write(self._clecert_millegrille.password)
+    #
+    #     # Sauvegarder information certificat intermediaire
+    #     with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_KEY + '.pem'), 'wb') as fichiers:
+    #         fichiers.write(self._clecert_intermediaire.private_key_bytes)
+    #     with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_INTERMEDIAIRE_PASSWD + '.txt'), 'wb') as fichiers:
+    #         fichiers.write(self._clecert_intermediaire.password)
+    #
+    #     # Sauvegarder information certificat monitor
+    #     with open(path.join(secret_path, ConstantesServiceMonitor.DOCKER_CONFIG_MONITOR_KEY + '.pem'), 'wb') as fichiers:
+    #         fichiers.write(self.clecert_monitor.private_key_bytes)
 
     def commande_signer_navigateur(self, commande):
         """
