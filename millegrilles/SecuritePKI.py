@@ -915,11 +915,15 @@ class VerificateurCertificats(UtilCertificats):
             enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
 
             if enveloppe is None and self._contexte.document_dao is not None:
-                collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-                document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint})
-                if document_cert is not None:
-                    pems = [document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in document_cert[ConstantesSecurityPki.LIBELLE_CHAINE]]
-                    enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(pems))
+                try:
+                    collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
+                    document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint})
+                    if document_cert is not None:
+                        pems = [document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in document_cert[ConstantesSecurityPki.LIBELLE_CHAINE]]
+                        enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(pems))
+                except TypeError:
+                    if self._logger.isEnabledFor(logging.DEBUG):
+                        self._logger.exception("DEBUG: Erreur access base de donnees mongo pour charger certificat manquant")
 
         elif fichier is not None and os.path.isfile(fichier):
             with open(fichier, 'r') as fichier:
