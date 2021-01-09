@@ -1,13 +1,13 @@
 # Serveur web / API pour le monitor
 import logging
 import json
-import socket
 
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 from threading import Thread
 from json.decoder import JSONDecodeError
 from base64 import b64decode
+from docker.errors import NotFound
 
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
@@ -85,16 +85,20 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
     def _traiter_get_api(self):
         path_fichier = self.path
         path_split = path_fichier.split('/')
-        if path_split[3] == 'infoMonitor':
-            self.return_info_monitor()
-        elif path_split[3] == 'csr':
-            self.return_csr()
-        elif path_split[3] == 'services':
-            self.return_services_installes()
-        elif path_split[3] == 'etatCertificatWeb':
-            self.return_etat_certificat_web()
-        else:
-            self.error_404()
+        try:
+            if path_split[3] == 'infoMonitor':
+                self.return_info_monitor()
+            elif path_split[3] == 'csr':
+                self.return_csr()
+            elif path_split[3] == 'services':
+                self.return_services_installes()
+            elif path_split[3] == 'etatCertificatWeb':
+                self.return_etat_certificat_web()
+            else:
+                self.error_404()
+        except Exception:
+            self.__logger.exception("Erreur GET")
+            self.send_error(500)
 
     def _traiter_post_api(self, request_data):
 
@@ -222,11 +226,18 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             # On est probablement dans un monitor instancie, charger avec docker
             try:
                 csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
-                # Decoder
+            except AttributeError:
+                self.__logger.exception("CSR intermediaire introuvable, on verifier si le CSR monitor existe")
+                try:
+                    csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
+                        'pki.monitor.csr')
+                except AttributeError:
+                    csr_intermediaire_docker = None
+
+            if csr_intermediaire_docker is not None:
                 csr_b64 = csr_intermediaire_docker['config'].attrs['Spec']['Data'].encode('utf-8')
                 csr_intermediaire = b64decode(csr_b64)
-            except Exception:
-                # Configuration non trouvee
+            else:
                 csr_intermediaire = None
 
         if csr_intermediaire is not None:

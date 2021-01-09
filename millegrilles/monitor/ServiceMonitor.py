@@ -157,7 +157,7 @@ class InitialiserServiceMonitor:
 
             # Verifier si on a le cert de monitor - indique que noeud est configure et completement installe
             # Lance une exception si aucune configuration ne commence par pki.monitor.cert
-            monitor_cert = self.__docker.configs.list(filters={'name': 'pki.monitor.cert'})[0]
+            # monitor_cert = self.__docker.configs.list(filters={'name': 'pki.monitor.cert'})[0]
 
             if securite == '1.public':
                 self.__logger.info("Noeud public")
@@ -1096,15 +1096,16 @@ class ServiceMonitor:
                 try:
                     config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
                     date_csr = config_csr['date']
-
-                    with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'rb') as fichier:
+                    with open(os.path.join(self._args.secrets, 'pki.monitor.key.%s' % date_csr), 'rb') as fichier:
                         monitor_key_pem = fichier.read()
                     clecert_recu = EnveloppeCleCert()
                     clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
                     if not clecert_recu.cle_correspondent():
-                        raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+                        raise ValueError('MODE DEV : Cle et Certificat monitor (mode insecure) ne correspondent pas')
                 except FileNotFoundError:
-                    raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+                    raise ValueError('MODE DEV : Cle associe au CSR monitor introuvable')
+                except AttributeError:
+                    raise ValueError('MODE DEV : CSR monitor introuvable')
             else:
                 raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
@@ -1753,14 +1754,18 @@ class ServiceMonitorPrive(ServiceMonitor):
         """
         clecert_monitor = self._gestionnaire_certificats.clecert_monitor
 
-        not_valid_before = clecert_monitor.not_valid_before
-        not_valid_after = clecert_monitor.not_valid_after
-        self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
-
-        # Calculer 2/3 de la duree du certificat
-        delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
-        epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-        date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+        try:
+            not_valid_before = clecert_monitor.not_valid_before
+            not_valid_after = clecert_monitor.not_valid_after
+            self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
+        except AttributeError:
+            self.__logger.exception("Certificat monitor absent")
+            date_renouvellement = None
+        else:
+            # Calculer 2/3 de la duree du certificat
+            delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
+            epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
 
         if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
             # MAJ date pour creation de certificats
@@ -1813,7 +1818,6 @@ class ServiceMonitorPrive(ServiceMonitor):
             self._initialiser_noeud(commande, Constantes.SECURITE_PRIVE)
         else:
             raise Exception("Type de noeud non supporte : " + securite)
-
 
     def ajouter_compte(self, certificat: str):
         raise Exception("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)

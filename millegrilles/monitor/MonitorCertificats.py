@@ -298,19 +298,25 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
         os.makedirs(secret_path, exist_ok=True)  # Creer path secret, au besoin
 
         # Charger information certificat monitor
-        cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-        with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
-            key_pem = fichiers.read()
-        clecert_monitor = EnveloppeCleCert()
-        clecert_monitor.from_pem_bytes(key_pem, cert_pem)
-        self.clecert_monitor = clecert_monitor
+        try:
+            cert_pem = self._charger_certificat_docker('pki.monitor.cert')
+        except AttributeError:
+            # Le certificat est introuvable - probablement un reset manuel (config supprimee manuellement)
+            # On doit creer nouveau CSR, attente connexion manuelle
+            pass
+        else:
+            with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
+                key_pem = fichiers.read()
+            clecert_monitor = EnveloppeCleCert()
+            clecert_monitor.from_pem_bytes(key_pem, cert_pem)
+            self.clecert_monitor = clecert_monitor
 
-        # Conserver reference au cert monitor pour middleware
-        self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
+            # Conserver reference au cert monitor pour middleware
+            self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
+            self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
 
-        # Charger le certificat de millegrille
-        self._charger_certificat_docker('pki.millegrille.cert')
+            # Charger le certificat de millegrille
+            self._charger_certificat_docker('pki.millegrille.cert')
 
     def generer_motsdepasse(self):
         """
