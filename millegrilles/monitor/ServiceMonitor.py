@@ -1051,7 +1051,7 @@ class ServiceMonitor:
             self.gestionnaire_docker.sauvegarder_config(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_IDMG, idmg)
             self._idmg = idmg
 
-    def _initialiser_noeud(self, commande: CommandeMonitor):
+    def _renouveller_certificat_monitor(self, commande: CommandeMonitor):
         """
         Initialise un noeud protege avec un certificat
         :param commande:
@@ -1823,7 +1823,7 @@ class ServiceMonitorPrive(ServiceMonitor):
         securite = params['securite']
 
         if securite == self.securite:
-            self._initialiser_noeud(commande)
+            self._renouveller_certificat_monitor(commande)
         else:
             raise Exception("Type de noeud non supporte : " + securite)
 
