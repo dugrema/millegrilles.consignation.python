@@ -321,7 +321,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
         # Charger information certificat monitor
         cert_pem = self._charger_certificat_docker('pki.monitor.cert')
-        with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME), 'rb') as fichiers:
+        with open(path.join(secret_path, GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'), 'rb') as fichiers:
             key_pem = fichiers.read()
         clecert_monitor = EnveloppeCleCert()
         clecert_monitor.from_pem_bytes(key_pem, cert_pem)
@@ -329,7 +329,7 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
 
         # Conserver reference au cert monitor pour middleware
         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
-        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME
+        self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
 
         # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
         #     self._passwd_mongo = fichiers.read()

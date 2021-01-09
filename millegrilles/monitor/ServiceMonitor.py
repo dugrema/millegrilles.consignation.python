@@ -589,7 +589,7 @@ class ServiceMonitor:
 
     def _entretien_secrets_pki(self, prefixe_filtre='pki.'):
         """
-        Supprime les secrets qui ne sont plus associes a une config pki.MODULE.cert.DATE
+        Supprime les secrets qui ne sont plus associes a une config pki.MODULE.cert.DATE (ou csr)
         :return:
         """
         filtre = {'name': prefixe_filtre}
@@ -603,9 +603,12 @@ class ServiceMonitor:
             try:
                 self._docker.configs.get(nom_config)
             except docker.errors.NotFound:
+                nom_config = '.'.join(['pki', nom_module, 'csr', date_secret])
                 try:
-                    secret.remove()
+                    self._docker.configs.get(nom_config)
                     self.__logger.debug("Secret non associe a config, supprimer : %s" % name_secret)
+                except docker.errors.NotFound:
+                    secret.remove()
                 except Exception:
                     self.__logger.exception("Erreur suppression secret non associe a config : %s" % name_secret)
 
@@ -1059,12 +1062,19 @@ class ServiceMonitor:
 
         # Faire correspondre et sauvegarder certificat de noeud
         secret_intermediaire = gestionnaire_docker.trouver_secret('pki.intermediaire.key')
+        secret_date = secret_intermediaire['date']
 
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.key'), 'rb') as fichier:
+        if not self._args.dev:
+            nom_fichier_key = 'pki.intermediaire.key.pem'
+            nom_fichier_passwd = 'pki.intermediaire.passwd.txt'
+        else:
+            nom_fichier_key = 'pki.intermediaire.key.%s' % secret_date
+            nom_fichier_passwd = 'pki.intermediaire.passwd.%s' % secret_date
+
+        with open(os.path.join(self._args.secrets, nom_fichier_key), 'rb') as fichier:
             intermediaire_key_pem = fichier.read()
-        with open(os.path.join(self._args.secrets, 'pki.intermediaire.passwd'), 'rb') as fichier:
+        with open(os.path.join(self._args.secrets, nom_fichier_passwd), 'rb') as fichier:
             intermediaire_passwd_pem = fichier.read()
-
         certificat_pem = params['certificatPem']
         certificat_millegrille = params['chainePem'][-1]
         chaine = params['chainePem']
@@ -1081,7 +1091,22 @@ class ServiceMonitor:
         clecert_recu = EnveloppeCleCert()
         clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
         if not clecert_recu.cle_correspondent():
-            raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+            if self._args.dev is not None:
+                # Tenter de charger cle pour monitor - mode insecure
+                try:
+                    config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
+                    date_csr = config_csr['date']
+
+                    with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'rb') as fichier:
+                        monitor_key_pem = fichier.read()
+                    clecert_recu = EnveloppeCleCert()
+                    clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
+                    if not clecert_recu.cle_correspondent():
+                        raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+                except FileNotFoundError:
+                    raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
+            else:
+                raise ValueError('Cle et Certificat intermediaire ne correspondent pas')
 
         # Verifier si on doit generer un certificat web SSL
         domaine_web = params.get('domaine')
@@ -1114,7 +1139,7 @@ class ServiceMonitor:
         self.__logger.debug("Sauvegarde certificat recu et cle intermediaire comme cert/cle de monitor prive")
         # securite = Constantes.SECURITE_PRIVE
         clecert_recu.password = None
-        cle_monitor = clecert_recu.private_key_bytes.decode('utf-8')
+        cle_monitor = clecert_recu.private_key_bytes
         secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
             ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
 
@@ -1744,17 +1769,30 @@ class ServiceMonitorPrive(ServiceMonitor):
             # Generer un nouveau CSR
             # Verifier si le CSR a deja ete genere, sinon le generer
             try:
-                self._gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+                self._gestionnaire_docker.charger_config_recente('pki.%s.csr' % ConstantesGenerateurCertificat.ROLE_MONITOR)
             except AttributeError:
                 self.__logger.warning("Certificat monitor expire, on genere un nouveau CSR")
 
                 # Creer CSR pour le service monitor
                 csr_info = self._gestionnaire_certificats.generer_csr(
-                    ConstantesGenerateurCertificat.ROLE_WEB_PRIVE,
+                    ConstantesGenerateurCertificat.ROLE_MONITOR,
                     insecure=self._args.dev,
-                    generer_password=True
+                    generer_password=False
                 )
                 csr_intermediaire = csr_info['request']
+
+                # Generer message a transmettre au monitor pour renouvellement
+                commande = {
+                    'csr': csr_intermediaire,
+                    'securite': Constantes.SECURITE_PRIVE
+                }
+
+                self._connexion_middleware.generateur_transactions.transmettre_commande(
+                    commande,
+                    'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                    correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
+                    reply_to=self._connexion_middleware.reply_q
+                )
 
             # self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
             # self._gestionnaire_docker.configurer_monitor()

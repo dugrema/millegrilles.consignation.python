@@ -1724,6 +1724,7 @@ class ConstantesServiceMonitor:
     CORRELATION_HEBERGEMENT_LISTE = 'hebergementListeActives'
     CORRELATION_LISTE_COMPTES_NOEUDS = 'listeComptesNoeuds'
     CORRELATION_CERTIFICAT_SIGNE = 'certificatSigne'
+    CORRELATION_RENOUVELLEMENT_CERTIFICAT = 'renouvellementCertificat'
 
     GROUP_MILLEGRILLES = 'millegrilles'
     GROUP_MILLEGRILLES_GID = 980

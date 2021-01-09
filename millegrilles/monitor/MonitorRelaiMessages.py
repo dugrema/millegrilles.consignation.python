@@ -60,6 +60,15 @@ class TraitementMessagesMiddleware(BaseCallback):
             self.traiter_presence_domaine(message_dict)
         elif correlation_id == ConstantesServiceMonitor.CORRELATION_HEBERGEMENT_LISTE:
             self.__gestionnaire_commandes.traiter_reponse_hebergement(message_dict)
+        elif correlation_id == ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT:
+            contenu = {
+                'commande': Constantes.ConstantesServiceMonitor.COMMANDE_INSTALLER_NOEUD,
+                'exchange': exchange,
+                'properties': properties,
+            }
+            contenu.update(message_dict)
+            commande = CommandeMonitor(contenu=contenu, mq_properties=properties, message=message_dict)
+            self.__gestionnaire_commandes.ajouter_commande(commande)
         else:
             raise ValueError("Type message inconnu", correlation_id, routing_key)
 

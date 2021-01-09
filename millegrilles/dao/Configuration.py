@@ -149,7 +149,7 @@ class TransactionConfiguration:
                     if len(organization) > 0:
                         self._millegrille_config[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = organization[0].value
             except FileNotFoundError:
-                self.__logger.exception("IDMG inconne, on utilise sansnom")
+                self.__logger.exception("IDMG inconnue, on utilise sansnom")
 
         self.__logger.info("Configuration MQ: host: %s, port: %s" % (self.mq_host, self.mq_port))
         self.__logger.info("Configuration Mongo: host: %s, port: %s" % (self.mongo_host, self.mongo_port))
