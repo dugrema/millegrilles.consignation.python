@@ -177,28 +177,6 @@ class GestionnaireCertificats:
             label_csr_inter = 'pki.%s.csr' % type_cle
             self.ajouter_config(label_csr_inter, data=request_pem)
 
-        # if insecure:  # Mode insecure
-        #     try:
-        #         os.mkdir(self.secret_path, 0o755)
-        #     except FileExistsError:
-        #         pass
-        #
-        #     # key_path = path.join(self.secret_path, 'pki.%s.key.pem' % type_cle)
-        #     key_path = path.join(self.secret_path, 'pki.%s.key' % type_cle)
-        #     try:
-        #         with open(key_path, 'xb') as fichier:
-        #             fichier.write(cle_pem)
-        #     except FileExistsError:
-        #         pass
-        #
-        #     if cle_passwd:
-        #         passwd_path = path.join(self.secret_path, 'pki.%s.passwd.txt' % type_cle)
-        #         try:
-        #             with open(passwd_path, 'xb') as fichier:
-        #                 fichier.write(cle_passwd)
-        #         except FileExistsError:
-        #             pass
-
         return info_cle
 
     def _charger_certificat_docker(self, nom_certificat) -> bytes:
@@ -330,11 +308,6 @@ class GestionnaireCertificatsNoeudPrive(GestionnaireCertificats):
         # Conserver reference au cert monitor pour middleware
         self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']
         self.certificats[GestionnaireCertificats.MONITOR_KEY_FILE] = GestionnaireCertificats.MONITOR_KEY_FILENAME + '.pem'
-
-        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MONGO_MOTDEPASSE), 'r') as fichiers:
-        #     self._passwd_mongo = fichiers.read()
-        # with open(path.join(secret_path, ConstantesServiceMonitor.FICHIER_MQ_MOTDEPASSE), 'r') as fichiers:
-        #     self._passwd_mq = fichiers.read()
 
         # Charger le certificat de millegrille
         self._charger_certificat_docker('pki.millegrille.cert')
