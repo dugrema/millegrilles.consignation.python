@@ -224,7 +224,8 @@ class ServiceMonitor:
 
         # Delais entretien pour differents modules et services
         self._certificats_entretien_date = None
-        self._certificats_entretien_frequence = datetime.timedelta(minutes=5)
+        # self._certificats_entretien_frequence = datetime.timedelta(minutes=5)
+        self._certificats_entretien_frequence = datetime.timedelta(seconds=30)
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
 
@@ -1069,9 +1070,9 @@ class ServiceMonitor:
         # secret_intermediaire = gestionnaire_docker.trouver_secret('pki.monitor.key')
         # secret_date = secret_intermediaire['date']
 
-        certificat_pem = params['certificatPem']
-        certificat_millegrille = params['chainePem'][-1]
-        chaine = params['chainePem']
+        certificat_pem = params.get('certificatPem') or params['cert']
+        chaine = params.get('chainePem') or params['fullchain']
+        certificat_millegrille = chaine[-1]
 
         try:
             config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
@@ -1777,13 +1778,15 @@ class ServiceMonitorPrive(ServiceMonitor):
             date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
 
         if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
+        # if True:
             # MAJ date pour creation de certificats
             self._gestionnaire_certificats.maj_date()
 
             # Generer un nouveau CSR
             # Verifier si le CSR a deja ete genere, sinon le generer
             try:
-                self._gestionnaire_docker.charger_config_recente('pki.%s.csr' % ConstantesGenerateurCertificat.ROLE_MONITOR)
+                csr_docker = self._gestionnaire_docker.charger_config_recente('pki.%s.csr' % ConstantesGenerateurCertificat.ROLE_MONITOR)
+                csr_intermediaire = b64decode(csr_docker['config'].attrs['Spec']['Data']).decode('utf-8')
             except AttributeError:
                 self.__logger.warning("Certificat monitor expire, on genere un nouveau CSR")
 
@@ -1795,18 +1798,24 @@ class ServiceMonitorPrive(ServiceMonitor):
                 )
                 csr_intermediaire = csr_info['request']
 
-                # Generer message a transmettre au monitor pour renouvellement
-                commande = {
-                    'csr': csr_intermediaire,
-                    'securite': Constantes.SECURITE_PRIVE
-                }
+            # Generer message a transmettre au monitor pour renouvellement
+            commande = {
+                'csr': csr_intermediaire,
+                'securite': self.securite
+            }
 
-                self._connexion_middleware.generateur_transactions.transmettre_commande(
+            try:
+                self.connexion_middleware.generateur_transactions.transmettre_commande(
                     commande,
                     'commande.servicemonitor.%s' % Constantes.ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+                    exchange=self.securite,
                     correlation_id=ConstantesServiceMonitor.CORRELATION_RENOUVELLEMENT_CERTIFICAT,
-                    reply_to=self._connexion_middleware.reply_q
+                    reply_to=self.connexion_middleware.reply_q
                 )
+            except AttributeError:
+                self.__logger.warning("Connexion MQ pas prete, on ne peut pas renouveller le certificat de monitor")
+                if self.__logger.isEnabledFor(logging.DEBUG):
+                    self.__logger.exception("Connexion MQ pas prete")
 
             # self._gestionnaire_certificats.generer_clecert_module('monitor', self.noeud_id)
             # self._gestionnaire_docker.configurer_monitor()
@@ -1817,15 +1826,13 @@ class ServiceMonitorPrive(ServiceMonitor):
 
     def initialiser_noeud(self, commande: CommandeMonitor):
         if self.__logger.isEnabledFor(logging.DEBUG):
-            self.__logger.debug("Commande initialiser noeud : %s", json.dumps(commande.contenu, indent=2))
+            try:
+                self.__logger.debug("Commande initialiser noeud : %s", json.dumps(commande.contenu, indent=2))
+            except Exception:
+                self.__logger.debug("Commande initialiser noeud : %s", commande.contenu)
 
         params = commande.contenu
-        securite = params['securite']
-
-        if securite == self.securite:
-            self._renouveller_certificat_monitor(commande)
-        else:
-            raise Exception("Type de noeud non supporte : " + securite)
+        self._renouveller_certificat_monitor(commande)
 
     def ajouter_compte(self, certificat: str):
         raise Exception("Ajouter compte PEM (**non implemente pour prive**): %s" % certificat)

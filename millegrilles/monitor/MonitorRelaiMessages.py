@@ -680,6 +680,10 @@ class ConnexionMiddleware:
     def verificateur_transactions(self):
         return self._contexte.verificateur_transaction
 
+    @property
+    def reply_q(self) -> str:
+        return self.__commandes_handler.queue_name
+
 
 class ConnexionMiddlewarePublic(ConnexionMiddleware):
     """
