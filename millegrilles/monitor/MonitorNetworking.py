@@ -40,7 +40,13 @@ class GestionnaireWeb:
         if self.__prochain_entretien < now:
             self.__prochain_entretien = now + self.__intervalle_entretien
 
-            if self.__service_monitor.securite is not None and self.__service_monitor.securite != Constantes.SECURITE_PROTEGE:
+            try:
+                securite_monitor = self.__service_monitor.securite
+            except NotImplementedError:
+                # En cours d'installation, la securite n'est pas definie
+                securite_monitor = None
+
+            if securite_monitor is not None and securite_monitor != Constantes.SECURITE_PROTEGE:
                 try:
                     config_mq = self.__service_monitor.get_info_connexion_mq(nowait=True)
                     hostname = config_mq['MQ_HOST']
@@ -196,15 +202,13 @@ proxy_pass $upstream_vitrine;
 resolver 127.0.0.11 valid=30s;
         """
 
-        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
-            # Pas de certificat client SSL pour noeud public
-            ssl_certs_content = """
-ssl_certificate       /run/secrets/webcert.pem;
-ssl_certificate_key   /run/secrets/webkey.pem;
-ssl_stapling          on;
-ssl_stapling_verify   on;
-            """
-        else:
+        try:
+            securite = self.__service_monitor.securite
+        except NotImplementedError:
+            # En cours d'installation
+            securite = None
+
+        if securite is not None and securite != Constantes.SECURITE_PUBLIC:
             # Mode prive ou protege - on ajoute les certs SSL client en option
             ssl_certs_content = """
 ssl_certificate       /run/secrets/webcert.pem;
@@ -215,6 +219,14 @@ ssl_stapling_verify   on;
 ssl_client_certificate /usr/share/nginx/files/certs/millegrille.cert.pem;
 ssl_verify_client      optional;
 ssl_verify_depth       1;
+            """
+        else:
+            # Pas de certificat client SSL pour noeud public
+            ssl_certs_content = """
+ssl_certificate       /run/secrets/webcert.pem;
+ssl_certificate_key   /run/secrets/webkey.pem;
+ssl_stapling          on;
+ssl_stapling_verify   on;
             """
 
         cache_content = """
@@ -227,7 +239,7 @@ proxy_cache_path /cache
                  use_temp_path=off;
         """
 
-        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
+        if securite == Constantes.SECURITE_PUBLIC:
             # Noeud public, rediriger vers vitrine
             redirect_defaut = 'vitrine'
         elif self.__service_monitor.idmg or mode_installe:
@@ -342,9 +354,9 @@ location /fichiers/public {
         # On a plusieurs options - une configuration par type de noeud (exclusif) et une qui permet
         # de rediriger les requetes sous /public vers un serveur tiers (e.g. AWS CloudFront)
         location_fichiers = "# include /etc/nginx/conf.d/modules/fichiers_rediriges.include;\n"
-        if self.__service_monitor.securite == Constantes.SECURITE_PUBLIC:
+        if securite == Constantes.SECURITE_PUBLIC:
             location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_public.include;"
-        else:
+        elif securite is not None:
             location_fichiers = location_fichiers + "include /etc/nginx/conf.d/modules/fichiers_protege.include;"
 
         location_public_component = """
@@ -392,7 +404,7 @@ location /certs {
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
-        if self.__service_monitor.securite != Constantes.SECURITE_PUBLIC:
+        if securite is not None and securite != Constantes.SECURITE_PUBLIC:
             locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
 

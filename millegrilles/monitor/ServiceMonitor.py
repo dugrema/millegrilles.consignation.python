@@ -400,11 +400,10 @@ class ServiceMonitor:
 
         try:
             securite_config = self._docker.configs.get(ConstantesServiceMonitor.DOCKER_LIBVAL_CONFIG_SECURITE)
-            self._securite = b64decode(securite_config.attrs['Spec']['Data']).decode('utf-8').strip()
+            securite = b64decode(securite_config.attrs['Spec']['Data']).decode('utf-8').strip()
+            self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, securite)
         except docker.errors.NotFound:
             self.__logger.info("configuration: Niveau de securite n'est pas encore configure")
-
-        self.__logger.debug("Configuration noeud, idmg: %s, securite: %s", self._idmg, self._securite)
 
     def _classe_configuration(self):
         """
@@ -757,7 +756,7 @@ class ServiceMonitor:
         information_systeme = {
             'noeud_id': self.noeud_id
         }
-        securite = self._securite
+        securite = self.securite
         if securite:
             information_systeme['securite'] = securite
             if securite == Constantes.SECURITE_PROTEGE:
@@ -2000,6 +1999,14 @@ class ServiceMonitorPublic(ServiceMonitor):
     def ajouter_compte(self, certificat: str):
         raise NotImplementedError("Ajouter compte PEM (**non implemente pour public**): %s" % certificat)
 
+    @property
+    def securite(self):
+        return Constantes.SECURITE_PUBLIC
+
+    @property
+    def role(self):
+        return ConstantesGenerateurCertificat.ROLE_NOEUD_PUBLIC
+
 
 class ServiceMonitorInstalleur(ServiceMonitor):
 
@@ -2012,6 +2019,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
 
         self.csr_intermediaire = None
+        self._securite = Constantes.SECURITE_PROTEGE
 
     def fermer(self, signum=None, frame=None):
         super().fermer(signum, frame)
@@ -2435,6 +2443,10 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         gestionnaire_docker.configurer_monitor()
 
         raise ForcerRedemarrage("Redemarrage")
+
+    # @property
+    # def securite(self):
+    #     return self._securite
 
 
 # class ServiceMonitorExtension(ServiceMonitor):
