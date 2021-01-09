@@ -28,10 +28,11 @@ from millegrilles.monitor import MonitorConstantes
 
 class TraitementMessagesMiddleware(BaseCallback):
 
-    def __init__(self, noeud_id: str, gestionnaire_commandes, contexte):
+    def __init__(self, noeud_id: str, gestionnaire_commandes, contexte, securite):
         super().__init__(contexte)
         self._noeud_id = noeud_id
         self.__gestionnaire_commandes = gestionnaire_commandes
+        self.__securite = securite
         self.__channel = None
         self.queue_name = None
 
@@ -83,13 +84,40 @@ class TraitementMessagesMiddleware(BaseCallback):
         self.queue_name = queue.method.queue
         self.__channel.basic_consume(self.callbackAvecAck, queue=self.queue_name, no_ack=False)
 
+        if self.__securite == Constantes.SECURITE_PROTEGE:
+            routing_keys = [
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+            ]
+
+            # Ajouter les routing keys
+            for routing_key in routing_keys:
+                self.__channel.queue_bind(
+                    exchange=self.__securite,
+                    queue=self.queue_name,
+                    routing_key=routing_key,
+                    callback=None
+                )
+
+            routing_keys_privepublic = [
+                'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
+            ]
+
+            # Ajouter les routing keys
+            for exchange in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC]:
+                for routing_key in routing_keys_privepublic:
+                    self.__channel.queue_bind(
+                        exchange=exchange,
+                        queue=self.queue_name,
+                        routing_key=routing_key,
+                        callback=None
+                    )
+
         routing_keys = [
             'commande.servicemonitor.%s.#' % self._noeud_id,
             'evenement.presence.domaine',
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_AJOUTER_COMPTE,
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES,
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NAVIGATEUR,
-            'commande.servicemonitor.' + ConstantesServiceMonitor.COMMANDE_SIGNER_NOEUD,
 
             # Backup
             Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_', 'global'),
@@ -100,7 +128,7 @@ class TraitementMessagesMiddleware(BaseCallback):
         # Ajouter les routing keys
         for routing_key in routing_keys:
             self.__channel.queue_bind(
-                exchange=self.configuration.exchange_defaut,
+                exchange=self.__securite,
                 queue=self.queue_name,
                 routing_key=routing_key,
                 callback=None
@@ -446,7 +474,12 @@ class ConnexionMiddleware:
                 self.__logger.exception("Detail error connexion Mongo")
 
         self._certificat_event_handler = GestionnaireEvenementsCertificat(self._contexte)
-        self.__commandes_handler = TraitementMessagesMiddleware(self._service_monitor.noeud_id, self._service_monitor.gestionnaire_commandes, self._contexte)
+        self.__commandes_handler = TraitementMessagesMiddleware(
+            self._service_monitor.noeud_id,
+            self._service_monitor.gestionnaire_commandes,
+            self._contexte,
+            securite=self._service_monitor.securite
+        )
 
         self._contexte.message_dao.register_channel_listener(self)
         self._contexte.message_dao.register_channel_listener(self.__commandes_handler)

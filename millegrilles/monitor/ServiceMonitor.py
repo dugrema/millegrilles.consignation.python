@@ -1363,6 +1363,14 @@ class ServiceMonitorPrincipal(ServiceMonitor):
     def gestionnaire_mongo(self):
         return self._connexion_middleware.get_gestionnaire_comptes_mongo
 
+    @property
+    def securite(self):
+        return Constantes.SECURITE_PROTEGE
+
+    @property
+    def role(self):
+        return ConstantesGenerateurCertificat.ROLE_MONITOR
+
 
 class ServiceMonitorDependant(ServiceMonitor):
     """
