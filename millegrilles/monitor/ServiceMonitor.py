@@ -36,7 +36,7 @@ from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTrouvee
 from millegrilles.util.IpUtils import get_ip
-
+from millegrilles.SecuritePKI import VerificateurTransaction
 
 class InitialiserServiceMonitor:
 
@@ -228,6 +228,8 @@ class ServiceMonitor:
         self._certificats_entretien_frequence = datetime.timedelta(seconds=30)
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
+
+        self._verificateur_transactions: Optional[VerificateurTransaction] = None
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
