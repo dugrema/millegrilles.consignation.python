@@ -162,6 +162,17 @@ class ValidateurCertificatCache(ValidateurCertificat):
             self.__logger.debug("Cache certificat %s" % fingerprint)
             self.__enveloppe_leaf_par_fingerprint[fingerprint] = EntreeCacheEnveloppe(enveloppe)
 
+            # Conserver toute la chaine - les certs CA sont deja valides
+            chaine = enveloppe.reste_chaine_pem
+            for i in range(0, len(chaine)):
+                enveloppe_ca = EnveloppeCertificat(certificat_pem=chaine)
+                chaine = chaine[1:]
+                if enveloppe_ca.is_CA:
+                    enveloppe_ca.set_est_verifie(True)
+                    fingerprint_ca = enveloppe_ca.fingerprint_sha256_b64
+                    if self.__enveloppe_leaf_par_fingerprint.get(fingerprint_ca) is None:
+                        self.__enveloppe_leaf_par_fingerprint[fingerprint_ca] = EntreeCacheEnveloppe(enveloppe_ca)
+
         super()._conserver_enveloppe(enveloppe)
 
     def get_enveloppe(self, fingerprint: str):
@@ -195,6 +206,20 @@ class ValidateurCertificatCache(ValidateurCertificat):
 
         # On n'a pas d'enveloppe verifiee
         return enveloppe
+
+    @property
+    def limite_obj_cache(self) -> int:
+        """
+        :return: Nombre maximum d'enveloppes dans le cache avant de forcer une purge
+        """
+        return 100
+
+    @property
+    def expiration_cache(self) -> datetime.timedelta:
+        """
+        :return: Timedelta avant purge des certificats dans le cache
+        """
+        return datetime.timedelta(minutes=15)
 
 
 class EntreeCacheEnveloppe:

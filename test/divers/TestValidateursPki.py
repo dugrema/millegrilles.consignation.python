@@ -143,6 +143,9 @@ class ValiderCertificat:
 
         self.__logger.debug("Certificat conserve dans le cache et valide : %s" % enveloppe_cache.est_verifie)
 
+        enveloppe_millegrille_cache = self.validateur_cache.get_enveloppe('XE1aGDnW9LmXg9svOFQXy0LSiWojyp0ipHBPlt5SirA=')
+        self.__logger.debug("Certificat millegrille conserve dans le cache et valide : %s" % enveloppe_millegrille_cache.est_verifie)
+
 
 def main():
     logging.basicConfig()
