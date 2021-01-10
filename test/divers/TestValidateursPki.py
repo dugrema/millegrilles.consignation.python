@@ -1,5 +1,6 @@
 import datetime
 import pytz
+import logging
 
 from certvalidator.errors import PathValidationError
 
@@ -85,6 +86,7 @@ class ValiderCertificat:
 
     def __init__(self):
         self.validateur = ValidateurCertificat(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
+        self.__logger = logging.getLogger('__main__.ValiderCertificat')
 
     def test_valider_1(self):
         date_reference = datetime.datetime(year=2021, month=1, day=9, hour=20, minute=0, tzinfo=pytz.UTC)
@@ -94,11 +96,18 @@ class ValiderCertificat:
             self.validateur.valider([cert_1_expire, cert_1_intermediaire, cert_millegrille])
         except PathValidationError:
             pass  # Ok
+            try:
+                # Tester chargement precedent du cert de millegrille (implicitement)
+                self.validateur.valider([cert_1_expire, cert_1_intermediaire])
+            except PathValidationError as pve:
+                self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
         else:
             raise Exception("Erreur de validation, date n'a pas ete flaggee comme invalide")
 
 
 def main():
+    logging.basicConfig()
+    logging.getLogger('__main__').setLevel(logging.DEBUG)
     test = ValiderCertificat()
     test.test_valider_1()
 
