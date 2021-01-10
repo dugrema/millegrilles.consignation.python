@@ -4,6 +4,7 @@ import logging
 
 from os import path
 from certvalidator.errors import PathValidationError
+from typing import Dict
 
 from millegrilles.Constantes import ConstantesGenerateurCertificat
 from millegrilles.util.ValidateursPki import ValidateurCertificat, ValidateurCertificatCache
@@ -91,7 +92,7 @@ vtYumyCsL6Qb/m3DW8OmFmiElePC
 dict_ca = dict()
 
 
-def generer_certificat_valide():
+def generer_certificat_valide() -> EnveloppeCleCert:
     ca_autorite = EnveloppeCleCert()
     ca_autorite.cert_from_pem_bytes(cert_millegrille.encode('utf-8'))
 
@@ -113,42 +114,46 @@ def generer_certificat_valide():
 
 class ValiderCertificat:
 
-    def __init__(self):
+    def __init__(self, certs: Dict[str, EnveloppeCleCert]):
         self.validateur = ValidateurCertificat(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
         self.validateur_cache = ValidateurCertificatCache(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
+        self.certs = certs
         self.__logger = logging.getLogger('__main__.ValiderCertificat')
 
     def test_valider_1(self):
-        date_reference = datetime.datetime(year=2021, month=1, day=9, hour=20, minute=0, tzinfo=pytz.UTC)
-        self.validateur.valider([cert_1_expire, cert_1_intermediaire, cert_millegrille], date_reference=date_reference)
+        enveloppe1 = self.certs['1']
+        self.validateur.valider(enveloppe1.chaine)
 
+        date_reference = datetime.datetime(year=2010, month=1, day=1, hour=0, minute=0, tzinfo=pytz.UTC)
         try:
-            self.validateur.valider([cert_1_expire, cert_1_intermediaire, cert_millegrille])
-        except PathValidationError:
-            pass  # Ok
-            try:
-                # Tester chargement precedent du cert de millegrille (implicitement)
-                self.validateur.valider([cert_1_expire, cert_1_intermediaire])
-            except PathValidationError as pve:
-                self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
+            self.validateur.valider(enveloppe1.chaine, date_reference=date_reference)
+        except PathValidationError as pve:
+            self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
         else:
             raise Exception("Erreur de validation, date n'a pas ete flaggee comme invalide")
 
     def test_valider_cache(self):
-        try:
-            # Tester chargement precedent du cert de millegrille (implicitement)
-            enveloppe = self.validateur_cache.valider([cert_1_expire, cert_1_intermediaire, cert_millegrille])
-        except PathValidationError as pve:
-            self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
+        # Tester chargement precedent du cert de millegrille (implicitement)
+        enveloppe1 = self.certs['1']
+        self.validateur_cache.valider(enveloppe1.chaine)
 
+        enveloppe_cache = self.validateur_cache.get_enveloppe(enveloppe1.fingerprint_sha256_b64)
+        if enveloppe_cache.fingerprint_sha256_b64 != enveloppe1.fingerprint_sha256_b64 is None:
+            raise ValueError("Certificat pas conserve dans le cache")
 
-cert_valide_1 = generer_certificat_valide()
+        self.__logger.debug("Certificat conserve dans le cache et valide : %s" % enveloppe_cache.est_verifie)
 
 
 def main():
     logging.basicConfig()
     logging.getLogger('__main__').setLevel(logging.DEBUG)
-    test = ValiderCertificat()
+
+    cert_valide_1 = generer_certificat_valide()
+    certs = {
+        '1': cert_valide_1,
+    }
+
+    test = ValiderCertificat(certs)
     # test.test_valider_1()
     test.test_valider_cache()
 

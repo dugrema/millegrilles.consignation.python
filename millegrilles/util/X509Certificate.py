@@ -243,6 +243,10 @@ class EnveloppeCleCert:
 
         return self.__fingerprint_b64
 
+    @property
+    def fingerprint_sha256_b64(self):
+        return str(base64.b64encode(self.cert.fingerprint(hashes.SHA256())), 'utf-8')
+
     @fingerprint_b64.setter
     def fingerprint_b64(self, fingerprint_b64):
         self.__fingerprint_b64 = fingerprint_b64
