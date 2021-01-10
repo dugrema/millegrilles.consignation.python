@@ -1984,7 +1984,7 @@ class RenouvelleurCertificat:
 
         return clecert
 
-    def renouveller_par_role(self, role, common_name, liste_dns: list = None, duree: int = None, duree_heures: int = None):
+    def renouveller_par_role(self, role, common_name, liste_dns: list = None, duree=31, duree_heures=0):
         generateur = self.__generateurs_par_role[role]
         if issubclass(generateur, GenerateurNoeud):
             generateur_instance = generateur(

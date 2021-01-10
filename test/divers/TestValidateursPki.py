@@ -2,11 +2,14 @@ import datetime
 import pytz
 import logging
 
+from os import path
 from certvalidator.errors import PathValidationError
 
+from millegrilles.Constantes import ConstantesGenerateurCertificat
 from millegrilles.util.ValidateursPki import ValidateurCertificat, ValidateurCertificatCache
 from millegrilles.util.X509Certificate import RenouvelleurCertificat, EnveloppeCleCert
 
+mgdev_certs = '/home/mathieu/mgdev/certs'
 idmg = 'QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST'
 
 
@@ -87,15 +90,25 @@ vtYumyCsL6Qb/m3DW8OmFmiElePC
 
 dict_ca = dict()
 
+
 def generer_certificat_valide():
     ca_autorite = EnveloppeCleCert()
     ca_autorite.cert_from_pem_bytes(cert_millegrille.encode('utf-8'))
 
-    with open('/var/opt/millegrilles/secrets/')
+    with open(path.join(mgdev_certs, 'pki.intermediaire.key'), 'rb') as fichiers:
+        inter_key = fichiers.read()
+    with open(path.join(mgdev_certs, 'pki.intermediaire.passwd'), 'rb') as fichiers:
+        inter_passwd = fichiers.read()
+    with open(path.join(mgdev_certs, 'pki.intermediaire.cert'), 'rb') as fichiers:
+        inter_cert = fichiers.read()
+
     clecert_intermediaire = EnveloppeCleCert()
-    clecert_intermediaire.from_pem_bytes()
+    clecert_intermediaire.from_pem_bytes(inter_key, inter_cert, inter_passwd)
 
     renouvelleur = RenouvelleurCertificat(idmg, dict_ca, clecert_intermediaire, ca_autorite)
+    cert_enveloppe = renouvelleur.renouveller_par_role(ConstantesGenerateurCertificat.ROLE_DOMAINES, 'test', duree=7)
+
+    return cert_enveloppe
 
 
 class ValiderCertificat:
@@ -128,6 +141,8 @@ class ValiderCertificat:
         except PathValidationError as pve:
             self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
 
+
+cert_valide_1 = generer_certificat_valide()
 
 
 def main():
