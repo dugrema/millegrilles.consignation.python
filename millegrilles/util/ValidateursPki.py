@@ -192,7 +192,12 @@ class ValidateurCertificatCache(ValidateurCertificat):
         Invoquer regulirement pour faire l'entretien du cache (eliminer entrees trop vieilles).
         :return:
         """
-        pass
+        # Trier les certificats en ordre - CA preferes
+        sorted_entries = sorted(self.__enveloppe_leaf_par_fingerprint.values(), key=EntreeCacheEnveloppe.sort_key)
+        supprimer = sorted_entries[self.max_entries_apres_nettoyage:]
+        for e in supprimer:
+            fingerprint = e.enveloppe.fingerprint_sha256_b64
+            del self.__enveloppe_leaf_par_fingerprint[fingerprint]
 
     def _charger_certificat(self, certificat: Union[bytes, str, list]) -> EnveloppeCertificat:
         enveloppe = super()._charger_certificat(certificat)
@@ -213,6 +218,10 @@ class ValidateurCertificatCache(ValidateurCertificat):
         :return: Nombre maximum d'enveloppes dans le cache avant de forcer une purge
         """
         return 100
+
+    @property
+    def max_entries_apres_nettoyage(self) -> int:
+        return 80
 
     @property
     def expiration_cache(self) -> datetime.timedelta:
@@ -236,5 +245,20 @@ class EntreeCacheEnveloppe:
         return self.__enveloppe
 
     @property
+    def nombre_access(self):
+        return self.__nombre_acces
+
+    @property
     def dernier_acces(self) -> datetime.datetime:
         return self.__dernier_acces
+
+    @staticmethod
+    def sort_key(e) -> tuple:
+        enveloppe: EnveloppeCertificat = e.enveloppe
+        # Note : pour bool, utilier not pour faire montre en premier (false < true)
+        return (
+            not enveloppe.is_rootCA,
+            not enveloppe.is_CA,
+            e.nombre_access,
+            e.dernier_acces
+        )
