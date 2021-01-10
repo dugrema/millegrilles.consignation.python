@@ -4,7 +4,11 @@ import logging
 
 from certvalidator.errors import PathValidationError
 
-from millegrilles.util.ValidateursPki import ValidateurCertificat
+from millegrilles.util.ValidateursPki import ValidateurCertificat, ValidateurCertificatCache
+from millegrilles.util.X509Certificate import RenouvelleurCertificat, EnveloppeCleCert
+
+idmg = 'QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST'
+
 
 cert_millegrille = """
 -----BEGIN CERTIFICATE-----
@@ -81,11 +85,24 @@ vtYumyCsL6Qb/m3DW8OmFmiElePC
 -----END CERTIFICATE-----
 """
 
+dict_ca = dict()
+
+def generer_certificat_valide():
+    ca_autorite = EnveloppeCleCert()
+    ca_autorite.cert_from_pem_bytes(cert_millegrille.encode('utf-8'))
+
+    with open('/var/opt/millegrilles/secrets/')
+    clecert_intermediaire = EnveloppeCleCert()
+    clecert_intermediaire.from_pem_bytes()
+
+    renouvelleur = RenouvelleurCertificat(idmg, dict_ca, clecert_intermediaire, ca_autorite)
+
 
 class ValiderCertificat:
 
     def __init__(self):
         self.validateur = ValidateurCertificat(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
+        self.validateur_cache = ValidateurCertificatCache(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
         self.__logger = logging.getLogger('__main__.ValiderCertificat')
 
     def test_valider_1(self):
@@ -104,12 +121,21 @@ class ValiderCertificat:
         else:
             raise Exception("Erreur de validation, date n'a pas ete flaggee comme invalide")
 
+    def test_valider_cache(self):
+        try:
+            # Tester chargement precedent du cert de millegrille (implicitement)
+            enveloppe = self.validateur_cache.valider([cert_1_expire, cert_1_intermediaire, cert_millegrille])
+        except PathValidationError as pve:
+            self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
+
+
 
 def main():
     logging.basicConfig()
     logging.getLogger('__main__').setLevel(logging.DEBUG)
     test = ValiderCertificat()
-    test.test_valider_1()
+    # test.test_valider_1()
+    test.test_valider_cache()
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 import datetime
 import logging
 
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 from certvalidator import CertificateValidator, ValidationContext
 from certvalidator.errors import PathValidationError
 
@@ -15,7 +15,7 @@ class ValidateurCertificat:
     """
 
     def __init__(self, idmg: str, certificat_millegrille: Union[bytes, str, list] = None):
-        self.__logger = logging.getLogger(__name__ + '.' + self.__class__)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__idmg = idmg
 
         # Validation context pour le idmg courant
@@ -106,7 +106,110 @@ class ValidateurCertificat:
         """
         enveloppe = self._charger_certificat(certificat)
 
+        try:
+            if enveloppe.est_verifie and date_reference is None and (idmg is None or idmg == self.__idmg):
+                # Raccourci, l'enveloppe a deja ete validee (e.g. cache) et on n'a aucune
+                # validation conditionnelle par date ou idmg
+                return enveloppe
+        except AttributeError:
+            pass  # Ok, le certificat n'est pas connu ou dans le cache
+
         validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
         self.__run_validation_context(enveloppe, validation_context)
 
+        # Validation completee, certificat est valide (sinon PathValidationError est lancee)
+        enveloppe.set_est_verifie(True)
+
+        # Le certificat est valide - on permet de le conserver si applicable (aucune validation conditionnelle)
+        if date_reference is None and (idmg is None or idmg == self.__idmg):
+            self._conserver_enveloppe(enveloppe)
+
         return enveloppe
+
+    def _conserver_enveloppe(self, enveloppe: EnveloppeCertificat):
+        """
+        Hook pour sous-classes (e.g. caching)
+        :param enveloppe:
+        :return:
+        """
+        pass
+
+
+class ValidateurCertificatCache(ValidateurCertificat):
+    """
+    Supporte un cache de certificats pour accelerer le traitement.
+    """
+
+    def __init__(self, idmg: str, certificat_millegrille: Union[bytes, str, list] = None):
+        super().__init__(idmg, certificat_millegrille)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.__enveloppe_leaf_par_fingerprint: Dict[str, EntreeCacheEnveloppe] = dict()
+
+    def _conserver_enveloppe(self, enveloppe: EnveloppeCertificat):
+        """
+        Ajoute l'enveloppe dans le cache.
+        :param enveloppe:
+        :return:
+        """
+        if not enveloppe.est_verifie:
+            raise ValueError("Certificat non verifie - Le cache ne fonctionne que sur des enveloppes verifiees")
+
+        # Verifier si le certificat est deja dans le cache
+        fingerprint = enveloppe.fingerprint_sha256_b64
+        if self.__enveloppe_leaf_par_fingerprint.get(fingerprint) is None:
+            # Conserver le certificat dans le cache
+            self.__logger.debug("Cache certificat %s" % fingerprint)
+            self.__enveloppe_leaf_par_fingerprint[fingerprint] = EntreeCacheEnveloppe(enveloppe)
+
+        super()._conserver_enveloppe(enveloppe)
+
+    def get_enveloppe(self, fingerprint: str):
+        """
+        :param fingerprint: Fingerprint du certificat
+        :return: Enveloppe du certificat avec la chaine complete (si presente dans le cache). Sinon retourne None.
+        """
+        entree_cache = self.__enveloppe_leaf_par_fingerprint.get(fingerprint)
+        try:
+            return entree_cache.enveloppe
+        except AttributeError:
+            # Entree inexistante
+            return None
+
+    def entretien(self):
+        """
+        Invoquer regulirement pour faire l'entretien du cache (eliminer entrees trop vieilles).
+        :return:
+        """
+        pass
+
+    def _charger_certificat(self, certificat: Union[bytes, str, list]) -> EnveloppeCertificat:
+        enveloppe = super()._charger_certificat(certificat)
+
+        # Tenter de charger l'enveloppe a partir du cache - elle serait deja verifiee
+        fingerprint = enveloppe.fingerprint_sha256_b64
+        enveloppe_verifiee = self.get_enveloppe(fingerprint)
+
+        if enveloppe_verifiee:
+            return enveloppe_verifiee
+
+        # On n'a pas d'enveloppe verifiee
+        return enveloppe
+
+
+class EntreeCacheEnveloppe:
+
+    def __init__(self, enveloppe: EnveloppeCertificat):
+        self.__enveloppe = enveloppe
+        self.__dernier_acces = datetime.datetime.utcnow()
+        self.__nombre_acces = 0
+
+    @property
+    def enveloppe(self) -> EnveloppeCertificat:
+        self.__dernier_acces = datetime.datetime.utcnow()  # Touch
+        self.__nombre_acces += 1
+        return self.__enveloppe
+
+    @property
+    def dernier_acces(self) -> datetime.datetime:
+        return self.__dernier_acces
