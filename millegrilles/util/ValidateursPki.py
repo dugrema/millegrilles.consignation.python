@@ -158,6 +158,10 @@ class ValidateurCertificatCache(ValidateurCertificat):
         # Verifier si le certificat est deja dans le cache
         fingerprint = enveloppe.fingerprint_sha256_b64
         if self.__enveloppe_leaf_par_fingerprint.get(fingerprint) is None:
+            # S'assurer qu'on n'a pas deja depasse le nombre limite du cache
+            if len(self.__enveloppe_leaf_par_fingerprint) > self.limite_obj_cache:
+                self.entretien()
+
             # Conserver le certificat dans le cache
             self.__logger.debug("Cache certificat %s" % fingerprint)
             self.__enveloppe_leaf_par_fingerprint[fingerprint] = EntreeCacheEnveloppe(enveloppe)
@@ -192,6 +196,13 @@ class ValidateurCertificatCache(ValidateurCertificat):
         Invoquer regulirement pour faire l'entretien du cache (eliminer entrees trop vieilles).
         :return:
         """
+        # Eliminer les certificats non CA qui sont expires
+        expiration = datetime.datetime.utcnow() - self.expiration_cache
+        for fingerprint, entry in self.__enveloppe_leaf_par_fingerprint.copy().items():
+            envelopppe = entry.enveloppe
+            if not envelopppe.is_CA and entry.dernier_acces < expiration:
+                del self.__enveloppe_leaf_par_fingerprint[fingerprint]
+
         # Trier les certificats en ordre - CA preferes
         sorted_entries = sorted(self.__enveloppe_leaf_par_fingerprint.values(), key=EntreeCacheEnveloppe.sort_key)
         supprimer = sorted_entries[self.max_entries_apres_nettoyage:]
@@ -217,16 +228,19 @@ class ValidateurCertificatCache(ValidateurCertificat):
         """
         :return: Nombre maximum d'enveloppes dans le cache avant de forcer une purge
         """
-        return 100
+        return 150
 
     @property
     def max_entries_apres_nettoyage(self) -> int:
-        return 80
+        """
+        :return: Nombre d'objets total conserves apres une purge certs (inclus root, CA et leaf)
+        """
+        return 100
 
     @property
     def expiration_cache(self) -> datetime.timedelta:
         """
-        :return: Timedelta avant purge des certificats dans le cache
+        :return: Timedelta avant purge d'un certificat non CA dans le cache
         """
         return datetime.timedelta(minutes=15)
 
