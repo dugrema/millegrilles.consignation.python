@@ -245,7 +245,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         try:
             # enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
             enveloppe_certificat = self.contexte.validateur_message.verifier(
-                enveloppe_transaction, utiliser_date_message=True, utiliser_idmg_message=True)
+                enveloppe_transaction, utiliser_date_message=False, utiliser_idmg_message=True)
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
@@ -325,7 +325,10 @@ class ConsignateurTransactionCallback(BaseCallback):
         # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
         entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         try:
-            enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+            # enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+            # Pour une transaction restauree, permettre des certificats expires s'ils correspondent a l'estampille.
+            enveloppe_certificat = self.contexte.validateur_message.verifier(
+                enveloppe_transaction, utiliser_date_message=True, utiliser_idmg_message=True)
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
