@@ -259,7 +259,9 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
     pas fournis explicitement ou dans le cache.
     """
 
-    def __init__(self, contexte: ContexteRessourcesMilleGrilles, idmg: str, certificat_millegrille: Union[bytes, str, list] = None):
+    def __init__(self, contexte: ContexteRessourcesMilleGrilles, idmg: str = None, certificat_millegrille: Union[bytes, str, list] = None):
+        if idmg is None:
+            idmg = contexte.idmg
         super().__init__(idmg, certificat_millegrille)
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
