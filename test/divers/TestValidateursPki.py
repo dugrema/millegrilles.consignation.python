@@ -194,6 +194,26 @@ class ValiderCertificat:
             except AttributeError:
                 self.__logger.debug("Certificat non recu")
 
+        # Valider un certificat contiditonnelement
+        date_validation = datetime.datetime(year=2021, month=1, day=8, hour=21, tzinfo=pytz.UTC)
+        self.__logger.debug("Verifier certificat expire avec une date valide : %s" % date_validation)
+        fp_conditionnel = 'sha256_b64:QLyRx1zpJemuUwkKfu38QZqgspo4XODy/047fz8sKko='
+        enveloppe_conditionnelle = validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
+        self.__logger.info("Enveloppe chargee est verifie %s (devrait etre False), expiration %s" % (enveloppe_conditionnelle.est_verifie, enveloppe_conditionnelle.not_valid_after))
+
+        self.__logger.debug("Verifier cache cert 'non-verifie'")
+        enveloppe_conditionnelle = validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
+        self.__logger.info("Enveloppe chargee est verifie (devrait etre False) : %s" % enveloppe_conditionnelle.est_verifie)
+
+        date_validation = datetime.datetime.now(tz=pytz.UTC)
+        self.__logger.debug("Verifier cache cert expire avec date courante %s" % date_validation)
+        try:
+            enveloppe_conditionnelle = validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
+        except PathValidationError:
+            self.__logger.info("Enveloppe chargee est invalide pour la date (OK) : expiration = %s" % enveloppe_conditionnelle.not_valid_after)
+        else:
+            raise Exception("Erreur validation date avec certificat, devrait etre invalide")
+
 
 def main():
     logging.basicConfig(format=Constantes.LOGGING_FORMAT)

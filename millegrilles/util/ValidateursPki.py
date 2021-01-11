@@ -122,12 +122,12 @@ class ValidateurCertificat:
         validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
         self.__run_validation_context(enveloppe, validation_context)
 
-        # Validation completee, certificat est valide (sinon PathValidationError est lancee)
-        enveloppe.set_est_verifie(True)
-
-        # Le certificat est valide - on permet de le conserver si applicable (aucune validation conditionnelle)
         if date_reference is None and (idmg is None or idmg == self.__idmg):
-            self._conserver_enveloppe(enveloppe)
+            # Validation completee, certificat est valide (sinon PathValidationError est lancee)
+            enveloppe.set_est_verifie(True)
+
+        # La chaine est valide (potentiellement avec conditions comme idmg ou date_reference)
+        self._conserver_enveloppe(enveloppe)
 
         return enveloppe
 
@@ -149,6 +149,7 @@ class ValidateurCertificatCache(ValidateurCertificat):
         super().__init__(idmg, certificat_millegrille)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+        # Cache pour certificats deja valides
         self.__enveloppe_leaf_par_fingerprint: Dict[str, EntreeCacheEnveloppe] = dict()
 
     def _conserver_enveloppe(self, enveloppe: EnveloppeCertificat):
@@ -157,8 +158,8 @@ class ValidateurCertificatCache(ValidateurCertificat):
         :param enveloppe:
         :return:
         """
-        if not enveloppe.est_verifie:
-            raise ValueError("Certificat non verifie - Le cache ne fonctionne que sur des enveloppes verifiees")
+        # if not enveloppe.est_verifie:
+        #     raise ValueError("Certificat non verifie - Le cache ne fonctionne que sur des enveloppes verifiees")
 
         # Verifier si le certificat est deja dans le cache
         fingerprint = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
@@ -172,15 +173,15 @@ class ValidateurCertificatCache(ValidateurCertificat):
             self.__enveloppe_leaf_par_fingerprint[fingerprint] = EntreeCacheEnveloppe(enveloppe)
 
             # Conserver toute la chaine - les certs CA sont deja valides
-            chaine = enveloppe.reste_chaine_pem
-            for i in range(0, len(chaine)):
-                enveloppe_ca = EnveloppeCertificat(certificat_pem=chaine)
-                chaine = chaine[1:]
-                if enveloppe_ca.is_CA:
-                    enveloppe_ca.set_est_verifie(True)
-                    fingerprint_ca = enveloppe_ca.fingerprint_sha256_b64
-                    if self.__enveloppe_leaf_par_fingerprint.get(fingerprint_ca) is None:
-                        self.__enveloppe_leaf_par_fingerprint[fingerprint_ca] = EntreeCacheEnveloppe(enveloppe_ca)
+            # chaine = enveloppe.reste_chaine_pem
+            # for i in range(0, len(chaine)):
+            #     enveloppe_ca = EnveloppeCertificat(certificat_pem=chaine)
+            #     chaine = chaine[1:]
+            #     if enveloppe_ca.is_CA:
+            #         enveloppe_ca.set_est_verifie(True)
+            #         fingerprint_ca = enveloppe_ca.fingerprint_sha256_b64
+            #         if self.__enveloppe_leaf_par_fingerprint.get(fingerprint_ca) is None:
+            #             self.__enveloppe_leaf_par_fingerprint[fingerprint_ca] = EntreeCacheEnveloppe(enveloppe_ca)
 
         super()._conserver_enveloppe(enveloppe)
 
@@ -379,6 +380,11 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             if handler.timestamp < expire:
                 self.__logger.warning("Nettoyage handler attente certificat stale : %s" % key)
                 del self.__attente[key]
+                try:
+                    # S'assurer qu'aucune thread reste bloquee en attente
+                    handler.set_event()
+                except Exception:
+                    pass  # OK
 
     @property
     def expiration_attente(self) -> datetime.timedelta:
