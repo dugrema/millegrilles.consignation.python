@@ -33,6 +33,13 @@ class ValidateurMessage:
     def fermer(self):
         self.__validateur.fermer()
 
+    def entretien(self):
+        """
+        Invoquer regulierement pour effectuer l'entretien des elements expires.
+        :return:
+        """
+        self.__validateur.entretien()
+
     def verifier(self, message: Union[bytes, str, dict], utiliser_date_message=False, utiliser_idmg_message=False) -> EnveloppeCertificat:
         """
 
