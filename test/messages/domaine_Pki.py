@@ -98,7 +98,7 @@ class MessagesSample(BaseCallback):
 
     def requete_certificat(self):
         requete = {
-            'fingerprint': 'sha256_b64:eju05mzQkl77M9XUJgJHMJjaxaHnSHa0moGHXCl9wxE='
+            'fingerprint': 'sha256_b64:buxEEFusbrDlsPPH7o6+ikGsCxHpa8C6Q9cy7vmogwc='
         }
         domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
         self.generateur.transmettre_requete(requete, domaine_action, correlation_id='abcd', reply_to=self.queue_name)

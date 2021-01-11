@@ -5,10 +5,13 @@ import logging
 from os import path
 from certvalidator.errors import PathValidationError
 from typing import Dict
+from threading import Event
 
+from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGenerateurCertificat
-from millegrilles.util.ValidateursPki import ValidateurCertificat, ValidateurCertificatCache
+from millegrilles.util.ValidateursPki import ValidateurCertificat, ValidateurCertificatCache, ValidateurCertificatRequete
 from millegrilles.util.X509Certificate import RenouvelleurCertificat, EnveloppeCleCert
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 
 mgdev_certs = '/home/mathieu/mgdev/certs'
 idmg = 'QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST'
@@ -115,18 +118,20 @@ def generer_certificat_valide() -> EnveloppeCleCert:
 class ValiderCertificat:
 
     def __init__(self, certs: Dict[str, EnveloppeCleCert]):
-        self.validateur = ValidateurCertificat(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
-        self.validateur_cache = ValidateurCertificatCache(idmg='QME8SjhaCFySD9qBt1AikQ1U7WxieJY2xDg2JCMczJST')
         self.certs = certs
         self.__logger = logging.getLogger('__main__.ValiderCertificat')
 
+        self.contexte = None
+
     def test_valider_1(self):
+        validateur = ValidateurCertificat(idmg=idmg)
+
         enveloppe1 = self.certs['1']
-        self.validateur.valider(enveloppe1.chaine)
+        validateur.valider(enveloppe1.chaine)
 
         date_reference = datetime.datetime(year=2010, month=1, day=1, hour=0, minute=0, tzinfo=pytz.UTC)
         try:
-            self.validateur.valider(enveloppe1.chaine, date_reference=date_reference)
+            validateur.valider(enveloppe1.chaine, date_reference=date_reference)
         except PathValidationError as pve:
             self.__logger.debug(" ** OK ** -> Message validation avec validateur implicite : %s" % pve)
         else:
@@ -134,24 +139,66 @@ class ValiderCertificat:
 
     def test_valider_cache(self):
         # Tester chargement precedent du cert de millegrille (implicitement)
-        enveloppe1 = self.certs['1']
-        self.validateur_cache.valider(enveloppe1.chaine)
+        validateur_cache = ValidateurCertificatCache(idmg=idmg)
 
-        enveloppe_cache = self.validateur_cache.get_enveloppe(enveloppe1.fingerprint_sha256_b64)
+        enveloppe1 = self.certs['1']
+        validateur_cache.valider(enveloppe1.chaine)
+
+        enveloppe_cache = validateur_cache.get_enveloppe(enveloppe1.fingerprint_sha256_b64)
         if enveloppe_cache.fingerprint_sha256_b64 != enveloppe1.fingerprint_sha256_b64 is None:
             raise ValueError("Certificat pas conserve dans le cache")
 
         self.__logger.debug("Certificat conserve dans le cache et valide : %s" % enveloppe_cache.est_verifie)
 
-        enveloppe_millegrille_cache = self.validateur_cache.get_enveloppe('XE1aGDnW9LmXg9svOFQXy0LSiWojyp0ipHBPlt5SirA=')
+        enveloppe_millegrille_cache = validateur_cache.get_enveloppe('XE1aGDnW9LmXg9svOFQXy0LSiWojyp0ipHBPlt5SirA=')
         self.__logger.debug("Certificat millegrille conserve dans le cache et valide : %s" % enveloppe_millegrille_cache.est_verifie)
 
-        self.validateur_cache.entretien()
+        validateur_cache.entretien()
+
+    def initialiser_contexte(self):
+        self.contexte = ContexteRessourcesMilleGrilles()
+        self.contexte.initialiser()
+
+    def test_valider_mq(self):
+        self.__logger.debug("Preparation validateur")
+        validateur = ValidateurCertificatRequete(self.contexte, idmg=idmg)
+        validateur.connecter()
+        self.__logger.debug("Validateur pret")
+
+        # Tester certs de base
+        enveloppe1 = self.certs['1']
+        cert_ref_enveloppe = validateur.valider(enveloppe1.chaine)
+        self.__logger.debug("Cert de reference valide : %s" % cert_ref_enveloppe.est_verifie)
+
+        fingerprints = [
+            'sha256_b64:vnR5pU5aNBmhks/bgblOGjxivrUykVGRvah5OUfSNTU=',
+            'sha256_b64:Z8VZ0OotcQUozW8pCx3vF99iCpk5RAqRE6WE4wieZ9U=',
+        ]
+
+        self.__logger.debug("Attente demarrage processing")
+        Event().wait(2)
+        self.__logger.debug("Demarrage processing")
+        for fp in fingerprints:
+            try:
+                # enveloppe_recue = validateur.get_enveloppe(fp)
+                enveloppe_recue = validateur.valider_fingerprint(fp)
+                self.__logger.info("Enveloppe chargee est valide : %s" % enveloppe_recue.est_verifie)
+            except AttributeError:
+                self.__logger.debug("Certificat non recu")
+
+        self.__logger.debug("Validation avec cache")
+        for fp in fingerprints:
+            try:
+                enveloppe_recue = validateur.valider_fingerprint(fp)
+                self.__logger.info("Enveloppe chargee est valide : %s" % enveloppe_recue.est_verifie)
+            except AttributeError:
+                self.__logger.debug("Certificat non recu")
 
 
 def main():
-    logging.basicConfig()
+    logging.basicConfig(format=Constantes.LOGGING_FORMAT)
     logging.getLogger('__main__').setLevel(logging.DEBUG)
+    logging.getLogger('millegrilles.util.ValidateursPki').setLevel(logging.DEBUG)
 
     cert_valide_1 = generer_certificat_valide()
     certs = {
@@ -160,7 +207,10 @@ def main():
 
     test = ValiderCertificat(certs)
     # test.test_valider_1()
-    test.test_valider_cache()
+    # test.test_valider_cache()
+
+    test.initialiser_contexte()
+    test.test_valider_mq()
 
 
 if __name__ == '__main__':

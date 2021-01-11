@@ -1,12 +1,17 @@
 # Module de validation des certificats (X.509) et des messages avec _signature
 import datetime
 import logging
+import json
 
 from typing import Optional, Union, Dict
 from certvalidator import CertificateValidator, ValidationContext
 from certvalidator.errors import PathValidationError
+from threading import Event, Barrier
 
-from millegrilles.SecuritePKI import EnveloppeCertificat
+from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
+from millegrilles.SecuritePKI import EnveloppeCertificat, CertificatInconnu
+from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.dao.MessageDAO import ConnexionWrapper, BaseCallback
 
 
 class ValidateurCertificat:
@@ -156,7 +161,7 @@ class ValidateurCertificatCache(ValidateurCertificat):
             raise ValueError("Certificat non verifie - Le cache ne fonctionne que sur des enveloppes verifiees")
 
         # Verifier si le certificat est deja dans le cache
-        fingerprint = enveloppe.fingerprint_sha256_b64
+        fingerprint = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
         if self.__enveloppe_leaf_par_fingerprint.get(fingerprint) is None:
             # S'assurer qu'on n'a pas deja depasse le nombre limite du cache
             if len(self.__enveloppe_leaf_par_fingerprint) > self.limite_obj_cache:
@@ -215,10 +220,13 @@ class ValidateurCertificatCache(ValidateurCertificat):
 
         # Tenter de charger l'enveloppe a partir du cache - elle serait deja verifiee
         fingerprint = enveloppe.fingerprint_sha256_b64
-        enveloppe_verifiee = self.get_enveloppe(fingerprint)
-
-        if enveloppe_verifiee:
-            return enveloppe_verifiee
+        entree_cache = self.__enveloppe_leaf_par_fingerprint.get(fingerprint)
+        try:
+            enveloppe_verifiee = entree_cache.enveloppe  # self.get_enveloppe(fingerprint)
+            if enveloppe_verifiee.est_verifie:
+                return enveloppe_verifiee
+        except AttributeError:
+            pass  # OK
 
         # On n'a pas d'enveloppe verifiee
         return enveloppe
@@ -243,6 +251,163 @@ class ValidateurCertificatCache(ValidateurCertificat):
         :return: Timedelta avant purge d'un certificat non CA dans le cache
         """
         return datetime.timedelta(minutes=15)
+
+
+class ValidateurCertificatRequete(ValidateurCertificatCache):
+    """
+    Validateur qui tente de charger les certificats par fingerprint lorsqu'ils ne sont
+    pas fournis explicitement ou dans le cache.
+    """
+
+    def __init__(self, contexte: ContexteRessourcesMilleGrilles, idmg: str, certificat_millegrille: Union[bytes, str, list] = None):
+        super().__init__(idmg, certificat_millegrille)
+        self.__contexte = contexte
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.__handler = ReponseCertificatHandler(contexte, self)
+        self.ready_event = Event()
+        self.__stop_event = Event()
+
+        self.__connexion_wrapper = ConnexionWrapper(contexte.configuration, self.__stop_event)
+        self.__connexion_wrapper.register_channel_listener(self)
+
+        self.channel = None
+        self.queue_name: Optional[str] = None
+
+        self.__attente: Dict[str, HandlerReponse] = dict()
+
+        self.__barrier_connexion = Barrier(2)
+
+    def fermer(self):
+        self.__stop_event.set()
+
+    def connecter(self):
+        self.__connexion_wrapper.connecter(self.__barrier_connexion)
+        self.__barrier_connexion.wait(5)
+
+    def on_channel_open(self, channel):
+        # Enregistrer la reply-to queue
+        self.channel = channel
+        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+
+    def queue_open(self, queue):
+        self.queue_name = queue.method.queue
+        self.__logger.info("Queue: %s" % self.queue_name)
+        self.channel.basic_consume(self.__handler.callbackAvecAck, queue=self.queue_name, no_ack=False)
+
+    def get_enveloppe(self, fingerprint: str):
+
+        # Tenter de charger le certificat a partir du cache
+        enveloppe = super().get_enveloppe(fingerprint)
+
+        if enveloppe is None:
+            # Le certificat n'est pas dans le cache, tenter de faire une requete via MQ
+            domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
+            requete = {
+                'fingerprint': fingerprint
+            }
+
+            try:
+                # Verifier si un handler existe deja pour le meme certificat
+                handler_reponse = self.__attente[fingerprint]
+                event_attente = handler_reponse.event
+            except KeyError:
+                # Handler n'existe pas
+                event_attente = Event()
+                handler_reponse = HandlerReponse(event_attente, timestamp=datetime.datetime.utcnow(), fingerprint=fingerprint)
+                self.__attente[fingerprint] = handler_reponse
+
+            # Note : on transmet potentiellement la requete pour le meme certificat plusieurs fois
+            self.__contexte.generateur_transactions.transmettre_requete(
+                requete, domaine_action, correlation_id=fingerprint, reply_to=self.queue_name
+            )
+
+            event_attente.wait(5)  # Timeout apres 5 secondes
+
+            try:
+                del self.__attente[fingerprint]
+            except Exception:
+                pass  # OK
+
+            try:
+                # Preparer chaine de certificats
+                message = handler_reponse.message
+                pems = [message['certificats_pem'][fp] for fp in message['chaine']]
+                enveloppe = EnveloppeCertificat(certificat_pem=pems)
+            except TypeError:
+                pass  # OK, certificat pas recu
+
+        return enveloppe
+
+    def valider_fingerprint(
+            self,
+            fingerprint: str,
+            date_reference: datetime.datetime = None,
+            idmg: str = None
+    ) -> EnveloppeCertificat:
+
+        enveloppe = self.get_enveloppe(fingerprint)
+        try:
+            if enveloppe.est_verifie:
+                return enveloppe
+            else:
+                chaine = [enveloppe.certificat_pem]
+                chaine.extend(enveloppe.reste_chaine_pem)
+                enveloppe = self.valider(chaine, date_reference, idmg)
+                return enveloppe
+        except AttributeError:
+            # Le certificat n'est pas trouve
+            raise CertificatInconnu('Certificat inconnu ' + fingerprint, fingerprint=fingerprint)
+
+    def recevoir_reponse(self, message: dict):
+        fingerprint = 'sha256_b64:' + message.get(ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64)
+        handler_attente = self.__attente.get(fingerprint)
+
+        try:
+            handler_attente.message = message
+        except AttributeError:
+            # Reponse ne correspond a aucun certificat en attente
+            self.__logger.warning("Message recu pour fingerprint %s, aucun handler en attente" % fingerprint)
+        else:
+            handler_attente.set_event()  # Declencher traitement de la reponse
+
+    def entretien(self):
+        super().entretien()
+
+        expire = datetime.datetime.utcnow() - self.expiration_attente
+        for key, handler in self.__attente.copy().items():
+            if handler.timestamp < expire:
+                self.__logger.warning("Nettoyage handler attente certificat stale : %s" % key)
+                del self.__attente[key]
+
+    @property
+    def expiration_attente(self) -> datetime.timedelta:
+        """
+        :return: Timedelta avant purge des handlers en attente
+        """
+        return datetime.timedelta(seconds=15)
+
+
+class ReponseCertificatHandler(BaseCallback):
+
+    def __init__(self, contexte: ContexteRessourcesMilleGrilles, validateur: ValidateurCertificatRequete):
+        super().__init__(contexte)
+        self.__validateur = validateur
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def traiter_message(self, ch, method, properties, body):
+
+        try:
+            # Extraire contenu json. Noter qu'on ne valide pas le message, les certificats sont auto-validants.
+            message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+
+            if self.__logger.isEnabledFor(logging.DEBUG):
+                json_body = json.dumps(message_dict, indent=2)
+                self.__logger.debug("ReponseCertificatHandler: %s\n%s" % (properties.correlation_id, json_body))
+
+            self.__validateur.recevoir_reponse(message_dict)
+        except Exception:
+            self.__logger.exception("Erreur traitement message reception certificat")
 
 
 class EntreeCacheEnveloppe:
@@ -276,3 +441,27 @@ class EntreeCacheEnveloppe:
             e.nombre_access,
             e.dernier_acces
         )
+
+
+class HandlerReponse:
+
+    def __init__(self, event: Event, timestamp: datetime.datetime, fingerprint: str):
+        self.__event = event
+        self.__timestamp = timestamp
+        self.__fingerprint = fingerprint
+        self.message: Optional[dict] = None
+
+    def set_event(self):
+        self.__event.set()
+
+    @property
+    def event(self):
+        return self.__event
+
+    @property
+    def timestamp(self) -> datetime.datetime:
+        return self.__timestamp
+
+    @property
+    def fingerprint(self):
+        return self.__fingerprint
