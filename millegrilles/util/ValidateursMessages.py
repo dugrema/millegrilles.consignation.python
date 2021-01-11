@@ -33,12 +33,13 @@ class ValidateurMessage:
     def fermer(self):
         self.__validateur.fermer()
 
-    def verifier(self, message: Union[bytes, str, dict], utiliser_date_message=False) -> EnveloppeCertificat:
+    def verifier(self, message: Union[bytes, str, dict], utiliser_date_message=False, utiliser_idmg_message=False) -> EnveloppeCertificat:
         """
 
         :param message: Message a valider.
         :param utiliser_date_message: Si True, le message est valide en utilisant en-tete.estampille comme date de
                                       validite pour le certificat plutot que la date courante.
+        :param utiliser_idmg_message: Si True, utilise le idmg du message pour valider le certificat de millegrille
 
         :return: Enveloppe du certificat utilise pour signer le message.
 
@@ -63,11 +64,9 @@ class ValidateurMessage:
         self.__verifier_hachage(message_nettoye)
 
         # Hachage du contenu valide. Verifier le certificat et la signature.
-
         # Valider presence de la signature en premier, certificat apres
         signature = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
-
-        enveloppe_certificat = self.__valider_certificat_message(message, utiliser_date_message)
+        enveloppe_certificat = self.__valider_certificat_message(message, utiliser_date_message, utiliser_idmg_message)
 
         # Certificat est valide. On verifie la signature.
         self.__verifier_signature(message_nettoye, signature, enveloppe_certificat)
@@ -126,9 +125,13 @@ class ValidateurMessage:
 
         # Signature OK, aucune exception n'a ete lancee
 
-    def __valider_certificat_message(self, message, utiliser_date_message):
+    def __valider_certificat_message(self, message, utiliser_date_message: bool, utiliser_idmg_message: bool):
         entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-        idmg_message = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        if utiliser_idmg_message:
+            idmg_message = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+        else:
+            idmg_message = None
+
         if utiliser_date_message:
             estampille = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
             date_reference = datetime.datetime.fromtimestamp(estampille, tz=pytz.UTC)
