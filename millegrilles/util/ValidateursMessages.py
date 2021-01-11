@@ -27,7 +27,26 @@ class ValidateurMessage:
         self.__hash_function = hashes.SHA256
         self.__signature_hash_function = hashes.SHA512
 
-    def verifier(self, message: Union[bytes, str, dict]) -> EnveloppeCertificat:
+    def connecter(self):
+        self.__validateur.connecter()
+
+    def fermer(self):
+        self.__validateur.fermer()
+
+    def verifier(self, message: Union[bytes, str, dict], utiliser_date_message=False) -> EnveloppeCertificat:
+        """
+
+        :param message: Message a valider.
+        :param utiliser_date_message: Si True, le message est valide en utilisant en-tete.estampille comme date de
+                                      validite pour le certificat plutot que la date courante.
+
+        :return: Enveloppe du certificat utilise pour signer le message.
+
+        :raise millegrilles.SecuritePKI.HachageInvalide: Contenu du message est invalide.
+        :raise millegrilles.SecuritePKI.CertificatInconnu: Certificat introuvable via le fingerprint du message
+        :raise certvalidator.errors.PathValidationError: Certificat est invalide.
+        :raise cryptography.exceptions.InvalidSignature: Signature du message est invalide.
+        """
         if isinstance(message, bytes):
             dict_message = json.loads(message.decode('utf-8'))
         elif isinstance(message, str):
@@ -37,20 +56,34 @@ class ValidateurMessage:
         else:
             raise TypeError("La transaction doit etre en format bytes, str ou dict")
 
-        signature = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
-
         # Preparer le message pour verification du hachage et de la signature
         message_nettoye = ValidateurMessage.__preparer_message(dict_message)
 
+        # Verifier le hachage du contenu - si invalide, pas de raison de verifier le certificat et la signature
         self.__verifier_hachage(message_nettoye)
-        enveloppe_certificat = self.__verifier_signature(message_nettoye, signature)
+
+        # Hachage du contenu valide. Verifier le certificat et la signature.
+
+        # Valider presence de la signature en premier, certificat apres
+        signature = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE]
+
+        enveloppe_certificat = self.__valider_certificat_message(message, utiliser_date_message)
+
+        # Certificat est valide. On verifie la signature.
+        self.__verifier_signature(message_nettoye, signature, enveloppe_certificat)
 
         return enveloppe_certificat
 
     def __verifier_hachage(self, message: dict):
         message_sans_entete = message.copy()
         del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-        message_bytes = json.dumps(message_sans_entete).encode('utf-8')
+        # message_bytes = json.dumps(message_sans_entete).encode('utf-8')
+        message_bytes = json.dumps(
+            message_sans_entete,
+            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+            sort_keys=True,
+            separators=(',', ':')
+        ).encode('utf-8')
 
         entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         hachage = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
@@ -60,7 +93,7 @@ class ValidateurMessage:
 
         digest.update(message_bytes)
         resultat_digest = digest.finalize()
-        digest_base64 = hachage.name + '_b64:' + b64encode(resultat_digest).decode('utf-8')
+        digest_base64 = fonction_hachage.name + '_b64:' + b64encode(resultat_digest).decode('utf-8')
 
         self.__logger.debug("Resultat hash contenu: %s" % digest_base64)
         if hachage != digest_base64:
@@ -69,14 +102,17 @@ class ValidateurMessage:
             ))
         self.__logger.debug("Hachage de la transaction est OK: %s" % digest_base64)
 
-    def __verifier_signature(self, message: dict, signature: str, utiliser_date_message=False) -> EnveloppeCertificat:
-        enveloppe_certificat = self.__valider_certificat_message(message, utiliser_date_message)
-
+    def __verifier_signature(self, message: dict, signature: str, enveloppe: EnveloppeCertificat):
         # Le certificat est valide. Valider la signature du message.
         signature_bytes = b64decode(signature)
-        message_bytes = json.dumps(message).encode('utf-8')
+        message_bytes = json.dumps(
+            message,
+            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
+            sort_keys=True,
+            separators=(',', ':')
+        ).encode('utf-8')
 
-        certificat = enveloppe_certificat.certificat
+        certificat = enveloppe.certificat
         cle_publique = certificat.public_key()
         cle_publique.verify(
             signature_bytes,
@@ -89,8 +125,6 @@ class ValidateurMessage:
         )
 
         # Signature OK, aucune exception n'a ete lancee
-
-        return enveloppe_certificat
 
     def __valider_certificat_message(self, message, utiliser_date_message):
         entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
