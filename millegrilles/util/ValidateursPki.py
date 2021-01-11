@@ -10,7 +10,7 @@ from threading import Event, Barrier
 
 from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
 from millegrilles.SecuritePKI import EnveloppeCertificat, CertificatInconnu
-from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+# from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ConnexionWrapper, BaseCallback
 
 
@@ -259,7 +259,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
     pas fournis explicitement ou dans le cache.
     """
 
-    def __init__(self, contexte: ContexteRessourcesMilleGrilles, idmg: str = None, certificat_millegrille: Union[bytes, str, list] = None):
+    def __init__(self, contexte, idmg: str = None, certificat_millegrille: Union[bytes, str, list] = None):
         if idmg is None:
             idmg = contexte.idmg
         super().__init__(idmg, certificat_millegrille)
@@ -397,7 +397,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
 class ReponseCertificatHandler(BaseCallback):
 
-    def __init__(self, contexte: ContexteRessourcesMilleGrilles, validateur: ValidateurCertificatRequete):
+    def __init__(self, contexte, validateur: ValidateurCertificatRequete):
         super().__init__(contexte)
         self.__validateur = validateur
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)

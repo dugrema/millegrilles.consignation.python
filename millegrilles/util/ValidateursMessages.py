@@ -10,8 +10,8 @@ from cryptography.hazmat.primitives import hashes, asymmetric
 from typing import Union
 
 from millegrilles import Constantes
-from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.util.ValidateursPki import ValidateurCertificatRequete
+# from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
+from millegrilles.util.ValidateursPki import ValidateurCertificatRequete, ValidateurCertificat
 from millegrilles.SecuritePKI import EnveloppeCertificat, HachageInvalide
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 
@@ -21,7 +21,7 @@ class ValidateurMessage:
     Validateur de messages. Verifie le hachage et la signature.
     """
 
-    def __init__(self, contexte: ContexteRessourcesMilleGrilles):
+    def __init__(self, contexte):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__validateur = ValidateurCertificatRequete(contexte)
         self.__hash_function = hashes.SHA256
@@ -195,3 +195,7 @@ class ValidateurMessage:
         if val_int == val_float:
             return val_int
         return val_float
+
+    @property
+    def validateur_pki(self) -> ValidateurCertificat:
+        return self.__validateur

@@ -9,12 +9,14 @@ import shutil
 
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
+from typing import Optional
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.SecuritePKI import SignateurTransaction, VerificateurTransaction, VerificateurCertificats
-
+from millegrilles.util.ValidateursMessages import ValidateurMessage
+from millegrilles.util.ValidateursPki import ValidateurCertificat
 
 class TransactionConfiguration:
 
@@ -452,11 +454,14 @@ class ContexteRessourcesMilleGrilles:
 
         self._email_dao = None
         self._signateur_transactions = None
-        self._verificateur_certificats = None
-        self._verificateur_transactions = None
+        self._verificateur_certificats = None  # Deprecated
+        self._verificateur_transactions = None  # Deprecated
         self._generateur_transactions = None
 
-        self.validation_workdir_tmp = None
+        # Validateur de messages (inclus validateur de certificats)
+        self._validateur_message: Optional[ValidateurMessage] = None
+
+        # self.validation_workdir_tmp = None
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -473,7 +478,7 @@ class ContexteRessourcesMilleGrilles:
         self._configuration.loadEnvironment(additionals=self._additionnals)
         self._message_dao = None
 
-        self.validation_workdir_tmp = tempfile.mkdtemp(prefix='millegrilles_pki_', dir=self._configuration.pki_workdir)
+        # self.validation_workdir_tmp = tempfile.mkdtemp(prefix='millegrilles_pki_', dir=self._configuration.pki_workdir)
 
         if init_message:
             self._message_dao = PikaDAO(self._configuration)
@@ -486,17 +491,25 @@ class ContexteRessourcesMilleGrilles:
             self._verificateur_certificats = VerificateurCertificats(self)
             self._verificateur_certificats.initialiser()
 
+            self._validateur_message = ValidateurMessage(self)
+
             if connecter:
                 self._message_dao.connecter()
+                self._validateur_message.connecter()
 
     def fermer(self):
-        try:
-            shutil.rmtree(self.validation_workdir_tmp)
-        except Exception as e:
-            self.__logger.warning("Erreur suppression workdir pki tmp : %s", str(e))
+        # try:
+        #     shutil.rmtree(self.validation_workdir_tmp)
+        # except Exception as e:
+        #     self.__logger.warning("Erreur suppression workdir pki tmp : %s", str(e))
 
         try:
             self._message_dao.deconnecter()
+        except:
+            pass
+
+        try:
+            self._validateur_message.fermer()
         except:
             pass
 
@@ -543,3 +556,10 @@ class ContexteRessourcesMilleGrilles:
     def idmg(self) -> str:
         return self._configuration.idmg
 
+    @property
+    def validateur_messages(self) -> ValidateurMessage:
+        return self._validateur_message
+
+    @property
+    def validateur_pki(self) -> ValidateurCertificat:
+        return self._validateur_message.validateur_pki
