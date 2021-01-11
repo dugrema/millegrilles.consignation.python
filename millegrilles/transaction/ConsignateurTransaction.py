@@ -243,7 +243,9 @@ class ConsignateurTransactionCallback(BaseCallback):
         signature_valide = False
         entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         try:
-            enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+            # enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
+            enveloppe_certificat = self.contexte.validateur_message.verifier(
+                enveloppe_transaction, utiliser_date_message=True, utiliser_idmg_message=True)
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
@@ -254,14 +256,14 @@ class ConsignateurTransactionCallback(BaseCallback):
                     fingerprint, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 )
             )
-            # Emettre demande pour le certificat manquant
-            self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
-        except AutorisationConditionnelleDomaine as acd:
-            if domaine_transaction in acd.domaines:
-                signature_valide = True
-            else:
-                # Pas autorise
-                raise acd
+            # # Emettre demande pour le certificat manquant
+            # self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
+        # except AutorisationConditionnelleDomaine as acd:
+        #     if domaine_transaction in acd.domaines:
+        #         signature_valide = True
+        #     else:
+        #         # Pas autorise
+        #         raise acd
 
         chaine_certificat = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
         try:

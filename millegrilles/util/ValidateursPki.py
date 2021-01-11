@@ -303,6 +303,10 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
         enveloppe = super().get_enveloppe(fingerprint)
 
         if enveloppe is None:
+
+            if self.queue_name is None:
+                raise CertificatInconnu("Certificat inconnu, validateur PKI MQ non initialise", fingerprint=fingerprint)
+
             # Le certificat n'est pas dans le cache, tenter de faire une requete via MQ
             domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
             requete = {

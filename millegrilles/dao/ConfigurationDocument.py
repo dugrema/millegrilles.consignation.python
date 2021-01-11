@@ -42,6 +42,7 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
         if connecter:
             # Connecter RabbitMQ
             self._message_dao.connecter()
+            self.validateur_message.connecter()
 
     def fermer(self):
         super().fermer()

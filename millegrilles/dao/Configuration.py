@@ -557,7 +557,7 @@ class ContexteRessourcesMilleGrilles:
         return self._configuration.idmg
 
     @property
-    def validateur_messages(self) -> ValidateurMessage:
+    def validateur_message(self) -> ValidateurMessage:
         return self._validateur_message
 
     @property
