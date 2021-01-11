@@ -202,7 +202,6 @@ class ValidateurCertificatCache(ValidateurCertificat):
         Invoquer regulirement pour faire l'entretien du cache (eliminer entrees trop vieilles).
         :return:
         """
-        # Eliminer les certificats non CA qui sont expires
         expiration = datetime.datetime.utcnow() - self.expiration_cache
         for fingerprint, entry in self.__enveloppe_leaf_par_fingerprint.copy().items():
             envelopppe = entry.enveloppe
