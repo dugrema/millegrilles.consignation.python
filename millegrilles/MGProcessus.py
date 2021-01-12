@@ -749,11 +749,19 @@ class RegenerationContexteWrapper:
 
     @property
     def verificateur_transaction(self):
-        return self.__contexte.verificateur_transactions
+        raise NotImplementedError("Deprecated - remplace par validateur_message()")
+        # return self.__contexte.verificateur_transactions
 
     @property
     def verificateur_certificats(self):
-        return self.__contexte.verificateur_certificats
+        raise NotImplementedError("Deprecated - remplace par ")
+        # return self.__contexte.verificateur_certificats
+
+    @property
+    def validateur_message(self) -> ValidateurMessage:
+        return self.__contexte.validateur_message
+
+
 
     @property
     def configuration(self):

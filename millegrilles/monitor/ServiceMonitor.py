@@ -37,6 +37,8 @@ from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTrouvee
 from millegrilles.util.IpUtils import get_ip
 from millegrilles.SecuritePKI import VerificateurTransaction
+from millegrilles.util.ValidateursMessages import ValidateurMessage
+from millegrilles.util.ValidateursPki import ValidateurCertificat
 
 class InitialiserServiceMonitor:
 
@@ -866,7 +868,16 @@ class ServiceMonitor:
 
     @property
     def verificateur_transactions(self):
-        return self._connexion_middleware.verificateur_transactions
+        raise NotImplementedError("Deprecated - remplace par validateur_message()")
+        # return self._connexion_middleware.verificateur_transactions
+
+    @property
+    def validateur_message(self) -> ValidateurMessage:
+        return self._connexion_middleware.validateur_message
+
+    @property
+    def validateur_pki(self) -> ValidateurCertificat:
+        return self._connexion_middleware.validateur_message.validateur_pki
 
     @property
     def gestionnaire_applications(self):

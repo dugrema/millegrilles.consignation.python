@@ -11,6 +11,7 @@ from docker.errors import NotFound
 
 from millegrilles.monitor.MonitorConstantes import ConstantesServiceMonitor
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor
+from millegrilles.util.ValidateursMessages import ValidateurMessage
 
 from millegrilles.util.IpUtils import get_ip
 
@@ -115,11 +116,14 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                 # S'assurer que la commande est correctement signee
                 try:
                     connexion_middleware = service_monitor.connexion_middleware
-                    verificateur_transactions = connexion_middleware.verificateur_transactions
+                    validateur_message: ValidateurMessage = connexion_middleware.validateur_message
                 except AttributeError:
-                    verificateur_transactions = service_monitor.verificateur_transactions
+                    #verificateur_transactions = service_monitor.verificateur_transactions
+                    # La connexion et contexte de messagerie ne sont pas encore charges
+                    # Utiliser un validateur "offline" qui utilise les certificats inline dans le message
+                    validateur_message: ValidateurMessage = None
 
-                cert = verificateur_transactions.verifier(request_data)
+                cert = validateur_message.verifier(request_data)
 
                 # S'assurer que le certificat est au moins de niveau protege ou de type navigateur
                 if 'navigateur' not in cert.get_roles and not any([s in ['3.protege', '4.secure'] for s in cert.get_exchanges]):

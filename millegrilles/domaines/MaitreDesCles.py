@@ -337,10 +337,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         """
         certificats = message_dict.get('certificats') or message_dict['resultats']['certificats']
 
-        verificateur_certificats = self.verificateur_certificats
+        validateur_pki = self.validateur_pki
         for fingerprint_hex, certificat in certificats.items():
 
-            enveloppe = EnveloppeCertificat(certificat_pem=certificat)
+            enveloppe = validateur_pki.valider(certificat)
+            # enveloppe = EnveloppeCertificat(certificat_pem=certificat)
             fingerprint_b64 = EnveloppeCertificat.calculer_fingerprint_b64(enveloppe.certificat)
 
             # Verifier que c'est un certificat du bon type
@@ -348,7 +349,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesGenerateurCertificat.ROLE_BACKUP, ConstantesGenerateurCertificat.ROLE_MAITREDESCLES
             ]
             if any([role in roles_acceptes for role in enveloppe.get_roles]):
-                resultat_verification = verificateur_certificats.verifier_chaine(enveloppe)
+                # resultat_verification = verificateur_certificats.verifier_chaine(enveloppe)
+                resultat_verification = validateur_pki.valider(certificat)
                 if resultat_verification:
                     self.__certificats_backup[fingerprint_b64] = enveloppe
             else:
@@ -807,12 +809,16 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             if fingerprint_demande is not None:
                 self._logger.debug("Re-encryption de la cle secrete avec certificat %s" % fingerprint_demande)
                 try:
-                    enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
+                    # enveloppe_certificat = self.verificateur_certificats.charger_certificat(fingerprint=fingerprint_demande)
+                    enveloppe_certificat = self.validateur_pki.valider_fingerprint(fingerprint_demande)
                 except CertificatInconnu:
                     enveloppe_certificat = None
             elif not enveloppe_certificat.est_verifie:
                 # S'assurer que le certificat est verifie
-                self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
+                chaine_pems = [enveloppe_certificat.certificat]
+                chaine_pems.extend(enveloppe_certificat.reste_chaine_pem)
+                self.validateur_pki.valider(chaine_pems)
+                # self.verificateur_certificats.verifier_chaine(enveloppe_certificat)
 
             # S'assurer que le certificat est d'un type qui permet d'exporter le contenu
             roles_rechiffrage = evenement.get('roles_permis') or roles_permis
@@ -865,8 +871,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             raise Exception("certificat d'un format non supporte")
 
-        enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_pem)
-        self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
+        enveloppe_certificat = self.validateur_pki.valider(cert_pem)
+
+        # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_pem)
+        # self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
 
         # enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_navi)
         # enveloppe_certificat_inter = EnveloppeCertificat(certificat_pem=cert_inter)
@@ -885,9 +893,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if 'domaines' in roles:
             cert = evenement.get('_certificat_tiers') or evenement.get('certificat_tiers') or evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
 
-            enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(cert))
+            # enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(cert))
             # self.verificateur_certificats.charger_certificat(enveloppe=enveloppe_certificat)
-            self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
+            # self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat)
+            enveloppe_certificat = self.validateur_pki.valider('\n'.join(cert))
 
             # Verifier si la validite de la permission de dechiffrage est expiree
             estampille = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][

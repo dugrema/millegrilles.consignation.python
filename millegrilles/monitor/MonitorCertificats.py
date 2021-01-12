@@ -614,7 +614,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Valider la signature, s'assurer que le certificat permet de faire une demande de signature de certificat
         contenu = commande.contenu
         message_commande = commande.message
-        enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
+        # enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
+        enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
         idmg = self._service_monitor.idmg
         roles_cert = enveloppe_cert.get_roles
 
@@ -663,7 +664,8 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         # Valider la signature, s'assurer que le certificat permet de faire une demande de signature de certificat
         contenu = commande.contenu
         message_commande = commande.message
-        enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
+        # enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
+        enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
         idmg = self._service_monitor.idmg
         roles_cert = enveloppe_cert.get_roles
 
