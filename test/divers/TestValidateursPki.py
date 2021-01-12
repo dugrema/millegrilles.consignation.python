@@ -173,7 +173,8 @@ class ValiderCertificat:
         self.__logger.debug("Cert de reference valide : %s" % cert_ref_enveloppe.est_verifie)
 
         fingerprints = [
-            'sha256_b64:/cosk/mnoBDoEKqqaNm0SD4aXsGdeHz6SIKGFeMOpo0=',
+            'sha256_b64:bD0hnLqS35LmOpVtn4mn4u5A2B9y1l3hOqpKX6XNfZI=',
+            'sha256_b64:naUCE5RY8Vk0f5Cz7gPDPuSDdDNBoLxhnl7DiWK0EFU=',
         ]
 
         self.__logger.debug("Attente demarrage processing")
@@ -217,6 +218,30 @@ class ValiderCertificat:
         else:
             raise Exception("Erreur validation date avec certificat, devrait etre invalide")
 
+    def test_recherche_cert_absent(self):
+
+        # Tester certs de base
+        enveloppe1 = self.certs['1']
+        cert_ref_enveloppe = self.validateur.valider(enveloppe1.chaine)
+        self.__logger.debug("Cert de reference valide : %s" % cert_ref_enveloppe.est_verifie)
+
+        fingerprints = [
+            'sha256_b64:DUMMY_EXISTE_PAS',
+        ]
+
+        self.__logger.debug("Attente demarrage processing")
+        Event().wait(2)
+        self.__logger.debug("Demarrage processing")
+        for fp in fingerprints:
+            try:
+                # enveloppe_recue = validateur.get_enveloppe(fp)
+                enveloppe_recue = self.validateur.valider_fingerprint(fp)
+                self.__logger.info("Enveloppe chargee est valide : %s" % enveloppe_recue.est_verifie)
+            except AttributeError:
+                self.__logger.debug("OK - Certificat non recu")
+            else:
+                self.__logger.error("ERREUR - Certificat recu, ne devrait pas exister")
+
 
 def main():
     logging.basicConfig(format=Constantes.LOGGING_FORMAT)
@@ -234,8 +259,9 @@ def main():
 
     test.initialiser_contexte()
     test.test_valider_mq()
+    # test.test_recherche_cert_absent()
 
-    Event().wait(120)
+    # Event().wait(120)
 
 
 if __name__ == '__main__':

@@ -310,45 +310,92 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
         if enveloppe is None:
 
             if self.queue_name is None:
-                raise CertificatInconnu("Certificat inconnu, validateur PKI MQ non initialise", fingerprint=fingerprint)
-
-            # Le certificat n'est pas dans le cache, tenter de faire une requete via MQ
-            domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
-            requete = {
-                'fingerprint': fingerprint
-            }
+                self.__logger.warning("Certificat inconnu, validateur PKI MQ non initialise : %s" % fingerprint)
+                return None
 
             try:
                 # Verifier si un handler existe deja pour le meme certificat
-                handler_reponse = self.__attente[fingerprint]
-                event_attente = handler_reponse.event
+                self.__attente[fingerprint]
             except KeyError:
                 # Handler n'existe pas
                 event_attente = Event()
-                handler_reponse = HandlerReponse(event_attente, timestamp=datetime.datetime.utcnow(), fingerprint=fingerprint)
+                handler_reponse = HandlerReponse(
+                    event_attente, timestamp=datetime.datetime.utcnow(), fingerprint=fingerprint)
                 self.__attente[fingerprint] = handler_reponse
 
-            # Note : on transmet potentiellement la requete pour le meme certificat plusieurs fois
-            self.__contexte.generateur_transactions.transmettre_requete(
-                requete, domaine_action, correlation_id=fingerprint, reply_to=self.queue_name
-            )
+            # Le certificat n'est pas dans le cache, tenter de faire une requete via MQ
+            enveloppe = self.__charger_via_pki(fingerprint)
+            if enveloppe is None:
+                enveloppe = self.__charger_via_broadcast(fingerprint)
 
-            event_attente.wait(5)  # Timeout apres 5 secondes
-
+            # Cleanup
             try:
                 del self.__attente[fingerprint]
             except Exception:
                 pass  # OK
 
-            try:
-                # Preparer chaine de certificats
-                message = handler_reponse.message
-                routing_key = handler_reponse.routing_key
+        return enveloppe
 
-                enveloppe = self.message_pems_to_enveloppe(message, routing_key)
+    def __charger_via_pki(self, fingerprint):
+        """
+        Tenter de charger le certificat avec le domaine pki
+        :return:
+        """
+        domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
+        requete = {
+            'fingerprint': fingerprint
+        }
 
-            except TypeError:
-                pass  # OK, certificat pas recu
+        # Note : on transmet potentiellement la requete pour le meme certificat plusieurs fois
+        self.__contexte.generateur_transactions.transmettre_requete(
+            requete, domaine_action, correlation_id=fingerprint, reply_to=self.queue_name
+        )
+
+        handler_reponse = self.__attente[fingerprint]
+        handler_reponse.event.wait(5)  # Timeout apres 5 secondes
+
+        try:
+            # Preparer chaine de certificats
+            message = handler_reponse.message
+            routing_key = handler_reponse.routing_key
+
+            enveloppe = self.message_pems_to_enveloppe(message, routing_key)
+
+        except TypeError:
+            # OK, certificat pas recu
+            enveloppe = None
+
+        return enveloppe
+
+    def __charger_via_broadcast(self, fingerprint):
+        """
+        Tenter de charger le certificat en effectuant un broadcast
+        :return:
+        """
+        fp = fingerprint.split(':')[-1]
+        domaine_action = 'requete.certificat.' + fp
+        requete = {
+            'fingerprint': fingerprint
+        }
+
+        # Note : on transmet potentiellement la requete pour le meme certificat plusieurs fois
+        self.__contexte.generateur_transactions.transmettre_requete(
+            requete, domaine_action, correlation_id=fingerprint, reply_to=self.queue_name
+        )
+
+        handler_reponse = self.__attente[fingerprint]
+        handler_reponse.event.wait(5)  # Timeout apres 5 secondes
+
+        try:
+            # Preparer chaine de certificats
+            message = handler_reponse.message
+            routing_key = handler_reponse.routing_key
+
+            enveloppe = self.message_pems_to_enveloppe(message, routing_key)
+
+        except TypeError:
+            # OK, certificat pas recu
+            enveloppe = None
 
         return enveloppe
 
