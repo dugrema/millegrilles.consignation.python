@@ -122,6 +122,7 @@ class ValiderCertificat:
         self.__logger = logging.getLogger('__main__.ValiderCertificat')
 
         self.contexte = None
+        self.validateur = None
 
     def test_valider_1(self):
         validateur = ValidateurCertificat(idmg=idmg)
@@ -159,20 +160,20 @@ class ValiderCertificat:
         self.contexte = ContexteRessourcesMilleGrilles()
         self.contexte.initialiser()
 
-    def test_valider_mq(self):
         self.__logger.debug("Preparation validateur")
-        validateur = ValidateurCertificatRequete(self.contexte, idmg=idmg)
-        validateur.connecter()
+        self.validateur = ValidateurCertificatRequete(self.contexte, idmg=idmg)
+        self.validateur.connecter()
         self.__logger.debug("Validateur pret")
+
+    def test_valider_mq(self):
 
         # Tester certs de base
         enveloppe1 = self.certs['1']
-        cert_ref_enveloppe = validateur.valider(enveloppe1.chaine)
+        cert_ref_enveloppe = self.validateur.valider(enveloppe1.chaine)
         self.__logger.debug("Cert de reference valide : %s" % cert_ref_enveloppe.est_verifie)
 
         fingerprints = [
-            'sha256_b64:vnR5pU5aNBmhks/bgblOGjxivrUykVGRvah5OUfSNTU=',
-            'sha256_b64:Z8VZ0OotcQUozW8pCx3vF99iCpk5RAqRE6WE4wieZ9U=',
+            'sha256_b64:/cosk/mnoBDoEKqqaNm0SD4aXsGdeHz6SIKGFeMOpo0=',
         ]
 
         self.__logger.debug("Attente demarrage processing")
@@ -181,7 +182,7 @@ class ValiderCertificat:
         for fp in fingerprints:
             try:
                 # enveloppe_recue = validateur.get_enveloppe(fp)
-                enveloppe_recue = validateur.valider_fingerprint(fp)
+                enveloppe_recue = self.validateur.valider_fingerprint(fp)
                 self.__logger.info("Enveloppe chargee est valide : %s" % enveloppe_recue.est_verifie)
             except AttributeError:
                 self.__logger.debug("Certificat non recu")
@@ -189,26 +190,28 @@ class ValiderCertificat:
         self.__logger.debug("Validation avec cache")
         for fp in fingerprints:
             try:
-                enveloppe_recue = validateur.valider_fingerprint(fp)
+                enveloppe_recue = self.validateur.valider_fingerprint(fp)
                 self.__logger.info("Enveloppe chargee est valide : %s" % enveloppe_recue.est_verifie)
             except AttributeError:
                 self.__logger.debug("Certificat non recu")
+
+    def verification_conditionnelle(self):
 
         # Valider un certificat contiditonnelement
         date_validation = datetime.datetime(year=2021, month=1, day=8, hour=21, tzinfo=pytz.UTC)
         self.__logger.debug("Verifier certificat expire avec une date valide : %s" % date_validation)
         fp_conditionnel = 'sha256_b64:QLyRx1zpJemuUwkKfu38QZqgspo4XODy/047fz8sKko='
-        enveloppe_conditionnelle = validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
+        enveloppe_conditionnelle = self.validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
         self.__logger.info("Enveloppe chargee est verifie %s (devrait etre False), expiration %s" % (enveloppe_conditionnelle.est_verifie, enveloppe_conditionnelle.not_valid_after))
 
         self.__logger.debug("Verifier cache cert 'non-verifie'")
-        enveloppe_conditionnelle = validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
+        enveloppe_conditionnelle = self.validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
         self.__logger.info("Enveloppe chargee est verifie (devrait etre False) : %s" % enveloppe_conditionnelle.est_verifie)
 
         date_validation = datetime.datetime.now(tz=pytz.UTC)
         self.__logger.debug("Verifier cache cert expire avec date courante %s" % date_validation)
         try:
-            enveloppe_conditionnelle = validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
+            enveloppe_conditionnelle = self.validateur.valider_fingerprint(fp_conditionnel, date_reference=date_validation)
         except PathValidationError:
             self.__logger.info("Enveloppe chargee est invalide pour la date (OK) : expiration = %s" % enveloppe_conditionnelle.not_valid_after)
         else:
@@ -231,6 +234,8 @@ def main():
 
     test.initialiser_contexte()
     test.test_valider_mq()
+
+    Event().wait(120)
 
 
 if __name__ == '__main__':

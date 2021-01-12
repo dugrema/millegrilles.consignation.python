@@ -294,8 +294,13 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
-        self.__logger.info("Queue: %s" % self.queue_name)
+        self.__logger.info("ValidateurCertificatRequete Queue: %s" % self.queue_name)
         self.channel.basic_consume(self.__handler.callbackAvecAck, queue=self.queue_name, no_ack=False)
+
+        # Ajouter routing keys
+        exchange_defaut = self.__contexte.configuration.exchange_defaut
+        routing_key = ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
+        self.channel.queue_bind(queue=self.queue_name, exchange=exchange_defaut, routing_key=routing_key, callback=None)
 
     def get_enveloppe(self, fingerprint: str):
 
@@ -338,11 +343,23 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             try:
                 # Preparer chaine de certificats
                 message = handler_reponse.message
-                pems = [message['certificats_pem'][fp] for fp in message['chaine']]
-                enveloppe = EnveloppeCertificat(certificat_pem=pems)
+                routing_key = handler_reponse.routing_key
+
+                enveloppe = self.message_pems_to_enveloppe(message, routing_key)
+
             except TypeError:
                 pass  # OK, certificat pas recu
 
+        return enveloppe
+
+    def message_pems_to_enveloppe(self, message, routing_key):
+        if routing_key == self.queue_name or routing_key is None:
+            pems = [message['certificats_pem'][fp] for fp in message['chaine']]
+        elif routing_key == ConstantesPki.EVENEMENT_CERTIFICAT_EMIS:
+            pems = message['chaine_pem']
+        else:
+            raise ValueError("Message de type inconnu : %s" % routing_key)
+        enveloppe = EnveloppeCertificat(certificat_pem=pems)
         return enveloppe
 
     def valider_fingerprint(
@@ -365,15 +382,20 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             # Le certificat n'est pas trouve
             raise CertificatInconnu('Certificat inconnu ' + fingerprint, fingerprint=fingerprint)
 
-    def recevoir_reponse(self, message: dict):
+    def recevoir_reponse(self, routing_key: str, message: dict):
         fingerprint = 'sha256_b64:' + message.get(ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64)
         handler_attente = self.__attente.get(fingerprint)
 
         try:
             handler_attente.message = message
+            handler_attente.routing_key = routing_key
         except AttributeError:
-            # Reponse ne correspond a aucun certificat en attente
-            self.__logger.warning("Message recu pour fingerprint %s, aucun handler en attente" % fingerprint)
+            # Reponse ne correspond a aucun certificat en attente. On le conserve dans le cache pour utilisation future.
+            enveloppe = self.message_pems_to_enveloppe(message, routing_key)
+            pems = [enveloppe.certificat_pem]
+            pems.extend(enveloppe.reste_chaine_pem)
+            self.valider(pems)
+            self.__logger.debug("Cert fingerprint %s recu, aucun handler en attente. On le met en cache." % fingerprint)
         else:
             handler_attente.set_event()  # Declencher traitement de la reponse
 
@@ -407,7 +429,8 @@ class ReponseCertificatHandler(BaseCallback):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def traiter_message(self, ch, method, properties, body):
-
+        routing_key = method.routing_key
+        message_dict = None
         try:
             # Extraire contenu json. Noter qu'on ne valide pas le message, les certificats sont auto-validants.
             message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
@@ -416,9 +439,13 @@ class ReponseCertificatHandler(BaseCallback):
                 json_body = json.dumps(message_dict, indent=2)
                 self.__logger.debug("ReponseCertificatHandler: %s\n%s" % (properties.correlation_id, json_body))
 
-            self.__validateur.recevoir_reponse(message_dict)
+            self.__validateur.recevoir_reponse(routing_key, message_dict)
         except Exception:
-            self.__logger.exception("Erreur traitement message reception certificat")
+            try:
+                fingerprint = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
+                self.__logger.exception("Erreur traitement message reception certificat %s" % fingerprint)
+            except (KeyError, TypeError):
+                self.__logger.exception("Erreur traitement message reception certificat")
 
 
 class EntreeCacheEnveloppe:
@@ -461,6 +488,7 @@ class HandlerReponse:
         self.__timestamp = timestamp
         self.__fingerprint = fingerprint
         self.message: Optional[dict] = None
+        self.routing_key: Optional[str] = None
 
     def set_event(self):
         self.__event.set()
