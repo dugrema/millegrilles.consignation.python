@@ -263,7 +263,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         except PathValidationError as pve:
             # Le certificat est invalide pour la nouvelle transaction en utilisant la date par defaut
             # Verifier si on peut valider avec un ensemble de regles conditionnelles
-            self.__logger.debug("Transaction rejetee avec validation standard, verifier regles conditionnelles : %s" % str(pve))
+            self._logger.debug("Transaction rejetee avec validation standard, verifier regles conditionnelles : %s" % str(pve))
             enveloppe_certificat = self.__verifier_regles_conditionnelles_nouvelle_transaction(enveloppe_transaction)
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
@@ -278,9 +278,15 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         # Nettoyer les certificats inclus (_certificat) si presents. Emettre la chaine pour s'assurer que le domaine
         # Pki la conserve.
-        chaine_certificat = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
+        chaine_certificat = \
+            enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS) or \
+            enveloppe_transaction.get('_certificats')
         try:
             del enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
+        except KeyError:
+            pass
+        try:
+            del enveloppe_transaction['_certificats']
         except KeyError:
             pass
         if chaine_certificat:
