@@ -9,13 +9,13 @@ import json
 from bson.objectid import ObjectId
 from threading import Thread, Event
 from pymongo.errors import DuplicateKeyError
+from certvalidator.errors import PathValidationError
 
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 from millegrilles.Domaines import GestionnaireDomaine
-from millegrilles.SecuritePKI import AutorisationConditionnelleDomaine
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -107,7 +107,7 @@ class ConsignateurTransaction(ModeleConfiguration):
             self.__logger.error("Un canal du consignateur de transactions est ferme")
             self.__channel = None
             self.contexte.message_dao.enter_error_state()
-            self.contexte.entretien()
+            # self.contexte.entretien()
 
     def deconnecter(self):
         self.__stop_event.set()
@@ -124,17 +124,31 @@ class ConsignateurTransactionCallback(BaseCallback):
         self.__compteur = 0
         self.__channel = None
 
+    def on_channel_open(self, channel):
+        self.__channel = channel
+
+        queue_name = self.contexte.configuration.queue_nouvelles_transactions
+        channel.add_on_close_callback(self.__on_channel_close)
+        channel.basic_qos(prefetch_count=5)
+        channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
+
+    def __on_channel_close(self, channel=None, code=None, reason=None):
+        self.__channel = None
+
+    def is_channel_open(self):
+        return self.__channel is not None and not self.__channel.is_closed
+
     # Methode pour recevoir le callback pour les nouvelles transactions.
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         routing_key_split = routing_key.split('.')
-        exchange = method.exchange
+
         if routing_key_split[0] == 'transaction':
             try:
                 self.__compteur = self.__compteur + 1
                 self._logger.debug("Nouvelle transaction %d: %s" % (self.__compteur, str(message_dict['en-tete']['domaine'])))
-                self.traiter_nouvelle_transaction(message_dict, exchange, properties)
+                self.traiter_nouvelle_transaction(message_dict, properties)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
         elif routing_key_split[0] == 'commande' and routing_key_split[-1] == 'restaurerTransaction':
@@ -147,9 +161,9 @@ class ConsignateurTransactionCallback(BaseCallback):
         else:
             raise ValueError("Type d'operation inconnue %s: %s" % (routing_key, str(message_dict)))
 
-    def traiter_nouvelle_transaction(self, message_dict, exchange, properties):
+    def traiter_nouvelle_transaction(self, message_dict, properties):
         try:
-            id_document, signature_valide = self.sauvegarder_nouvelle_transaction(message_dict, exchange)
+            id_document, signature_valide = self.sauvegarder_nouvelle_transaction(message_dict)
 
             if signature_valide:
                 entete = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION]
@@ -230,16 +244,7 @@ class ConsignateurTransactionCallback(BaseCallback):
             document_staging[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = dict_message.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
             collection_erreurs.insert_one(document_staging)
 
-    def sauvegarder_nouvelle_transaction(self, enveloppe_transaction, exchange):
-
-        domaine_transaction = enveloppe_transaction[
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE
-        ][
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE
-        ]
-        nom_collection = GestionnaireDomaine.identifier_collection_domaine(domaine_transaction)
-        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
-
+    def sauvegarder_nouvelle_transaction(self, enveloppe_transaction):
         # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
         signature_valide = False
         entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
@@ -250,6 +255,10 @@ class ConsignateurTransactionCallback(BaseCallback):
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
+        except PathValidationError as pve:
+            # Le certificat est invalide pour la nouvelle transaction en utilisant la date par defaut
+            # Verifier si on peut valider avec un ensemble de regles conditionnelles
+            self.__verifier_regles_conditionnelles_nouvelle_transaction()
         except CertificatInconnu:
             fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
             self._logger.warning(
@@ -257,24 +266,22 @@ class ConsignateurTransactionCallback(BaseCallback):
                     fingerprint, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
                 )
             )
-            # # Emettre demande pour le certificat manquant
-            # self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
-        # except AutorisationConditionnelleDomaine as acd:
-        #     if domaine_transaction in acd.domaines:
-        #         signature_valide = True
-        #     else:
-        #         # Pas autorise
-        #         raise acd
 
+        # Nettoyer les certificats inclus (_certificat) si presents. Emettre la chaine pour s'assurer que le domaine
+        # Pki la conserve.
         chaine_certificat = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
         try:
             del enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
         except KeyError:
             pass
-
         if chaine_certificat:
             self.__emettre_chaine(chaine_certificat)
 
+        doc_id = self.__sauvegarder_transaction(enveloppe_transaction, signature_valide)
+
+        return doc_id, signature_valide
+
+    def __sauvegarder_transaction(self, enveloppe_transaction, signature_valide):
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
         # Changer estampille du format epoch en un format date et sauver l'evenement
@@ -287,16 +294,22 @@ class ConsignateurTransactionCallback(BaseCallback):
         }
         if signature_valide:
             evenements[Constantes.EVENEMENT_SIGNATURE_VERIFIEE] = datetime.datetime.now(tz=datetime.timezone.utc)
-
         enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT] = evenements
 
+        entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        domaine_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+        nom_collection = GestionnaireDomaine.identifier_collection_domaine(domaine_transaction)
+
+        collection_transactions = self.contexte.document_dao.get_collection(nom_collection)
         try:
             resultat = collection_transactions.insert_one(enveloppe_transaction)
             doc_id = resultat.inserted_id
         except DuplicateKeyError as dke:
             # Verifier si la transaction a ete traite correctement - relancer le trigger de traitement sinon
-            uuid_transaction = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-            filtre = {Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction}
+            uuid_transaction = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            filtre = {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE + '.' + Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transaction}
             doc_existant = collection_transactions.find_one(filtre)
             date_traitement = doc_existant['_evenements'].get('transaction_traitee')
             if date_traitement is None:
@@ -310,7 +323,7 @@ class ConsignateurTransactionCallback(BaseCallback):
                 # Transaction deja traitee avec succes, on empeche l'execution subsequente
                 raise dke
 
-        return doc_id, signature_valide
+        return doc_id
 
     def __emettre_chaine(self, certs: list):
         self.contexte.signateur_transactions.emettre_certificat(certs)
@@ -358,20 +371,6 @@ class ConsignateurTransactionCallback(BaseCallback):
         except DuplicateKeyError:
             # Ok, la transaction existe deja dans la collection - rien a faire
             pass
-
-    def on_channel_open(self, channel):
-        self.__channel = channel
-
-        queue_name = self.contexte.configuration.queue_nouvelles_transactions
-        channel.add_on_close_callback(self.__on_channel_close)
-        channel.basic_qos(prefetch_count=1)
-        channel.basic_consume(self.callbackAvecAck, queue=queue_name, no_ack=False)
-
-    def __on_channel_close(self, channel=None, code=None, reason=None):
-        self.__channel = None
-
-    def is_channel_open(self):
-        return self.__channel is not None and not self.__channel.is_closed
 
 
 class EvenementTransactionCallback(BaseCallback):

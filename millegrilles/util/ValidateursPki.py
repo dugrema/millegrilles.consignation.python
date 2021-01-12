@@ -301,6 +301,9 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
         routing_key = ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
         self.channel.queue_bind(queue=self.queue_name, exchange=exchange_defaut, routing_key=routing_key, callback=None)
 
+    def is_channel_open(self):
+        return self.channel is not None and not self.channel.is_closed
+
     def get_enveloppe(self, fingerprint: str):
 
         # Tenter de charger le certificat a partir du cache
