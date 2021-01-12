@@ -294,7 +294,7 @@ class UtilCertificats:
 
         self.__validation_context: Optional[ValidationContext] = None
         self.__cert_millegrille: Optional[bytes] = None
-        self.__autorisations_idmg = autorisations_idmg()  # Autorisations pour idmg tierces
+        self.__autorisations_idmg = autorisations_idmg  # Autorisations pour idmg tierces
 
     def initialiser(self):
         # Charger le contexte de validation

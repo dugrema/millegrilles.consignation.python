@@ -16,6 +16,8 @@ from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 from millegrilles.Domaines import GestionnaireDomaine
+from millegrilles.config.Autorisations import autorisations_idmg, ConstantesAutorisation
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class ConsignateurTransaction(ModeleConfiguration):
@@ -123,6 +125,9 @@ class ConsignateurTransactionCallback(BaseCallback):
         self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
         self.__compteur = 0
         self.__channel = None
+
+        # Whitelist des regles de transactions autorisees
+        self.__whitelist_autorisations = autorisations_idmg()
 
     def on_channel_open(self, channel):
         self.__channel = channel
@@ -258,7 +263,11 @@ class ConsignateurTransactionCallback(BaseCallback):
         except PathValidationError as pve:
             # Le certificat est invalide pour la nouvelle transaction en utilisant la date par defaut
             # Verifier si on peut valider avec un ensemble de regles conditionnelles
-            self.__verifier_regles_conditionnelles_nouvelle_transaction()
+            self.__logger.debug("Transaction rejetee avec validation standard, verifier regles conditionnelles : %s" % str(pve))
+            enveloppe_certificat = self.__verifier_regles_conditionnelles_nouvelle_transaction(enveloppe_transaction)
+            enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
+                enveloppe_certificat.authority_key_identifier
+            signature_valide = True
         except CertificatInconnu:
             fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
             self._logger.warning(
@@ -281,7 +290,7 @@ class ConsignateurTransactionCallback(BaseCallback):
 
         return doc_id, signature_valide
 
-    def __sauvegarder_transaction(self, enveloppe_transaction, signature_valide):
+    def __sauvegarder_transaction(self, enveloppe_transaction, signature_valide) -> EnveloppeCertificat:
         # Ajouter l'element evenements et l'evenement de persistance
         estampille = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]['estampille']
         # Changer estampille du format epoch en un format date et sauver l'evenement
@@ -304,6 +313,11 @@ class ConsignateurTransactionCallback(BaseCallback):
         try:
             resultat = collection_transactions.insert_one(enveloppe_transaction)
             doc_id = resultat.inserted_id
+
+            if self._logger.isEnabledFor(logging.DEBUG):
+                message_str = self.json_helper.dict_vers_json(enveloppe_transaction)
+                message_str = json.dumps(json.loads(message_str), indent=2)
+                self._logger.debug("Sauvegarde  transaction :\n%s" % message_str)
         except DuplicateKeyError as dke:
             # Verifier si la transaction a ete traite correctement - relancer le trigger de traitement sinon
             uuid_transaction = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
@@ -371,6 +385,25 @@ class ConsignateurTransactionCallback(BaseCallback):
         except DuplicateKeyError:
             # Ok, la transaction existe deja dans la collection - rien a faire
             pass
+
+    def __verifier_regles_conditionnelles_nouvelle_transaction(self, enveloppe_transaction) -> EnveloppeCertificat:
+        """
+        Verifie si une regle conditionnelle d'autorisation permet de re-valider le certificat differemment
+        :param enveloppe_transaction:
+        :return:
+        """
+        entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        idmg_message = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG]
+
+        regles_exceptions = self.__whitelist_autorisations.get(idmg_message)
+        try:
+            domaines_actions = regles_exceptions[ConstantesAutorisation.REGLE_DOMAINEACTIONS_PERMIS]
+            domaine_message = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+            if domaine_message in domaines_actions:
+                return self.contexte.validateur_message.verifier(
+                    enveloppe_transaction, utiliser_date_message=True, utiliser_idmg_message=True)
+        except KeyError:
+            pass  # OK
 
 
 class EvenementTransactionCallback(BaseCallback):
