@@ -37,12 +37,11 @@ class ContexteRessourcesDocumentsMilleGrilles(ContexteRessourcesMilleGrilles):
             self._document_dao = MongoDAO(self._configuration)
 
             if connecter:
-                self._document_dao.connecter()
+                self.connecter()
 
-        if connecter:
-            # Connecter RabbitMQ
-            self._message_dao.connecter()
-            self.validateur_message.connecter()
+    def connecter(self):
+        super().connecter()
+        self._document_dao.connecter()
 
     def fermer(self):
         super().fermer()

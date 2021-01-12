@@ -10,6 +10,7 @@ import shutil
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from typing import Optional
+from threading import Thread, Event
 
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
@@ -463,6 +464,10 @@ class ContexteRessourcesMilleGrilles:
 
         # self.validation_workdir_tmp = None
 
+        # Thread pour l'entretien du contexte, demarree automatiqement sur connexion
+        self.__thread_entretien = Thread(name="ctxmaint", target=self.__entretien, daemon=True)
+        self.__stop_event = Event()
+
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def initialiser(self, init_message=True, connecter=True):
@@ -494,14 +499,21 @@ class ContexteRessourcesMilleGrilles:
             self._validateur_message = ValidateurMessage(self)
 
             if connecter:
-                self._message_dao.connecter()
-                self._validateur_message.connecter()
+                self.connecter()
+
+    def connecter(self):
+        self._message_dao.connecter()
+        self._validateur_message.connecter()
+
+        self.__stop_event.clear()
+        self.__thread_entretien.start()
 
     def fermer(self):
         # try:
         #     shutil.rmtree(self.validation_workdir_tmp)
         # except Exception as e:
         #     self.__logger.warning("Erreur suppression workdir pki tmp : %s", str(e))
+        self.__stop_event.set()
 
         try:
             self._message_dao.deconnecter()
@@ -512,6 +524,20 @@ class ContexteRessourcesMilleGrilles:
             self._validateur_message.fermer()
         except:
             pass
+
+    def __entretien(self):
+        """
+        Effectue l'entretien des modules du contexte.
+        """
+
+        while not self.__stop_event.is_set():
+            try:
+                self.validateur_message.entretien()
+            except Exception:
+                self.__logger.exception("Erreur d'entretien du validateur de messages")
+
+            # Entretien toutes les 30 secondes
+            self.__stop_event.wait(30)
 
     @property
     def configuration(self):

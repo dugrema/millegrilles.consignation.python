@@ -107,6 +107,7 @@ class ConsignateurTransaction(ModeleConfiguration):
             self.__logger.error("Un canal du consignateur de transactions est ferme")
             self.__channel = None
             self.contexte.message_dao.enter_error_state()
+            self.contexte.entretien()
 
     def deconnecter(self):
         self.__stop_event.set()

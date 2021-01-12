@@ -10,7 +10,6 @@ from threading import Event, Barrier
 
 from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
 from millegrilles.SecuritePKI import EnveloppeCertificat, CertificatInconnu
-# from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import ConnexionWrapper, BaseCallback
 
 
@@ -469,6 +468,12 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
 
 class ReponseCertificatHandler(BaseCallback):
+    """
+    Handler de callback pour reponse sur la Q du validateur.
+
+    Dirige les messages de certificat vers le validateur pour debloquer une thread en attente ou mettre le
+    certificat recu dans le cache local.
+    """
 
     def __init__(self, contexte, validateur: ValidateurCertificatRequete):
         super().__init__(contexte)
@@ -496,6 +501,9 @@ class ReponseCertificatHandler(BaseCallback):
 
 
 class EntreeCacheEnveloppe:
+    """
+    Entree du cache d'enveloppes de certificats. Permet de gerer l'entretien du cache.
+    """
 
     def __init__(self, enveloppe: EnveloppeCertificat):
         self.__enveloppe = enveloppe
@@ -509,7 +517,7 @@ class EntreeCacheEnveloppe:
         return self.__enveloppe
 
     @property
-    def nombre_access(self):
+    def nombre_access(self) -> int:
         return self.__nombre_acces
 
     @property
@@ -529,6 +537,9 @@ class EntreeCacheEnveloppe:
 
 
 class HandlerReponse:
+    """
+    Handler pour faire la correspondance d'une attente de reponse pour un certificat.
+    """
 
     def __init__(self, event: Event, timestamp: datetime.datetime, fingerprint: str):
         self.__event = event
@@ -538,10 +549,13 @@ class HandlerReponse:
         self.routing_key: Optional[str] = None
 
     def set_event(self):
+        """
+        Execute la commande event.set(). Debloque l'execution des threads en attente pour reception de certificat.
+        """
         self.__event.set()
 
     @property
-    def event(self):
+    def event(self) -> Event:
         return self.__event
 
     @property
@@ -549,5 +563,5 @@ class HandlerReponse:
         return self.__timestamp
 
     @property
-    def fingerprint(self):
+    def fingerprint(self) -> str:
         return self.__fingerprint
