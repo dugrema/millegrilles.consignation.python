@@ -24,6 +24,7 @@ from millegrilles.monitor.MonitorComptes import GestionnaireComptesMongo, Gestio
 from millegrilles.monitor.MonitorCommandes import CommandeMonitor, GestionnaireCommandes
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat, PemHelpers, EnveloppeCleCert
 from millegrilles.monitor import MonitorConstantes
+from millegrilles.util.ValidateursMessages import ValidateurMessage
 
 
 class TraitementMessagesMiddleware(BaseCallback):
@@ -711,7 +712,12 @@ class ConnexionMiddleware:
 
     @property
     def verificateur_transactions(self):
-        return self._contexte.verificateur_transaction
+        raise NotImplementedError("Deprecated - remplace par validateur_message()")
+        # return self._contexte.verificateur_transaction
+
+    @property
+    def validateur_message(self) -> ValidateurMessage:
+        return self._contexte.validateur_message
 
     @property
     def reply_q(self) -> str:

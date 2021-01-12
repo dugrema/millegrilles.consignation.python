@@ -8,7 +8,6 @@ from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers, Gestionna
 from millegrilles.domaines.MaitreDesCles import GestionnaireMaitreDesCles
 from millegrilles.domaines.SenseursPassifs import GestionnaireSenseursPassifs
 from millegrilles.domaines.Principale import GestionnairePrincipale
-from millegrilles.domaines.Plume import GestionnairePlume
 from millegrilles.domaines.Parametres import GestionnaireParametres
 from millegrilles.domaines.Pki import GestionnairePki
 
@@ -77,12 +76,6 @@ class RegenererTest(BaseMongo):
         gestionnaire_principale = GestionnairePrincipale(self.contexte)
         self.prep_gestionnaire(gestionnaire_principale)
         processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_principale)
-        processus_controleur.regenerer_documents()
-
-    def regenerer_plume(self):
-        gestionnaire_plume = GestionnairePlume(self.contexte)
-        self.prep_gestionnaire(gestionnaire_plume)
-        processus_controleur = MGPProcesseurRegeneration(self.contexte, gestionnaire_plume)
         processus_controleur.regenerer_documents()
 
     def regenerer_parametres(self):

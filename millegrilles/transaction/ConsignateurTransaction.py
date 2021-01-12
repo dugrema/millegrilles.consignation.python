@@ -722,7 +722,8 @@ class EntretienCollectionsDomaines(BaseCallback):
             Constantes.EVENEMENT_TRANSACTION_DATE_RESOUMISE
         )
 
-        verificateur_transaction = self.contexte.verificateur_transaction
+        verificateur_transaction = self.contexte.validateur_message
+
         for nom_collection_transaction in self.__liste_domaines:
             filtre = {
                 '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT, Constantes.EVENEMENT_TRANSACTION_COMPLETE): False,
@@ -739,7 +740,8 @@ class EntretienCollectionsDomaines(BaseCallback):
 
                     self.__logger.info("Resoumission transaction non terminee: %s" % uuid_transaction)
                     try:
-                        verificateur_transaction.verifier(doc_transaction)
+                        verificateur_transaction.verifier(
+                            doc_transaction, utiliser_date_message=True, utiliser_idmg_message=True)
 
                         compteur_resoumission = 0
                         if evenements_transaction is not None:

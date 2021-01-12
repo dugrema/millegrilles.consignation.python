@@ -19,7 +19,7 @@ from threading import Thread, Event
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
-from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu, AutorisationConditionnelleDomaine
+from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu, EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
@@ -728,16 +728,13 @@ class HandlerBackupDomaine:
         :param transaction:
         :return:
         """
-        try:
-            enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
-        except AutorisationConditionnelleDomaine as acd:
-            # OK, c'est un backup d'une transaction deja sauvegardee. Le domaine va re-valider la permission
-            # sur restauration / regeneration
-            enveloppe_initial = acd.enveloppe
+        # enveloppe_initial = self._contexte.verificateur_transaction.verifier(transaction)
+        enveloppe = self._contexte.validateur_message.verifier(
+            transaction, utiliser_date_message=True, utiliser_idmg_message=True)
 
-        enveloppe = enveloppe_initial
-
-        liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_initial)
+        liste_enveloppes_cas = [enveloppe]
+        for cert_pem in enveloppe.reste_chaine_pem:
+            liste_enveloppes_cas.append(EnveloppeCertificat(certificat_pem=cert_pem))
 
         # S'assurer que le certificat racine correspond a la transaction
         ca_racine = liste_enveloppes_cas[-1]
@@ -748,7 +745,7 @@ class HandlerBackupDomaine:
         liste_cas = [enveloppe.fingerprint_ascii for enveloppe in liste_enveloppes_cas]
 
         return {
-            'certificats': [enveloppe_initial.fingerprint_ascii],
+            'certificats': [enveloppe.fingerprint_ascii],
             'certificats_intermediaires': liste_cas[:-1],
             'certificats_racine': [liste_cas[-1]],
         }
@@ -844,7 +841,8 @@ class HandlerBackupDomaine:
                 catalogue = json.load(fichier, object_hook=decoder_backup)
 
             self.__logger.debug("Verifier signature catalogue %s\n%s" % (nom_fichier_catalogue, catalogue))
-            self._contexte.verificateur_transaction.verifier(catalogue)
+            # self._contexte.verificateur_transaction.verifier(catalogue)
+            self._contexte.validateur_message.verifier(catalogue, utiliser_date_message=True, utiliser_idmg_message=True)
 
             with requests.get(
                     '%s/backup/horaire/catalogues/%s' % (url_consignationfichiers, path_fichier_catalogue),
@@ -1036,8 +1034,9 @@ class HandlerBackupDomaine:
         :param entete:
         :return:
         """
-        hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA512())
-        hachage_backup = 'sha512_b64:' + hachage_backup
+        # hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA512())
+        hachage_backup = self._contexte.verificateur_certificats.verifier_hachage(entete, fonction_hachage=hashes.SHA512())
+        # hachage_backup = 'sha512_b64:' + hachage_backup
         return hachage_backup
 
 

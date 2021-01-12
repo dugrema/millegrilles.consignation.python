@@ -24,6 +24,8 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.BackupModule import HandlerBackupDomaine
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.BackupModule import ArchivesBackupParser
+from millegrilles.util.ValidateursPki import ValidateurCertificat
+from millegrilles.util.ValidateursMessages import ValidateurMessage
 
 
 class TraitementMessageDomaineCommande(TraitementMessageDomaine):
@@ -35,7 +37,7 @@ class TraitementMessageDomaineCommande(TraitementMessageDomaine):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
 
         try:
-            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            enveloppe_certificat = self.gestionnaire.validateur_message.verifier(message_dict)
             reponse = self.traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
             if reponse is not None and properties.reply_to is not None:
                 self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
@@ -65,7 +67,7 @@ class TraitementMessageDomaineEvenement(TraitementMessageDomaine):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
 
         try:
-            enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            enveloppe_certificat = self.gestionnaire.validateur_message.verifier(message_dict)
             self.traiter_evenement(enveloppe_certificat, ch, method, properties, body, message_dict)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
@@ -93,7 +95,8 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
             return
 
         try:
-            self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            # self.gestionnaire.verificateur_transaction.verifier(message_dict)
+            self.gestionnaire.validateur_message.verifier(message_dict)  #  verificateur_transaction.verifier(message_dict)
             self.traiter_requete(ch, method, properties, body, message_dict)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
@@ -1096,11 +1099,21 @@ class GestionnaireDomaine:
 
     @property
     def verificateur_transaction(self):
-        return self._contexte.verificateur_transaction
+        raise NotImplementedError("Deprecated - remplace par validateur_message()")
+        # return self._contexte.verificateur_transaction
 
     @property
     def verificateur_certificats(self):
-        return self._contexte.verificateur_certificats
+        raise NotImplementedError("Deprecated - replace par validateur_pki()")
+        # return self._contexte.verificateur_certificats
+
+    @property
+    def validateur_message(self) -> ValidateurMessage:
+        return self._contexte.validateur_message
+
+    @property
+    def validateur_pki(self) -> ValidateurCertificat:
+        return self._contexte.validateur_message.validateur_pki
 
     def creer_regenerateur_documents(self):
         return RegenerateurDeDocuments(self)
@@ -1558,7 +1571,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.validateur_message.verifier(message_dict)
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
 
         reponse = self.traiter_requete(ch, method, properties, body, message_dict)
@@ -1568,7 +1581,7 @@ class TraitementRequetesNoeuds(TraitementMessageDomaine):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
-        enveloppe_certificat = self.gestionnaire.verificateur_transaction.verifier(message_dict)
+        enveloppe_certificat = self.gestionnaire.validateur_message.verifier(message_dict)
 
         self._logger.debug("Certificat: %s" % str(enveloppe_certificat))
         resultats = list()

@@ -68,7 +68,7 @@ class ValidateurMessage:
         message_nettoye = ValidateurMessage.__preparer_message(dict_message)
 
         # Verifier le hachage du contenu - si invalide, pas de raison de verifier le certificat et la signature
-        self.__verifier_hachage(message_nettoye)
+        self.verifier_hachage(message_nettoye)
 
         # Hachage du contenu valide. Verifier le certificat et la signature.
         # Valider presence de la signature en premier, certificat apres
@@ -80,7 +80,7 @@ class ValidateurMessage:
 
         return enveloppe_certificat
 
-    def __verifier_hachage(self, message: dict):
+    def verifier_hachage(self, message: dict, fonction_hachage=None) -> str:
         message_sans_entete = message.copy()
         del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         # message_bytes = json.dumps(message_sans_entete).encode('utf-8')
@@ -94,7 +94,8 @@ class ValidateurMessage:
         entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         hachage = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
 
-        fonction_hachage = self.__hash_function()
+        if fonction_hachage is None:
+            fonction_hachage = self.__hash_function()
         digest = hashes.Hash(fonction_hachage, backend=default_backend())
 
         digest.update(message_bytes)
@@ -107,6 +108,8 @@ class ValidateurMessage:
                 hachage, digest_base64
             ))
         self.__logger.debug("Hachage de la transaction est OK: %s" % digest_base64)
+
+        return digest_base64
 
     def __verifier_signature(self, message: dict, signature: str, enveloppe: EnveloppeCertificat):
         # Le certificat est valide. Valider la signature du message.

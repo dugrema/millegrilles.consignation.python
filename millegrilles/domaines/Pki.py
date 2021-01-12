@@ -1,6 +1,7 @@
 # Domaine Public Key Infrastructure (PKI)
 
 from cryptography import x509
+from certvalidator.errors import PathValidationError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
@@ -25,7 +26,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
             fingerprint = routing_key.split('.')[-1]
             certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
             try:
-                self.gestionnaire.verificateur_transaction.emettre_certificat(
+                self.gestionnaire.generateur_transactions.emettre_certificat(
                     certificat[ConstantesSecurityPki.LIBELLE_CHAINE_PEM])
             except KeyError:
                 pass  # Certificat inconnu
@@ -60,7 +61,7 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
             fingerprint = routing_key.split('.')[-1]
             certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
             try:
-                self.gestionnaire.verificateur_transaction.emettre_certificat(
+                self.gestionnaire.generateur_transactions.emettre_certificat(
                     certificat[ConstantesSecurityPki.LIBELLE_CHAINE_PEM])
             except KeyError:
                 pass  # Certificat inconnu
@@ -475,14 +476,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
         try:
             # Charger le certificat en ignorant la date d'expiration - valide la chaine sur la date d'expiration
             # Les certificats expires restent necessaires pour valider la signature des transactions et documents
-            self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
-        except AutorisationConditionnelleDomaine:
-            # Le certificat est valide dans certains cas, on le conserve
-            pass
-        except CertificatExpire:
-            # La chaine est expiree mais valide en date de l'expiration, on conserve le certificat pour
-            # valider la signature de transactions et documents
-            pass
+            # self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
+            self._contexte.validateur_pki.valider(chaine_pem)
+        except PathValidationError as pve:
+            if 'expired' not in str(pve):
+                # La chaine est invalide pour raison autre que l'expiration du certificat
+                raise pve
 
         idmg = enveloppe.subject_organization_name
         chaine_fingerprints = [fingerprint_sha256_b64]

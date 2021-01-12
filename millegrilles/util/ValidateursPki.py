@@ -2,6 +2,7 @@
 import datetime
 import logging
 import json
+import pytz
 
 from typing import Optional, Union, Dict
 from certvalidator import CertificateValidator, ValidationContext
@@ -443,7 +444,15 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             enveloppe = self.message_pems_to_enveloppe(message, routing_key)
             pems = [enveloppe.certificat_pem]
             pems.extend(enveloppe.reste_chaine_pem)
-            self.valider(pems)
+            try:
+                self.valider(pems)
+            except PathValidationError as pve:
+                if 'expired' in str(pve):
+                    # Tenter de valider avec date feuille valide - si toujours invalide, on laisse l'exception monter
+                    date_reference = pytz.UTC.localize(dt=enveloppe.not_valid_after)
+                    self.valider(pems, date_reference=date_reference)
+                else:
+                    raise pve
             self.__logger.debug("Cert fingerprint %s recu, aucun handler en attente. On le met en cache." % fingerprint)
         else:
             handler_attente.set_event()  # Declencher traitement de la reponse

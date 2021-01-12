@@ -7,6 +7,7 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class GenerateurTransaction:
@@ -294,22 +295,28 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def emettre_certificat(self, certificat_pem: str, fingerprint_ascii: str, correlation_csr: str = None):
-        raise NotImplemented("Remplace par SecuritePKI UtilCertificats.emettre_certificat() (verificateur ou signateur de tranactions)")
-        # message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
-        # message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = fingerprint_ascii
-        # message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = certificat_pem
-        #
-        # if correlation_csr is not None:
-        #     message_evenement[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
-        #
-        # routing = Constantes.ConstantesPki.REQUETE_CERTIFICAT_EMIS
-        # self._contexte.message_dao.transmettre_message(
-        #     message_evenement, routing,
-        # )
-        # self._contexte.message_dao.transmettre_message_noeuds(
-        #     message_evenement, routing
-        # )
+    def emettre_certificat(self, chaine_pem: list, correlation_csr: str = None):
+        """
+        Emet un certificat avec sa chaine comme evenement a etre capture par les modules interesses.
+        :param chaine_pem:
+        :param correlation_csr:
+        :return:
+        """
+        enveloppe = EnveloppeCertificat(certificat_pem=chaine_pem[0])
+        fingerprint = enveloppe.fingerprint_ascii
+        fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+
+        message = {
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
+            ConstantesSecurityPki.LIBELLE_CHAINE_PEM: chaine_pem,
+        }
+        if correlation_csr is not None:
+            message[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
+
+        # Emet le certificat sur l'exchange par defaut
+        routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
+        self.emettre_message(message, routing)
 
     def transmettre_evenement_persistance(self, id_document, id_transaction, domaine, properties_mq):
         message = {

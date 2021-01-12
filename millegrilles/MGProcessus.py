@@ -15,6 +15,7 @@ from millegrilles.dao.MessageDAO import JSONHelper, ConnexionWrapper, Traitement
 from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from millegrilles.SecuritePKI import AutorisationConditionnelleDomaine
+from millegrilles.util.ValidateursMessages import ValidateurMessage
 
 
 class MGPProcesseur:
@@ -104,7 +105,12 @@ class MGPProcesseur:
 
     @property
     def verificateur_transaction(self):
-        return self.__contexte.verificateur_transaction
+        raise NotImplementedError("Deprecated - utiliser validateur_message()")
+        # return self.__contexte.verificateur_transaction
+
+    @property
+    def validateur_message(self) -> ValidateurMessage:
+        return self.__contexte.validateur_message
 
     @property
     def configuration(self):
@@ -1575,7 +1581,7 @@ class MGProcessusTransaction(MGProcessus):
         id_transaction = info_transaction['id_transaction']
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
         try:
-            self._controleur.gestionnaire.verificateur_transaction.verifier(self._transaction)
+            self._controleur.gestionnaire.validateur_message.verifier(self._transaction)
         except AutorisationConditionnelleDomaine as acd:
             domaine = self._transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
             if domaine not in acd.domaines:

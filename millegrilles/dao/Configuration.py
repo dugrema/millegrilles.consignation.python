@@ -4,8 +4,6 @@ import os
 import json
 import logging
 import ssl
-import tempfile
-import shutil
 
 from cryptography.hazmat.backends import default_backend
 from cryptography import x509
@@ -18,6 +16,7 @@ from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.SecuritePKI import SignateurTransaction, VerificateurTransaction, VerificateurCertificats
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
+
 
 class TransactionConfiguration:
 
@@ -455,8 +454,8 @@ class ContexteRessourcesMilleGrilles:
 
         self._email_dao = None
         self._signateur_transactions = None
-        self._verificateur_certificats = None  # Deprecated
-        self._verificateur_transactions = None  # Deprecated
+        # self._verificateur_certificats = None  # Deprecated
+        # self._verificateur_transactions = None  # Deprecated
         self._generateur_transactions = None
 
         # Validateur de messages (inclus validateur de certificats)
@@ -491,10 +490,10 @@ class ContexteRessourcesMilleGrilles:
             self._signateur_transactions.initialiser()
 
             # Preparer les certificats, validateurs
-            self._verificateur_transactions = VerificateurTransaction(self)
-            self._verificateur_transactions.initialiser()
-            self._verificateur_certificats = VerificateurCertificats(self)
-            self._verificateur_certificats.initialiser()
+            # self._verificateur_transactions = VerificateurTransaction(self)
+            # self._verificateur_certificats = VerificateurCertificats(self)
+            # self._verificateur_transactions.initialiser()
+            # self._verificateur_certificats.initialiser()
 
             self._validateur_message = ValidateurMessage(self)
 
@@ -572,11 +571,13 @@ class ContexteRessourcesMilleGrilles:
 
     @property
     def verificateur_transaction(self) -> VerificateurTransaction:
-        return self._verificateur_transactions
+        raise NotImplementedError("Deprecated")
+        # return self._verificateur_transactions
 
     @property
     def verificateur_certificats(self) -> VerificateurCertificats:
-        return self._verificateur_certificats
+        raise NotImplementedError("Deprecated")
+        # return self._verificateur_certificats
 
     @property
     def idmg(self) -> str:
