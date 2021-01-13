@@ -121,7 +121,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
                     #verificateur_transactions = service_monitor.verificateur_transactions
                     # La connexion et contexte de messagerie ne sont pas encore charges
                     # Utiliser un validateur "offline" qui utilise les certificats inline dans le message
-                    validateur_message: ValidateurMessage = None
+                    validateur_message: ValidateurMessage = ValidateurMessage(idmg=service_monitor.idmg)
 
                 cert = validateur_message.verifier(request_data)
 

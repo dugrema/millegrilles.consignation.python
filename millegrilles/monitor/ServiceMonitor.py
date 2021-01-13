@@ -36,7 +36,6 @@ from millegrilles.monitor.MonitorApplications import GestionnaireApplications
 from millegrilles.monitor.MonitorWebAPI import ServerWebAPI
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTrouvee
 from millegrilles.util.IpUtils import get_ip
-from millegrilles.SecuritePKI import VerificateurTransaction
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
 
@@ -231,7 +230,8 @@ class ServiceMonitor:
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
 
-        self._verificateur_transactions: Optional[VerificateurTransaction] = None
+        # self._verificateur_transactions: Optional[VerificateurTransaction] = None
+        self.__validateur_message: Optional[ValidateurMessage] = None
 
         # Gerer les signaux OS, permet de deconnecter les ressources au besoin
         signal.signal(signal.SIGINT, self.fermer)
@@ -792,10 +792,6 @@ class ServiceMonitor:
 
         return info_mq
 
-    @property
-    def connexion_middleware(self) -> ConnexionMiddleware:
-        return self._connexion_middleware
-
     def preparer_secrets(self):
         """
         Expose les certs/cle prive dans le volume secrets pour les containers
@@ -847,6 +843,27 @@ class ServiceMonitor:
             self.__logger.exception("Erreur transmission evenement monitor")
 
     @property
+    def connexion_middleware(self) -> ConnexionMiddleware:
+        return self._connexion_middleware
+
+    @property
+    def validateur_message(self) -> ValidateurMessage:
+        try:
+            if self._connexion_middleware is not None:
+                validateur = self._connexion_middleware.validateur_message
+                if validateur is not None:
+                    return validateur
+        except Exception:
+            self.__logger.exception("Erreur chargement validateur messages, on utilise une version offline")
+        else:
+            self.__logger.warning("Erreur chargement validateur messages, on utilise une version offline")
+
+        if self.__validateur_message is None:
+            self.__validateur_message = self._connexion_middleware.validateur_message
+
+        return self.__validateur_message
+
+    @property
     def gestionnaire_mq(self):
         return self._gestionnaire_mq
 
@@ -870,10 +887,6 @@ class ServiceMonitor:
     def verificateur_transactions(self):
         raise NotImplementedError("Deprecated - remplace par validateur_message()")
         # return self._connexion_middleware.verificateur_transactions
-
-    @property
-    def validateur_message(self) -> ValidateurMessage:
-        return self._connexion_middleware.validateur_message
 
     @property
     def validateur_pki(self) -> ValidateurCertificat:

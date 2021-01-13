@@ -11,7 +11,7 @@ from typing import Union
 
 from millegrilles import Constantes
 # from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
-from millegrilles.util.ValidateursPki import ValidateurCertificatRequete, ValidateurCertificat
+from millegrilles.util.ValidateursPki import ValidateurCertificatRequete, ValidateurCertificatCache, ValidateurCertificat
 from millegrilles.SecuritePKI import EnveloppeCertificat, HachageInvalide
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 
@@ -21,9 +21,21 @@ class ValidateurMessage:
     Validateur de messages. Verifie le hachage et la signature.
     """
 
-    def __init__(self, contexte):
+    def __init__(self, contexte=None, idmg=None):
+        """
+        :param contexte: millegrilles.dao.Configuration.ContexteRessourcesMilleGrilles [Optionnel]
+                         Permet de faire des requetes MQ pour charger les certificats par fingerprint
+        :param idmg: Parametre qui permet de bloquer le validateur sur un idmg en particulier. Requis si contexte non fournis.
+        """
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        self.__validateur = ValidateurCertificatRequete(contexte)
+
+        if contexte is not None:
+            self.__validateur = ValidateurCertificatRequete(contexte)
+        elif idmg is not None:
+            self.__validateur = ValidateurCertificatCache(idmg)
+        else:
+            raise ValueError("Il faut fournir le contexte ou le idmg")
+
         self.__hash_function = hashes.SHA256
         self.__signature_hash_function = hashes.SHA512
 
@@ -31,7 +43,10 @@ class ValidateurMessage:
         self.__validateur.connecter()
 
     def fermer(self):
-        self.__validateur.fermer()
+        try:
+            self.__validateur.fermer()
+        except AttributeError:
+            pass  # OK, probablement du a l'utilisation du ValidateurCertificatCache
 
     def entretien(self):
         """
