@@ -2054,6 +2054,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
 
         self.csr_intermediaire = None
+        self._securite: Optional[str] = None
 
     def fermer(self, signum=None, frame=None):
         super().fermer(signum, frame)
@@ -2224,6 +2225,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         elif securite == Constantes.SECURITE_PUBLIC:
             self.__initialiser_noeud_installation(commande, Constantes.SECURITE_PUBLIC)
         else:
+            self._securite = None
             raise Exception("Type de noeud non supporte : " + securite)
 
     def __initialiser_noeud_protege(self, commande: CommandeMonitor):
@@ -2478,9 +2480,11 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         raise ForcerRedemarrage("Redemarrage")
 
-    # @property
-    # def securite(self):
-    #     return self._securite
+    @property
+    def securite(self):
+        if self._securite is None:
+            raise NotImplementedError("Securite n'existe pas - pas initialise")
+        return self._securite
 
 
 # class ServiceMonitorExtension(ServiceMonitor):

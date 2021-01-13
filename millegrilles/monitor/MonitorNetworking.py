@@ -385,7 +385,7 @@ location %s {
         location_public_paths = [
             "/vitrine",
         ]
-        location_priv_prot_paths = [
+        location_prot_paths = [
             "/coupdoeil",
             "/senseurspassifs",
             "/grosfichiers",
@@ -404,8 +404,8 @@ location /certs {
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
-        if securite is not None and securite != Constantes.SECURITE_PUBLIC:
-            locations_list.extend([location_priv_prot_component % loc for loc in location_priv_prot_paths])
+        if securite == Constantes.SECURITE_PROTEGE:
+            locations_list.extend([location_priv_prot_component % loc for loc in location_prot_paths])
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
 
         locations_content = '\n'.join(locations_list)
