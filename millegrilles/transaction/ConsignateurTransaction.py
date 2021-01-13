@@ -253,6 +253,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         # Verifier la signature de la transaction (pas fatal si echec, on va reessayer plus tard)
         signature_valide = False
         entete = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        uuid_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
         try:
             # enveloppe_certificat = self.contexte.verificateur_transaction.verifier(enveloppe_transaction)
             enveloppe_certificat = self.contexte.validateur_message.verifier(
@@ -263,11 +264,12 @@ class ConsignateurTransactionCallback(BaseCallback):
         except PathValidationError as pve:
             # Le certificat est invalide pour la nouvelle transaction en utilisant la date par defaut
             # Verifier si on peut valider avec un ensemble de regles conditionnelles
-            self._logger.debug("Transaction rejetee avec validation standard, verifier regles conditionnelles : %s" % str(pve))
+            self._logger.debug("Transaction %s rejetee avec validation standard, verifier regles conditionnelles : %s" % (uuid_transaction, str(pve)))
             enveloppe_certificat = self.__verifier_regles_conditionnelles_nouvelle_transaction(enveloppe_transaction)
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
             signature_valide = True
+            self._logger.debug("Transaction %s valide avec regles conditionnelles" % uuid_transaction)
         except CertificatInconnu:
             fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
             self._logger.warning(

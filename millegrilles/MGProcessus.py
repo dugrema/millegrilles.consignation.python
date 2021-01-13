@@ -1589,7 +1589,10 @@ class MGProcessusTransaction(MGProcessus):
         id_transaction = info_transaction['id_transaction']
         self._transaction = self._controleur.charger_transaction_par_id(id_transaction, nom_collection)
         try:
-            self._controleur.gestionnaire.validateur_message.verifier(self._transaction)
+            # Verifier la transaction. Utilise idmg et date (estampille) du message pour permettre
+            # de regenerer les transactions.
+            self._controleur.gestionnaire.validateur_message.verifier(
+                self._transaction, utiliser_date_message=True, utiliser_idmg_message=True)
         except AutorisationConditionnelleDomaine as acd:
             domaine = self._transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
             if domaine not in acd.domaines:
