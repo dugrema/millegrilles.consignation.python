@@ -444,10 +444,13 @@ include /etc/nginx/conf.d/server.include;
         :param force_update: Si True, force le redemarrage du service - permet de recharger fichiers .conf des modules
         :return:
         """
-        docker_nginx = self.__service_monitor.gestionnaire_docker.reconfigurer_service('nginx')
+        try:
+            docker_nginx = self.__service_monitor.gestionnaire_docker.reconfigurer_service('nginx')
 
-        if force_update:
-            docker_nginx.force_update()
+            if force_update:
+                docker_nginx.force_update()
+        except IndexError:
+            self.__logger.warning("Reconfiguration nginx - le service n'est pas configure")
 
     def supprimer_nginx(self):
         docker_nginx = self.__service_monitor.gestionnaire_docker.get_service('nginx')

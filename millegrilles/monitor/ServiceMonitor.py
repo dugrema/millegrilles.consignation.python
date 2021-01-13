@@ -1318,7 +1318,8 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         try:
             self._gestionnaire_certificats.charger_certificats()  # Charger certs sur disque
         except FileNotFoundError:
-            self.__logger.exception("Erreur chargement certificats/cles pour monitor")
+            self.__logger.exception("Erreur chargement certificats/cles pour monitor. Tenter de regenerer configuration monitor.")
+            self._gestionnaire_docker.configurer_monitor()
         self._entretien_certificats()
 
     def connecter_middleware(self):
@@ -1383,14 +1384,18 @@ class ServiceMonitorPrincipal(ServiceMonitor):
         """
         clecert_monitor = self._gestionnaire_certificats.clecert_monitor
 
-        not_valid_before = clecert_monitor.not_valid_before
-        not_valid_after = clecert_monitor.not_valid_after
-        self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
+        try:
+            not_valid_before = clecert_monitor.not_valid_before
+            not_valid_after = clecert_monitor.not_valid_after
+            self.__logger.debug("Verification validite certificat du monitor : valide jusqu'a %s" % str(clecert_monitor.not_valid_after))
 
-        # Calculer 2/3 de la duree du certificat
-        delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
-        epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-        date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+            # Calculer 2/3 de la duree du certificat
+            delta_fin_debut = not_valid_after.timestamp() - not_valid_before.timestamp()
+            epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
+            date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+        except AttributeError:
+            self.__logger.warning("Certificat monitor inexistant, on le fait renouveller")
+            date_renouvellement = None
 
         if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
             self.__logger.warning("Certificat monitor expire, on genere un nouveau et redemarre immediatement")
