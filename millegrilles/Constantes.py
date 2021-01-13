@@ -258,6 +258,7 @@ EVENEMENT_TOKEN_CONNECTE = 'connecte'
 
 DOCUMENT_TACHE_NOTIFICATION = 'tache_notification'
 
+SECURITE_OUVERT = '0.installation'  # Non configure, le noeud est ouvert et pret a etre initialise
 SECURITE_PUBLIC = '1.public'    # Niveau 1, le moins securitaire. Accessible a n'importe qui.
 SECURITE_PRIVE = '2.prive'      # Niveau 2, accessible aux personnes authentifiees
 SECURITE_PROTEGE = '3.protege'  # Niveau 3, accessible aux personnes autorisees (delegues, autorise individuellement)

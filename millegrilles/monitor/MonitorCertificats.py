@@ -112,8 +112,9 @@ class GestionnaireCertificats:
                 os.mkdir(self.secret_path, 0o755)
             except FileExistsError:
                 pass
-        with open(path.join(self.secret_path, name_tronque), 'wb') as fichiers:
-            fichiers.write(data)
+
+            with open(path.join(self.secret_path, name_tronque), 'wb') as fichiers:
+                fichiers.write(data)
 
         return name_tronque
 
