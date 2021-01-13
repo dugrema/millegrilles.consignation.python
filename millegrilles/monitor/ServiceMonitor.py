@@ -1112,19 +1112,24 @@ class ServiceMonitor:
             config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
             date_csr = config_csr['date']
 
-            if not self._args.dev:
+            if self._args.dev:
+                # Mode DEV, on verifie que la cle et cert correspondent.
                 with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'rb') as fichier:
                     monitor_key_pem = fichier.read()
-            else:
-                with open(os.path.join(self._args.secrets, 'pki.monitor.key.%s' % date_csr), 'rb') as fichier:
-                    monitor_key_pem = fichier.read()
 
-            clecert_recu = EnveloppeCleCert()
-            clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
-            if not clecert_recu.cle_correspondent():
-                raise ValueError('MODE DEV : Cle et Certificat monitor (mode insecure) ne correspondent pas')
+                clecert_recu = EnveloppeCleCert()
+                clecert_recu.from_pem_bytes(monitor_key_pem, certificat_pem.encode('utf-8'))
+                if not clecert_recu.cle_correspondent():
+                    raise ValueError('Cle et Certificat monitor (mode insecure) ne correspondent pas')
+            else:
+                # On n'a pas acces a la nouvelle cle (secret docker non deploye).
+                # On charge uniquement le nouveau certificat
+                clecert_recu = EnveloppeCleCert()
+                clecert_recu.cert_from_pem_bytes(certificat_pem.encode('utf-8'))
+
         except Exception as e:
-            self.__logger.exception("Erreur ouverture CSR")
+            # self.__logger.exception("Erreur ouverture CSR")
+            self.__logger.error("Commande CSR en ereur : %s" % str(params))
             raise e
 
         # if not self._args.dev:
@@ -1184,9 +1189,15 @@ class ServiceMonitor:
 
         self.__logger.debug("Sauvegarde certificat recu et cle comme cert/cle de monitor %s" % self.role)
         clecert_recu.password = None
-        cle_monitor = clecert_recu.private_key_bytes
-        secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
-            ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
+
+        try:
+            cle_monitor = clecert_recu.private_key_bytes
+            # Mode developpement/insecure, on re-sauvegarde la cle pour obtenir nouvelle date
+            secret_name, date_key = gestionnaire_docker.sauvegarder_secret(
+                ConstantesServiceMonitor.PKI_MONITOR_KEY, cle_monitor, ajouter_date=True)
+        except AttributeError:
+            # Mode securitaire/production. Faire correspondre le nouveau cert a la cle existante
+            date_key = date_csr
 
         # if self._args.dev:
         #     nom_key = ConstantesServiceMonitor.PKI_MONITOR_KEY + date_key

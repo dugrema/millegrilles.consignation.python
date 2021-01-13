@@ -695,12 +695,16 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
                 'roles_demandeur': roles_cert
             }
 
-        clecert = self.__renouvelleur.signer_noeud(csr_bytes, role_in=role_noeud, duree=duree_delta)
-
-        return {
-            'cert': clecert.cert_bytes.decode('utf-8'),
-            'fullchain': clecert.chaine,
-        }
+        try:
+            clecert = self.__renouvelleur.signer_noeud(csr_bytes, role_in=role_noeud, duree=duree_delta)
+        except ValueError as ve:
+            self.__logger.error("Erreur renouvellement noeud, contenu commande : %s" % str(contenu))
+            raise ve
+        else:
+            return {
+                'cert': clecert.cert_bytes.decode('utf-8'),
+                'fullchain': clecert.chaine,
+            }
 
 
 class GestionnaireCertificatsInstallation(GestionnaireCertificats):

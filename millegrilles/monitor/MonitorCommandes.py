@@ -200,7 +200,11 @@ class GestionnaireCommandes:
             generateur_transactions = self._service_monitor.generateur_transactions
             reply_to = mq_properties.reply_to
             correlation_id = mq_properties.correlation_id
-            generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
+            try:
+                generateur_transactions.transmettre_reponse(reponse, reply_to, correlation_id)
+            except Exception:
+                self.__logger.exception("Erreur transmission reponse a commande %s:\n%s\nReponse :\n%s" % (
+                    commande.nom_commande, str(commande.contenu), str(reponse)))
 
     def ajouter_comptes(self, commande: dict):
         contenu = commande['contenu']
