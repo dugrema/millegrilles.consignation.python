@@ -859,7 +859,7 @@ class ServiceMonitor:
             self.__logger.warning("Erreur chargement validateur messages, on utilise une version offline")
 
         if self.__validateur_message is None:
-            self.__validateur_message = self._connexion_middleware.validateur_message
+            self.__validateur_message = ValidateurMessage(idmg=self.idmg)
 
         return self.__validateur_message
 
@@ -925,13 +925,18 @@ class ServiceMonitor:
         return self._args.dev
 
     @property
-    def est_verouille(self):
+    def est_verrouille(self):
         """
         Un noeud verrouille est un noeud qui ne repond qu'a des commandes signees.
         Le noeud est deverouille durant l'installation si le type (securite) et l'IDMG ne sont pas fournis.
         :return:
         """
-        return self._securite is not None and self._idmg is not None
+        try:
+            self.securite
+        except NotImplementedError:
+            return False
+        else:
+            return self._idmg is not None and self._idmg != ''
 
     def initialiser_domaine(self, commande):
         params = commande.contenu
@@ -2045,7 +2050,6 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         self.__connexion_principal: ConnexionPrincipal = cast(ConnexionPrincipal, None)
 
         self.csr_intermediaire = None
-        self._securite = Constantes.SECURITE_PROTEGE
 
     def fermer(self, signum=None, frame=None):
         super().fermer(signum, frame)

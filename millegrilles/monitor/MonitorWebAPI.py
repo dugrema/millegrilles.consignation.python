@@ -112,17 +112,18 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
 
         try:
             service_monitor = self.service_monitor
-            if service_monitor.est_verouille:
+            if service_monitor.est_verrouille:
                 # S'assurer que la commande est correctement signee
-                try:
-                    connexion_middleware = service_monitor.connexion_middleware
-                    validateur_message: ValidateurMessage = connexion_middleware.validateur_message
-                except AttributeError:
-                    #verificateur_transactions = service_monitor.verificateur_transactions
-                    # La connexion et contexte de messagerie ne sont pas encore charges
-                    # Utiliser un validateur "offline" qui utilise les certificats inline dans le message
-                    validateur_message: ValidateurMessage = ValidateurMessage(idmg=service_monitor.idmg)
+                # try:
+                #     connexion_middleware = service_monitor.connexion_middleware
+                #     validateur_message: ValidateurMessage = connexion_middleware.validateur_message
+                # except AttributeError:
+                #     #verificateur_transactions = service_monitor.verificateur_transactions
+                #     # La connexion et contexte de messagerie ne sont pas encore charges
+                #     # Utiliser un validateur "offline" qui utilise les certificats inline dans le message
+                #     validateur_message: ValidateurMessage = ValidateurMessage(idmg=service_monitor.idmg)
 
+                validateur_message = service_monitor.validateur_message
                 cert = validateur_message.verifier(request_data)
 
                 # S'assurer que le certificat est au moins de niveau protege ou de type navigateur
@@ -181,7 +182,7 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
             logger.debug("post_configurer_idmg: POST recu\n%s", json.dumps(request_data, indent=2))
 
         # S'assurer que le IDMG n'est pas deja configure
-        if self.service_monitor.idmg is not None and self.service_monitor.securite is not None:
+        if self.service_monitor.est_verrouille:
             logger.error("IDMG et securite deja configure, retourner erreur 403")
             return self.repondre_json({'ok': False, 'idmg': self.service_monitor.idmg}, status_code=403)
 
