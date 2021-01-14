@@ -457,7 +457,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
                     raise pve
             self.__logger.debug("Cert fingerprint %s recu, aucun handler en attente. On le met en cache." % fingerprint)
         except TypeError:
-            self.__logger.exception("Erreur reception reponse sur Q reception certificats")
+            self.__logger.exception("Erreur reception reponse (routing %s) sur Q reception certificats, message: \n%s" % (routing_key, str(message)))
         else:
             handler_attente.set_event()  # Declencher traitement de la reponse
 

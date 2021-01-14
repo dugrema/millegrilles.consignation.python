@@ -14,6 +14,7 @@ from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.SecuritePKI import SignateurTransaction, VerificateurTransaction, VerificateurCertificats
+from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
 
@@ -108,6 +109,9 @@ class TransactionConfiguration:
             Constantes.CONFIG_BACKUP_WORKDIR: Constantes.DEFAUT_BACKUP_WORKDIR,
         }
 
+        # Cle et certificat du module
+        self.__cle: Optional[EnveloppeCleCert] = None
+
     def loadEnvironment(self, additionals: list = None):
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
@@ -152,6 +156,35 @@ class TransactionConfiguration:
                         self._millegrille_config[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG] = organization[0].value
             except FileNotFoundError:
                 self.__logger.exception("IDMG inconnue, on utilise sansnom")
+                pem = None
+        else:
+            with open(self.pki_certfile, 'rb') as fichier:
+                pem = fichier.read()
+
+        if pem is not None:
+            # Tenter de charger la cle associee au certificat
+            try:
+                with open(self.pki_keyfile, 'rb') as fichier:
+                    cle = fichier.read()
+            except FileNotFoundError:
+                # Cle non present, on charge le certificat
+                clecert = EnveloppeCleCert()
+                clecert.cert_from_pem_bytes(pem)
+                self.__cle = clecert
+            else:
+                # Cle et certificat presents, on charge clecert avec les deux
+                clecert = EnveloppeCleCert()
+                clecert.from_pem_bytes(private_key_bytes=cle, cert_bytes=pem)
+
+                if not clecert.cle_correspondent():
+                    self.__logger.warning(
+                        "TransactionConfiguration.loadEnvironnemnt: Cle et certificat du module ne correspondent pas, "
+                        "on ignore la cle"
+                    )
+                    clecert = EnveloppeCleCert()
+                    clecert.cert_from_pem_bytes(pem)
+
+                self.__cle = clecert
 
         self.__logger.info("Configuration MQ: host: %s, port: %s" % (self.mq_host, self.mq_port))
         self.__logger.info("Configuration Mongo: host: %s, port: %s" % (self.mongo_host, self.mongo_port))
@@ -434,6 +467,10 @@ class TransactionConfiguration:
     @property
     def backup_workdir(self):
         return self._backup[Constantes.CONFIG_BACKUP_WORKDIR]
+
+    @property
+    def cle(self) -> EnveloppeCleCert:
+        return self.__cle
 
 
 class ContexteRessourcesMilleGrilles:
