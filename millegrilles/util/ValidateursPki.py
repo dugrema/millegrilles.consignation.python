@@ -433,10 +433,12 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             raise CertificatInconnu('Certificat inconnu ' + fingerprint, fingerprint=fingerprint)
 
     def recevoir_reponse(self, routing_key: str, message: dict):
-        fingerprint = 'sha256_b64:' + message.get(ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64)
-        handler_attente = self.__attente.get(fingerprint)
 
+        fingerprint = None
         try:
+            fingerprint = 'sha256_b64:' + message.get(ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64)
+            handler_attente = self.__attente.get(fingerprint)
+
             handler_attente.message = message
             handler_attente.routing_key = routing_key
         except AttributeError:
@@ -454,6 +456,8 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
                 else:
                     raise pve
             self.__logger.debug("Cert fingerprint %s recu, aucun handler en attente. On le met en cache." % fingerprint)
+        except TypeError:
+            self.__logger.exception("Erreur reception reponse sur Q reception certificats")
         else:
             handler_attente.set_event()  # Declencher traitement de la reponse
 
