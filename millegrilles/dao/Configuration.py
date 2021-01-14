@@ -472,6 +472,10 @@ class TransactionConfiguration:
     def cle(self) -> EnveloppeCleCert:
         return self.__cle
 
+    @cle.setter
+    def cle(self, cle: EnveloppeCleCert):
+        self.__cle = cle
+
 
 class ContexteRessourcesMilleGrilles:
     """ Classe helper qui permet d'initialiser et de passer les ressources (configuration, DAOs) """

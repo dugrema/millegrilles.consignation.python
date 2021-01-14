@@ -2,11 +2,14 @@
 # Genere aussi les certificats requis en memoire pour le test, fournissant des certs differents et actifs a chaque test.
 import logging
 
+from millegrilles.Constantes import ConstantesGenerateurCertificat
 from millegrilles.SecuritePKI import VerificateurCertificats, VerificateurTransaction, SignateurTransaction
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles, TransactionConfiguration
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
+
+from unit.helpers.CertUTHelper import PreparateurCertificats, clecert_1
 
 
 class ContexteUnitTest(ContexteRessourcesMilleGrilles):
@@ -17,13 +20,19 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
         self._message_dao = None
         super().__init__(configuration, message_dao=None)
 
+        # Preparer une cle temporaire (avec son cert)
+        self.preparateur = PreparateurCertificats(clecert_1)
+        clecert_domaine = self.preparateur.generer_role(ConstantesGenerateurCertificat.ROLE_DOMAINES)
+        self.configuration.cle = clecert_domaine
+
+        # Charger le signateur - utilise la cle temporaire
         self._signateur_transactions = SignateurTransaction(self)
         self._signateur_transactions.initialiser()
-        self._validateur_message = ValidateurMessage()  # Validateur avec cache, sans connexion mq
+        self._validateur_message = ValidateurMessage(idmg=self.idmg)  # Validateur avec cache, sans connexion mq
         self._generateur_transactions = None
 
     def initialiser(self, init_message=True, connecter=True):
-        self.__logger.debug("ContexteUnitTest: Dummy initialiser()")
+        self.__logger.debug("ContexteUnitTest: re-initialiser")
 
     def connecter(self):
         self.__logger.debug("ContexteUnitTest: Dummy connecter()")
@@ -33,7 +42,7 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
 
     @property
     def configuration(self):
-        return super().configuration()
+        return super().configuration
 
     # @property
     # def message_dao(self) -> PikaDAO:
@@ -59,3 +68,6 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
     # def validateur_pki(self) -> ValidateurCertificat:
     #     return super().validateur_pki()
     #
+
+
+instance = ContexteUnitTest()

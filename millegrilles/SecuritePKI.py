@@ -298,8 +298,13 @@ class UtilCertificats:
 
     def initialiser(self):
         # Charger le contexte de validation
-        with open(self._contexte.configuration.mq_cafile, 'rb') as fichier:
-            self.__cert_millegrille = fichier.read()
+        try:
+            cle = self._contexte.configuration.cle
+            self.__cert_millegrille = cle.chaine[-1].encode('utf-8')
+        except:
+            with open(self._contexte.configuration.mq_cafile, 'rb') as fichier:
+                self.__cert_millegrille = fichier.read()
+
         self.__validation_context = ValidationContext(trust_roots=[self.__cert_millegrille])
 
         self._charger_cle_privee()
@@ -360,8 +365,13 @@ class UtilCertificats:
         return val_float
 
     def _charger_certificat(self):
-        certfile_path = self.configuration.pki_certfile
-        self._certificat = self._charger_pem(certfile_path)
+        try:
+            cle = self._contexte.configuration.cle
+            self._certificat = cle.cert
+            self._chaine = cle.chaine[0:-1]
+        except:
+            certfile_path = self.configuration.pki_certfile
+            self._certificat = self._charger_pem(certfile_path)
 
     def _charger_pem(self, certfile_path):
         with open(certfile_path, "rb") as certfile:
@@ -376,14 +386,20 @@ class UtilCertificats:
         return certificat
 
     def _charger_cle_privee(self):
-        keyfile_path = self.configuration.pki_keyfile
-        with open(keyfile_path, "rb") as keyfile:
-            cle = serialization.load_pem_private_key(
-                keyfile.read(),
-                password=None,
-                backend=default_backend()
-            )
-            self._cle = cle
+        try:
+            cle = self._contexte.configuration.cle
+            key_bytes = cle.private_key_bytes
+        except:
+            keyfile_path = self.configuration.pki_keyfile
+            with open(keyfile_path, "rb") as keyfile:
+                key_bytes = keyfile.read()
+
+        cle = serialization.load_pem_private_key(
+            key_bytes,
+            password=None,
+            backend=default_backend()
+        )
+        self._cle = cle
 
     def hacher_contenu(self, dict_message, hachage=None):
         """
