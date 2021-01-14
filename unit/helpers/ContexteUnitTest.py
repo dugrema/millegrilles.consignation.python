@@ -8,6 +8,7 @@ from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles, Trans
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
+from millegrilles.MGProcessus import StubGenerateurTransactions
 
 from unit.helpers.CertUTHelper import PreparateurCertificats, clecert_1
 
@@ -17,7 +18,11 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
     def __init__(self):
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         configuration = TransactionConfiguration()
+
         self._message_dao = None
+        self._stub_document_dao = None
+        self._generateur_transactions = GenerateurTransactionsStub()
+
         super().__init__(configuration, message_dao=None)
 
         # Preparer une cle temporaire (avec son cert)
@@ -29,7 +34,6 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
         self._signateur_transactions = SignateurTransaction(self)
         self._signateur_transactions.initialiser()
         self._validateur_message = ValidateurMessage(idmg=self.idmg)  # Validateur avec cache, sans connexion mq
-        self._generateur_transactions = None
 
     def initialiser(self, init_message=True, connecter=True):
         self.__logger.debug("ContexteUnitTest: re-initialiser")
@@ -43,6 +47,10 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
     @property
     def configuration(self):
         return super().configuration
+
+    @property
+    def document_dao(self):
+        return self._stub_document_dao
 
     # @property
     # def message_dao(self) -> PikaDAO:
@@ -70,4 +78,8 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
     #
 
 
-instance = ContexteUnitTest()
+class GenerateurTransactionsStub(StubGenerateurTransactions):
+    pass
+
+
+contexte_instance = ContexteUnitTest()

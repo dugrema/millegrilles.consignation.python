@@ -3,7 +3,7 @@ import logging
 from typing import Optional
 from unittest import TestCase
 
-from unit.helpers.ContexteUnitTest import ContexteUnitTest
+from unit.helpers.ContexteUnitTest import ContexteUnitTest, contexte_instance
 from millegrilles import Constantes
 
 
@@ -14,6 +14,7 @@ class TestCaseContexte(TestCase):
 
     ma_valeur: Optional[int] = None
     logger: Optional[logging.Logger] = None
+    contexte = contexte_instance
 
     @classmethod
     def setUpClass(cls):
