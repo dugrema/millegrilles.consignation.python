@@ -22,7 +22,7 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
     DELTA_INITIAL = datetime.timedelta(minutes=2)  # Initialiser a 2 minutes avant temps courant
     ONE_DAY = datetime.timedelta(hours=2)
 
-    DUREE_CERT_ROOT = datetime.timedelta(days=7)
+    DUREE_CERT_ROOT = datetime.timedelta(days=3655)
     DUREE_CERT_BACKUP = datetime.timedelta(hours=3)
     DUREE_CERT_MILLEGRILLE = datetime.timedelta(hours=3)
     DUREE_CERT_NOEUD = datetime.timedelta(hours=3)
@@ -869,7 +869,8 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
     def _generer_self_signed(self) -> EnveloppeCleCert:
         clecert = EnveloppeCleCert()
         clecert.generer_private_key(generer_password=True, keysize=4096)
-        builder = self.__preparer_builder(clecert.private_key, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_ROOT)
+        private_key = clecert.private_key
+        builder = self.__preparer_builder(private_key, duree_cert=ConstantesGenerateurCertificat.DUREE_CERT_ROOT)
 
         name = x509.Name([
             x509.NameAttribute(x509.name.NameOID.ORGANIZATION_NAME, u'MilleGrille'),
@@ -883,7 +884,7 @@ class GenerateurInitial(GenerateurCertificatMilleGrille):
             critical=True,
         )
 
-        ski = x509.SubjectKeyIdentifier.from_public_key(clecert.private_key.public_key())
+        ski = x509.SubjectKeyIdentifier.from_public_key(private_key.public_key())
         builder = builder.add_extension(
             x509.AuthorityKeyIdentifier(
                 ski.digest,
