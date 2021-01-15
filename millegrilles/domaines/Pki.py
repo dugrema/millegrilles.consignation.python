@@ -14,6 +14,7 @@ from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 
 import logging
 import datetime
+import pytz
 
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
@@ -477,7 +478,11 @@ class GestionnairePki(GestionnaireDomaineStandard):
             # Charger le certificat en ignorant la date d'expiration - valide la chaine sur la date d'expiration
             # Les certificats expires restent necessaires pour valider la signature des transactions et documents
             # self._contexte.verificateur_certificats.valider_x509_enveloppe(enveloppe)
-            self._contexte.validateur_pki.valider(chaine_pem)
+            cert_millegrille_pem = chaine_pem[-1]
+            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=cert_millegrille_pem)
+            idmg_validation = enveloppe_millegrille.idmg
+            date_reference = pytz.UTC.localize(dt=enveloppe.not_valid_after)
+            self._contexte.validateur_pki.valider(chaine_pem, date_reference=date_reference, idmg=idmg_validation)
         except PathValidationError as pve:
             if 'expired' not in str(pve):
                 # La chaine est invalide pour raison autre que l'expiration du certificat

@@ -6,7 +6,7 @@ import pytz
 
 from typing import Optional, Union, Dict
 from certvalidator import CertificateValidator, ValidationContext
-from certvalidator.errors import PathValidationError
+from certvalidator.errors import PathValidationError, PathBuildingError
 from threading import Event, Barrier
 
 from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
@@ -50,7 +50,7 @@ class ValidateurCertificat:
             # L'enveloppe a deja la chaine complete, on fait juste la passer au validateur
             validation_context = self.__preparer_validation_context(enveloppe, date_reference, idmg)
         else:
-            raise PathValidationError("Impossible de preparer la chaine de validation du certificat (chaine manquante)")
+            raise PathBuildingError("Impossible de preparer la chaine de validation du certificat (chaine manquante)")
         return validation_context
 
     def __preparer_validation_context(
@@ -66,7 +66,7 @@ class ValidateurCertificat:
         certificat_millegrille_pem = enveloppe.reste_chaine_pem[-1]
         certificat_millegrille = EnveloppeCertificat(certificat_pem=certificat_millegrille_pem)
         if certificat_millegrille.idmg != idmg_effectif:
-            raise ValueError("Certificat de millegrille ne correspond pas au idmg: %s" % idmg_effectif)
+            raise PathValidationError("Certificat de millegrille ne correspond pas au idmg: %s" % idmg_effectif)
 
         if date_reference is not None:
             validation_context = ValidationContext(
@@ -85,7 +85,7 @@ class ValidateurCertificat:
 
     def __run_validation_context(self, enveloppe: EnveloppeCertificat, validation_context: ValidationContext):
         cert_pem = enveloppe.certificat_pem.encode('utf-8')
-        inter_list = [c.encode('utf-8') for c in enveloppe.reste_chaine_pem]
+        inter_list = [c.encode('utf-8') for c in enveloppe.reste_chaine_pem[:-1]]
         validator = CertificateValidator(
             cert_pem,
             intermediate_certs=inter_list,
@@ -120,7 +120,15 @@ class ValidateurCertificat:
             pass  # Ok, le certificat n'est pas connu ou dans le cache
 
         validation_context = self._preparer_validation_context(enveloppe, date_reference=date_reference, idmg=idmg)
-        self.__run_validation_context(enveloppe, validation_context)
+        try:
+            self.__run_validation_context(enveloppe, validation_context)
+        except PathBuildingError as pbe:
+            # Verifier si l'echec est du a un certificat d'un IDMG different
+            if idmg is None:
+                idmg_certificat = enveloppe.subject_organization_name
+                if self.__idmg != idmg_certificat:
+                    raise PathValidationError("Certificat pour le mauvais IDMG sans X-Signing : %s" % idmg_certificat)
+            raise pbe
 
         if date_reference is None and (idmg is None or idmg == self.__idmg):
             # Validation completee, certificat est valide (sinon PathValidationError est lancee)
@@ -290,7 +298,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
         self.channel = channel
-        channel.queue_declare(durable=True, exclusive=True, callback=self.queue_open)
+        channel.queue_declare(durable=False, exclusive=True, callback=self.queue_open)
 
     def queue_open(self, queue):
         self.queue_name = queue.method.queue
@@ -446,16 +454,25 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             enveloppe = self.message_pems_to_enveloppe(message, routing_key)
             pems = [enveloppe.certificat_pem]
             pems.extend(enveloppe.reste_chaine_pem)
+
+            # Utiliser IDMG annonce dans le certificat de feuille - le IDMG est valide directement sur le
+            # certificat de MilleGrille dans la chaine de certification (le dernier)
+            idmg_certificat = enveloppe.subject_organization_name
+
             try:
-                self.valider(pems)
+                enveloppe = self.valider(pems, idmg=idmg_certificat)
             except PathValidationError as pve:
                 if 'expired' in str(pve):
                     # Tenter de valider avec date feuille valide - si toujours invalide, on laisse l'exception monter
                     date_reference = pytz.UTC.localize(dt=enveloppe.not_valid_after)
-                    self.valider(pems, date_reference=date_reference)
+                    self.valider(pems, date_reference=date_reference, idmg=idmg_certificat)
                 else:
+                    self.__logger.error("Erreur validation certificat\n%s" % pems)
                     raise pve
-            self.__logger.debug("Cert fingerprint %s recu, aucun handler en attente. On le met en cache." % fingerprint)
+                self.__logger.debug("Cert fingerprint %s recu, aucun handler en attente. On le met en cache." % fingerprint)
+            except PathBuildingError as pbe:
+                self.__logger.error("Erreur path certificat\n%s" % '\n'.join(pems))
+                raise pbe
         except TypeError:
             self.__logger.exception("Erreur reception reponse (routing %s) sur Q reception certificats, message: \n%s" % (routing_key, str(message)))
         else:
