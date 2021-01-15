@@ -151,7 +151,6 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE_ENTETE,
             ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO,
             ConstantesBackup.TRANSACTION_ARCHIVE_QUOTIDIENNE_INFO,
-            ConstantesBackup.TRANSACTION_ARCHIVE_MENSUELLE_INFO,
         ]
         filtre_transactions = {
             '%s.%s' % (Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE, Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE): {'$in': backup_domaines}
