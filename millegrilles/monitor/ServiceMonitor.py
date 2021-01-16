@@ -1095,6 +1095,11 @@ class ServiceMonitor:
         """
 
         params = commande.contenu
+
+        erreur_recue = params.get('err')
+        if erreur_recue:
+            raise ValueError("Erreur renouvellement certificat\n%s" % erreur_recue)
+
         gestionnaire_docker = self.gestionnaire_docker
 
         # gestionnaire_certs = GestionnaireCertificatsNoeudPrive(
@@ -1115,7 +1120,7 @@ class ServiceMonitor:
 
             if self._args.dev:
                 # Mode DEV, on verifie que la cle et cert correspondent.
-                with open(os.path.join(self._args.secrets, 'pki.monitor.key.pem'), 'rb') as fichier:
+                with open(os.path.join(self._args.secrets, 'pki.monitor.key.' + date_csr), 'rb') as fichier:
                     monitor_key_pem = fichier.read()
 
                 clecert_recu = EnveloppeCleCert()
@@ -1836,7 +1841,8 @@ class ServiceMonitorPrive(ServiceMonitor):
             epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
             date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
 
-        if date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
+        flag_force_renew = os.environ.get('MGDEBUG_FORCE_RENEW') == '1'
+        if flag_force_renew or date_renouvellement is None or date_renouvellement < datetime.datetime.utcnow():
         # if True:
             # MAJ date pour creation de certificats
             self._gestionnaire_certificats.maj_date()

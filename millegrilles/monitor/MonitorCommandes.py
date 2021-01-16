@@ -195,7 +195,7 @@ class GestionnaireCommandes:
             self.__logger.exception("Exception traitement commande")
             reponse = {'err': str(err)}
 
-        if reponse is not None and mq_properties is not None:
+        if reponse is not None and mq_properties is not None and mq_properties.reply_to is not None:
             # Transmettre la reponse a la commande / requete
             generateur_transactions = self._service_monitor.generateur_transactions
             reply_to = mq_properties.reply_to
