@@ -650,6 +650,10 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
             securite = Constantes.SECURITE_PRIVE
 
         clecert = self.__renouvelleur.signer_navigateur(csr, securite, duree=duree_delta)
+
+        # Emettre le nouveau certificat pour conserver sous PKI
+        self._service_monitor.generateur_transactions.emettre_certificat(clecert.chaine)
+
         return {
             'cert': clecert.cert_bytes.decode('utf-8'),
             'fullchain': clecert.chaine,

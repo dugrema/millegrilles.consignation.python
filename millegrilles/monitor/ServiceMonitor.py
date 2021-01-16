@@ -38,6 +38,7 @@ from millegrilles.monitor.MonitorConstantes import CommandeMonitor, PkiCleNonTro
 from millegrilles.util.IpUtils import get_ip
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
+from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
 
 class InitialiserServiceMonitor:
 
@@ -884,7 +885,7 @@ class ServiceMonitor:
         return self._gestionnaire_certificats
 
     @property
-    def generateur_transactions(self):
+    def generateur_transactions(self) -> GenerateurTransaction:
         return self._connexion_middleware.generateur_transactions
 
     @property
