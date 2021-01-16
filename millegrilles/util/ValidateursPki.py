@@ -9,6 +9,7 @@ from certvalidator import CertificateValidator, ValidationContext
 from certvalidator.errors import PathValidationError, PathBuildingError
 from threading import Event, Barrier
 
+from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
 from millegrilles.SecuritePKI import EnveloppeCertificat, CertificatInconnu
 from millegrilles.dao.MessageDAO import ConnexionWrapper, BaseCallback
@@ -23,15 +24,15 @@ class ValidateurCertificat:
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.__idmg = idmg
 
-        # Validation context pour le idmg courant
-        self.__validation_context: Optional[ValidationContext] = None
+        # # Validation context pour le idmg courant
+        # self.__validation_context: Optional[ValidationContext] = None
 
         if certificat_millegrille is not None:
             enveloppe = self._charger_certificat(certificat_millegrille)
             if enveloppe.idmg != idmg:
                 raise ValueError("Le certificat en parametre ne correspond pas au idmg %s" % idmg)
             certificat_millegrille_pem = enveloppe.certificat_pem
-            self.__validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
+            # self.__validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
 
     def _charger_certificat(self, certificat: Union[bytes, str, list]) -> EnveloppeCertificat:
         if isinstance(certificat, bytes):
@@ -58,8 +59,10 @@ class ValidateurCertificat:
     ) -> ValidationContext:
 
         # Raccourci - si on a idmg et date par defaut et un validator deja construit
-        if self.__validation_context is not None and date_reference is None and idmg is None:
-            return self.__validation_context
+        # Note : le validation context conserve la date courante - l'utiliser avec caching devrait etre fait pour
+        # une tres courte periode de temps (desactive pour l'instant)
+        # if self.__validation_context is not None and date_reference is None and idmg is None:
+        #     return self.__validation_context
 
         # Extraire le certificat de millegrille, verifier le idmg et construire le contexte
         idmg_effectif = idmg or self.__idmg
@@ -76,10 +79,10 @@ class ValidateurCertificat:
         else:
             validation_context = ValidationContext(trust_roots=[certificat_millegrille_pem.encode('utf-8')])
 
-            if idmg_effectif == self.__idmg and self.__validation_context is None:
-                # Conserver l'instance du validation context pour reutilisation
-                self.__logger.debug("Conserver instance pour validation de certificat idmg = %s" % idmg_effectif)
-                self.__validation_context = validation_context
+            # if idmg_effectif == self.__idmg and self.__validation_context is None:
+            #     # Conserver l'instance du validation context pour reutilisation
+            #     self.__logger.debug("Conserver instance pour validation de certificat idmg = %s" % idmg_effectif)
+            #     self.__validation_context = validation_context
 
         return validation_context
 
@@ -306,9 +309,19 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
         self.channel.basic_consume(self.__handler.callbackAvecAck, queue=self.queue_name, no_ack=False)
 
         # Ajouter routing keys
-        exchange_defaut = self.__contexte.configuration.exchange_defaut
         routing_key = ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
-        self.channel.queue_bind(queue=self.queue_name, exchange=exchange_defaut, routing_key=routing_key, callback=None)
+        exchanges = self.__get_liste_exchanges(self.__contexte.configuration.exchange_defaut)
+        for exchange in exchanges:
+            self.channel.queue_bind(
+                queue=self.queue_name, exchange=exchange, routing_key=routing_key, callback=None)
+
+    def __get_liste_exchanges(self, exchange_defaut):
+        exchanges = [exchange_defaut]
+        if exchange_defaut == Constantes.SECURITE_PROTEGE:
+            exchanges.extend([Constantes.SECURITE_PRIVE, Constantes.SECURITE_PUBLIC])
+        elif exchange_defaut == Constantes.SECURITE_PRIVE:
+            exchanges.extend([Constantes.SECURITE_PUBLIC])
+        return exchanges
 
     def is_channel_open(self):
         return self.channel is not None and not self.channel.is_closed
@@ -358,9 +371,12 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
         }
 
         # Note : on transmet potentiellement la requete pour le meme certificat plusieurs fois
-        self.__contexte.generateur_transactions.transmettre_requete(
-            requete, domaine_action, correlation_id=fingerprint, reply_to=self.queue_name
-        )
+        exchanges = self.__get_liste_exchanges(self.__contexte.configuration.exchange_defaut)
+        for exchange in exchanges:
+            self.__contexte.generateur_transactions.transmettre_requete(
+                requete, domaine_action, securite=exchange,
+                correlation_id=fingerprint, reply_to=self.queue_name
+            )
 
         handler_reponse = self.__attente[fingerprint]
         handler_reponse.event.wait(5)  # Timeout apres 5 secondes

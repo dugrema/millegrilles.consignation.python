@@ -13,6 +13,7 @@ from cryptography import x509
 from cryptography.hazmat import primitives
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import asymmetric, hashes
+from certvalidator.errors import PathValidationError
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesServiceMonitor
@@ -677,7 +678,13 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
         contenu = commande.contenu
         message_commande = commande.message
         # enveloppe_cert = self._service_monitor.verificateur_transactions.verifier(message_commande)
-        enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
+
+        try:
+            enveloppe_cert = self._service_monitor.validateur_message.verifier(message_commande)
+        except PathValidationError as pve:
+            self.__logger.error("Refuser signature certificat noeud, erreur de validation de la commande : %s" % pve)
+            raise pve  # Va transmettre un message d'erreur comme reponse
+
         idmg = self._service_monitor.idmg
         roles_cert = enveloppe_cert.get_roles
 
