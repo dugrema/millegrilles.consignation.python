@@ -6,6 +6,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
 from ipaddress import IPv4Address, IPv6Address
 from os import environ
+from typing import Union
 
 import datetime
 import secrets
@@ -155,13 +156,18 @@ class EnveloppeCleCert:
         fingerprint = self.fingerprint
         return cle_secrete_backup, fingerprint
 
-    def dechiffrage_asymmetrique(self, contenu) -> bytes:
+    def dechiffrage_asymmetrique(self, contenu: Union[bytes, str]) -> bytes:
         """
         Utilise la cle privee en memoire pour dechiffrer le contenu.
         :param contenu:
         :return:
         """
-        contenu_bytes = base64.b64decode(contenu)
+        if isinstance(contenu, str):
+            contenu_bytes = base64.b64decode(contenu)
+        elif isinstance(contenu, bytes):
+            contenu_bytes = contenu
+        else:
+            raise TypeError("Mauvais type contenu pour dechiffrage")
 
         contenu_dechiffre = self.private_key.decrypt(
             contenu_bytes,

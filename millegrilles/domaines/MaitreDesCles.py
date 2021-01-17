@@ -21,11 +21,12 @@ from cryptography.hazmat.primitives import hashes
 from cryptography import x509
 from base64 import b64encode, b64decode
 from typing import Optional
+from os import path, listdir
 
 import binascii
 import logging
 import datetime
-import pytz
+import re
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
@@ -154,6 +155,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__ca_file_pem = None
         self.__dict_ca = None  # Key=akid, Value=x509.Certificate()
 
+        # Liste de tous les clecerts qui sont disponibles pour dechiffrer (e.g. cles de vieux certificats)
+        self.__clecert_historique: Optional[list] = None
+
         self.__renouvelleur_certificat = None
 
         # Queue message handlers
@@ -210,6 +214,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         super().demarrer()
         self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
 
+    def executer_entretien(self):
+        super().executer_entretien()
+        self.rechiffrer_cles_apres_rotation()
+
     def charger_ca_chaine(self):
         self.__dict_ca = dict()
 
@@ -233,6 +241,18 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 x509_cert = x509.load_pem_x509_certificate(cert.encode('utf-8'), backend=default_backend())
                 skid = EnveloppeCleCert.get_subject_identifier(x509_cert)
                 self.__dict_ca[skid] = x509_cert
+
+        # Parcourir le repertoire de cles pour trouver toutes les cles avec une date (e.g. key.pem.20210117191956)
+        p = re.compile('key.pem.[0-9]+|pki.maitrecles.key.[0-9]+')
+        path_cle = path.dirname(self.configuration.pki_keyfile)
+        self.__clecert_historique = list()
+        for fichier in listdir(path_cle):
+            if p.match(fichier):
+                self._logger.info("Charger cle historique %s" % fichier)
+                clecert = EnveloppeCleCert()
+                with open(path.join(path_cle, fichier), 'rb') as fp:
+                    clecert.key_from_pem_bytes(fp.read())
+                    self.__clecert_historique.append(clecert)
 
     # def charger_clecert_intermediaire(self) -> EnveloppeCleCert:
     #     """
@@ -1055,7 +1075,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         return reponse
 
-    def transmettre_cles_non_dechiffrables(self, message_dict: dict):
+    def transmettre_cles_non_dechiffrables(self, message_dict: dict, toutes_cles=False):
         """
         Recupere une batch de cles qui ne sont pas dechiffrables par le maitre des cles.
         Transmet cettre batch pour qu'elle soit dechiffree et retournee sous forme de transactions.
@@ -1132,6 +1152,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     'domaine_transaction': domaine_transaction,
                 }
 
+                if toutes_cles:
+                    info_cle['cles'] = cles_existantes
+
                 for champ in champs:
                     valeur = doc.get(champ)
                     if valeur is not None:
@@ -1148,6 +1171,32 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
 
         return reponse
+
+    def rechiffrer_cles_apres_rotation(self):
+        """
+        Tenter de rechiffrer les cles qui n'ont pas encore ete rechiffrees avec le certificat courant.
+        :return:
+        """
+
+        info_non_dechiffrables = self.transmettre_cles_non_dechiffrables(dict(), toutes_cles=True)
+        cles_non_dechiffrables = info_non_dechiffrables.get('cles')
+
+        for r in cles_non_dechiffrables:
+            self._logger.debug("Cle non dechiffrable : %s" % r)
+            # Tenter de dechiffrer la cle symetrique avec une des vieilles cles asymetriques de maitre des cles
+            cles_dict = r['cles']
+            for cle_sym_b64 in cles_dict.values():
+                for clecert in self.__clecert_historique:
+                    cle_sym = b64decode(cle_sym_b64)
+                    try:
+                        cle_dechiffree = clecert.dechiffrage_asymmetrique(cle_sym)
+                        self.creer_transaction_cles_manquantes(r, cle_dechiffree=cle_dechiffree)
+                        self._logger.debug("Cle trouvee pour dechiffrer une cle symmetrique")
+                    except ValueError:
+                        # self._logger.exception("Erreur dechiffrage")
+                        pass  # Non dechiffre
+                    except Exception:
+                        self._logger.exception("Erreur dechiffrage")
 
     # def signer_cle_backup(self, properties, message_dict):
     #     self._logger.debug("Signer cle de backup : %s" % str(message_dict))
@@ -1561,7 +1610,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def renouvelleur_certificat(self) -> RenouvelleurCertificat:
         return self.__renouvelleur_certificat
 
-    def creer_transaction_cles_manquantes(self, document, clecert_dechiffrage: EnveloppeCleCert = None):
+    def creer_transaction_cles_manquantes(self, document, clecert_dechiffrage: EnveloppeCleCert = None, cle_dechiffree: bytes = None):
         """
         Methode qui va dechiffrer une cle secrete et la rechiffrer pour chaque cle backup/maitre des cles manquant.
 
@@ -1573,7 +1622,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Extraire cle secrete en utilisant le certificat du maitre des cles courant
         try:
 
-            if clecert_dechiffrage:
+            if cle_dechiffree is not None:
+                pass
+            elif clecert_dechiffrage:
                 fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
                 cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE][
                     fingerprint_cert_dechiffrage]
@@ -1625,17 +1676,21 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateur_document,
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
                 }
+                if document.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID):
+                    transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+
                 sujet = document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE)
                 if sujet:
                     transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
+
+                domaine_action = document.get('domaine_transaction') or ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES
 
                 # Soumettre la transaction immediatement
                 # Permet de fonctionner incrementalement si le nombre de cles est tres grand
                 self.generateur_transactions.soumettre_transaction(
                     transaction,
-                    ConstantesMaitreDesCles.TRANSACTION_MAJ_DOCUMENT_CLES,
+                    domaine_action,
                     version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
                 )
 
