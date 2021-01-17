@@ -581,12 +581,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             curseur = collection_documents.find(filtre)
 
             cles_cert_par_fuuid = dict()
-            for doc_cle in curseur:
-                fuuid = doc_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
-                cles_cert_par_fuuid[fuuid] = {
-                    'iv': doc_cle['iv'],
-                    'cles': doc_cle['cles']
-                }
+            try:
+                for doc_cle in curseur:
+                    fuuid = doc_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+                    cles_cert_par_fuuid[fuuid] = {
+                        'iv': doc_cle['iv'],
+                        'cles': doc_cle['cles']
+                    }
+            except Exception:
+                self._logger.exception("Erreur chargement cle pour fuuid %s" % liste_fuuid)
 
             # Note: si les cles ne sont pas trouvees, on repond acces refuse (obfuscation)
             if len(cles_cert_par_fuuid) > 0:
@@ -620,6 +623,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                         reponse = {
                             Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
                         }
+            else:
+                reponse = {
+                    Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE
+                }
+
         return reponse
         # self.generateur_transactions.transmettre_reponse(
         #     reponse, properties.reply_to, properties.correlation_id
