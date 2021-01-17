@@ -4,6 +4,8 @@ import os
 import datetime
 import socket
 import docker
+import re
+
 from os import path
 
 from uuid import uuid4
@@ -755,6 +757,37 @@ class GestionnaireModulesDocker:
 
         raise ValueError("Aucun secrets %s ne correspond a une config" % str(secret_names))
 
+    def __trouver_secret_regex(self, secret_params: dict) -> list:
+        regex_pattern = secret_params['name']
+        output_name = secret_params['filename']
+        secrets = self.__docker.secrets.list()
+
+        p = re.compile(regex_pattern)
+        mappings = list()
+        for secret in secrets:
+            secret_name = secret.name
+            r = p.match(secret_name)
+            if r is not None:
+
+                output_name_update = output_name
+                groups = r.groups()
+                for i in range(0, len(groups)):
+                    g = groups[i]
+                    index = i+1
+                    output_name_update = output_name_update.replace('$%d' % index, g)
+
+                mapping = {
+                    'secret_id': secret.attrs['ID'],
+                    'secret_name': secret.name,
+                    'filename': output_name_update
+                }
+                mappings.append(mapping)
+
+        if len(mappings) == 0:
+            raise ValueError("Le regex ne correspond a aucun secret : %s" % regex_pattern)
+
+        return mappings
+
     def __mapping(self, valeur: str):
         for cle, valeur_mappee in self.__mappings.items():
             cle = cle.upper()
@@ -938,18 +971,27 @@ class GestionnaireModulesDocker:
                 for secret in config_secrets:
                     self.__logger.debug("Mapping secret %s" % secret)
                     secret_name = secret['name']
-                    if secret.get('match_config'):
-                        secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
+                    if secret.get('regex'):
+                        references = self.__trouver_secret_regex(secret)
+                        for secret_reference in references:
+                            # secret_reference['filename'] = secret['filename']
+                            secret_reference['uid'] = secret.get('uid') or 0
+                            secret_reference['gid'] = secret.get('gid') or 0
+                            secret_reference['mode'] = secret.get('mode') or 0o444
+                            liste_secrets.append(SecretReference(**secret_reference))
                     else:
-                        secret_reference = self.trouver_secret(secret_name)
+                        if secret.get('match_config'):
+                            secret_reference = self.__trouver_secret_matchdate(secret_name, dates_configs)
+                        else:
+                            secret_reference = self.trouver_secret(secret_name)
 
-                    secret_reference['filename'] = secret['filename']
-                    secret_reference['uid'] = secret.get('uid') or 0
-                    secret_reference['gid'] = secret.get('gid') or 0
-                    secret_reference['mode'] = secret.get('mode') or 0o444
+                        secret_reference['filename'] = secret['filename']
+                        secret_reference['uid'] = secret.get('uid') or 0
+                        secret_reference['gid'] = secret.get('gid') or 0
+                        secret_reference['mode'] = secret.get('mode') or 0o444
 
-                    del secret_reference['date']  # Cause probleme lors du chargement du secret
-                    liste_secrets.append(SecretReference(**secret_reference))
+                        del secret_reference['date']  # Cause probleme lors du chargement du secret
+                        liste_secrets.append(SecretReference(**secret_reference))
 
                 dict_config_docker['secrets'] = liste_secrets
 
