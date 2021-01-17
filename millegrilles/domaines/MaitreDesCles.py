@@ -841,7 +841,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             del copie_evenement['_certificat']
         except KeyError:
             pass
-        return self.verificateur_transaction.verifier(evenement)
+        # return self.verificateur_transaction.verifier(evenement)
+        enveloppe_certificat = self.validateur_message.verifier(evenement)
+        return enveloppe_certificat
         # ----------- MERGE ME
 
         # try:

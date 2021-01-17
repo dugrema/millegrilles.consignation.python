@@ -166,8 +166,9 @@ class ValidateurMessage:
         # Tenter d'extraire un certificat inclus dans le message - il sera utilise pour la validation
         certificats_inline = \
             message.get('_certificats') or \
-            message.get('_certificat') or \
-            message.get('certificat')
+            message.get('_certificat')  #\
+            #or \
+            #message.get('certificat')
 
         # Valider le certificat
         if certificats_inline is not None:
