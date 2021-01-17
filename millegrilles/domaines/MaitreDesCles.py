@@ -1027,7 +1027,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Fingerprints qui doivent exister pour considerer dechiffrable
         fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
         # Ajouter fingerprint du maitre des cles local
-        fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
+        # fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
+        fingerprint_b64_local = self._contexte.signateur_transactions.enveloppe_certificat_courant.fingerprint_b64
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
@@ -1067,12 +1068,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Fingerprints qui doivent exister pour considerer dechiffrable
         fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
         # Ajouter fingerprint du maitre des cles local
-        fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
+        # fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
+        enveloppe_certificat_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        fingerprint_b64_local = enveloppe_certificat_courant.fingerprint_b64
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
         condition_actif = [
-            {'non_dechiffrable': True,}
+            {'non_dechiffrable': True}
         ]
         for fp in fingerprint_b64_actifs:
             condition_actif.append({'cles.%s' % fp: {'$exists': False}})
@@ -1081,7 +1084,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
             fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint_b64
 
-        collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
         filtre = {
             '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
@@ -1136,9 +1139,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
                 cles.append(info_cle)
 
+        pems = [enveloppe_certificat_courant.certificat_pem]
+        pems.extend(enveloppe_certificat_courant.reste_chaine_pem)
+
         reponse = {
             'cles': cles,
-            'certificat_rechiffrage': [self.get_certificat_pem, self.get_intermediaires_pem, self.get_ca_pem],
+            'certificat_rechiffrage': pems,
         }
 
         return reponse
