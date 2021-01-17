@@ -506,7 +506,7 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
                 key_pem = fichiers.read()
             clecert_monitor = EnveloppeCleCert()
             clecert_monitor.from_pem_bytes(key_pem, cert_pem)
-            self.clecert_monitor = clecert_monitor
+            self.clecert_monitor: EnveloppeCleCert = clecert_monitor
 
             # Conserver reference au cert monitor pour middleware
             self.certificats[GestionnaireCertificats.MONITOR_CERT_PATH] = self.certificats['pki.monitor.cert']

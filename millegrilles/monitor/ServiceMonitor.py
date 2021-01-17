@@ -491,6 +491,18 @@ class ServiceMonitor:
 
                 # Reconfigurer tous les services qui utilisent le nouveau certificat
                 self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+            elif nom_role == 'nginx':
+                clecert = info_role['clecert']
+                subject_dict = clecert.formatter_subject()
+                organization = subject_dict['organizationName']
+                if organization != self.idmg:
+                    # Le certificat nginx est encore celui d'installation, on en genere un nouveau
+                    self._gestionnaire_certificats.generer_clecert_module(
+                        nom_role, self._nodename, liste_dns=[fqdn_noeud, domaine_noeud])
+                    self._gestionnaire_docker.maj_services_avec_certificat(nom_role)
+
+        # Entretien certificat nginx - s'assurer que le certificat d'installation est remplace
+
 
         # Nettoyer certificats monitor
         self._supprimer_certificats_expires(['monitor'])
@@ -561,6 +573,7 @@ class ServiceMonitor:
                 clecert = EnveloppeCleCert()
                 clecert.cert_from_pem_bytes(pem)
                 date_expiration = clecert.not_valid_after
+                role_info['clecert'] = clecert
 
                 if date_expiration is not None:
                     role_info['expiration'] = date_expiration

@@ -171,6 +171,10 @@ class ValidateurMessage:
 
         # Valider le certificat
         if certificats_inline is not None:
+
+            # Nettoyage, certains certificats utilisent ; pour remplacer newline (\n)
+            certificats_inline = certificats_inline.replace(';', '\n')
+
             enveloppe_certificat = self.__validateur.valider(
                 certificats_inline, date_reference=date_reference, idmg=idmg_message)
         else:
