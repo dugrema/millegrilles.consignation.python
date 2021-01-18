@@ -52,12 +52,13 @@ class MessagesSample(BaseCallback):
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
 
     def requete_cert_fingerprint(self):
-        requete_cert = {
-            'fingerprint': 'fe4e7c9b64a4f2f31b7f8c54102573d14c8894d0'
-        }
+        fingerprint = 'idpQSrDt2h+CE0XSJZZNPEakd3Wha+EhcD9v4VKUXSk='
+        # requete_cert = {
+        #     'fingerprint': fingerprint
+        # }
         enveloppe_requete = self.generateur.transmettre_requete(
-            requete_cert,
-            ConstantesPki.REQUETE_CERTIFICAT_DEMANDE,
+            dict(),
+            ConstantesPki.REQUETE_CERTIFICAT_DEMANDE + '.' + fingerprint,
             'abcd-1234',
             self.queue_name,
             securite=Constantes.SECURITE_PROTEGE,
@@ -97,10 +98,11 @@ class MessagesSample(BaseCallback):
         return enveloppe_requete
 
     def requete_certificat(self):
+        fingerprint = 'G2wDuvqGpxSl2KICGmVfaVxYzgd315zvo7znzwZaMr4='
         requete = {
-            'fingerprint': 'sha256_b64:buxEEFusbrDlsPPH7o6+ikGsCxHpa8C6Q9cy7vmogwc='
+            # 'fingerprint': 'sha256_b64:idpQSrDt2h+CE0XSJZZNPEakd3Wha+EhcD9v4VKUXSk='
         }
-        domaine_action = 'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT
+        domaine_action = 'requete.certificat.' + fingerprint
         self.generateur.transmettre_requete(requete, domaine_action, correlation_id='abcd', reply_to=self.queue_name)
 
     def executer(self):
