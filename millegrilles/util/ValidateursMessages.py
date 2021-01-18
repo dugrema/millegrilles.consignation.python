@@ -167,8 +167,9 @@ class ValidateurMessage:
         certificats_inline = \
             message.get('_certificats') or \
             message.get('_certificat')
-            #or \
-            #message.get('certificat')
+
+        entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        fingerprint_message = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
 
         # Valider le certificat
         if certificats_inline is not None:
@@ -179,11 +180,24 @@ class ValidateurMessage:
 
             enveloppe_certificat = self.__validateur.valider(
                 certificats_inline, date_reference=date_reference, idmg=idmg_message)
-        else:
-            entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
-            enveloppe_certificat = self.__validateur.valider_fingerprint(
-                fingerprint, date_reference=date_reference, idmg=idmg_message)
+
+            # S'assurer que le certificat correspond au fingerprint
+            fingerprint_charge = enveloppe_certificat.fingerprint_sha256_b64
+            if fingerprint_charge != fingerprint_message:
+                self.__logger.warning(
+                    "Message recu avec certificat inline (%s) qui ne correspond pas au fingerprint du message %s" % (
+                        fingerprint_charge, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                    )
+                )
+
+                # Ignorer ce certificat, il n'est pas utilisable pour verifier ce message. Tenter de charger
+                # le certificat via requete MQ
+                enveloppe_certificat = None
+            else:
+                return enveloppe_certificat
+
+        enveloppe_certificat = self.__validateur.valider_fingerprint(
+            fingerprint_message, date_reference=date_reference, idmg=idmg_message)
 
         return enveloppe_certificat
 

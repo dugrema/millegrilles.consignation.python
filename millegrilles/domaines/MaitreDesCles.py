@@ -918,7 +918,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # C'est une demande pour un tiers (e.g. domaine pour consignationfichiers)
         # Le certificat va etre attache, on doit s'assurer que c'est un role permis
         # En premier, s'assurer que l'emetteur est autorise
-        enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+        # enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
+        enveloppe_certificat = self.validateur_message.verifier(evenement)
         roles = enveloppe_certificat.get_roles
         if 'domaines' in roles:
             cert = evenement.get('_certificat_tiers') or evenement.get('certificat_tiers') or evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)

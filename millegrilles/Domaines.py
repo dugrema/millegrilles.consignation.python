@@ -96,7 +96,7 @@ class TraitementMessageDomaineRequete(TraitementMessageDomaine):
 
         try:
             # self.gestionnaire.verificateur_transaction.verifier(message_dict)
-            self.gestionnaire.validateur_message.verifier(message_dict)  #  verificateur_transaction.verifier(message_dict)
+            self.gestionnaire.validateur_message.verifier(message_dict)
             self.traiter_requete(ch, method, properties, body, message_dict)
         except CertificatInconnu as ci:
             fingerprint = ci.fingerprint
