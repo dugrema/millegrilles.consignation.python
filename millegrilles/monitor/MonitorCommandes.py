@@ -170,6 +170,7 @@ class GestionnaireCommandes:
 
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_TRANSMETTRE_CATALOGUES:
                 self._service_monitor.transmettre_catalogue_local()
+                reponse = {'ok': True}
 
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_REQUETE_CONFIG_APPLICATION:
                 reponse = self._service_monitor.get_configuration_application(commande)
