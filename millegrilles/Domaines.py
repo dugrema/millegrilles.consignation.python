@@ -1980,7 +1980,7 @@ class BackupHoraire(MGProcessus):
         self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
 
         info_cles = self.parametres['reponse'][1]
-        gestionnaire.handler_backup.backup_domaine(heure, entete_dernier_backup, info_cles)
+        gestionnaire.handler_backup.backup_horaire_domaine(heure, entete_dernier_backup, info_cles)
 
         self.set_etape_suivante()  # Termine
 

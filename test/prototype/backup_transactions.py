@@ -148,7 +148,7 @@ class MessagesSample(BaseCallback):
         heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.handler_backup_senseurspassifs.backup_domaine(heure, nom_collection_mongo)
+        self.handler_backup_senseurspassifs.backup_horaire_domaine(heure, nom_collection_mongo)
 
     def backup_domaine_grosfichiers(self):
         nom_collection_mongo = ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM
@@ -157,7 +157,7 @@ class MessagesSample(BaseCallback):
         heure = datetime.datetime(year=heure_courante.year, month=heure_courante.month, day=heure_courante.day, hour=heure_courante.hour, tzinfo=datetime.timezone.utc)
         heure = heure - datetime.timedelta(hours=1)
         self.__logger.debug("Faire backup horaire de %s" % str(heure))
-        self.handler_grosfichiers.backup_domaine(heure, nom_collection_mongo)
+        self.handler_grosfichiers.backup_horaire_domaine(heure, nom_collection_mongo)
 
     def restore_domaine(self, nom_collection_mongo):
 

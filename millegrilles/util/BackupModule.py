@@ -136,21 +136,19 @@ class HandlerBackupDomaine:
         self.__niveau_securite = niveau_securite
         self.__backup_util = BackupUtil(contexte)
 
-    def backup_domaine(self, heure: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
+    def backup_horaire_domaine(self, heure: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
         """
+        Effectue le backup horaire pour un domaine.
 
         :param heure: Heure du backup horaire
         :param entete_backup_precedent: Entete du catalogue precedent, sert a creer une chaine de backups (merkle tree)
         :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         :return:
         """
-        debut_backup = heure
-
-        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
-
-        curseur = self._effectuer_requete_domaine(heure)
-
         try:
+            debut_backup = heure
+            self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
+
             # Utilise pour creer une chaine entre backups horaires
             chainage_backup_precedent = None
             if entete_backup_precedent:
@@ -160,9 +158,9 @@ class HandlerBackupDomaine:
                 }
 
             heures_sous_domaines = dict()
-
             heure_plusvieille = heure
 
+            curseur = self._effectuer_requete_domaine(heure)
             for transanter in curseur:
                 self.__logger.debug("Vieille transaction : %s" % str(transanter))
                 heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])

@@ -1,6 +1,10 @@
-from unit.helpers.TestBaseContexte import TestCaseContexte
+import datetime
 
-from millegrilles.util.BackupModule import BackupUtil
+from base64 import b64decode
+
+from unit.helpers.TestBaseContexte import TestCaseContexte
+from millegrilles import Constantes
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine
 
 
 class BackupUtilTest(TestCaseContexte):
@@ -32,3 +36,55 @@ class BackupUtilTest(TestCaseContexte):
         self.assertEqual(32, len(resultat), "Erreur taille resultat cipher")
 
         self.__class__.logger.debug("Transaction maitrecles : %s" % transaction_maitrecles)
+
+    def test_chiffrer_cle(self):
+        clecert = self.contexte.configuration.cle
+        certs_cles_backup = [
+            clecert.cert_bytes.decode('utf-8'),
+            clecert.chaine[-1]
+        ]
+        password = b'abcdefghijkl12345678910111213141'
+        cles_chiffrees = self.backup_util.chiffrer_cle(certs_cles_backup, password)
+
+        self.assertEqual(2, len(cles_chiffrees))
+
+        # S'assurer que les cles sont formattes en base64 valide
+        for cle in cles_chiffrees.values():
+            resultat = b64decode(cle)
+
+
+class HandlerBackupDomaineTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        self.handler = HandlerBackupDomaine(
+            self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
+            niveau_securite=Constantes.SECURITE_PROTEGE
+        )
+
+    def test_transmettre_evenement_backup(self):
+        ts = datetime.datetime.utcnow()
+        self.handler.transmettre_evenement_backup('evenement_test', ts)
+
+        # Stub generateur transaction, verifier message transmis
+        generateur_transactions = self.contexte.generateur_transactions
+        liste_messages = generateur_transactions.liste_emettre_message
+
+        # S'assurer que l'evenement a ete emis
+        self.assertEqual(1, len(liste_messages))
+
+    def test_effectuer_requete_domaine(self):
+        contexte = self.contexte
+        document_dao = contexte.document_dao
+
+        # Prep data
+        ts = datetime.datetime.utcnow()
+        contexte.document_dao.valeurs_aggregate.append('dummy')
+
+        # Call methode a tester
+        resultat_aggregate = self.handler._effectuer_requete_domaine(ts)
+
+        # Verification
+        self.assertEqual('dummy', resultat_aggregate)
+        call_aggregate = document_dao.calls_aggregate[0]
+        requete_match = call_aggregate['args'][0][0]['$match']
+        self.assertEqual(ts, requete_match['_evenements.transaction_traitee']['$lt'])

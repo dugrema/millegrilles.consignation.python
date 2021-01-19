@@ -20,10 +20,11 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
         configuration = TransactionConfiguration()
 
         self._message_dao = None
-        self._stub_document_dao = None
-        self._generateur_transactions = GenerateurTransactionsStub()
+        self._stub_document_dao = DocumentDaoStub()
 
         super().__init__(configuration, message_dao=None)
+
+        self._generateur_transactions = GenerateurTransactionsStub()
 
         # Preparer une cle temporaire (avec son cert)
         self.preparateur = PreparateurCertificats(clecert_1)
@@ -79,7 +80,45 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
 
 
 class GenerateurTransactionsStub(StubGenerateurTransactions):
-    pass
+
+    def __init__(self):
+        super().__init__()
+        self.liste_emettre_message = list()
+
+    def emettre_message(self, *args, **kwargs):
+        # Capture messages
+        self.liste_emettre_message.append({'args': args, 'kwargs': kwargs})
+
+
+class DocumentDaoStub:
+    """
+    Stub document dao - agit aussi comme une collection (get_collection -> self)
+    """
+
+    def __init__(self):
+        self.calls_aggregate = list()
+        self.calls_find = list()
+        self.calls_update = list()
+
+        # Placeholders pour retourner des valeurs
+        self.valeurs_aggregate = list()
+        self.valeurs_find = list()
+        self.valeurs_update = list()
+
+    def get_collection(self, nom_collection):
+        return self
+
+    def find(self, *args, **kwargs):
+        self.calls_find.append({'args': args, 'kwargs': kwargs})
+        return self.valeurs_find.pop(0)
+
+    def update(self, *args, **kwargs):
+        self.calls_update.append({'args': args, 'kwargs': kwargs})
+        return self.valeurs_update.pop(0)
+
+    def aggregate(self, *args, **kwargs):
+        self.calls_aggregate.append({'args': args, 'kwargs': kwargs})
+        return self.valeurs_aggregate.pop(0)
 
 
 contexte_instance = ContexteUnitTest()
