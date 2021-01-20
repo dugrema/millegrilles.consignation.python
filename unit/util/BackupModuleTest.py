@@ -1,4 +1,5 @@
 import datetime
+import pytz
 
 from base64 import b64decode
 
@@ -88,3 +89,41 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         call_aggregate = document_dao.calls_aggregate[0]
         requete_match = call_aggregate['args'][0][0]['$match']
         self.assertEqual(ts, requete_match['_evenements.transaction_traitee']['$lt'])
+
+    def test_preparer_curseur_transactions(self):
+        contexte = self.contexte
+        document_dao = contexte.document_dao
+
+        # Prep data
+        ts = datetime.datetime.utcnow()
+        contexte.document_dao.valeurs_find.append('dummy')
+
+        # Call methode a tester
+        curseur = self.handler.preparer_curseur_transactions('collection_test', 'sousdomaine_test', heure_max=ts)
+        self.assertEqual('dummy', curseur)
+
+        # Verification
+        call_find = document_dao.calls_find[0]
+        params_find = call_find['args'][0]
+        self.assertEqual(params_find['en-tete.domaine']['$regex'], '^sousdomaine_test\\.[A-Za-z0-9_\\/\\-]+$')
+        self.assertEqual(params_find['_evenements.transaction_traitee']['$lt'], ts)
+
+    def test_preparer_sousgroupes_horaires(self):
+        contexte = self.contexte
+        document_dao = contexte.document_dao
+
+        # Prep data
+        ts = datetime.datetime.utcnow()
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        document_dao.valeurs_aggregate.append([
+            {'_id': {'timestamp': ts_groupe}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7}
+        ])
+
+        # Call methode a tester
+        resultat = self.handler.preparer_sousgroupes_horaires(ts)
+
+        # Verification
+        self.assertEqual(1, len(resultat))
+        groupe = resultat[0]
+        self.assertEqual(pytz.UTC.localize(ts_groupe), groupe.heure)
+        self.assertEqual('sousdomaine_test.abcd.1234', groupe.sous_domaine)
