@@ -89,6 +89,9 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
         # Capture messages
         self.liste_emettre_message.append({'args': args, 'kwargs': kwargs})
 
+    def preparer_enveloppe(self, *args, **kwargs):
+        return args[0]
+
 
 class DocumentDaoStub:
     """

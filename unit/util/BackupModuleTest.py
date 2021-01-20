@@ -155,3 +155,38 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('sousdomaine_test_transactions_2021011821_1.public.jsonl.xz', catalogue_backup['transactions_nomfichier'])
         self.assertEqual(3, len(catalogue_backup['certificats_chaine_catalogue']))
         self.assertEqual(2, len(catalogue_backup['certificats_pem']))
+
+    def test_preparation_backup_horaire_protege(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+
+        clecert = self.contexte.configuration.cle
+        info_cles = {
+            'certificat': [clecert.cert_bytes.decode('utf-8')],
+            'certificat_millegrille': clecert.chaine[-1],
+            'certificats_backup': dict(),
+        }
+
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.info_cles = info_cles
+
+        self.handler_protege._preparation_backup_horaire(information_sousgroupe)
+
+        # Verifications
+        self.assertIsNotNone(information_sousgroupe.cipher)
+        self.assertIsNotNone(information_sousgroupe.transaction_maitredescles)
+
+        catalogue_backup = information_sousgroupe.catalogue_backup
+        self.assertIsNotNone(catalogue_backup['iv'])
+        self.assertIsNotNone(catalogue_backup['cle'])
+
+    def test_preparation_backup_horaire_snapshot(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=True)
+
+        self.handler_public._preparation_backup_horaire(information_sousgroupe)
+
+        # Verification
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_202101182100-SNAPSHOT_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_202101182100-SNAPSHOT_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)

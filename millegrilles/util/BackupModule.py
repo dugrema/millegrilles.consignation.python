@@ -730,6 +730,8 @@ class HandlerBackupDomaine:
             )
 
             if information_sousgroupe.snapshot is True:
+                # Conserver les cles de backup dans le snapshot - ces cles ne sont pas sauvegardes par le
+                # maitre des cles (snapshot est temporaire)
                 information_sousgroupe.catalogue_backup['cles'] = transaction_maitredescles['cles']
 
     def sauvegarder_catalogue(self, backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
