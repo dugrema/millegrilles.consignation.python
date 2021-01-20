@@ -276,6 +276,12 @@ class EnveloppeCertificat:
         fingerprint = self.fingerprint_ascii
         return cle_secrete_backup, fingerprint
 
+    def chaine_enveloppes(self):
+        enveloppes = [self]
+        for p in self.reste_chaine_pem:
+            enveloppes.append(EnveloppeCertificat(certificat_pem=p))
+        return enveloppes
+
 
 class UtilCertificats:
 

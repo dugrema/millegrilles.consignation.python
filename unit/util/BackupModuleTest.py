@@ -5,7 +5,7 @@ from base64 import b64decode
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
-from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
 
 
 class BackupUtilTest(TestCaseContexte):
@@ -57,14 +57,18 @@ class BackupUtilTest(TestCaseContexte):
 class HandlerBackupDomaineTest(TestCaseContexte):
 
     def setUp(self) -> None:
-        self.handler = HandlerBackupDomaine(
+        self.handler_protege = HandlerBackupDomaine(
             self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
             niveau_securite=Constantes.SECURITE_PROTEGE
+        )
+        self.handler_public = HandlerBackupDomaine(
+            self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
+            niveau_securite=Constantes.SECURITE_PUBLIC
         )
 
     def test_transmettre_evenement_backup(self):
         ts = datetime.datetime.utcnow()
-        self.handler.transmettre_evenement_backup('evenement_test', ts)
+        self.handler_protege.transmettre_evenement_backup('evenement_test', ts)
 
         # Stub generateur transaction, verifier message transmis
         generateur_transactions = self.contexte.generateur_transactions
@@ -82,7 +86,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         contexte.document_dao.valeurs_aggregate.append('dummy')
 
         # Call methode a tester
-        resultat_aggregate = self.handler._effectuer_requete_domaine(ts)
+        resultat_aggregate = self.handler_protege._effectuer_requete_domaine(ts)
 
         # Verification
         self.assertEqual('dummy', resultat_aggregate)
@@ -99,7 +103,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         contexte.document_dao.valeurs_find.append('dummy')
 
         # Call methode a tester
-        curseur = self.handler.preparer_curseur_transactions('collection_test', 'sousdomaine_test', heure_max=ts)
+        curseur = self.handler_protege.preparer_curseur_transactions('collection_test', 'sousdomaine_test', heure_max=ts)
         self.assertEqual('dummy', curseur)
 
         # Verification
@@ -120,10 +124,34 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         ])
 
         # Call methode a tester
-        resultat = self.handler.preparer_sousgroupes_horaires(ts)
+        resultat = self.handler_protege.preparer_sousgroupes_horaires(ts)
 
         # Verification
         self.assertEqual(1, len(resultat))
         groupe = resultat[0]
         self.assertEqual(pytz.UTC.localize(ts_groupe), groupe.heure)
         self.assertEqual('sousdomaine_test.abcd.1234', groupe.sous_domaine)
+
+    def test_preparation_backup_horaire_public(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+
+        self.handler_public._preparation_backup_horaire(information_sousgroupe)
+
+        # Verification
+        self.assertEqual('sousdomaine_test', information_sousgroupe.sous_domaine)
+        self.assertEqual(ts_groupe, information_sousgroupe.heure)
+        self.assertEqual(ts_groupe + datetime.timedelta(hours=1), information_sousgroupe.heure_fin)
+        self.assertEqual('collection_test', information_sousgroupe.nom_collection_mongo)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_2021011821_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_2021011821_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)
+
+        catalogue_backup = information_sousgroupe.catalogue_backup
+        self.assertEqual('sousdomaine_test', catalogue_backup['domaine'])
+        self.assertEqual(Constantes.SECURITE_PUBLIC, catalogue_backup['securite'])
+        self.assertEqual(ts_groupe, catalogue_backup['heure'])
+        self.assertEqual('sousdomaine_test_catalogue_2021011821_1.public.json.xz', catalogue_backup['catalogue_nomfichier'])
+        self.assertEqual('sousdomaine_test_transactions_2021011821_1.public.jsonl.xz', catalogue_backup['transactions_nomfichier'])
+        self.assertEqual(3, len(catalogue_backup['certificats_chaine_catalogue']))
+        self.assertEqual(2, len(catalogue_backup['certificats_pem']))
