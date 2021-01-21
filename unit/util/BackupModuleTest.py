@@ -2,10 +2,13 @@ import datetime
 import pytz
 
 from base64 import b64decode
+from io import BytesIO
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
+from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class BackupUtilTest(TestCaseContexte):
@@ -65,6 +68,10 @@ class HandlerBackupDomaineTest(TestCaseContexte):
             self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
             niveau_securite=Constantes.SECURITE_PUBLIC
         )
+
+        self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
+        idmg = self.enveloppe_certificat.subject_organization_name
+        self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
 
     def test_transmettre_evenement_backup(self):
         ts = datetime.datetime.utcnow()
@@ -190,3 +197,21 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         # Verification
         self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_202101182100-SNAPSHOT_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
         self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_202101182100-SNAPSHOT_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)
+
+    def test_persister_transactions_backup_public(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        fp = BytesIO()  # Simuler output fichier en memoire
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+
+        # S'assurer que le certificat est dans le cache
+        self.contexte.validateur_pki.valider(self.enveloppe_certificat.chaine_pem())
+
+        # Data pour simuler transactions
+        curseur = [
+            self.formatteur.signer_message({'valeur': 1, 'en-tete': {Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'abcd-1'}})[0],
+            self.formatteur.signer_message({'valeur': 2, 'en-tete': {Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'abcd-2'}})[0],
+        ]
+
+        self.handler_public._persister_transactions_backup(information_sousgroupe, curseur, fp)
+

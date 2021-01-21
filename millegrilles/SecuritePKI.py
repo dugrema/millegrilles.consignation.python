@@ -282,6 +282,11 @@ class EnveloppeCertificat:
             enveloppes.append(EnveloppeCertificat(certificat_pem=p))
         return enveloppes
 
+    def chaine_pem(self):
+        pems = [self.certificat_pem]
+        pems.extend(self.reste_chaine_pem)
+        return pems
+
 
 class UtilCertificats:
 

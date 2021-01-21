@@ -2,6 +2,7 @@
 # Genere aussi les certificats requis en memoire pour le test, fournissant des certs differents et actifs a chaque test.
 import logging
 
+from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesGenerateurCertificat
 from millegrilles.SecuritePKI import VerificateurCertificats, VerificateurTransaction, SignateurTransaction
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles, TransactionConfiguration
@@ -27,14 +28,18 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
         self._generateur_transactions = GenerateurTransactionsStub()
 
         # Preparer une cle temporaire (avec son cert)
-        self.preparateur = PreparateurCertificats(clecert_1)
+        cle_millegrille = clecert_1
+        idmg = cle_millegrille.idmg
+        configuration._millegrille_config[Constantes.CONFIG_IDMG] = idmg
+
+        self.preparateur = PreparateurCertificats(cle_millegrille)
         clecert_domaine = self.preparateur.generer_role(ConstantesGenerateurCertificat.ROLE_DOMAINES)
         self.configuration.cle = clecert_domaine
 
         # Charger le signateur - utilise la cle temporaire
         self._signateur_transactions = SignateurTransaction(self)
         self._signateur_transactions.initialiser()
-        self._validateur_message = ValidateurMessage(idmg=self.idmg)  # Validateur avec cache, sans connexion mq
+        self._validateur_message = ValidateurMessage(idmg=idmg)  # Validateur avec cache, sans connexion mq
 
     def initialiser(self, init_message=True, connecter=True):
         self.__logger.debug("ContexteUnitTest: re-initialiser")

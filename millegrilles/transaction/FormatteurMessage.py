@@ -23,11 +23,11 @@ class FormatteurMessageMilleGrilles:
         self.__signateur_transactions = signateur_transactions
         self.__contresignateur_transactions = contresignateur_transactions
 
-        with open(signateur_transactions.configuration.mq_certfile) as certs:
-            cert = self.__signateur_transactions.certificat
-            self.__chaine_certificats = [
-
-            ]
+        # with open(signateur_transactions.configuration.mq_certfile) as certs:
+        #     cert = self.__signateur_transactions.certificat
+        #     self.__chaine_certificats = [
+        #
+        #     ]
 
 
     def signer_message(self,

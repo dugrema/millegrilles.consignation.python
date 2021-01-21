@@ -242,6 +242,27 @@ class ValidateurCertificatCache(ValidateurCertificat):
         # On n'a pas d'enveloppe verifiee
         return enveloppe
 
+    def valider_fingerprint(
+            self,
+            fingerprint: str,
+            date_reference: datetime.datetime = None,
+            idmg: str = None
+    ) -> EnveloppeCertificat:
+
+        entree_cache = self.__enveloppe_leaf_par_fingerprint.get(fingerprint)
+        try:
+            enveloppe = entree_cache.enveloppe
+            if enveloppe.est_verifie:
+                return enveloppe
+            else:
+                chaine = [enveloppe.certificat_pem]
+                chaine.extend(enveloppe.reste_chaine_pem)
+                enveloppe = self.valider(chaine, date_reference, idmg)
+                return enveloppe
+        except AttributeError:
+            # Le certificat n'est pas trouve
+            raise CertificatInconnu('Certificat inconnu ' + fingerprint, fingerprint=fingerprint)
+
     @property
     def limite_obj_cache(self) -> int:
         """

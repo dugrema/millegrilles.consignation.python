@@ -56,6 +56,8 @@ class InformationSousDomaineHoraire:
     Information cumulee durant le backup d'un groupe sous-domaine/heure
     """
 
+    CLES_SET = frozenset(['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers'])
+
     def __init__(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime.datetime, snapshot=False):
         self.nom_collection_mongo = nom_collection_mongo
         self.sous_domaine = sous_domaine
@@ -75,6 +77,8 @@ class InformationSousDomaineHoraire:
         self.path_fichier_backup: Optional[str] = None
         self.path_fichier_catalogue: Optional[str] = None
         self.catalogue_backup: Optional[dict] = None
+        self.sha512_backup: Optional[str] = None
+        self.sha512_catalogue: Optional[str] = None
 
         # Detail du contenu de backup
         self.uuid_transactions = list()      # UUID des transactions inclues dans le backup
@@ -87,6 +91,10 @@ class InformationSousDomaineHoraire:
     @property
     def nom_fichier_catalogue(self) -> str:
         return path.basename(self.path_fichier_catalogue)
+
+    @property
+    def backup_workdir(self) -> str:
+        return path.dirname(self.path_fichier_backup)
 
 
 class BackupUtil:
@@ -162,6 +170,8 @@ class HandlerBackupDomaine:
     Gestionnaire de backup des transactions d'un domaine.
     """
 
+    BUFFER_SIZE = 4 * 1024  # 64 KB
+
     def __init__(self, contexte, nom_domaine, nom_collection_transactions, nom_collection_documents,
                  niveau_securite=Constantes.SECURITE_PROTEGE):
         self._contexte = contexte
@@ -205,7 +215,7 @@ class HandlerBackupDomaine:
                 self._execution_backup_horaire(information_sousgroupe)
 
                 if information_sousgroupe.catalogue_backup is not None:
-                    self.persister_fichiers_backup(information_sousgroupe)
+                    self.uploader_fichiers_backup(information_sousgroupe)
                 else:
                     self.__logger.warning(
                         "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
@@ -306,8 +316,8 @@ class HandlerBackupDomaine:
     #
     #     return heure_plusvieille
 
-    def persister_fichiers_backup(self, catalogue_backup, debut_backup, dependances_backup,
-                                  heure_anterieure, sous_domaine):
+    def uploader_fichiers_backup(self, catalogue_backup, debut_backup, dependances_backup,
+                                 heure_anterieure, sous_domaine):
         self.transmettre_evenement_backup(
             ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, debut_backup)
 
@@ -606,75 +616,93 @@ class HandlerBackupDomaine:
     #
     #     return info_backup
 
-    def _execution_backup_horaire(self, backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
-                                  cipher, cles_set, heure, heure_fin, info_backup, liste_uuid_transactions,
-                                  liste_uuids_invalides, nom_collection_mongo, path_fichier_backup, sous_domaine):
+    def _execution_backup_horaire(self, information_sousgroupe: InformationSousDomaineHoraire):
 
         # Creer repertoire backup (s'assurer qu'il existe)
-        Path(backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
-        with open(path_fichier_backup, 'wb') as fichier:
-            lzma_compressor = lzma.LZMACompressor()
+        Path(information_sousgroupe.backup_workdir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
-            # if cipher is not None:
-            #     fichier.write(cipher.start_encrypt())
+        # Effectuer requete sur les transactions a inclure
+        curseur = self.preparer_curseur_transactions(
+            information_sousgroupe.nom_collection_mongo,
+            information_sousgroupe.sous_domaine,
+            information_sousgroupe.heure_fin
+        )
 
-            curseur = self.preparer_curseur_transactions(nom_collection_mongo, sous_domaine, heure_fin)
-            for transaction in curseur:
-                uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-                try:
-                    # Extraire metadonnees de la transaction
-                    info_transaction = self._traiter_transaction(transaction, heure)
-                    for cle in cles_set:
-                        try:
-                            catalogue_backup[cle].update(info_transaction[cle])
-                        except KeyError:
-                            pass
+        # Parcourir le curseur et persister les transactions
+        with open(information_sousgroupe.path_fichier_backup, 'wb') as fichier:
+            self._persister_transactions_backup(information_sousgroupe, curseur, fichier)
 
-                    tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
-                    if cipher is not None:
-                        fichier.write(cipher.update(lzma_compressor.compress(tran_json.encode('utf-8'))))
-                    else:
-                        fichier.write(lzma_compressor.compress(tran_json.encode('utf-8')))
-
-                    # Une transaction par ligne
-                    if cipher is not None:
-                        fichier.write(cipher.update(lzma_compressor.compress(b'\n')))
-                    else:
-                        fichier.write(lzma_compressor.compress(b'\n'))
-
-                    # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
-                    liste_uuid_transactions.append(uuid_transaction)
-                except HachageInvalide:
-                    self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup de %s" % (
-                    uuid_transaction, nom_collection_mongo))
-                    # Marquer la transaction comme invalide pour backup
-                    liste_uuids_invalides.append(uuid_transaction)
-                except (CertificatInvalide, CertificatInconnu):
-                    self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
-                    liste_uuids_invalides.append(uuid_transaction)
-
-            if cipher is not None:
-                fichier.write(cipher.update(lzma_compressor.flush()))
-                fichier.write(cipher.finalize())
-            else:
-                fichier.write(lzma_compressor.flush())
-
-        if len(liste_uuid_transactions) > 0:
+        if len(information_sousgroupe.uuid_transactions) > 0:
             # Calculer SHA512 du fichier de backup des transactions
-            hachage_catalogue = self.sauvegarder_catalogue(backup_nomfichier, backup_workdir, catalogue_backup,
-                                                           catalogue_nomfichier, cles_set, info_backup,
-                                                           path_fichier_backup)
+            information_sousgroupe.sha512_backup = self.__calculer_fichier_SHA512(
+                information_sousgroupe.path_fichier_backup)
 
-            info_backup[ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE] = hachage_catalogue
+            # Sauvegarder catalogue et calculer digest
+            with lzma.open(information_sousgroupe.path_fichier_catalogue, 'wt') as fichier:
+                self.presister_catalogue(information_sousgroupe, fichier)
+            information_sousgroupe.sha512_catalogue = self.__calculer_fichier_SHA512(
+                information_sousgroupe.path_fichier_backup)
 
         else:
-            self.__logger.info("Backup: aucune transaction, backup annule")
-            info_backup = {
-                'liste_uuids_invalides': liste_uuids_invalides
-            }
+            self.__logger.debug("Backup: aucune transaction, backup annule")
 
-        return info_backup
+    def __calculer_fichier_SHA512(self, path_fichier):
+        sha512 = hashlib.sha512()
+        with open(path_fichier, 'rb') as fichier:
+            buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
+            while buffer:
+                sha512.update(buffer)
+                buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
+        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+        return sha512_digest
+
+    def _persister_transactions_backup(self, information_sousgroupe: InformationSousDomaineHoraire, curseur, fp_fichier):
+        lzma_compressor = lzma.LZMACompressor()
+        # if cipher is not None:
+        #     fichier.write(cipher.start_encrypt())
+        for transaction in curseur:
+            uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+            try:
+                # Extraire metadonnees de la transaction
+                info_transaction = self._traiter_transaction(transaction, information_sousgroupe.heure)
+                for cle in InformationSousDomaineHoraire.CLES_SET:
+                    try:
+                        information_sousgroupe.catalogue_backup[cle].update(info_transaction[cle])
+                    except KeyError:
+                        pass
+
+                tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
+                if information_sousgroupe.cipher is not None:
+                    fp_fichier.write(
+                        information_sousgroupe.cipher.update(
+                            lzma_compressor.compress(tran_json.encode('utf-8'))
+                        )
+                    )
+                else:
+                    fp_fichier.write(lzma_compressor.compress(tran_json.encode('utf-8')))
+
+                # Une transaction par ligne
+                if information_sousgroupe.cipher is not None:
+                    fp_fichier.write(information_sousgroupe.cipher.update(lzma_compressor.compress(b'\n')))
+                else:
+                    fp_fichier.write(lzma_compressor.compress(b'\n'))
+
+                # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
+                information_sousgroupe.uuid_transactions.append(uuid_transaction)
+            except HachageInvalide:
+                self.__logger.error("Transaction hachage invalide %s: transaction exclue du backup de %s" % (
+                    uuid_transaction, information_sousgroupe.nom_collection_mongo))
+                # Marquer la transaction comme invalide pour backup
+                information_sousgroupe.liste_uuids_invalides.append(uuid_transaction)
+            except (CertificatInvalide, CertificatInconnu):
+                self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
+                information_sousgroupe.liste_uuids_invalides.append(uuid_transaction)
+        if information_sousgroupe.cipher is not None:
+            fp_fichier.write(information_sousgroupe.cipher.update(lzma_compressor.flush()))
+            fp_fichier.write(information_sousgroupe.cipher.finalize())
+        else:
+            fp_fichier.write(lzma_compressor.flush())
 
     def _preparation_backup_horaire(self, information_sousgroupe: InformationSousDomaineHoraire):
         heure = information_sousgroupe.heure
@@ -734,18 +762,16 @@ class HandlerBackupDomaine:
                 # maitre des cles (snapshot est temporaire)
                 information_sousgroupe.catalogue_backup['cles'] = transaction_maitredescles['cles']
 
-    def sauvegarder_catalogue(self, backup_nomfichier, backup_workdir, catalogue_backup, catalogue_nomfichier,
-                              cles_set, info_backup, path_fichier_backup):
-        sha512 = hashlib.sha512()
-        with open(path_fichier_backup, 'rb') as fichier:
-            sha512.update(fichier.read())
-        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
-        catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE] = sha512_digest
-        catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = backup_nomfichier
+    def presister_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier_catalogue):
+        catalogue_backup = information_sousgroupe.catalogue_backup
+
+        catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE] = information_sousgroupe.sha512_backup
+        catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER] = information_sousgroupe.nom_fichier_backup
         # Changer les set() par des list() pour extraire en JSON
-        for cle in cles_set:
+        for cle in InformationSousDomaineHoraire.CLES_SET:
             if isinstance(catalogue_backup[cle], set):
                 catalogue_backup[cle] = list(catalogue_backup[cle])
+
         # Generer l'entete et la signature pour le catalogue
         catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
         # Recharger le catalogue pour avoir le format exact (e.g. encoding dates)
@@ -753,19 +779,16 @@ class HandlerBackupDomaine:
         catalogue_backup = self._contexte.generateur_transactions.preparer_enveloppe(
             catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE, ajouter_certificats=True)
         catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
-        info_backup['catalogue'] = catalogue_backup
-        # Sauvegarder catlogue sur disque pour transferer
-        path_catalogue = path.join(backup_workdir, catalogue_nomfichier)
-        info_backup['path_catalogue'] = path_catalogue
-        with lzma.open(path_catalogue, 'wt') as fichier:
-            # Dump du catalogue en format de transaction avec DateFormatEncoder
-            fichier.write(catalogue_json)
-        sha512 = hashlib.sha512()
-        with open(path_catalogue, 'rb') as fichier:
-            sha512.update(fichier.read())
-        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+        fp_fichier_catalogue.write(catalogue_json)
 
-        return sha512_digest
+        # # Sauvegarder catalogue sur disque pour transferer
+        # path_catalogue = information_sousgroupe.path_fichier_catalogue
+        # with lzma.open(path_catalogue, 'wt') as fichier:
+        #     # Dump du catalogue en format de transaction avec DateFormatEncoder
+        #     fichier.write(catalogue_json)
+        #
+        # sha512_digest = self.__calculer_fichier_SHA512(path_catalogue)
+        # return sha512_digest
 
     def preparer_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire):
         catalogue_backup = {
