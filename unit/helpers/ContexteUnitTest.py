@@ -50,6 +50,9 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
     def fermer(self):
         self.__logger.debug("ContexteUnitTest: Dummy fermer()")
 
+    def reset(self):
+        self.generateur_transactions.reset()
+
     @property
     def configuration(self):
         return super().configuration
@@ -96,6 +99,9 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
 
     def preparer_enveloppe(self, *args, **kwargs):
         return args[0]
+
+    def reset(self):
+        self.liste_emettre_message = list()
 
 
 class DocumentDaoStub:

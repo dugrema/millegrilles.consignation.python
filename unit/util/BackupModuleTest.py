@@ -16,6 +16,8 @@ from millegrilles.SecuritePKI import EnveloppeCertificat
 class BackupUtilTest(TestCaseContexte):
 
     def setUp(self) -> None:
+        super().setUp()
+
         self.backup_util = BackupUtil(self.contexte)
 
     def test_preparer_cipher(self):
@@ -62,6 +64,8 @@ class BackupUtilTest(TestCaseContexte):
 class HandlerBackupDomaineTest(TestCaseContexte):
 
     def setUp(self) -> None:
+        super().setUp()
+
         self.handler_protege = HandlerBackupDomaine(
             self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
             niveau_securite=Constantes.SECURITE_PROTEGE
@@ -75,6 +79,8 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
         idmg = self.enveloppe_certificat.subject_organization_name
         self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
+
+        self.contexte.generateur_transactions.reset()
 
     def test_transmettre_evenement_backup(self):
         ts = datetime.datetime.utcnow()
@@ -298,4 +304,18 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('evenement.TestDomaine.transactionEvenement', domaine)
         self.assertEqual('collection_test', evenement['domaine'])
         self.assertEqual('backup_horaire', evenement['evenement'])
+        self.assertListEqual(uuid_transactions, evenement['uuid_transaction'])
+
+    def test_marquer_transactions_invalides(self):
+        uuid_transactions = ['a', 'b', 'c']
+        self.handler_protege.marquer_transactions_invalides('collection_test', uuid_transactions)
+
+        # Verification
+        generateur_transactions = self.contexte.generateur_transactions
+        messages = generateur_transactions.liste_emettre_message
+        self.assertEqual(1, len(messages))
+        evenement, domaine = messages[0]['args']
+        self.assertEqual('evenement.TestDomaine.transactionEvenement', domaine)
+        self.assertEqual('collection_test', evenement['domaine'])
+        self.assertEqual('backup_erreur', evenement['evenement'])
         self.assertListEqual(uuid_transactions, evenement['uuid_transaction'])

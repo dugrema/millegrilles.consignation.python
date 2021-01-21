@@ -904,7 +904,8 @@ class HandlerBackupDomaine:
         }
         domaine_action = 'evenement.%s.transactionEvenement' % self._nom_domaine
         # self._contexte.message_dao.transmettre_message(evenement, domaine_action)
-        self._contexte.generateur_transactions.emettre_message(evenement, domaine_action, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE])
+        self._contexte.generateur_transactions.emettre_message(
+            evenement, domaine_action, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE])
 
     def marquer_transactions_invalides(self, nom_collection_mongo: str, uuid_transactions: list):
         """
@@ -922,7 +923,9 @@ class HandlerBackupDomaine:
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: nom_collection_mongo,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: Constantes.EVENEMENT_TRANSACTION_BACKUP_ERREUR,
         }
-        self._contexte.message_dao.transmettre_message(evenement, Constantes.TRANSACTION_ROUTING_EVENEMENT)
+        domaine_action = 'evenement.%s.transactionEvenement' % self._nom_domaine
+        self._contexte.generateur_transactions.emettre_message(
+            evenement, domaine_action, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE])
 
     def restaurer_domaines_horaires(self, nom_collection_mongo):
 
