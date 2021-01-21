@@ -201,6 +201,19 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_202101182100-SNAPSHOT_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
         self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_202101182100-SNAPSHOT_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)
 
+    def test_extraire_certificats(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        transaction = self.formatteur.signer_message({'valeur': 1})[0]
+
+        # Call methode a tester
+        resultat = self.handler_protege._extraire_certificats(transaction, ts_groupe)
+
+        # Verification
+        self.assertEqual(3, len(resultat))
+        self.assertEqual(1, len(resultat['certificats']))
+        self.assertEqual(1, len(resultat['certificats_intermediaires']))
+        self.assertEqual(1, len(resultat['certificats_millegrille']))
+
     def test_persister_transactions_backup(self):
         ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
         fp = BytesIO()  # Simuler output fichier en memoire
@@ -272,3 +285,17 @@ class HandlerBackupDomaineTest(TestCaseContexte):
             self.assertRaises(LZMAError, lzma_file_object.read)
 
         self.assertEqual(2, len(information_sousgroupe.uuid_transactions))
+
+    def test_marquer_transactions_backup_complete(self):
+        uuid_transactions = ['a', 'b', 'c']
+        self.handler_protege.marquer_transactions_backup_complete('collection_test', uuid_transactions)
+
+        # Verification
+        generateur_transactions = self.contexte.generateur_transactions
+        messages = generateur_transactions.liste_emettre_message
+        self.assertEqual(1, len(messages))
+        evenement, domaine = messages[0]['args']
+        self.assertEqual('evenement.TestDomaine.transactionEvenement', domaine)
+        self.assertEqual('collection_test', evenement['domaine'])
+        self.assertEqual('backup_horaire', evenement['evenement'])
+        self.assertListEqual(uuid_transactions, evenement['uuid_transaction'])

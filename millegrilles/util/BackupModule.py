@@ -634,27 +634,17 @@ class HandlerBackupDomaine:
 
         if len(information_sousgroupe.uuid_transactions) > 0:
             # Calculer SHA512 du fichier de backup des transactions
-            information_sousgroupe.sha512_backup = self.__calculer_fichier_SHA512(
+            information_sousgroupe.sha512_backup = self.calculer_fichier_SHA512(
                 information_sousgroupe.path_fichier_backup)
 
             # Sauvegarder catalogue et calculer digest
             with lzma.open(information_sousgroupe.path_fichier_catalogue, 'wt') as fichier:
                 self.presister_catalogue(information_sousgroupe, fichier)
-            information_sousgroupe.sha512_catalogue = self.__calculer_fichier_SHA512(
+            information_sousgroupe.sha512_catalogue = self.calculer_fichier_SHA512(
                 information_sousgroupe.path_fichier_backup)
 
         else:
             self.__logger.debug("Backup: aucune transaction, backup annule")
-
-    def __calculer_fichier_SHA512(self, path_fichier):
-        sha512 = hashlib.sha512()
-        with open(path_fichier, 'rb') as fichier:
-            buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
-            while buffer:
-                sha512.update(buffer)
-                buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
-        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
-        return sha512_digest
 
     def _persister_transactions_backup(self, information_sousgroupe: InformationSousDomaineHoraire, curseur, fp_fichier):
         lzma_compressor = lzma.LZMACompressor()
@@ -665,7 +655,7 @@ class HandlerBackupDomaine:
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
             try:
                 # Extraire metadonnees de la transaction
-                info_transaction = self._traiter_transaction(transaction, information_sousgroupe.heure)
+                info_transaction = self._extraire_certificats(transaction, information_sousgroupe.heure)
                 for cle in InformationSousDomaineHoraire.CLES_SET:
                     try:
                         information_sousgroupe.catalogue_backup[cle].update(info_transaction[cle])
@@ -869,7 +859,7 @@ class HandlerBackupDomaine:
         curseur = coltrans.find(filtre, sort=sort, hint=hint)
         return curseur
 
-    def _traiter_transaction(self, transaction, heure: datetime.datetime):
+    def _extraire_certificats(self, transaction, heure: datetime.datetime):
         """
         Verifie la signature de la transaction et extrait les certificats requis pour le backup.
 
@@ -906,7 +896,6 @@ class HandlerBackupDomaine:
         :param uuid_transactions: Liste des uuid de transactions (en-tete)
         :return:
         """
-
         evenement = {
             Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT: Constantes.EVENEMENT_MESSAGE_EVENEMENT,
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: uuid_transactions,
@@ -1186,6 +1175,16 @@ class HandlerBackupDomaine:
         hachage_backup = self._contexte.verificateur_certificats.verifier_hachage(entete, fonction_hachage=hashes.SHA512())
         # hachage_backup = 'sha512_b64:' + hachage_backup
         return hachage_backup
+
+    def calculer_fichier_SHA512(self, path_fichier):
+        sha512 = hashlib.sha512()
+        with open(path_fichier, 'rb') as fichier:
+            buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
+            while buffer:
+                sha512.update(buffer)
+                buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
+        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+        return sha512_digest
 
 
 class WrapperDownload(RawIOBase):

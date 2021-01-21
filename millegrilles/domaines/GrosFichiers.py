@@ -134,8 +134,8 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
                          ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM,
                          ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-    def _traiter_transaction(self, transaction, heure: datetime.datetime):
-        info_transaction = super()._traiter_transaction(transaction, heure)
+    def _extraire_certificats(self, transaction, heure: datetime.datetime):
+        info_transaction = super()._extraire_certificats(transaction, heure)
 
         heure_str = heure.strftime('%H')
 
