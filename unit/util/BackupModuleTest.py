@@ -3,7 +3,7 @@ import pytz
 import json
 
 from base64 import b64decode
-from io import BytesIO
+from io import BytesIO, StringIO
 from lzma import LZMAFile, LZMAError
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
@@ -170,7 +170,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('sousdomaine_test_catalogue_2021011821_1.public.json.xz', catalogue_backup['catalogue_nomfichier'])
         self.assertEqual('sousdomaine_test_transactions_2021011821_1.public.jsonl.xz', catalogue_backup['transactions_nomfichier'])
         self.assertEqual(3, len(catalogue_backup['certificats_chaine_catalogue']))
-        self.assertEqual(2, len(catalogue_backup['certificats_pem']))
+        self.assertEqual(3, len(catalogue_backup['certificats_pem']))
 
     def test_preparation_backup_horaire_protege(self):
         ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
@@ -352,3 +352,58 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
         # Verifier
         self.assertEqual('sha256_b64:mljbzzAiBKFitVGyA6c9j/DEjIDFo3pxZX7t5sJmRZI=', hachage)
+
+    def test_presister_catalogue(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        fp = StringIO()  # Simuler output fichier en memoire
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.sha512_backup = 'hachage-catalogue'
+        information_sousgroupe.path_fichier_backup = '/tmp/backup.jsonl'
+
+        clecert = self.contexte.configuration.cle
+        info_cles = {
+            'certificat': [clecert.cert_bytes.decode('utf-8')],
+            'certificat_millegrille': clecert.chaine[-1],
+            'certificats_backup': dict(),
+        }
+        information_sousgroupe.info_cles = info_cles
+
+        information_sousgroupe.catalogue_backup = {
+            'certificats_millegrille': 'a',
+            'certificats_intermediaires': 'b',
+            'certificats': 'c',
+            'fuuid_grosfichiers': 'd'
+        }
+
+        # Caller methode a tester
+        self.handler_protege.persister_catalogue(information_sousgroupe, fp)
+
+        catalogue_str = fp.getvalue()
+        catalogue = json.loads(catalogue_str)
+
+        self.assertEqual('a', catalogue['certificats_millegrille'])
+        self.assertEqual('b', catalogue['certificats_intermediaires'])
+        self.assertEqual('c', catalogue['certificats'])
+        self.assertEqual('d', catalogue['fuuid_grosfichiers'])
+        self.assertEqual('hachage-catalogue', catalogue['transactions_hachage'])
+        self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
+
+    def test_preparer_catalogue(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.path_fichier_catalogue = '/tmp/catalogue.json'
+        information_sousgroupe.path_fichier_backup = '/tmp/backup.jsonl'
+
+        # Caller methode
+        catalogue = self.handler_protege.preparer_catalogue(information_sousgroupe)
+
+        # Verification
+        self.assertEqual('sousdomaine_test', catalogue['domaine'])
+        self.assertEqual('3.protege', catalogue['securite'])
+        self.assertIsNotNone(catalogue['heure'])
+        self.assertEqual('catalogue.json', catalogue['catalogue_nomfichier'])
+        self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
+        self.assertEqual(3, len(catalogue['certificats_chaine_catalogue']))
+        self.assertEqual(3, len(catalogue['certificats_pem']))

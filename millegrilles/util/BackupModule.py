@@ -639,7 +639,7 @@ class HandlerBackupDomaine:
 
             # Sauvegarder catalogue et calculer digest
             with lzma.open(information_sousgroupe.path_fichier_catalogue, 'wt') as fichier:
-                self.presister_catalogue(information_sousgroupe, fichier)
+                self.persister_catalogue(information_sousgroupe, fichier)
             information_sousgroupe.sha512_catalogue = self.calculer_fichier_SHA512(
                 information_sousgroupe.path_fichier_backup)
 
@@ -752,7 +752,7 @@ class HandlerBackupDomaine:
                 # maitre des cles (snapshot est temporaire)
                 information_sousgroupe.catalogue_backup['cles'] = transaction_maitredescles['cles']
 
-    def presister_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier_catalogue):
+    def persister_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier_catalogue):
         catalogue_backup = information_sousgroupe.catalogue_backup
 
         catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE] = information_sousgroupe.sha512_backup
@@ -805,22 +805,20 @@ class HandlerBackupDomaine:
         information_sousgroupe.catalogue_backup = catalogue_backup
 
         # Ajouter le certificat du module courant pour etre sur
-        enveloppe_certificat_module_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        clecert_courant = self._contexte.configuration.cle
+        enveloppe = EnveloppeCertificat(certificat_pem=clecert_courant.chaine)
+        fp_enveloppe = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
+
         # Conserver la chaine de validation du catalogue
-        certificats_validation_catalogue = [
-            enveloppe_certificat_module_courant.fingerprint_ascii
-        ]
-        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
-        certs_pem = {
-            enveloppe_certificat_module_courant.fingerprint_ascii: enveloppe_certificat_module_courant.certificat_pem
-        }
+        certs_pem = {fp_enveloppe: enveloppe.certificat_pem}
         catalogue_backup[ConstantesBackup.LIBELLE_CERTS_PEM] = certs_pem
 
-        # liste_enveloppes_cas = self._contexte.verificateur_certificats.aligner_chaine_cas(enveloppe_certificat_module_courant)
-        liste_enveloppes_cas = enveloppe_certificat_module_courant.chaine_enveloppes()
+        liste_enveloppes_cas = enveloppe.chaine_enveloppes()
 
+        certificats_validation_catalogue = list()
+        catalogue_backup[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
         for cert_ca in liste_enveloppes_cas:
-            fingerprint_ca = cert_ca.fingerprint_ascii
+            fingerprint_ca = 'sha256_b64:' + cert_ca.fingerprint_sha256_b64
             certificats_validation_catalogue.append(fingerprint_ca)
             certs_pem[fingerprint_ca] = cert_ca.certificat_pem
 
@@ -1174,7 +1172,6 @@ class HandlerBackupDomaine:
         :param entete:
         :return:
         """
-        # hachage_backup = self._contexte.verificateur_certificats.verifier_hachage(entete, fonction_hachage=hashes.SHA512())
         hachage_backup = self._contexte.validateur_message.hacher_dict(entete)
         return hachage_backup
 

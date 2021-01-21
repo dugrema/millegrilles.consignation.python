@@ -103,7 +103,11 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
         self.liste_transmettre_commande.append({'args': args, 'kwargs': kwargs})
 
     def preparer_enveloppe(self, *args, **kwargs):
-        return args[0]
+        message = args[0]
+        message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'dummy'
+        }
+        return message
 
     def reset(self):
         self.liste_emettre_message = list()
