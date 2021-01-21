@@ -1128,7 +1128,7 @@ class HandlerBackupDomaine:
             evenement_contenu, domaine, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
         )
 
-    def transmettre_trigger_jour_precedent(self, heure_plusvieille):
+    def transmettre_trigger_jour_precedent(self, heure_plusvieille: datetime.datetime):
         """
         Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
         backup quotidien, mensuel et annuel pour les aggregations qui peuvent etre generees

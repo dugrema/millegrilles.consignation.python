@@ -319,3 +319,27 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('collection_test', evenement['domaine'])
         self.assertEqual('backup_erreur', evenement['evenement'])
         self.assertListEqual(uuid_transactions, evenement['uuid_transaction'])
+
+    def test_transmettre_trigger_jour_precedent(self):
+        ts = datetime.datetime(2021, 1, 18, 21, 0)
+        self.handler_protege.transmettre_trigger_jour_precedent(ts)
+
+        # Verification
+        generateur_transactions = self.contexte.generateur_transactions
+        evenement, domaine_action = generateur_transactions.liste_transmettre_commande[0]['args']
+        self.assertEqual('commande.TestDomaine.declencherBackupQuotidien', domaine_action)
+        self.assertEqual('TestDomaine', evenement['domaine'])
+        self.assertLess(evenement['jour'], (ts-datetime.timedelta(days=1)).timestamp())
+        self.assertGreater(evenement['jour'], (ts-datetime.timedelta(days=2)).timestamp())
+
+    def test_transmettre_trigger_annee_precedente(self):
+        ts = datetime.datetime(2021, 1, 18, 21, 0)
+        self.handler_protege.transmettre_trigger_annee_precedente(ts)
+
+        # Verification
+        generateur_transactions = self.contexte.generateur_transactions
+        evenement, domaine_action = generateur_transactions.liste_transmettre_commande[0]['args']
+        self.assertEqual('commande.TestDomaine.declencherBackupAnnuel', domaine_action)
+        self.assertEqual('TestDomaine', evenement['domaine'])
+        self.assertLess(evenement['annee'], (ts-datetime.timedelta(days=549)).timestamp())
+        self.assertGreater(evenement['annee'], (ts-datetime.timedelta(days=915)).timestamp())

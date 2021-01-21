@@ -92,16 +92,22 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
     def __init__(self):
         super().__init__()
         self.liste_emettre_message = list()
+        self.liste_transmettre_commande = list()
 
     def emettre_message(self, *args, **kwargs):
         # Capture messages
         self.liste_emettre_message.append({'args': args, 'kwargs': kwargs})
+
+    def transmettre_commande(self, *args, **kwargs):
+        # Capture messages
+        self.liste_transmettre_commande.append({'args': args, 'kwargs': kwargs})
 
     def preparer_enveloppe(self, *args, **kwargs):
         return args[0]
 
     def reset(self):
         self.liste_emettre_message = list()
+        self.liste_transmettre_commande = list()
 
 
 class DocumentDaoStub:
