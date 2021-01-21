@@ -96,26 +96,10 @@ class ValidateurMessage:
         return enveloppe_certificat
 
     def verifier_hachage(self, message: dict, fonction_hachage=None) -> str:
-        message_sans_entete = message.copy()
-        del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-        # message_bytes = json.dumps(message_sans_entete).encode('utf-8')
-        message_bytes = json.dumps(
-            message_sans_entete,
-            ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
-            sort_keys=True,
-            separators=(',', ':')
-        ).encode('utf-8')
-
         entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         hachage = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
 
-        if fonction_hachage is None:
-            fonction_hachage = self.__hash_function()
-        digest = hashes.Hash(fonction_hachage, backend=default_backend())
-
-        digest.update(message_bytes)
-        resultat_digest = digest.finalize()
-        digest_base64 = fonction_hachage.name + '_b64:' + b64encode(resultat_digest).decode('utf-8')
+        digest_base64 = self.hacher_dict(message, fonction_hachage)
 
         self.__logger.debug("Resultat hash contenu: %s" % digest_base64)
         if hachage != digest_base64:
@@ -123,6 +107,31 @@ class ValidateurMessage:
                 hachage, digest_base64
             ))
         self.__logger.debug("Hachage de la transaction est OK: %s" % digest_base64)
+
+        return digest_base64
+
+    def hacher_dict(self, message, fonction_hachage=None):
+        message_sans_entete = message.copy()
+
+        try:
+            del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        except KeyError:
+            pass  # Ce n'est pas un message avec entete
+
+        # message_bytes = json.dumps(message_sans_entete).encode('utf-8')
+        message_bytes = json.dumps(
+            message_sans_entete,
+            ensure_ascii=False,  # S'assurer de supporter tous le range UTF-8
+            sort_keys=True,
+            separators=(',', ':')
+        ).encode('utf-8')
+
+        if fonction_hachage is None:
+            fonction_hachage = self.__hash_function()
+        digest = hashes.Hash(fonction_hachage, backend=default_backend())
+        digest.update(message_bytes)
+        resultat_digest = digest.finalize()
+        digest_base64 = fonction_hachage.name + '_b64:' + b64encode(resultat_digest).decode('utf-8')
 
         return digest_base64
 

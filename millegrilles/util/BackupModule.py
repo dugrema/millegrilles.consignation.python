@@ -1174,9 +1174,8 @@ class HandlerBackupDomaine:
         :param entete:
         :return:
         """
-        # hachage_backup = self._contexte.verificateur_transaction.hacher_contenu(entete, hachage=hashes.SHA512())
-        hachage_backup = self._contexte.verificateur_certificats.verifier_hachage(entete, fonction_hachage=hashes.SHA512())
-        # hachage_backup = 'sha512_b64:' + hachage_backup
+        # hachage_backup = self._contexte.verificateur_certificats.verifier_hachage(entete, fonction_hachage=hashes.SHA512())
+        hachage_backup = self._contexte.validateur_message.hacher_dict(entete)
         return hachage_backup
 
     def calculer_fichier_SHA512(self, path_fichier):

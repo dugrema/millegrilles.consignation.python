@@ -343,3 +343,12 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('TestDomaine', evenement['domaine'])
         self.assertLess(evenement['annee'], (ts-datetime.timedelta(days=549)).timestamp())
         self.assertGreater(evenement['annee'], (ts-datetime.timedelta(days=915)).timestamp())
+
+    def test_calculer_hash_entetebackup(self):
+        entete = {'valeur': 1}
+
+        # Call methode a tester
+        hachage = self.handler_protege.calculer_hash_entetebackup(entete)
+
+        # Verifier
+        self.assertEqual('sha256_b64:mljbzzAiBKFitVGyA6c9j/DEjIDFo3pxZX7t5sJmRZI=', hachage)
