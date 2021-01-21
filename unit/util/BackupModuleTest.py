@@ -4,7 +4,7 @@ import json
 
 from base64 import b64decode
 from io import BytesIO
-from lzma import LZMAFile
+from lzma import LZMAFile, LZMAError
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
@@ -70,6 +70,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
             self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
             niveau_securite=Constantes.SECURITE_PUBLIC
         )
+        self.backup_util = BackupUtil(self.contexte)
 
         self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
         idmg = self.enveloppe_certificat.subject_organization_name
@@ -200,7 +201,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_202101182100-SNAPSHOT_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
         self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_202101182100-SNAPSHOT_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)
 
-    def test_persister_transactions_backup_public(self):
+    def test_persister_transactions_backup(self):
         ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
         fp = BytesIO()  # Simuler output fichier en memoire
         information_sousgroupe = InformationSousDomaineHoraire(
@@ -231,4 +232,43 @@ class HandlerBackupDomaineTest(TestCaseContexte):
                 transactions_archivees[transaction['valeur']] = transaction
 
         self.assertEqual(2, len(transactions_archivees))
+        self.assertEqual(2, len(information_sousgroupe.uuid_transactions))
+
+    def test_persister_transactions_backup_cipher(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        fp = BytesIO()  # Simuler output fichier en memoire
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.catalogue_backup = dict()
+
+        clecert = self.contexte.configuration.cle
+        info_cles = {
+            'certificat': [clecert.cert_bytes.decode('utf-8')],
+            'certificat_millegrille': clecert.chaine[-1],
+            'certificats_backup': dict(),
+        }
+        cipher, transaction_maitrecles = self.backup_util.preparer_cipher(dict(), info_cles)
+        information_sousgroupe.cipher = cipher
+        cipher.start_encrypt()
+
+        # S'assurer que le certificat est dans le cache
+        self.contexte.validateur_pki.valider(self.enveloppe_certificat.chaine_pem())
+
+        # Data pour simuler transactions
+        curseur = [
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+        ]
+
+        # Call methode a tester
+        self.handler_protege._persister_transactions_backup(information_sousgroupe, curseur, fp)
+
+        # Verification
+
+        # Verifier que le contenu n'est pas en clair (LZMA invalide)
+        bytes_ecrits = fp.getbuffer()
+        with BytesIO(bytes_ecrits) as reader:
+            lzma_file_object = LZMAFile(reader)
+            self.assertRaises(LZMAError, lzma_file_object.read)
+
         self.assertEqual(2, len(information_sousgroupe.uuid_transactions))
