@@ -56,7 +56,7 @@ class InformationSousDomaineHoraire:
     Information cumulee durant le backup d'un groupe sous-domaine/heure
     """
 
-    CLES_SET = frozenset(['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers'])
+    CLES_SET = frozenset(['certificats_millegrille', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers'])
 
     def __init__(self, nom_collection_mongo: str, sous_domaine: str, heure: datetime.datetime, snapshot=False):
         self.nom_collection_mongo = nom_collection_mongo
@@ -890,12 +890,12 @@ class HandlerBackupDomaine:
             raise ValueError("Transaction IDMG ne correspond pas au certificat racine " + enveloppe.fingerprint_base58)
 
         # Extraire liste de fingerprints
-        liste_cas = [enveloppe.fingerprint_ascii for enveloppe in liste_enveloppes_cas]
+        liste_cas = ['sha256_b64:' + enveloppe.fingerprint_sha256_b64 for enveloppe in liste_enveloppes_cas]
 
         return {
-            'certificats': [enveloppe.fingerprint_ascii],
-            'certificats_intermediaires': liste_cas[:-1],
-            'certificats_racine': [liste_cas[-1]],
+            'certificats': ['sha256_b64:' + enveloppe.fingerprint_sha256_b64],
+            'certificats_intermediaires': liste_cas[1:-1],
+            'certificats_millegrille': [liste_cas[-1]],
         }
 
     def marquer_transactions_backup_complete(self, nom_collection_mongo: str, uuid_transactions: list):

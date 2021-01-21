@@ -1,8 +1,10 @@
 import datetime
 import pytz
+import json
 
 from base64 import b64decode
 from io import BytesIO
+from lzma import LZMAFile
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
@@ -203,15 +205,30 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         fp = BytesIO()  # Simuler output fichier en memoire
         information_sousgroupe = InformationSousDomaineHoraire(
             'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.catalogue_backup = dict()
 
         # S'assurer que le certificat est dans le cache
         self.contexte.validateur_pki.valider(self.enveloppe_certificat.chaine_pem())
 
         # Data pour simuler transactions
         curseur = [
-            self.formatteur.signer_message({'valeur': 1, 'en-tete': {Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'abcd-1'}})[0],
-            self.formatteur.signer_message({'valeur': 2, 'en-tete': {Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'abcd-2'}})[0],
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
         ]
 
+        # Call methode a tester
         self.handler_public._persister_transactions_backup(information_sousgroupe, curseur, fp)
 
+        # Verification
+
+        # Extraire transactions du contenu compresse en LZMA
+        transactions_archivees = dict()
+        bytes_ecrits = fp.getbuffer()
+        with BytesIO(bytes_ecrits) as reader:
+            lzma_file_object = LZMAFile(reader)
+            for transaction_str in lzma_file_object:
+                transaction = json.loads(transaction_str)
+                transactions_archivees[transaction['valeur']] = transaction
+
+        self.assertEqual(2, len(transactions_archivees))
+        self.assertEqual(2, len(information_sousgroupe.uuid_transactions))
