@@ -514,6 +514,45 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         })
         self.assertEqual('evenement.TestDomaine.transactionEvenement', evenement['args'][1])
 
+    def test_creer_backup_quoditien(self):
+        ts = datetime.datetime(2021, 1, 18, 21, 0)
+
+        document_dao = self.contexte.document_dao
+        document_dao.valeurs_find.append([{
+            'jour': datetime.datetime(2021, 1, 17, 1, 0)
+        }])
+
+        # Caller methode a tester
+        self.handler_protege.creer_backup_quoditien('sousdomaine_test', ts)
+
+        # Verifications
+        calls_find = document_dao.calls_find
+        info_commande_quotidien = self.contexte.generateur_transactions.liste_transmettre_commande[0]
+        info_commande_annuel = self.contexte.generateur_transactions.liste_transmettre_commande[1]
+
+        self.assertDictEqual(info_commande_annuel['args'][0], {'annee': 1546300800, 'domaine': 'TestDomaine', 'securite': '2.prive'})
+        self.assertEqual('commande.TestDomaine.declencherBackupAnnuel', info_commande_annuel['args'][1])
+        self.assertDictEqual(info_commande_quotidien['args'][0], {'catalogue': {'jour': 1610845200, 'en-tete': {'uuid_transaction': 'dummy.0'}}})
+        self.assertEqual('commande.backup.genererBackupQuotidien', info_commande_quotidien['args'][1])
+
+    def test_creer_backup_annuel(self):
+        ts = datetime.datetime(2020, 8, 18, 21, 0)
+
+        document_dao = self.contexte.document_dao
+        document_dao.valeurs_find.append([{
+            'annee': datetime.datetime(2020, 1, 17, 0, 0)
+        }])
+
+        # Caller methode a tester
+        self.handler_protege.creer_backup_annuel('sousdomaine_test', ts)
+
+        # Verifications
+        calls_find = document_dao.calls_find
+        info_commande_annuel = self.contexte.generateur_transactions.liste_transmettre_commande[0]
+
+        self.assertDictEqual(info_commande_annuel['args'][0], {'catalogue': {'annee': 1579219200, 'en-tete': {'uuid_transaction': 'dummy.0'}}})
+        self.assertEqual('commande.backup.genererBackupAnnuel', info_commande_annuel['args'][1])
+
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
 

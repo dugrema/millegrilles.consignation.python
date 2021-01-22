@@ -1095,6 +1095,7 @@ class HandlerBackupDomaine:
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
         # Calculer la fin du jour comme etant le lendemain, on fait un "<" dans la selection
+        jour = datetime.datetime(year=jour.year, month=jour.month, day=jour.day, tzinfo=pytz.UTC)
         fin_jour = jour + datetime.timedelta(days=1)
 
         # Faire la liste des catalogues de backups qui sont dus
@@ -1138,15 +1139,16 @@ class HandlerBackupDomaine:
     def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
-        annee_fin = annee.year
-        fin_annee = datetime.datetime(year=annee_fin, month=1, day=1)
+        annee = datetime.datetime(year=annee.year, month=1, day=1, tzinfo=pytz.UTC)
+        # annee_fin = annee.year
+        # fin_annee = datetime.datetime(year=annee_fin, month=1, day=1, tzinfo=pytz.UTC)
 
         # Faire la liste des catalogues de backups qui sont dus
         filtre_backups_annuels_dirty = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_CATALOGUE_ANNUEL,
             ConstantesBackup.LIBELLE_DOMAINE: {'$regex': '^' + domaine},
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
-            ConstantesBackup.LIBELLE_ANNEE: {'$lte': fin_annee}
+            ConstantesBackup.LIBELLE_ANNEE: {'$lte': annee}
         }
         curseur_catalogues = coldocs.find(filtre_backups_annuels_dirty)
         plus_vieille_annee = annee
