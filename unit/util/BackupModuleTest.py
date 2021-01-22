@@ -7,6 +7,7 @@ import lzma
 from base64 import b64decode
 from io import BytesIO, StringIO
 from lzma import LZMAFile, LZMAError
+from typing import Optional
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
@@ -177,9 +178,10 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
         # Verification
         self.assertEqual(1, len(resultat))
-        groupe = resultat[0]
-        self.assertEqual(pytz.UTC.localize(ts_groupe), groupe.heure)
-        self.assertEqual('sousdomaine_test.abcd.1234', groupe.sous_domaine)
+        for domaine, groupe in resultat.items():
+            groupe = groupe.liste_horaire[0]
+            self.assertEqual(pytz.UTC.localize(ts_groupe), groupe.heure)
+            self.assertEqual('sousdomaine_test.abcd.1234', groupe.sous_domaine)
 
     def test_preparation_backup_horaire_public(self):
         ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
@@ -629,8 +631,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
 
     def test_backup_horaire_domaine_1domaine(self):
         ts = datetime.datetime(2021, 1, 19, 0, 2)
-        entete_precedente = None
-        info_cles = None
+        info_cles: Optional[dict] = None
 
         contexte = self.contexte
         configuration = contexte.configuration
@@ -641,6 +642,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         document_dao.valeurs_aggregate.append([
             {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
         ])
+        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup
         document_dao.valeurs_find.append([
@@ -654,7 +656,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_public.backup_horaire_domaine(ts, entete_precedente, info_cles)
+        self.handler_public.backup_horaire_domaine(ts, info_cles)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions
@@ -683,7 +685,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
                         self.contexte.validateur_message.verifier(contenu)
                     except KeyError as e:
                         # OK si on a une entete generee par le contexte UT
-                        if contenu['en-tete']['uuid_transaction'] != 'dummy':
+                        if not contenu['en-tete']['uuid_transaction'].startswith('dummy.'):
                             raise e
 
         # On verifie le chainage des catalogues
@@ -692,7 +694,6 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
 
     def test_backup_horaire_domaine_1domaine_chainage(self):
         ts = datetime.datetime(2021, 1, 19, 0, 2)
-        entete_precedente = None
         info_cles = None
 
         contexte = self.contexte
@@ -708,6 +709,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
             {'_id': {'timestamp': ts_2}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 3},
             {'_id': {'timestamp': ts_3}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 5},
         ])
+        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup, 3 groupes pour test de chainage
         document_dao.valeurs_find.append([self.formatteur.signer_message({'valeur': 1})[0]])
@@ -719,7 +721,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_public.backup_horaire_domaine(ts, entete_precedente, info_cles)
+        self.handler_public.backup_horaire_domaine(ts, info_cles)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions

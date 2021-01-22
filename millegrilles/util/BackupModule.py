@@ -7,13 +7,14 @@ import hashlib
 import requests
 import tarfile
 
-from typing import Optional
+from typing import Optional, List, Dict
 from io import RawIOBase
 from os import path
 from pathlib import Path
 from base64 import b64encode, b64decode
 from lzma import LZMAFile, LZMAError
 from threading import Thread, Event
+from operator import attrgetter
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
@@ -94,6 +95,29 @@ class InformationSousDomaineHoraire:
     @property
     def backup_workdir(self) -> str:
         return path.dirname(self.path_fichier_backup)
+
+
+class GroupeSousdomaine:
+
+    def __init__(self):
+        self.__liste_horaire = sorted(list(), key=attrgetter('heure'))
+        self.__sous_domaine = None
+
+    def append(self, information_sousdomaine: InformationSousDomaineHoraire):
+        """
+        Ajoute sous-domaine pour une heure. S'assure que le sous-domaine correspond aux autres heures.
+        """
+        domaine = information_sousdomaine.sous_domaine
+        if self.__sous_domaine is None:
+            self.__sous_domaine = domaine
+        elif self.__sous_domaine != domaine:
+            raise ValueError("Mismatch sous-domaine: %s != %s" % (self.__sous_domaine, domaine))
+
+        self.__liste_horaire.append(information_sousdomaine)
+
+    @property
+    def liste_horaire(self) -> List[InformationSousDomaineHoraire]:
+        return self.__liste_horaire
 
 
 class BackupUtil:
@@ -195,58 +219,58 @@ class HandlerBackupDomaine:
             # Progress update - debut backup horaire
             self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
 
-            # Trouver le plus recent backup
+            sousgroupes = self.preparer_sousgroupes_horaires(heure)
 
+            entete_backup_precedent: Optional[dict] = None
+            for domaine, sousgroupe in sousgroupes.items():
+                # Transmettre info de debut de backup au client
+                for information_sousgroupe in sousgroupe.liste_horaire:
 
-            # Preparer chainange avec plus recent backup
-            try:
-                chainage_backup_precedent = {
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-                    ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(entete_backup_precedent)
-                }
-            except (TypeError, KeyError):
-                # C'est le premier backup de la chaine
-                chainage_backup_precedent = None
+                    if entete_backup_precedent is None:
+                        # Trouver le plus recent backup
+                        entete_backup_precedent = self.trouver_entete_backup_precedent(information_sousgroupe.sous_domaine)
 
-            sousgroupes_horaire = self.preparer_sousgroupes_horaires(heure)
+                    # Preparer chainange avec plus recent backup
+                    try:
+                        chainage_backup_precedent = {
+                            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
+                                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
+                            ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(
+                                entete_backup_precedent)
+                        }
+                    except (TypeError, KeyError):
+                        # C'est le premier backup de la chaine
+                        chainage_backup_precedent = None
 
-            # Transmettre info de debut de backup au client
-            for information_sousgroupe in sousgroupes_horaire:
-                information_sousgroupe.chainage_backup_precedent = chainage_backup_precedent
+                    information_sousgroupe.chainage_backup_precedent = chainage_backup_precedent
 
-                self._preparation_backup_horaire(information_sousgroupe)
-                self._execution_backup_horaire(information_sousgroupe)
+                    self._preparation_backup_horaire(information_sousgroupe)
+                    self._execution_backup_horaire(information_sousgroupe)
 
-                if information_sousgroupe.catalogue_backup is not None:
-                    # Uploader les fichiers et transactions de backup vers consignationfichiers
-                    with open(information_sousgroupe.path_fichier_backup, 'rb') as fp_transactions:
-                        with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fp_catalogue:
-                            self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue)
+                    if information_sousgroupe.catalogue_backup is not None:
+                        # Uploader les fichiers et transactions de backup vers consignationfichiers
+                        with open(information_sousgroupe.path_fichier_backup, 'rb') as fp_transactions:
+                            with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fp_catalogue:
+                                self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue)
 
-                    self.soumettre_transactions_backup_horaire(information_sousgroupe)
+                        self.soumettre_transactions_backup_horaire(information_sousgroupe)
 
-                    # Calculer nouvelle entete
-                    entete_backup_precedent = information_sousgroupe.catalogue_backup[
-                        Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-                    hachage_entete = self.calculer_hash_entetebackup(entete_backup_precedent)
-                    chainage_backup_precedent = {
-                        Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
-                            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-                        ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete
-                    }
+                        # Calculer nouvelle entete
+                        entete_backup_precedent = information_sousgroupe.catalogue_backup[
+                            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
 
-                else:
-                    self.__logger.warning(
-                        "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
-                            self._nom_collection_transactions, str(information_sousgroupe.heure))
-                    )
+                    else:
+                        self.__logger.warning(
+                            "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
+                                self._nom_collection_transactions, str(information_sousgroupe.heure))
+                        )
 
-            # Progress update - backup horaire termine
-            self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
+                # Progress update - backup horaire termine
+                self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
 
-            # if heure_plus_vieille is not None:
-            #     # Declencher backup quotidien
-            #     self.transmettre_trigger_jour_precedent(heure_plus_vieille)
+                # if heure_plus_vieille is not None:
+                #     # Declencher backup quotidien
+                #     self.transmettre_trigger_jour_precedent(heure_plus_vieille)
 
         except Exception as e:
             self.__logger.exception("Erreur backup")
@@ -254,7 +278,15 @@ class HandlerBackupDomaine:
             self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, info=info)
             raise e
 
-    def preparer_sousgroupes_horaires(self, heure: datetime.datetime) -> list:
+    def trouver_entete_backup_precedent(self, domaine: str):
+        # TODO
+        filtre = {
+
+        }
+        collection_documents = self._contexte.document_dao.get_collection(self._nom_collection_documents)
+        return collection_documents.aggregate(filtre)
+
+    def preparer_sousgroupes_horaires(self, heure: datetime.datetime) -> Dict[str, GroupeSousdomaine]:
         """
         Trouver toutes les transactions disponibles pour un backup. Les grouper par sous-domaine/heure.
         :param heure:
@@ -265,7 +297,8 @@ class HandlerBackupDomaine:
 
         # Preparer la liste de tous les sous domaines par heure qui ne sont pas encore dans un backup
         # Calculer taille (nb transactions et groupes) du backup
-        groupes_sousdomaine_horaire = list()
+        groupes_sousdomaine = dict()
+        # groupes_sousdomaine_horaire = list()
         for transanter in curseur:
             self.__logger.debug("Vieille transaction : %s" % str(transanter))
             heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
@@ -276,9 +309,17 @@ class HandlerBackupDomaine:
                     self._nom_collection_transactions, sous_domaine, heure_anterieure,
                     snapshot=False
                 )
-                groupes_sousdomaine_horaire.append(information_backup)
 
-        return groupes_sousdomaine_horaire
+                try:
+                    groupe_sousdomaine = groupes_sousdomaine[sous_domaine]
+                except KeyError:
+                    groupe_sousdomaine = GroupeSousdomaine()
+                    groupes_sousdomaine[sous_domaine] = groupe_sousdomaine
+
+                # Inserer heure dans le groupe. Le tri est fait automatiquement
+                groupe_sousdomaine.append(information_backup)
+
+        return groupes_sousdomaine
 
     # def process_sousgroupe_horaire(self, sousgroupe_horaire: InformationSousDomaineHoraire):
     #
@@ -574,8 +615,6 @@ class HandlerBackupDomaine:
 
     def _effectuer_requete_domaine(self, heure: datetime.datetime):
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
-        idmg = self._contexte.idmg
-
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
             '_evenements.%s' % Constantes.EVENEMENT_TRANSACTION_BACKUP_FLAG: False,
