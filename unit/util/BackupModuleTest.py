@@ -19,12 +19,16 @@ class RequestsReponse:
 
     def __init__(self):
         self.status_code = 200
-        self.text = json.dumps({
+        self.json = {
             'fichiersDomaines': {
                 'backup.jsonl': 'allo'
             }
-        })
+        }
         self.headers = list()
+
+    @property
+    def text(self):
+        return json.dumps(self.json)
 
 
 class BackupUtilTest(TestCaseContexte):
@@ -528,9 +532,14 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         idmg = self.enveloppe_certificat.subject_organization_name
         self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
 
-        self.contexte.generateur_transactions.reset()
-
         self.files_for_cleanup = list()
+
+        # Override methode requests
+        self.handler_protege._requests_put = self.__requests_put
+        self.handler_public._requests_put = self.__requests_put
+
+        self._requests_calls = list()
+        self._requests_response = RequestsReponse()
 
     def tearDown(self) -> None:
         super().tearDown()
@@ -542,6 +551,24 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
                 pass # OK
             except Exception:
                 self.logger.exception("Erreur nettoyage fichier")
+
+    def __requests_put(self, *args, **kwargs):
+        self.logger.info("CALL requests_put:\n%s\n%s" % (args, kwargs))
+        self._requests_calls.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+
+        try:
+            test_params = kwargs['test_params']
+            information_sousgroupe = test_params['information_sousgroupe']
+        except (KeyError, TypeError):
+            pass  # OK Pas de valeur
+        else:
+            fichiers_domaine = self._requests_response.json['fichiersDomaines']
+            fichiers_domaine[information_sousgroupe.nom_fichier_backup] = information_sousgroupe.sha512_backup
+
+        return self._requests_response
 
     def test_execution_backup_horaire(self):
         ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
@@ -600,3 +627,31 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self.assertIsNotNone(catalogue['transactions_hachage'])
         self.assertIsNotNone(information_sousgroupe.sha512_catalogue)
 
+    def test_backup_horaire_domaine(self):
+        ts = datetime.datetime(2021, 1, 19, 0, 2)
+        entete_precedente = None
+        info_cles = None
+
+        contexte = self.contexte
+        document_dao = contexte.document_dao
+
+        ts_1 = datetime.datetime(2021, 1, 18, 22, 0)
+        document_dao.valeurs_aggregate.append([
+            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7}
+        ])
+
+        # Preparer transactions pour le backup
+        document_dao.valeurs_find.append([
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+            self.formatteur.signer_message({'valeur': 3})[0],
+        ])
+
+        self._requests_response.json = {
+            'fichiersDomaines': {
+                'sousdomaine_test.abcd.1234_transactions_2021011822_1.public.jsonl.xz': 'allo'
+            }
+        }
+
+        # Caller methode a tester
+        self.handler_public.backup_horaire_domaine(ts, entete_precedente, info_cles)

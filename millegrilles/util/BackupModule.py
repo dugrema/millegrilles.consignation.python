@@ -202,7 +202,7 @@ class HandlerBackupDomaine:
                     Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
                     ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(entete_backup_precedent)
                 }
-            except KeyError:
+            except (TypeError, KeyError):
                 # C'est le premier backup de la chaine
                 chainage_backup_precedent = None
 
@@ -376,7 +376,8 @@ class HandlerBackupDomaine:
             data=data,
             files=files,
             verify=self._contexte.configuration.mq_cafile,
-            cert=(certfile, keyfile)
+            cert=(certfile, keyfile),
+            test_params={'information_sousgroupe': information_sousgroupe} # Utilise pour UT
         )
 
         if r.status_code == 200:
@@ -792,17 +793,13 @@ class HandlerBackupDomaine:
         catalogue_backup = json.loads(catalogue_json)
         catalogue_backup = self._contexte.generateur_transactions.preparer_enveloppe(
             catalogue_backup, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE, ajouter_certificats=True)
+
+        # Remplacer le catalogue precedent dans information_sousgroupe
+        information_sousgroupe.catalogue_backup = catalogue_backup
+
+        # Sauvegarder sur disque
         catalogue_json = json.dumps(catalogue_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
         fp_fichier_catalogue.write(catalogue_json)
-
-        # # Sauvegarder catalogue sur disque pour transferer
-        # path_catalogue = information_sousgroupe.path_fichier_catalogue
-        # with lzma.open(path_catalogue, 'wt') as fichier:
-        #     # Dump du catalogue en format de transaction avec DateFormatEncoder
-        #     fichier.write(catalogue_json)
-        #
-        # sha512_digest = self.__calculer_fichier_SHA512(path_catalogue)
-        # return sha512_digest
 
     def preparer_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire):
         catalogue_backup = {

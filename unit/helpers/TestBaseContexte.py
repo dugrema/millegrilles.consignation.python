@@ -33,7 +33,8 @@ class TestCaseContexte(TestCase):
     def setUp(self) -> None:
         # self.__class__.logger.debug("setUp")
         # self.__class__.logger.debug("Ma valeur = %s" % self.__class__.ma_valeur)
-        self.contexte.reset()
+        pass
 
     def tearDown(self) -> None:
         self.__class__.logger.debug("tear down")
+        self.contexte.reset()
