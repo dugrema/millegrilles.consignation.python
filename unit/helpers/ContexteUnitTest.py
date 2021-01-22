@@ -93,6 +93,7 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
         super().__init__()
         self.liste_emettre_message = list()
         self.liste_transmettre_commande = list()
+        self.liste_relayer_transactions = list()
 
     def emettre_message(self, *args, **kwargs):
         # Capture messages
@@ -109,9 +110,16 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
         }
         return message
 
+    def relayer_transaction(self, *args, **kwargs):
+        self.liste_relayer_transactions.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+
     def reset(self):
         self.liste_emettre_message = list()
         self.liste_transmettre_commande = list()
+        self.liste_relayer_transactions = list()
 
 
 class DocumentDaoStub:

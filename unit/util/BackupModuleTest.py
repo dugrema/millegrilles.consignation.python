@@ -13,7 +13,6 @@ from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
-from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class RequestsReponse:
@@ -463,11 +462,43 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         cert = requests_call['kwargs']['cert']
 
         self.assertEqual('https://fichiers:443/backup/domaine/catalogue.json', requests_call['args'][0])
-        self.assertEqual(cert, ('/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert', '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'))
+        self.assertEqual(cert, (
+            '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert',
+            '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'
+        ))
         self.assertDictEqual(data, {'timestamp_backup': 1611003600, 'transaction_maitredescles': 'null'})
         self.assertEqual('/opt/millegrilles/etc/millegrilles.RootCA.pem', verify)
         self.assertEqual(('backup.jsonl', fp_backup, 'application/x-xz'), files['transactions'])
         self.assertEqual(('catalogue.json', fp_catalogue, 'application/x-xz'), files['catalogue'])
+
+    def test_soumettre_transactions_backup_horaire(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.catalogue_backup = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE: {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'DUMMY'
+            },
+            'securite': '3.protege',
+        }
+
+        # Caller methode a tester
+        self.handler_protege.soumettre_transactions_backup_horaire(information_sousgroupe)
+
+        # Verifications
+        evenement = self.contexte.generateur_transactions.liste_emettre_message[0]
+        transaction = self.contexte.generateur_transactions.liste_relayer_transactions[0]
+
+        self.assertDictEqual(transaction['args'][0], {
+            'en-tete': {'uuid_transaction': 'DUMMY'}, 'securite': '3.protege'
+        })
+        self.assertDictEqual(evenement['args'][0], {
+            '_evenements': 'evenement',
+            'uuid_transaction': [],
+            'domaine': 'TestTransactions',
+            'evenement': 'backup_horaire'
+        })
+        self.assertEqual('evenement.TestDomaine.transactionEvenement', evenement['args'][1])
 
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
