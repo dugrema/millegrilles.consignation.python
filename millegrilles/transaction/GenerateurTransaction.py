@@ -283,17 +283,8 @@ class GenerateurTransaction:
         else:
             return uuid_transaction
 
-    def relayer_transaction(self, enveloppe):
-
-        uuid_transaction = enveloppe.get(
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID)
-
-        self._contexte.message_dao.transmettre_message_noeuds(
-            message_dict=enveloppe, routing_key='transaction.nouvelle'
-        )
-
-        return uuid_transaction
+    def relayer_transaction(self, enveloppe, reply_to=None, correlation_id=None):
+        self._contexte.message_dao.transmettre_nouvelle_transaction(enveloppe, reply_to, correlation_id)
 
     def emettre_certificat(self, chaine_pem: list, correlation_csr: str = None):
         """

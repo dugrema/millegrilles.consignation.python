@@ -10,9 +10,22 @@ from lzma import LZMAFile, LZMAError
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
 from millegrilles.SecuritePKI import EnveloppeCertificat
+
+
+class RequestsReponse:
+
+    def __init__(self):
+        self.status_code = 200
+        self.text = json.dumps({
+            'fichiersDomaines': {
+                'backup.jsonl': 'allo'
+            }
+        })
+        self.headers = list()
 
 
 class BackupUtilTest(TestCaseContexte):
@@ -75,6 +88,11 @@ class HandlerBackupDomaineTest(TestCaseContexte):
             self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
             niveau_securite=Constantes.SECURITE_PUBLIC
         )
+
+        # Override methode requests
+        self.handler_protege._requests_put = self.__requests_put
+        self.handler_public._requests_put = self.__requests_put
+
         self.backup_util = BackupUtil(self.contexte)
 
         self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
@@ -82,6 +100,17 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
 
         self.contexte.generateur_transactions.reset()
+
+        self._requests_calls = list()
+        self._requests_response = RequestsReponse()
+
+    def __requests_put(self, *args, **kwargs):
+        self.logger.info("CALL requests_put:\n%s\n%s" % (args, kwargs))
+        self._requests_calls.append({
+            'args': args,
+            'kwargs': kwargs,
+        })
+        return self._requests_response
 
     def test_transmettre_evenement_backup(self):
         ts = datetime.datetime.utcnow()
@@ -409,6 +438,37 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual(3, len(catalogue['certificats_chaine_catalogue']))
         self.assertEqual(3, len(catalogue['certificats_pem']))
 
+    def test_uploader_fichiers_backup(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.path_fichier_backup = '/tmp/backup.jsonl'
+        information_sousgroupe.path_fichier_catalogue = '/tmp/catalogue.json'
+        information_sousgroupe.catalogue_backup = {
+            ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE: 'allo',
+        }
+
+        # Simuler fichiers en memoire
+        fp_backup = BytesIO()
+        fp_catalogue = BytesIO()
+
+        # Caller methode a tester
+        self.handler_protege.uploader_fichiers_backup(information_sousgroupe, fp_backup, fp_catalogue)
+
+        # Verification resultats
+        requests_call = self._requests_calls[0]
+        data = requests_call['kwargs']['data']
+        files = requests_call['kwargs']['files']
+        verify = requests_call['kwargs']['verify']
+        cert = requests_call['kwargs']['cert']
+
+        self.assertEqual('https://fichiers:443/backup/domaine/catalogue.json', requests_call['args'][0])
+        self.assertEqual(cert, ('/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert', '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'))
+        self.assertDictEqual(data, {'timestamp_backup': 1611003600, 'transaction_maitredescles': 'null'})
+        self.assertEqual('/opt/millegrilles/etc/millegrilles.RootCA.pem', verify)
+        self.assertEqual(('backup.jsonl', fp_backup, 'application/x-xz'), files['transactions'])
+        self.assertEqual(('catalogue.json', fp_catalogue, 'application/x-xz'), files['catalogue'])
+
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
 
@@ -499,6 +559,3 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self.assertEqual(3, backup_transactions[2]['valeur'])
         self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
 
-
-    # def test_uploader_fichiers_backup(self):
-    #     self.handler_protege.uploader_fichiers_backup()
