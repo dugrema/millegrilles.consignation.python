@@ -112,6 +112,8 @@ class TransactionConfiguration:
         # Cle et certificat du module
         self.__cle: Optional[EnveloppeCleCert] = None
 
+        self._backup_workdir: Optional[str] = None
+
     def loadEnvironment(self, additionals: list = None):
         fichier_json_path = os.environ.get(Constantes.CONFIG_FICHIER_JSON.upper())
         dict_fichier_json = dict()
@@ -466,7 +468,11 @@ class TransactionConfiguration:
 
     @property
     def backup_workdir(self):
-        return self._backup[Constantes.CONFIG_BACKUP_WORKDIR]
+        return self._backup_workdir or self._backup[Constantes.CONFIG_BACKUP_WORKDIR]
+
+    @backup_workdir.setter
+    def backup_workdir(self, backup_workdir: str):
+        self._backup_workdir = backup_workdir
 
     @property
     def cle(self) -> EnveloppeCleCert:

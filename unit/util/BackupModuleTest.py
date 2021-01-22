@@ -627,17 +627,19 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self.assertIsNotNone(catalogue['transactions_hachage'])
         self.assertIsNotNone(information_sousgroupe.sha512_catalogue)
 
-    def test_backup_horaire_domaine(self):
+    def test_backup_horaire_domaine_1domaine(self):
         ts = datetime.datetime(2021, 1, 19, 0, 2)
         entete_precedente = None
         info_cles = None
 
         contexte = self.contexte
+        configuration = contexte.configuration
+        configuration.backup_workdir = '/tmp/ut_backupmoduletest'
         document_dao = contexte.document_dao
 
         ts_1 = datetime.datetime(2021, 1, 18, 22, 0)
         document_dao.valeurs_aggregate.append([
-            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7}
+            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
         ])
 
         # Preparer transactions pour le backup
@@ -648,10 +650,113 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         ])
 
         self._requests_response.json = {
-            'fichiersDomaines': {
-                'sousdomaine_test.abcd.1234_transactions_2021011822_1.public.jsonl.xz': 'allo'
-            }
+            'fichiersDomaines': dict()
         }
 
         # Caller methode a tester
         self.handler_public.backup_horaire_domaine(ts, entete_precedente, info_cles)
+
+        # Preparation au nettoyage
+        generateur_transactions = self.contexte.generateur_transactions
+        info_transaction_catalogue = generateur_transactions.liste_relayer_transactions[0]
+        transaction_catalogue = info_transaction_catalogue['args'][0]
+        fichiers = [os.path.join(configuration.backup_workdir, f) for f in [
+            transaction_catalogue['transactions_nomfichier'],
+            transaction_catalogue['catalogue_nomfichier'],
+        ]]
+        self.files_for_cleanup.extend(fichiers)
+
+        # Verifications
+
+        # On verifie les fichiers non-chiffres sauvegardes sur disque
+        catalogues = list()
+        for f in fichiers:
+            with lzma.open(f, 'rt') as fichier:
+                for l in fichier:
+                    contenu = json.loads(l)
+
+                    # Conserver catalogue pour test additionnel
+                    if f.find('catalogue') > 0:
+                        catalogues.append(contenu)
+
+                    try:
+                        self.contexte.validateur_message.verifier(contenu)
+                    except KeyError as e:
+                        # OK si on a une entete generee par le contexte UT
+                        if contenu['en-tete']['uuid_transaction'] != 'dummy':
+                            raise e
+
+        # On verifie le chainage des catalogues
+        self.assertEqual(1, len(catalogues))
+        self.assertIsNone(catalogues[0]['backup_precedent'])
+
+    def test_backup_horaire_domaine_1domaine_chainage(self):
+        ts = datetime.datetime(2021, 1, 19, 0, 2)
+        entete_precedente = None
+        info_cles = None
+
+        contexte = self.contexte
+        configuration = contexte.configuration
+        configuration.backup_workdir = '/tmp/ut_backupmoduletest'
+        document_dao = contexte.document_dao
+
+        ts_1 = datetime.datetime(2021, 1, 18, 20, 0)
+        ts_2 = datetime.datetime(2021, 1, 18, 21, 0)
+        ts_3 = datetime.datetime(2021, 1, 18, 22, 0)
+        document_dao.valeurs_aggregate.append([
+            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
+            {'_id': {'timestamp': ts_2}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 3},
+            {'_id': {'timestamp': ts_3}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 5},
+        ])
+
+        # Preparer transactions pour le backup, 3 groupes pour test de chainage
+        document_dao.valeurs_find.append([self.formatteur.signer_message({'valeur': 1})[0]])
+        document_dao.valeurs_find.append([self.formatteur.signer_message({'valeur': 2})[0]])
+        document_dao.valeurs_find.append([self.formatteur.signer_message({'valeur': 3})[0]])
+
+        self._requests_response.json = {
+            'fichiersDomaines': dict()
+        }
+
+        # Caller methode a tester
+        self.handler_public.backup_horaire_domaine(ts, entete_precedente, info_cles)
+
+        # Preparation au nettoyage
+        generateur_transactions = self.contexte.generateur_transactions
+        for info_transaction_catalogue in generateur_transactions.liste_relayer_transactions:
+            transaction_catalogue = info_transaction_catalogue['args'][0]
+            fichiers = [os.path.join(configuration.backup_workdir, f) for f in [
+                transaction_catalogue['transactions_nomfichier'],
+                transaction_catalogue['catalogue_nomfichier'],
+            ]]
+            self.files_for_cleanup.extend(fichiers)
+
+        # Verifications
+
+        # On verifie les fichiers non-chiffres sauvegardes sur disque
+        catalogues = list()
+        for f in self.files_for_cleanup:
+            with lzma.open(f, 'rt') as fichier:
+                for l in fichier:
+                    contenu = json.loads(l)
+
+                    # Conserver catalogue pour test additionnel
+                    if f.find('catalogue') > 0:
+                        catalogues.append(contenu)
+
+                    try:
+                        self.contexte.validateur_message.verifier(contenu)
+                    except KeyError as e:
+                        # OK si on a une entete generee par le contexte UT
+                        if not contenu['en-tete']['uuid_transaction'].startswith('dummy.'):
+                            raise e
+
+        # On verifie le chainage des catalogues, hachage des entetes
+        self.assertEqual(3, len(catalogues))
+        self.assertIsNone(catalogues[0]['backup_precedent'])
+        self.assertDictEqual(catalogues[1]['backup_precedent'], {
+            'hachage_entete': 'sha256_b64:EsMUl/S7JTgOBTPbhogyCTVuzCpn3xfA7hgCmSMwoWs=', 'uuid_transaction': 'dummy.0'
+        })
+        self.assertDictEqual(catalogues[2]['backup_precedent'], {
+            'hachage_entete': 'sha256_b64:pyVbBs8ujea0IHi5k9KevV8x0Y+2oHxtoKJEzkUdKJM=', 'uuid_transaction': 'dummy.1'
+        })

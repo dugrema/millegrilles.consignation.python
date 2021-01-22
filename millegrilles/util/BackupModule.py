@@ -210,6 +210,8 @@ class HandlerBackupDomaine:
 
             # Transmettre info de debut de backup au client
             for information_sousgroupe in sousgroupes_horaire:
+                information_sousgroupe.chainage_backup_precedent = chainage_backup_precedent
+
                 self._preparation_backup_horaire(information_sousgroupe)
                 self._execution_backup_horaire(information_sousgroupe)
 

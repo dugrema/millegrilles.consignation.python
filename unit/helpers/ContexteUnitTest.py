@@ -95,6 +95,7 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
         self.liste_emettre_message = list()
         self.liste_transmettre_commande = list()
         self.liste_relayer_transactions = list()
+        self.compteur_enveloppes = 0
 
     def soumettre_transaction(self, *args, **kwargs):
         self.liste_soumettre_transaction.append({'args': args, 'kwargs': kwargs})
@@ -110,8 +111,9 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
     def preparer_enveloppe(self, *args, **kwargs):
         message = args[0]
         message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = {
-            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'dummy'
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'dummy.%d' % self.compteur_enveloppes
         }
+        self.compteur_enveloppes = self.compteur_enveloppes + 1
         return message
 
     def relayer_transaction(self, *args, **kwargs):
@@ -125,6 +127,7 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
         self.liste_emettre_message = list()
         self.liste_transmettre_commande = list()
         self.liste_relayer_transactions = list()
+        self.compteur_enveloppes = 0
 
 
 class DocumentDaoStub:
