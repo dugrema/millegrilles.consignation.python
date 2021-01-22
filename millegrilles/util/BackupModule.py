@@ -733,7 +733,7 @@ class HandlerBackupDomaine:
         prefixe_fichier = information_sousgroupe.sous_domaine
 
         # Determiner si on doit chiffrer le fichier de transactions
-        chiffrer_transactions = self.__niveau_securite in [Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
+        chiffrer_transactions = self.__niveau_securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
         # Nom fichier transactions avec .jsonl, indique que chaque ligne est un message JSON
 
         if chiffrer_transactions:
@@ -757,8 +757,6 @@ class HandlerBackupDomaine:
 
         # Preparer chiffrage, cle
         if chiffrer_transactions:
-            cles_set = ['certificats_racine', 'certificats_intermediaires', 'certificats', 'fuuid_grosfichiers']
-
             cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(
                 information_sousgroupe.catalogue_backup, information_sousgroupe.info_cles,
                 nom_domaine=information_sousgroupe.sous_domaine

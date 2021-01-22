@@ -597,4 +597,6 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self.assertEqual(2, backup_transactions[1]['valeur'])
         self.assertEqual(3, backup_transactions[2]['valeur'])
         self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
+        self.assertIsNotNone(catalogue['transactions_hachage'])
+        self.assertIsNotNone(information_sousgroupe.sha512_catalogue)
 
