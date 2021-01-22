@@ -232,24 +232,27 @@ class GestionnaireModulesDocker:
 
         entretien_compte_complete = True
         for service_name in self.__modules_requis:
-            params = self.get_configuration_services()[service_name]
-            service = dict_services.get(service_name)
-            if not service:
-                try:
-                    self.demarrer_service(service_name, **params)
-                except IndexError:
-                    self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
-                entretien_compte_complete = False
-                break  # On demarre un seul service a la fois, on attend qu'il soit pret
-            else:
-                # Verifier etat service
-                self.verifier_etat_service(service)
-
-                if self.__derniere_creation_comptes < datetime.datetime.utcnow() - self.__intervalle_entretien_comptes:
+            try:
+                params = self.get_configuration_services()[service_name]
+                service = dict_services.get(service_name)
+                if not service:
                     try:
-                        self.creer_comptes_service(service)
-                    except:
-                        entretien_compte_complete = False
+                        self.demarrer_service(service_name, **params)
+                    except IndexError:
+                        self.__logger.error("Configuration service docker.cfg.%s introuvable" % service_name)
+                    entretien_compte_complete = False
+                    break  # On demarre un seul service a la fois, on attend qu'il soit pret
+                else:
+                    # Verifier etat service
+                    self.verifier_etat_service(service)
+
+                    if self.__derniere_creation_comptes < datetime.datetime.utcnow() - self.__intervalle_entretien_comptes:
+                        try:
+                            self.creer_comptes_service(service)
+                        except:
+                            entretien_compte_complete = False
+            except Exception:
+                self.__logger.exception("Erreur verification etat service %s" % service_name)
 
         # Liste des applications container (sans service)
         liste_applications_arretees = self.__docker.containers.list(
@@ -607,12 +610,16 @@ class GestionnaireModulesDocker:
             task_name = service.name
             configuration_service_meta = MonitorConstantes.DICT_MODULES_PROTEGES.get(task_name)
             if configuration_service_meta:
-                configuration_service = self.charger_config_recente('docker.cfg.' + configuration_service_meta['role'])
-                config_attrs = configuration_service['config'].attrs
-                configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
-                certificat_compte_cle = configuration_service_json.get('certificat_compte')
-                if certificat_compte_cle:
-                    self.creer_compte(certificat_compte_cle)
+                try:
+                    configuration_service = self.charger_config_recente('docker.cfg.' + configuration_service_meta['role'])
+                except KeyError:
+                    self.__logger.warning("Configuration inconnue pour role : %s" % task_name)
+                else:
+                    config_attrs = configuration_service['config'].attrs
+                    configuration_service_json = json.loads(b64decode(config_attrs['Spec']['Data']))
+                    certificat_compte_cle = configuration_service_json.get('certificat_compte')
+                    if certificat_compte_cle:
+                        self.creer_compte(certificat_compte_cle)
 
             service.force_update()
 

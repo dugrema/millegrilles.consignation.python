@@ -182,12 +182,11 @@ class HandlerBackupDomaine:
         self.__niveau_securite = niveau_securite
         self.__backup_util = BackupUtil(contexte)
 
-    def backup_horaire_domaine(self, heure: datetime.datetime, entete_backup_precedent: dict, info_cles: dict):
+    def backup_horaire_domaine(self, heure: datetime.datetime, info_cles: dict):
         """
         Effectue le backup horaire pour un domaine.
 
         :param heure: Heure du backup horaire
-        :param entete_backup_precedent: Entete du catalogue precedent, sert a creer une chaine de backups (merkle tree)
         :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         :return:
         """
@@ -195,6 +194,9 @@ class HandlerBackupDomaine:
         try:
             # Progress update - debut backup horaire
             self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
+
+            # Trouver le plus recent backup
+
 
             # Preparer chainange avec plus recent backup
             try:
