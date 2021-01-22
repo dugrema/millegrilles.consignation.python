@@ -243,6 +243,7 @@ class HandlerBackupDomaine:
                         chainage_backup_precedent = None
 
                     information_sousgroupe.chainage_backup_precedent = chainage_backup_precedent
+                    information_sousgroupe.info_cles = info_cles
 
                     self._preparation_backup_horaire(information_sousgroupe)
                     self._execution_backup_horaire(information_sousgroupe)
@@ -733,8 +734,10 @@ class HandlerBackupDomaine:
 
                 tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
                 if information_sousgroupe.cipher is not None:
+                    cipher = information_sousgroupe.cipher
+                    cipher.start_encrypt()
                     fp_fichier.write(
-                        information_sousgroupe.cipher.update(
+                        cipher.update(
                             lzma_compressor.compress(tran_json.encode('utf-8'))
                         )
                     )
@@ -742,8 +745,8 @@ class HandlerBackupDomaine:
                     fp_fichier.write(lzma_compressor.compress(tran_json.encode('utf-8')))
 
                 # Une transaction par ligne
-                if information_sousgroupe.cipher is not None:
-                    fp_fichier.write(information_sousgroupe.cipher.update(lzma_compressor.compress(b'\n')))
+                if cipher is not None:
+                    fp_fichier.write(cipher.update(lzma_compressor.compress(b'\n')))
                 else:
                     fp_fichier.write(lzma_compressor.compress(b'\n'))
 

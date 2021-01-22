@@ -762,3 +762,66 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self.assertDictEqual(catalogues[2]['backup_precedent'], {
             'hachage_entete': 'sha256_b64:pyVbBs8ujea0IHi5k9KevV8x0Y+2oHxtoKJEzkUdKJM=', 'uuid_transaction': 'dummy.1'
         })
+
+    def test_backup_horaire_domaine_protege(self):
+        ts = datetime.datetime(2021, 1, 19, 0, 2)
+        clecert = self.contexte.configuration.cle
+        info_cles = {
+            'certificat': [clecert.cert_bytes.decode('utf-8')],
+            'certificat_millegrille': clecert.chaine[-1],
+            'certificats_backup': dict(),
+        }
+
+        contexte = self.contexte
+        configuration = contexte.configuration
+        configuration.backup_workdir = '/tmp/ut_backupmoduletest'
+        document_dao = contexte.document_dao
+
+        ts_1 = datetime.datetime(2021, 1, 18, 22, 0)
+        document_dao.valeurs_aggregate.append([
+            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
+        ])
+        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
+
+        # Preparer transactions pour le backup
+        document_dao.valeurs_find.append([
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+            self.formatteur.signer_message({'valeur': 3})[0],
+        ])
+
+        self._requests_response.json = {
+            'fichiersDomaines': dict()
+        }
+
+        # Caller methode a tester
+        self.handler_protege.backup_horaire_domaine(ts, info_cles)
+
+        # Preparation au nettoyage
+        generateur_transactions = self.contexte.generateur_transactions
+        info_transaction_catalogue = generateur_transactions.liste_relayer_transactions[0]
+        transaction_catalogue = info_transaction_catalogue['args'][0]
+        fichiers = [os.path.join(configuration.backup_workdir, f) for f in [
+            transaction_catalogue['transactions_nomfichier'],
+            transaction_catalogue['catalogue_nomfichier'],
+        ]]
+        self.files_for_cleanup.extend(fichiers)
+
+        # Verifications
+
+        # On verifie les fichiers non-chiffres sauvegardes sur disque
+        catalogues = list()
+        for f in fichiers:
+            with lzma.open(f, 'rt') as fichier:
+                if f.find('transaction') > 0:
+                    # S'assurer que le fichier de backup n'est pas "lisible"
+                    self.assertRaises(LZMAError, fichier.read)
+                else:
+                    contenu = json.loads(fichier.read())
+                    catalogues.append(contenu)
+
+        # On verifie le chainage des catalogues
+        self.assertEqual(1, len(catalogues))
+        self.assertIsNone(catalogues[0]['backup_precedent'])
+
+
