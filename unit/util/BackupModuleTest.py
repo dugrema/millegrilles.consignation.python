@@ -1,6 +1,8 @@
 import datetime
 import pytz
 import json
+import os
+import lzma
 
 from base64 import b64decode
 from io import BytesIO, StringIO
@@ -17,7 +19,6 @@ class BackupUtilTest(TestCaseContexte):
 
     def setUp(self) -> None:
         super().setUp()
-
         self.backup_util = BackupUtil(self.contexte)
 
     def test_preparer_cipher(self):
@@ -407,3 +408,97 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
         self.assertEqual(3, len(catalogue['certificats_chaine_catalogue']))
         self.assertEqual(3, len(catalogue['certificats_pem']))
+
+
+class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        super().setUp()
+
+        self.handler_protege = HandlerBackupDomaine(
+            self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
+            niveau_securite=Constantes.SECURITE_PROTEGE
+        )
+        self.handler_public = HandlerBackupDomaine(
+            self.contexte, "TestDomaine", "TestTransactions", "TestDocuments",
+            niveau_securite=Constantes.SECURITE_PUBLIC
+        )
+        self.backup_util = BackupUtil(self.contexte)
+
+        self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
+        idmg = self.enveloppe_certificat.subject_organization_name
+        self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
+
+        self.contexte.generateur_transactions.reset()
+
+        self.files_for_cleanup = list()
+
+    def tearDown(self) -> None:
+        super().tearDown()
+
+        for f in self.files_for_cleanup:
+            try:
+                os.unlink(f)
+            except FileNotFoundError:
+                pass # OK
+            except Exception:
+                self.logger.exception("Erreur nettoyage fichier")
+
+    def test_execution_backup_horaire(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+
+        information_sousgroupe.path_fichier_catalogue = '/tmp/catalogue.json'
+        information_sousgroupe.path_fichier_backup = '/tmp/backup.jsonl'
+
+        document_dao = self.contexte.document_dao
+
+        # Preparer transactions pour le backup
+        document_dao.valeurs_find.append([
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+            self.formatteur.signer_message({'valeur': 3})[0],
+        ])
+
+        self.files_for_cleanup.extend([
+            information_sousgroupe.path_fichier_catalogue,
+            information_sousgroupe.path_fichier_backup,
+        ])
+
+        clecert = self.contexte.configuration.cle
+        info_cles = {
+            'certificat': [clecert.cert_bytes.decode('utf-8')],
+            'certificat_millegrille': clecert.chaine[-1],
+            'certificats_backup': dict(),
+        }
+        information_sousgroupe.info_cles = info_cles
+
+        information_sousgroupe.catalogue_backup = {
+            'certificats_millegrille': set(),
+            'certificats_intermediaires': set(),
+            'certificats': set(),
+            'fuuid_grosfichiers': set()
+        }
+
+        # Caller methode a tester
+        self.handler_protege._execution_backup_horaire(information_sousgroupe)
+
+        # Verifier contenu
+        backup_transactions = list()
+        with lzma.open(information_sousgroupe.path_fichier_backup, 'rt') as fichier:
+            l = fichier.readline()
+            while l:
+                backup_transactions.append(json.loads(l))
+                l = fichier.readline()
+        with lzma.open(information_sousgroupe.path_fichier_catalogue, 'rt') as fichier:
+            catalogue = json.load(fichier)
+
+        self.assertEqual(1, backup_transactions[0]['valeur'])
+        self.assertEqual(2, backup_transactions[1]['valeur'])
+        self.assertEqual(3, backup_transactions[2]['valeur'])
+        self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
+
+
+    # def test_uploader_fichiers_backup(self):
+    #     self.handler_protege.uploader_fichiers_backup()

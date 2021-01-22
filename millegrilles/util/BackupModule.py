@@ -658,9 +658,16 @@ class HandlerBackupDomaine:
                 info_transaction = self._extraire_certificats(transaction, information_sousgroupe.heure)
                 for cle in InformationSousDomaineHoraire.CLES_SET:
                     try:
-                        information_sousgroupe.catalogue_backup[cle].update(info_transaction[cle])
+                        groupe_cles_backup = information_sousgroupe.catalogue_backup[cle]
                     except KeyError:
-                        pass
+                        groupe_cles_backup = set()
+                        information_sousgroupe.catalogue_backup[cle] = groupe_cles_backup
+
+                    try:
+                        cles_transaction = info_transaction[cle]
+                        groupe_cles_backup.update(cles_transaction)
+                    except KeyError:
+                        pass  # OK, group non present dans transaction
 
                 tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
                 if information_sousgroupe.cipher is not None:
@@ -688,6 +695,7 @@ class HandlerBackupDomaine:
             except (CertificatInvalide, CertificatInconnu):
                 self.__logger.error("Erreur, certificat de transaction invalide : %s" % uuid_transaction)
                 information_sousgroupe.liste_uuids_invalides.append(uuid_transaction)
+
         if information_sousgroupe.cipher is not None:
             fp_fichier.write(information_sousgroupe.cipher.update(lzma_compressor.flush()))
             fp_fichier.write(information_sousgroupe.cipher.finalize())
