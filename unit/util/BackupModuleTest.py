@@ -809,7 +809,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
 
         # Verifications
 
-        # On verifie les fichiers non-chiffres sauvegardes sur disque
+        # On verifie les fichiers sauvegardes sur disque
         catalogues = list()
         for f in fichiers:
             with lzma.open(f, 'rt') as fichier:
@@ -823,5 +823,3 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         # On verifie le chainage des catalogues
         self.assertEqual(1, len(catalogues))
         self.assertIsNone(catalogues[0]['backup_precedent'])
-
-

@@ -741,13 +741,13 @@ class HandlerBackupDomaine:
                             lzma_compressor.compress(tran_json.encode('utf-8'))
                         )
                     )
+
+                    # Une transaction par ligne
+                    fp_fichier.write(information_sousgroupe.cipher.update(lzma_compressor.compress(b'\n')))
                 else:
                     fp_fichier.write(lzma_compressor.compress(tran_json.encode('utf-8')))
 
-                # Une transaction par ligne
-                if cipher is not None:
-                    fp_fichier.write(cipher.update(lzma_compressor.compress(b'\n')))
-                else:
+                    # Une transaction par ligne
                     fp_fichier.write(lzma_compressor.compress(b'\n'))
 
                 # La transaction est bonne, on l'ajoute a la liste inclue dans le backup
