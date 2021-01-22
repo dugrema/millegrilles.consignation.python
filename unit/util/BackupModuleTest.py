@@ -487,11 +487,19 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
         # Verifications
         evenement = self.contexte.generateur_transactions.liste_emettre_message[0]
-        transaction = self.contexte.generateur_transactions.liste_relayer_transactions[0]
+        transaction_catalogue = self.contexte.generateur_transactions.liste_relayer_transactions[0]
+        transaction_hachage = self.contexte.generateur_transactions.liste_soumettre_transaction[0]
 
-        self.assertDictEqual(transaction['args'][0], {
-            'en-tete': {'uuid_transaction': 'DUMMY'}, 'securite': '3.protege'
+        self.assertDictEqual(transaction_catalogue['args'][0], information_sousgroupe.catalogue_backup)
+        self.assertDictEqual(transaction_hachage['args'][0], {
+            'domaine': 'sousdomaine_test',
+            'securite': '3.protege',
+            'heure': 1611003600,
+            'catalogue_hachage': None,
+            'hachage_entete': 'sha256_b64:T87zS0qkcWmB6xvCFENW0puNff7mGb2QVgx/G+ITKkg=',
+            'uuid_transaction': 'DUMMY'
         })
+        self.assertEqual('Backup.catalogueHoraireHachage', transaction_hachage['args'][1])
         self.assertDictEqual(evenement['args'][0], {
             '_evenements': 'evenement',
             'uuid_transaction': [],
