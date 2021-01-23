@@ -15,6 +15,7 @@ from millegrilles.Constantes import ConstantesBackup, ConstantesGrosFichiers
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
 from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
+from millegrilles.domaines.MaitreDesCles import HandlerBackupMaitreDesCles
 
 
 class RequestsReponse:
@@ -626,6 +627,73 @@ class HandlerBackupGrosFichiersTest(TestCaseContexte):
         self.assertListEqual(['sha256_b64:VAbbqvSU4Iq1+/ajwcc4nklWFkPrcuPsWHuHUe59Cb8='], resultat['certificats_millegrille'])
         self.assertEqual(1, len(resultat['certificats']))
         self.assertEqual(1, len(resultat['certificats_intermediaires']))
+
+
+class HandlerBackupMaitreDesClesTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        super().setUp()
+
+        self.handler_maitredescles_protege = HandlerBackupMaitreDesCles(self.contexte)
+
+        self.backup_util = BackupUtil(self.contexte)
+
+        self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
+        idmg = self.enveloppe_certificat.subject_organization_name
+        self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
+
+        self.contexte.generateur_transactions.reset()
+
+        self._requests_calls = list()
+        self._requests_response = RequestsReponse()
+
+    def test_persister_transactions_backup(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        fp = BytesIO()  # Simuler output fichier en memoire
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+        information_sousgroupe.catalogue_backup = dict()
+
+        # S'assurer que le certificat est dans le cache
+        self.contexte.validateur_pki.valider(self.enveloppe_certificat.chaine_pem())
+
+        # Data pour simuler transactions
+        curseur = [
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+        ]
+
+        # Call methode a tester
+        self.handler_maitredescles_protege._persister_transactions_backup(information_sousgroupe, curseur, fp)
+
+        # Verification
+
+        # Extraire transactions du contenu compresse en LZMA
+        transactions_archivees = dict()
+        bytes_ecrits = fp.getbuffer()
+        with BytesIO(bytes_ecrits) as reader:
+            lzma_file_object = LZMAFile(reader)
+            for transaction_str in lzma_file_object:
+                transaction = json.loads(transaction_str)
+                transactions_archivees[transaction['valeur']] = transaction
+
+        self.assertEqual(2, len(transactions_archivees))
+        self.assertEqual(2, len(information_sousgroupe.uuid_transactions))
+
+    def test_preparation_backup_horaire(self):
+        ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
+        information_sousgroupe = InformationSousDomaineHoraire(
+            'collection_test', 'sousdomaine_test', ts_groupe, snapshot=False)
+
+        self.handler_maitredescles_protege._preparation_backup_horaire(information_sousgroupe)
+
+        # Verification
+        self.assertEqual('sousdomaine_test', information_sousgroupe.sous_domaine)
+        self.assertEqual(ts_groupe, information_sousgroupe.heure)
+        self.assertEqual(ts_groupe + datetime.timedelta(hours=1), information_sousgroupe.heure_fin)
+        self.assertEqual('collection_test', information_sousgroupe.nom_collection_mongo)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_2021011821_3.protege.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_2021011821_3.protege.json.xz', information_sousgroupe.path_fichier_catalogue)
 
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):

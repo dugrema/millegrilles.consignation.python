@@ -173,6 +173,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         self.__handler_commandes[Constantes.SECURITE_SECURE] = TraitementCommandesMaitreDesClesSecures(self)
 
         self.__encryption_helper = None
+        self.__handler_backup = HandlerBackupMaitreDesCles(self._contexte)
 
     def configurer(self):
         super().configurer()
@@ -2050,6 +2051,26 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def supporte_regenerer_global(self):
         """
         :return: False, le maitre de cles ne supporte pas regeneration globale
+        """
+        return False
+
+    @property
+    def handler_backup(self):
+        return self.__handler_backup
+
+
+class HandlerBackupMaitreDesCles(HandlerBackupDomaine):
+
+    def __init__(self, contexte):
+        super().__init__(contexte,
+                         ConstantesMaitreDesCles.DOMAINE_NOM,
+                         ConstantesMaitreDesCles.COLLECTION_TRANSACTIONS_NOM,
+                         ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+
+    def _doit_chiffrer(self):
+        """
+        Les transactions de cles sont deja chiffrees (asymetrique). On ne rechiffre pas une deuxieme fois.
+        :return:
         """
         return False
 
