@@ -584,10 +584,7 @@ class HandlerBackupDomaine:
         prefixe_fichier = information_sousgroupe.sous_domaine
 
         # Determiner si on doit chiffrer le fichier de transactions
-        chiffrer_transactions = self.__niveau_securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE, Constantes.SECURITE_SECURE]
-        # Nom fichier transactions avec .jsonl, indique que chaque ligne est un message JSON
-
-        if chiffrer_transactions:
+        if self._doit_chiffrer():
             # Fichier va etre chiffre en format mgs1
             extension_transactions = 'jsonl.xz.mgs1'
         else:
@@ -607,7 +604,7 @@ class HandlerBackupDomaine:
         self.preparer_catalogue(information_sousgroupe)
 
         # Preparer chiffrage, cle
-        if chiffrer_transactions:
+        if self._doit_chiffrer():
             cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(
                 information_sousgroupe.catalogue_backup, information_sousgroupe.info_cles,
                 nom_domaine=information_sousgroupe.sous_domaine
@@ -626,6 +623,15 @@ class HandlerBackupDomaine:
                 # Conserver les cles de backup dans le snapshot - ces cles ne sont pas sauvegardes par le
                 # maitre des cles (snapshot est temporaire)
                 information_sousgroupe.catalogue_backup['cles'] = transaction_maitredescles['cles']
+
+    def _doit_chiffrer(self):
+        """
+        :return: True s'il faut chiffrer le fichier de transactions.
+        """
+        chiffrer_transactions = self.__niveau_securite in [Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE,
+                                                           Constantes.SECURITE_SECURE]
+
+        return chiffrer_transactions
 
     def persister_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier_catalogue):
         catalogue_backup = information_sousgroupe.catalogue_backup
