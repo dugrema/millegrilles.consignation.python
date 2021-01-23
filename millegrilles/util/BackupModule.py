@@ -427,142 +427,12 @@ class HandlerBackupDomaine:
         self._contexte.generateur_transactions.soumettre_transaction(
             transaction_sha512_catalogue, ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE_HACHAGE)
 
-    def backup_snapshot(self, entete_backup_precedent: dict, info_cles: dict):
-        """
-
-        :param entete_backup_precedent: Entete du catalogue precedent, sert a creer une chaine de backups (merkle tree)
-        :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
-        :return:
-        """
-        debut_backup = datetime.datetime.utcnow()
-
-        self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_DEBUT, debut_backup)
-
-        curseur = self._effectuer_requete_domaine(debut_backup)
-
-        # Utilise pour creer une chaine entre backups horaires
-        chainage_backup_precedent = None
-        if entete_backup_precedent:
-            chainage_backup_precedent = {
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
-                    Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-                ConstantesBackup.LIBELLE_HACHAGE_ENTETE: self.calculer_hash_entetebackup(entete_backup_precedent)
-            }
-
-        #SNAP heures_sous_domaines = dict()
-        heure_backup = datetime.datetime.utcnow()
-
-        try:
-            for sousdomaines_horaire in curseur:
-                self.__logger.debug("Groupement de sous-domaines horaire : %s" % str(sousdomaines_horaire))
-                # SNAP heure_anterieure = pytz.utc.localize(transanter['_id']['timestamp'])
-                for sous_domaine_gr in sousdomaines_horaire['sousdomaine']:
-                    sous_domaine = '.'.join(sous_domaine_gr)
-                    self.__logger.debug("Sous-domaine horaire : %s" % str(sousdomaines_horaire))
-
-                    # Conserver l'heure la plus vieille dans ce backup
-                    # Permet de declencher backup quotidiens anterieurs
-                    # SNAP heure_plusvieille = heures_sous_domaines.get(sous_domaine)
-                    # SNAP if heure_plusvieille is None or heure_plusvieille > heure_anterieure:
-                    # SNAP     heure_plusvieille = heure_anterieure
-                    # SNAP     heures_sous_domaines[sous_domaine] = heure_anterieure
-
-                    # Creer le fichier de backup
-                    dependances_backup = self._backup_horaire_domaine(
-                        self._nom_collection_transactions,
-                        sous_domaine,
-                        heure_backup,
-                        chainage_backup_precedent,
-                        info_cles,
-                        snapshot=True
-                    )
-
-                    catalogue_backup = dependances_backup.get('catalogue')
-                    if catalogue_backup is not None:
-                        self.transmettre_evenement_backup(
-                            ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_CATALOGUE_PRET, debut_backup)
-
-                        hachage_entete = self.calculer_hash_entetebackup(
-                            catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE])
-                        uuid_transaction_catalogue = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
-
-                        path_fichier_transactions = dependances_backup['path_fichier_backup']
-                        nom_fichier_transactions = path.basename(path_fichier_transactions)
-
-                        path_fichier_catalogue = dependances_backup['path_catalogue']
-                        nom_fichier_catalogue = path.basename(path_fichier_catalogue)
-
-                        self.__logger.debug("Information fichier backup:\n%s" % json.dumps(dependances_backup, indent=4,
-                                                                                           cls=BackupFormatEncoder))
-
-                        # Transferer vers consignation_fichier
-                        data = {
-                            'timestamp_backup': int(heure_backup.timestamp()),
-                            'fuuid_grosfichiers': json.dumps(catalogue_backup['fuuid_grosfichiers']),
-                        }
-
-                        # Preparer URL de connexion a consignationfichiers
-                        url_consignationfichiers = 'https://%s:%s' % (
-                            self._contexte.configuration.serveur_consignationfichiers_host,
-                            self._contexte.configuration.serveur_consignationfichiers_port
-                        )
-
-                        with open(path_fichier_transactions, 'rb') as transactions_fichier:
-                            with open(path_fichier_catalogue, 'rb') as catalogue_fichier:
-                                files = {
-                                    'transactions': (nom_fichier_transactions, transactions_fichier, 'application/x-xz'),
-                                    'catalogue': (nom_fichier_catalogue, catalogue_fichier, 'application/x-xz'),
-                                }
-
-                                certfile = self._contexte.configuration.mq_certfile
-                                keyfile = self._contexte.configuration.mq_keyfile
-
-                                r = requests.put(
-                                    '%s/backup/domaine/%s' % (url_consignationfichiers, nom_fichier_catalogue),
-                                    data=data,
-                                    files=files,
-                                    verify=self._contexte.configuration.mq_cafile,
-                                    cert=(certfile, keyfile)
-                                )
-
-                        if r.status_code == 200:
-                            self.transmettre_evenement_backup(
-                                ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_UPLOAD_CONFIRME, debut_backup)
-
-                            reponse_json = json.loads(r.text)
-                            self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
-
-                            # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
-                            if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
-                                    catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]:
-                                raise ValueError(
-                                    "Le hachage du fichier de backup de transactions ne correspond pas a celui recu de consignationfichiers")
-
-                        else:
-                            raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
-
-                        # Calculer nouvelle entete
-                        entete_backup_precedent = catalogue_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-                        chainage_backup_precedent = {
-                            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: entete_backup_precedent[
-                                Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
-                            ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete
-                        }
-
-                    else:
-                        self.__logger.warning(
-                            "Aucune transaction valide inclue dans le backup snapshot de %s a %s mais transactions en erreur presentes" % (
-                                self._nom_collection_transactions, str(heure_backup))
-                        )
-
-            self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_TERMINE, debut_backup)
-        except Exception as e:
-            self.__logger.exception("Erreur traitement backup")
-            info = {'err': str(e)}
-            self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_SNAPSHOT_TERMINE, debut_backup, info=info)
-
     def _effectuer_requete_domaine(self, heure: datetime.datetime):
+        """
+        Requete mongodb pour grouper les transactions par heure.
+        :param heure: Timestamp max pour les transactions a trouver
+        :return: Curseur de groupes de transactions non sauvegardees dans un backup precedent l'heure en parametre
+        """
         # Verifier s'il y a des transactions qui n'ont pas ete traitees avant la periode actuelle
         filtre_verif_transactions_anterieures = {
             '_evenements.transaction_complete': True,
@@ -643,8 +513,12 @@ class HandlerBackupDomaine:
 
     def _persister_transactions_backup(self, information_sousgroupe: InformationSousDomaineHoraire, curseur, fp_fichier):
         lzma_compressor = lzma.LZMACompressor()
-        # if cipher is not None:
-        #     fichier.write(cipher.start_encrypt())
+
+        # Preparer chiffrage si applicable
+        cipher = information_sousgroupe.cipher
+        if cipher is not None:
+            fp_fichier.write(cipher.start_encrypt())
+
         for transaction in curseur:
             uuid_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -666,8 +540,6 @@ class HandlerBackupDomaine:
 
                 tran_json = json.dumps(transaction, sort_keys=True, ensure_ascii=True, cls=BackupFormatEncoder)
                 if information_sousgroupe.cipher is not None:
-                    cipher = information_sousgroupe.cipher
-                    cipher.start_encrypt()
                     fp_fichier.write(
                         cipher.update(
                             lzma_compressor.compress(tran_json.encode('utf-8'))

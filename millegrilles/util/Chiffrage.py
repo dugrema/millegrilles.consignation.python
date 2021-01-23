@@ -76,6 +76,9 @@ class CipherMsg1Chiffrer(CipherMgs1):
         self._iv = secrets.token_bytes(16)
 
     def start_encrypt(self):
+        if self._context is not None:
+            raise Exception('Contexte cipher deja initialise')
+
         self._context = self._cipher.encryptor()
         self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
 

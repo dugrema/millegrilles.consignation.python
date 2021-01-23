@@ -303,7 +303,6 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         }
         cipher, transaction_maitrecles = self.backup_util.preparer_cipher(dict(), info_cles)
         information_sousgroupe.cipher = cipher
-        cipher.start_encrypt()
 
         # S'assurer que le certificat est dans le cache
         self.contexte.validateur_pki.valider(self.enveloppe_certificat.chaine_pem())
