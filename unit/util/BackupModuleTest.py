@@ -862,3 +862,69 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         # On verifie le chainage des catalogues
         self.assertEqual(1, len(catalogues))
         self.assertIsNone(catalogues[0]['backup_precedent'])
+
+    def test_backup_horaire_domaine_snapshot(self):
+        ts = datetime.datetime(2021, 1, 19, 0, 2)
+        info_cles: Optional[dict] = None
+
+        contexte = self.contexte
+        configuration = contexte.configuration
+        configuration.backup_workdir = '/tmp/ut_backupmoduletest'
+        document_dao = contexte.document_dao
+
+        ts_1 = datetime.datetime(2021, 1, 18, 22, 0)
+        document_dao.valeurs_aggregate.append([
+            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
+        ])
+        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
+
+        # Preparer transactions pour le backup
+        document_dao.valeurs_find.append([
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+            self.formatteur.signer_message({'valeur': 3})[0],
+        ])
+
+        self._requests_response.json = {
+            'fichiersDomaines': dict()
+        }
+
+        # Caller methode a tester
+        self.handler_public.backup_horaire_domaine(ts, info_cles, snapshot=True)
+
+        # Preparation au nettoyage
+        generateur_transactions = self.contexte.generateur_transactions
+        self.assertEqual(0, len(generateur_transactions.liste_relayer_transactions))
+
+        # Charger fichiers a partir du repertoire
+        fichiers = list()
+        for f in os.listdir(configuration.backup_workdir):
+            fichiers.append(os.path.join(configuration.backup_workdir, f))
+        self.files_for_cleanup.extend(fichiers)
+
+        # Verifications
+        self.assertEqual(2, len(fichiers))
+
+        # On verifie les fichiers non-chiffres sauvegardes sur disque
+        catalogues = list()
+        for f in fichiers:
+            self.assertGreater(f.find('SNAPSHOT'), 0)
+
+            with lzma.open(f, 'rt') as fichier:
+                for l in fichier:
+                    contenu = json.loads(l)
+
+                    # Conserver catalogue pour test additionnel
+                    if f.find('catalogue') > 0:
+                        catalogues.append(contenu)
+
+                    try:
+                        self.contexte.validateur_message.verifier(contenu)
+                    except KeyError as e:
+                        # OK si on a une entete generee par le contexte UT
+                        if not contenu['en-tete']['uuid_transaction'].startswith('dummy.'):
+                            raise e
+
+        # On verifie le chainage des catalogues
+        self.assertEqual(1, len(catalogues))
+        self.assertIsNone(catalogues[0]['backup_precedent'])

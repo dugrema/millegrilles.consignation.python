@@ -206,7 +206,7 @@ class HandlerBackupDomaine:
         self.__niveau_securite = niveau_securite
         self.__backup_util = BackupUtil(contexte)
 
-    def backup_horaire_domaine(self, heure: datetime.datetime, info_cles: dict):
+    def backup_horaire_domaine(self, heure: datetime.datetime, info_cles: dict, snapshot=False):
         """
         Effectue le backup horaire pour un domaine.
 
@@ -221,10 +221,12 @@ class HandlerBackupDomaine:
 
             sousgroupes = self.preparer_sousgroupes_horaires(heure)
 
-            entete_backup_precedent: Optional[dict] = None
             for domaine, sousgroupe in sousgroupes.items():
+                entete_backup_precedent: Optional[dict] = None
+
                 # Transmettre info de debut de backup au client
                 for information_sousgroupe in sousgroupe.liste_horaire:
+                    information_sousgroupe.snapshot = snapshot
 
                     if entete_backup_precedent is None:
                         # Trouver le plus recent backup
@@ -254,7 +256,8 @@ class HandlerBackupDomaine:
                             with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fp_catalogue:
                                 self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue)
 
-                        self.soumettre_transactions_backup_horaire(information_sousgroupe)
+                        if not information_sousgroupe.snapshot:
+                            self.soumettre_transactions_backup_horaire(information_sousgroupe)
 
                         # Calculer nouvelle entete
                         entete_backup_precedent = information_sousgroupe.catalogue_backup[

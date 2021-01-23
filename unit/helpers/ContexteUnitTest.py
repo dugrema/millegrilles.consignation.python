@@ -52,6 +52,7 @@ class ContexteUnitTest(ContexteRessourcesMilleGrilles):
 
     def reset(self):
         self.generateur_transactions.reset()
+        self.document_dao.reset()
 
     @property
     def configuration(self):
@@ -159,6 +160,16 @@ class DocumentDaoStub:
     def aggregate(self, *args, **kwargs):
         self.calls_aggregate.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_aggregate.pop(0)
+
+    def reset(self):
+        self.calls_aggregate = list()
+        self.calls_find = list()
+        self.calls_update = list()
+
+        # Placeholders pour retourner des valeurs
+        self.valeurs_aggregate = list()
+        self.valeurs_find = list()
+        self.valeurs_update = list()
 
 
 contexte_instance = ContexteUnitTest()
