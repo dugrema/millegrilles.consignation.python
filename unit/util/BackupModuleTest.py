@@ -11,9 +11,10 @@ from typing import Optional
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesBackup
+from millegrilles.Constantes import ConstantesBackup, ConstantesGrosFichiers
 from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
+from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
 
 
 class RequestsReponse:
@@ -551,6 +552,80 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
         self.assertDictEqual(info_commande_annuel['args'][0], {'catalogue': {'annee': 1579219200, 'en-tete': {'uuid_transaction': 'dummy.0'}}})
         self.assertEqual('commande.backup.genererBackupAnnuel', info_commande_annuel['args'][1])
+
+
+class HandlerBackupGrosFichiersTest(TestCaseContexte):
+
+    def setUp(self) -> None:
+        super().setUp()
+
+        self.handler_grosfichiers_protege = HandlerBackupGrosFichiers(self.contexte)
+
+        self.backup_util = BackupUtil(self.contexte)
+
+        self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
+        idmg = self.enveloppe_certificat.subject_organization_name
+        self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
+
+        self.contexte.generateur_transactions.reset()
+
+        self._requests_calls = list()
+        self._requests_response = RequestsReponse()
+
+    def test_extraire_certificats_none(self):
+        ts = datetime.datetime(2021, 1, 18, 21, 0)
+        transaction = self.formatteur.signer_message({
+            'valeur': 1
+        }, 'dummy_domaine')[0]
+
+        # Caller methode a tester
+        resultat = self.handler_grosfichiers_protege._extraire_certificats(transaction, ts)
+
+        # Verifications
+        self.assertEqual(0, len(resultat['fuuid_grosfichiers']))
+        self.assertListEqual(['sha256_b64:VAbbqvSU4Iq1+/ajwcc4nklWFkPrcuPsWHuHUe59Cb8='], resultat['certificats_millegrille'])
+        self.assertEqual(1, len(resultat['certificats']))
+        self.assertEqual(1, len(resultat['certificats_intermediaires']))
+
+    def test_extraire_certificats_nouvelleversion(self):
+        ts = datetime.datetime(2021, 1, 18, 21, 0)
+        transaction = self.formatteur.signer_message({
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: '3.protege',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: 'hachage_1',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER: 'fichier_1.txt',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: 'abcd-1234-efgh-5678',
+        }, ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA)[0]
+
+        # Caller methode a tester
+        resultat = self.handler_grosfichiers_protege._extraire_certificats(transaction, ts)
+
+        # Verifications
+        self.assertDictEqual(resultat['fuuid_grosfichiers'], {
+            'abcd-1234-efgh-5678': {'securite': '3.protege', 'hachage': 'hachage_1', 'extension': 'txt', 'heure': '21'}
+        })
+        self.assertListEqual(['sha256_b64:VAbbqvSU4Iq1+/ajwcc4nklWFkPrcuPsWHuHUe59Cb8='], resultat['certificats_millegrille'])
+        self.assertEqual(1, len(resultat['certificats']))
+        self.assertEqual(1, len(resultat['certificats_intermediaires']))
+
+    def test_extraire_certificats_associerpreview(self):
+        ts = datetime.datetime(2021, 1, 18, 21, 0)
+        transaction = self.formatteur.signer_message({
+            ConstantesGrosFichiers.DOCUMENT_SECURITE: '3.protege',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW: 'hachage_1',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW: 'txt',
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW: 'abcd-1234-efgh-5678',
+        }, ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW)[0]
+
+        # Caller methode a tester
+        resultat = self.handler_grosfichiers_protege._extraire_certificats(transaction, ts)
+
+        # Verifications
+        self.assertDictEqual(resultat['fuuid_grosfichiers'], {
+            'abcd-1234-efgh-5678': {'securite': '3.protege', 'hachage': 'hachage_1', 'extension': 'txt', 'heure': '21'}
+        })
+        self.assertListEqual(['sha256_b64:VAbbqvSU4Iq1+/ajwcc4nklWFkPrcuPsWHuHUe59Cb8='], resultat['certificats_millegrille'])
+        self.assertEqual(1, len(resultat['certificats']))
+        self.assertEqual(1, len(resultat['certificats_intermediaires']))
 
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):

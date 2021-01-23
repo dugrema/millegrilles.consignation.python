@@ -134,7 +134,7 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
                          ConstantesGrosFichiers.COLLECTION_TRANSACTIONS_NOM,
                          ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
 
-    def _extraire_certificats(self, transaction, heure: datetime.datetime):
+    def _extraire_certificats(self, transaction, heure: datetime.datetime) -> dict:
         info_transaction = super()._extraire_certificats(transaction, heure)
 
         heure_str = heure.strftime('%H')
@@ -146,66 +146,29 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
 
         if domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVELLEVERSION_METADATA:
             # Ajouter information pour le backup du fichier
-            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
             nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
-            extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
 
-            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]] = {
-                'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
-                'extension': extension,
-                'heure': heure_str,
-            }
+            fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
+            hachage = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
+            extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:
             # Ajouter information pour le backup du fichier de preview
+            fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
             securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            sha256 = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW]
+            hachage = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW]
             extension = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
+        else:
+            # Aucune information de fichier a ajouter
+            return info_transaction
 
-            fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = {
-                'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
-                'extension': extension,
-                'heure': heure_str,
-            }
-
-        elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_NOUVEAU_FICHIER_DECRYPTE:
-            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-            sha256 = transaction['sha256Hash']
-
-            fuuid_document_dechiffre = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_DECRYPTE]
-
-            # Aller chercher l'information sur l'extension du fichier dechiffre dans la base de donnees
-            collection_documents = self._contexte.document_dao.get_collection(ConstantesGrosFichiers.COLLECTION_DOCUMENTS_NOM)
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
-                '%s.%s' % (ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS, fuuid_document_dechiffre): {'$exists': True}
-            }
-            document_fichier = collection_documents.find_one(filtre)
-            info_version_fichier = document_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_VERSIONS][fuuid_document_dechiffre]
-            extension = info_version_fichier[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER].split('.')[-1].lower()
-
-            fuuid_dict[fuuid_document_dechiffre] = {
-                'securite': securite,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: sha256,
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL: extension,
-                'heure': heure_str,
-            }
-
-            try:
-                info_preview = {
-                    'securite': securite,
-                    'heure': heure_str,
-                }
-                fuuid_dict[transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]] = info_preview
-
-                if transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW] == 'image/jpeg':
-                    info_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_ORIGINAL] = 'jpg'
-
-            except KeyError:
-                pass
+        fuuid_dict[fuuid] = {
+            'securite': securite,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: hachage,
+            'extension': extension,
+            'heure': heure_str,
+        }
 
         return info_transaction
 
