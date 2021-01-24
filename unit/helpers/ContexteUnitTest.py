@@ -93,6 +93,7 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
     def __init__(self):
         super().__init__()
         self.liste_soumettre_transaction = list()
+        self.liste_transmettre_requete = list()
         self.liste_emettre_message = list()
         self.liste_transmettre_commande = list()
         self.liste_relayer_transactions = list()
@@ -100,6 +101,9 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
 
     def soumettre_transaction(self, *args, **kwargs):
         self.liste_soumettre_transaction.append({'args': args, 'kwargs': kwargs})
+
+    def transmettre_requete(self, *args, **kwargs):
+        self.liste_transmettre_requete.append({'args': args, 'kwargs': kwargs})
 
     def emettre_message(self, *args, **kwargs):
         # Capture messages
@@ -125,6 +129,7 @@ class GenerateurTransactionsStub(StubGenerateurTransactions):
 
     def reset(self):
         self.liste_soumettre_transaction = list()
+        self.liste_transmettre_requete = list()
         self.liste_emettre_message = list()
         self.liste_transmettre_commande = list()
         self.liste_relayer_transactions = list()

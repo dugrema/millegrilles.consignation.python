@@ -1447,12 +1447,20 @@ class ArchivesBackupParser:
                 type_archive = 'annuelle'
             else:
                 raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
-        elif len(nom_fichier_parts) == 4:
-            date_fichier = nom_fichier_parts[2]
+        elif len(nom_fichier_parts) in [4, 5]:
+            domaine = nom_fichier_parts.pop(0)
+            if len(nom_fichier_parts) == 4:
+                sousdomaine = nom_fichier_parts.pop(0)
+            else:
+                sousdomaine = None
+            type_fichier = nom_fichier_parts.pop(0)
+            date_fichier = nom_fichier_parts.pop(0)
             try:
                 if len(date_fichier) == 10:
-                    type_archive = 'horaire_' + nom_fichier_parts[1]
+                    int(date_fichier)
+                    type_archive = 'horaire_' + type_fichier
                 elif len(date_fichier) < 10:
+                    int(date_fichier)
                     type_archive = 'catalogue'
                 else:
                     try:

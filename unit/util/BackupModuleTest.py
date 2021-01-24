@@ -14,7 +14,8 @@ from typing import Optional
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesGrosFichiers
-from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire, ArchivesBackupParser
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire, \
+    ArchivesBackupParser, TypeArchiveInconnue
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
 from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
 from millegrilles.domaines.MaitreDesCles import HandlerBackupMaitreDesCles
@@ -1230,6 +1231,36 @@ class ArchivesBackupParserTest(TestCaseContexte):
         self.files_for_cleanup.append(tmpfile)
         return tmpfile
 
+    def test_detecter_type_archive(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        nom_fichier = 'grosfichiers/CID.xz'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('grosfichier', type_archive)
+
+        nom_fichier = ArchivesBackupParserTest.SAMPLE_TRANSACTIONS_NOMS[0]
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('horaire_transactions', type_archive)
+
+        nom_fichier = ArchivesBackupParserTest.SAMPLE_CATALOGUES_NOMS[0]
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('horaire_catalogue', type_archive)
+
+        nom_fichier = 'pasbon'
+        self.assertRaises(TypeArchiveInconnue, archives_parser.detecter_type_archive, nom_fichier)
+
+        nom_fichier = 'pas_bon'
+        self.assertRaises(TypeArchiveInconnue, archives_parser.detecter_type_archive, nom_fichier)
+
+        nom_fichier = 'tres_pas_bon'
+        self.assertRaises(TypeArchiveInconnue, archives_parser.detecter_type_archive, nom_fichier)
+
+        nom_fichier = 'super_tres_pas_bon'
+        self.assertRaises(TypeArchiveInconnue, archives_parser.detecter_type_archive, nom_fichier)
+
+        nom_fichier = 'quosse_ca_tres_pas_bon'
+        self.assertRaises(TypeArchiveInconnue, archives_parser.detecter_type_archive, nom_fichier)
+
     def test_process_archive_horaire_catalogue(self):
         archives_parser = ArchivesBackupParser(self.contexte)
 
@@ -1281,19 +1312,68 @@ class ArchivesBackupParserTest(TestCaseContexte):
             self.assertEqual(message_transactions['valeur'], i)
 
     def test_process_archive_snapshot_catalogue(self):
-        pass
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tmpfile = self.preparer_sampletar(0)
+        with tarfile.open(tmpfile, mode='r', debug=3, errorlevel=3) as tar_stream:
+            fichier_tar = tar_stream.next()
+            tar_fo = tar_stream.extractfile(fichier_tar)
+
+            # Caller methode a tester
+            archives_parser._process_archive_snapshot_catalogue(fichier_tar.name, tar_fo)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+        self.assertEqual(0, len(generateur_transactions.liste_emettre_message))
 
     def test_process_archive_snapshot_transaction(self):
-        pass
+        archives_parser = ArchivesBackupParser(self.contexte)
 
-    def test_extract_catalogue(self):
-        pass
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tmpfile = self.preparer_sampletar(0)
+        with tarfile.open(tmpfile, mode='r', debug=3, errorlevel=3) as tar_stream:
+            # Preparer catalogue
+            fichier_tar = tar_stream.next()
+            tar_fo = tar_stream.extractfile(fichier_tar)
+            archives_parser._process_archive_snapshot_catalogue(fichier_tar.name, tar_fo)
 
-    def test_extract_transaction(self):
-        pass
+            # Tester transactions
+            fichier_tar = tar_stream.next()
+            tar_fo = tar_stream.extractfile(fichier_tar)
 
-    def test_detecter_type_archive(self):
-        pass
+            # Caller methode a tester
+            archives_parser._process_archive_snapshot_transaction(fichier_tar.name, tar_fo)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+
+        # Tester messages transactions, index=0 -> catalogue
+        for i in range(0, 3):
+            message_transactions = generateur_transactions.liste_emettre_message[i]['args'][0]
+            message_domaine = generateur_transactions.liste_emettre_message[i]['args'][1]
+
+            self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
+            self.assertIsNotNone(message_transactions)
+            self.assertEqual(message_transactions['valeur'], i+1)
 
     def test_demander_cle(self):
-        pass
+        archives_parser = ArchivesBackupParser(self.contexte)
+        catalogue = {
+            'domaine': 'test',
+            'transactions_nomfichier': 'transactions.jsonl.xz',
+            'iv': 'IV_123',
+        }
+
+        # Caller methode a tester
+        reponse_cle = archives_parser.demander_cle(catalogue)
+
+        generateur_transactions = self.contexte.generateur_transactions
+        liste_transmettre_requete = generateur_transactions.liste_transmettre_requete
+        requete = liste_transmettre_requete[0]['args'][0]
+        domaine_action = liste_transmettre_requete[0]['args'][1]
+
+        self.assertEqual('MaitreDesCles.dechiffrageBackup', domaine_action)
+        self.assertEqual('test', requete['domaine'])
+        self.assertDictEqual(requete['identificateurs_document'], {'transactions_nomfichier': 'transactions.jsonl.xz'})
+        self.assertEqual(2, len(requete['certificat']))
