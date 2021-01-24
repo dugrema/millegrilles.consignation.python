@@ -692,8 +692,8 @@ class HandlerBackupMaitreDesClesTest(TestCaseContexte):
         self.assertEqual(ts_groupe, information_sousgroupe.heure)
         self.assertEqual(ts_groupe + datetime.timedelta(hours=1), information_sousgroupe.heure_fin)
         self.assertEqual('collection_test', information_sousgroupe.nom_collection_mongo)
-        self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_2021011821_3.protege.jsonl.xz', information_sousgroupe.path_fichier_backup)
-        self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_2021011821_3.protege.json.xz', information_sousgroupe.path_fichier_catalogue)
+        self.assertEqual('/tmp/ut_backupmoduletest/sousdomaine_test_transactions_2021011821_3.protege.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/ut_backupmoduletest/sousdomaine_test_catalogue_2021011821_3.protege.json.xz', information_sousgroupe.path_fichier_catalogue)
 
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
