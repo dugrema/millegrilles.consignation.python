@@ -1295,34 +1295,30 @@ class ArchivesBackupParser:
             self.__traiter_archive(type_archive, nom_fichier, tar_fo)
 
     def __traiter_archive(self, type_archive, nom_fichier, file_object):
-        if type_archive == 'annuelle':
-            self._process_archive_aggregee(nom_fichier, file_object)
-        elif type_archive == 'quotidienne':
-            self._process_archive_aggregee(nom_fichier, file_object)
+        if type_archive == 'tar':
+            self._process_archive_aggregee(file_object)
         elif type_archive == 'snapshot_catalogue':
             self._process_archive_snapshot_catalogue(nom_fichier, file_object)
         elif type_archive == 'snapshot_transactions':
             self._process_archive_snapshot_transaction(nom_fichier, file_object)
         elif type_archive == 'catalogue':
-            pass  # Catalogue annuel ou quotidien
-        elif type_archive == 'horaire_catalogue':
             self._process_archive_horaire_catalogue(nom_fichier, file_object)
-        elif type_archive == 'horaire_transactions':
+        elif type_archive == 'transactions':
             self._process_archive_horaire_transaction(nom_fichier, file_object)
         elif type_archive == 'grosfichier':
             pass  # Skip les fichiers
         else:
             raise TypeArchiveInconnue(type_archive)
 
-    def _process_archive_aggregee(self, nom_fichier: str, file_object):
+    def _process_archive_aggregee(self, file_object):
         self.__logger.debug("Traitement archive annuelle/quotidienne")
         try:
-            tar_quotidienne = tarfile.open(fileobj=file_object, mode='r|')
+            tar_aggregee = tarfile.open(fileobj=file_object, mode='r|')
             self.__logger.debug("Liste contenu archive annuelle/quotidienne")
 
-            for tarinfo_quotidien in tar_quotidienne:
-                path_fichier = tarinfo_quotidien.name
-                fo = tar_quotidienne.extractfile(tarinfo_quotidien)
+            for tarinfo_aggrege in tar_aggregee:
+                path_fichier = tarinfo_aggrege.name
+                fo = tar_aggregee.extractfile(tarinfo_aggrege)
                 try:
                     type_archive = self.detecter_type_archive(path_fichier)
                     nom_fichier = path.basename(path_fichier)
@@ -1438,43 +1434,27 @@ class ArchivesBackupParser:
         if dernier_folder == 'grosfichiers':
             return 'grosfichier'
 
-        nom_fichier_parts = nom_fichier.split('_')
-        if len(nom_fichier_parts) == 3:
-            date_fichier = nom_fichier_parts[1]
-            if len(date_fichier) == 8:
-                type_archive = 'quotidienne'
-            elif len(date_fichier) == 4:
-                type_archive = 'annuelle'
-            else:
-                raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
-        elif len(nom_fichier_parts) in [4, 5]:
-            domaine = nom_fichier_parts.pop(0)
-            if len(nom_fichier_parts) == 4:
-                sousdomaine = nom_fichier_parts.pop(0)
-            else:
-                sousdomaine = None
-            type_fichier = nom_fichier_parts.pop(0)
-            date_fichier = nom_fichier_parts.pop(0)
-            try:
-                if len(date_fichier) == 10:
-                    int(date_fichier)
-                    type_archive = 'horaire_' + type_fichier
-                elif len(date_fichier) < 10:
-                    int(date_fichier)
-                    type_archive = 'catalogue'
-                else:
-                    try:
-                        date_fichier.index('SNAPSHOT')
-                        type_archive = 'snapshot_' + nom_fichier_parts[1]
-                    except ValueError:
-                        raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
-            except ValueError:
-                raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
+        # Detecter type de fichier en fonction de l'extension
+        # .tar = agregee (quotidienne ou annuelle)
+        # .jsonl.xz.mgs1, .jsonl.xz = transactions
+        # .json.xz = catalogue
+
+        if nom_fichier.endswith('.tar'):
+            return 'tar'
+        elif nom_fichier.endswith('.json1.xz.mgs1') or nom_fichier.endswith('.jsonl.xz'):
+            type = 'transactions'
+        elif nom_fichier.endswith('.json.xz'):
+            type = 'catalogue'
         else:
             raise TypeArchiveInconnue("Type archive inconnue : %s" % nom_fichier)
 
-        self.__logger.debug("Archive %s : %s" % (type_archive, nom_fichier))
-        return type_archive
+        # Determiner le sous_type "snapshot"
+        try:
+            nom_fichier.index('SNAPSHOT')
+        except ValueError:
+            return type
+        else:
+            return 'snapshot_' + type
 
     def demander_cle(self, catalogue):
 

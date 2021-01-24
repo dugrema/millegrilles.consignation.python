@@ -1240,11 +1240,35 @@ class ArchivesBackupParserTest(TestCaseContexte):
 
         nom_fichier = ArchivesBackupParserTest.SAMPLE_TRANSACTIONS_NOMS[0]
         type_archive = archives_parser.detecter_type_archive(nom_fichier)
-        self.assertEqual('horaire_transactions', type_archive)
+        self.assertEqual('transactions', type_archive)
 
         nom_fichier = ArchivesBackupParserTest.SAMPLE_CATALOGUES_NOMS[0]
         type_archive = archives_parser.detecter_type_archive(nom_fichier)
-        self.assertEqual('horaire_catalogue', type_archive)
+        self.assertEqual('catalogue', type_archive)
+
+        nom_fichier = 'domaine_20200101-SNAPSHOT_dequoi.jsonl.xz'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('snapshot_transactions', type_archive)
+
+        nom_fichier = 'domaine_20200101-SNAPSHOT_dequoi.json.xz'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('snapshot_catalogue', type_archive)
+
+        nom_fichier = 'domaine_20200101_dequoi.tar'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('tar', type_archive)
+
+        nom_fichier = 'domaine_sousdomaine_20200101_dequoi.tar'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('tar', type_archive)
+
+        nom_fichier = 'domaine_20200101_dequoi.tar'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('tar', type_archive)
+
+        nom_fichier = 'domaine_sousdomaine_20200101_dequoi.tar'
+        type_archive = archives_parser.detecter_type_archive(nom_fichier)
+        self.assertEqual('tar', type_archive)
 
         nom_fichier = 'pasbon'
         self.assertRaises(TypeArchiveInconnue, archives_parser.detecter_type_archive, nom_fichier)
@@ -1377,3 +1401,50 @@ class ArchivesBackupParserTest(TestCaseContexte):
         self.assertEqual('test', requete['domaine'])
         self.assertDictEqual(requete['identificateurs_document'], {'transactions_nomfichier': 'transactions.jsonl.xz'})
         self.assertEqual(2, len(requete['certificat']))
+
+    def test_process_archive_quotidienne(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tarfile_1 = self.preparer_sampletar(0)
+
+        with open(tarfile_1, 'rb') as tar_stream:
+            # Caller methode a tester
+            archives_parser._process_archive_aggregee(tar_stream)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+        message_catalogue = generateur_transactions.liste_emettre_message[0]['args'][0]
+        message_domaine = generateur_transactions.liste_emettre_message[0]['args'][1]
+
+        self.assertEqual(4, len(generateur_transactions.liste_emettre_message))
+        self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
+        self.assertIsNotNone(message_catalogue)
+
+    def test_process_archive_annuelle(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tarfile_1 = self.preparer_sampletar(0)
+
+        # Ajouter fichier TAR (equivalent d'archive quotidienne) dans une _super_ archive (annuelle)
+        tmp_basetar = tempfile.mktemp(dir=UT_TEMP_FOLDER)
+        self.files_for_cleanup.append(tmp_basetar)
+
+        with tarfile.open(tmp_basetar, 'w') as fichier_tar:
+            fichier_tar.add(tarfile_1, arcname='jour_1.tar')
+            fichier_tar.add(tarfile_1, arcname='jour_2.tar')
+            fichier_tar.add(tarfile_1, arcname='jour_3.tar')
+
+        with open(tmp_basetar, 'rb') as tar_stream:
+            # Caller methode a tester
+            archives_parser._process_archive_aggregee(tar_stream)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+        message_catalogue = generateur_transactions.liste_emettre_message[0]['args'][0]
+        message_domaine = generateur_transactions.liste_emettre_message[0]['args'][1]
+
+        self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
+        self.assertIsNotNone(message_catalogue)
+        self.assertEqual(12, len(generateur_transactions.liste_emettre_message))
