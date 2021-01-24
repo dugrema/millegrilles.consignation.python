@@ -1188,25 +1188,23 @@ class ArchivesBackupParser:
     Parse le fichier .tar transmis par consignationfichiers contenant toutes les archives de backup.
     """
 
-    def __init__(self, contexte: ContexteRessourcesMilleGrilles, stream, path_output: str = None):
+    def __init__(self, contexte: ContexteRessourcesMilleGrilles):
         self.__contexte = contexte
-        self.__path_output = path_output
-        self.__catalogue_horaire_courant = None
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+        self.__path_output: Optional[str] = None
+        self._catalogue_horaire_courant = None
         self.__channel = None
         self.__nom_queue: Optional[str] = None
         self.__thread: Optional[Thread] = None
+        self.__tar_stream: Optional[tarfile.TarFile] = None
+        self.__reponse_cle: Optional[dict] = None
+        self.__cle_iv_transactions: Optional[dict] = None
 
         self.__handler_messages = ReceptionMessage(self, contexte.message_dao, contexte.configuration)
 
-        # wrapper = WrapperDownload(resultat.iter_content(chunk_size=512 * 1024))
-        wrapper = WrapperDownload(stream)
-        self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
-
         self.__event_execution = Event()
         self.__event_attente_reponse = Event()
-        self.__reponse_cle: Optional[dict] = None
-
-        self.__cle_iv_transactions: Optional[dict] = None
 
         self.__chaine_pem_courante = contexte.signateur_transactions.chaine_certs
 
@@ -1215,13 +1213,18 @@ class ArchivesBackupParser:
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def start(self) -> Event:
+    def start(self, stream, path_output: str = None) -> Event:
         """
         Demarre execution
         :return: Event qui est set() a la fin de l'execution
         """
+        self.__path_output = path_output
+        wrapper = WrapperDownload(stream)
+        self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
+
         self.__thread = Thread(name="ArchivesBackupParser", target=self.parse_tar_stream, daemon=True)
         self.__contexte.message_dao.register_channel_listener(self)
+
         return self.__event_execution
 
     def stop(self):
@@ -1243,7 +1246,7 @@ class ArchivesBackupParser:
 
     def on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
-        self.__logger.info("MQ Channel ferme")
+        self.__logger.info("MQ Channel ferme code=%s, reason=%s" % (code, reason))
 
     def q_ouverte(self, queue):
         self.__nom_queue = queue.method.queue
@@ -1337,7 +1340,7 @@ class ArchivesBackupParser:
         self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
         generateur = self.__contexte.generateur_transactions
         generateur.emettre_message(catalogue_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
-        self.__catalogue_horaire_courant = catalogue_json
+        self._catalogue_horaire_courant = catalogue_json
 
     def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions horaire")
@@ -1347,7 +1350,7 @@ class ArchivesBackupParser:
         # self.__logger.debug("Catalogue snapshot")
         catalogue_json = self._extract_catalogue(nom_fichier, file_object)
         self.__logger.debug("Catalogue snapshot : %s" % catalogue_json)
-        self.__catalogue_horaire_courant = catalogue_json
+        self._catalogue_horaire_courant = catalogue_json
 
     def _process_archive_snapshot_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions snapshot")
@@ -1369,7 +1372,7 @@ class ArchivesBackupParser:
 
     def _extract_transaction(self, nom_fichier, file_object):
         self.__logger.debug("Extract transactions %s", nom_fichier)
-        catalogue = self.__catalogue_horaire_courant
+        catalogue = self._catalogue_horaire_courant
         domaine = catalogue['domaine']
 
         try:

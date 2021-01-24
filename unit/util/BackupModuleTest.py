@@ -3,8 +3,10 @@ import pytz
 import json
 import os
 import lzma
+import tarfile
+import tempfile
 
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from io import BytesIO, StringIO
 from lzma import LZMAFile, LZMAError
 from typing import Optional
@@ -12,10 +14,13 @@ from typing import Optional
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup, ConstantesGrosFichiers
-from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupDomaine, InformationSousDomaineHoraire, ArchivesBackupParser
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
 from millegrilles.domaines.GrosFichiers import HandlerBackupGrosFichiers
 from millegrilles.domaines.MaitreDesCles import HandlerBackupMaitreDesCles
+
+
+UT_TEMP_FOLDER = '/tmp/ut_backupmoduletest'
 
 
 class RequestsReponse:
@@ -724,6 +729,8 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self._requests_calls = list()
         self._requests_response = RequestsReponse()
 
+        self.extract_samples = True
+
     def tearDown(self) -> None:
         super().tearDown()
 
@@ -810,6 +817,14 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         self.assertIsNotNone(catalogue['transactions_hachage'])
         self.assertIsNotNone(information_sousgroupe.sha512_catalogue)
 
+        if self.extract_samples:
+            with open(information_sousgroupe.path_fichier_backup, 'rb') as fichier:
+                sample = b64encode(fichier.read()).decode('utf-8')
+                self.logger.info("SAMPLE - TRANSACTIONS test_execution_backup_horaire\n%s" % sample)
+            with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fichier:
+                sample = b64encode(fichier.read()).decode('utf-8')
+                self.logger.info("SAMPLE - CATALOGUE test_execution_backup_horaire\n%s" % sample)
+
     def test_backup_horaire_domaine_1domaine(self):
         ts = datetime.datetime(2021, 1, 19, 0, 2)
         info_cles: Optional[dict] = None
@@ -872,6 +887,14 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         # On verifie le chainage des catalogues
         self.assertEqual(1, len(catalogues))
         self.assertIsNone(catalogues[0]['backup_precedent'])
+
+        if self.extract_samples:
+            with open(os.path.join(configuration.backup_workdir, transaction_catalogue['transactions_nomfichier']), 'rb') as fichier:
+                sample = b64encode(fichier.read()).decode('utf-8')
+                self.logger.info("SAMPLE - TRANSACTIONS test_execution_backup_horaire\n%s" % sample)
+            with open(os.path.join(configuration.backup_workdir, transaction_catalogue['catalogue_nomfichier']), 'rb') as fichier:
+                sample = b64encode(fichier.read()).decode('utf-8')
+                self.logger.info("SAMPLE - CATALOGUE test_execution_backup_horaire\n%s" % sample)
 
     def test_backup_horaire_domaine_1domaine_chainage(self):
         ts = datetime.datetime(2021, 1, 19, 0, 2)
@@ -1070,3 +1093,207 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         # On verifie le chainage des catalogues
         self.assertEqual(1, len(catalogues))
         self.assertIsNone(catalogues[0]['backup_precedent'])
+
+
+class ArchivesBackupParserTest(TestCaseContexte):
+
+    # Sample de fichiers de transactions (lzma, jsonl)
+    SAMPLE_TRANSACTIONS_NOMS = [
+        'sousdomaine_test.abcd.1234_transactions_2021011822_1.public.jsonl.xz'
+    ]
+    SAMPLE_TRANSACTIONS = [
+        b'/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AhLBNBdAD2Ih+czhTwcCpsSCGl+NG1qsR8phvfJrI1mppgJn0P2exSGquKcnwa0bdxuqOGOywrNw'
+        b'ZsXVGuGdyli9tqqrbnOJZ3SYj9FC8O2JZuhjXT1PzOCr1Qc+nNhV+Zl43z07j2UgLXO69jyk7wciupR7rx9yEfc9MQyiYBJqJYPhXDCZu/f/5'
+        b'BhUum+yGj4i6opSgGw0wnUjIj0SwpPu+ccuYXCq/2cpFbwiSjDRPAXVLBguGFlHhyCVhwGjIl4xrwmMjn02WPBXtwuzlIPdKfiQCuW8VY2LPA'
+        b'IbUT04nYGI+ToZI3ywhb/O4xGcUUO/oTVyq3pOoRn4FzXWDtLsJA98pEP8KVhhO4AnPinhazvkMdBLd8zyO6ZNL0dv46I+rwBCOAFDcUoXASJ'
+        b'ksfUwtDqPuJQGR1yGQnAP0MYHsLbqbbu8ppKJ0yjbCK/LemCb8zg6YbrRzDbkKt8+9l7fxqx1vykXeUmkUTJr5K2R3Ey4GxO4KZBApbmhHZKW'
+        b'5uqhiXryBFUg7nOLe8FLvKNCth5HkXNmiVrjRDcCwCf2T4k0pAfjAa/hd3XE9FKlvvFELxMFcJJ+suLnJSqf3d87MkFsh+bUtLhRnBKLHkKVr'
+        b'BEmzWrfcsL1OOGykjZaXLKWKT8GeejMv13xN++amZWES4oXCDTxTUJlzzT4bBLx/c0+CbvlqBtn8PpJ97OlZDQJ4uGiaLL2c2RViVfDLOMVoR'
+        b'USEuZx9o1p2E3UDxqqe8+7o4zb4I4IUU5pOk6EUKN4lMa9ge3diC+1Px0Vgw/0dts4uNGVm/5LcvUaxgsLccxyfAOwwC9B1TAv6KQynCObssW'
+        b'4L8tIGrDsLqi4XBG1b+v1NX7o1fGz1DCACe78zSzWWrz02bu0/HpL8Bd/MWeRRsCZAyuI8NKUUPSvt5XPEZBv54RxPTs8xMsVx0/gzgnITCe0'
+        b'PfW3ntTDHWfcKSsu5Z8WRcQl7uTqroKEjyBmbsBWsqXLnkFTKK7XRgaCvC20t/VqkqmaZ9iG7EvvbgmufCm3OiY+I2mrrPUAkR4baM4lXiz3T'
+        b'+Ti/XHm4bucs0UzNp+5vJVB7Qe3XOxlgKkrkHtk3stqOUgaSKM49nKcEhU9FrVy90Q/GNY20BpcmpPB7yjJuE1VqJbfgF8gLh0VHkuM5GSGOW'
+        b'5p/duMJBNMMC9Ang8K3r2w8Se3qyLG+oJwvlvTcXJSaz+CXqvP2lqvpiCtdGL31Vco+jxD/ZjMP2Ag8iHDKA4jpC7TqV1dFCqCL1XQZwRZbh1'
+        b'pONTQkxx51B7ZFFu5RB3ToKBKyZtB0Rl+POWHRI8IG4vE10gxqKpQxZRxCJ7y2pn5Y7AXpFFWZqDVJwV06svxw1RvJ+kvtmWue8/BmHOzW8jm'
+        b'jZWQk+B9N73oxqNvZmsvEP1gPfumWdPQ3URgzTDANrScvyfn2OHEXDvm7ou/IQoyv7T3OK84Tna4JU8ILJx0pJpPkZk1VV/EBve/+FyNZQ1rU'
+        b'2VL589ZgeGZBsvIU2D2PV/Z2nwMQ1MYKwSnXBNEHbbPTiIeXZMwl86uAb2oJdXlLhyYNQPZ3NyxiSbmmBzLSlmusngoBH25GztgvnptauLt0a'
+        b'sQXyVnBEz5jFxZs0qAI85V9DGCynulxYdiQ7RAnaTvUN0WCwAAE58p9DPSXfAAAHsCcwQAACbn36PscRn+wIAAAAABFla',
+    ]
+
+    # Sample de fichiers de catalogues (lzma, json)
+    SAMPLE_CATALOGUES_NOMS = [
+        'sousdomaine_test.abcd.1234_catalogue_2021011822_1.public.json.xz'
+    ]
+    SAMPLE_CATALOGUES = [
+        b'/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4Bh/D6hdAD2IiEZT2x5VkgSmO0tZm2FK2Yxpu8kQ/XurG1PvO9+JH1WoUKJyQoW04CoYUYTLzfgF8'
+        b'XvmW96oPPnfn/JCerE0JA3zpQ0W9n4NGfWUaxDh9hqVgnCMN/Fw+y9F5Lxzwfvg8yEZK+rYxfnAScLI3WHGK2bqW2UXjYW1k3fZ59k6OI6VRf'
+        b'y/pVUa/ljfr/EZhI6bbn4M+gmRBCHDM5Dw8hPu1rsWstpbeeBQ8Qq7FSGBWBigPX8eYjspycJ0N+AF75KnANpOTdUODwNFgUXO1KDV2LfIza+'
+        b'l+15uwsdjkb+5e7Pct1KSusxruIJNF7OWTa19B3DO/bV2d81O6Wn6gTBmwmMCyH/uJaZdICaJ56mE+VSaXv//zUpPtUw+GHwuSBtFXkrx4KY6'
+        b'QPqsVQVMQroDOkNhN1urT0vDGuPAfQpmj40YQdk5tbUHQyHzbJMPu9d2QHs9KCsUiZCZyP63P6Hib1xGofq4S3jAYgrQSzgtaWvRjt1lhN/lf'
+        b'7ChJLqe8Llri+HHYACNUrzwdVKz5DqGu8lF3MqULJxJY+FIGVBk1B6aS6PiqYpQeqrVlRKvcEPnMAeoSleP3Da97y3sjsqK4ldmNVcgZSOBr7'
+        b'0V1K6DY1hvhCXCDg/6oVct9IYm2rrHD0Cmve0iagFzQHhgjpvfw+j8D/a3AIHAXVqWh45ekpn3M8us0aNdwNHBdD/kWZvhqCh/8KvY2Z/ceBU'
+        b'b9nGXHyD1ARoYlfpYJsC4bQ0mB07yjxfgXrBji30WuSq3OrPO1mhyNi4TU/aKprd+jxO4jVS2N+iR9z3e6nY4nlcatNQ+J7dcym7C2xKYGIHC'
+        b'EkQShDoCeDxLRg9YGR0y5eGCiNMP5Rvstqs5m9S91xiN7Ukw9qR0VYf+b2JxYy3Cdd4kOuU+I31uJpUaCvgdQ4sdOZpeSkndN4aGvQj4nukyn'
+        b'Nljs1RoCUXb3SXbjatnypGY9+ZCVlQ70s1AHR9fqGrZxd74YZ/GrFkfQRGpagFWM7ADYFoEmyv0HMemcXk/snRHYE5YjOwr4CE9T4oKczeRo5'
+        b'6oKEV1vZIu3SdBeOgf45cWVkfjG7ThRmMqOXw7JIxI9PFh7EPpHx+/q3InK6iBs6hRR7jT9RoSTfyvCFm3ILzMnWGy+nDoKcnwRYAQbyG37Ut'
+        b'0z3dkHN4jZ3xkpvpoezlOvU7gjjxDNqRwheG9u5/FToAiQ7IIfLgno8dteLSqIu150aa9xS8j6GMlP/3azDJ2cEv0wC2cvKp9zYKccpcWFPF7'
+        b't6iiy9ENSioTaF3NrfTFmTD8MWmwVpcgBu3MGzCUeeDUrGAbeysKdjdvbw9XDpfUFLAGkVJdzOMveXgjw5aPKMfZDjrRQ2WMTABmwQQe+HeRo'
+        b'KBcP5pEtZkiUowmZJwMwg6cmnwl45qtGQAxW0TL/NH8692sblA8NweWgdIPa8jQ5aTrwKBf9bdPgGC/f2wQWwhDbuLtboDtTLyRAiWMWTmhPH'
+        b'uSgDhELYUM5ruwMyPTLKXEYhwxSAYUIQkzW6euyDTGo6+qgLXdiXy35VPCnzSq3BG/kkt4AVbzAcvjYdw0DlglppXtv9/BmldA2mlnxjdA10T'
+        b'YY6iZQ9krE+BzRhzP84x3eCxkioecdTA01ZoIqsZL+9j2bgRqJwhCNrGqH9CRgzFUYsVNoNkFodRjyNmp0rAm6VIeesdy6PCM0MZLyYKaKYQ0'
+        b'6Cda3f/ZP9kPEjcxucBPwabGFWyP9MxizyLN7Nj/hg2j2YCn9DgZLtJLpTGXMvfkXLwWAKRJ4Vt941j2MSClZcmqNc91AEGNrxH5N7VsPUUW7'
+        b'MgNCW59ShdB6xoQyIHVL0upSi/kJnN3ec2YVcKHejBk5DjTk4o38D22Zb7iDDqbF1pKxvyfmM7tOk053i1YLehL14zMlVzGCSD2n8XTVxIPVL'
+        b'UXggo38+4sLY8ViqZNoAC+RvnSJY1i/Tiupwub+/71nm2PCPmXgAcjmoNpq5/E7N6XrEv1BX9INCS2UijfeAYdk9XGxr3gKRVulhaZYPkB7ra'
+        b'10VPonk/Y/zsGOEjncFehutWhYf57xh+5Q/rFBtLLRIRty3dDHvyLnPZ/1IoZ/NQMULHTEjGDsCZvsZ51WSQFUR1/yNJbczkVL+0XkGAl6oev'
+        b'MDmkHQtcIrrqHf7jSmMTvcwf9WVTUG4+T2tin5ES7R2UvU+nMouJYQ2YVOny8YG8NyvwXIIFAW1mg7MzG8vlXXqUJI3xJii454V5UJoWA8pZn'
+        b'osrocJMMc3S6QCDNpo5bAfAyLjK9p6A3V4dCuFmjo0BZ4lC8n6dt/ajUcyTb/uc2hPAY3SHVg3B2Vx/BQxN/sSGNxPQuSUKPytEREfM1gQIaG'
+        b'DQp3844bwc2gxYLk8oviy2rAeraX7Ou10GQReuyeZyTenjHhv7OlBnPB8HJsUEC5NeE7HrJwe6n0ikUyaG8Bc+aEzspHiyLWwzwAG84ca81Gd'
+        b'DYt8+M+COIRK39So55N26N4iWj2m6n1CPjnVc4QQq7rHqaLTCMwwSoVDnHrUZP4L+G2pOSNe565UgMmUoUE1JpjWjwmkys3mU65jP8d0Pe4ZJ'
+        b'/Cz1y0VEh5y3hmRLYR3CDhzL1pnnURBnEJVl4IE+DuxpuvLmjZjXZo875ZALIpdUoUg7TLeLpiYRtQi1n80ur/UE8Q+4h+pjIRHgVsiJeMLsU'
+        b'TrrglNWqg/32WqnLuMS4XWKo4Yc1fKP7W12HNjCsVftXLrXaudfvDJ97iigFQ9sw3KSdeJZqzQPJo6YPyU0PfMslzZ1WsukefZUWp7s7WqAgD'
+        b'c26GuaqRU/qJqRhy+ICfItLA7tMb9ZVFVV/5wH4Sb3SfEdbVNosBqSEQdgXWQ91+Ki54x2+jvpue5NvRc9fD7Qyh2vzzDGXd3tqknjuXdmb6p'
+        b'MzvOwtkxhHugH35x0zyboV2M3pgpre8DMv9oW/NYb11FT2LW1DLe4Awz+iiONkqiEa+qu0+8+100skJeWOT4tnp4eTNzgBeaqihZR2AhwZoUQ'
+        b'fs1JgaNZZ7cymzEnpb6JON1GXfnE8IZbynUsYRCzyubZ8pr00oDD+LuZLrIKD1fPob84v69sfei+wv4dpJV671PiWrIwYc8D3Xpo4AD5iCUz9'
+        b'UCNR4/tkp/GzsvYOpIFUcAPKUrkks8u3KYfoCfy3xVvggkRYp5A6rbObb+BjV7/7RplV7ZA9jj178cS9OLgsrPqPbpOTHWX2Bp+rhYKN7VSZ+'
+        b'RzAIbQEX0PMl2j+0k/nYI7nO7LUzg6RwkiZb71fjWtATC9e6ch512YTKEtbNKshJJqSlDV9vxsGFzXJKDJLDxUk3EdNnObyI108PisuPF02YW'
+        b'eqARfMFTNqlcWEKGPkm63/GefB5y/xDWEnGCZwB7TWyi5z75eMj0KC6xj1HavVD8DcC3f4wdgujDWHLsVUtSa/3ER2SYZOAJrPxDCrx0j3agZ'
+        b'o/eDx7qU91RCLNRsASujF8iBejAfT4ic8CR1OmRmGYaGvIOX2KAZU343PG9Qo1rKeem5uLup0aArqLGz2Ue1C/wiOBbwBVZgHDxfnLFsypgcc'
+        b'hE/JaCcviuRHLktCyKcmCxLmJrCidNUfXdB3c8Tpc/FE/7YxBFEFvkW8+s9WpiWAvFudPiBrnpL0j+Or1JIK3KKn1KJN2umLdrDGXpMHWCUkg'
+        b'99REGQd89zUO74l8+G/aJliffP1z1Ogpww0HqcmlFBKM9EwNEt39lBKkquPdWoRkM7JRn/OdvXFvNEYf7OIzHrYYVQrE1Y6Yte21tHVqbrKs8'
+        b'hM8AzxwvT9xcUaIYb0LUYlvMIPmmNHje9izczYU1DJvXjbgMvpAvdJShckJ4BU5ykLrNANgjw8zWII0K4VhnArq2m4W62/pkCFSf+ZeRnzTNI'
+        b'JUgZy2QtGfKPHfj3V+FQUGU2ijNkahrdB5YaCCBrrRGdSuieKW85HO0qZXJtd8igHWVYtxJ8VrL+HHyCBPjD4WRCiSVCX6ND8VY6rFWu8PCLP'
+        b'5CoYGQMnDHTSFKPvqiD7b7iIN6MXi/oJrCJVba/BHRVZluS9vVSt+g9A2LzVXOfdcNaAxZK8veej8iRM6x+m8o7D4Fqzk6wo+auAvr1zngiME'
+        b'BTvO4BMXOtpMbNEZF65xY/xnxNZ6EW+DnJi8gSdeqLGYLn+OxSlRomxmDOncDEAICVL20xoCu6WmrsF7r0A/dV77ExMnAOho20RhazJOi8slS'
+        b'1bfTAHhKqsgGmRGVyCgL+25HUXV0wg3Ul2fQJUMe2GgPP/8gjyGIUk4cFbXWOZB6pNFbt3FtDWFstcZ6aVMK75M1NPSQccqvbSVrrHM2jQGJx'
+        b'd01opqTcVPLNH8lcgSX3BUp4+DTrtmD5puC2Z4HpjySTaw/0WA0CnoAGQxnS1gBZpHTMP7OcYlRcoWfTuEfSFfvPs1quY3OPgfGT23X4jKEI7'
+        b'VwzHPQPOZ3IqvGIBXByT9N084MEaxmGy3GXtCAjXMwEnl+j9jesXBo1JK5ehxQOlVeU1Nl2dS80EPnHpgEuwBv6gU99FBxmQgkjpsFekY/i9s'
+        b'rNMpnyrthS+/+UPCSC8bXxm5Sj7MXG0CK/GiwjxeJOmfl7lD9Y2PAA14v3OPMQYwA45H7a/4d2h7/zs+dMhZ/k7u2EIUlwDzCjvqR3pqYIhq6'
+        b'mDI5Ycq8IWnuK1S4ppZnjxv5I11QU/pFdZtoHRJpA4y9Ngv/OOSfgwyaWfSjeB/WTo7v09Qo96txYZcCf9V80VUHLBdmcsKAhxan5T3TI/AUT'
+        b'ecl0Q8dxXyYOjyHX0grdUzNnP7NBkLJThAYNXsLyxJskWSXgR7bjgq9e99L4VqHflVV8qQ6wsdmwW5OeRmV1DBwPvxy9/wA4eSJjIFEz08YEU'
+        b'pO4qntFqkjveYKdiMZd/bc5HpPXH5mDS/Z2AT/FXxkMvj/d37ar8ZwT/8m8yUtc4pYtKtn4xSC2V3UKyJZPtpokaUZPGOIWwhrPIzuzTyykcH'
+        b'qvcmMybUTtpsf8v5i45B/3/0Yxe1bdrPOu7CXw5nfdexfawr9aWm8+ufQ9woDEr4EaKT4pxX/XExjxrd7Nhv0XsGJ0gg+9dwcXvwWr72sOKxD'
+        b'pqkdPduwTU+Ej2SS1piWZkQ80Q4/I973EYKASGgzrru4vDzdU25ATQIiLyAFXMaS6UbifLwcP4xO01RPyfiQGpIVLI5mH+ghaOR7vnpOqcgaq'
+        b'xsLlpE02t0bTqUWaj3vYj/qJlk8Esixin8ZTNZGIGl6QaeIlAGxEreLzxbzy0p0HfYCW7XpfEAiLB3dAjNGWViP99/RSOA37N39tTrtSw9VTJ'
+        b'IXsGy8dFkgIxy5i/U6q4MKXV4T8ju7LIhnXztG/0Ld4VwB4UbNJ1/fISAABxB+AMQAAsLFsY7HEZ/sCAAAAAARZWg=='
+    ]
+
+    def setUp(self) -> None:
+        super().setUp()
+
+        # self.backup_util = BackupUtil(self.contexte)
+
+        # self.enveloppe_certificat = self.contexte.validateur_pki.valider(self.contexte.configuration.cle.chaine)
+        # idmg = self.enveloppe_certificat.subject_organization_name
+        # self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
+
+        self.files_for_cleanup = list()
+
+        # self._requests_calls = list()
+        # self._requests_response = RequestsReponse()
+
+    def tearDown(self) -> None:
+        super().tearDown()
+
+        for f in self.files_for_cleanup:
+            try:
+                os.unlink(f)
+            except FileNotFoundError:
+                pass # OK
+            except Exception:
+                self.logger.exception("Erreur nettoyage fichier")
+
+    def preparer_sampletar(self, idx: int):
+        """
+        Simule un download de backups horaire/snapshot a partir du serveur consignationfichiers
+        :param idx:
+        :return:
+        """
+        tmpfile = tempfile.mktemp(dir=UT_TEMP_FOLDER)
+
+        with tarfile.open(tmpfile, 'w') as fichier_tar:
+            nomfichier_catalogue = ArchivesBackupParserTest.SAMPLE_CATALOGUES_NOMS[idx]
+            catalogue = b64decode(ArchivesBackupParserTest.SAMPLE_CATALOGUES[idx])
+            path_fichier_catalogue = os.path.join(UT_TEMP_FOLDER, nomfichier_catalogue)
+            with open(path_fichier_catalogue, 'wb') as fichier:
+                fichier.write(catalogue)
+            fichier_tar.add(path_fichier_catalogue, arcname=nomfichier_catalogue)
+            os.unlink(os.path.join(UT_TEMP_FOLDER, path_fichier_catalogue))
+
+            nomfichier_transactions = ArchivesBackupParserTest.SAMPLE_TRANSACTIONS_NOMS[idx]
+            transactions = b64decode(ArchivesBackupParserTest.SAMPLE_TRANSACTIONS[idx])
+            path_fichier_transactions = os.path.join(UT_TEMP_FOLDER, nomfichier_transactions)
+            with open(path_fichier_transactions, 'wb') as fichier:
+                fichier.write(transactions)
+            fichier_tar.add(path_fichier_transactions, arcname=nomfichier_transactions)
+            os.unlink(path_fichier_transactions)
+
+        self.files_for_cleanup.append(tmpfile)
+        return tmpfile
+
+    def test_process_archive_horaire_catalogue(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tmpfile = self.preparer_sampletar(0)
+        with tarfile.open(tmpfile, mode='r', debug=3, errorlevel=3) as tar_stream:
+            fichier_tar = tar_stream.next()
+            tar_fo = tar_stream.extractfile(fichier_tar)
+
+            # Caller methode a tester
+            archives_parser._process_archive_horaire_catalogue(fichier_tar.name, tar_fo)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+        message_catalogue = generateur_transactions.liste_emettre_message[0]['args'][0]
+        message_domaine = generateur_transactions.liste_emettre_message[0]['args'][1]
+
+        self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
+        self.assertIsNotNone(message_catalogue)
+
+    def test_process_archive_horaire_transaction(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tmpfile = self.preparer_sampletar(0)
+        with tarfile.open(tmpfile, mode='r', debug=3, errorlevel=3) as tar_stream:
+            # Preparer catalogue
+            fichier_tar = tar_stream.next()
+            tar_fo = tar_stream.extractfile(fichier_tar)
+            archives_parser._process_archive_horaire_catalogue(fichier_tar.name, tar_fo)
+
+            # Tester transactions
+            fichier_tar = tar_stream.next()
+            tar_fo = tar_stream.extractfile(fichier_tar)
+
+            # Caller methode a tester
+            archives_parser._process_archive_horaire_transaction(fichier_tar.name, tar_fo)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+
+        # Tester messages transactions, index=0 -> catalogue
+        for i in range(1, 4):
+            message_transactions = generateur_transactions.liste_emettre_message[i]['args'][0]
+            message_domaine = generateur_transactions.liste_emettre_message[i]['args'][1]
+
+            self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
+            self.assertIsNotNone(message_transactions)
+            self.assertEqual(message_transactions['valeur'], i)
+
+    def test_process_archive_snapshot_catalogue(self):
+        pass
+
+    def test_process_archive_snapshot_transaction(self):
+        pass
+
+    def test_extract_catalogue(self):
+        pass
+
+    def test_extract_transaction(self):
+        pass
+
+    def test_detecter_type_archive(self):
+        pass
+
+    def test_demander_cle(self):
+        pass
