@@ -35,14 +35,18 @@ class PutCommands(DomaineTest):
         self.keyfile = self.configuration.pki_keyfile
 
     def put_backup(self, nom_fichier_backup: str, catalogue: dict, transactions: bytes):
-        path_catalogue = '/tmp/fichier_catalogue.json.xz'
+
         path_transactions = '/tmp/fichier_transactions.txt'
-        with lzma.open(path_catalogue, 'wt') as fichier:
-            json.dump(catalogue, fichier)
         with open(path_transactions, 'wb') as fichier:
             fichier.write(transactions)
-
         hachage_transactions = calculer_fichier_SHA512(path_transactions)
+
+        catalogue['hachage_transactions'] = hachage_transactions
+        catalogue = self.contexte.generateur_transactions.preparer_enveloppe(catalogue, ajouter_certificats=True)
+        path_catalogue = '/tmp/fichier_catalogue.json.xz'
+        # catalogue['corrupu'] = True
+        with lzma.open(path_catalogue, 'wt') as fichier:
+            json.dump(catalogue, fichier)
 
         data = {'valeur': 1}
 
@@ -61,11 +65,15 @@ class PutCommands(DomaineTest):
                     cert=(self.certfile, self.keyfile)
                 )
 
-        hachage_transactions_recu = r.json()[nom_fichier_backup + '.jsonl.xz.mgs1']
-        if hachage_transactions_recu != hachage_transactions:
-            raise ValueError("Hachage transactions incorrect")
+        resultat = r.json()
+        if r.status_code != 200:
+            self.__logger.error("Erreur processing backup (%d): %s" % (r.status_code, resultat['err']))
         else:
-            self.__logger.info("Hachage transaction OK")
+            hachage_transactions_recu = r.json()[nom_fichier_backup + '.jsonl.xz.mgs1']
+            if hachage_transactions_recu != hachage_transactions:
+                raise ValueError("Hachage transactions incorrect")
+            else:
+                self.__logger.info("Hachage transaction OK")
 
         os.unlink(path_catalogue)
         os.unlink(path_transactions)
@@ -83,7 +91,10 @@ class PutCommands(DomaineTest):
 
     def executer(self):
         self.__logger.debug("Executer")
-        self.put_test1()
+        try:
+            self.put_test1()
+        finally:
+            self.event_recu.set()
 
 
 class GetCommands(DomaineTest):
@@ -138,14 +149,15 @@ class GetCommands(DomaineTest):
 
     def executer(self):
         self.__logger.debug("Executer")
-        # self.get_listedomaines()
-        # self.get_catalogues()
-        # self.get_catalogues("sample5")
-        # self.get_liste_fichiers("sample5")
-        self.get_fichier()
-        self.get_fichier('sample4', 'domaine.test_2020.tar')
-
-        self.event_recu.set()
+        try:
+            # self.get_listedomaines()
+            # self.get_catalogues()
+            # self.get_catalogues("sample5")
+            # self.get_liste_fichiers("sample5")
+            self.get_fichier()
+            self.get_fichier('sample4', 'domaine.test_2020.tar')
+        finally:
+            self.event_recu.set()
 
 
 # --- MAIN ---
@@ -154,8 +166,8 @@ if __name__ == '__main__':
     logging.getLogger('millegrilles').setLevel(logging.DEBUG)
     logging.getLogger('PutCommands').setLevel(logging.DEBUG)
     logging.getLogger('GetCommands').setLevel(logging.DEBUG)
-    # test = PutCommands()
-    test = GetCommands()
+    test = PutCommands()
+    # test = GetCommands()
     # TEST
 
     # FIN TEST
