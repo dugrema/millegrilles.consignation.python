@@ -34,7 +34,7 @@ class PutCommands(DomaineTest):
         self.certfile = self.configuration.pki_certfile
         self.keyfile = self.configuration.pki_keyfile
 
-    def put_backup(self, nom_fichier_backup: str, catalogue: dict, transactions: bytes):
+    def put_backup(self, nom_fichier_backup: str, catalogue: dict, transactions: bytes, maitrecles: dict = None):
 
         path_transactions = '/tmp/fichier_transactions.txt'
         with open(path_transactions, 'wb') as fichier:
@@ -48,7 +48,15 @@ class PutCommands(DomaineTest):
         with lzma.open(path_catalogue, 'wt') as fichier:
             json.dump(catalogue, fichier)
 
-        data = {'valeur': 1}
+        path_maitrecles = None
+        if maitrecles is not None:
+            maitrecles = self.contexte.generateur_transactions.preparer_enveloppe(
+                maitrecles, 'MaitreDesCles.dadada', ajouter_certificats=True)
+            # maitrecles['corrupu'] = True
+
+            path_maitrecles = '/tmp/fichier_maitrecles.json.xz'
+            with lzma.open(path_maitrecles, 'wt') as fichier:
+                json.dump(maitrecles, fichier)
 
         with open(path_catalogue, 'rb') as fp_catalogue:
             with open(path_transactions, 'rb') as fp_transactions:
@@ -56,14 +64,19 @@ class PutCommands(DomaineTest):
                     'transactions': (nom_fichier_backup + '.jsonl.xz.mgs1', fp_transactions, 'application/x-xz'),
                     'catalogue': (nom_fichier_backup + '.json.xz', fp_catalogue, 'application/x-xz'),
                 }
+                if maitrecles is not None:
+                    fp_cles = open(path_maitrecles, 'rb')
+                    files['cles'] = ('maitrecles.json.xz', fp_cles, 'application/x-xz')
 
                 r = requests.put(
                     '%s/backup/domaine/%s' % (self.url_consignationfichiers, nom_fichier_backup),
-                    data=data,
                     files=files,
                     verify=self._contexte.configuration.mq_cafile,
                     cert=(self.certfile, self.keyfile)
                 )
+
+                if maitrecles is not None:
+                    fp_cles.close()
 
         resultat = r.json()
         if r.status_code != 200:
@@ -77,6 +90,8 @@ class PutCommands(DomaineTest):
 
         os.unlink(path_catalogue)
         os.unlink(path_transactions)
+        if maitrecles is not None:
+            os.unlink(path_maitrecles)
 
         return r
 
@@ -89,10 +104,26 @@ class PutCommands(DomaineTest):
         r = self.put_backup('domaine.sousdomaine.202001010000', catalogue, transactions)
         self.__logger.debug("Resultat put : %d\n%s" % (r.status_code, r.json()))
 
+    def put_test_protege(self):
+        catalogue = {
+            'domaine': 'domaine.test',
+            'heure': int(datetime.datetime(year=2020, month=1, day=1, hour=1, tzinfo=pytz.UTC).timestamp()),
+        }
+        maitrecles = {
+            'iv': 'Mon IV',
+            'cles': {
+                'hachage-1': 'cle-1'
+            }
+        }
+        transactions = b'donnees pas rapport'
+        r = self.put_backup('domaine.sousdomaine.202001010000', catalogue, transactions, maitrecles)
+        self.__logger.debug("Resultat put_test_protege : %d\n%s" % (r.status_code, r.json()))
+
     def executer(self):
         self.__logger.debug("Executer")
         try:
             self.put_test1()
+            # self.put_test_protege()
         finally:
             self.event_recu.set()
 
