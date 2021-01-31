@@ -130,12 +130,20 @@ class GetCommands(DomaineTest):
         self.__logger.debug("Resultat get_liste_fichiers : %d\nHeaders: %s" % (r.status_code, r.headers))
         self.__logger.debug(r.text)
 
+    def get_fichier(self, domaine='domaine.test', fichier='horaire/domaine.sousdomaine.202001010000.json.xz'):
+        r = self.get('fichier/' + domaine + '/' + fichier)
+        self.__logger.debug("Resultat get_fichier : %d\nHeaders: %s" % (r.status_code, r.headers))
+        content = r.content
+        self.__logger.debug("Taille contenu fichier : %d" % len(content))
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.get_listedomaines()
         # self.get_catalogues()
         # self.get_catalogues("sample5")
-        self.get_liste_fichiers("sample5")
+        # self.get_liste_fichiers("sample5")
+        self.get_fichier()
+        self.get_fichier('sample4', 'domaine.test_2020.tar')
 
         self.event_recu.set()
 
