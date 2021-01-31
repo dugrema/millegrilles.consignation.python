@@ -125,11 +125,17 @@ class GetCommands(DomaineTest):
             except json.decoder.JSONDecodeError:
                 pass
 
+    def get_liste_fichiers(self, domaine='domaine.test'):
+        r = self.get('listeFichiers/' + domaine)
+        self.__logger.debug("Resultat get_liste_fichiers : %d\nHeaders: %s" % (r.status_code, r.headers))
+        self.__logger.debug(r.text)
+
     def executer(self):
         self.__logger.debug("Executer")
         # self.get_listedomaines()
         # self.get_catalogues()
-        self.get_catalogues("sample5")
+        # self.get_catalogues("sample5")
+        self.get_liste_fichiers("sample5")
 
         self.event_recu.set()
 
