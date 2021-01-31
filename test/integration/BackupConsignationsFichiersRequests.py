@@ -185,8 +185,10 @@ class GetCommands(DomaineTest):
             # self.get_catalogues()
             # self.get_catalogues("sample5")
             # self.get_liste_fichiers("sample5")
-            self.get_fichier()
-            self.get_fichier('sample4', 'domaine.test_2020.tar')
+            # self.get_liste_fichiers("mathieu.main")
+            # self.get_fichier()
+            # self.get_fichier('sample4', 'domaine.test_2020.tar')
+            self.get_fichier('mathieu.main', 'snapshot/test.txt')
         finally:
             self.event_recu.set()
 
@@ -197,8 +199,8 @@ if __name__ == '__main__':
     logging.getLogger('millegrilles').setLevel(logging.DEBUG)
     logging.getLogger('PutCommands').setLevel(logging.DEBUG)
     logging.getLogger('GetCommands').setLevel(logging.DEBUG)
-    test = PutCommands()
-    # test = GetCommands()
+    # test = PutCommands()
+    test = GetCommands()
     # TEST
 
     # FIN TEST
