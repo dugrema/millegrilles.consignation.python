@@ -83,11 +83,18 @@ class EnveloppeCleCert:
         self.chaine = chaine
 
     def set_chaine_str(self, chaine: str):
-        chaine_list = chaine.split('-----END CERTIFICATE-----')
+        END_MARKER = '-----END CERTIFICATE-----'
+        chaine_list = chaine.split(END_MARKER)
         self.chaine = list()
         for cert in chaine_list:
-            cert = cert + '-----END CERTIFICATE-----'
+            cert = cert + END_MARKER
+            cert = cert.strip()
             self.chaine.append(cert)
+
+        # Cleanup dernier element au besoin
+        if self.chaine[-1] == END_MARKER:
+            self.chaine = self.chaine[:-1]
+
 
     def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
         self.private_key = primitives.serialization.load_pem_private_key(
@@ -102,6 +109,11 @@ class EnveloppeCleCert:
 
     def cert_from_pem_bytes(self, cert_bytes):
         self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
+        pem_string = cert_bytes.decode('utf-8')
+
+        self.set_chaine_str(pem_string)
+        if len(self.chaine) < 2:
+            self.chaine = None  # On n'a pas de chaine
 
     def cle_correspondent(self):
         if self.private_key is not None and self.cert is not None:

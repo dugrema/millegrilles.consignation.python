@@ -212,7 +212,7 @@ class HandlerBackupDomaine:
 
         :param heure: Heure du backup horaire
         :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
-        :return:
+        :param snapshot: Si True, effectue un snapshot plutot qu'un backup horaire
         """
         debut_backup = heure
         try:
@@ -287,8 +287,9 @@ class HandlerBackupDomaine:
         filtre = {
 
         }
-        collection_documents = self._contexte.document_dao.get_collection(self._nom_collection_documents)
-        return collection_documents.aggregate(filtre)
+        # collection_documents = self._contexte.document_dao.get_collection(self._nom_collection_documents)
+        # return collection_documents.aggregate(filtre)
+        return None
 
     def preparer_sousgroupes_horaires(self, heure: datetime.datetime) -> Dict[str, GroupeSousdomaine]:
         """
@@ -969,6 +970,8 @@ class HandlerBackupDomaine:
         """
         Hook pour requests.put. Simplifie override pour unit tests.
         """
+        if kwargs.get('test_params'):
+            del kwargs['test_params']
         return requests.put(*args, **kwargs)
 
 
@@ -1407,7 +1410,7 @@ class ArchivesBackupParser:
                         generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
 
                     digest_transactions = stream.digest()
-                    digest_transactions_catalogue = catalogue['transactions_hachage']
+                    digest_transactions_catalogue = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
                     if digest_transactions == digest_transactions_catalogue:
                         self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
                     else:
