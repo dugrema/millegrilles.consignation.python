@@ -9,7 +9,7 @@ import tarfile
 
 from typing import Optional, List, Dict
 from io import RawIOBase
-from os import path
+from os import path, unlink
 from pathlib import Path
 from base64 import b64encode, b64decode
 from lzma import LZMAFile, LZMAError
@@ -76,6 +76,7 @@ class InformationSousDomaineHoraire:
         # Fichiers et catalogue
         self.path_fichier_backup: Optional[str] = None
         self.path_fichier_catalogue: Optional[str] = None
+        self.path_fichier_maitrecles: Optional[str] = None
         self.catalogue_backup: Optional[dict] = None
         self.sha512_backup: Optional[str] = None
         self.sha512_catalogue: Optional[str] = None
@@ -95,6 +96,18 @@ class InformationSousDomaineHoraire:
     @property
     def backup_workdir(self) -> str:
         return path.dirname(self.path_fichier_backup)
+
+    def cleanup(self):
+        """
+        Supprime les fichiers temporaires
+        :return:
+        """
+        fichiers = [self.path_fichier_backup, self.path_fichier_catalogue, self.path_fichier_maitrecles]
+        for fichier in fichiers:
+            try:
+                unlink(fichier)
+            except (FileNotFoundError, TypeError):
+                pass
 
 
 class GroupeSousdomaine:
@@ -126,11 +139,13 @@ class BackupUtil:
         self.__contexte = contexte
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def preparer_cipher(self, catalogue_backup, info_cles: dict, nom_domaine: str = None, nom_application: str = None, output_stream=None):
+    def preparer_cipher(
+            self, catalogue_backup, info_cles: dict, heure_str: str,
+            nom_domaine: str = None, nom_application: str = None, output_stream=None):
         """
         Prepare un objet cipher pour chiffrer le fichier de transactions
 
-        :param catalogue_backup:
+        :param catalogue_backup: Catalogue de backup horaire
         :param info_cles: Cles publiques (certs) retournees par le maitre des cles. Utilisees pour chiffrer cle secrete.
         :param output_stream: Optionnel, stream/fichier d'output. Permet d'utiliser le cipher comme output stream dans un pipe.
         :return:
@@ -151,16 +166,19 @@ class BackupUtil:
         certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
 
-        identificateurs_document = dict()
-        liste_identificateurs = [
-            ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER,
-            ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER,
-        ]
-        for ident in liste_identificateurs:
-            try:
-                identificateurs_document[ident] = catalogue_backup[ident]
-            except KeyError:
-                pass
+        # identificateurs_document = dict()
+        # liste_identificateurs = [
+        #     ConstantesBackup.LIBELLE_TRANSACTIONS,
+        #     heure_str or int(catalogue_backup['heure'].timestamp()),
+        # ]
+        # for ident in liste_identificateurs:
+        #     try:
+        #         identificateurs_document[ident] = catalogue_backup[ident]
+        #     except KeyError:
+        #         pass
+        identificateurs_document = {
+            'heure': heure_str
+        }
 
         transaction_maitredescles = {
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
@@ -254,7 +272,8 @@ class HandlerBackupDomaine:
                         # Uploader les fichiers et transactions de backup vers consignationfichiers
                         with open(information_sousgroupe.path_fichier_backup, 'rb') as fp_transactions:
                             with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fp_catalogue:
-                                self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue)
+                                with open(information_sousgroupe.path_fichier_maitrecles, 'rb') as fp_maitrecles:
+                                    self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue, fp_maitrecles)
 
                         if not information_sousgroupe.snapshot:
                             self.soumettre_transactions_backup_horaire(information_sousgroupe)
@@ -327,7 +346,7 @@ class HandlerBackupDomaine:
         return groupes_sousdomaine
 
     def uploader_fichiers_backup(
-            self, information_sousgroupe: InformationSousDomaineHoraire, fp_transactions, fp_catalogue):
+            self, information_sousgroupe: InformationSousDomaineHoraire, fp_transactions, fp_catalogue, fp_maitrecles):
 
         self.transmettre_evenement_backup(
             ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, information_sousgroupe.heure)
@@ -343,12 +362,6 @@ class HandlerBackupDomaine:
         except (KeyError, TypeError):
             pass  # Pas de grosfichiers
 
-        # Ajouter la transaction de maitre des cles si le backup est chiffre
-        try:
-            data['transaction_maitredescles'] = json.dumps(information_sousgroupe.transaction_maitredescles)
-        except Exception:
-            self.__logger.exception("TODO : Mettre bon type d'exception")
-
         # Preparer URL de connexion a consignationfichiers
         url_consignationfichiers = 'https://%s:%s' % (
             self._contexte.configuration.serveur_consignationfichiers_host,
@@ -360,6 +373,7 @@ class HandlerBackupDomaine:
         files = {
             'transactions': (nom_fichier_transactions, fp_transactions, 'application/x-xz'),
             'catalogue': (nom_fichier_catalogue, fp_catalogue, 'application/x-xz'),
+            'cles': ('cles', fp_maitrecles, 'application/x-xz'),
         }
 
         certfile = self._contexte.configuration.mq_certfile
@@ -502,6 +516,12 @@ class HandlerBackupDomaine:
             information_sousgroupe.sha512_backup = self.calculer_fichier_SHA512(
                 information_sousgroupe.path_fichier_backup)
 
+            # Preparer la transaction maitredescles
+            information_sousgroupe.transaction_maitredescles[ConstantesBackup.LIBELLE_HACHAGE_BYTES] = information_sousgroupe.sha512_backup
+            information_sousgroupe.path_fichier_maitrecles = 'cles.json.xz'
+            with lzma.open(information_sousgroupe.path_fichier_maitrecles, 'wt') as fichier:
+                self.persister_cles(information_sousgroupe, fichier)
+
             # Sauvegarder catalogue et calculer digest
             with lzma.open(information_sousgroupe.path_fichier_catalogue, 'wt') as fichier:
                 self.persister_catalogue(information_sousgroupe, fichier)
@@ -593,11 +613,11 @@ class HandlerBackupDomaine:
         # Determiner path fichiers
         backup_workdir = self._contexte.configuration.backup_workdir
 
-        backup_nomfichier = '%s_transactions_%s_%s.%s' % (
-            prefixe_fichier, heure_str, self.__niveau_securite, extension_transactions)
+        backup_nomfichier = '%s_%s.%s' % (
+            prefixe_fichier, heure_str, extension_transactions)
         information_sousgroupe.path_fichier_backup = path.join(backup_workdir, backup_nomfichier)
 
-        catalogue_nomfichier = '%s_catalogue_%s_%s.json.xz' % (prefixe_fichier, heure_str, self.__niveau_securite)
+        catalogue_nomfichier = '%s_%s.json.xz' % (prefixe_fichier, heure_str)
         information_sousgroupe.path_fichier_catalogue = path.join(backup_workdir, catalogue_nomfichier)
 
         # Preparer le contenu du catalogue
@@ -607,17 +627,18 @@ class HandlerBackupDomaine:
         if self._doit_chiffrer():
             cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(
                 information_sousgroupe.catalogue_backup, information_sousgroupe.info_cles,
-                nom_domaine=information_sousgroupe.sous_domaine
+                heure_str=heure_str, nom_domaine=information_sousgroupe.sous_domaine,
             )
 
             information_sousgroupe.cipher = cipher
             information_sousgroupe.transaction_maitredescles = transaction_maitredescles
 
-            # Inserer la transaction de maitre des cles dans l'info backup pour l'uploader avec le PUT
-            self._contexte.generateur_transactions.preparer_enveloppe(
-                transaction_maitredescles,
-                Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
-            )
+            # Note : il manque le hachage du fichier de backup (transactions), on ne peut pas signer tout de suite
+            # # Inserer la transaction de maitre des cles dans l'info backup pour l'uploader avec le PUT
+            # self._contexte.generateur_transactions.preparer_enveloppe(
+            #     transaction_maitredescles,
+            #     Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
+            # )
 
             if information_sousgroupe.snapshot is True:
                 # Conserver les cles de backup dans le snapshot - ces cles ne sont pas sauvegardes par le
@@ -632,6 +653,33 @@ class HandlerBackupDomaine:
                                                            Constantes.SECURITE_SECURE]
 
         return chiffrer_transactions
+
+    def persister_cles(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier):
+        """
+        Conserve le fichier de maitre des cles pour upload
+        :param information_sousgroupe:
+        :param fp_fichier:
+        :return:
+        """
+        cles = information_sousgroupe.transaction_maitredescles
+
+        # Generer l'entete et la signature
+        cles_json = json.dumps(cles, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+
+        # Recharger le fichier pour avoir le format exact (e.g. encoding dates)
+        cles_backup = json.loads(cles_json)
+        cles_backup = self._contexte.generateur_transactions.preparer_enveloppe(
+            cles_backup,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
+            ajouter_certificats=True
+        )
+
+        # Remplacer le catalogue precedent dans information_sousgroupe
+        information_sousgroupe.transaction_maitredescles = cles_backup
+
+        # Sauvegarder sur disque
+        cles_json = json.dumps(cles_backup, sort_keys=True, ensure_ascii=True, cls=DateFormatEncoder)
+        fp_fichier.write(cles_json)
 
     def persister_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire, fp_fichier_catalogue):
         catalogue_backup = information_sousgroupe.catalogue_backup

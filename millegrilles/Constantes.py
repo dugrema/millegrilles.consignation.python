@@ -710,6 +710,9 @@ class ConstantesMaitreDesCles:
 
     LIBVAL_CONFIGURATION = 'configuration'
 
+    TRANSACTION_NOUVELLE_CLE = 'nouvelleCle'
+    TRANSACTION_SAUVEGARDER_CLE = 'cle'
+
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.cleGrosFichier' % DOMAINE_NOM
     TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP = 'cleGrosFichierBackup'
     TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS = '%s.cleBackupTransactions' % DOMAINE_NOM
@@ -779,6 +782,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CERTIFICAT_TIERS = '_certificat_tiers'
     TRANSACTION_CHAMP_DUREE_PERMISSION = 'duree'
     TRANSACTION_CHAMP_UUID_ORIGINAL = 'uuid_original'
+    TRANSACTION_CHAMP_HACHAGE_BYTES = 'hachage_bytes'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -1436,6 +1440,8 @@ class ConstantesBackup:
     LIBELLE_DIRTY_FLAG = 'dirty_flag'
     LIBELLE_BACKUP_PRECEDENT = 'backup_precedent'
     LIBELLE_HACHAGE_ENTETE = 'hachage_entete'
+    LIBELLE_TRANSACTIONS = 'transactions'
+    LIBELLE_HACHAGE_BYTES = 'hachage_bytes'
 
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
     LIBELLE_ARCHIVE_HACHAGE = 'archive_hachage'

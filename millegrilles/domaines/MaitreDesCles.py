@@ -2156,18 +2156,19 @@ class ProcessusReceptionCles(MGProcessusTransaction):
 
             sous_domaine = '.'.join([ConstantesMaitreDesCles.DOMAINE_NOM, fingerprint, action + 'Backup'])
 
-            identificateurs_document = transaction['identificateurs_document'].copy()
-            identificateurs_document['fingerprint'] = fingerprint_b64
+            # identificateurs_document = transaction['identificateurs_document'].copy()
+            # identificateurs_document['fingerprint'] = fingerprint_b64
 
             domaine_effectif = domaine or transaction.get('domaine')
 
             transaction_cle = {
                 'domaine': domaine_effectif,
-                'identificateurs_document': identificateurs_document,
+                'identificateurs_document': transaction['identificateurs_document'],
                 'fingerprint': fingerprint,
+                'fingerprint_sha256_b64': fingerprint_b64,
                 'cle': cle,
                 'iv': transaction['iv'],
-                'sujet': sujet,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_UUID_ORIGINAL: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
             }
             self.ajouter_transaction_a_soumettre(sous_domaine, transaction_cle)
