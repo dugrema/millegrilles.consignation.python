@@ -670,7 +670,10 @@ class HandlerBackupDomaine:
         cles_backup = json.loads(cles_json)
         cles_backup = self._contexte.generateur_transactions.preparer_enveloppe(
             cles_backup,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
+            '.'.join([
+                Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+                Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
+            ]),
             ajouter_certificats=True
         )
 

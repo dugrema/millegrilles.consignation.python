@@ -705,61 +705,68 @@ class ConstantesMaitreDesCles:
 
     COLLECTION_TRANSACTIONS_NOM = COLLECTION_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_NOM
+    COLLECTION_CLES_NOM = '%s/cles' % COLLECTION_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     LIBVAL_CONFIGURATION = 'configuration'
 
-    TRANSACTION_NOUVELLE_CLE = 'nouvelleCle'
-    TRANSACTION_SAUVEGARDER_CLE = 'cle'
+    # TRANSACTION_NOUVELLE_CLE = 'nouvelleCle'
+    TRANSACTION_CLE = 'cle'
 
-    TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.cleGrosFichier' % DOMAINE_NOM
-    TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP = 'cleGrosFichierBackup'
-    TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS = '%s.cleBackupTransactions' % DOMAINE_NOM
-    TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS_BACKUP = 'cleBackupTransactionsBackup'
-    TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION = 'cleBackupApplication'
-    TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION_BACKUP = 'cleBackupApplicationBackup'
-    TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.cleDocument' % DOMAINE_NOM
-    TRANSACTION_NOUVELLE_CLE_DOCUMENT_BACKUP = 'cleDocumentBackup'
-    TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
-    TRANSACTION_MAJ_MOTDEPASSE = '%s.maj_motdepasse' % DOMAINE_NOM
+    # TRANSACTION_NOUVELLE_CLE_GROSFICHIER = '%s.cleGrosFichier' % DOMAINE_NOM
+    # TRANSACTION_NOUVELLE_CLE_GROSFICHIER_BACKUP = 'cleGrosFichierBackup'
+    # TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS = '%s.cleBackupTransactions' % DOMAINE_NOM
+    # TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS_BACKUP = 'cleBackupTransactionsBackup'
+    # TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION = 'cleBackupApplication'
+    # TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION_BACKUP = 'cleBackupApplicationBackup'
+    # TRANSACTION_NOUVELLE_CLE_DOCUMENT = '%s.cleDocument' % DOMAINE_NOM
+    # TRANSACTION_NOUVELLE_CLE_DOCUMENT_BACKUP = 'cleDocumentBackup'
+    # TRANSACTION_MAJ_DOCUMENT_CLES = '%s.majcles' % DOMAINE_NOM
+    # TRANSACTION_MAJ_MOTDEPASSE = '%s.maj_motdepasse' % DOMAINE_NOM
 
-    TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
-    TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
-    TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
-    TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR = '%s.genererCertificatNavigateur' % DOMAINE_NOM
-    TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
-    TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
-    TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
+    # TRANSACTION_DOMAINES_DOCUMENT_CLESRECUES = 'clesRecues'
+    # TRANSACTION_RENOUVELLEMENT_CERTIFICAT = '%s.renouvellementCertificat' % DOMAINE_NOM
+    # TRANSACTION_SIGNER_CERTIFICAT_NOEUD = '%s.signerCertificatNoeud' % DOMAINE_NOM
+    # TRANSACTION_GENERER_CERTIFICAT_NAVIGATEUR = '%s.genererCertificatNavigateur' % DOMAINE_NOM
+    # TRANSACTION_DECLASSER_CLE_GROSFICHIER = '%s.declasserCleGrosFichier' % DOMAINE_NOM
+    # TRANSACTION_GENERER_DEMANDE_INSCRIPTION = '%s.genererDemandeInscription' % DOMAINE_NOM
+    # TRANSACTION_GENERER_CERTIFICAT_POUR_TIERS = '%s.genererCertificatPourTiers' % DOMAINE_NOM
 
-    TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU = '%s.nouveauTrousseauHebergement' % DOMAINE_NOM
-    TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU = '%s.majTrousseauHebergement' % DOMAINE_NOM
-    TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE = '%s.nouveauMotDePasseCleHebergement' % DOMAINE_NOM
-    TRANSACTION_HEBERGEMENT_SUPPRIMER = '%s.supprimerHebergement' % DOMAINE_NOM
+    # TRANSACTION_HEBERGEMENT_NOUVEAU_TROUSSEAU = '%s.nouveauTrousseauHebergement' % DOMAINE_NOM
+    # TRANSACTION_HEBERGEMENT_MAJ_TROUSSEAU = '%s.majTrousseauHebergement' % DOMAINE_NOM
+    # TRANSACTION_HEBERGEMENT_MOTDEPASSE_CLE = '%s.nouveauMotDePasseCleHebergement' % DOMAINE_NOM
+    # TRANSACTION_HEBERGEMENT_SUPPRIMER = '%s.supprimerHebergement' % DOMAINE_NOM
 
-    REQUETE_CLE_RACINE = 'requeteCleRacine'
+    # REQUETE_CLE_RACINE = 'requeteCleRacine'
     REQUETE_CERT_MAITREDESCLES = 'certMaitreDesCles'
-    REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
-    REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
-    REQUETE_TROUSSEAU_HEBERGEMENT = 'trousseauHebergement'
+
+    REQUETE_DECHIFFRAGE = 'dechiffrage'
+
+    # REQUETE_DECRYPTAGE_DOCUMENT = 'decryptageDocument'
+    # REQUETE_DECRYPTAGE_GROSFICHIER = 'decryptageGrosFichier'
+    # REQUETE_TROUSSEAU_HEBERGEMENT = 'trousseauHebergement'
     REQUETE_CLES_NON_DECHIFFRABLES = 'clesNonDechiffrables'
     REQUETE_COMPTER_CLES_NON_DECHIFFRABLES = 'compterClesNonDechiffrables'
-    REQUETE_DECHIFFRAGE_BACKUP = 'dechiffrageBackup'
+    # REQUETE_DECHIFFRAGE_BACKUP = 'dechiffrageBackup'
     REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
 
-    COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
+    # COMMANDE_SIGNER_CLE_BACKUP = 'signerCleBackup'
     COMMANDE_RESTAURER_BACKUP_CLES = 'restaurerBackupCles'
-    COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE = 'creerClesMilleGrilleHebergee'
-    COMMANDE_SIGNER_CSR = 'signerCsr'
-    COMMANDE_SIGNER_NAVIGATEUR_CSR = 'signerNavigateurCsr'
-    COMMANDE_SIGNER_CSR_CA_DEPENDANT = 'signerCSRCADependant'
+    # COMMANDE_CREER_CLES_MILLEGRILLE_HEBERGEE = 'creerClesMilleGrilleHebergee'
+    # COMMANDE_SIGNER_CSR = 'signerCsr'
+    # COMMANDE_SIGNER_NAVIGATEUR_CSR = 'signerNavigateurCsr'
+    # COMMANDE_SIGNER_CSR_CA_DEPENDANT = 'signerCSRCADependant'
     COMMANDE_SAUVEGARDER_CLE = 'sauvegarderCle'
 
     CORRELATION_CERTIFICATS_BACKUP = 'certificatsBackup'
 
     TRANSACTION_CHAMP_CLESECRETE = 'cle'
+    TRANSACTION_CHAMP_CLE_INDIVIDUELLE = 'cle'
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_IV = 'iv'
+    TRANSACTION_CHAMP_FINGERPRINT = 'fingerprint'
+    TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64 = 'fingerprint_sha256_b64'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
     TRANSACTION_CHAMP_DOMAINES = 'domaines'
@@ -783,6 +790,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_DUREE_PERMISSION = 'duree'
     TRANSACTION_CHAMP_UUID_ORIGINAL = 'uuid_original'
     TRANSACTION_CHAMP_HACHAGE_BYTES = 'hachage_bytes'
+    TRANSACTION_CHAMP_NON_DECHIFFRABLE = 'non_dechiffrable'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
@@ -790,12 +798,13 @@ class ConstantesMaitreDesCles:
 
     TOKEN_SYNCHRONISER = 'synchroniser'
 
-    DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
-    DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS = 'cles.backupTransactions'
-    DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
-    DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION = 'cles.backupApplication'
-    DOCUMENT_LIBVAL_MOTDEPASSE = 'motdepasse.document'
-    DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU = 'hebergement.trousseau'
+    DOCUMENT_LIBVAL_CLE = 'cle'
+    # DOCUMENT_LIBVAL_CLES_GROSFICHIERS = 'cles.grosFichiers'
+    # DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS = 'cles.backupTransactions'
+    # DOCUMENT_LIBVAL_CLES_DOCUMENT = 'cles.document'
+    # DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION = 'cles.backupApplication'
+    # DOCUMENT_LIBVAL_MOTDEPASSE = 'motdepasse.document'
+    # DOCUMENT_LIBVAL_HEBERGEMENT_TROUSSEAU = 'hebergement.trousseau'
 
     DOCUMENT_SECURITE = 'securite'
 
@@ -805,18 +814,18 @@ class ConstantesMaitreDesCles:
     }
 
     # Document utilise pour conserver un ensemble de cles lie a un document
-    DOCUMENT_CLES_GROSFICHIERS = {
-        DOCUMENT_INFODOC_LIBELLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+    # DOCUMENT_CLES_GROSFICHIERS = {
+    #     DOCUMENT_INFODOC_LIBELLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+    #
+    #     # Template a remplir
+    #     'fuuid': None,    # Identificateur unique de version de fichier
+    #     'cles': dict(),   # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
+    # }
 
-        # Template a remplir
-        'fuuid': None,    # Identificateur unique de version de fichier
-        'cles': dict(),   # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
-    }
-
-    DOCUMENT_TRANSACTION_CONSERVER_CLES = {
-        TRANSACTION_CHAMP_SUJET_CLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,  # Mettre le sujet approprie
-        'cles': dict(),  # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
-    }
+    # DOCUMENT_TRANSACTION_CONSERVER_CLES = {
+    #     TRANSACTION_CHAMP_SUJET_CLE: DOCUMENT_LIBVAL_CLES_GROSFICHIERS,  # Mettre le sujet approprie
+    #     'cles': dict(),  # Dictionnaire indexe par fingerprint de certificat signataire. Valeur: cle secrete cryptee
+    # }
 
     DOCUMENT_TRANSACTION_GROSFICHIERRESUME = {
         'fuuid': None,  # Identificateur unique de version de fichier
