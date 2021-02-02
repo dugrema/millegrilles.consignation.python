@@ -1528,7 +1528,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: transaction[
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES]
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: transaction[
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
         }
 
         version_courante = transaction.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_UUID_ORIGINAL) or \
@@ -1543,7 +1545,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         for champ, valeur in identificateurs_documents.items():
             try:
                 nom_champ = '.'.join([ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, champ])
-                set_ops[nom_champ] = transaction[champ]
+                set_ops[nom_champ] = identificateurs_documents[champ]
             except KeyError:
                 pass
 

@@ -166,29 +166,20 @@ class BackupUtil:
         certs_cles_backup.extend(info_cles['certificats_backup'].values())
         cles_chiffrees = self.chiffrer_cle(certs_cles_backup, cipher.password)
 
-        # identificateurs_document = dict()
-        # liste_identificateurs = [
-        #     ConstantesBackup.LIBELLE_TRANSACTIONS,
-        #     heure_str or int(catalogue_backup['heure'].timestamp()),
-        # ]
-        # for ident in liste_identificateurs:
-        #     try:
-        #         identificateurs_document[ident] = catalogue_backup[ident]
-        #     except KeyError:
-        #         pass
         identificateurs_document = {
             'heure': heure_str
         }
+        if nom_domaine is not None:
+            identificateurs_document['domaine'] = nom_domaine
+        if nom_application is not None:
+            identificateurs_document['application'] = nom_application
 
         transaction_maitredescles = {
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'iv': iv,
             'cles': cles_chiffrees,
+            'domaine': ConstantesBackup.DOMAINE_NOM,
         }
-        if nom_domaine is not None:
-            transaction_maitredescles['domaine'] = nom_domaine
-        if nom_application is not None:
-            transaction_maitredescles['application'] = nom_application
 
         return cipher, transaction_maitredescles
 
