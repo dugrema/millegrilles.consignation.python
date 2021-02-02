@@ -384,11 +384,10 @@ class HandlerBackupDomaine:
 
             # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
             nom_fichier_transactions = information_sousgroupe.nom_fichier_backup
-            if reponse_json['fichiersDomaines'][nom_fichier_transactions] != \
-                    catalogue_backup[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]:
+            if reponse_json.get('ok') is not True:
+                erreur = reponse_json.get('err')
                 raise ValueError(
-                    "Le SHA512 du fichier de backup de transactions ne correspond pas "
-                    "a celui recu de consignationfichiers"
+                    "Erreur traitement backup. %s" % erreur
                 )
         else:
             raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
@@ -666,11 +665,11 @@ class HandlerBackupDomaine:
 
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: information_sousgroupe.nom_fichier_catalogue,
             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: information_sousgroupe.nom_fichier_backup,
-            ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: None,
+            # ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: None,
 
             # Conserver la liste des certificats racine, intermediaire et noeud necessaires pour
             # verifier toutes les transactions de ce backup
-            ConstantesBackup.LIBELLE_CERTS_RACINE: set(),
+            # ConstantesBackup.LIBELLE_CERTS_RACINE: set(),
             ConstantesBackup.LIBELLE_CERTS_INTERMEDIAIRES: set(),
             ConstantesBackup.LIBELLE_CERTS: set(),
             ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE: list(),
@@ -781,7 +780,7 @@ class HandlerBackupDomaine:
         domaine_action = 'evenement.%s.transactionEvenement' % self._nom_domaine
         # self._contexte.message_dao.transmettre_message(evenement, domaine_action)
         self._contexte.generateur_transactions.emettre_message(
-            evenement, domaine_action, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE])
+            evenement, domaine_action, exchanges=[Constantes.SECURITE_PROTEGE])
 
     def marquer_transactions_invalides(self, nom_collection_mongo: str, uuid_transactions: list):
         """
@@ -801,7 +800,7 @@ class HandlerBackupDomaine:
         }
         domaine_action = 'evenement.%s.transactionEvenement' % self._nom_domaine
         self._contexte.generateur_transactions.emettre_message(
-            evenement, domaine_action, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE])
+            evenement, domaine_action, exchanges=[Constantes.SECURITE_PROTEGE])
 
     def creer_backup_quoditien(self, domaine: str, jour: datetime.datetime):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
@@ -904,7 +903,7 @@ class HandlerBackupDomaine:
         domaine = 'evenement.backup.backupTransaction'
 
         self._contexte.generateur_transactions.emettre_message(
-            evenement_contenu, domaine, exchanges=[Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS]
+            evenement_contenu, domaine, exchanges=[Constantes.SECURITE_PROTEGE]
         )
 
     def transmettre_trigger_jour_precedent(self, heure_plusvieille: datetime.datetime):

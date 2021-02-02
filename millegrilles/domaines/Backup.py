@@ -223,7 +223,7 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
             ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER,
             ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE,
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER,
-            ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE,
+            # ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE,
         ]
 
         set_ops = {

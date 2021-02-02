@@ -379,7 +379,7 @@ class UtilCertificats:
         try:
             cle = self._contexte.configuration.cle
             self._certificat = cle.cert
-            self._chaine = cle.chaine[0:-1]
+            self._chaine = cle.chaine
         except:
             certfile_path = self.configuration.pki_certfile
             self._certificat = self._charger_pem(certfile_path)

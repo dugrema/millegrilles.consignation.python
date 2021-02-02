@@ -121,6 +121,20 @@ class MessagesSample(BaseCallback):
                 declencheur, domaine, reply_to=self.queue_name, correlation_id='reply_regenerer')
             print("Commande regenerer domaine %s : %s" % (domaine, enveloppe_val))
 
+    def trigger_backup(self, domaine):
+        timestamp_courant = datetime.datetime.utcnow()
+
+        commande_backup_quotidien = {
+            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup_quotidien,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', domaine),
+            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            reply_to=self.queue_name,
+            correlation_id='trigger_backup_horaire'
+        )
+
     def requete_backup_dernierhoraire(self):
         requete = {
             'domaine': Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
@@ -352,7 +366,7 @@ class MessagesSample(BaseCallback):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
-        # sample.trigger_backup_global()
+        sample.trigger_backup_global()
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
         # sample.trigger_backup_snapshot_maitredescles()
@@ -371,13 +385,15 @@ class MessagesSample(BaseCallback):
 
         # sample.trigger_restaurer_global()
         # sample.trigger_restaurer_maitredescles()
-        sample.trigger_restaurer_grosfichiers()
+        # sample.trigger_restaurer_grosfichiers()
 
         # sample.trigger_quotidien('MaitreDesCles', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('GrosFichiers', datetime.datetime(year=2020, month=10, day=8))
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2020, month=10, day=9))
 
         # sample.trigger_restaurer_liensgrosfichiers()
+
+        # sample.trigger_backup('Publication')
 
 
 # --- MAIN ---
