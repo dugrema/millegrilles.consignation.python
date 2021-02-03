@@ -263,8 +263,15 @@ class HandlerBackupDomaine:
                         # Uploader les fichiers et transactions de backup vers consignationfichiers
                         with open(information_sousgroupe.path_fichier_backup, 'rb') as fp_transactions:
                             with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fp_catalogue:
-                                with open(information_sousgroupe.path_fichier_maitrecles, 'rb') as fp_maitrecles:
-                                    self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue, fp_maitrecles)
+                                fp_maitrecles = None
+                                if information_sousgroupe.path_fichier_maitrecles is not None:
+                                    fp_maitrecles = open(information_sousgroupe.path_fichier_maitrecles, 'rb')
+                                self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue, fp_maitrecles)
+                                if fp_maitrecles is not None:
+                                    try:
+                                        fp_maitrecles.close()
+                                    except IOError as ioe:
+                                        self.__logger.warning("Erreur fermeture fp_maitredescles : %s" % str(ioe))
 
                         if not information_sousgroupe.snapshot:
                             self.soumettre_transactions_backup_horaire(information_sousgroupe)
@@ -507,11 +514,12 @@ class HandlerBackupDomaine:
             information_sousgroupe.sha512_backup = self.calculer_fichier_SHA512(
                 information_sousgroupe.path_fichier_backup)
 
-            # Preparer la transaction maitredescles
-            information_sousgroupe.transaction_maitredescles[ConstantesBackup.LIBELLE_HACHAGE_BYTES] = information_sousgroupe.sha512_backup
-            information_sousgroupe.path_fichier_maitrecles = 'cles.json.xz'
-            with lzma.open(information_sousgroupe.path_fichier_maitrecles, 'wt') as fichier:
-                self.persister_cles(information_sousgroupe, fichier)
+            if information_sousgroupe.transaction_maitredescles is not None:
+                # Preparer la transaction maitredescles
+                information_sousgroupe.transaction_maitredescles[ConstantesBackup.LIBELLE_HACHAGE_BYTES] = information_sousgroupe.sha512_backup
+                information_sousgroupe.path_fichier_maitrecles = 'cles.json.xz'
+                with lzma.open(information_sousgroupe.path_fichier_maitrecles, 'wt') as fichier:
+                    self.persister_cles(information_sousgroupe, fichier)
 
             # Sauvegarder catalogue et calculer digest
             with lzma.open(information_sousgroupe.path_fichier_catalogue, 'wt') as fichier:
