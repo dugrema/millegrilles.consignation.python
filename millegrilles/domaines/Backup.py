@@ -450,7 +450,7 @@ class ProcessusInformationArchiveQuotidienne(MGProcessusTransaction):
         }
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
-            Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE]
+            # Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE]
         }
         set_on_insert.update(filtre)  # On utilise les memes valeurs que le filtre lors de l'insertion
 
