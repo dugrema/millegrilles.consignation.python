@@ -830,7 +830,7 @@ class HandlerBackupDomaine:
         domaine_action = 'evenement.%s.transactionEvenement' % self._nom_domaine
         # self._contexte.message_dao.transmettre_message(evenement, domaine_action)
         self._contexte.generateur_transactions.emettre_message(
-            evenement, domaine_action, exchanges=[Constantes.SECURITE_PROTEGE])
+            evenement, domaine_action, exchanges=[Constantes.SECURITE_SECURE])
 
     def marquer_transactions_invalides(self, nom_collection_mongo: str, uuid_transactions: list):
         """
