@@ -58,6 +58,15 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             name='dirty-backups'
         )
 
+        collection_transactions = self.document_dao.get_collection(ConstantesBackup.COLLECTION_TRANSACTIONS_NOM)
+        collection_transactions.create_index(
+            [
+                (ConstantesBackup.LIBELLE_HEURE, -1),
+                (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
+            ],
+            name='backup-heure-domaine'
+        )
+
     def demarrer(self):
         super().demarrer()
         # self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
@@ -276,14 +285,15 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
             transactions_nomfichier = transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER]
 
             commande_sauvegarder_cle = {
-                'domaine': transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+                'domaine': ConstantesBackup.DOMAINE_NOM,
                 Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
-                    ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: transactions_nomfichier,
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+                    ConstantesBackup.LIBELLE_HEURE: transaction[ConstantesBackup.LIBELLE_HEURE],
+                    # ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER: transactions_nomfichier,
                 },
                 "cles": cles,
                 "iv": iv,
-                'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
-                'securite': transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
+                ConstantesBackup.LIBELLE_HACHAGE_BYTES: transaction[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE],
             }
 
             self.controleur.generateur_transactions.transmettre_commande(

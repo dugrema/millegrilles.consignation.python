@@ -1190,6 +1190,8 @@ class TraitementCommandesSecures(TraitementMessageDomaineCommande):
             resultat = self.gestionnaire.declencher_backup_annuel(message_dict)
         elif routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", nom_domaine):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
+        elif routing_key == ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL:
+            resultat = self.gestionnaire.reset_backup(message_dict)
 
         else:
             raise ValueError("Commande inconnue: " + routing_key)

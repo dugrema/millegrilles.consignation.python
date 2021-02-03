@@ -230,6 +230,8 @@ class HandlerBackupDomaine:
 
             sousgroupes = self.preparer_sousgroupes_horaires(heure)
 
+            heure_plus_vieille = None
+
             for domaine, sousgroupe in sousgroupes.items():
                 entete_backup_precedent: Optional[dict] = None
 
@@ -280,6 +282,10 @@ class HandlerBackupDomaine:
                         entete_backup_precedent = information_sousgroupe.catalogue_backup[
                             Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
 
+                        # Conserver l'heure la plus vieille de ce backup - utilise pour trigger backup quotidien
+                        if heure_plus_vieille is None or heure_plus_vieille > information_sousgroupe.heure:
+                            heure_plus_vieille = information_sousgroupe.heure
+
                     else:
                         self.__logger.warning(
                             "Aucune transaction valide inclue dans le backup de %s a %s mais transactions en erreur presentes" % (
@@ -289,9 +295,12 @@ class HandlerBackupDomaine:
                 # Progress update - backup horaire termine
                 self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
 
-                # if heure_plus_vieille is not None:
-                #     # Declencher backup quotidien
-                #     self.transmettre_trigger_jour_precedent(heure_plus_vieille)
+            # Aucun backup a faire, s'assurer de transmettre le trigger pour le backup quotidien precedent
+            if heure_plus_vieille is None:
+                heure_plus_vieille = heure - datetime.timedelta(hours=1)
+
+            # Declencher backup quotidien
+            self.transmettre_trigger_jour_precedent(heure_plus_vieille)
 
         except Exception as e:
             self.__logger.exception("Erreur backup")
@@ -300,12 +309,26 @@ class HandlerBackupDomaine:
             raise e
 
     def trouver_entete_backup_precedent(self, domaine: str):
-        # TODO
         filtre = {
-
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+            'en-tete.domaine': 'Backup.catalogueHoraire',
+            '_evenements.transaction_traitee': {'$exists': True}
         }
-        # collection_documents = self._contexte.document_dao.get_collection(self._nom_collection_documents)
-        # return collection_documents.aggregate(filtre)
+        sort_backup = [
+            (ConstantesBackup.LIBELLE_HEURE, -1),
+            ('_evenements.transaction_traitee', -1)
+        ]
+        hint = [
+            (ConstantesBackup.LIBELLE_HEURE, -1),
+            (Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE, 1),
+        ]
+
+        collection_backups = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_TRANSACTIONS_NOM)
+        plus_recent_backup = collection_backups.find_one(filtre, sort=sort_backup, hint=hint)
+
+        if plus_recent_backup is not None:
+            return plus_recent_backup[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+
         return None
 
     def preparer_sousgroupes_horaires(self, heure: datetime.datetime) -> Dict[str, GroupeSousdomaine]:

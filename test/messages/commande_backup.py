@@ -235,7 +235,7 @@ class MessagesSample(BaseCallback):
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,
             ConstantesBackup.COMMANDE_BACKUP_RESET_GLOBAL,
-            exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
+            exchange=Constantes.SECURITE_PROTEGE,
             reply_to=self.queue_name,
             correlation_id='trigger_backup_reset'
         )
@@ -393,6 +393,7 @@ class MessagesSample(BaseCallback):
 
         # sample.trigger_restaurer_liensgrosfichiers()
 
+        # sample.trigger_backup_reset_global()
         sample.trigger_backup('Publication')
         # sample.trigger_quotidien('Publication', datetime.datetime(year=2021, month=2, day=1))
 
