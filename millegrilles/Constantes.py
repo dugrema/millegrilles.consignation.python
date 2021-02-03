@@ -290,7 +290,7 @@ class ConstantesDomaines:
     COMMANDE_DOMAINE_DEMARRER = 'demarrer'
     COMMANDE_DOMAINE_ARRETER = 'arreter'
 
-    REQUETE_GLOBAL_PREFIX = 'requete.global'
+    REQUETE_GLOBAL_PREFIX = 'requete.ALL'
     REQUETE_STATS_TRANSACTIONS = 'requeteStatsTransactions'
 
 

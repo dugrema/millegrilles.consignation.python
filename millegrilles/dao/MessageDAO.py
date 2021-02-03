@@ -996,7 +996,7 @@ class PikaDAO:
 
         message_utf8 = self.json_helper.dict_vers_json(message)
 
-        routing_key = 'evenement.%s.%s_%s' % \
+        routing_key = 'evenement.%s.mgpprocessus.%s_%s' % \
                       (nom_domaine, nom_processus, nom_etape)
 
         with self.lock_transmettre_message:

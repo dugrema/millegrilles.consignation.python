@@ -366,6 +366,7 @@ class MessagesSample(BaseCallback):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
+
         # sample.trigger_backup_global()
         # sample.trigger_backup_maitrecles()
         # sample.trigger_backup_grosfichiers()
@@ -392,8 +393,8 @@ class MessagesSample(BaseCallback):
 
         # sample.trigger_restaurer_liensgrosfichiers()
 
-        # sample.trigger_backup('Publication')
-        sample.trigger_quotidien('Publication', datetime.datetime(year=2021, month=2, day=1))
+        sample.trigger_backup('Publication')
+        # sample.trigger_quotidien('Publication', datetime.datetime(year=2021, month=2, day=1))
 
 
 # --- MAIN ---

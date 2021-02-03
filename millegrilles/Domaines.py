@@ -1316,7 +1316,11 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
             {
                 'nom': '%s.%s' % (self.get_nom_queue(), 'evenements'),
                 'routing': [
-                    'evenement.%s.#.*' % self.get_nom_domaine(),
+                    'evenement.%s.mgpprocessus.*' % self.get_nom_domaine(),
+                    'evenement.%s.resumer.*' % self.get_nom_domaine(),
+                    'evenement.%s.verifierResumer.*' % self.get_nom_domaine(),
+                    'evenement.%s.recevoirTransaction' % self.get_nom_domaine(),
+                    'evenement.%s.transactionEvenement' % self.get_nom_domaine(),
                 ],
                 'exchange': self.configuration.exchange_middleware,
                 'ttl': 300000,
