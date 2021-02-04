@@ -267,7 +267,7 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         self.__logger.debug("Traitement evenement de backup %s" % message)
 
         evenement_backup = message['evenement']
-        domaine = message['domaine']
+        domaine = message['domaine'].replace('.', '/')  # Remplace dot par / pour sauvegarder dans le rapport
         heure_backup = datetime.datetime.fromtimestamp(message['timestamp'])
         maintenant = datetime.datetime.utcnow()
 
