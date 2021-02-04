@@ -104,6 +104,25 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             name='backup-heure-domaine'
         )
 
+        collection_rapports = self.document_dao.get_collection(ConstantesBackup.COLLECTION_RAPPORTS_NOM)
+        collection_rapports.create_index(
+            [
+                ('termine', 1),
+                (Constantes.DOCUMENT_INFODOC_LIBELLE, 1),
+                (ConstantesBackup.LIBELLE_HEURE, -1),
+            ],
+            name='rapport-actif'
+        )
+
+        collection_rapports = self.document_dao.get_collection(ConstantesBackup.COLLECTION_RAPPORTS_NOM)
+        collection_rapports.create_index(
+            [
+                (ConstantesBackup.CHAMP_UUID_RAPPORT, 1),
+            ],
+            name='uuid-rapport',
+            unique=True,
+        )
+
     def demarrer(self):
         super().demarrer()
         # self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
@@ -304,6 +323,7 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             'heure': heure_backup,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_RAPPORT_BACKUP,
+            'termine': False,
         }
         ops = {
             '$set': set_ops,
