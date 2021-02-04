@@ -22,6 +22,10 @@ from millegrilles.domaines.MaitreDesCles import HandlerBackupMaitreDesCles
 
 
 UT_TEMP_FOLDER = '/tmp/ut_backupmoduletest'
+try:
+    os.mkdir(UT_TEMP_FOLDER)
+except FileExistsError:
+    pass
 
 
 class RequestsReponse:
@@ -29,9 +33,7 @@ class RequestsReponse:
     def __init__(self):
         self.status_code = 200
         self.json = {
-            'fichiersDomaines': {
-                'backup.jsonl': 'allo'
-            }
+            'ok': True,
         }
         self.headers = list()
 
@@ -53,7 +55,8 @@ class BackupUtilTest(TestCaseContexte):
             'certificat_millegrille': clecert.chaine[-1],
             'certificats_backup': dict(),
         }
-        cipher, transaction_maitrecles = self.backup_util.preparer_cipher(dict(), info_cles)
+        heure_str = '2020010100'
+        cipher, transaction_maitrecles = self.backup_util.preparer_cipher(dict(), info_cles, heure_str)
 
         self.assertIsNotNone(cipher, "Cipher n'a pas ete genere")
         self.assertIsNotNone(cipher.iv, "IV pas inclus dans cipher")
@@ -203,15 +206,15 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertEqual(ts_groupe, information_sousgroupe.heure)
         self.assertEqual(ts_groupe + datetime.timedelta(hours=1), information_sousgroupe.heure_fin)
         self.assertEqual('collection_test', information_sousgroupe.nom_collection_mongo)
-        self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_2021011821_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
-        self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_2021011821_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_2021011821.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_2021011821.json.xz', information_sousgroupe.path_fichier_catalogue)
 
         catalogue_backup = information_sousgroupe.catalogue_backup
         self.assertEqual('sousdomaine_test', catalogue_backup['domaine'])
-        self.assertEqual(Constantes.SECURITE_PUBLIC, catalogue_backup['securite'])
+        # self.assertEqual(Constantes.SECURITE_PUBLIC, catalogue_backup['securite'])
         self.assertEqual(ts_groupe, catalogue_backup['heure'])
-        self.assertEqual('sousdomaine_test_catalogue_2021011821_1.public.json.xz', catalogue_backup['catalogue_nomfichier'])
-        self.assertEqual('sousdomaine_test_transactions_2021011821_1.public.jsonl.xz', catalogue_backup['transactions_nomfichier'])
+        self.assertEqual('sousdomaine_test_2021011821.json.xz', catalogue_backup['catalogue_nomfichier'])
+        self.assertEqual('sousdomaine_test_2021011821.jsonl.xz', catalogue_backup['transactions_nomfichier'])
         self.assertEqual(3, len(catalogue_backup['certificats_chaine_catalogue']))
         self.assertEqual(3, len(catalogue_backup['certificats_pem']))
 
@@ -247,8 +250,8 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.handler_public._preparation_backup_horaire(information_sousgroupe)
 
         # Verification
-        self.assertEqual('/tmp/mgbackup/sousdomaine_test_transactions_202101182100-SNAPSHOT_1.public.jsonl.xz', information_sousgroupe.path_fichier_backup)
-        self.assertEqual('/tmp/mgbackup/sousdomaine_test_catalogue_202101182100-SNAPSHOT_1.public.json.xz', information_sousgroupe.path_fichier_catalogue)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_202101182100-SNAPSHOT.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/mgbackup/sousdomaine_test_202101182100-SNAPSHOT.json.xz', information_sousgroupe.path_fichier_catalogue)
 
     def test_extraire_certificats(self):
         ts_groupe = datetime.datetime(2021, 1, 18, 21, 0)
@@ -309,7 +312,8 @@ class HandlerBackupDomaineTest(TestCaseContexte):
             'certificat_millegrille': clecert.chaine[-1],
             'certificats_backup': dict(),
         }
-        cipher, transaction_maitrecles = self.backup_util.preparer_cipher(dict(), info_cles)
+        heure_str = '202101182100'
+        cipher, transaction_maitrecles = self.backup_util.preparer_cipher(dict(), info_cles, heure_str)
         information_sousgroupe.cipher = cipher
 
         # S'assurer que le certificat est dans le cache
@@ -443,7 +447,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
         # Verification
         self.assertEqual('sousdomaine_test', catalogue['domaine'])
-        self.assertEqual('3.protege', catalogue['securite'])
+        # self.assertEqual('3.protege', catalogue['securite'])
         self.assertIsNotNone(catalogue['heure'])
         self.assertEqual('catalogue.json', catalogue['catalogue_nomfichier'])
         self.assertEqual('backup.jsonl', catalogue['transactions_nomfichier'])
@@ -479,7 +483,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
             '/usr/local/etc/millegrilles/certs/pki.millegrilles.ssl.cert',
             '/usr/local/etc/millegrilles/keys/pki.millegrilles.ssl.key'
         ))
-        self.assertDictEqual(data, {'timestamp_backup': 1611003600, 'transaction_maitredescles': 'null'})
+        self.assertDictEqual(data, {'timestamp_backup': 1611003600})
         self.assertEqual('/opt/millegrilles/etc/millegrilles.RootCA.pem', verify)
         self.assertEqual(('backup.jsonl', fp_backup, 'application/x-xz'), files['transactions'])
         self.assertEqual(('catalogue.json', fp_catalogue, 'application/x-xz'), files['catalogue'])
@@ -506,7 +510,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         self.assertDictEqual(transaction_catalogue['args'][0], information_sousgroupe.catalogue_backup)
         self.assertDictEqual(transaction_hachage['args'][0], {
             'domaine': 'sousdomaine_test',
-            'securite': '3.protege',
+            # 'securite': '3.protege',
             'heure': 1611003600,
             'catalogue_hachage': None,
             'hachage_entete': 'sha256_b64:T87zS0qkcWmB6xvCFENW0puNff7mGb2QVgx/G+ITKkg=',
@@ -698,8 +702,8 @@ class HandlerBackupMaitreDesClesTest(TestCaseContexte):
         self.assertEqual(ts_groupe, information_sousgroupe.heure)
         self.assertEqual(ts_groupe + datetime.timedelta(hours=1), information_sousgroupe.heure_fin)
         self.assertEqual('collection_test', information_sousgroupe.nom_collection_mongo)
-        self.assertEqual('/tmp/ut_backupmoduletest/sousdomaine_test_transactions_2021011821_3.protege.jsonl.xz', information_sousgroupe.path_fichier_backup)
-        self.assertEqual('/tmp/ut_backupmoduletest/sousdomaine_test_catalogue_2021011821_3.protege.json.xz', information_sousgroupe.path_fichier_catalogue)
+        self.assertEqual('/tmp/ut_backupmoduletest/sousdomaine_test_2021011821.jsonl.xz', information_sousgroupe.path_fichier_backup)
+        self.assertEqual('/tmp/ut_backupmoduletest/sousdomaine_test_2021011821.json.xz', information_sousgroupe.path_fichier_catalogue)
 
 
 class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
@@ -839,7 +843,14 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         document_dao.valeurs_aggregate.append([
             {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
         ])
-        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
+        document_dao.valeurs_find.append(None
+            # {
+            #     'en-tete': {
+            #         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'abcd-1234',
+            #         ConstantesBackup.LIBELLE_HACHAGE_ENTETE: 'efgh-5678'
+            #     }
+            # }
+        )  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup
         document_dao.valeurs_find.append([
@@ -849,7 +860,8 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         ])
 
         self._requests_response.json = {
-            'fichiersDomaines': dict()
+            'fichiersDomaines': dict(),
+            'ok': True
         }
 
         # Caller methode a tester
@@ -875,7 +887,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
                     contenu = json.loads(l)
 
                     # Conserver catalogue pour test additionnel
-                    if f.find('catalogue') > 0:
+                    if f.endswith('.json.xz'):
                         catalogues.append(contenu)
 
                     try:
@@ -914,7 +926,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
             {'_id': {'timestamp': ts_2}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 3},
             {'_id': {'timestamp': ts_3}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 5},
         ])
-        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
+        document_dao.valeurs_find.append(None)  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup, 3 groupes pour test de chainage
         document_dao.valeurs_find.append([self.formatteur.signer_message({'valeur': 1})[0]])
@@ -922,7 +934,8 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         document_dao.valeurs_find.append([self.formatteur.signer_message({'valeur': 3})[0]])
 
         self._requests_response.json = {
-            'fichiersDomaines': dict()
+            'fichiersDomaines': dict(),
+            'ok': True,
         }
 
         # Caller methode a tester
@@ -948,7 +961,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
                     contenu = json.loads(l)
 
                     # Conserver catalogue pour test additionnel
-                    if f.find('catalogue') > 0:
+                    if f.endswith('.json.xz'):
                         catalogues.append(contenu)
 
                     try:
@@ -986,7 +999,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         document_dao.valeurs_aggregate.append([
             {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
         ])
-        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
+        document_dao.valeurs_find.append(None)  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup
         document_dao.valeurs_find.append([
@@ -996,7 +1009,8 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         ])
 
         self._requests_response.json = {
-            'fichiersDomaines': dict()
+            'fichiersDomaines': dict(),
+            'ok': True,
         }
 
         # Caller methode a tester
@@ -1018,7 +1032,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         catalogues = list()
         for f in fichiers:
             with lzma.open(f, 'rt') as fichier:
-                if f.find('transaction') > 0:
+                if f.endswith('.mgs1'):
                     # S'assurer que le fichier de backup n'est pas "lisible"
                     self.assertRaises(LZMAError, fichier.read)
                 else:
@@ -1042,7 +1056,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         document_dao.valeurs_aggregate.append([
             {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
         ])
-        document_dao.valeurs_aggregate.append(None)  # Plus recent backup (pour entete)
+        document_dao.valeurs_find.append(None)  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup
         document_dao.valeurs_find.append([
@@ -1052,7 +1066,8 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         ])
 
         self._requests_response.json = {
-            'fichiersDomaines': dict()
+            'fichiersDomaines': dict(),
+            'ok': True,
         }
 
         # Caller methode a tester
@@ -1081,7 +1096,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
                     contenu = json.loads(l)
 
                     # Conserver catalogue pour test additionnel
-                    if f.find('catalogue') > 0:
+                    if f.endswith('.json.xz') > 0:
                         catalogues.append(contenu)
 
                     try:
@@ -1381,26 +1396,26 @@ class ArchivesBackupParserTest(TestCaseContexte):
             self.assertIsNotNone(message_transactions)
             self.assertEqual(message_transactions['valeur'], i+1)
 
-    def test_demander_cle(self):
-        archives_parser = ArchivesBackupParser(self.contexte)
-        catalogue = {
-            'domaine': 'test',
-            'transactions_nomfichier': 'transactions.jsonl.xz',
-            'iv': 'IV_123',
-        }
-
-        # Caller methode a tester
-        reponse_cle = archives_parser.demander_cle(catalogue)
-
-        generateur_transactions = self.contexte.generateur_transactions
-        liste_transmettre_requete = generateur_transactions.liste_transmettre_requete
-        requete = liste_transmettre_requete[0]['args'][0]
-        domaine_action = liste_transmettre_requete[0]['args'][1]
-
-        self.assertEqual('MaitreDesCles.dechiffrageBackup', domaine_action)
-        self.assertEqual('test', requete['domaine'])
-        self.assertDictEqual(requete['identificateurs_document'], {'transactions_nomfichier': 'transactions.jsonl.xz'})
-        self.assertEqual(2, len(requete['certificat']))
+    # def test_demander_cle(self):
+    #     archives_parser = ArchivesBackupParser(self.contexte)
+    #     catalogue = {
+    #         'domaine': 'test',
+    #         'transactions_nomfichier': 'transactions.jsonl.xz',
+    #         'iv': 'IV_123',
+    #     }
+    #
+    #     # Caller methode a tester
+    #     reponse_cle = archives_parser.demander_cle(catalogue)
+    #
+    #     generateur_transactions = self.contexte.generateur_transactions
+    #     liste_transmettre_requete = generateur_transactions.liste_transmettre_requete
+    #     requete = liste_transmettre_requete[0]['args'][0]
+    #     domaine_action = liste_transmettre_requete[0]['args'][1]
+    #
+    #     self.assertEqual('MaitreDesCles.dechiffrageBackup', domaine_action)
+    #     self.assertEqual('test', requete['domaine'])
+    #     self.assertDictEqual(requete['identificateurs_document'], {'transactions_nomfichier': 'transactions.jsonl.xz'})
+    #     self.assertEqual(2, len(requete['certificat']))
 
     def test_process_archive_quotidienne(self):
         archives_parser = ArchivesBackupParser(self.contexte)

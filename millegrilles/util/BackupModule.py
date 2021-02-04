@@ -367,7 +367,7 @@ class HandlerBackupDomaine:
         return groupes_sousdomaine
 
     def uploader_fichiers_backup(
-            self, information_sousgroupe: InformationSousDomaineHoraire, fp_transactions, fp_catalogue, fp_maitrecles):
+            self, information_sousgroupe: InformationSousDomaineHoraire, fp_transactions, fp_catalogue, fp_maitrecles=None):
 
         self.transmettre_evenement_backup(
             ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, information_sousgroupe.heure)
@@ -394,8 +394,9 @@ class HandlerBackupDomaine:
         files = {
             'transactions': (nom_fichier_transactions, fp_transactions, 'application/x-xz'),
             'catalogue': (nom_fichier_catalogue, fp_catalogue, 'application/x-xz'),
-            'cles': ('cles', fp_maitrecles, 'application/x-xz'),
         }
+        if fp_maitrecles is not None:
+            files['cles'] = ('cles', fp_maitrecles, 'application/x-xz'),
 
         certfile = self._contexte.configuration.mq_certfile
         keyfile = self._contexte.configuration.mq_keyfile

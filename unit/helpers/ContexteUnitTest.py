@@ -158,6 +158,10 @@ class DocumentDaoStub:
         self.calls_find.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_find.pop(0)
 
+    def find_one(self, *args, **kwargs):
+        self.calls_find.append({'args': args, 'kwargs': kwargs})
+        return self.valeurs_find.pop(0)
+
     def update(self, *args, **kwargs):
         self.calls_update.append({'args': args, 'kwargs': kwargs})
         return self.valeurs_update.pop(0)
