@@ -1455,6 +1455,8 @@ class ConstantesBackup:
     LIBELLE_ARCHIVE_NOMFICHIER = 'archive_nomfichier'
     LIBELLE_ARCHIVE_HACHAGE = 'archive_hachage'
 
+    CHAMP_UUID_RAPPORT = 'uuid_rapport'
+
 
 class ConstantesHebergement:
 

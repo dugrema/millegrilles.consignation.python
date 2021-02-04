@@ -1979,6 +1979,7 @@ class BackupHoraire(MGProcessus):
 
     def executer_backup(self):
         heure = pytz.utc.localize(self.parametres[ConstantesBackup.LIBELLE_HEURE])
+        uuid_rapport = self.parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
         gestionnaire = self.controleur.gestionnaire
 
         # entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
@@ -1986,7 +1987,7 @@ class BackupHoraire(MGProcessus):
         # self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
 
         info_cles = self.parametres['reponse'][0]
-        gestionnaire.handler_backup.backup_horaire_domaine(heure, info_cles)
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, heure, info_cles)
 
         self.set_etape_suivante()  # Termine
 
@@ -2017,16 +2018,18 @@ class BackupSnapshot(MGProcessus):
 
     def executer_backup(self):
         gestionnaire = self.controleur.gestionnaire
+        parametres = self.parametres
+        uuid_rapport = parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
 
         # entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
 
         # self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
 
-        info_cles = self.parametres['reponse'][0]
+        info_cles = parametres['reponse'][0]
         date_courante = datetime.datetime.utcnow()
         # heure_backup = datetime.datetime(
         #     year=date_courante.year, month=date_courante.month, day=date_courante.day, hour=date_courante.hour)
-        gestionnaire.handler_backup.backup_horaire_domaine(date_courante, info_cles, snapshot=True)
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True)
 
         self.set_etape_suivante()  # Termine
 

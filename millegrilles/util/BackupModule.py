@@ -215,10 +215,11 @@ class HandlerBackupDomaine:
         self.__niveau_securite = niveau_securite
         self.__backup_util = BackupUtil(contexte)
 
-    def backup_horaire_domaine(self, heure: datetime.datetime, info_cles: dict, snapshot=False):
+    def backup_horaire_domaine(self, uuid_rapport: str, heure: datetime.datetime, info_cles: dict, snapshot=False):
         """
         Effectue le backup horaire pour un domaine.
 
+        :param uuid_rapport: Identificateur unique pour le rapport de backup
         :param heure: Heure du backup horaire
         :param info_cles: Reponse de requete ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         :param snapshot: Si True, effectue un snapshot plutot qu'un backup horaire
@@ -226,7 +227,7 @@ class HandlerBackupDomaine:
         debut_backup = heure
         try:
             # Progress update - debut backup horaire
-            self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
+            self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
 
             sousgroupes = self.preparer_sousgroupes_horaires(heure)
 
@@ -293,7 +294,7 @@ class HandlerBackupDomaine:
                         )
 
                 # Progress update - backup horaire termine
-                self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
+                self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
 
             # Aucun backup a faire, s'assurer de transmettre le trigger pour le backup quotidien precedent
             if heure_plus_vieille is None:
@@ -305,7 +306,7 @@ class HandlerBackupDomaine:
         except Exception as e:
             self.__logger.exception("Erreur backup")
             info = {'err': str(e)}
-            self.transmettre_evenement_backup(ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, info=info)
+            self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, info=info)
             raise e
 
     def trouver_entete_backup_precedent(self, domaine: str):
@@ -331,14 +332,24 @@ class HandlerBackupDomaine:
 
         return None
 
-    def preparer_sousgroupes_horaires(self, heure: datetime.datetime) -> Dict[str, GroupeSousdomaine]:
+    def preparer_sousgroupes_horaires(self, heure: datetime.datetime, snapshot=False) -> Dict[str, GroupeSousdomaine]:
         """
         Trouver toutes les transactions disponibles pour un backup. Les grouper par sous-domaine/heure.
         :param heure:
         :return:
         """
+        if snapshot is True:
+            heure_effective = heure
+        else:
+            heure_effective = datetime.datetime(year=heure.year, month=heure.month, day=heure.day, hour=heure.hour)
+            UNE_HEURE = datetime.timedelta(hours=1)
 
-        curseur = self._effectuer_requete_domaine(heure)
+            # S'assurer de ne pas utiliser les transactions de l'heure courante,
+            # on remonte de 1 a 2 heures dans le passe
+            if datetime.datetime.utcnow() - UNE_HEURE < heure_effective:
+                heure_effective = heure_effective - UNE_HEURE
+
+        curseur = self._effectuer_requete_domaine(heure_effective)
 
         # Preparer la liste de tous les sous domaines par heure qui ne sont pas encore dans un backup
         # Calculer taille (nb transactions et groupes) du backup
@@ -369,8 +380,8 @@ class HandlerBackupDomaine:
     def uploader_fichiers_backup(
             self, information_sousgroupe: InformationSousDomaineHoraire, fp_transactions, fp_catalogue, fp_maitrecles=None):
 
-        self.transmettre_evenement_backup(
-            ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, information_sousgroupe.heure)
+        # self.transmettre_evenement_backup(
+        #     ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET, information_sousgroupe.heure)
 
         catalogue_backup = information_sousgroupe.catalogue_backup
 
@@ -415,8 +426,8 @@ class HandlerBackupDomaine:
             reponse_json = json.loads(r.text)
             self.__logger.debug("Reponse backup\nHeaders: %s\nData: %s" % (r.headers, str(reponse_json)))
 
-            self.transmettre_evenement_backup(
-                ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME, information_sousgroupe.heure)
+            # self.transmettre_evenement_backup(
+            #     ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME, information_sousgroupe.heure)
 
             # Verifier si le SHA512 du fichier de backup recu correspond a celui calcule localement
             nom_fichier_transactions = information_sousgroupe.nom_fichier_backup
@@ -965,8 +976,9 @@ class HandlerBackupDomaine:
             self._contexte.generateur_transactions.transmettre_commande(
                 {'catalogue': catalogue_annuel}, ConstantesBackup.COMMANDE_BACKUP_ANNUEL)
 
-    def transmettre_evenement_backup(self, evenement: str, heure: datetime.datetime, info: dict = None):
+    def transmettre_evenement_backup(self, uuid_rapport: str, evenement: str, heure: datetime.datetime, info: dict = None):
         evenement_contenu = {
+            ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
             ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: int(heure.timestamp()),
