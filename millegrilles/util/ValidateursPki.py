@@ -490,6 +490,9 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
             handler_attente.message = message
             handler_attente.routing_key = routing_key
+
+            self.__logger.debug("Reception message certificat via broadcast %s : %s" % (routing_key, message))
+            handler_attente.set_event()  # Declencher traitement de la reponse
         except AttributeError:
             # Reponse ne correspond a aucun certificat en attente. On le conserve dans le cache pour utilisation future.
             enveloppe = self.message_pems_to_enveloppe(message, routing_key)
@@ -517,8 +520,6 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
         except (TypeError, AttributeError):
             self.__logger.exception("Erreur reception reponse (routing %s) sur Q reception certificats, "
                                     "message: \n%s" % (routing_key, str(message)))
-        else:
-            handler_attente.set_event()  # Declencher traitement de la reponse
 
     def entretien(self):
         super().entretien()

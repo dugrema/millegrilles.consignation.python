@@ -362,6 +362,19 @@ class MessagesSample(BaseCallback):
             correlation_id='trigger_restauration'
         )
 
+    def commande_verifier_domaine(self, domaine):
+        commande = {
+            'domaine': domaine,
+            'uuid_rapport': 'abcd-1234',
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.backup.verifierDomaine',
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='test'
+        )
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
@@ -398,6 +411,12 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup('Publication')
         # sample.trigger_backup('Topologie')
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2021, month=2, day=1))
+        # sample.commande_verifier_domaine('Publication')
+        # sample.commande_verifier_domaine('MaitreDesCles.48a07cc993f5116f158fb280e69b7889f7a24b60')
+        # sample.commande_verifier_domaine('MaitreDesCles.5d541b783539eb95e465d941d03df36d38c761c5')
+        # sample.commande_verifier_domaine('Topologie')
+
+
 
 
 # --- MAIN ---
