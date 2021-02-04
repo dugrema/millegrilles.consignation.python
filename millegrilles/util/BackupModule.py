@@ -935,7 +935,7 @@ class HandlerBackupDomaine:
             self._contexte.generateur_transactions.transmettre_commande(
                 commande, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
-        self.transmettre_trigger_annee_precedente(plus_vieux_jour)
+        self.transmettre_trigger_annee_precedente(plus_vieux_jour, uuid_rapport)
 
     def creer_backup_annuel(self, domaine: str, annee: datetime.datetime, uuid_rapport: str):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
@@ -1026,14 +1026,14 @@ class HandlerBackupDomaine:
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
-    def transmettre_trigger_annee_precedente(self, date: datetime.datetime):
+    def transmettre_trigger_annee_precedente(self, date: datetime.datetime, uuid_rapport: str):
         mois_moins_18 = date + datetime.timedelta(days=-549)  # 18 mois
         annee_precedente = datetime.datetime(year=mois_moins_18.year, month=1, day=1, tzinfo=datetime.timezone.utc)
 
         commande_backup_annuel = {
             ConstantesBackup.LIBELLE_ANNEE: int(annee_precedente.timestamp()),
             ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_annuel,
