@@ -1453,6 +1453,8 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         except KeyError:
             heure_demandee = heure_precedente
 
+        uuid_rapport = declencheur[ConstantesBackup.CHAMP_UUID_RAPPORT]
+
         domaine = self.get_nom_domaine()
 
         self.__logger.info("Declencher backup horaire pour domaine %s, heure %s" % (domaine, str(heure_demandee)))
@@ -1463,6 +1465,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
 
         parametres = {
             'heure': heure_demandee,
+            ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
         }
 
         self.demarrer_processus(processus, parametres)
@@ -1498,15 +1501,17 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
         uuid_rapport = declencheur[ConstantesBackup.CHAMP_UUID_RAPPORT]
-        self.__logger.info("Declencher backup quotidien pour domaine %s, uuid_rapport %s, jour %s" % (domaine, __logger, str(jour)))
+        self.__logger.info("Declencher backup quotidien pour domaine %s, uuid_rapport %s, jour %s" % (
+            domaine, uuid_rapport, str(jour)))
         self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour, uuid_rapport)
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
-        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self.__logger.info("Declencher backup annuel pour domaine %s, securite %s, annee %s" % (domaine, securite, str(annee)))
-        self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee)
+        uuid_rapport = declencheur[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        self.__logger.info("Declencher backup annuel pour domaine %s, uuid_rapport %s, annee %s" % (
+            domaine, uuid_rapport, str(annee)))
+        self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee, uuid_rapport)
 
     def declencher_backup_snapshot(self, declencheur: dict):
         domaine = self.get_nom_domaine()

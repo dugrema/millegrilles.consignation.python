@@ -8,6 +8,7 @@ import logging
 import sys
 
 from io import BufferedReader, RawIOBase
+from uuid import uuid1
 
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import BaseCallback
@@ -215,7 +216,7 @@ class MessagesSample(BaseCallback):
 
         commande_backup_quotidien = {
             ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesBackup.CHAMP_UUID_RAPPORT: str(uuid1())
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,
@@ -229,8 +230,6 @@ class MessagesSample(BaseCallback):
         timestamp_courant = datetime.datetime.utcnow()
 
         commande_backup_quotidien = {
-            ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,

@@ -1358,6 +1358,7 @@ class ConstantesBackup:
     DOMAINE_NOM = 'Backup'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_RAPPORTS_NOM = '%s/rapports' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
     QUEUE_NOEUDS_NOM = '%s.noeuds' % DOMAINE_NOM
@@ -1397,10 +1398,13 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_APPLICATION = 'evenement.backup.backupApplication'
     EVENEMENT_RESTAURATION_APPLICATION = 'evenement.backup.restaurationApplication'
 
+    EVENEMENT_BACKUP_MAJ = 'backupMaj'
     EVENEMENT_BACKUP_HORAIRE_DEBUT = 'backupHoraireDebut'
-    EVENEMENT_BACKUP_HORAIRE_CATALOGUE_PRET = 'backupHoraireCataloguePret'
-    EVENEMENT_BACKUP_HORAIRE_UPLOAD_CONFIRME = 'backupHoraireUploadConfirme'
     EVENEMENT_BACKUP_HORAIRE_TERMINE = 'backupHoraireTermine'
+    EVENEMENT_BACKUP_QUOTIDIEN_DEBUT = 'backupQuotidienDebut'
+    EVENEMENT_BACKUP_QUOTIDIEN_TERMINE = 'backupQuotidienTermine'
+    EVENEMENT_BACKUP_ANNUEL_DEBUT = 'backupAnnuelDebut'
+    EVENEMENT_BACKUP_ANNUEL_TERMINE = 'backupAnnuelTermine'
 
     EVENEMENT_BACKUP_SNAPSHOT_DEBUT = 'backupSnapshotDebut'
     EVENEMENT_BACKUP_SNAPSHOT_CATALOGUE_PRET = 'backupSnapshotCataloguePret'
@@ -1420,6 +1424,8 @@ class ConstantesBackup:
     LIBVAL_CATALOGUE_ANNUEL = 'catalogue.annuel'
     LIBVAL_CATALOGUE_APPLICATIONS = 'catalogue.applications'
     LIBVAL_RAPPORT_RESTAURATION = 'rapportRestauration'
+    LIBVAL_RAPPORT_BACKUP = 'rapportBackup'
+    LIBVAL_RAPPORT_VERIFICATION = 'rapportVerification'
 
     LIBELLE_SECURITE = 'securite'
     LIBELLE_HEURE = 'heure'

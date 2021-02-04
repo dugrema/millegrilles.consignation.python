@@ -3,7 +3,8 @@ import datetime
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
-from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete
+from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
+    TraitementMessageDomaine, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 
@@ -30,6 +31,40 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
         domaine_routing_key = method.routing_key.replace('requete.', '')
 
 
+class TraitementEvenementsBackup(TraitementMessageDomaine):
+
+    EVENEMENTS_BACKUP_RAPPORT = [
+        ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT,
+        ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE,
+        ConstantesBackup.EVENEMENT_BACKUP_QUOTIDIEN_DEBUT,
+        ConstantesBackup.EVENEMENT_BACKUP_QUOTIDIEN_TERMINE,
+        ConstantesBackup.EVENEMENT_BACKUP_ANNUEL_DEBUT,
+        ConstantesBackup.EVENEMENT_BACKUP_ANNUEL_TERMINE,
+    ]
+
+    def __init__(self, gestionnaire):
+        super().__init__(gestionnaire)
+        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
+
+    def traiter_message(self, ch, method, properties, body):
+        message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
+        enveloppe_certificat = self.gestionnaire.validateur_message.verifier(message_dict)
+        securite = enveloppe_certificat.get_exchanges
+        if Constantes.SECURITE_PROTEGE in securite or Constantes.SECURITE_SECURE in securite:
+            self._logger.debug("Evenement: %s" % str(message_dict))
+            self.traiter_evenement(method.routing_key, message_dict)
+        else:
+            self.__logger.error("Evenement de backup recu pour exchanges non supportes : %s" % str(securite))
+
+    def traiter_evenement(self, routing_key:str, message: dict):
+        action = routing_key.split('.')[-1]
+
+        if action == ConstantesBackup.EVENEMENT_BACKUP_MAJ:
+            self.gestionnaire.maj_rapport_backup(message)
+        else:
+            self.__logger.error("Evenement de backup non supporte : %s\n%s" % (routing_key, str(message)))
+
+
 class GestionnaireBackup(GestionnaireDomaineStandard):
     """
     Gestionnaire du domaine de backup
@@ -43,6 +78,8 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesBackupProtegees(self),
         }
+
+        self.__handler_evenements_backup = TraitementEvenementsBackup(self)
 
     def configurer(self):
         super().configurer()
@@ -79,6 +116,21 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
     def get_nom_queue_certificats(self):
         return ConstantesBackup.QUEUE_NOM
+
+    def get_queue_configuration(self) -> list:
+        configuration = super().get_queue_configuration()
+
+        configuration.append({
+            'nom': '%s.%s' % (self.get_nom_queue(), 'evenements.3.protege'),
+            'routing': [
+                'evenement.%s.%s' % (ConstantesBackup.DOMAINE_NOM, ConstantesBackup.EVENEMENT_BACKUP_MAJ)
+            ],
+            'exchange': self.configuration.exchange_protege,
+            'ttl': 300000,
+            'callback': self.__handler_evenements_backup.callbackAvecAck
+        }),
+
+        return configuration
 
     def get_nom_collection(self):
         return ConstantesBackup.COLLECTION_DOCUMENTS_NOM
@@ -206,6 +258,60 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         }
 
         collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+        resultat = collection.update_one(filtre, ops, upsert=True)
+
+        if resultat.upserted_id is None and resultat.matched_count != 1:
+            raise Exception("Erreur maj rapport restauration")
+
+    def maj_rapport_backup(self, message: dict):
+        self.__logger.debug("Traitement evenement de backup %s" % message)
+
+        evenement_backup = message['evenement']
+        domaine = message['domaine']
+        heure_backup = datetime.datetime.fromtimestamp(message['timestamp'])
+        maintenant = datetime.datetime.utcnow()
+
+        set_ops = {}
+        try:
+            erreur = message['info']['err']
+        except KeyError:
+            erreur = None
+
+        if evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT:
+            set_ops['%s.horaire_debut' % domaine] = maintenant
+        elif evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE:
+            if erreur is not None:
+                set_ops['%s.horaire_resultat' % domaine] = {'ok': False, 'erreur': erreur}
+            else:
+                set_ops['%s.horaire_resultat' % domaine] = {'ok': True}
+        elif evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_QUOTIDIEN_DEBUT:
+            set_ops['%s.quotidien_debut' % domaine] = maintenant
+        elif evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_QUOTIDIEN_TERMINE:
+            if erreur is not None:
+                set_ops['%s.quotidien' % domaine] = {'ok': False, 'erreur': erreur}
+            else:
+                set_ops['%s.quotidien_resultat' % domaine] = {'ok': True}
+        elif evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_ANNUEL_DEBUT:
+            set_ops['%s.annuel_debut' % domaine] = maintenant
+        elif evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_ANNUEL_TERMINE:
+            if erreur is not None:
+                set_ops['%s.annuel_resultat' % domaine] = {'ok': False, 'erreur': erreur}
+            else:
+                set_ops['%s.annuel_resultat' % domaine] = {'ok': True}
+
+        filtre = {ConstantesBackup.CHAMP_UUID_RAPPORT: message[ConstantesBackup.CHAMP_UUID_RAPPORT]}
+        set_on_insert = {
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
+            'heure': heure_backup,
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_RAPPORT_BACKUP,
+        }
+        ops = {
+            '$set': set_ops,
+            '$setOnInsert': set_on_insert,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_RAPPORTS_NOM)
         resultat = collection.update_one(filtre, ops, upsert=True)
 
         if resultat.upserted_id is None and resultat.matched_count != 1:

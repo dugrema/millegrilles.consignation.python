@@ -293,8 +293,8 @@ class HandlerBackupDomaine:
                                 self._nom_collection_transactions, str(information_sousgroupe.heure))
                         )
 
-                # Progress update - backup horaire termine
-                self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
+            # Progress update - backup horaire termine
+            self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
 
             # Aucun backup a faire, s'assurer de transmettre le trigger pour le backup quotidien precedent
             if heure_plus_vieille is None:
@@ -406,8 +406,8 @@ class HandlerBackupDomaine:
             'transactions': (nom_fichier_transactions, fp_transactions, 'application/x-xz'),
             'catalogue': (nom_fichier_catalogue, fp_catalogue, 'application/x-xz'),
         }
-        if fp_maitrecles is not None:
-            files['cles'] = ('cles', fp_maitrecles, 'application/x-xz'),
+        # if fp_maitrecles is not None:
+        #     files['cles'] = ('cles', fp_maitrecles, 'application/x-xz'),
 
         certfile = self._contexte.configuration.mq_certfile
         keyfile = self._contexte.configuration.mq_keyfile
@@ -553,7 +553,7 @@ class HandlerBackupDomaine:
             if information_sousgroupe.transaction_maitredescles is not None:
                 # Preparer la transaction maitredescles
                 information_sousgroupe.transaction_maitredescles[ConstantesBackup.LIBELLE_HACHAGE_BYTES] = information_sousgroupe.sha512_backup
-                information_sousgroupe.path_fichier_maitrecles = 'cles.json.xz'
+                information_sousgroupe.path_fichier_maitrecles = path.join(Constantes.DEFAUT_BACKUP_WORKDIR, 'cles.json.xz')
                 with lzma.open(information_sousgroupe.path_fichier_maitrecles, 'wt') as fichier:
                     self.persister_cles(information_sousgroupe, fichier)
 
@@ -994,7 +994,7 @@ class HandlerBackupDomaine:
         if info:
             evenement_contenu['info'] = info
 
-        domaine = 'evenement.backup.backupTransaction'
+        domaine = 'evenement.Backup.' + ConstantesBackup.EVENEMENT_BACKUP_MAJ
 
         self._contexte.generateur_transactions.emettre_message(
             evenement_contenu, domaine, exchanges=[Constantes.SECURITE_PROTEGE]

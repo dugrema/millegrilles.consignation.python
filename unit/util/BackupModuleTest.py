@@ -380,7 +380,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
     def test_transmettre_trigger_annee_precedente(self):
         ts = datetime.datetime(2021, 1, 18, 21, 0)
-        self.handler_protege.transmettre_trigger_annee_precedente(ts)
+        self.handler_protege.transmettre_trigger_annee_precedente(ts, 'test_transmettre_trigger_annee_precedente')
 
         # Verification
         generateur_transactions = self.contexte.generateur_transactions
