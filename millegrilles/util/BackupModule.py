@@ -6,6 +6,7 @@ import lzma
 import hashlib
 import requests
 import tarfile
+import tempfile
 
 from typing import Optional, List, Dict
 from io import RawIOBase
@@ -225,6 +226,7 @@ class HandlerBackupDomaine:
         :param snapshot: Si True, effectue un snapshot plutot qu'un backup horaire
         """
         debut_backup = heure
+        fichiers_supprimer = list()
         try:
             # Progress update - debut backup horaire
             self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
@@ -264,10 +266,14 @@ class HandlerBackupDomaine:
 
                     if information_sousgroupe.catalogue_backup is not None:
                         # Uploader les fichiers et transactions de backup vers consignationfichiers
+                        fichiers_supprimer.append(information_sousgroupe.path_fichier_backup)
+                        fichiers_supprimer.append(information_sousgroupe.path_fichier_catalogue)
+
                         with open(information_sousgroupe.path_fichier_backup, 'rb') as fp_transactions:
                             with open(information_sousgroupe.path_fichier_catalogue, 'rb') as fp_catalogue:
                                 fp_maitrecles = None
                                 if information_sousgroupe.path_fichier_maitrecles is not None:
+                                    fichiers_supprimer.append(information_sousgroupe.path_fichier_maitrecles)
                                     fp_maitrecles = open(information_sousgroupe.path_fichier_maitrecles, 'rb')
                                 self.uploader_fichiers_backup(information_sousgroupe, fp_transactions, fp_catalogue, fp_maitrecles)
                                 if fp_maitrecles is not None:
@@ -308,6 +314,13 @@ class HandlerBackupDomaine:
             info = {'err': str(e)}
             self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, info=info)
             raise e
+        finally:
+            # Nettoyer les fichiers temporaires
+            for f in fichiers_supprimer:
+                try:
+                    unlink(f)
+                except FileNotFoundError:
+                    pass  # OK
 
     def trouver_entete_backup_precedent(self, domaine: str):
         filtre = {
@@ -553,7 +566,9 @@ class HandlerBackupDomaine:
             if information_sousgroupe.transaction_maitredescles is not None:
                 # Preparer la transaction maitredescles
                 information_sousgroupe.transaction_maitredescles[ConstantesBackup.LIBELLE_HACHAGE_BYTES] = information_sousgroupe.sha512_backup
-                information_sousgroupe.path_fichier_maitrecles = path.join(Constantes.DEFAUT_BACKUP_WORKDIR, 'cles.json.xz')
+                # information_sousgroupe.path_fichier_maitrecles = path.join(Constantes.DEFAUT_BACKUP_WORKDIR, 'cles.json.xz')
+                fichier_maitrecles_temp = tempfile.mktemp(dir=Constantes.DEFAUT_BACKUP_WORKDIR)
+                information_sousgroupe.path_fichier_maitrecles = fichier_maitrecles_temp
                 with lzma.open(information_sousgroupe.path_fichier_maitrecles, 'wt') as fichier:
                     self.persister_cles(information_sousgroupe, fichier)
 
