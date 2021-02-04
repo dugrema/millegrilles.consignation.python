@@ -16,9 +16,6 @@
       "module": "millegrilles.domaines.MaitreDesComptes",
       "classe": "GestionnaireMaitreDesComptes"
     },{
-      "module": "millegrilles.domaines.Annuaire",
-      "classe": "GestionnaireAnnuaire"
-    },{
       "module": "millegrilles.domaines.Topologie",
       "classe": "GestionnaireTopologie"
     },{

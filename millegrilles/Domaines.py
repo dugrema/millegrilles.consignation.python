@@ -1322,7 +1322,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
                     'evenement.%s.resumer.*' % self.get_nom_domaine(),
                     'evenement.%s.verifierResumer.*' % self.get_nom_domaine(),
                     'evenement.%s.recevoirTransaction' % self.get_nom_domaine(),
-                    'evenement.%s.transactionEvenement' % self.get_nom_domaine(),
+                    # 'evenement.%s.transactionEvenement' % self.get_nom_domaine(),
                 ],
                 'exchange': self.configuration.exchange_middleware,
                 'ttl': 300000,
