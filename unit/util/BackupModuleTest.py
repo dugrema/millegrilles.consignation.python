@@ -534,7 +534,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         }])
 
         # Caller methode a tester
-        self.handler_protege.creer_backup_quoditien('sousdomaine_test', ts)
+        self.handler_protege.creer_backup_quoditien('sousdomaine_test', ts, 'test_creer_backup_quoditien')
 
         # Verifications
         calls_find = document_dao.calls_find
@@ -543,7 +543,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
         self.assertDictEqual(info_commande_annuel['args'][0], {'annee': 1546300800, 'domaine': 'TestDomaine', 'securite': '2.prive'})
         self.assertEqual('commande.TestDomaine.declencherBackupAnnuel', info_commande_annuel['args'][1])
-        self.assertDictEqual(info_commande_quotidien['args'][0], {'catalogue': {'jour': 1610845200, 'en-tete': {'uuid_transaction': 'dummy.0'}}})
+        self.assertDictEqual(info_commande_quotidien['args'][0], {'catalogue': {'jour': 1610845200, 'en-tete': {'uuid_transaction': 'dummy.0'}}, 'uuid_rapport': 'test_creer_backup_quoditien'})
         self.assertEqual('commande.backup.genererBackupQuotidien', info_commande_quotidien['args'][1])
 
     def test_creer_backup_annuel(self):
@@ -555,13 +555,13 @@ class HandlerBackupDomaineTest(TestCaseContexte):
         }])
 
         # Caller methode a tester
-        self.handler_protege.creer_backup_annuel('sousdomaine_test', ts)
+        self.handler_protege.creer_backup_annuel('sousdomaine_test', ts, 'test_creer_backup_annuel')
 
         # Verifications
         calls_find = document_dao.calls_find
         info_commande_annuel = self.contexte.generateur_transactions.liste_transmettre_commande[0]
 
-        self.assertDictEqual(info_commande_annuel['args'][0], {'catalogue': {'annee': 1579219200, 'en-tete': {'uuid_transaction': 'dummy.0'}}})
+        self.assertDictEqual(info_commande_annuel['args'][0], {'catalogue': {'annee': 1579219200, 'en-tete': {'uuid_transaction': 'dummy.0'}}, 'uuid_rapport': 'test_creer_backup_annuel'})
         self.assertEqual('commande.backup.genererBackupAnnuel', info_commande_annuel['args'][1])
 
 

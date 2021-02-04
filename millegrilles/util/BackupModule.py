@@ -888,7 +888,7 @@ class HandlerBackupDomaine:
         self._contexte.generateur_transactions.emettre_message(
             evenement, domaine_action, exchanges=[Constantes.SECURITE_PROTEGE])
 
-    def creer_backup_quoditien(self, domaine: str, jour: datetime.datetime):
+    def creer_backup_quoditien(self, domaine: str, jour: datetime.datetime, uuid_rapport: str):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
         # Calculer la fin du jour comme etant le lendemain, on fait un "<" dans la selection
@@ -928,12 +928,16 @@ class HandlerBackupDomaine:
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
             # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
             # transaction de catalogue quotidien.
+            commande = {
+                'catalogue': catalogue_quotidien,
+                'uuid_rapport': uuid_rapport,
+            }
             self._contexte.generateur_transactions.transmettre_commande(
-                {'catalogue': catalogue_quotidien}, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
+                commande, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
         self.transmettre_trigger_annee_precedente(plus_vieux_jour)
 
-    def creer_backup_annuel(self, domaine: str, annee: datetime.datetime):
+    def creer_backup_annuel(self, domaine: str, annee: datetime.datetime, uuid_rapport: str):
         coldocs = self._contexte.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
 
         annee = datetime.datetime(year=annee.year, month=1, day=1, tzinfo=pytz.UTC)
@@ -973,8 +977,11 @@ class HandlerBackupDomaine:
             # Transmettre le catalogue au consignateur de fichiers sous forme de commande. Ceci declenche la
             # creation de l'archive de backup. Une fois termine, le consignateur de fichier va transmettre une
             # transaction de catalogue quotidien.
-            self._contexte.generateur_transactions.transmettre_commande(
-                {'catalogue': catalogue_annuel}, ConstantesBackup.COMMANDE_BACKUP_ANNUEL)
+            commande = {
+                'catalogue': catalogue_annuel,
+                'uuid_rapport': uuid_rapport,
+            }
+            self._contexte.generateur_transactions.transmettre_commande(commande, ConstantesBackup.COMMANDE_BACKUP_ANNUEL)
 
     def transmettre_evenement_backup(self, uuid_rapport: str, evenement: str, heure: datetime.datetime, info: dict = None):
         evenement_contenu = {
@@ -998,6 +1005,7 @@ class HandlerBackupDomaine:
         Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
         backup quotidien, mensuel et annuel pour les aggregations qui peuvent etre generees
 
+        :param uuid_rapport: Identificateur du rapport de backup
         :param heure_plusvieille:
         :return:
         """

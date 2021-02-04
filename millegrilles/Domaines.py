@@ -1497,9 +1497,9 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
     def declencher_backup_quotidien(self, declencheur: dict):
         jour = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_JOUR], tz=datetime.timezone.utc)
         domaine = declencheur[ConstantesBackup.LIBELLE_DOMAINE]
-        securite = declencheur[ConstantesBackup.LIBELLE_SECURITE]
-        self.__logger.info("Declencher backup quotidien pour domaine %s, securite %s, jour %s" % (domaine, securite, str(jour)))
-        self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour)
+        uuid_rapport = declencheur[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        self.__logger.info("Declencher backup quotidien pour domaine %s, uuid_rapport %s, jour %s" % (domaine, __logger, str(jour)))
+        self.handler_backup.creer_backup_quoditien(self.get_nom_domaine(), jour, uuid_rapport)
 
     def declencher_backup_annuel(self, declencheur: dict):
         annee = datetime.datetime.fromtimestamp(declencheur[ConstantesBackup.LIBELLE_ANNEE], tz=datetime.timezone.utc)
