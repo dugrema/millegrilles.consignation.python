@@ -843,14 +843,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         document_dao.valeurs_aggregate.append([
             {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
         ])
-        document_dao.valeurs_find.append(None
-            # {
-            #     'en-tete': {
-            #         Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID: 'abcd-1234',
-            #         ConstantesBackup.LIBELLE_HACHAGE_ENTETE: 'efgh-5678'
-            #     }
-            # }
-        )  # Plus recent backup (pour entete)
+        document_dao.valeurs_find.append(None)  # Plus recent backup (pour entete)
 
         # Preparer transactions pour le backup
         document_dao.valeurs_find.append([
@@ -1109,6 +1102,57 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         # On verifie le chainage des catalogues
         self.assertEqual(1, len(catalogues))
         self.assertIsNone(catalogues[0]['backup_precedent'])
+
+    def test_backup_horaire_domaine_messages_ok(self):
+        ts = datetime.datetime(2021, 1, 19, 0, 2)
+        info_cles: Optional[dict] = None
+
+        contexte = self.contexte
+        configuration = contexte.configuration
+        configuration.backup_workdir = '/tmp/ut_backupmoduletest'
+        document_dao = contexte.document_dao
+
+        ts_1 = datetime.datetime(2021, 1, 18, 22, 0)
+        document_dao.valeurs_aggregate.append([
+            {'_id': {'timestamp': ts_1}, 'sousdomaine': [['sousdomaine_test', 'abcd', '1234']], 'count': 7},
+        ])
+        document_dao.valeurs_find.append(None)  # Plus recent backup (pour entete)
+
+        # Preparer transactions pour le backup
+        document_dao.valeurs_find.append([
+            self.formatteur.signer_message({'valeur': 1})[0],
+            self.formatteur.signer_message({'valeur': 2})[0],
+            self.formatteur.signer_message({'valeur': 3})[0],
+        ])
+
+        self._requests_response.json = {
+            'fichiersDomaines': dict(),
+            'ok': True
+        }
+
+        # Caller methode a tester
+        self.handler_public.backup_horaire_domaine(ts, info_cles)
+
+        # Preparation au nettoyage
+        generateur_transactions = self.contexte.generateur_transactions
+        info_transaction_catalogue = generateur_transactions.liste_relayer_transactions[0]
+        transaction_catalogue = info_transaction_catalogue['args'][0]
+        fichiers = [os.path.join(configuration.backup_workdir, f) for f in [
+            transaction_catalogue['transactions_nomfichier'],
+            transaction_catalogue['catalogue_nomfichier'],
+        ]]
+        self.files_for_cleanup.extend(fichiers)
+
+        # Verifications
+        evenements = [e['args'][0] for e in generateur_transactions.liste_emettre_message]
+        self.assertDictEqual(evenements[0], {'evenement': 'backupHoraireDebut', 'domaine': 'TestDomaine', 'timestamp': 1611014520, 'securite': '1.public'})
+        self.assertDictEqual(evenements[1], {'evenement': 'backupHoraireCataloguePret', 'domaine': 'TestDomaine', 'timestamp': 1611007200, 'securite': '1.public'})
+        self.assertDictEqual(evenements[2], {'evenement': 'backupHoraireUploadConfirme', 'domaine': 'TestDomaine', 'timestamp': 1611007200, 'securite': '1.public'})
+        self.assertDictEqual(evenements[4], {'evenement': 'backupHoraireTermine', 'domaine': 'TestDomaine', 'timestamp': 1611014520, 'securite': '1.public'})
+
+        # {'_evenements': 'evenement', 'uuid_transaction': ['53d584a0-6712-11eb-8353-2987badbfc4c', '53d584a1-6712-11eb-8353-2987badbfc4c', '53d584a2-6712-11eb-8353-2987badbfc4c'], 'domaine': 'TestTransactions', 'evenement': 'backup_horaire'}
+        self.assertEqual(evenements[3]['domaine'], 'TestTransactions')
+        self.assertEqual(3, len(evenements[3]['uuid_transaction']))
 
 
 class ArchivesBackupParserTest(TestCaseContexte):
