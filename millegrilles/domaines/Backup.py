@@ -237,7 +237,7 @@ class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
         set_ops = {
             ConstantesBackup.LIBELLE_DIRTY_FLAG: True,
-            Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
+            # Constantes.DOCUMENT_INFODOC_SECURITE: transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
         }
 
         for champ in champs_fichier:

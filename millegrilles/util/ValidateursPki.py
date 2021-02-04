@@ -409,7 +409,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
             enveloppe = self.message_pems_to_enveloppe(message, routing_key)
 
-        except TypeError:
+        except (TypeError, AttributeError):
             # OK, certificat pas recu
             enveloppe = None
 
@@ -441,7 +441,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
             enveloppe = self.message_pems_to_enveloppe(message, routing_key)
 
-        except TypeError:
+        except (TypeError, AttributeError):
             # OK, certificat pas recu
             enveloppe = None
 
@@ -514,8 +514,9 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             except PathBuildingError as pbe:
                 self.__logger.error("Erreur path certificat\n%s" % '\n'.join(pems))
                 raise pbe
-        except TypeError:
-            self.__logger.exception("Erreur reception reponse (routing %s) sur Q reception certificats, message: \n%s" % (routing_key, str(message)))
+        except (TypeError, AttributeError):
+            self.__logger.exception("Erreur reception reponse (routing %s) sur Q reception certificats, "
+                                    "message: \n%s" % (routing_key, str(message)))
         else:
             handler_attente.set_event()  # Declencher traitement de la reponse
 

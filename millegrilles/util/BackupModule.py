@@ -425,7 +425,8 @@ class HandlerBackupDomaine:
                     "Erreur traitement backup. %s" % erreur
                 )
         else:
-            raise Exception("Reponse %d sur upload backup %s" % (r.status_code, nom_fichier_catalogue))
+            raise Exception("Reponse %d sur upload backup %s\n"
+                            "DETAIL: %s" % (r.status_code, nom_fichier_catalogue, r.text))
 
     def soumettre_transactions_backup_horaire(self, information_sousgroupe: InformationSousDomaineHoraire):
         """
@@ -452,8 +453,8 @@ class HandlerBackupDomaine:
 
         transaction_sha512_catalogue = {
             ConstantesBackup.LIBELLE_DOMAINE: information_sousgroupe.sous_domaine,
-            ConstantesBackup.LIBELLE_SECURITE: information_sousgroupe.catalogue_backup[
-                ConstantesBackup.LIBELLE_SECURITE],
+            # ConstantesBackup.LIBELLE_SECURITE: information_sousgroupe.catalogue_backup[
+            #     ConstantesBackup.LIBELLE_SECURITE],
             ConstantesBackup.LIBELLE_HEURE: int(information_sousgroupe.heure.timestamp()),
             ConstantesBackup.LIBELLE_CATALOGUE_HACHAGE: information_sousgroupe.sha512_catalogue,
             ConstantesBackup.LIBELLE_HACHAGE_ENTETE: hachage_entete,
@@ -733,7 +734,7 @@ class HandlerBackupDomaine:
     def preparer_catalogue(self, information_sousgroupe: InformationSousDomaineHoraire):
         catalogue_backup = {
             ConstantesBackup.LIBELLE_DOMAINE: information_sousgroupe.sous_domaine,
-            ConstantesBackup.LIBELLE_SECURITE: self.__niveau_securite,
+            # ConstantesBackup.LIBELLE_SECURITE: self.__niveau_securite,
             ConstantesBackup.LIBELLE_HEURE: information_sousgroupe.heure,
 
             ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER: information_sousgroupe.nom_fichier_catalogue,
