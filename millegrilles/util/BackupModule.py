@@ -301,7 +301,7 @@ class HandlerBackupDomaine:
                 heure_plus_vieille = heure - datetime.timedelta(hours=1)
 
             # Declencher backup quotidien
-            self.transmettre_trigger_jour_precedent(heure_plus_vieille)
+            self.transmettre_trigger_jour_precedent(uuid_rapport, heure_plus_vieille)
 
         except Exception as e:
             self.__logger.exception("Erreur backup")
@@ -993,7 +993,7 @@ class HandlerBackupDomaine:
             evenement_contenu, domaine, exchanges=[Constantes.SECURITE_PROTEGE]
         )
 
-    def transmettre_trigger_jour_precedent(self, heure_plusvieille: datetime.datetime):
+    def transmettre_trigger_jour_precedent(self, uuid_rapport: str, heure_plusvieille: datetime.datetime):
         """
         Determiner le jour avant la plus vieille transaction. On va transmettre un declencheur de
         backup quotidien, mensuel et annuel pour les aggregations qui peuvent etre generees
@@ -1009,7 +1009,7 @@ class HandlerBackupDomaine:
         commande_backup_quotidien = {
             ConstantesBackup.LIBELLE_JOUR: int(veille.timestamp()),
             ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
-            ConstantesBackup.LIBELLE_SECURITE: Constantes.SECURITE_PRIVE,
+            ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,

@@ -368,7 +368,7 @@ class HandlerBackupDomaineTest(TestCaseContexte):
 
     def test_transmettre_trigger_jour_precedent(self):
         ts = datetime.datetime(2021, 1, 18, 21, 0)
-        self.handler_protege.transmettre_trigger_jour_precedent(ts)
+        self.handler_protege.transmettre_trigger_jour_precedent('test_transmettre_trigger_jour_precedent', ts)
 
         # Verification
         generateur_transactions = self.contexte.generateur_transactions
@@ -1167,9 +1167,12 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         quotidien_rk = quotidien['args'][1]
         quotidien_exchange = quotidien['kwargs']['exchange']
 
-        self.assertEqual(quotidien_rk, 'commande.TestDomaine.declencherBackupQuotidien')
-        self.assertEqual(quotidien_exchange, '4.secure')
-        self.assertDictEqual(quotidien_message, {'jour': 1610841600, 'domaine': 'TestDomaine', 'securite': '2.prive'})
+        self.assertEqual(quotidien_rk,  'commande.TestDomaine.declencherBackupQuotidien')
+        self.assertEqual(quotidien_exchange, Constantes.SECURITE_SECURE)
+        self.assertDictEqual(
+            quotidien_message,
+            {'jour': 1610841600, 'domaine': 'TestDomaine', 'uuid_rapport': 'test_backup_horaire_domaine_messages_ok'}
+        )
 
 
 class ArchivesBackupParserTest(TestCaseContexte):
