@@ -127,6 +127,7 @@ class MessagesSample(BaseCallback):
 
         commande_backup_quotidien = {
             ConstantesBackup.LIBELLE_HEURE: int(timestamp_courant.timestamp()),
+            ConstantesBackup.CHAMP_UUID_RAPPORT: str(uuid1()),
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_quotidien,

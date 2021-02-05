@@ -216,7 +216,7 @@ class HandlerBackupDomaine:
         self.__niveau_securite = niveau_securite
         self.__backup_util = BackupUtil(contexte)
 
-    def backup_horaire_domaine(self, uuid_rapport: str, heure: datetime.datetime, info_cles: dict, snapshot=False):
+    def backup_horaire_domaine(self, uuid_rapport: str, heure: datetime.datetime, info_cles: dict, snapshot=False, supprimer_temp=True):
         """
         Effectue le backup horaire pour un domaine.
 
@@ -227,6 +227,7 @@ class HandlerBackupDomaine:
         """
         debut_backup = heure
         fichiers_supprimer = list()
+        domaine = self._nom_domaine
         try:
             # Progress update - debut backup horaire
             self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
@@ -237,6 +238,12 @@ class HandlerBackupDomaine:
 
             for domaine, sousgroupe in sousgroupes.items():
                 entete_backup_precedent: Optional[dict] = None
+
+                if domaine != self._nom_domaine:
+                    # Sous-domaine, transmettre message debut
+                    self.transmettre_evenement_backup(
+                        uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup,
+                        sousdomaine=domaine)
 
                 # Transmettre info de debut de backup au client
                 for information_sousgroupe in sousgroupe.liste_horaire:
@@ -299,8 +306,16 @@ class HandlerBackupDomaine:
                                 self._nom_collection_transactions, str(information_sousgroupe.heure))
                         )
 
-            # Progress update - backup horaire termine
-            self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup)
+                # Progress update - backup horaire termine
+                self.transmettre_evenement_backup(
+                    uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup,
+                    sousdomaine=domaine)
+
+            if domaine != self._nom_domaine or len(sousgroupes) == 0:
+                # On a un domaine avec plusieurs sous-domaines - transmettre evenement de fin du top-level
+                self.transmettre_evenement_backup(
+                    uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup,
+                    sousdomaine=self._nom_domaine)
 
             # Aucun backup a faire, s'assurer de transmettre le trigger pour le backup quotidien precedent
             if heure_plus_vieille is None:
@@ -312,15 +327,19 @@ class HandlerBackupDomaine:
         except Exception as e:
             self.__logger.exception("Erreur backup")
             info = {'err': str(e)}
-            self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, info=info)
+            self.transmettre_evenement_backup(
+                uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_TERMINE, debut_backup, info=info,
+                sousdomaine=domaine
+            )
             raise e
         finally:
             # Nettoyer les fichiers temporaires
-            for f in fichiers_supprimer:
-                try:
-                    unlink(f)
-                except FileNotFoundError:
-                    pass  # OK
+            if supprimer_temp:  # Flag de nettoyage - False pour UT
+                for f in fichiers_supprimer:
+                    try:
+                        unlink(f)
+                    except FileNotFoundError:
+                        pass  # OK
 
     def trouver_entete_backup_precedent(self, domaine: str):
         filtre = {
@@ -920,7 +939,9 @@ class HandlerBackupDomaine:
         curseur_catalogues = coldocs.find(filtre_backups_quotidiens_dirty)
         plus_vieux_jour = jour
 
+        aucuns_catalogues = True
         for catalogue in curseur_catalogues:
+            aucuns_catalogues = False
 
             # Identifier le plus vieux backup qui est effectue
             # Utilise pour transmettre trigger backup annuel
@@ -950,6 +971,13 @@ class HandlerBackupDomaine:
             self._contexte.generateur_transactions.transmettre_commande(
                 commande, ConstantesBackup.COMMANDE_BACKUP_QUOTIDIEN)
 
+        if aucuns_catalogues is True:
+            self.__logger.debug("Aucun catalogue quotidien dirty pour %s ou plus vieux" % str(jour))
+            self.transmettre_evenement_backup(
+                uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_QUOTIDIEN_TERMINE, jour,
+                info={'catalogues': 0, 'inclure_sousdomaines': True}
+            )
+
         self.transmettre_trigger_annee_precedente(plus_vieux_jour, uuid_rapport)
 
     def creer_backup_annuel(self, domaine: str, annee: datetime.datetime, uuid_rapport: str):
@@ -969,8 +997,9 @@ class HandlerBackupDomaine:
         curseur_catalogues = coldocs.find(filtre_backups_annuels_dirty)
         plus_vieille_annee = annee
 
+        aucuns_catalogues = True
         for catalogue in curseur_catalogues:
-
+            aucuns_catalogues = False
             # Identifier le plus vieux backup qui est effectue
             # Utilise pour transmettre trigger backup mensuel
             annee_backup = pytz.utc.localize(catalogue[ConstantesBackup.LIBELLE_ANNEE])
@@ -998,11 +1027,21 @@ class HandlerBackupDomaine:
             }
             self._contexte.generateur_transactions.transmettre_commande(commande, ConstantesBackup.COMMANDE_BACKUP_ANNUEL)
 
-    def transmettre_evenement_backup(self, uuid_rapport: str, evenement: str, heure: datetime.datetime, info: dict = None):
+        if aucuns_catalogues is True:
+            self.__logger.debug("Aucun catalogue annuel dirty pour %s ou plus vieux" % str(plus_vieille_annee))
+            self.transmettre_evenement_backup(
+                uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_ANNUEL_TERMINE, annee,
+                info={'catalogues': 0, 'inclure_sousdomaines': True}
+            )
+
+    def transmettre_evenement_backup(self, uuid_rapport: str, evenement: str, heure: datetime.datetime, info: dict = None, sousdomaine: str = None):
+        if sousdomaine is None:
+            sousdomaine = self._nom_domaine
+
         evenement_contenu = {
             ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT: evenement,
-            ConstantesBackup.LIBELLE_DOMAINE: self._nom_domaine,
+            ConstantesBackup.LIBELLE_DOMAINE: sousdomaine,
             Constantes.EVENEMENT_MESSAGE_EVENEMENT_TIMESTAMP: int(heure.timestamp()),
             ConstantesBackup.LIBELLE_SECURITE: self.__niveau_securite,
         }

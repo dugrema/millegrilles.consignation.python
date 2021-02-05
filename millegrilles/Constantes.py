@@ -1405,6 +1405,7 @@ class ConstantesBackup:
     EVENEMENT_BACKUP_QUOTIDIEN_TERMINE = 'backupQuotidienTermine'
     EVENEMENT_BACKUP_ANNUEL_DEBUT = 'backupAnnuelDebut'
     EVENEMENT_BACKUP_ANNUEL_TERMINE = 'backupAnnuelTermine'
+    EVENEMENT_BACKUP_COMPLET_TERMINE = 'backupTermine'
 
     EVENEMENT_BACKUP_SNAPSHOT_DEBUT = 'backupSnapshotDebut'
     EVENEMENT_BACKUP_SNAPSHOT_CATALOGUE_PRET = 'backupSnapshotCataloguePret'

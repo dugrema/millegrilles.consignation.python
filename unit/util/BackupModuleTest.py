@@ -868,7 +868,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_1domaine', ts, info_cles)
+        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_1domaine', ts, info_cles, supprimer_temp=False)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions
@@ -942,7 +942,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_1domaine_chainage', ts, info_cles)
+        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_1domaine_chainage', ts, info_cles, supprimer_temp=False)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions
@@ -1017,7 +1017,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_protege.backup_horaire_domaine('test_backup_horaire_domaine_protege', ts, info_cles)
+        self.handler_protege.backup_horaire_domaine('test_backup_horaire_domaine_protege', ts, info_cles, supprimer_temp=False)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions
@@ -1074,7 +1074,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_snapshot', ts, info_cles, snapshot=True)
+        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_snapshot', ts, info_cles, snapshot=True, supprimer_temp=False)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions
@@ -1139,7 +1139,7 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         }
 
         # Caller methode a tester
-        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_messages_ok', ts, info_cles)
+        self.handler_public.backup_horaire_domaine('test_backup_horaire_domaine_messages_ok', ts, info_cles, supprimer_temp=False)
 
         # Preparation au nettoyage
         generateur_transactions = self.contexte.generateur_transactions
@@ -1160,7 +1160,21 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
             'timestamp': 1611014520,
             'securite': '1.public'
         })
-        self.assertDictEqual(evenements[2], {
+        self.assertDictEqual(evenements[1], {
+            'evenement': 'backupHoraireDebut',
+            ConstantesBackup.CHAMP_UUID_RAPPORT: 'test_backup_horaire_domaine_messages_ok',
+            'domaine': 'sousdomaine_test.abcd.1234',
+            'timestamp': 1611014520,
+            'securite': '1.public'
+        })
+        self.assertDictEqual(evenements[3], {
+            'evenement': 'backupHoraireTermine',
+            ConstantesBackup.CHAMP_UUID_RAPPORT: 'test_backup_horaire_domaine_messages_ok',
+            'domaine': 'sousdomaine_test.abcd.1234',
+            'timestamp': 1611014520,
+            'securite': '1.public'
+        })
+        self.assertDictEqual(evenements[4], {
             'evenement': 'backupHoraireTermine',
             ConstantesBackup.CHAMP_UUID_RAPPORT: 'test_backup_horaire_domaine_messages_ok',
             'domaine': 'TestDomaine',
@@ -1169,8 +1183,8 @@ class HandlerBackupDomaine_FileIntegrationTest(TestCaseContexte):
         })
 
         # {'_evenements': 'evenement', 'uuid_transaction': ['53d584a0-6712-11eb-8353-2987badbfc4c', '53d584a1-6712-11eb-8353-2987badbfc4c', '53d584a2-6712-11eb-8353-2987badbfc4c'], 'domaine': 'TestTransactions', 'evenement': 'backup_horaire'}
-        self.assertEqual(evenements[1]['domaine'], 'TestTransactions')
-        self.assertEqual(1, len(evenements[1]['uuid_transaction']))
+        self.assertEqual(evenements[2]['domaine'], 'TestTransactions')
+        self.assertEqual(1, len(evenements[2]['uuid_transaction']))
 
         quotidien = generateur_transactions.liste_transmettre_commande[0]
         quotidien_message = quotidien['args'][0]

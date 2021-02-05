@@ -286,11 +286,18 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         self.__logger.debug("Traitement evenement de backup %s" % message)
 
         evenement_backup = message['evenement']
-        domaine = message['domaine'].replace('.', '/')  # Remplace dot par / pour sauvegarder dans le rapport
+
+        if evenement_backup == ConstantesBackup.EVENEMENT_BACKUP_COMPLET_TERMINE:
+            # Rien a faire - la flag termine: True est deja en place
+            return
+
+        domaine = message['domaine'].replace('.', '.sousdomaine.')  # Remplace dot par / pour grouper sous le domaine
         heure_backup = datetime.datetime.fromtimestamp(message['timestamp'])
         maintenant = datetime.datetime.utcnow()
 
-        set_ops = {}
+        set_ops = {
+            'termine': False,
+        }
         try:
             erreur = message['info']['err']
         except KeyError:
@@ -318,12 +325,12 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             else:
                 set_ops['%s.annuel_resultat' % domaine] = {'ok': True}
 
-        filtre = {ConstantesBackup.CHAMP_UUID_RAPPORT: message[ConstantesBackup.CHAMP_UUID_RAPPORT]}
+        uuid_rapport = message[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        filtre = {ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport}
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             'heure': heure_backup,
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesBackup.LIBVAL_RAPPORT_BACKUP,
-            'termine': False,
         }
         ops = {
             '$set': set_ops,
@@ -332,11 +339,63 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         }
 
         collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_RAPPORTS_NOM)
-        resultat = collection.update_one(filtre, ops, upsert=True)
+        # resultat = collection.update_one(filtre, ops, upsert=True)
+        # if resultat.upserted_id is None and resultat.matched_count != 1:
+        #     raise Exception("Erreur maj rapport restauration")
 
-        if resultat.upserted_id is None and resultat.matched_count != 1:
-            raise Exception("Erreur maj rapport restauration")
+        rapport = collection.find_one_and_update(filtre, ops, return_document=True, upsert=True)
 
+        if self.verifier_si_rapport_complet(rapport):
+            # On a termine le backup. Marquer le rapport comme complete, emettre evenement
+            collection.update_one(filtre, {'$set': {'termine': True}})
+            self.handler_backup.transmettre_evenement_backup(
+                uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_COMPLET_TERMINE, heure_backup)
+        else:
+            if evenement_backup.get['info']['inclure_sousdomaines'] is True:
+                # Retransmettre l'evenement pour chaque sous-domaine
+                sous_domaines = [k for k in rapport.keys() if k.startswith(domaine + '/')]
+                for sd in sous_domaines:
+                    self.handler_backup.transmettre_evenement_backup(
+                        uuid_rapport, evenement_backup, heure_backup, sousdomaine=sd)
+
+    def verifier_si_rapport_complet(self, rapport):
+        # Verifier si tous les domaines ont ete traites
+        domaines_incomplets = list()
+        for key, value in rapport.items():
+            try:
+                debut_backup = value['horaire_debut']
+            except (TypeError, KeyError):
+                # Pas un domaine
+                continue
+
+            termine = False
+
+            # Verifier si horaire est termine
+            try:
+                termine = value['horaire_resultat']['ok']
+            except KeyError:
+                domaines_incomplets.append(key)
+                continue
+
+            if termine is True:
+                # Verifier si quotidien est termine
+                # Si false, le backup de ce domaine est deja interrompu (termine)
+                try:
+                    termine = value['quotidien_resultat']['ok']
+                except KeyError:
+                    domaines_incomplets.append(key)
+                    continue
+
+            if termine is True:
+                # Verifier si annuel est termine
+                # Si false, le backup de ce domaine est deja interrompu (termine)
+                try:
+                    termine = value['annuel_resultat']['ok']
+                except KeyError:
+                    domaines_incomplets.append(key)
+                    continue
+
+        return len(domaines_incomplets) == 0
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
