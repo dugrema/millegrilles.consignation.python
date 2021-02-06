@@ -138,7 +138,7 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
-    def requete_decryptage_cle_fuuid(self):
+    def requete_dechiffrage_cle(self):
         requete_cert_maitredescles = {
             'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0"
         }

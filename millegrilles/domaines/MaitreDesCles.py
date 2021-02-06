@@ -436,108 +436,199 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     #         'cert_racine': fichier_cert_racine,
     #     }
 
-    def transmettre_cle_grosfichier(self, evenement, properties):
+    def transmettre_cle(self, evenement: dict, properties):
         """
         Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
         :param evenement:
         :param properties:
         :return:
         """
-        self._logger.debug("Transmettre cle grosfichier a %s" % properties.reply_to)
+        self._logger.debug("Transmettre cle a %s" % properties.reply_to)
 
         # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
+        enveloppe_evenement = self.extraire_certificat(evenement)
 
-        enveloppe_certificat, estampille, temps_limite_demande = self.trouver_certificat_autorisation(evenement)
+        domaines_permis = None
 
-        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+        if evenement.get('roles_permis') is not None:
+            self._logger.debug("Verification de permission pour dechiffrer une cle : %s" % evenement)
 
-        if enveloppe_certificat is None:
-            pass  # Pas de cert, Acces refuse
-        elif not enveloppe_certificat.est_verifie:
-            pass  # Cert invalide, access refuse
-        elif temps_limite_demande > estampille:
-            pass  # Vieille demande, on la rejette
-        else:
-
-            self._logger.debug(
-                "Verification signature requete cle grosfichier. Cert: %s" % str(
-                    enveloppe_certificat.fingerprint_ascii))
-            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
-
-            liste_fuuid = [evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]]
-            try:
-                liste_fuuid.extend(evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_ASSOCIES])
-            except KeyError:
-                pass
-
-            # S'assurer de trouver un document qui correspond a la cle locale
-            enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
-            fingerprint_courant = enveloppe.fingerprint_b64
-
-            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
-                '.'.join([ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 'fuuid']): {
-                    '$in': liste_fuuid
-                },
-                'cles.%s' % fingerprint_courant: {'$exists': True}
-            }
-            curseur = collection_documents.find(filtre)
-
-            cles_cert_par_fuuid = dict()
-            try:
-                for doc_cle in curseur:
-                    fuuid = doc_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
-                    cles_cert_par_fuuid[fuuid] = {
-                        'iv': doc_cle['iv'],
-                        'cles': doc_cle['cles']
-                    }
-            except Exception:
-                self._logger.exception("Erreur chargement cle pour fuuid %s" % liste_fuuid)
-
-            # Note: si les cles ne sont pas trouvees, on repond acces refuse (obfuscation)
-            if len(cles_cert_par_fuuid) > 0:
-                self._logger.debug("Documents de cles pour grosfichiers: %s" % str(cles_cert_par_fuuid))
-                if acces_permis:
-                    cles_par_fuuid = dict()
-                    # Dechiffrer toutes les cles, ajouter dans une collection indexee par fuuid
-                    try:
-                        for fuuid, cles_par_cert in cles_cert_par_fuuid.items():
-                            cle_secrete = self.decrypter_cle(cles_par_cert['cles'])
-                            if cle_secrete is None:
-                                # raise CleNonDechiffrableException("Fuuid " + fuuid)
-                                return {'err': 'Cle non dechiffrable', 'fuuid': fuuid}
-                            cle_secrete_reencryptee, fingerprint = self.crypter_cle(
-                                cle_secrete, enveloppe_certificat.certificat)
-                            cles_par_fuuid[fuuid] = {
-                                'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                                'iv': cles_par_cert['iv']
-                            }
-
-                        fuuid_fichier = evenement['fuuid']
-
-                        reponse = {
-                            'cle': cles_par_fuuid[fuuid_fichier]['cle'],
-                            'iv': cles_par_fuuid[fuuid_fichier]['iv'],
-                            'cles_par_fuuid': cles_par_fuuid,
-                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
-                        }
-                    except TypeError:
-                        self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
-                        reponse = {
-                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
-                        }
+            if Constantes.SECURITE_SECURE in enveloppe_evenement.get_exchanges:
+                # Un certificat 4.secure peut donner acces a n'importe quel domaine
+                domaines_permis = evenement.get('roles_permis')
+            elif Constantes.SECURITE_PROTEGE in enveloppe_evenement.get_exchanges:
+                # Faire l'intersection entre les roles du certificat de la permission et les roles explicitement permis
+                # Evite de donner acces a un role que le certificat d'origine n'as pas acces
+                set_domaines_evenement = set(enveloppe_evenement.get_roles)
+                set_domaines_permis = set(evenement.get('roles_permis'))
+                domaines_permis = list(set_domaines_evenement.intersection(set_domaines_permis))
             else:
-                reponse = {
-                    Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE
-                }
+                self._logger.debug("Une permission ne peut pas etre donnee par "
+                                   "un certificat 1.public ou 2.prive : %s" % evenement)
+                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+            # Par defaut, 30 minutes pour une permission
+            # Verifier si la validite de la permission de dechiffrage est expiree
+            estampille_evenement = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+            duree_permission = evenement.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION) or (30 * 60)
+
+            if estampille_evenement > datetime.datetime.utcnow() - datetime.timedelta(seconds=duree_permission):
+                # Extraire certificats de rechiffrage
+                rechiffrage_pems = \
+                    evenement.get('_certificat_tiers') or \
+                    evenement.get('certificat_tiers') or \
+                    evenement.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS)
+                enveloppe_rechiffrage = self.validateur_pki.valider('\n'.join(rechiffrage_pems))
+            else:
+                self._logger.debug("Permission expiree : %s" % evenement)
+                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+        else:
+            self._logger.debug("Verification de certificat pour dechiffrer une cle : %s" % evenement)
+
+            # Verifier le niveau d'acces (exchange)
+            exchanges = enveloppe_evenement.get_exchanges
+
+            if Constantes.SECURITE_SECURE in exchanges:
+                # Le certificat donne acces a toutes les cles sans verification supplementaire
+                enveloppe_rechiffrage = enveloppe_evenement
+            elif Constantes.SECURITE_PROTEGE in exchanges:
+                # Niveau protege, verifier si on a une permission speciale inclue dans la demande
+                domaines_permis = enveloppe_evenement.get_roles.split(',')
+                enveloppe_rechiffrage = enveloppe_evenement
+            else:
+                self._logger.debug("Le dechiffrage ne peut etre demande directement par un certificat "
+                                   "1.public ou 2.prive : %s" % evenement)
+                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+        # Charger la cle
+        collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
+        filtre = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: evenement[
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES]
+        }
+        hint = [(ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES, 1)]
+        document_cle = collection_documents.find_one(filtre, hint=hint)
+
+        if document_cle is None:
+            self._logger.debug("Le dechiffrage n'a pas trouve de cle correspondant a : "
+                               "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES])
+            return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
+
+        if domaines_permis is not None:
+            # Verifier que la cle correspond a un domaine permis
+            if document_cle[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] not in domaines_permis:
+                self._logger.debug("Le dechiffrage ne permet pas d'acceder au domaine "
+                                   "%s" % document_cle[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE])
+                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+        cle_secrete = self.decrypter_cle(document_cle['cles'])
+        if cle_secrete is None:
+            self._logger.debug("Cle non dechiffrable : "
+                               "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES])
+            return {Constantes.SECURITE_LIBELLE_REPONSE: ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES}
+        cle_secrete_reencryptee, fingerprint = self.crypter_cle(cle_secrete, enveloppe_rechiffrage.certificat)
+
+        reponse = {
+            'cle': cle_secrete_reencryptee,
+            'iv': document_cle['iv'],
+            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+        }
 
         return reponse
-        # self.generateur_transactions.transmettre_reponse(
-        #     reponse, properties.reply_to, properties.correlation_id
-        # )
+
+        # enveloppe_certificat, estampille, temps_limite_demande = self.verifier_autorisation_dechiffrage_cle(evenement)
+        #
+        # reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+        #
+        # if enveloppe_certificat is None:
+        #     pass  # Pas de cert, Acces refuse
+        # elif not enveloppe_certificat.est_verifie:
+        #     pass  # Cert invalide, access refuse
+        # elif temps_limite_demande > estampille:
+        #     pass  # Vieille demande, on la rejette
+        # else:
+        #
+        #     self._logger.debug(
+        #         "Verification signature requete cle grosfichier. Cert: %s" % str(
+        #             enveloppe_certificat.fingerprint_ascii))
+        #     acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+        #
+        #     liste_fuuid = [evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]]
+        #     try:
+        #         liste_fuuid.extend(evenement[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_ASSOCIES])
+        #     except KeyError:
+        #         pass
+        #
+        #     # S'assurer de trouver un document qui correspond a la cle locale
+        #     enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        #     fingerprint_courant = enveloppe.fingerprint_b64
+        #
+        #     collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        #     filtre = {
+        #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS,
+        #         '.'.join([ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, 'fuuid']): {
+        #             '$in': liste_fuuid
+        #         },
+        #         'cles.%s' % fingerprint_courant: {'$exists': True}
+        #     }
+        #     curseur = collection_documents.find(filtre)
+        #
+        #     cles_cert_par_fuuid = dict()
+        #     try:
+        #         for doc_cle in curseur:
+        #             fuuid = doc_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS][ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
+        #             cles_cert_par_fuuid[fuuid] = {
+        #                 'iv': doc_cle['iv'],
+        #                 'cles': doc_cle['cles']
+        #             }
+        #     except Exception:
+        #         self._logger.exception("Erreur chargement cle pour fuuid %s" % liste_fuuid)
+        #
+        #     # Note: si les cles ne sont pas trouvees, on repond acces refuse (obfuscation)
+        #     if len(cles_cert_par_fuuid) > 0:
+        #         self._logger.debug("Documents de cles pour grosfichiers: %s" % str(cles_cert_par_fuuid))
+        #         if acces_permis:
+        #             cles_par_fuuid = dict()
+        #             # Dechiffrer toutes les cles, ajouter dans une collection indexee par fuuid
+        #             try:
+        #                 for fuuid, cles_par_cert in cles_cert_par_fuuid.items():
+        #                     cle_secrete = self.decrypter_cle(cles_par_cert['cles'])
+        #                     if cle_secrete is None:
+        #                         # raise CleNonDechiffrableException("Fuuid " + fuuid)
+        #                         return {'err': 'Cle non dechiffrable', 'fuuid': fuuid}
+        #                     cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+        #                         cle_secrete, enveloppe_certificat.certificat)
+        #                     cles_par_fuuid[fuuid] = {
+        #                         'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+        #                         'iv': cles_par_cert['iv']
+        #                     }
+        #
+        #                 fuuid_fichier = evenement['fuuid']
+        #
+        #                 reponse = {
+        #                     'cle': cles_par_fuuid[fuuid_fichier]['cle'],
+        #                     'iv': cles_par_fuuid[fuuid_fichier]['iv'],
+        #                     'cles_par_fuuid': cles_par_fuuid,
+        #                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+        #                 }
+        #             except TypeError:
+        #                 self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
+        #                 reponse = {
+        #                     Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+        #                 }
+        #     else:
+        #         reponse = {
+        #             Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE
+        #         }
+        #
+        # return reponse
+        # # self.generateur_transactions.transmettre_reponse(
+        # #     reponse, properties.reply_to, properties.correlation_id
+        # # )
 
     def transmettre_cle_document(self, evenement, properties):
         """
@@ -552,7 +643,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
         # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
 
-        enveloppe_certificat, estampille, temps_limite_demande = self.trouver_certificat_autorisation(evenement)
+        enveloppe_certificat, estampille, temps_limite_demande = self.verifier_autorisation_dechiffrage_cle(evenement)
 
         reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
 
@@ -684,16 +775,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     #
     #     return reponse
 
-    def trouver_certificat_autorisation(self, evenement, roles_permis: list = None):
-
-        if roles_permis is None:
-            # Utiliser roles par defaut
-            roles_permis = [
-                ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
-                ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
-                ConstantesGenerateurCertificat.ROLE_MAITREDESCLES,
-                ConstantesGenerateurCertificat.ROLE_DOMAINES,
-            ]
+    def verifier_autorisation_dechiffrage_cle(self, evenement):
+        """
+        Verifie que le dechiffrage est permis pour l'evenement recu
+        :param evenement:
+        :return:
+        """
 
         enveloppe_certificat = self.extraire_certificat(evenement)
 
@@ -748,7 +835,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return enveloppe_certificat, estampille, temps_limite_demande
 
     def extraire_certificat(self, evenement):
-        # ----------- MERGE ME
         # Enlever le certificat inclus pour utiliser celui de l'entete (demande permission originale)
         copie_evenement = evenement.copy()
         try:
@@ -758,20 +844,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # return self.verificateur_transaction.verifier(evenement)
         enveloppe_certificat = self.validateur_message.verifier(evenement)
         return enveloppe_certificat
-        # ----------- MERGE ME
-
-        # try:
-        #     cert = evenement['_certificat']
-        #     cert_join = '\n'.join(cert)
-        #     enveloppe_certificat = EnveloppeCertificat(certificat_pem=cert_join)
-        #     # La date de reference pour la validation va etre l'estampille du document
-        #     date_validation = datetime.datetime.now(tz=pytz.UTC)
-        #
-        #     self.verificateur_certificats.valider_x509_enveloppe(enveloppe_certificat, date_validation)
-        # except KeyError:
-        #     enveloppe_certificat = self.verificateur_transaction.verifier(evenement)
-        #
-        # return enveloppe_certificat
 
     def extraire_certificat_string(self, evenement):
         # cert = self.verificateur_certificats.split_chaine_certificats(evenement['certificat'])

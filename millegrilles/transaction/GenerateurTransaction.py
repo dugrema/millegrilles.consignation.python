@@ -326,9 +326,9 @@ class GenerateurTransaction:
         nom_domaine = split_domaine[0]
 
         routing = ['evenement', nom_domaine]
-        if len(split_domaine) == 3:
-            sous_domaine = split_domaine[2]
-            routing.append(sous_domaine)
+        # if len(split_domaine) == 3:
+        #     sous_domaine = split_domaine[2]
+        #     routing.append(sous_domaine)
         routing.append(action)
 
         return '.'.join(routing)
