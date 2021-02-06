@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from base64 import b64encode
 from uuid import uuid4
+from binascii import hexlify
 
 
 contexte = ContexteRessourcesDocumentsMilleGrilles()
@@ -103,10 +104,22 @@ class MessagesSample(BaseCallback):
                 print("Erreur traitement certificat_pem")
             self.cert_maitredescles_recu.set()
         else:
-            self.event_recu.set()
             if message_dict.get('certificats_pem'):
                 for cert in message_dict.get('certificats_pem'):
                     print(cert)
+
+            if message_dict.get('cles'):
+                # Tenter de dechiffrer la cle
+                clecert = self.configuration.cle
+                for cle in message_dict['cles'].values():
+                    try:
+                        cle_dechiffree = clecert.dechiffrage_asymmetrique(cle['cle'])
+                        print("Cle secrete dechiffree : %s" % cle_dechiffree.decode('utf-8'))
+                    except KeyError:
+                        pass
+
+            self.event_recu.set()
+
 
         print(json.dumps(message_dict, indent=4))
 
@@ -138,13 +151,13 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
-    def requete_dechiffrage_cle(self):
+    def requete_dechiffrage_cle(self, hachage: list):
         requete_cert_maitredescles = {
-            'fuuid': "ddb0d8f0-f7b4-11ea-89ec-13126005a8b0"
+            "liste_hachage_bytes": hachage,
         }
         enveloppe_requete = self.generateur.transmettre_requete(
             requete_cert_maitredescles,
-            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER,
+            'MaitreDesCles.%s' % ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE,
             'abcd-1234',
             self.queue_name
         )
@@ -696,10 +709,15 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_cles_non_dechiffrables()
         # self.requete_cles_non_dechiffrables_verifmaitrecles()
         # self.requete_cles_non_dechiffrables_verifcledummy()
-        self.requete_compter_cles_non_dechiffrables_verifcledummy()
+        # self.requete_compter_cles_non_dechiffrables_verifcledummy()
         # self.requete_cle_backup()
         # self.requete_cle_backup_application()
         # self.commande_sauvegarder_cle()
+
+        self.requete_dechiffrage_cle([
+            "sha512_b64:aBUX0NsH2scbs+dCqAFsd2FCRO1L6aXsvxMpqVrE94vxam45dN9J1sxhrzTh8xKvy17vZDuHW5DmqnOKAij5DQ==",
+            "sha512_b64:ys1vTtaKjCXnqt6i2G1GbHvN9vvMoiDt2IuV6/WatDVrN6pm670KO9iiL4N/tu6U60Jhsad+W3ZJky5iUGI1Hg==",
+        ])
 
 
 def reset_docs_cles():

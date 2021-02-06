@@ -332,7 +332,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
         enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
-        fingerprint_courant = enveloppe.fingerprint_b64
+        fingerprint_courant = 'sha256_b64:' + enveloppe.fingerprint_b64
         cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
         if cle_secrete_cryptee is not None:
             # On peut decoder la cle secrete
@@ -507,38 +507,56 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Charger la cle
         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
-            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: evenement[
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES]
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: {
+                '$in': evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]
+            }
         }
         hint = [(ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES, 1)]
-        document_cle = collection_documents.find_one(filtre, hint=hint)
+        curseur = collection_documents.find(filtre, hint=hint)
 
-        if document_cle is None:
+        cles = dict()
+        for document_cle in curseur:
+            hachage_bytes = document_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES]
+
+            if domaines_permis is not None:
+                # Verifier que la cle correspond a un domaine permis
+                if document_cle[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] not in domaines_permis:
+                    self._logger.debug("Le dechiffrage ne permet pas d'acceder au domaine "
+                                       "%s" % document_cle[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE])
+                    return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+
+            cle_secrete = self.decrypter_cle(document_cle['cles'])
+            if cle_secrete is None:
+                self._logger.debug("Cle non dechiffrable : "
+                                   "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES])
+                return {Constantes.SECURITE_LIBELLE_REPONSE: ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES}
+            cle_secrete_reencryptee, fingerprint = self.crypter_cle(cle_secrete, enveloppe_rechiffrage.certificat)
+
+            cles[hachage_bytes] = {
+                Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS,
+                'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+                'iv': document_cle['iv'],
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: document_cle[
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: document_cle[
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
+            }
+
+        if len(cles) == 0:
             self._logger.debug("Le dechiffrage n'a pas trouve de cle correspondant a : "
-                               "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES])
+                               "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES])
             return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
-        if domaines_permis is not None:
-            # Verifier que la cle correspond a un domaine permis
-            if document_cle[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] not in domaines_permis:
-                self._logger.debug("Le dechiffrage ne permet pas d'acceder au domaine "
-                                   "%s" % document_cle[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE])
-                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+        cles_trouvees = cles.keys()
+        for h in evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]:
+            if h not in cles_trouvees:
+                self._logger.debug("Le dechiffrage n'a pas trouve de cle correspondant a : %s" % h)
+                cles[h] = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
-        cle_secrete = self.decrypter_cle(document_cle['cles'])
-        if cle_secrete is None:
-            self._logger.debug("Cle non dechiffrable : "
-                               "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES])
-            return {Constantes.SECURITE_LIBELLE_REPONSE: ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES}
-        cle_secrete_reencryptee, fingerprint = self.crypter_cle(cle_secrete, enveloppe_rechiffrage.certificat)
-
-        reponse = {
-            'cle': cle_secrete_reencryptee,
-            'iv': document_cle['iv'],
+        return {
+            'cles': cles,
             Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
         }
-
-        return reponse
 
         # enveloppe_certificat, estampille, temps_limite_demande = self.verifier_autorisation_dechiffrage_cle(evenement)
         #
@@ -630,66 +648,66 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # #     reponse, properties.reply_to, properties.correlation_id
         # # )
 
-    def transmettre_cle_document(self, evenement, properties):
-        """
-        Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
-        :param evenement:
-        :param properties:
-        :return:
-        """
-        self._logger.debug("Transmettre cle grosfichier a %s" % properties.reply_to)
-
-        # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
-        # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
-        # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
-
-        enveloppe_certificat, estampille, temps_limite_demande = self.verifier_autorisation_dechiffrage_cle(evenement)
-
-        reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
-
-        if enveloppe_certificat is None:
-            pass  # Pas de cert, Acces refuse
-        elif not enveloppe_certificat.est_verifie:
-            pass  # Cert invalide, access refuse
-        elif temps_limite_demande > estampille:
-            pass  # Vieille demande, on la rejette
-        else:
-
-            self._logger.debug(
-                "Verification signature requete cle grosfichier. Cert: %s" % str(
-                    enveloppe_certificat.fingerprint_ascii))
-            acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
-
-            collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
-            filtre = {
-                'domaine': evenement['domaine'],
-            }
-            for key, value in evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS].items():
-                filtre['%s.%s' % (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, key)] = value
-
-            document = collection_documents.find_one(filtre)
-            # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
-            if document is not None:
-                self._logger.debug("Document de cles pour document: %s" % str(document))
-                if acces_permis:
-                    cle_secrete = self.decrypter_cle(document['cles'])
-                    try:
-                        cle_secrete_reencryptee, fingerprint = self.crypter_cle(
-                            cle_secrete, enveloppe_certificat.certificat)
-                        reponse = {
-                            'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                            'iv': document['iv'],
-                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
-                        }
-                    except TypeError:
-                        self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
-                        reponse = {
-                            Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
-                        }
-
-        self.generateur_transactions.transmettre_reponse(
-            reponse, properties.reply_to, properties.correlation_id
-        )
+    # def transmettre_cle_document(self, evenement, properties):
+    #     """
+    #     Verifie si la requete de cle est valide, puis transmet une reponse (cle re-encryptee ou acces refuse)
+    #     :param evenement:
+    #     :param properties:
+    #     :return:
+    #     """
+    #     self._logger.debug("Transmettre cle grosfichier a %s" % properties.reply_to)
+    #
+    #     # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de
+    #     # se connecter a MQ sans un certificat verifie. Mais s'assurer qu'il n'y ait pas de "relais" via un
+    #     # messager qui a acces aux noeuds. La signature de la requete permet de faire cette verification.
+    #
+    #     enveloppe_certificat, estampille, temps_limite_demande = self.verifier_autorisation_dechiffrage_cle(evenement)
+    #
+    #     reponse = {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_REFUSE}
+    #
+    #     if enveloppe_certificat is None:
+    #         pass  # Pas de cert, Acces refuse
+    #     elif not enveloppe_certificat.est_verifie:
+    #         pass  # Cert invalide, access refuse
+    #     elif temps_limite_demande > estampille:
+    #         pass  # Vieille demande, on la rejette
+    #     else:
+    #
+    #         self._logger.debug(
+    #             "Verification signature requete cle grosfichier. Cert: %s" % str(
+    #                 enveloppe_certificat.fingerprint_ascii))
+    #         acces_permis = True  # Pour l'instant, les noeuds peuvent tout le temps obtenir l'acces a 4.secure.
+    #
+    #         collection_documents = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+    #         filtre = {
+    #             'domaine': evenement['domaine'],
+    #         }
+    #         for key, value in evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS].items():
+    #             filtre['%s.%s' % (ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS, key)] = value
+    #
+    #         document = collection_documents.find_one(filtre)
+    #         # Note: si le document n'est pas trouve, on repond acces refuse (obfuscation)
+    #         if document is not None:
+    #             self._logger.debug("Document de cles pour document: %s" % str(document))
+    #             if acces_permis:
+    #                 cle_secrete = self.decrypter_cle(document['cles'])
+    #                 try:
+    #                     cle_secrete_reencryptee, fingerprint = self.crypter_cle(
+    #                         cle_secrete, enveloppe_certificat.certificat)
+    #                     reponse = {
+    #                         'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
+    #                         'iv': document['iv'],
+    #                         Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS
+    #                     }
+    #                 except TypeError:
+    #                     self._logger.exception("Document fuuid %s non dechiffrable" % evenement['fuuid'])
+    #                     reponse = {
+    #                         Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_ERREUR
+    #                     }
+    #
+    #     self.generateur_transactions.transmettre_reponse(
+    #         reponse, properties.reply_to, properties.correlation_id
+    #     )
 
     # def transmettre_cle_backup(self, evenement: dict):
     #     # Verifier que la signature de la requete est valide - c'est fort probable, il n'est pas possible de

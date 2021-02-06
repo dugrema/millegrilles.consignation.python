@@ -791,6 +791,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_UUID_ORIGINAL = 'uuid_original'
     TRANSACTION_CHAMP_HACHAGE_BYTES = 'hachage_bytes'
     TRANSACTION_CHAMP_NON_DECHIFFRABLE = 'non_dechiffrable'
+    TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES = 'liste_hachage_bytes'
 
     TYPE_DEMANDE_INSCRIPTION = 'inscription'
 
