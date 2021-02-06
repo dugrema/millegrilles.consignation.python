@@ -1772,14 +1772,17 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
     def _get_keyusage(self, builder, **kwargs):
         builder = super()._get_keyusage(builder, **kwargs)
 
-        roles = ['navigateur']
+        roles = [
+            ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
+            ConstantesGenerateurCertificat.ROLE_FICHIERS,
+        ]
         exchange_list = [Constantes.SECURITE_PRIVE]
-
-        if kwargs.get('securite') == Constantes.SECURITE_PROTEGE:
-            exchange_list.append(Constantes.SECURITE_PROTEGE)
 
         if kwargs.get('est_proprietaire'):
             roles.append('proprietaire')
+            exchange_list.append(Constantes.SECURITE_PROTEGE)
+        elif kwargs.get('securite') == Constantes.SECURITE_PROTEGE:
+            exchange_list.append(Constantes.SECURITE_PROTEGE)
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
         roles = ','.join(roles).encode('utf-8')
