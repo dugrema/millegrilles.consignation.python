@@ -1687,11 +1687,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                     else:
                         # Resoumettre demande de conversion
                         commande_preview = doc.copy()
-                        if securite == Constantes.SECURITE_PROTEGE:
-                            # Creer une permission de dechiffrage pour recuperer la cle du fichier
-                            commande_permission = self.preparer_permission_dechiffrage_fichier(fuuid)
-                            commande_preview[
-                                ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+                        # if securite == Constantes.SECURITE_PROTEGE:
+                        #     # Creer une permission de dechiffrage pour recuperer la cle du fichier
+                        #     commande_permission = self.preparer_information_fichier(fuuid)
+                        #     commande_preview[
+                        #         ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
 
                         current_date['previews.%s.derniere_activite' % fuuid] = True
 
@@ -1719,7 +1719,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         self._logger.debug("Set ops : %s\nUnset ops: %s" % (set_ops, unset_ops))
 
-    def preparer_permission_dechiffrage_fichier(self, fuuid, fichier: dict = None, info_version: dict = None, duree: int = 120):
+    def preparer_information_fichier(self, fuuid, fichier: dict = None, info_version: dict = None, duree: int = 120):
         permission = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
@@ -1762,14 +1762,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             permission[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_ASSOCIES] = fuuid_associes
 
         # Signer
-        generateur_transactions = self._contexte.generateur_transactions
-        commande_permission = generateur_transactions.preparer_enveloppe(
-            permission,
-            '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
-                      Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
-        )
+        # generateur_transactions = self._contexte.generateur_transactions
+        # commande_permission = generateur_transactions.preparer_enveloppe(
+        #     permission,
+        #     '.'.join([Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+        #               Constantes.ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER])
+        # )
 
-        return commande_permission
+        return permission
 
     def maj_documents_vitrine(self, collection_figee_uuid):
         collection_figee = self.get_collection_figee_par_uuid(collection_figee_uuid)
@@ -2005,8 +2005,10 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_METADATA,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_DATA_VIDEO,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_VIDEO,
         ]:
             value = transaction.get(key)
             if value:
@@ -2069,7 +2071,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 info_version = None
 
             duree_12h = 12*60*60
-            permission = self.preparer_permission_dechiffrage_fichier(fuuid, fichier, info_version, duree=duree_12h)
+            permission = self.preparer_information_fichier(fuuid, fichier, info_version, duree=duree_12h)
             return permission
 
         # Erreur, le fichier n'est pas public
@@ -2229,9 +2231,11 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 {ConstantesGrosFichiers.DOCUMENT_FICHIER_FLAG_PREVIEW: {'$exists': False}},
             ],
             ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE: {'$regex': '^(video|image)'},
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_SUPPRIME: False,
         }
         curseur = collection_documents.find(filtre)
 
+        conversions_resoumises = False
         for f in curseur:
             self._logger.debug("Media sans preview : %s" % str(f))
 
@@ -2250,10 +2254,14 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             else:
                 continue  # Type inconnu
 
-            self.message_dao.transmettre_commande(commande_preview, domaine_action)
+            self.generateur_transactions.transmettre_commande(commande_preview, domaine_action)
+            conversions_resoumises = True
 
         # Transmettre commande pour commencer le traitement
-        self.resoumettre_conversions_manquantes()
+        if conversions_resoumises is False:
+            # S'assurer de nettoyer le document de conversions en cours si aucune conversion n'est trouvee
+            # Ne pas executer cette requete si on a deja transmis des documents ... fait generer previews en double
+            self.resoumettre_conversions_manquantes()
 
         return {'ok': True}
 
@@ -2271,13 +2279,24 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self.ajouter_conversion_preview(info)
 
         commande_preview = info.copy()
+        for c in info.keys():
+            if c.startswith('_'):
+                del commande_preview[c]
 
-        if securite == Constantes.SECURITE_PROTEGE:
-            # Creer une permission de dechiffrage pour recuperer la cle du fichier
-            commande_permission = self.preparer_permission_dechiffrage_fichier(fuuid)
-            commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+        # Aplatir version courante
+        try:
+            version_courante = commande_preview['versions'][commande_preview['fuuid_v_courante']]
+            commande_preview['version_courante'] = version_courante
+            del commande_preview['versions']
+        except KeyError:
+            pass  # OK - ce n'est pas un message charge a partir de la collection
 
-        mimetype = info['mimetype'].split('/')[0]
+        # if securite == Constantes.SECURITE_PROTEGE:
+        # Creer une permission de dechiffrage pour recuperer la cle du fichier
+        # commande_permission = self.preparer_information_fichier(fuuid)
+        # commande_preview[ConstantesGrosFichiers.DOCUMENT_FICHIER_COMMANDE_PERMISSION] = commande_permission
+
+        # mimetype = info['mimetype'].split('/')[0]
 
         return commande_preview
 
@@ -2307,7 +2326,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         info_version = info_fichier['versions'][fuuid]
 
-        permission = self.preparer_permission_dechiffrage_fichier(
+        permission = self.preparer_information_fichier(
             fuuid, fichier=info_fichier, info_version=info_version)
 
         # Marquer document media
@@ -2669,6 +2688,8 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
             'mimetype': transaction['mimetype'],
             'extension': extension,
             'nom_fichier': transaction['nom_fichier'],
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: transaction[
+                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE],
         }
 
         # Verifier s'il y a un traitement supplementaire a faire

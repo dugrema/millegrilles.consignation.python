@@ -97,7 +97,7 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
             ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_RESTAURER_BACKUP_CLES):
                 resultat = self.gestionnaire.restaurer_backup_cles(properties, message_dict)
         elif action == ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE:
-            resultat = self.gestionnaire.sauvegarder_cle(message_dict)
+            resultat = self.gestionnaire.sauvegarder_cle(message_dict, properties)
 
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
@@ -799,7 +799,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     #         'fullchain': clecert.chaine,
     #     }
 
-    def sauvegarder_cle(self, message_dict: dict):
+    def sauvegarder_cle(self, message_dict: dict, properties):
         """
         Sauvegarder une cle. Genere les transactions manquantes au besoin.
         :param message_dict:
@@ -816,10 +816,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         fingerprints_inconnus = message_dict['cles'].keys()
         if transaction_cle is not None:
             # Le document existe deja pour cette cle - on verifie s'il nous manque des fingerprint
-            fingerprint_connus = collection_cles['cles'].keys()
+            fingerprint_connus = transaction_cle['cles'].keys()
+
             for fp in fingerprint_connus:
                 try:
-                    del fingerprints_inconnus[fp]
+                    del message_dict['cles'][fp]
                 except KeyError:
                     pass  #OK
 
@@ -851,9 +852,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesMaitreDesCles.TRANSACTION_CLE,
             ])
 
-            self.generateur_transactions.soumettre_transaction(transaction, domaine_action_transaction)
+            # Soumettre transaction - utiliser reply_to et correlation de l'appeleur
+            # Va faire transmettre la confirmation de transactions a l'appeleur
+            self.generateur_transactions.soumettre_transaction(
+                transaction, domaine_action_transaction,
+                reply_to=properties.reply_to, correlation_id=properties.correlation_id
+            )
 
-        return {'ok': True}
+        # Pas de retour de valeur - on laisse les transactions retourner les confirmations
+        # return {'ok': True}
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM

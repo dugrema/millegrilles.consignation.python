@@ -268,18 +268,18 @@ class MessagesSample(BaseCallback):
             'identificateurs_document': {
                 'transactions_nomfichier': 'Topologie_transactions_2020100325_3.protege.jsonl.xz.mgs1',
             },
+            'hachage_bytes': 'HAHAHOHO',
             "cles": {
                 # "cGrSTYhEB19QGjiipURder6/IRc=Z": "aVA+CkgvSqP496IBrDbFa2SVP11f+BKq8oc3vJ2+8g4Ypo4u2c5ZnYvNPTFEnoAGcggGRDDQY2wkCNUGOjh2gTMnItUOdWJNq5vmjs0XNTOpiEkJpq7U5ZzPTssn2m6V1JbG0TmTu5/f24K1HAhae2lz95mlVdwufm+kQolwL5rzULOzGGV+mX8PGuaQkCHPdcletVj9IUwgkwrwYAgjYHt9qPjGUHO7Bcyiw1t7dWTUTbvt59uh41J53IB79hRqwx8BMeY7rMsWoY5ffVIWBorV//XxcsnEqiXgEOUJoC/LmQfI21FxPNV6mBIzs4hakvOgET5D2yGoAlYX4wJnxg==",
-                "OaUo6vkTDQ26S9hbdFqeKYS3NyI=": "jYYDIgn4ShniCGkBgfJ1tIzOARRl1wBAps/SQwKBDMZnL+uH3MAhsieg6XW5vtdZyC/hh+hZ2q++2GGsgSUHAKbJlTn8YWS4WuRpUQssg4agpfCVPndkRoN1qf7QaQiN27HZJhMawqif0KDx7ZU0MsJoHF1l0X0E+frNuVg+WY+8DpHRxxc15CeHcLToSYn1V15WDiCTbrfvZ0zONEF2btie7eQ/B81prcTnUNrJe5xoHraEaQOcD4NOW1gCV0D8YfGcKZ2/by9zad3aJL5iUvGW4AeftewOaaKu4tM5bjdqSeICoeaI0fXwk7L/q2bBR2FOMM/P4so3JbabOaShHA=="
+                "sha256_b64:OaUo6vkTDQ26S9hbdFqeKYS3NyI=": "jYYDIgn4ShniCGkBgfJ1tIzOARRl1wBAps/SQwKBDMZnL+uH3MAhsieg6XW5vtdZyC/hh+hZ2q++2GGsgSUHAKbJlTn8YWS4WuRpUQssg4agpfCVPndkRoN1qf7QaQiN27HZJhMawqif0KDx7ZU0MsJoHF1l0X0E+frNuVg+WY+8DpHRxxc15CeHcLToSYn1V15WDiCTbrfvZ0zONEF2btie7eQ/B81prcTnUNrJe5xoHraEaQOcD4NOW1gCV0D8YfGcKZ2/by9zad3aJL5iUvGW4AeftewOaaKu4tM5bjdqSeICoeaI0fXwk7L/q2bBR2FOMM/P4so3JbabOaShHA=="
             },
             "iv": "16ldjBWXospiToJEKEIWGw==",
-            'domaine_action_transaction': ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS,
         }
 
         self.generateur.transmettre_commande(
             commande,
             'commande.MaitreDesCles.%s' % ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
-            exchange=Constantes.SECURITE_SECURE,
+            exchange=Constantes.SECURITE_PROTEGE,
             correlation_id='abcd-1234',
             reply_to=self.queue_name
         )
@@ -712,12 +712,12 @@ BMz4ginADdtNs9ARr3DcwG4=
         # self.requete_compter_cles_non_dechiffrables_verifcledummy()
         # self.requete_cle_backup()
         # self.requete_cle_backup_application()
-        # self.commande_sauvegarder_cle()
+        self.commande_sauvegarder_cle()
 
-        self.requete_dechiffrage_cle([
-            "sha512_b64:aBUX0NsH2scbs+dCqAFsd2FCRO1L6aXsvxMpqVrE94vxam45dN9J1sxhrzTh8xKvy17vZDuHW5DmqnOKAij5DQ==",
-            "sha512_b64:ys1vTtaKjCXnqt6i2G1GbHvN9vvMoiDt2IuV6/WatDVrN6pm670KO9iiL4N/tu6U60Jhsad+W3ZJky5iUGI1Hg==",
-        ])
+        # self.requete_dechiffrage_cle([
+        #     "sha512_b64:aBUX0NsH2scbs+dCqAFsd2FCRO1L6aXsvxMpqVrE94vxam45dN9J1sxhrzTh8xKvy17vZDuHW5DmqnOKAij5DQ==",
+        #     "sha512_b64:ys1vTtaKjCXnqt6i2G1GbHvN9vvMoiDt2IuV6/WatDVrN6pm670KO9iiL4N/tu6U60Jhsad+W3ZJky5iUGI1Hg==",
+        # ])
 
 
 def reset_docs_cles():
