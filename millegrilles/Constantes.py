@@ -1633,6 +1633,7 @@ class ConstantesGenerateurCertificat:
     ROLE_CEDULEUR = 'ceduleur'
     ROLE_DOMAINES = 'domaines'
     ROLE_FICHIERS = 'fichiers'
+    ROLE_GROS_FICHIERS = 'GrosFichiers'
     ROLE_MONGOEXPRESS = 'mongoxp'
     ROLE_NAVIGATEUR = 'navigateur'
     ROLE_WEB_PROTEGE = 'web_protege'

@@ -497,7 +497,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 enveloppe_rechiffrage = enveloppe_evenement
             elif Constantes.SECURITE_PROTEGE in exchanges:
                 # Niveau protege, verifier si on a une permission speciale inclue dans la demande
-                domaines_permis = enveloppe_evenement.get_roles.split(',')
+                domaines_permis = enveloppe_evenement.get_roles
                 enveloppe_rechiffrage = enveloppe_evenement
             else:
                 self._logger.debug("Le dechiffrage ne peut etre demande directement par un certificat "

@@ -1134,6 +1134,7 @@ class GenererMonitor(GenerateurNoeud):
 
         liste_dns = [
             x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'localhost'),
             x509.IPAddress(IPv4Address('127.0.0.1')),
             x509.IPAddress(IPv6Address('::1')),
         ]
@@ -1189,6 +1190,8 @@ class GenererMQ(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'mq'),
             x509.DNSName(u'%s' % self._common_name),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
         ]
 
         # Ajouter la liste des domaines publics recus du CSR
@@ -1220,6 +1223,8 @@ class GenererMongo(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'mongo'),
             x509.DNSName(u'%s' % self._common_name),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
         ]
 
         # Si le CN == mg-IDMG, on n'a pas besoin d'ajouter cette combinaison (identique)
@@ -1257,9 +1262,11 @@ class GenererWebProtege(GenerateurNoeud):
         )
 
         liste_dns = [
-            x509.DNSName(u'www'),
+            x509.DNSName(u'web_protege'),
             x509.DNSName(u'%s' % self._common_name),
-            x509.DNSName(u'coupdoeil-%s' % self._idmg),
+            x509.DNSName(u'localhost'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1'))
         ]
 
         if self._domaines_publics is not None:
@@ -1354,7 +1361,7 @@ class GenererFichiers(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_FICHIERS).encode('utf-8')
+        roles = ('%s,%s' % (ConstantesGenerateurCertificat.ROLE_FICHIERS, ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS)).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False
@@ -1363,6 +1370,9 @@ class GenererFichiers(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'fichiers'),
             x509.DNSName(u'%s' % self._common_name),
+            x509.DNSName(u'localhost'),
+            x509.IPAddress(IPv4Address('127.0.0.1')),
+            x509.IPAddress(IPv6Address('::1')),
         ]
 
         # Ajouter noms DNS valides pour MQ
@@ -1455,6 +1465,7 @@ class GenererVitrine(GenerateurNoeud):
         liste_dns = [
             x509.DNSName(u'www'),
             x509.DNSName(u'vitrine'),
+            x509.DNSName(u'localhost'),
             x509.IPAddress(IPv4Address('127.0.0.1')),
             x509.IPAddress(IPv6Address('::1')),
         ]
@@ -1774,7 +1785,7 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
 
         roles = [
             ConstantesGenerateurCertificat.ROLE_NAVIGATEUR,
-            ConstantesGenerateurCertificat.ROLE_FICHIERS,
+            ConstantesGenerateurCertificat.ROLE_GROS_FICHIERS,
         ]
         exchange_list = [Constantes.SECURITE_PRIVE]
 
