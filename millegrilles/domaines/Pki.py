@@ -37,9 +37,14 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
+        action = routing_key.split('.')[-1]
 
         if routing_key.startswith(ConstantesPki.REQUETE_CERTIFICAT_DEMANDE):
-            fingerprint = routing_key.split('.')[-1]
+            # fingerprint = routing_key.split('.')[-1]
+            # reponse = self.gestionnaire.get_certificat(fingerprint)
+            raise NotImplementedError("Deprecated")
+        elif action == ConstantesPki.REQUETE_CERTIFICAT:
+            fingerprint = message_dict['fingerprint']
             reponse = self.gestionnaire.get_certificat(fingerprint)
         else:
             raise Exception("Requete publique non supportee " + routing_key)

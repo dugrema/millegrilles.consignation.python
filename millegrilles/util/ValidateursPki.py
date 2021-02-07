@@ -454,7 +454,7 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
             pems = message.get('_certificats')
         elif message.get('chaine') and (routing_key == self.queue_name or routing_key is None):
             pems = [message['certificats_pem'][fp] for fp in message['chaine']]
-        elif message.get('chaine_pem') and routing_key == ConstantesPki.EVENEMENT_CERTIFICAT_EMIS:
+        elif message.get('chaine_pem') and routing_key in [ConstantesPki.EVENEMENT_CERTIFICAT_EMIS, self.queue_name]:
             pems = message['chaine_pem']
         else:
             raise ValueError("Message de type inconnu : %s" % routing_key)

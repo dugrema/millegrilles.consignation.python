@@ -183,12 +183,12 @@ class GetCommands(DomaineTest):
         try:
             # self.get_listedomaines()
             # self.get_catalogues()
-            # self.get_catalogues("sample5")
+            self.get_catalogues("MaitreDesComptes")
             # self.get_liste_fichiers("sample5")
-            # self.get_liste_fichiers("mathieu.main")
+            # self.get_liste_fichiers("MaitreDesComptes")
             # self.get_fichier()
             # self.get_fichier('sample4', 'domaine.test_2020.tar')
-            self.get_fichier('mathieu.main', 'snapshot/test.txt')
+            # self.get_fichier('mathieu.main', 'snapshot/test.txt')
         finally:
             self.event_recu.set()
 

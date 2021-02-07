@@ -407,11 +407,11 @@ class MessagesSample(BaseCallback):
         # sample.trigger_restaurer_liensgrosfichiers()
 
         # sample.trigger_backup_reset_global()
-        sample.trigger_backup_global()
+        # sample.trigger_backup_global()
         # sample.trigger_backup('Publication')
         # sample.trigger_backup('Topologie')
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2021, month=2, day=1))
-        # sample.commande_verifier_domaine('Publication')
+        sample.commande_verifier_domaine('Publication')
         # sample.commande_verifier_domaine('MaitreDesCles.48a07cc993f5116f158fb280e69b7889f7a24b60')
         # sample.commande_verifier_domaine('MaitreDesCles.5d541b783539eb95e465d941d03df36d38c761c5')
         # sample.commande_verifier_domaine('Topologie')
