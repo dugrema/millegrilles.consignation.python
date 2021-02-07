@@ -1224,14 +1224,18 @@ class MGProcessus:
             self.__logger.exception("Erreur traitement processus")
             self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur, processus=self)
 
-    ''' Methode initiale, doit etre implementee par la sous-classe '''
     def initiale(self):
+        """
+        Methode initiale, doit etre implementee par la sous-classe
+        :return:
+        """
         raise NotImplemented("La methode initiale doit etre implementee par la sous-classe")
 
-    '''
-    Implementation de reference pour l'etape finale. Peut etre modifiee par la sous-classe au besoin.
-    '''
     def finale(self):
+        """
+        Implementation de reference pour l'etape finale. Peut etre modifiee par la sous-classe au besoin.
+        :return:
+        """
         self._etape_complete = True
         self._processus_complete = True
 

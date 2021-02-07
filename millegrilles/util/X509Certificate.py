@@ -1255,7 +1255,13 @@ class GenererWebProtege(GenerateurNoeud):
         )
 
         custom_oid_roles = ConstantesGenerateurCertificat.MQ_ROLES_OID
-        roles = ('%s' % ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE).encode('utf-8')
+
+        liste_roles = [
+            ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+            Constantes.ConstantesMaitreDesComptes.DOMAINE_NOM,
+        ]
+
+        roles = ','.join(liste_roles).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_roles, roles),
             critical=False

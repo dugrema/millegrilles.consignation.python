@@ -267,16 +267,13 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         info_totp = transaction['totp']
 
-        mg_libelle = info_totp[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]['libelle']
         filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle,
             'nomUsager': transaction['nomUsager'],
         }
         set_ops = {
             'totp': info_totp
         }
         set_on_insert = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: mg_libelle,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
         }
         ops = {
