@@ -165,7 +165,8 @@ class MGPProcesseurTraitementEvenements(MGPProcesseur, TraitementMessageDomaine)
     """
 
     def __init__(self, contexte, stop_event, gestionnaire_domaine=None):
-        super().__init__(gestionnaire_domaine, contexte)
+        MGPProcesseur.__init__(self, gestionnaire_domaine, contexte)
+        TraitementMessageDomaine.__init__(self, gestionnaire_domaine)
 
         self._json_helper = JSONHelper()
         self._gestionnaire_domaine = gestionnaire_domaine
@@ -1219,8 +1220,8 @@ class MGProcessus:
 
         except Exception as erreur:
             # Erreur inconnue. On va assumer qu'elle est fatale.
-            if self.__logger.isEnabledFor(logging.DEBUG):
-                self.__logger.exception("Erreur traitement processus")
+            # if self.__logger.isEnabledFor(logging.DEBUG):
+            self.__logger.exception("Erreur traitement processus")
             self._controleur.erreur_fatale(id_document_processus=id_document_processus, erreur=erreur, processus=self)
 
     ''' Methode initiale, doit etre implementee par la sous-classe '''

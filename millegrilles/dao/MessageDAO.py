@@ -1232,8 +1232,8 @@ class TraitementMessageCallback:
                 self.__logger.exception("Erreur dans callbackAvecAck, exception: %s" % str(e))
                 self.__logger.error(body)
                 self.transmettre_erreur(ch, body, e)
-            except Exception:
-                print("Erreur logging message dao")
+            except Exception as e2:
+                print("Erreur logging message dao : %s\nOriginale : %s" % (str(e2), str(e)))
         finally:
             self.transmettre_ack(ch, method)
 
@@ -1302,15 +1302,15 @@ class TraitementMessageDomaine(TraitementMessageCallback):
 
     def __init__(self, gestionnaire_domaine):
         super().__init__(message_dao=gestionnaire_domaine.message_dao, configuration=gestionnaire_domaine.configuration)
-        self._gestionnaire = gestionnaire_domaine
+        self.__gestionnaire = gestionnaire_domaine
 
     @property
     def document_dao(self):
-        return self._gestionnaire.document_dao
+        return self.__gestionnaire.document_dao
 
     @property
     def gestionnaire(self):
-        return self._gestionnaire
+        return self.__gestionnaire
 
 
 class TraitementMessageDomaineMiddleware(TraitementMessageDomaine):

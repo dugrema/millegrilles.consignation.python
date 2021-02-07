@@ -1720,10 +1720,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         self._logger.debug("Set ops : %s\nUnset ops: %s" % (set_ops, unset_ops))
 
     def preparer_information_fichier(self, fuuid, fichier: dict = None, info_version: dict = None, duree: int = 120):
+
+        liste_hachage = list()
         permission = {
             ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID: fuuid,
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_ROLES_PERMIS: ['fichiers'],
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_DUREE_PERMISSION: duree,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: liste_hachage,
         }
 
         if fichier:
@@ -1747,6 +1750,8 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
 
             fuuid_associes.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW])
+            liste_hachage.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE])
+            liste_hachage.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW])
         except (KeyError, TypeError):
             pass
 
@@ -1755,6 +1760,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
             video = info_version['video']
             for value_dict in video.values():
                 fuuid_associes.append(value_dict['fuuid'])
+                liste_hachage.append(value_dict[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE])
         except (KeyError, TypeError):
             pass
 
@@ -2326,16 +2332,13 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
 
         info_version = info_fichier['versions'][fuuid]
 
-        permission = self.preparer_information_fichier(
-            fuuid, fichier=info_fichier, info_version=info_version)
-
         # Marquer document media
         self.ajouter_conversion_video(info_version)
 
         # Transmettre commande a consignation_fichiers
         commande = {
-            'permission': permission,
             'fuuid': fuuid,
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE],
         }
 
         domaine_action = 'commande.fichiers.transcoderVideo'
