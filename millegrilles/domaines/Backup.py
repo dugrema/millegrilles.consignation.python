@@ -1,11 +1,14 @@
 import logging
 import datetime
+import requests
+import json
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
-    TraitementMessageDomaine, TraitementMessageDomaineRequete
+    TraitementMessageDomaine, TraitementMessageDomaineRequete, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
+from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
 class TraitementRequetesBackupProtegees(TraitementRequetesProtegees):
@@ -29,6 +32,17 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key
         domaine_routing_key = method.routing_key.replace('requete.', '')
+
+
+class TraitementCommandeBackup(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
+        action = method.routing_key.split('.')[-1]
+
+        if action == ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION:
+            return self.gestionnaire.preparer_restauration(message_dict)
+        else:
+            raise ValueError("Type de commande de backup inconnue : %s" % action)
 
 
 class TraitementEvenementsBackup(TraitementMessageDomaine):
@@ -77,6 +91,9 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_PUBLIC: TraitementRequetesPubliques(self),
             Constantes.SECURITE_PROTEGE: TraitementRequetesBackupProtegees(self),
+        }
+        self.__handler_commandes_backup = {
+            Constantes.SECURITE_PROTEGE: TraitementCommandeBackup(self),
         }
 
         self.__handler_evenements_backup = TraitementEvenementsBackup(self)
@@ -165,6 +182,9 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
     def get_handler_requetes(self) -> dict:
         return self.__handler_requetes_noeuds
+
+    def get_handler_commandes(self) -> dict:
+        return self.__handler_commandes_backup
 
     def identifier_processus(self, domaine_transaction):
         if domaine_transaction == ConstantesBackup.TRANSACTION_CATALOGUE_HORAIRE:
@@ -396,6 +416,54 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
                     continue
 
         return len(domaines_incomplets) == 0
+
+    def preparer_restauration(self, message_dict):
+        """
+        Prepare la restauration d'une MilleGrille a partir de fichiers de backup
+        :param message_dict:
+        :return: Liste des domaines qui seront restaures ou message d'erreur
+        """
+
+        # Faire la liste des domaines a restaurer
+        url_liste_domaines = 'https://%s:%s/backup/listedomaines' % (
+            self.configuration.serveur_consignationfichiers_host, self.configuration.serveur_consignationfichiers_port)
+        try:
+            mq_certfile = self._contexte.configuration.mq_certfile
+            mq_keyfile = self._contexte.configuration.mq_keyfile
+            mq_cafile = self._contexte.configuration.mq_cafile
+            reponse = requests.get(
+                url_liste_domaines,
+                verify=mq_cafile,
+                cert=(mq_certfile, mq_keyfile),
+                timeout=3,
+            )
+        except requests.exceptions.RequestException as re:
+            self.__logger.exception("Erreur demande liste de domaines pour la restauration")
+            return {'err': str(re)}
+
+        # On a recu la reponse, demarrer un processus de restauration
+        contenu_reponse = reponse.json()
+        domaines = contenu_reponse['domaines']
+
+        # Utiliser uuid_transaction de la commande comme collateur pour cette restauration
+        uuid_restauration = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        debut_restauration = int(datetime.datetime.utcnow().timestamp())
+
+        parametres_processus = {
+            'domaines': domaines,
+            'uuid_restauration': uuid_restauration,
+            'debut_restauration': debut_restauration,
+        }
+
+        nom_module = 'millegrilles_domaines_Backup'
+        nom_classe = 'ProcessusRestaurerCatalogues'
+        processus = "%s:%s" % (nom_module, nom_classe)
+        self.demarrer_processus(processus, parametres_processus)
+
+        # Repondre a l'initiateur de la restauration (commande)
+        return parametres_processus
+
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
 
@@ -849,3 +917,122 @@ class ProcessusAjouterCatalogueApplication(MGProcessusTransaction):
                 'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
                 exchange=Constantes.SECURITE_SECURE,
             )
+
+
+class ProcessusRestaurerCatalogues(MGProcessusTransaction):
+    """
+    Processus qui restaure le contenu des catalogues des domaines en parametre.
+    Extrait les certificats et les cles.
+    """
+
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        uuid_restauration = self.parametres['uuid_restauration']
+
+        # Charger certificat millegrille pour trouver fingerprint
+        # Utilise pour retransmettre la cle de dechiffrage des fichiers de transaction
+        with open(self.controleur.configuration.mq_cafile, 'r') as fichier:
+            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=fichier.read())
+        fingerprint_millegrille = enveloppe_millegrille.fingerprint_sha256_b64
+
+        self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_domaines.__name__)
+        return {'fingerprint_millegrille': fingerprint_millegrille}
+
+    def boucle_domaines(self):
+        domaines = self.parametres['domaines']
+        if len(domaines) == 0:
+            # Termine
+            self.set_etape_suivante(ProcessusRestaurerCatalogues.completer_preparation.__name__)
+            return
+
+        domaine = domaines.pop()
+        self.__logger.debug("Extraction catalogues domaine : %s", domaine)
+        configuration = self.controleur.configuration
+
+        # Charger et traiter les catalogues (au vol)
+        try:
+            reponse = self.get_catalogues_domaine(configuration, domaine)
+        except requests.exceptions.RequestException as re:
+            self.__logger.exception("Erreur demande liste de domaines pour la restauration")
+            self.set_etape_suivante()  # Termine, erreur
+            return {'err': str(re)}
+
+        compteur = self.traiter_catalogues(domaine, reponse)
+
+        self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_domaines.__name__)
+        return {
+            'domaines': domaines,
+            domaine: {'nombre_catalogues': compteur},
+        }
+
+    def traiter_catalogues(self, domaine, reponse):
+        compteur = 0
+        certificats = dict()
+
+        fingerprint = self.parametres['fingerprint_millegrille']
+
+        for line in reponse.iter_lines(chunk_size=5 * 1024 * 1024):
+            self.__logger.info("Catalogue : %s" % line)
+            try:
+                catalogue = json.loads(line)
+
+                if catalogue.get('heure'):
+                    # Catalogue horaire
+                    if catalogue.get('cle'):
+                        self.sauvegarder_cle(catalogue, fingerprint)
+
+                    certificats.update(catalogue['certificats_pem'])
+
+            except json.decoder.JSONDecodeError:
+                self.__logger.exception("Erreur extraction catalogue en JSON\n" + line)
+
+            self.__logger.debug("Certificats cumules :\n%s" % certificats)
+
+            compteur = compteur + 1
+
+        return compteur
+
+    def sauvegarder_cle(self, catalogue, fingerprint):
+        domaine = catalogue['domaine']
+        cle = catalogue['cle']
+        iv = catalogue['iv']
+        hachage = catalogue['transactions_hachage']
+
+        commande = {
+            'domaine': ConstantesBackup.DOMAINE_NOM,
+            'hachage_bytes': hachage,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+                ConstantesBackup.LIBELLE_HEURE: catalogue[ConstantesBackup.LIBELLE_HEURE],
+            },
+            'iv': iv,
+            'cles': {fingerprint: cle},
+        }
+
+        self.__logger.debug("Commande cle transactions %s %s: %s" % (
+            domaine, datetime.datetime.fromtimestamp(catalogue['heure']), commande))
+
+        domaine_action = 'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE
+        self.controleur.generateur_transactions.transmettre_commande(commande, domaine_action)
+
+    def get_catalogues_domaine(self, configuration, domaine):
+        url_liste_domaines = 'https://%s:%s/backup/catalogues/%s' % (
+            configuration.serveur_consignationfichiers_host, configuration.serveur_consignationfichiers_port, domaine)
+        mq_certfile = configuration.mq_certfile
+        mq_keyfile = configuration.mq_keyfile
+        mq_cafile = configuration.mq_cafile
+        reponse = requests.get(
+            url_liste_domaines,
+            verify=mq_cafile,
+            cert=(mq_certfile, mq_keyfile),
+            timeout=3,
+        )
+        self.__logger.debug("Resultat get_catalogues : %d\nHeaders: %s" % (reponse.status_code, reponse.headers))
+        return reponse
+
+    def completer_preparation(self):
+        self.__logger.debug("Terminer preparation restauration")
+        self.set_etape_suivante()  # Termine

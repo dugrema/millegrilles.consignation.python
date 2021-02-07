@@ -1388,8 +1388,7 @@ class ConstantesBackup:
     COMMANDE_BACKUP_DECLENCHER_ANNUEL = 'commande._DOMAINE_.declencherBackupAnnuel'
     COMMANDE_BACKUP_DECLENCHER_SNAPSHOT = 'commande._DOMAINE_.declencherBackupSnapshot'
 
-    COMMANDE_BACKUP_PREPARER_RESTAURATION = 'commande.backup.preparerStagingRestauration'
-    COMMANDE_BACKUP_RESTAURER_GROSFICHIERS = 'commande.backup.restaurerGrosFichiers'
+    COMMANDE_BACKUP_PREPARER_RESTAURATION = 'preparerStagingRestauration'
 
     COMMANDE_BACKUP_RESTAURER_TRANSACTIONS = 'restaurerTransactions'
 

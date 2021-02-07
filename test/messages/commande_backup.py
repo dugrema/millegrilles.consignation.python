@@ -351,17 +351,6 @@ class MessagesSample(BaseCallback):
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_MIDDLEWARE
         )
 
-    def trigger_restaurer_liensgrosfichiers(self):
-        commande = {
-        }
-        self._contexte.generateur_transactions.transmettre_commande(
-            commande,
-            ConstantesBackup.COMMANDE_BACKUP_RESTAURER_GROSFICHIERS,
-            exchange=Constantes.SECURITE_PROTEGE,
-            reply_to=self.queue_name,
-            correlation_id='trigger_restauration'
-        )
-
     def commande_verifier_domaine(self, domaine):
         commande = {
             'domaine': domaine,
@@ -370,6 +359,16 @@ class MessagesSample(BaseCallback):
         self._contexte.generateur_transactions.transmettre_commande(
             commande,
             'commande.backup.verifierDomaine',
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='test'
+        )
+
+    def commande_preparer_restauration(self):
+        commande = {}
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.Backup.' + ConstantesBackup.COMMANDE_BACKUP_PREPARER_RESTAURATION,
             exchange=Constantes.SECURITE_PROTEGE,
             reply_to=self.queue_name,
             correlation_id='test'
@@ -411,12 +410,12 @@ class MessagesSample(BaseCallback):
         # sample.trigger_backup('Publication')
         # sample.trigger_backup('Topologie')
         # sample.trigger_quotidien('Topologie', datetime.datetime(year=2021, month=2, day=1))
-        sample.commande_verifier_domaine('Publication')
+        # sample.commande_verifier_domaine('Publication')
         # sample.commande_verifier_domaine('MaitreDesCles.48a07cc993f5116f158fb280e69b7889f7a24b60')
         # sample.commande_verifier_domaine('MaitreDesCles.5d541b783539eb95e465d941d03df36d38c761c5')
         # sample.commande_verifier_domaine('Topologie')
 
-
+        sample.commande_preparer_restauration()
 
 
 # --- MAIN ---

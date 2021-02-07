@@ -144,14 +144,18 @@ class GetCommands(DomaineTest):
             data=data,
             verify=self._contexte.configuration.mq_cafile,
             cert=(self.certfile, self.keyfile),
+            timeout=1,
             stream=True,
         )
 
         return r
 
     def get_listedomaines(self):
-        r = self.get('listedomaines')
-        self.__logger.debug("Resultat get_listedomaines : %d\n%s" % (r.status_code, r.json()))
+        try:
+            r = self.get('listedomaines')
+            self.__logger.debug("Resultat get_listedomaines : %d\n%s" % (r.status_code, r.json()))
+        except requests.exceptions.RequestException:
+            self.__logger.exception("Timeout")
 
     def get_catalogues(self, domaine='domaine.test'):
         r = self.get('catalogues/' + domaine)
@@ -189,6 +193,8 @@ class GetCommands(DomaineTest):
             # self.get_fichier()
             # self.get_fichier('sample4', 'domaine.test_2020.tar')
             # self.get_fichier('mathieu.main', 'snapshot/test.txt')
+        except:
+            self.__logger.exception("Erreur")
         finally:
             self.event_recu.set()
 
