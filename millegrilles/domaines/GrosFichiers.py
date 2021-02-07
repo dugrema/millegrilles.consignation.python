@@ -149,14 +149,12 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
             nom_fichier = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_NOMFICHIER]
 
             fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
-            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
             hachage = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE]
             extension = GestionnaireGrosFichiers.extension_fichier(nom_fichier)
 
         elif domaine_transaction == ConstantesGrosFichiers.TRANSACTION_ASSOCIER_PREVIEW:
             # Ajouter information pour le backup du fichier de preview
             fuuid = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW]
-            securite = transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
             hachage = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW]
             extension = transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
         else:
@@ -164,7 +162,6 @@ class HandlerBackupGrosFichiers(HandlerBackupDomaine):
             return info_transaction
 
         fuuid_dict[fuuid] = {
-            'securite': securite,
             ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: hachage,
             'extension': extension,
             'heure': heure_str,
