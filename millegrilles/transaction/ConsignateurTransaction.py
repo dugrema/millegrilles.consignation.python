@@ -148,6 +148,7 @@ class ConsignateurTransactionCallback(BaseCallback):
         message_dict = self.json_helper.bin_utf8_json_vers_dict(body)
         routing_key = method.routing_key
         routing_key_split = routing_key.split('.')
+        action = routing_key.split('.')[-1]
 
         if routing_key_split[0] == 'transaction':
             try:
@@ -156,7 +157,7 @@ class ConsignateurTransactionCallback(BaseCallback):
                 self.traiter_nouvelle_transaction(message_dict, properties)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
-        elif routing_key_split[0] == 'commande' and routing_key_split[-1] == 'restaurerTransaction':
+        elif action == 'restaurerTransaction':
             try:
                 self._logger.debug(
                     "Transaction restauree %s" % str(message_dict['en-tete']['domaine']))

@@ -187,7 +187,9 @@ class GetCommands(DomaineTest):
         try:
             # self.get_listedomaines()
             # self.get_catalogues()
-            self.get_catalogues("MaitreDesComptes")
+            self.get_catalogues("Backup")
+            self.get_catalogues("MaitreDesCles")
+            self.get_catalogues("GrosFichiers")
             # self.get_liste_fichiers("sample5")
             # self.get_liste_fichiers("MaitreDesComptes")
             # self.get_fichier()

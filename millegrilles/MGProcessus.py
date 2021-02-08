@@ -16,6 +16,7 @@ from millegrilles.transaction import GenerateurTransaction
 from millegrilles.transaction.TransmetteurMessage import TransmetteurMessageMilleGrilles
 from millegrilles.SecuritePKI import AutorisationConditionnelleDomaine
 from millegrilles.util.ValidateursMessages import ValidateurMessage
+from millegrilles.util.ValidateursPki import ValidateurCertificat
 
 
 class MGPProcesseur:
@@ -111,6 +112,10 @@ class MGPProcesseur:
     @property
     def validateur_message(self) -> ValidateurMessage:
         return self.__contexte.validateur_message
+
+    @property
+    def validateur_pki(self) -> ValidateurCertificat:
+        return self.__contexte.validateur_pki
 
     @property
     def configuration(self):

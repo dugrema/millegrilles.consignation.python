@@ -1374,7 +1374,12 @@ class ArchivesBackupParser:
         self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
 
         self.__thread = Thread(name="ArchivesBackupParser", target=self.parse_tar_stream, daemon=True)
-        self.__contexte.message_dao.register_channel_listener(self)
+        if self.__nom_queue is None:
+            # Attendre l'ouverture de la queue de reception de messages
+            self.__contexte.message_dao.register_channel_listener(self)
+        else:
+            # Queue deja ouverte, on lance le parsing
+            self.__thread.start()
 
         return self.__event_execution
 
@@ -1382,6 +1387,7 @@ class ArchivesBackupParser:
         self.__logger.debug("Stop")
         self.__event_execution.set()
         if self.__channel is not None:
+            self.__nom_queue = None
             self.__channel.close()
 
     def on_channel_open(self, channel):
@@ -1538,7 +1544,7 @@ class ArchivesBackupParser:
                     stream = DecipherStream(decipher, file_object)
 
                     # Wrapper le stream dans un decodeur lzma
-                    internal_file_object = LZMAFile(stream)
+                    internal_file_object = stream
 
                 except (KeyError, TypeError):
                     self.__logger.warning("Fichier transaction, cle non dechiffrable")
@@ -1547,27 +1553,11 @@ class ArchivesBackupParser:
             else:
                 # Note : pas de dechiffrage, juste le calcul du digest
                 stream = DigestStream(file_object)
-                internal_file_object = LZMAFile(stream)
+                internal_file_object = stream
 
             if internal_file_object is not None:
-                generateur = self.__contexte.generateur_transactions
-                try:
-                    for line in internal_file_object:
-                        archive_json = json.loads(line.decode('utf-8'))
-                        self.__logger.debug("Transaction : %s" % archive_json)
-                        generateur.emettre_message(archive_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
-
-                    digest_transactions = stream.digest()
-                    digest_transactions_catalogue = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
-                    if digest_transactions == digest_transactions_catalogue:
-                        self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
-                    else:
-                        self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s", digest_transactions)
-                        self.__rapport_restauration.incrementer_digest_invalide(domaine)
-                except EOFError as e:
-                    self.__logger.warning("Erreur - EOF : %s" % str(e))
-
-            self.__rapport_restauration.incrementer_completee(domaine)
+                self.traiter_transaction(catalogue, domaine, internal_file_object)
+                self.__rapport_restauration.incrementer_completee(domaine)
 
         except (json.decoder.JSONDecodeError, LZMAError) as e:
             self.__logger.exception("Erreur traitement transactions %s : %s" % (nom_fichier, str(e)))
@@ -1575,6 +1565,33 @@ class ArchivesBackupParser:
         # finally:
         #     # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
         #     file_object.read()
+
+    def traiter_transaction(self, catalogue, domaine, stream):
+        stream_lzma = LZMAFile(stream)
+        generateur = self.__contexte.generateur_transactions
+        try:
+            for line in stream_lzma:
+                archive_json = json.loads(line.decode('utf-8'))
+                self.__logger.debug("Transaction : %s" % archive_json)
+                generateur.emettre_message(
+                    archive_json,
+                    'commande.transaction.restaurerTransaction',
+                    exchanges=[Constantes.SECURITE_SECURE]
+                )
+
+            try:
+                digest_transactions = stream.digest()
+                digest_transactions_catalogue = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
+                if digest_transactions == digest_transactions_catalogue:
+                    self.__logger.debug("Digest calcule du fichier de transaction est OK : %s", digest_transactions)
+                else:
+                    self.__logger.warning("Digest calcule du fichier de transaction est invalide : %s",
+                                          digest_transactions)
+                    self.__rapport_restauration.incrementer_digest_invalide(domaine)
+            except AttributeError:
+                self.__logger.warning("Digest ne peut pas etre calcul pour transactions domaine %s" % domaine)
+        except EOFError as e:
+            self.__logger.warning("Erreur - EOF : %s" % str(e))
 
     def detecter_type_archive(self, path_fichier):
         # Determiner type d'archive - annuelle, quotidienne, horaire ou snapshot
@@ -1616,9 +1633,12 @@ class ArchivesBackupParser:
 
         # Produire la requete, include la cle/iv du catalogue pour dechiffrage en ligne si possible
         # Noter que la requete va permettre de conserver la cle cote serveur si elle n'est pas connue
-        domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP
+        domaine_action = '.'.join([
+            Constantes.ConstantesMaitreDesCles.DOMAINE_NOM,
+            Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE
+        ])
         requete = {
-            'certificat': self.__chaine_pem_courante ,
+            'certificat': self.__chaine_pem_courante,
             'domaine': catalogue[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
             'identificateurs_document': {
                 'transactions_nomfichier': catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER],
@@ -1630,6 +1650,7 @@ class ArchivesBackupParser:
         except KeyError:
             pass
         try:
+            # Snapshot a un dict de cles
             requete['cles'] = catalogue['cles']
         except KeyError:
             pass
