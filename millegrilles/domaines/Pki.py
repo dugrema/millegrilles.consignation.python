@@ -11,6 +11,7 @@ from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, AutorisationConditionnelleDomaine, CertificatExpire
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
+from millegrilles.util.BackupModule import HandlerBackupDomaine
 
 import logging
 import datetime
@@ -136,6 +137,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         handler_requetes_protegees = TraitementRequetesProtegeesPki(self)
         handler_requetes_publiques = TraitementRequetesPubliques(self)
         self.__handler_evenements_certificats = TraitementEvenementsPki(self)
+        self.__handler_backup = HandlerBackupPKI(self._contexte)
 
         self.__handler_requetes_noeuds = {
             Constantes.SECURITE_SECURE: handler_requetes_protegees,
@@ -296,6 +298,10 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def get_handler_commandes(self) -> dict:
         return self.__hanlder_commandes
+
+    @property
+    def handler_backup(self):
+        return self.__handler_backup
 
     def initialiser_mgca(self):
         """ Initialise les root CA et noeud middleware (ou local) """
@@ -812,6 +818,22 @@ class GestionnairePki(GestionnaireDomaineStandard):
 #
 #         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
 #         collection.update(filtre, operation, multi=True)
+
+
+class HandlerBackupPKI(HandlerBackupDomaine):
+
+    def __init__(self, contexte):
+        super().__init__(contexte,
+                         ConstantesPki.DOMAINE_NOM,
+                         ConstantesPki.COLLECTION_TRANSACTIONS_NOM,
+                         ConstantesPki.COLLECTION_DOCUMENTS_NOM)
+
+    def _doit_chiffrer(self):
+        """
+        Les transactions de cles sont deja chiffrees (asymetrique). On ne rechiffre pas une deuxieme fois.
+        :return:
+        """
+        return False
 
 
 class ProcessusAjouterCertificat(MGProcessusTransaction):
