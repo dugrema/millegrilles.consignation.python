@@ -6,7 +6,7 @@ from certvalidator.errors import PathValidationError
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
-    TraitementRequetesProtegees, MGPProcesseurTraitementEvenements
+    TraitementRequetesProtegees, MGPProcesseurTraitementEvenements, TraitementMessageDomaineCommande
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, AutorisationConditionnelleDomaine, CertificatExpire
@@ -113,6 +113,17 @@ class TraitementEvenementsPki(TraitementMessageDomaine):
             self.gestionnaire.recevoir_certificat(message_dict)
 
 
+class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
+
+    def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
+        action = method.routing_key.split('.')[-1]
+
+        if action == ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT:
+            return self.gestionnaire.recevoir_certificat(message_dict)
+        else:
+            return {'err': 'Commande inconnue : ' + action}
+
+
 class GestionnairePki(GestionnaireDomaineStandard):
 
     def __init__(self, contexte):
@@ -131,6 +142,10 @@ class GestionnairePki(GestionnaireDomaineStandard):
             Constantes.SECURITE_PROTEGE: handler_requetes_protegees,
             Constantes.SECURITE_PRIVE: handler_requetes_publiques,
             Constantes.SECURITE_PUBLIC: handler_requetes_publiques,
+        }
+
+        self.__hanlder_commandes = {
+            Constantes.SECURITE_PROTEGE: TraitementCommandesProtegees(self),
         }
 
     def configurer(self):
@@ -278,6 +293,9 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def get_collection_processus_nom(self):
         return ConstantesPki.COLLECTION_PROCESSUS_NOM
+
+    def get_handler_commandes(self) -> dict:
+        return self.__hanlder_commandes
 
     def initialiser_mgca(self):
         """ Initialise les root CA et noeud middleware (ou local) """
@@ -460,11 +478,17 @@ class GestionnairePki(GestionnaireDomaineStandard):
         # Verifier si le certificat existe deja
         fingerprint_sha256_b64 = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
         document_existant = self.verifier_presence_certificat(fingerprint_sha256_b64)
+
+        ajoute = False
         if document_existant is None:
             self._logger.debug('Ajout du certificat %s' % fingerprint_sha256_b64)
             chaine_pem = message_dict[ConstantesSecurityPki.LIBELLE_CHAINE_PEM]
             correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
             self.inserer_certificat_pem(chaine_pem, correlation_csr=correlation_csr)
+
+            ajoute = True
+
+        return {'ok': True, 'ajoute': ajoute}
 
     def verifier_presence_certificat(self, fingerprint_sha256_b64: str):
         filtre = {ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64}

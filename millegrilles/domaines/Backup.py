@@ -971,6 +971,8 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
     def traiter_catalogues(self, domaine, reponse):
         compteur = 0
         certificats = dict()
+        certificats_millegrille = set()
+        certificats_intermediaires = set()
 
         fingerprint = self.parametres['fingerprint_millegrille']
 
@@ -985,15 +987,70 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
                         self.sauvegarder_cle(catalogue, fingerprint)
 
                     certificats.update(catalogue['certificats_pem'])
+                    certificats_intermediaires.update(catalogue['certificats_intermediaires'])
+                    certificats_millegrille.update(catalogue['certificats_millegrille'])
 
             except json.decoder.JSONDecodeError:
                 self.__logger.exception("Erreur extraction catalogue en JSON\n" + line)
-
-            self.__logger.debug("Certificats cumules :\n%s" % certificats)
-
             compteur = compteur + 1
 
+        # Sauvegarder les certificats
+        self.__logger.debug("Certificats cumules :\n%s" % certificats)
+
+        self.emettre_certificats(certificats, certificats_millegrille, certificats_intermediaires)
+
         return compteur
+
+    def emettre_certificats(self, certificats, certificats_millegrille, certificats_intermediaires):
+        # Preparer enveloppes intermediaires, millegrille
+        pem_par_skid = dict()
+
+        # Preparer certificats millegrille
+        for fp in certificats_millegrille:
+            try:
+                pem_millegrille = certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat de millegrille manquant du catalogue : %s" % fp)
+                continue
+            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=pem_millegrille)
+            pem_par_skid[enveloppe_millegrille.subject_key_identifier] = pem_millegrille
+
+        # Preparer certificats intermediaires
+        for fp in certificats_intermediaires:
+            try:
+                pem_intermediaire = certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+                continue
+            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=pem_intermediaire)
+
+            # Completer la chaine
+            akid = enveloppe_intermediaire.authority_key_identifier
+            pem_millegrille = pem_par_skid[akid]
+            pem_par_skid[enveloppe_intermediaire.subject_key_identifier] = [pem_intermediaire, pem_millegrille]
+
+        for fp, pem in certificats.items():
+            try:
+                pem = certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+                continue
+            enveloppe = EnveloppeCertificat(certificat_pem=pem)
+
+            # Completer la chaine
+            akid = enveloppe.authority_key_identifier
+            pems_inter = pem_par_skid[akid]
+            pems = [pem]
+            pems.extend(pems_inter)
+
+            self.__logger.debug("Certificat avec chaine complete : %s", pems)
+            commande = {
+                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: enveloppe.fingerprint_sha256_b64,
+                Constantes.ConstantesSecurityPki.LIBELLE_CHAINE_PEM: pems,
+            }
+            domaine_action = 'commande.' + '.'.join([
+                Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT])
+            self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
     def sauvegarder_cle(self, catalogue, fingerprint):
         domaine = catalogue['domaine']
