@@ -1264,10 +1264,20 @@ class ReceptionMessage(TraitementMessageCallback):
     def __init__(self, backup_parser, message_dao, configuration):
         super().__init__(message_dao, configuration)
         self.__parser = backup_parser
+        self.correlation_id = None
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def traiter_message(self, ch, method, properties, body):
         message_dict = json.loads(body)
-        self.__parser.nouveau_message(message_dict)
+        if self.correlation_id == properties.correlation_id:
+            self.correlation_id = None  # Reset correlation
+            self.__parser.nouveau_message(message_dict)
+        elif self.correlation_id is None:
+            # Aucune correlation necessaire
+            self.__parser.nouveau_message(message_dict)
+        else:
+            self.__logger.warning("ReceptionMessage: Message recu qui ne correspond pas a la correlation %s" % body)
 
 
 class RapportRestauration:
@@ -1364,6 +1374,7 @@ class ArchivesBackupParser:
 
         # Parametres
         self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs1)
+        self.skip_chiffrage = False     # Mettre a true pour ignorer tous les messages chiffres (.mgs1)
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1630,6 +1641,10 @@ class ArchivesBackupParser:
 
     def demander_cle(self, catalogue):
 
+        if self.skip_chiffrage is True:
+            # Ignorer la demande, on ne dechiffre pas les transactions
+            return
+
         # Effacer la reponse de la demande precedente, resetter event d'attente
         self.__reponse_cle = None
         self.__cle_iv_transactions = None
@@ -1642,12 +1657,9 @@ class ArchivesBackupParser:
             Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE
         ])
         requete = {
-            'certificat': self.__chaine_pem_courante,
-            'domaine': catalogue[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
-            'identificateurs_document': {
-                'transactions_nomfichier': catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_NOMFICHIER],
-            },
-            "iv": catalogue['iv'],
+            'domaine': ConstantesBackup.DOMAINE_NOM,
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: catalogue[
+                ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
         }
         try:
             requete['cle'] = catalogue['cle']
@@ -1661,8 +1673,10 @@ class ArchivesBackupParser:
 
         # Demander la cle rechiffree - il est possible que la cle soit inconnue, la requete va automatiquement
         # la conserver pour le prochein rechiffrage avec cle de backup ou cle de millegrille
+        correlation_id = 'cle'
+        self.__handler_messages.correlation_id = correlation_id
         self.__contexte.generateur_transactions.transmettre_requete(
-            requete, domaine_action, correlation_id='cle', reply_to=self.__nom_queue)
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.__nom_queue)
 
         self.__logger.debug("Attendre reponse cle")
         self.__event_attente_reponse.wait(1)

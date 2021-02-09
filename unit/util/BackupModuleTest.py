@@ -1484,26 +1484,41 @@ class ArchivesBackupParserTest(TestCaseContexte):
             self.assertIsNotNone(message_transactions)
             self.assertEqual(message_transactions['valeur'], i+1)
 
-    # def test_demander_cle(self):
-    #     archives_parser = ArchivesBackupParser(self.contexte)
-    #     catalogue = {
-    #         'domaine': 'test',
-    #         'transactions_nomfichier': 'transactions.jsonl.xz',
-    #         'iv': 'IV_123',
-    #     }
-    #
-    #     # Caller methode a tester
-    #     reponse_cle = archives_parser.demander_cle(catalogue)
-    #
-    #     generateur_transactions = self.contexte.generateur_transactions
-    #     liste_transmettre_requete = generateur_transactions.liste_transmettre_requete
-    #     requete = liste_transmettre_requete[0]['args'][0]
-    #     domaine_action = liste_transmettre_requete[0]['args'][1]
-    #
-    #     self.assertEqual('MaitreDesCles.dechiffrageBackup', domaine_action)
-    #     self.assertEqual('test', requete['domaine'])
-    #     self.assertDictEqual(requete['identificateurs_document'], {'transactions_nomfichier': 'transactions.jsonl.xz'})
-    #     self.assertEqual(2, len(requete['certificat']))
+    def test_demander_cle(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+        catalogue = {
+            'domaine': 'test',
+            'iv': 'IV_123',
+            ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE: 'HACHAGE_DUMMY',
+        }
+
+        # Caller methode a tester
+        reponse_cle = archives_parser.demander_cle(catalogue)
+
+        generateur_transactions = self.contexte.generateur_transactions
+        liste_transmettre_requete = generateur_transactions.liste_transmettre_requete
+        requete = liste_transmettre_requete[0]['args'][0]
+        domaine_action = liste_transmettre_requete[0]['args'][1]
+
+        self.assertEqual('MaitreDesCles.dechiffrage', domaine_action)
+        self.assertEqual('Backup', requete['domaine'])
+        self.assertEqual('HACHAGE_DUMMY', requete['hachage_bytes'])
+
+    def test_skip_demander_cle(self):
+        archives_parser = ArchivesBackupParser(self.contexte)
+        archives_parser.skip_chiffrage = True  # Flag pour ignorer transactions chiffres
+        catalogue = {
+            'domaine': 'test',
+            'iv': 'IV_123',
+            ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE: 'HACHAGE_DUMMY',
+        }
+
+        # Caller methode a tester
+        reponse_cle = archives_parser.demander_cle(catalogue)
+
+        generateur_transactions = self.contexte.generateur_transactions
+        liste_transmettre_requete = generateur_transactions.liste_transmettre_requete
+        self.assertEqual(0, len(liste_transmettre_requete))
 
     def test_process_archive_quotidienne(self):
         archives_parser = ArchivesBackupParser(self.contexte)
