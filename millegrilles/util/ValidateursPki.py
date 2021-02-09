@@ -69,7 +69,7 @@ class ValidateurCertificat:
         certificat_millegrille_pem = enveloppe.reste_chaine_pem[-1]
         certificat_millegrille = EnveloppeCertificat(certificat_pem=certificat_millegrille_pem)
         if certificat_millegrille.idmg != idmg_effectif:
-            raise PathValidationError("Certificat de millegrille ne correspond pas au idmg: %s" % idmg_effectif)
+            raise PathValidationError("Certificat de millegrille (idmg: %s) ne correspond pas au idmg: %s" % (certificat_millegrille.idmg, idmg_effectif))
 
         if date_reference is not None:
             validation_context = ValidationContext(

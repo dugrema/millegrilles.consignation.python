@@ -1400,9 +1400,10 @@ class ArchivesBackupParser:
     def stop(self):
         self.__logger.debug("Stop")
         self.__event_execution.set()
+        self.__nom_queue = None
         if self.__channel is not None:
-            self.__nom_queue = None
             self.__channel.close()
+            self.__channel = None
 
     def on_channel_open(self, channel):
         self.__logger.debug("Channel open")
@@ -1624,7 +1625,7 @@ class ArchivesBackupParser:
 
         if nom_fichier.endswith('.tar'):
             return 'tar'
-        elif nom_fichier.endswith('.json1.xz.mgs1') or nom_fichier.endswith('.jsonl.xz'):
+        elif nom_fichier.endswith('.jsonl.xz.mgs1') or nom_fichier.endswith('.jsonl.xz'):
             type = 'transactions'
         elif nom_fichier.endswith('.json.xz'):
             type = 'catalogue'

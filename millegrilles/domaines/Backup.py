@@ -3,6 +3,7 @@ import datetime
 import requests
 import json
 import certvalidator
+import pytz
 
 from lzma import LZMAFile, LZMAError
 from threading import Event
@@ -295,17 +296,20 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             del info_domaine['domaine']
             set_ops[domaine] = info_domaine
 
-        ops = {
-            '$set': set_ops,
-            '$setOnInsert': set_on_insert,
-            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
-        }
+        if len(set_ops) > 0:
+            ops = {
+                '$set': set_ops,
+                '$setOnInsert': set_on_insert,
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            }
 
-        collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
-        resultat = collection.update_one(filtre, ops, upsert=True)
+            collection = self.document_dao.get_collection(ConstantesBackup.COLLECTION_DOCUMENTS_NOM)
+            resultat = collection.update_one(filtre, ops, upsert=True)
 
-        if resultat.upserted_id is None and resultat.matched_count != 1:
-            raise Exception("Erreur maj rapport restauration")
+            if resultat.upserted_id is None and resultat.matched_count != 1:
+                raise Exception("Erreur maj rapport restauration")
+        else:
+            self.__logger.warning("Aucune mise a jour a faire pour rapport")
 
     def maj_rapport_backup(self, message: dict):
         self.__logger.debug("Traitement evenement de backup %s" % message)
@@ -934,6 +938,8 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         super().__init__(controleur, evenement, transaction_mapper)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+        self.compteur_catalogues = 0
+
     def initiale(self):
         # Charger certificat millegrille pour trouver fingerprint
         # Utilise pour retransmettre la cle de dechiffrage des fichiers de transaction
@@ -963,10 +969,6 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         Extrait toutes les transactions PKI (contenu non chiffre)
         :return:
         """
-        # TEST - SKIP! #
-        self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_transactions_cles.__name__)
-        return
-
         domaines = self.parametres['domaines_pki']
         idx_pki = self.parametres['idx_pki']
 
@@ -989,8 +991,6 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         Extrait toutes les transactions MaitreDesCles (contenu non chiffre)
         :return:
         """
-        self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_catalogues_domaines.__name__)
-
         domaines = self.parametres['domaines_maitredescles']
         idx_maitredescles = self.parametres['idx_maitredescles']
 
@@ -1023,26 +1023,7 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         configuration = self.controleur.configuration
 
         # Charger et traiter les catalogues (au vol)
-
-        compteur = 0
-        for essai in range(0, 2):
-            try:
-                # Hack, eviter de surcharger l'extraction de catalogue - erreur "invalid tar file"
-                Event().wait(3)
-                reponse = self.get_catalogues_domaine(configuration, domaine)
-                self.__logger.debug("Reponse lire catalogues %s : %d" % (domaine, reponse.status_code))
-
-                if reponse.status_code == 200:
-                    compteur = self.traiter_catalogues(domaine, reponse)
-                    break
-                else:
-                    self.__logger.error(
-                        "Erreur reception catalogues (code %d) %s : %s" % (reponse.status_code, domaine, reponse.text))
-                    break
-            except requests.exceptions.RequestException as re:
-                self.__logger.exception("Erreur demande liste de domaines pour la restauration")
-                # self.set_etape_suivante()  # Termine, erreur
-                # return {'err': str(re)}
+        compteur = self.traiter_catalogues(configuration, domaine)
 
         self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_catalogues_domaines.__name__)
         return {
@@ -1050,102 +1031,67 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
             'idx_catalogue': idx_catalogue + 1,
         }
 
-    def traiter_catalogues(self, domaine, reponse):
+    def traiter_catalogues(self, configuration, domaine):
+        """
+        Recupere les fichiers de transactions et effectue le traitement (upload).
+        :return:
+        """
+        liste_fichiers = self.get_liste_fichiers(configuration, domaine)
+        self.__logger.debug("Contenu listeFichiers %s : %s" % (domaine, liste_fichiers))
+
+        parser = ArchivesBackupParser(self.controleur.contexte)
+        parser.skip_transactions = True
+
         compteur = 0
-        certificats = dict()
-        certificats_millegrille = set()
-        certificats_intermediaires = set()
 
-        fingerprint = self.parametres['fingerprint_millegrille']
+        handler_certificats = HandlerCertificatsCatalogue()
 
-        for line in reponse.iter_lines(chunk_size=5 * 1024 * 1024):
-            self.__logger.info("Catalogue : %s" % line)
-            if line == b'':
-                break
+        def callback_catalogue(domaine, catalogue):
+            self.__logger.debug("Catalogue extrait : %s" % str(catalogue))
+            handler_certificats.extraire_certificats(catalogue)
+            self.compteur_catalogues = self.compteur_catalogues + 1
 
-            try:
-                catalogue = json.loads(line.decode('utf-8'))
+        parser.callback_catalogue = callback_catalogue
 
-                if catalogue.get('heure'):
-                    # Catalogue horaire
-                    if catalogue.get('cle'):
-                        self.sauvegarder_cle(catalogue, fingerprint)
+        for f in liste_fichiers['fichiers']:
+            if f.endswith('.tar'):
+                self.__logger.debug("Downloader le fichier %s pour traiter transactions" % f)
 
-                    certificats.update(catalogue['certificats_pem'])
-                    certificats_intermediaires.update(catalogue['certificats_intermediaires'])
-                    certificats_millegrille.update(catalogue['certificats_millegrille'])
+                # Aller chercher un stream du fichier
+                stream = self.get_stream_fichier(configuration, domaine, f)
+                if stream.status_code != 200:
+                    self.__logger.error("Erreur telechargement fichier %s" % f)
+                    continue
 
-            except json.decoder.JSONDecodeError:
-                self.__logger.exception("Erreur extraction catalogue en JSON\n" + line)
-            compteur = compteur + 1
-
-        # Sauvegarder les certificats
-        self.__logger.debug("Certificats cumules :\n%s" % certificats)
-
-        self.emettre_certificats(certificats, certificats_millegrille, certificats_intermediaires)
-
-        return compteur
-
-    def emettre_certificats(self, certificats, certificats_millegrille, certificats_intermediaires):
-        # Preparer enveloppes intermediaires, millegrille
-        pem_par_skid = dict()
-
-        # Preparer certificats millegrille
-        for fp in certificats_millegrille:
-            try:
-                pem_millegrille = certificats[fp]
-            except KeyError:
-                self.__logger.warning("Certificat de millegrille manquant du catalogue : %s" % fp)
-                continue
-            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=pem_millegrille)
-            pem_par_skid[enveloppe_millegrille.subject_key_identifier] = [pem_millegrille]
-
-        # Preparer certificats intermediaires
-        for fp in certificats_intermediaires:
-            try:
-                pem_intermediaire = certificats[fp]
-            except KeyError:
-                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
-                continue
-            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=pem_intermediaire)
-
-            # Completer la chaine
-            akid = enveloppe_intermediaire.authority_key_identifier
-            pem_millegrille = pem_par_skid[akid][0]
-            pem_par_skid[enveloppe_intermediaire.subject_key_identifier] = [pem_intermediaire, pem_millegrille]
-
-        for fp, pem in certificats.items():
-            try:
-                pem = certificats[fp]
-            except KeyError:
-                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
-                continue
-            enveloppe = EnveloppeCertificat(certificat_pem=pem)
-
-            # Completer la chaine
-            akid = enveloppe.authority_key_identifier
-            pems_inter = pem_par_skid[akid]
-            pems = [pem]
-            pems.extend(pems_inter)
-
-            # Valider le certificat
-            try:
-                self.controleur.validateur_pki.valider(pems)
-            except certvalidator.errors.InvalidCertificateError:
-                if len(pems) >= 3:
-                    self.__logger.warning("Certificat non valide provient de backup : %s" % enveloppe.fingerprint_sha256_b64)
+                event_attente = parser.start(stream)
+                if f.endswith('.tar'):
+                    # Fichier tar (quotidien, annuel), donner 2 minutes max
+                    timeout = 120
                 else:
-                    self.__logger.debug("Ignorer certificat millegrille/intermediaire pour restauration : %s" % enveloppe.fingerprint_sha256_b64)
-                continue
+                    # Fichier horaire, donner 15 secondes max
+                    timeout = 15
 
-            self.__logger.debug("Certificat avec chaine complete : %s", pems)
-            commande = {
-                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: enveloppe.fingerprint_sha256_b64,
-                Constantes.ConstantesSecurityPki.LIBELLE_CHAINE_PEM: pems,
-            }
-            domaine_action = 'commande.' + '.'.join([
-                Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT])
-            self.generateur_transactions.transmettre_commande(commande, domaine_action)
+                event_attente.wait(timeout)  # Donner 2 minutes pour faire le traitement (
+                if event_attente.is_set() is not True:
+                    self.__logger.error("Erreur traitement fichier %s, timeout apres %d" % (f, timeout))
+
+            elif f.endswith('.json.xz'):
+                # Lire le fichier de catalogue
+                stream = self.get_stream_fichier(configuration, domaine, f)
+                if stream.status_code != 200:
+                    self.__logger.error("Erreur telechargement fichier %s" % f)
+                    continue
+
+                wrapper = WrapperDownload(stream)
+                stream_lzma = LZMAFile(wrapper)
+                catalogue = json.load(stream_lzma)
+                callback_catalogue(domaine, catalogue)
+
+        # Emettre certificats
+        handler_certificats.generer_chaines_pems(self.controleur.validateur_pki)
+        handler_certificats.emettre_certificats(self.controleur.generateur_transactions)
+
+        return self.compteur_catalogues
 
     def sauvegarder_cle(self, catalogue, fingerprint):
         domaine = catalogue['domaine']
@@ -1170,27 +1116,27 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         domaine_action = 'commande.MaitreDesCles.%s' % Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE
         self.controleur.generateur_transactions.transmettre_commande(commande, domaine_action)
 
-    def get_catalogues_domaine(self, configuration, domaine):
-        url_liste_domaines = 'https://%s:%s/backup/catalogues/%s' % (
-            configuration.serveur_consignationfichiers_host, configuration.serveur_consignationfichiers_port, domaine)
-        mq_certfile = configuration.mq_certfile
-        mq_keyfile = configuration.mq_keyfile
-        mq_cafile = configuration.mq_cafile
-        reponse = requests.get(
-            url_liste_domaines,
-            verify=mq_cafile,
-            cert=(mq_certfile, mq_keyfile),
-            stream=True,
-            timeout=30,
-        )
-        self.__logger.debug("Resultat get_catalogues : %d\nHeaders: %s" % (reponse.status_code, reponse.headers))
-        return reponse
+    # def get_catalogues_domaine(self, configuration, domaine):
+    #     url_liste_domaines = 'https://%s:%s/backup/catalogues/%s' % (
+    #         configuration.serveur_consignationfichiers_host, configuration.serveur_consignationfichiers_port, domaine)
+    #     mq_certfile = configuration.mq_certfile
+    #     mq_keyfile = configuration.mq_keyfile
+    #     mq_cafile = configuration.mq_cafile
+    #     reponse = requests.get(
+    #         url_liste_domaines,
+    #         verify=mq_cafile,
+    #         cert=(mq_certfile, mq_keyfile),
+    #         stream=True,
+    #         timeout=30,
+    #     )
+    #     self.__logger.debug("Resultat get_catalogues : %d\nHeaders: %s" % (reponse.status_code, reponse.headers))
+    #     return reponse
 
     def completer_preparation(self):
         self.__logger.debug("Terminer preparation restauration")
         self.set_etape_suivante()  # Termine
 
-    def traiter_transactions(self, configuration, domaine):
+    def traiter_transactions(self, configuration, domaine, skip_chiffrage=False):
         """
         Recupere les fichiers de transactions et effectue le traitement (upload).
         :return:
@@ -1199,6 +1145,7 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         self.__logger.debug("Contenu listeFichiers %s : %s" % (domaine, liste_fichiers))
 
         parser = ArchivesBackupParser(self.controleur.contexte)
+        parser.skip_chiffrage = skip_chiffrage
         catalogue = None
         for f in liste_fichiers['fichiers']:
             if f.endswith('.tar'):
@@ -1291,3 +1238,99 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         liste_fichiers = reponse.json()
         return liste_fichiers
 
+
+class HandlerCertificatsCatalogue:
+
+    def __init__(self):
+        self.certificats = dict()
+        self.certificats_millegrille = set()
+        self.certificats_intermediaires = set()
+
+        self.chaine_pems = dict()   # fingeprint / [...pems]
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def extraire_certificats(self, catalogue: dict):
+        if catalogue.get('heure'):
+            self.certificats.update(catalogue['certificats_pem'])
+            self.certificats_intermediaires.update(catalogue['certificats_intermediaires'])
+            self.certificats_millegrille.update(catalogue['certificats_millegrille'])
+
+    def generer_chaines_pems(self, validateur_pki):
+        """
+        Aligne tous les certificats leaf avec leur chaine complete. Valide la chaine.
+        :param validateur_pki: Utilise pour valider la chaine de certificats
+        :return:
+        """
+        # Preparer enveloppes intermediaires, millegrille
+        pem_par_skid = dict()
+
+        # Preparer certificats millegrille
+        for fp in self.certificats_millegrille:
+            try:
+                pem_millegrille = self.certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat de millegrille manquant du catalogue : %s" % fp)
+                continue
+            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=pem_millegrille)
+            pem_par_skid[enveloppe_millegrille.subject_key_identifier] = [pem_millegrille]
+
+        # Preparer certificats intermediaires
+        for fp in self.certificats_intermediaires:
+            try:
+                pem_intermediaire = self.certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+                continue
+            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=pem_intermediaire)
+
+            # Completer la chaine
+            akid = enveloppe_intermediaire.authority_key_identifier
+            pem_millegrille = pem_par_skid[akid][0]
+            pem_par_skid[enveloppe_intermediaire.subject_key_identifier] = [pem_intermediaire, pem_millegrille]
+
+        for fp, pem in self.certificats.items():
+            try:
+                pem = self.certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+                continue
+            enveloppe = EnveloppeCertificat(certificat_pem=pem)
+
+            # Completer la chaine
+            akid = enveloppe.authority_key_identifier
+            pems_inter = pem_par_skid[akid]
+            pems = [pem]
+            pems.extend(pems_inter)
+
+            # Valider le certificat
+            try:
+                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+                idmg = enveloppe.subject_organization_name
+                validateur_pki.valider(pems, date_reference=date_reference, idmg=idmg)
+            except certvalidator.errors.InvalidCertificateError:
+                if len(pems) >= 3:
+                    self.__logger.warning("Certificat non valide provient de backup : %s" % enveloppe.fingerprint_sha256_b64)
+                else:
+                    self.__logger.debug("Ignorer certificat millegrille/intermediaire pour restauration : %s" % enveloppe.fingerprint_sha256_b64)
+                continue
+            except certvalidator.errors.PathValidationError:
+                self.__logger.exception("Erreur validation certificat %s, le ceritifcat est ignore" % enveloppe.fingerprint_sha256_b64)
+                continue
+
+            # Ajouter la chaine complete a la liste
+            self.chaine_pems[enveloppe.fingerprint_sha256_b64] = pems
+
+    def emettre_certificats(self, generateur_transactions):
+        for fp, pems in self.chaine_pems.items():
+            self.__logger.debug("Certificat avec chaine complete %s = %s" % (fp, pems))
+
+            commande = {
+                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fp,
+                Constantes.ConstantesSecurityPki.LIBELLE_CHAINE_PEM: pems,
+            }
+
+            domaine_action = 'commande.' + '.'.join([
+                Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT])
+
+            generateur_transactions.transmettre_commande(commande, domaine_action)
