@@ -1551,3 +1551,78 @@ class ArchivesBackupParserTest(TestCaseContexte):
         self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
         self.assertIsNotNone(message_catalogue)
         self.assertEqual(12, len(generateur_transactions.liste_emettre_message))
+
+    def test_override_callbacks(self):
+        """
+        Override de la methode de traitement de ficheirs de transactions
+        :return:
+        """
+        archives_parser = ArchivesBackupParser(self.contexte)
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tarfile_1 = self.preparer_sampletar(0)
+
+        # Ajouter fichier TAR (equivalent d'archive quotidienne) dans une _super_ archive (annuelle)
+        tmp_basetar = tempfile.mktemp(dir=UT_TEMP_FOLDER)
+        self.files_for_cleanup.append(tmp_basetar)
+
+        with tarfile.open(tmp_basetar, 'w') as fichier_tar:
+            fichier_tar.add(tarfile_1, arcname='jour_1.tar')
+            fichier_tar.add(tarfile_1, arcname='jour_2.tar')
+            fichier_tar.add(tarfile_1, arcname='jour_3.tar')
+
+        catalogues = list()
+
+        def callback_catalogue(domaine: str, catalogue: dict):
+            catalogues.append(catalogue)
+
+        archives_parser.callback_catalogue = callback_catalogue
+
+        transactions = list()
+
+        # Override methode callback transactions
+        def callback_transactions_override(domaine: str, catalogue: dict, transaction: dict):
+            transactions.append(transaction)
+
+        archives_parser.callback_transactions = callback_transactions_override
+
+        with open(tmp_basetar, 'rb') as tar_stream:
+            # Caller methode a tester
+            archives_parser._process_archive_aggregee(tar_stream)
+
+        # Verifications
+        self.assertEqual(3, len(catalogues))
+        self.assertEqual(9, len(transactions))
+
+    def test_skip_transactions(self):
+        """
+        Override de la methode de traitement de ficheirs de transactions
+        :return:
+        """
+        archives_parser = ArchivesBackupParser(self.contexte)
+        archives_parser.skip_transactions = True
+
+        # Generer fichier tar avec transaction/catalogue dummy et preparer lecture
+        tarfile_1 = self.preparer_sampletar(0)
+
+        # Ajouter fichier TAR (equivalent d'archive quotidienne) dans une _super_ archive (annuelle)
+        tmp_basetar = tempfile.mktemp(dir=UT_TEMP_FOLDER)
+        self.files_for_cleanup.append(tmp_basetar)
+
+        with tarfile.open(tmp_basetar, 'w') as fichier_tar:
+            fichier_tar.add(tarfile_1, arcname='jour_1.tar')
+            fichier_tar.add(tarfile_1, arcname='jour_2.tar')
+            fichier_tar.add(tarfile_1, arcname='jour_3.tar')
+
+        with open(tmp_basetar, 'rb') as tar_stream:
+            # Caller methode a tester
+            archives_parser._process_archive_aggregee(tar_stream)
+
+        # Verifications
+        generateur_transactions = self.contexte.generateur_transactions
+        message_catalogue = generateur_transactions.liste_emettre_message[0]['args'][0]
+        message_domaine = generateur_transactions.liste_emettre_message[0]['args'][1]
+
+        self.assertEqual('commande.transaction.restaurerTransaction', message_domaine)
+        self.assertIsNotNone(message_catalogue)
+        self.assertEqual(3, len(generateur_transactions.liste_emettre_message))

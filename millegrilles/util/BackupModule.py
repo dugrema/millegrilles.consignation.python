@@ -1362,6 +1362,9 @@ class ArchivesBackupParser:
         # Statistiques de restauration, erreurs, etc
         self.__rapport_restauration = RapportRestauration()
 
+        # Parametres
+        self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs1)
+
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def start(self, stream, path_output: str = None) -> Event:
@@ -1457,11 +1460,13 @@ class ArchivesBackupParser:
         elif type_archive == 'snapshot_catalogue':
             self._process_archive_snapshot_catalogue(nom_fichier, file_object)
         elif type_archive == 'snapshot_transactions':
-            self._process_archive_snapshot_transaction(nom_fichier, file_object)
+            if self.skip_transactions is False:
+                self._process_archive_snapshot_transaction(nom_fichier, file_object)
         elif type_archive == 'catalogue':
             self._process_archive_horaire_catalogue(nom_fichier, file_object)
         elif type_archive == 'transactions':
-            self._process_archive_horaire_transaction(nom_fichier, file_object)
+            if self.skip_transactions is False:
+                self._process_archive_horaire_transaction(nom_fichier, file_object)
         elif type_archive == 'grosfichier':
             pass  # Skip les fichiers
         else:
@@ -1514,10 +1519,8 @@ class ArchivesBackupParser:
             lzma_file_object = LZMAFile(file_object)
             archive_json = json.load(lzma_file_object)
 
-            # Si transactions chiffrees, demander cle
-            if archive_json.get('iv'):
-                info_cle = self.demander_cle(archive_json)
-                self.__logger.debug("Reponse commande submit catalogue : %s" % info_cle)
+            domaine = archive_json.get('domaine')
+            self.callback_catalogue(domaine, archive_json)
 
             return archive_json
         except json.decoder.JSONDecodeError:
@@ -1568,16 +1571,17 @@ class ArchivesBackupParser:
 
     def traiter_transaction(self, catalogue, domaine, stream):
         stream_lzma = LZMAFile(stream)
-        generateur = self.__contexte.generateur_transactions
+        # generateur = self.__contexte.generateur_transactions
         try:
             for line in stream_lzma:
                 archive_json = json.loads(line.decode('utf-8'))
                 self.__logger.debug("Transaction : %s" % archive_json)
-                generateur.emettre_message(
-                    archive_json,
-                    'commande.transaction.restaurerTransaction',
-                    exchanges=[Constantes.SECURITE_SECURE]
-                )
+                # generateur.emettre_message(
+                #     archive_json,
+                #     'commande.transaction.restaurerTransaction',
+                #     exchanges=[Constantes.SECURITE_SECURE]
+                # )
+                self.callback_transactions(domaine, catalogue, archive_json)
 
             try:
                 digest_transactions = stream.digest()
@@ -1667,6 +1671,33 @@ class ArchivesBackupParser:
         self.__event_attente_reponse.clear()
 
         return self.__reponse_cle
+
+    def callback_transactions(self, domaine: str, catalogue: dict, transaction: dict):
+        """
+        Methode invoquee pour chaque transaction lue (pour override/hook)
+        :param domaine:
+        :param catalogue:
+        :param transaction:
+        :return:
+        """
+        generateur = self.__contexte.generateur_transactions
+        generateur.emettre_message(
+            transaction,
+            'commande.transaction.restaurerTransaction',
+            exchanges=[Constantes.SECURITE_SECURE]
+        )
+
+    def callback_catalogue(self, domaine: str, catalogue: dict):
+        """
+        Methode invoquee pour chaque catalogue lu
+        :param domaine:
+        :param catalogue:
+        :return:
+        """
+        # Si transactions chiffrees, demander cle
+        if catalogue.get('iv'):
+            info_cle = self.demander_cle(catalogue)
+            self.__logger.debug("Reponse commande submit catalogue : %s" % info_cle)
 
 
 class TypeArchiveInconnue(Exception):
