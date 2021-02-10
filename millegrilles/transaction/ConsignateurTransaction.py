@@ -350,7 +350,19 @@ class ConsignateurTransactionCallback(BaseCallback):
         return doc_id
 
     def __emettre_chaine(self, certs: list):
-        self.contexte.signateur_transactions.emettre_certificat(certs)
+        # self.contexte.signateur_transactions.emettre_certificat(certs)
+        # Emettre le certificat vers PKI
+        enveloppe_cert_inclus = EnveloppeCertificat(certificat_pem=certs)
+
+        domaine_action_certificat = '.'.join([
+            'commande', ConstantesPki.DOMAINE_NOM, ConstantesPki.COMMANDE_SAUVEGADER_CERTIFICAT])
+
+        commande = {
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: enveloppe_cert_inclus.fingerprint_sha256_b64,
+            ConstantesSecurityPki.LIBELLE_CHAINE_PEM: certs,
+        }
+
+        self.contexte.generateur_transactions.transmettre_commande(commande, domaine_action_certificat)
 
     def sauvegarder_transaction_restauree(self, enveloppe_transaction):
 
@@ -384,16 +396,7 @@ class ConsignateurTransactionCallback(BaseCallback):
             certificat_inclus = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
             del enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
 
-            enveloppe_cert_inclus = EnveloppeCertificat(certificat_pem=certificat_inclus)
-
-            # Emettre le certificat vers PKI
-            domaine_action_certificat = '.'.join([
-                'commande', ConstantesPki.DOMAINE_NOM, ConstantesPki.COMMANDE_SAUVEGADER_CERTIFICAT])
-            commande = {
-                ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: enveloppe_cert_inclus.fingerprint_sha256_b64,
-                ConstantesSecurityPki.LIBELLE_CHAINE_PEM: certificat_inclus,
-            }
-            self.contexte.generateur_transactions.transmettre_commande(commande, domaine_action_certificat)
+            self.__emettre_chaine(certificat_inclus)
         except KeyError:
             pass  #OK
 

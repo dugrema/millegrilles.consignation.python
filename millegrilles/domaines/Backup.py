@@ -976,10 +976,10 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
             domaine = domaines[idx_pki]
         except IndexError:
             # Termine
-            domaine_action_regener = 'commande.%s' % '.'.join([
+            domaine_action_regenerer = 'commande.%s' % '.'.join([
                 Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
-            self.ajouter_commande_a_transmettre(domaine_action_regener, dict(), blocking=True)
             self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_transactions_cles.__name__)
+            self.ajouter_commande_a_transmettre(domaine_action_regenerer, dict(), blocking=False)
             return
 
         self.traiter_transactions(self.controleur.configuration, domaine)
@@ -1003,8 +1003,8 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
             # Termine
             domaine_action_regener = 'commande.%s' % '.'.join([
                 Constantes.ConstantesMaitreDesCles.DOMAINE_NOM, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
-            self.ajouter_commande_a_transmettre(domaine_action_regener, dict(), blocking=True)
             self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_catalogues_domaines.__name__)
+            self.ajouter_commande_a_transmettre(domaine_action_regener, dict(), blocking=False)
             return
 
         self.traiter_transactions(self.controleur.configuration, domaine)
@@ -1015,7 +1015,6 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         }
 
     def boucle_catalogues_domaines(self):
-        raise Exception("BAM!")
         domaines = self.parametres['domaines']
         idx_catalogue = self.parametres['idx_catalogue']
 
