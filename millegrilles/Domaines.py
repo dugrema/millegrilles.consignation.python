@@ -1029,6 +1029,9 @@ class GestionnaireDomaine:
     def get_collection(self):
         return self.document_dao.get_collection(self.get_nom_collection())
 
+    def get_collection_par_nom(self, nom_collection: str):
+        return self.document_dao.get_collection(nom_collection)
+
     def get_transaction(self, id_transaction):
         collection_transactions = self.document_dao.get_collection(self.get_collection_transaction_nom())
         return collection_transactions.find_one({Constantes.MONGO_DOC_ID: ObjectId(id_transaction)})
@@ -1173,6 +1176,13 @@ class GestionnaireDomaine:
         """
         return True
 
+    @property
+    def get_collections_documents(self):
+        """
+        :return: Liste des collections de documents (e.g. DOMAINE/documents, DOMAINE/rapports, etc.)
+        """
+        return [self.get_nom_collection()]
+
 
 class TraitementCommandesSecures(TraitementMessageDomaineCommande):
 
@@ -1223,9 +1233,9 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
             routing_key == ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace("_DOMAINE_", 'global'):
             resultat = self.gestionnaire.declencher_backup_snapshot(message_dict)
         elif routing_key == ConstantesDomaines.COMMANDE_GLOBAL_REGENERER:
-            if self._gestionnaire.supporte_regenerer_global:
+            if self.gestionnaire.supporte_regenerer_global:
                 resultat = self.gestionnaire.regenerer_documents()
-        elif commande == ConstantesDomaines.COMMANDE_REGENERER:
+        elif action == ConstantesDomaines.COMMANDE_REGENERER:
             resultat = self.gestionnaire.regenerer_documents()
 
         elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
@@ -1818,11 +1828,12 @@ class RegenerateurDeDocuments:
         Supprime les documents de la collection
         :return:
         """
-        nom_collection_documents = self._gestionnaire_domaine.get_nom_collection()
-        self.__logger.info("Supprimer les documents de %s" % nom_collection_documents)
+        collections_documents = self._gestionnaire_domaine.get_collections_documents
 
-        collection_documents = self._gestionnaire_domaine.get_collection()
-        collection_documents.delete_many({})
+        for nom_collection_documents in collections_documents:
+            self.__logger.info("Supprimer les documents de %s" % nom_collection_documents)
+            collection_documents = self._gestionnaire_domaine.get_collection_par_nom(nom_collection_documents)
+            collection_documents.delete_many({})
 
     def creer_generateur_transactions(self):
         return GroupeurTransactionsARegenerer(self._gestionnaire_domaine)

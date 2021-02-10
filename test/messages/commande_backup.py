@@ -102,11 +102,11 @@ class MessagesSample(BaseCallback):
     def commande_regenerer(self):
         domaines = [
             # ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', 'Annuaire'),
-            # 'commande.millegrilles.domaines.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # # 'commande.millegrilles.domaines.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Principale.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.SenseursPassifs.%s' % ConstantesDomaines.COMMANDE_REGENERER,
@@ -376,7 +376,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # sample.requete_backup_dernierhoraire()
-        # sample.commande_regenerer()
+        sample.commande_regenerer()
         # sample.trigger_backup_reset_global()
 
         # sample.trigger_backup_global()
@@ -415,7 +415,7 @@ class MessagesSample(BaseCallback):
         # sample.commande_verifier_domaine('MaitreDesCles.5d541b783539eb95e465d941d03df36d38c761c5')
         # sample.commande_verifier_domaine('Topologie')
 
-        sample.commande_preparer_restauration()
+        # sample.commande_preparer_restauration()
 
 
 # --- MAIN ---

@@ -1173,6 +1173,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def handler_backup(self):
         return self.__handler_backup
 
+    @property
+    def get_collections_documents(self):
+        return [
+            ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM,
+            ConstantesMaitreDesCles.COLLECTION_CLES_NOM,
+        ]
+
 
 class HandlerBackupMaitreDesCles(HandlerBackupDomaine):
 

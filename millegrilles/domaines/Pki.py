@@ -6,7 +6,7 @@ from certvalidator.errors import PathValidationError
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPki
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
-    TraitementRequetesProtegees, MGPProcesseurTraitementEvenements, TraitementMessageDomaineCommande
+    TraitementRequetesProtegees, MGPProcesseurTraitementEvenements, TraitementCommandesProtegees
 from millegrilles.dao.MessageDAO import TraitementMessageDomaine
 from millegrilles.MGProcessus import MGPProcesseur, MGProcessusTransaction
 from millegrilles.SecuritePKI import ConstantesSecurityPki, EnveloppeCertificat, AutorisationConditionnelleDomaine, CertificatExpire
@@ -114,7 +114,7 @@ class TraitementEvenementsPki(TraitementMessageDomaine):
             self.gestionnaire.recevoir_certificat(message_dict)
 
 
-class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
+class TraitementCommandesProtegeesPki(TraitementCommandesProtegees):
 
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         action = method.routing_key.split('.')[-1]
@@ -122,7 +122,7 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
         if action == ConstantesPki.COMMANDE_SAUVEGADER_CERTIFICAT:
             return self.gestionnaire.recevoir_certificat(message_dict)
         else:
-            return {'err': 'Commande inconnue : ' + action}
+            return super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
 
 class GestionnairePki(GestionnaireDomaineStandard):
@@ -146,7 +146,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             Constantes.SECURITE_PUBLIC: handler_requetes_publiques,
         }
 
-        handler_commandes_protegees = TraitementCommandesProtegees(self)
+        handler_commandes_protegees = TraitementCommandesProtegeesPki(self)
         self.__hanlder_commandes = {
             Constantes.SECURITE_SECURE: handler_commandes_protegees,
             Constantes.SECURITE_PROTEGE: handler_commandes_protegees,
