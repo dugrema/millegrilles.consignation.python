@@ -522,6 +522,8 @@ class ConstantesPki:
     REQUETE_LISTE_CERTS_CA = 'certificatsCA'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
+    COMMANDE_SAUVEGADER_CERTIFICAT = 'certificat'  # Commande pour s'assurer d'avoir un certificat
+
     # Indique que c'est un evenement avec un certificat (reference)
     EVENEMENT_CERTIFICAT = ConstantesSecurityPki.EVENEMENT_CERTIFICAT
     # Indique que c'est une requete pour trouver un certificat par fingerprint

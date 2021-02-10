@@ -119,7 +119,7 @@ class TraitementCommandesProtegees(TraitementMessageDomaineCommande):
     def traiter_commande(self, enveloppe_certificat, ch, method, properties, body, message_dict) -> dict:
         action = method.routing_key.split('.')[-1]
 
-        if action == ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT:
+        if action == ConstantesPki.COMMANDE_SAUVEGADER_CERTIFICAT:
             return self.gestionnaire.recevoir_certificat(message_dict)
         else:
             return {'err': 'Commande inconnue : ' + action}
@@ -146,8 +146,10 @@ class GestionnairePki(GestionnaireDomaineStandard):
             Constantes.SECURITE_PUBLIC: handler_requetes_publiques,
         }
 
+        handler_commandes_protegees = TraitementCommandesProtegees(self)
         self.__hanlder_commandes = {
-            Constantes.SECURITE_PROTEGE: TraitementCommandesProtegees(self),
+            Constantes.SECURITE_SECURE: handler_commandes_protegees,
+            Constantes.SECURITE_PROTEGE: handler_commandes_protegees,
         }
 
     def configurer(self):

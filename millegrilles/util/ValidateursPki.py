@@ -485,7 +485,12 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
         fingerprint = None
         try:
-            fingerprint = 'sha256_b64:' + message.get(ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64)
+            fingerprint = 'sha256_b64:' + message[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
+        except KeyError:
+            self.__logger.warning("Recu reponse de mauvais type - pas un certificat : %s" % str(message))
+            return
+
+        try:
             handler_attente = self.__attente.get(fingerprint)
 
             handler_attente.message = message

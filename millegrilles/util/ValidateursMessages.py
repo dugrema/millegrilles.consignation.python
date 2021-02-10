@@ -191,7 +191,7 @@ class ValidateurMessage:
                 certificats_inline, date_reference=date_reference, idmg=idmg_message)
 
             # S'assurer que le certificat correspond au fingerprint
-            fingerprint_charge = enveloppe_certificat.fingerprint_sha256_b64
+            fingerprint_charge = 'sha256_b64:' + enveloppe_certificat.fingerprint_sha256_b64
             if fingerprint_charge != fingerprint_message:
                 self.__logger.warning(
                     "Message recu avec certificat inline (%s) qui ne correspond pas au fingerprint du message %s" % (

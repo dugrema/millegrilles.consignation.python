@@ -7,6 +7,7 @@ import hashlib
 import requests
 import tarfile
 import tempfile
+import certvalidator
 
 from typing import Optional, List, Dict
 from io import RawIOBase
@@ -1363,6 +1364,7 @@ class ArchivesBackupParser:
         self.__cle_iv_transactions: Optional[dict] = None
 
         self.__handler_messages = ReceptionMessage(self, contexte.message_dao, contexte.configuration)
+        self.__handler_certificats = HandlerCertificatsCatalogue()
 
         self.__event_execution = Event()
         self.__event_attente_reponse = Event()
@@ -1375,6 +1377,7 @@ class ArchivesBackupParser:
         # Parametres
         self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs1)
         self.skip_chiffrage = False     # Mettre a true pour ignorer tous les messages chiffres (.mgs1)
+        self.fermer_auto = True         # Ferme la connexion automatiquement sur fin de thread
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -1395,6 +1398,7 @@ class ArchivesBackupParser:
             # Queue deja ouverte, on lance le parsing
             self.__thread.start()
 
+        self.__event_execution.clear()
         return self.__event_execution
 
     def stop(self):
@@ -1413,6 +1417,7 @@ class ArchivesBackupParser:
 
         self.__channel.queue_declare(
             queue='',
+            exclusive=True,
             callback=self.q_ouverte,
         )
 
@@ -1430,10 +1435,13 @@ class ArchivesBackupParser:
         self.__reponse_cle = message_dict
 
         try:
-            self.__cle_iv_transactions = {
-                'cle': message_dict['cle'],
-                'iv': message_dict['iv'],
-            }
+            if message_dict['acces'] != '1.permis':
+                self.__logger.warning("Erreur acces cle %s" % message_dict)
+            else:
+                self.__cle_iv_transactions = {
+                    'cle': message_dict['cle'],
+                    'iv': message_dict['iv'],
+                }
         finally:
             self.__event_attente_reponse.set()
 
@@ -1444,7 +1452,11 @@ class ArchivesBackupParser:
         finally:
             self.__rapport_restauration.generer_transaction_restauration(self.__contexte.generateur_transactions)
             self.__event_execution.wait(1)
-            self.stop()
+
+            if self.fermer_auto:
+                self.stop()
+            else:
+                self.__event_execution.set()
 
     def _process_tar_info(self, tar_info):
         path_fichier = tar_info.name
@@ -1571,7 +1583,7 @@ class ArchivesBackupParser:
                 internal_file_object = stream
 
             if internal_file_object is not None:
-                self.traiter_transaction(catalogue, domaine, internal_file_object)
+                self.traiter_transaction(catalogue, domaine, internal_file_object, self.__handler_certificats)
                 self.__rapport_restauration.incrementer_completee(domaine)
 
         except (json.decoder.JSONDecodeError, LZMAError) as e:
@@ -1581,19 +1593,25 @@ class ArchivesBackupParser:
         #     # S'assurer que le fichier a ete lu au complet (en cas d'erreur)
         #     file_object.read()
 
-    def traiter_transaction(self, catalogue, domaine, stream):
+    def traiter_transaction(self, catalogue, domaine, stream, handler_certificats):
         stream_lzma = LZMAFile(stream)
         # generateur = self.__contexte.generateur_transactions
         try:
+            handler_certificats.extraire_certificats(catalogue)
+            handler_certificats.generer_chaines_pems(self.__contexte.validateur_pki)
+
             for line in stream_lzma:
-                archive_json = json.loads(line.decode('utf-8'))
-                self.__logger.debug("Transaction : %s" % archive_json)
-                # generateur.emettre_message(
-                #     archive_json,
-                #     'commande.transaction.restaurerTransaction',
-                #     exchanges=[Constantes.SECURITE_SECURE]
-                # )
-                self.callback_transactions(domaine, catalogue, archive_json)
+                transaction = json.loads(line.decode('utf-8'))
+                self.__logger.debug("Transaction : %s" % transaction)
+                fingerprint = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
+                try:
+                    fingerprint = fingerprint.split(':')[-1]  # Cle dict n'a pas la fonction de hachage
+                    certificat = handler_certificats.chaine_pems[fingerprint]
+                    transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = certificat
+                except KeyError:
+                    self.__logger.warning("Certificat restauration %s introuvable dans le catalogue pour transaction %s " % (fingerprint, transaction))
+                self.callback_transactions(domaine, catalogue, transaction)
 
             try:
                 digest_transactions = stream.digest()
@@ -1659,8 +1677,9 @@ class ArchivesBackupParser:
         ])
         requete = {
             'domaine': ConstantesBackup.DOMAINE_NOM,
-            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: catalogue[
-                ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [
+                catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
+            ]
         }
         try:
             requete['cle'] = catalogue['cle']
@@ -1710,9 +1729,107 @@ class ArchivesBackupParser:
         :return:
         """
         # Si transactions chiffrees, demander cle
-        if catalogue.get('iv'):
+        self.__handler_certificats.extraire_certificats(catalogue)
+        if catalogue.get('iv') and self.skip_chiffrage is False:
             info_cle = self.demander_cle(catalogue)
             self.__logger.debug("Reponse commande submit catalogue : %s" % info_cle)
+
+
+class HandlerCertificatsCatalogue:
+
+    def __init__(self):
+        self.certificats = dict()
+        self.certificats_millegrille = set()
+        self.certificats_intermediaires = set()
+
+        self.chaine_pems = dict()   # fingeprint / [...pems]
+
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def extraire_certificats(self, catalogue: dict):
+        if catalogue.get('heure'):
+            self.certificats.update(catalogue['certificats_pem'])
+            self.certificats_intermediaires.update(catalogue['certificats_intermediaires'])
+            self.certificats_millegrille.update(catalogue['certificats_millegrille'])
+
+    def generer_chaines_pems(self, validateur_pki):
+        """
+        Aligne tous les certificats leaf avec leur chaine complete. Valide la chaine.
+        :param validateur_pki: Utilise pour valider la chaine de certificats
+        :return:
+        """
+        # Preparer enveloppes intermediaires, millegrille
+        pem_par_skid = dict()
+
+        # Preparer certificats millegrille
+        for fp in self.certificats_millegrille:
+            try:
+                pem_millegrille = self.certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat de millegrille manquant du catalogue : %s" % fp)
+                continue
+            enveloppe_millegrille = EnveloppeCertificat(certificat_pem=pem_millegrille)
+            pem_par_skid[enveloppe_millegrille.subject_key_identifier] = [pem_millegrille]
+
+        # Preparer certificats intermediaires
+        for fp in self.certificats_intermediaires:
+            try:
+                pem_intermediaire = self.certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+                continue
+            enveloppe_intermediaire = EnveloppeCertificat(certificat_pem=pem_intermediaire)
+
+            # Completer la chaine
+            akid = enveloppe_intermediaire.authority_key_identifier
+            pem_millegrille = pem_par_skid[akid][0]
+            pem_par_skid[enveloppe_intermediaire.subject_key_identifier] = [pem_intermediaire, pem_millegrille]
+
+        for fp, pem in self.certificats.items():
+            try:
+                pem = self.certificats[fp]
+            except KeyError:
+                self.__logger.warning("Certificat intermediaire manquant du catalogue : %s" % fp)
+                continue
+            enveloppe = EnveloppeCertificat(certificat_pem=pem)
+
+            # Completer la chaine
+            akid = enveloppe.authority_key_identifier
+            pems_inter = pem_par_skid[akid]
+            pems = [pem]
+            pems.extend(pems_inter)
+
+            # Valider le certificat
+            try:
+                date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+                idmg = enveloppe.subject_organization_name
+                validateur_pki.valider(pems, date_reference=date_reference, idmg=idmg)
+            except certvalidator.errors.InvalidCertificateError:
+                if len(pems) >= 3:
+                    self.__logger.warning("Certificat non valide provient de backup : %s" % enveloppe.fingerprint_sha256_b64)
+                else:
+                    self.__logger.debug("Ignorer certificat millegrille/intermediaire pour restauration : %s" % enveloppe.fingerprint_sha256_b64)
+                continue
+            except certvalidator.errors.PathValidationError:
+                self.__logger.exception("Erreur validation certificat %s, le ceritifcat est ignore" % enveloppe.fingerprint_sha256_b64)
+                continue
+
+            # Ajouter la chaine complete a la liste
+            self.chaine_pems[enveloppe.fingerprint_sha256_b64] = pems
+
+    def emettre_certificats(self, generateur_transactions):
+        for fp, pems in self.chaine_pems.items():
+            self.__logger.debug("Certificat avec chaine complete %s = %s" % (fp, pems))
+
+            commande = {
+                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fp,
+                Constantes.ConstantesSecurityPki.LIBELLE_CHAINE_PEM: pems,
+            }
+
+            domaine_action = 'commande.' + '.'.join([
+                Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesPki.TRANSACTION_EVENEMENT_CERTIFICAT])
+
+            generateur_transactions.transmettre_commande(commande, domaine_action)
 
 
 class TypeArchiveInconnue(Exception):
@@ -1727,3 +1844,4 @@ class BackupException(Exception):
     Exception generique lancee durant un Backup
     """
     pass
+

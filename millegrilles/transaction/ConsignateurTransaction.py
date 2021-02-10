@@ -14,6 +14,7 @@ from certvalidator.errors import PathValidationError
 from millegrilles.dao.MessageDAO import JSONHelper, BaseCallback, CertificatInconnu
 from millegrilles.util.UtilScriptLigneCommande import ModeleConfiguration
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesPki, ConstantesSecurityPki
 from millegrilles.util.Ceduleur import CeduleurMilleGrilles
 from millegrilles.Domaines import GestionnaireDomaine
 from millegrilles.config.Autorisations import autorisations_idmg, ConstantesAutorisation
@@ -368,9 +369,8 @@ class ConsignateurTransactionCallback(BaseCallback):
                 enveloppe_transaction, utiliser_date_message=True, utiliser_idmg_message=True)
             enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_ORIGINE] = \
                 enveloppe_certificat.authority_key_identifier
-            signature_valide = True
         except CertificatInconnu as ci:
-            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT]
+            fingerprint = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
             self._logger.warning(
                 "Signature transaction incorrect ou certificat manquant. fingerprint: %s, uuid-transaction: %s" % (
                     fingerprint, entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -379,6 +379,23 @@ class ConsignateurTransactionCallback(BaseCallback):
             # Emettre demande pour le certificat manquant
             self.contexte.message_dao.transmettre_demande_certificat(fingerprint)
             raise ci
+
+        try:
+            certificat_inclus = enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
+            del enveloppe_transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS]
+
+            enveloppe_cert_inclus = EnveloppeCertificat(certificat_pem=certificat_inclus)
+
+            # Emettre le certificat vers PKI
+            domaine_action_certificat = '.'.join([
+                'commande', ConstantesPki.DOMAINE_NOM, ConstantesPki.COMMANDE_SAUVEGADER_CERTIFICAT])
+            commande = {
+                ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: enveloppe_cert_inclus.fingerprint_sha256_b64,
+                ConstantesSecurityPki.LIBELLE_CHAINE_PEM: certificat_inclus,
+            }
+            self.contexte.generateur_transactions.transmettre_commande(commande, domaine_action_certificat)
+        except KeyError:
+            pass  #OK
 
         # Ajouter la date de restauration
         evenements = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT)
