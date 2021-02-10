@@ -590,13 +590,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             {'non_dechiffrable': True}
         ]
         for fp in fingerprint_b64_actifs:
-            condition_actif.append({'cles.%s' % fp: {'$exists': False}})
+            fp_avec_fonction = 'sha256_b64:' + fp
+            condition_actif.append({'cles.%s' % fp_avec_fonction: {'$exists': False}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
-            fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint_b64
+            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_b64
 
-        collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_DOCUMENTS_NOM)
+        collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
             '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
@@ -632,11 +633,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             {ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: True}
         ]
         for fp in fingerprint_b64_actifs:
-            condition_actif.append({'cles.%s' % fp: {'$exists': False}})
+            fp_avec_fonction = 'sha256_b64:' + fp
+            condition_actif.append({'cles.%s' % fp_avec_fonction: {'$exists': False}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
-            fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint_b64
+            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_b64
 
         collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
@@ -646,17 +648,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
         sort_order = [(Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)]
 
-        resultats = collection.find(filtre).sort(sort_order).limit(taille_bacth)
-
-        # domaine, cles[fingerprint], iv, _mg - libelle, identificateurs_document, securite,
         champs = [
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV,
-            # Constantes.DOCUMENT_INFODOC_LIBELLE,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS,
-            # Constantes.DOCUMENT_INFODOC_SECURITE,
-            # ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES,
         ]
+
+        resultats = collection.find(filtre).sort(sort_order).limit(taille_bacth)
 
         cles = list()
         for doc in resultats:
