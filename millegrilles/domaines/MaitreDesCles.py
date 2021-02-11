@@ -2,22 +2,18 @@
 # Responsable de la gestion et de l'acces aux cles secretes pour les niveaux 3.Protege et 4.Secure.
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesSecurite, ConstantesSecurityPki
+from millegrilles.Constantes import ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TransactionTypeInconnuError, \
-    TraitementMessageDomaineRequete, TraitementRequetesProtegees, TraitementCommandesProtegees, TraitementCommandesSecures
-from millegrilles.domaines.GrosFichiers import ConstantesGrosFichiers
-from millegrilles.dao.MessageDAO import CertificatInconnu
+    TraitementMessageDomaineRequete, TraitementRequetesProtegees, TraitementCommandesProtegees, \
+    TraitementCommandesSecures
 from millegrilles.MGProcessus import MGProcessusTransaction, MGProcessus
 from millegrilles.util.X509Certificate import EnveloppeCleCert, \
     ConstantesGenerateurCertificat, RenouvelleurCertificat, PemHelpers
-from millegrilles.util.JSONEncoders import DocElemFilter
 from millegrilles.domaines.Pki import ConstantesPki
 from millegrilles.SecuritePKI import EnveloppeCertificat
-from millegrilles.domaines.Annuaire import ConstantesAnnuaire
 from millegrilles.util.BackupModule import HandlerBackupDomaine
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 from cryptography import x509
 from base64 import b64encode, b64decode
 from typing import Optional
@@ -59,20 +55,8 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
         action = method.routing_key.split('.')[-1]
 
         reponse = None
-        # if action == ConstantesMaitreDesCles.REQUETE_CLE_RACINE:
-        #     reponse = self.gestionnaire.transmettre_cle_racine(properties, message_dict)
         if action == ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE:
             reponse = self.gestionnaire.transmettre_cle(message_dict, properties)
-
-        # elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_GROSFICHIER:
-        #     reponse = self.gestionnaire.transmettre_cle_grosfichier(message_dict, properties)
-        # elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECRYPTAGE_DOCUMENT:
-        #     self.gestionnaire.transmettre_cle_document(message_dict, properties)
-        # elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP:
-        #     reponse = self.gestionnaire.transmettre_cle_backup(message_dict)
-        # elif domaine_routing_key == ConstantesMaitreDesCles.REQUETE_TROUSSEAU_HEBERGEMENT:
-        #     self.gestionnaire.transmettre_trousseau_hebergement(message_dict, properties)
-
         elif action == ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES:
             self.gestionnaire.transmettre_certificat(properties)
         elif action == ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES:
@@ -98,7 +82,6 @@ class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
                 resultat = self.gestionnaire.restaurer_backup_cles(properties, message_dict)
         elif action == ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE:
             resultat = self.gestionnaire.sauvegarder_cle(message_dict, properties)
-
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -189,7 +172,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Index pour trouver rapidement cles non dechiffrables
         collection_cles.create_index(
             [
-                (ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE, 1)
+                (ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE, 1),
+                (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1),
             ],
             name='flag_non_dechiffrable',
         )
@@ -619,6 +603,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         """
         taille_bacth = message_dict.get('taille') or 1000
         fingerprint_b64_dechiffrage = message_dict.get('fingerprint_b64_dechiffrage')
+        hachages_ignorer = message_dict.get('hachage_ignorer')  # Hachage a ignorer (erreur, en cours, etc.)
 
         # Fingerprints qui doivent exister pour considerer dechiffrable
         fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
@@ -646,7 +631,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
             'domaine': {'$ne': None},
         }
-        sort_order = [(Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1)]
+        if hachages_ignorer is not None:
+            filtre['hachage_bytes'] = {'$nin': hachages_ignorer}
+
+        hint = [
+            (ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE, 1),
+            (Constantes.DOCUMENT_INFODOC_DATE_CREATION, 1),
+        ]
 
         champs = [
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE,
@@ -655,7 +646,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES,
         ]
 
-        resultats = collection.find(filtre).sort(sort_order).limit(taille_bacth)
+        resultats = collection.find(filtre).sort(hint).hint(hint).limit(taille_bacth)
 
         cles = list()
         for doc in resultats:
