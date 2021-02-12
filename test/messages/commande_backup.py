@@ -203,6 +203,7 @@ class MessagesSample(BaseCallback):
 
     def trigger_backup_snapshot_global(self):
         commande_backup_snapshot = {
+            ConstantesBackup.CHAMP_UUID_RAPPORT: str(uuid1()),
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_snapshot,
@@ -224,7 +225,7 @@ class MessagesSample(BaseCallback):
             ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
             reply_to=self.queue_name,
-            correlation_id='trigger_backup_horaire'
+            correlation_id='trigger_backup_horaire',
         )
 
     def trigger_backup_reset_global(self):

@@ -2,11 +2,9 @@ import logging
 import datetime
 import requests
 import json
-import certvalidator
-import pytz
 
-from lzma import LZMAFile, LZMAError
-from threading import Event
+from lzma import LZMAFile
+from uuid import uuid1
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesBackup
@@ -84,7 +82,6 @@ class TraitementEvenementsBackup(TraitementMessageDomaine):
         else:
             self.__logger.error("Evenement de backup non supporte : %s\n%s" % (routing_key, str(message)))
 
-
 class GestionnaireBackup(GestionnaireDomaineStandard):
     """
     Gestionnaire du domaine de backup
@@ -148,10 +145,13 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
     def demarrer(self):
         super().demarrer()
-        # self.initialiser_document(ConstantesPki.LIBVAL_CONFIGURATION, ConstantesPki.DOCUMENT_DEFAUT)
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
+
+        indicateurs = evenement['indicateurs']
+        if 'heure' in indicateurs:
+            self.transmettre_commande_backup_horaire()
 
     def get_nom_queue(self):
         return ConstantesBackup.QUEUE_NOM
@@ -472,6 +472,22 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
         # Repondre a l'initiateur de la restauration (commande)
         return parametres_processus
+
+    def transmettre_commande_backup_horaire(self):
+        """
+        Transmet une commande globale pour faire un backup horaire pour tous les domaines.
+
+        :return:
+        """
+        commande_backup = {
+            ConstantesBackup.LIBELLE_HEURE: datetime.datetime.utcnow() - datetime.timedelta(hours=1),
+            ConstantesBackup.CHAMP_UUID_RAPPORT: str(uuid1())
+        }
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande_backup,
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL,
+            exchange=Constantes.SECURITE_PROTEGE
+        )
 
 
 class ProcessusAjouterCatalogueHoraire(MGProcessusTransaction):
