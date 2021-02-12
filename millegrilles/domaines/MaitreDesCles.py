@@ -316,7 +316,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
         enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
-        fingerprint_courant = 'sha256_b64:' + enveloppe.fingerprint_b64
+        fingerprint_courant = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
         cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
         if cle_secrete_cryptee is not None:
             # On peut decoder la cle secrete
@@ -512,8 +512,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             cle_secrete = self.decrypter_cle(document_cle['cles'])
             if cle_secrete is None:
                 self._logger.debug("Cle non dechiffrable : "
-                                   "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES])
-                return {Constantes.SECURITE_LIBELLE_REPONSE: ConstantesMaitreDesCles.REQUETE_CLES_NON_DECHIFFRABLES}
+                                   "%s" % str(evenement))
+                return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INDECHIFFRABLE}
             cle_secrete_reencryptee, fingerprint = self.crypter_cle(cle_secrete, enveloppe_rechiffrage.certificat)
 
             cles[hachage_bytes] = {
@@ -823,7 +823,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
             transaction = {
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64: 'sha256_b64:' + fp,
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT: fingerprint_hex,
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: message_dict[
                     Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: message_dict[
@@ -948,7 +947,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 self._logger.debug("Ajouter cle %s dans document %s" % (
                     fingerprint, identificateur_document))
                 enveloppe_backup = dict_certs[fingerprint]
-                fingerprint_backup_b64 = enveloppe_backup.fingerprint_b64
+                fingerprint_backup_b64 = enveloppe_backup.fingerprint_sha256_b64
 
                 try:
                     # Type EnveloppeCertificat
