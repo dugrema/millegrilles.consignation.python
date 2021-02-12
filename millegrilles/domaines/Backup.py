@@ -975,11 +975,10 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         try:
             domaine = domaines[idx_pki]
         except IndexError:
-            # Termine
-            domaine_action_regenerer = 'commande.%s' % '.'.join([
-                Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
-            self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_transactions_cles.__name__)
-            self.ajouter_commande_a_transmettre(domaine_action_regenerer, dict(), blocking=False)
+            # Termine, inserer une commande de marqueur pour etre notifie des que les transactions sont sauvegardees
+            domaine_action_marqueur = Constantes.TRANSACTION_ROUTING_MARQUER_FIN
+            self.set_etape_suivante(ProcessusRestaurerCatalogues.regenerer_pki.__name__)
+            self.ajouter_commande_a_transmettre(domaine_action_marqueur, dict(), blocking=True)
             return
 
         self.traiter_transactions(self.controleur.configuration, domaine)
@@ -988,6 +987,12 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         return {
             'idx_pki': idx_pki+1,
         }
+
+    def regenerer_pki(self):
+        domaine_action_regenerer = 'commande.%s' % '.'.join([
+            Constantes.ConstantesPki.DOMAINE_NOM, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
+        self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_transactions_cles.__name__)
+        self.ajouter_commande_a_transmettre(domaine_action_regenerer, dict(), blocking=True)
 
     def boucle_transactions_cles(self):
         """
@@ -1001,10 +1006,9 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
             domaine = domaines[idx_maitredescles]
         except IndexError:
             # Termine
-            domaine_action_regener = 'commande.%s' % '.'.join([
-                Constantes.ConstantesMaitreDesCles.DOMAINE_NOM, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
-            self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_catalogues_domaines.__name__)
-            self.ajouter_commande_a_transmettre(domaine_action_regener, dict(), blocking=False)
+            domaine_action_marqueur = Constantes.TRANSACTION_ROUTING_MARQUER_FIN
+            self.set_etape_suivante(ProcessusRestaurerCatalogues.regenerer_cles.__name__)
+            self.ajouter_commande_a_transmettre(domaine_action_marqueur, dict(), blocking=True)
             return
 
         self.traiter_transactions(self.controleur.configuration, domaine)
@@ -1013,6 +1017,13 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
         return {
             'idx_maitredescles': idx_maitredescles + 1,
         }
+
+    def regenerer_cles(self):
+        domaine_action_regener = 'commande.%s' % '.'.join([
+            Constantes.ConstantesMaitreDesCles.DOMAINE_NOM, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
+        self.set_etape_suivante(ProcessusRestaurerCatalogues.boucle_catalogues_domaines.__name__)
+        self.ajouter_commande_a_transmettre(domaine_action_regener, dict(), blocking=True)
+        return
 
     def boucle_catalogues_domaines(self):
         domaines = self.parametres['domaines']

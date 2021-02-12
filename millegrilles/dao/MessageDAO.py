@@ -498,7 +498,7 @@ class PikaDAO:
             self.__channel_consumer,
             exchange_protege,
             self.queuename_nouvelles_transactions(),
-            None,
+            [Constantes.TRANSACTION_ROUTING_MARQUER_FIN],
             queue_durable=True,
             arguments={'x-queue-mode': 'lazy'},
         ))
@@ -509,6 +509,7 @@ class PikaDAO:
             self.queuename_nouvelles_transactions(),
             [
                 Constantes.TRANSACTION_ROUTING_RESTAURER_COMMUN,
+                Constantes.TRANSACTION_ROUTING_MARQUER_FIN,
             ],
             queue_durable=True,
             arguments={'x-queue-mode': 'lazy'},

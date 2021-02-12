@@ -1160,7 +1160,7 @@ class MGProcessus:
                         self.controleur.generateur_transactions.transmettre_commande(
                             message['contenu'], message['domaine'],
                             correlation_id=str(self.document_processus['_id']),
-                            reply_to='%s.processus' % self.controleur.gestionnaire.get_nom_queue()
+                            reply_to='%s.evenements' % self.controleur.gestionnaire.get_nom_queue()
                         )
                         if message.get('blocking') and self._requete is None:
                             self._commande_blocking = message['domaine']

@@ -165,6 +165,9 @@ class ConsignateurTransactionCallback(BaseCallback):
                 self.traiter_restauration_transaction(message_dict)
             except Exception as e:
                 self._logger.exception("Erreur traitement transaction")
+        elif routing_key == Constantes.TRANSACTION_ROUTING_MARQUER_FIN:
+            # Marque la fin d'une operation (e.g. restauration) - repondre a l'emetteur que le marqueur a ete lu
+            self.repondre_marqueur(message_dict, routing_key, properties)
         else:
             raise ValueError("Type d'operation inconnue %s: %s" % (routing_key, str(message_dict)))
 
@@ -225,6 +228,23 @@ class ConsignateurTransactionCallback(BaseCallback):
             )
             message_traceback = traceback.format_exc()
             self.traiter_erreur_persistance(message_dict, e, message_traceback)
+
+    def repondre_marqueur(self, message_dict: dict, routing_key, properties):
+        """
+        Repondre a l'emetteur que le marqueur d'operation a ete lu
+        :param message_dict:
+        :param properties:
+        :return:
+        """
+        reponse = {
+            'routing_key': routing_key,
+            'marqueur': message_dict,
+        }
+        self.contexte.generateur_transactions.transmettre_reponse(
+            reponse,
+            replying_to=properties.reply_to,
+            correlation_id=properties.correlation_id,
+        )
 
     def traiter_erreur_persistance(self, dict_message, error, message_traceback):
         document_staging = {
