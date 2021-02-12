@@ -1148,8 +1148,12 @@ class ProcessusRestaurerCatalogues(MGProcessusTransaction):
             fingerprint = catalogue['certificats_millegrille'][0]
             fingerprint = fingerprint.split(':')[-1]  # Retirer prefixe sha256_b64: - Sera corrige avec le multihash
         else:
-            raise NotImplementedError("Plusieurs certificats de millegrille dans le catalogue, "
-                                      "il faut trouver le bon - TODO")
+            # raise NotImplementedError("Plusieurs certificats de millegrille dans le catalogue, "
+            #                           "il faut trouver le bon")
+            certificats_pem = catalogue['certificats_pem']
+            certs = [EnveloppeCertificat(certificat_pem=certificats_pem[c]) for c in certificats_millegrilles if c in certificats_pem.keys()]
+            idmg = self.controleur.configuration.idmg
+            fingerprint = [c for c in certs if c.idmg == idmg][0].fingerprint_sha256_b64
 
         commande = {
             'domaine': ConstantesBackup.DOMAINE_NOM,
