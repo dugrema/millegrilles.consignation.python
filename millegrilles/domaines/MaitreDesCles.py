@@ -566,7 +566,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
         # Ajouter fingerprint du maitre des cles local
         # fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
-        fingerprint_b64_local = self._contexte.signateur_transactions.enveloppe_certificat_courant.fingerprint_b64
+        fingerprint_b64_local = self._contexte.signateur_transactions.enveloppe_certificat_courant.fingerprint_sha256_b64
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
@@ -579,7 +579,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
-            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_b64
+            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_sha256_b64
 
         collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
@@ -610,7 +610,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Ajouter fingerprint du maitre des cles local
         # fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
         enveloppe_certificat_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
-        fingerprint_b64_local = enveloppe_certificat_courant.fingerprint_b64
+        fingerprint_b64_local = enveloppe_certificat_courant.fingerprint_sha256_b64
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
@@ -623,7 +623,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
-            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_b64
+            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_sha256_b64
 
         collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
@@ -935,8 +935,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         enveloppe_maitredescles = self._contexte.signateur_transactions.enveloppe_certificat_courant
         clecert_maitredescles = EnveloppeCleCert(cert=enveloppe_maitredescles.certificat)
         dict_certs = self.get_certificats_backup.copy()
-        dict_certs[clecert_maitredescles.fingerprint_b64] = clecert_maitredescles
-        cles_connues = list(dict_certs.keys())
+        dict_certs[clecert_maitredescles.fingerprint_sha256_b64] = clecert_maitredescles
+        cles_connues = ['sha256_b64:' + c for c in list(dict_certs.keys())]
         cles_documents = list(document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].keys())
 
         # Parcourir
@@ -978,11 +978,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 if sujet:
                     transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
 
-                domaine_action = [
+                domaine_action = '.'.join([
                     ConstantesMaitreDesCles.DOMAINE_NOM,
                     fingerprint_hex,
                     ConstantesMaitreDesCles.TRANSACTION_CLE
-                ]
+                ])
 
                 # Soumettre la transaction immediatement
                 # Permet de fonctionner incrementalement si le nombre de cles est tres grand
@@ -1121,9 +1121,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             contenu_on_insert['non_dechiffrable'] = True
 
+        hachage_sha256 = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64]
+        if hachage_sha256.find(':') < 0:
+            hachage_sha256 = 'sha256_b64:' + hachage_sha256
+
         champ_cles = '.'.join([
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES,
-            transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64]
+            hachage_sha256
         ])
         set_ops[champ_cles] = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLE_INDIVIDUELLE]
 
