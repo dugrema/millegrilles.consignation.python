@@ -233,7 +233,7 @@ class HandlerBackupDomaine:
             # Progress update - debut backup horaire
             self.transmettre_evenement_backup(uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_HORAIRE_DEBUT, debut_backup)
 
-            sousgroupes = self.preparer_sousgroupes_horaires(heure)
+            sousgroupes = self.preparer_sousgroupes_horaires(heure, snapshot)
 
             heure_plus_vieille = None
 

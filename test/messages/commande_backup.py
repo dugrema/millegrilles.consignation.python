@@ -103,8 +103,8 @@ class MessagesSample(BaseCallback):
         domaines = [
             # ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE.replace('_DOMAINE_', 'Annuaire'),
             # 'commande.Backup.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            # 'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
-            'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            'commande.GrosFichiers.%s' % ConstantesDomaines.COMMANDE_REGENERER,
+            # 'commande.MaitreDesCles.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Parametres.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.Pki.%s' % ConstantesDomaines.COMMANDE_REGENERER,
             # 'commande.millegrilles.domaines.Plume.%s' % ConstantesDomaines.COMMANDE_REGENERER,
@@ -207,7 +207,7 @@ class MessagesSample(BaseCallback):
         }
         self._contexte.generateur_transactions.transmettre_commande(
             commande_backup_snapshot,
-            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.replace('_DOMAINE_', 'global'),
+            ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT_GLOBAL,
             exchange=Constantes.DEFAUT_MQ_EXCHANGE_NOEUDS,
             reply_to=self.queue_name,
             correlation_id='trigger_backup_snapshot'

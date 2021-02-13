@@ -1505,7 +1505,23 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         self.__handler_backup.creer_backup_annuel(self.get_nom_domaine(), annee, uuid_rapport)
 
     def declencher_backup_snapshot(self, declencheur: dict):
+        # domaine = self.get_nom_domaine()
+        # self.__logger.info("Declencher backup snapshot pour domaine %s" % domaine)
+        # routing = domaine
+        # nom_module = 'millegrilles_Domaines'
+        # nom_classe = 'BackupSnapshot'
+        # processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
+        #
+        # parametres = {
+        # }
+        #
+        # self.demarrer_processus(processus, parametres)
+
+        # Verifier qu'on ne demande pas un backup de l'heure courante
+        uuid_rapport = declencheur[ConstantesBackup.CHAMP_UUID_RAPPORT]
+
         domaine = self.get_nom_domaine()
+
         self.__logger.info("Declencher backup snapshot pour domaine %s" % domaine)
         routing = domaine
         nom_module = 'millegrilles_Domaines'
@@ -1513,6 +1529,7 @@ class GestionnaireDomaineStandard(GestionnaireDomaine):
         processus = "%s:%s:%s" % (routing, nom_module, nom_classe)
 
         parametres = {
+            ConstantesBackup.CHAMP_UUID_RAPPORT: uuid_rapport,
         }
 
         self.demarrer_processus(processus, parametres)
@@ -1960,30 +1977,16 @@ class BackupHoraire(MGProcessus):
 
     def initiale(self):
         self.__logger.info("Processus backup horaire demarre, %s" % str(self.parametres))
-
-        # # Charger l'information du backup horaire precedent pour creer une chaine
-        # requete = {
-        #     ConstantesBackup.LIBELLE_DOMAINE: self.controleur.gestionnaire.get_nom_domaine(),
-        # }
-        # self.set_requete(ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE, requete)
-        #
-        # self.set_etape_suivante(BackupHoraire.requete_cles_backup.__name__)
-
-    # def requete_cles_backup(self):
         domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         self.set_requete(domaine_action, dict())
         self.set_etape_suivante(BackupHoraire.executer_backup.__name__)
 
     def executer_backup(self):
-        heure = pytz.utc.localize(self.parametres[ConstantesBackup.LIBELLE_HEURE])
         uuid_rapport = self.parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
-        gestionnaire = self.controleur.gestionnaire
-
-        # entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
-
-        # self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
-
         info_cles = self.parametres['reponse'][0]
+        heure = pytz.utc.localize(self.parametres[ConstantesBackup.LIBELLE_HEURE])
+
+        gestionnaire = self.controleur.gestionnaire
         gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, heure, info_cles)
 
         self.set_etape_suivante()  # Termine
@@ -1999,33 +2002,17 @@ class BackupSnapshot(MGProcessus):
 
     def initiale(self):
         self.__logger.info("Processus backup snapshot demarre, %s" % str(self.parametres))
-
-        # # Charger l'information du backup horaire precedent pour creer une chaine
-        # requete = {
-        #     ConstantesBackup.LIBELLE_DOMAINE: self.controleur.gestionnaire.get_nom_domaine(),
-        # }
-        # self.set_requete(ConstantesBackup.REQUETE_BACKUP_DERNIERHORAIRE, requete)
-        #
-        # self.set_etape_suivante(BackupHoraire.requete_cles_backup.__name__)
-
-    # def requete_cles_backup(self):
         domaine_action = Constantes.ConstantesMaitreDesCles.DOMAINE_NOM + '.' + Constantes.ConstantesMaitreDesCles.REQUETE_CERT_MAITREDESCLES
         self.set_requete(domaine_action, dict())
         self.set_etape_suivante(BackupHoraire.executer_backup.__name__)
 
     def executer_backup(self):
+        uuid_rapport = self.parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
         gestionnaire = self.controleur.gestionnaire
-        parametres = self.parametres
-        uuid_rapport = parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        info_cles = self.parametres['reponse'][0]
 
-        # entete_dernier_backup = self.parametres['reponse'][0]['dernier_backup']
-
-        # self.__logger.info("Reponse requete : %s" % str(entete_dernier_backup))
-
-        info_cles = parametres['reponse'][0]
         date_courante = datetime.datetime.utcnow()
-        # heure_backup = datetime.datetime(
-        #     year=date_courante.year, month=date_courante.month, day=date_courante.day, hour=date_courante.hour)
+
         gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True)
 
         self.set_etape_suivante()  # Termine

@@ -1385,6 +1385,7 @@ class ConstantesBackup:
     COMMANDE_BACKUP_ANNUEL = 'commande.backup.genererBackupAnnuel'
 
     COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL = 'commande.global.declencherBackupHoraire'
+    COMMANDE_BACKUP_DECLENCHER_SNAPSHOT_GLOBAL = 'commande.global.declencherBackupSnapshot'
     COMMANDE_BACKUP_RESET_GLOBAL = 'commande.global.resetBackup'
     COMMANDE_BACKUP_DECLENCHER_HORAIRE = 'commande._DOMAINE_.declencherBackupHoraire'
     COMMANDE_BACKUP_DECLENCHER_QUOTIDIEN = 'commande._DOMAINE_.declencherBackupQuotidien'
