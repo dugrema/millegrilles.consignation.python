@@ -375,6 +375,16 @@ class MessagesSample(BaseCallback):
             correlation_id='test'
         )
 
+    def commande_restaurer_transactions(self):
+        commande = {}
+        self._contexte.generateur_transactions.transmettre_commande(
+            commande,
+            'commande.Backup.' + ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS,
+            exchange=Constantes.SECURITE_PROTEGE,
+            reply_to=self.queue_name,
+            correlation_id='test'
+        )
+
     def executer(self):
         # sample.requete_backup_dernierhoraire()
         # sample.commande_regenerer()
@@ -416,7 +426,8 @@ class MessagesSample(BaseCallback):
         # sample.commande_verifier_domaine('MaitreDesCles.5d541b783539eb95e465d941d03df36d38c761c5')
         # sample.commande_verifier_domaine('Topologie')
 
-        sample.commande_preparer_restauration()
+        # sample.commande_preparer_restauration()
+        sample.commande_restaurer_transactions()
 
 
 # --- MAIN ---

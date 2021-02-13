@@ -1392,7 +1392,6 @@ class ConstantesBackup:
     COMMANDE_BACKUP_DECLENCHER_SNAPSHOT = 'commande._DOMAINE_.declencherBackupSnapshot'
 
     COMMANDE_BACKUP_PREPARER_RESTAURATION = 'preparerStagingRestauration'
-
     COMMANDE_BACKUP_RESTAURER_TRANSACTIONS = 'restaurerTransactions'
 
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM

@@ -1361,7 +1361,7 @@ class ArchivesBackupParser:
         self.__thread: Optional[Thread] = None
         self.__tar_stream: Optional[tarfile.TarFile] = None
         self.__reponse_cle: Optional[dict] = None
-        self.__cle_iv_transactions: Optional[dict] = None
+        self.__cle_iv_transactions: Optional[dict] = dict()
 
         self.__handler_messages = ReceptionMessage(self, contexte.message_dao, contexte.configuration)
         self.__handler_certificats = HandlerCertificatsCatalogue()
@@ -1381,14 +1381,15 @@ class ArchivesBackupParser:
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
-    def start(self, stream, path_output: str = None) -> Event:
+    def start(self, stream = None, path_output: str = None) -> Event:
         """
         Demarre execution
         :return: Event qui est set() a la fin de l'execution
         """
         self.__path_output = path_output
-        wrapper = WrapperDownload(stream)
-        self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
+        if stream is not None:
+            wrapper = WrapperDownload(stream)
+            self.__tar_stream = tarfile.open(fileobj=wrapper, mode='r|', debug=3, errorlevel=3)
 
         self.__thread = Thread(name="ArchivesBackupParser", target=self.parse_tar_stream, daemon=True)
         if self.__nom_queue is None:
@@ -1438,10 +1439,8 @@ class ArchivesBackupParser:
             if message_dict['acces'] != '1.permis':
                 self.__logger.warning("Erreur acces cle %s" % message_dict)
             else:
-                self.__cle_iv_transactions = {
-                    'cle': message_dict['cle'],
-                    'iv': message_dict['iv'],
-                }
+                # Ajouter les cles pour toutes les reponses (par hachage_bytes)
+                self.__cle_iv_transactions.update(message_dict['cles'])
         finally:
             self.__event_attente_reponse.set()
 
@@ -1518,7 +1517,7 @@ class ArchivesBackupParser:
 
     def _process_archive_horaire_catalogue(self, nom_fichier: str, file_object):
         # self.__logger.debug("Catalogue horaire")
-        catalogue_json = self._extract_catalogue(nom_fichier, file_object)
+        catalogue_json = self.extract_catalogue(nom_fichier, file_object)
         self.__logger.debug("Catalogue horaire : %s" % catalogue_json)
         generateur = self.__contexte.generateur_transactions
         generateur.emettre_message(catalogue_json, 'commande.transaction.restaurerTransaction', exchanges=[Constantes.SECURITE_SECURE])
@@ -1526,19 +1525,19 @@ class ArchivesBackupParser:
 
     def _process_archive_horaire_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions horaire")
-        self._extract_transaction(nom_fichier, file_object)
+        self.extract_transaction(nom_fichier, file_object)
 
     def _process_archive_snapshot_catalogue(self, nom_fichier: str, file_object):
         # self.__logger.debug("Catalogue snapshot")
-        catalogue_json = self._extract_catalogue(nom_fichier, file_object)
+        catalogue_json = self.extract_catalogue(nom_fichier, file_object)
         self.__logger.debug("Catalogue snapshot : %s" % catalogue_json)
         self._catalogue_horaire_courant = catalogue_json
 
     def _process_archive_snapshot_transaction(self, nom_fichier: str, file_object):
         self.__logger.debug("Transactions snapshot")
-        self._extract_transaction(nom_fichier, file_object)
+        self.extract_transaction(nom_fichier, file_object)
 
-    def _extract_catalogue(self, nom_fichier, file_object):
+    def extract_catalogue(self, nom_fichier, file_object):
         try:
             lzma_file_object = LZMAFile(file_object)
             archive_json = json.load(lzma_file_object)
@@ -1546,11 +1545,13 @@ class ArchivesBackupParser:
             domaine = archive_json.get('domaine')
             self.callback_catalogue(domaine, archive_json)
 
+            self._catalogue_horaire_courant = archive_json
+
             return archive_json
         except json.decoder.JSONDecodeError:
             self.__logger.warning("Erreur traitement catalogue %s" % nom_fichier)
 
-    def _extract_transaction(self, nom_fichier, file_object):
+    def extract_transaction(self, nom_fichier, file_object):
         self.__logger.debug("Extract transactions %s", nom_fichier)
         catalogue = self._catalogue_horaire_courant
         domaine = catalogue['domaine']
@@ -1563,8 +1564,15 @@ class ArchivesBackupParser:
                 internal_file_object = None
 
                 try:
-                    iv = b64decode(self.__cle_iv_transactions['iv'].encode('utf-8'))
-                    cle = self.__cle_iv_transactions['cle']
+                    hachage_bytes = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
+                    cle_iv = self.__cle_iv_transactions[hachage_bytes]
+                    del self.__cle_iv_transactions[hachage_bytes]  # Nettoyer dictionnaire
+                except (KeyError, TypeError):
+                    self.__logger.warning("Fichier transaction %s, cle non dechiffrable" % nom_fichier)
+                    self.__rapport_restauration.incrementer_indechiffrables(domaine)
+                else:
+                    iv = b64decode(cle_iv['iv'].encode('utf-8'))
+                    cle = cle_iv['cle']
 
                     cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
                     decipher = CipherMsg1Dechiffrer(iv, cle_dechiffree)
@@ -1572,10 +1580,6 @@ class ArchivesBackupParser:
 
                     # Wrapper le stream dans un decodeur lzma
                     internal_file_object = stream
-
-                except (KeyError, TypeError):
-                    self.__logger.warning("Fichier transaction, cle non dechiffrable")
-                    self.__rapport_restauration.incrementer_indechiffrables(domaine)
 
             else:
                 # Note : pas de dechiffrage, juste le calcul du digest
@@ -1664,9 +1668,12 @@ class ArchivesBackupParser:
             # Ignorer la demande, on ne dechiffre pas les transactions
             return
 
+        if self.__nom_queue is None:
+            raise Exception("Erreur - Q de reception est None")
+
         # Effacer la reponse de la demande precedente, resetter event d'attente
         self.__reponse_cle = None
-        self.__cle_iv_transactions = None
+        self.__cle_iv_transactions.clear()  # Nettoyage cles
         self.__event_attente_reponse.clear()
 
         # Produire la requete, include la cle/iv du catalogue pour dechiffrage en ligne si possible

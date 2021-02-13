@@ -49,6 +49,10 @@ class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
 
 class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
 
+    def __init__(self, gestionnaire_domaine):
+        super().__init__(gestionnaire_domaine)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def traiter_requete(self, ch, method, properties, body, message_dict):
         # domaine_routing_key = method.routing_key.replace('requete.%s.' % ConstantesMaitreDesCles.DOMAINE_NOM, '')
 
@@ -67,7 +71,10 @@ class TraitementRequetesMaitreDesClesProtegees(TraitementRequetesProtegees):
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
         if reponse is not None:
-            self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            try:
+                self.transmettre_reponse(message_dict, reponse, properties.reply_to, properties.correlation_id)
+            except Exception:
+                self._logger.exception("Erreur transmission reponse %s" % reponse)
 
 
 class TraitementCommandesMaitreDesClesProtegees(TraitementCommandesProtegees):
