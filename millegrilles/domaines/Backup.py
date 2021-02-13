@@ -1387,7 +1387,25 @@ class ProcessusRestaurerDomaines(ProcessusRestauration):
         # Charger et traiter les transactions
         self.traiter_transactions(configuration, domaine)
 
+        # Inserer marqueur de fin de restauration - attendre reponse (blocking) avant regeneration
+        domaine_action_marqueur = Constantes.TRANSACTION_ROUTING_MARQUER_FIN
+        self.set_etape_suivante(ProcessusPreparerRestauration.regenerer_cles.__name__)
+        self.ajouter_commande_a_transmettre(domaine_action_marqueur, dict(), blocking=True)
+
+        self.set_etape_suivante(ProcessusRestaurerDomaines.prochain_domaine.__name__)
+
+    def prochain_domaine(self):
+        domaines = self.parametres['domaines']
+        idx_domaine = self.parametres['idx_domaine']
+        domaine = domaines[idx_domaine]
+
+        # Transmettre commande pour regenerer transactions - va etre bloquante avant de laisser la
+        # prochaine restauration de transactions commencer
+        domaine_action_regener = 'commande.%s' % '.'.join([domaine, Constantes.ConstantesDomaines.COMMANDE_REGENERER])
+        self.ajouter_commande_a_transmettre(domaine_action_regener, dict())
+
         self.set_etape_suivante(ProcessusRestaurerDomaines.boucle_restauration_domaines.__name__)
+
         return {
             'idx_domaine': idx_domaine + 1,
         }
