@@ -1273,7 +1273,8 @@ class HandlerBackupApplication:
             fichiers = self._preparer_transactions_backup(catalogue_backup, transaction_maitredescles)
             fichiers_temporaire.extend(fichiers.values())
             self._put_backup(nom_application, fichiers, path_archive)
-
+        except requests.exceptions.RequestException:
+            self.__logger.exception("Erreur PUT backup application %s" % nom_application)
         finally:
             # Supprimer les archives
             for fichier in fichiers_temporaire:
@@ -1318,6 +1319,8 @@ class HandlerBackupApplication:
         if r.status_code == 200:
             self.transmettre_evenement_backup(
                 ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_UPLOAD_CONFIRME, nom_application)
+        else:
+            self.__logger.error("Error PUT backup application: %d" % r.status_code)
 
         self.transmettre_evenement_backup(
             ConstantesBackup.EVENEMENT_BACKUP_APPLICATION_TERMINE, nom_application)

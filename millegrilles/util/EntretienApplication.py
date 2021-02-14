@@ -81,8 +81,10 @@ class BackupApplication(ModeleConfiguration):
         self.upload()
 
     def upload(self):
+        self.__logger.info("Upload fichier backup application")
         handler_backup = HandlerBackupApplication(self.contexte)
         handler_backup.upload_backup(self.__catalogue_backup, self.__transaction_maitredescles, self.__path_output)
+        self.__logger.info("Fin upload fichier backup application")
 
     def charger_environnement(self):
         app_config_path = environ['CONFIG_APP']
