@@ -13,12 +13,14 @@ from base64 import b64decode
 from io import BytesIO
 
 from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguration
-from millegrilles.util.BackupModule import BackupUtil
+from millegrilles.util.BackupModule import BackupUtil, HandlerBackupApplication
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles import Constantes
 
 
 class BackupApplication(ModeleConfiguration):
+
+    FORMAT_HEURE = '%Y%m%d%H%M'
 
     def __init__(self):
         super().__init__()
@@ -74,6 +76,7 @@ class BackupApplication(ModeleConfiguration):
         self.__cipher.close()
 
         self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = self.__cipher.digest
+        self.__transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = self.__cipher.digest
 
         self.upload()
 
@@ -101,7 +104,7 @@ class BackupApplication(ModeleConfiguration):
         makedirs(self.__path_backup, exist_ok=True)
 
     def preparer_catalogue(self):
-        date_formattee = datetime.datetime.utcnow().strftime('%Y%m%d%H%M')
+        date_formattee = datetime.datetime.utcnow().strftime(BackupApplication.FORMAT_HEURE)
         nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs1' % (self.__nom_application, date_formattee)
         nom_fichier_catalogue = 'application_%s_catalogue_%s.json' % (self.__nom_application, date_formattee)
 
@@ -121,8 +124,10 @@ class BackupApplication(ModeleConfiguration):
         # Creer un fichier .tar.xz.mgs1 pour streamer le backup
         self.__output_stream = open(self.__path_output, 'wb')
 
+        heure = datetime.datetime.utcnow().strftime(BackupApplication.FORMAT_HEURE)
         cipher, transaction_maitredescles = self.__backup_util.preparer_cipher(
-            self.__catalogue_backup, cles_chiffrage, nom_application=self.__nom_application,
+            self.__catalogue_backup, cles_chiffrage, heure,
+            nom_application=self.__nom_application,
             output_stream=self.__output_stream
         )
 

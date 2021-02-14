@@ -972,7 +972,7 @@ class ProcessusAjouterCatalogueApplication(MGProcessusTransaction):
                 },
                 "cles": cles,
                 "iv": iv,
-                'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION,
+                'domaine_action_transaction': Constantes.ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE,
                 'securite': transaction[Constantes.DOCUMENT_INFODOC_SECURITE],
             }
 
