@@ -38,7 +38,7 @@ class MessagesSample(BaseCallback):
         self.cert_maitredescles_recu = Event()
 
         self.mot_de_passe = 'sjdpo-1824-JWAZ'
-        self.noeud_id = 'a1199776-264f-4525-9f10-6eb02332f9e1'
+        self.noeud_id = 'd495a462-e138-4112-9099-1e655458e14d'
 
         # Charger cert MaitreDesCles pour pouvoir crypter contenu a transmettre
         with open('/home/mathieu/mgdev/certs/pki.maitrecles.cert', 'rb') as certificat_pem:
