@@ -16,6 +16,7 @@ from millegrilles.util.UtilScriptLigneCommandeMessages import ModeleConfiguratio
 from millegrilles.util.BackupModule import BackupUtil, WrapperDownload
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles import Constantes
+from millegrilles.Constantes import ConstantesMaitreDesCles, ConstantesBackup
 from millegrilles.util.Chiffrage import CipherMsg1Dechiffrer, DecipherStream
 
 
@@ -104,8 +105,6 @@ class RestaurerApplication(ModeleConfiguration):
         )
 
         archive_hachage = r.headers.get('archive_hachage')
-        archive_nomfichier = r.headers.get('archive_nomfichier')
-        archive_epoch = r.headers.get('estampille')
         cle_header = r.headers.get('cle')
         iv_header = r.headers.get('iv')
 
@@ -113,17 +112,22 @@ class RestaurerApplication(ModeleConfiguration):
         chaine_certs = contexte.signateur_transactions.chaine_certs
         requete = {
             'certificat': chaine_certs,
-            'identificateurs_document': {
-                'archive_nomfichier': archive_nomfichier,
-            },
 
             # Ajouter params pour recuperation de la cle
-            'cle': cle_header, 'iv': iv_header, 'domaine': 'Applications',
+            ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLE: cle_header,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv_header,
+
+            # Info pour trouver la cle
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesBackup.DOMAINE_NOM,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES: [archive_hachage],
         }
         resultat_cle = self.__handler_requetes.requete(
-            'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE_BACKUP, requete)
-        cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(resultat_cle['cle'])
-        decipher = CipherMsg1Dechiffrer(b64decode(resultat_cle['iv']), cle_dechiffree)
+            'MaitreDesCles.' + Constantes.ConstantesMaitreDesCles.REQUETE_DECHIFFRAGE, requete)
+        if resultat_cle['acces'] != '1.permis':
+            raise Exception("Acces refuse a la cle pour le backup d'application %s: %s" % (self.__nom_application, resultat_cle))
+        cle = resultat_cle['cles'][archive_hachage]
+        cle_dechiffree = contexte.signateur_transactions.dechiffrage_asymmetrique(cle['cle'])
+        decipher = CipherMsg1Dechiffrer(b64decode(cle['iv']), cle_dechiffree)
 
         wrapper = WrapperDownload(r.iter_content(chunk_size=10 * 1024))
         decipher_stream = DecipherStream(decipher, wrapper)
@@ -165,6 +169,7 @@ class RestaurerApplication(ModeleConfiguration):
     #     subprocess.run(commande_backup, stdout=sys.stdout, check=True)
 
     def extraire_archive(self, decipher_stream):
+        self.__logger.debug("Extraction de l'archive vers %s" % self.__path_output)
         with lzma.open(decipher_stream, 'r') as xz:
             with tarfile.open(fileobj=xz, mode='r|') as tar:
                 tar.extractall(self.__path_output)
