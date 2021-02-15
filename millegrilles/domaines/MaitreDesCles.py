@@ -536,6 +536,29 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if len(cles) == 0:
             self._logger.debug("Le dechiffrage n'a pas trouve de cle correspondant a : "
                                "%s" % evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES])
+            cle_fournie = evenement.get('cle')
+            if cle_fournie and len(evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES]) == 1:
+                domaine = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
+                hachage_bytes = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES][0]
+                iv = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV]
+                self._logger.info("On insere la cle dans le maitre des cles pour permettre un rechiffrage subsequent de la cle %s, %s" % (domaine, hachage_bytes))
+
+                fingerprint_millegrille = self.configuration.certificat_millegrille.fingerprint_sha256_b64
+
+                information_cle = {
+                    Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {
+                        'adhoc': True,
+                    },
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+                    "cles": {
+                        fingerprint_millegrille: cle_fournie,
+                    },
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv,
+                }
+
+                self.sauvegarder_cle(information_cle)
+
             return {Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_CLE_INCONNUE}
 
         cles_trouvees = cles.keys()
@@ -796,7 +819,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     #         'fullchain': clecert.chaine,
     #     }
 
-    def sauvegarder_cle(self, message_dict: dict, properties):
+    def sauvegarder_cle(self, message_dict: dict, properties=None):
         """
         Sauvegarder une cle. Genere les transactions manquantes au besoin.
         :param message_dict:
@@ -848,11 +871,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 ConstantesMaitreDesCles.TRANSACTION_CLE,
             ])
 
+            reply_to = None
+            correlation_id = None
+            if properties is not None:
+                reply_to = properties.reply_to
+                correlation_id = properties.correlation_id
+
             # Soumettre transaction - utiliser reply_to et correlation de l'appeleur
             # Va faire transmettre la confirmation de transactions a l'appeleur
             self.generateur_transactions.soumettre_transaction(
                 transaction, domaine_action_transaction,
-                reply_to=properties.reply_to, correlation_id=properties.correlation_id
+                reply_to=reply_to, correlation_id=correlation_id
             )
 
         # Pas de retour de valeur - on laisse les transactions retourner les confirmations

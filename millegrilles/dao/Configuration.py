@@ -111,6 +111,7 @@ class TransactionConfiguration:
 
         # Cle et certificat du module
         self.__cle: Optional[EnveloppeCleCert] = None
+        self.__certificat_millegrille: Optional[EnveloppeCleCert] = None
 
         self._backup_workdir: Optional[str] = None
 
@@ -187,6 +188,13 @@ class TransactionConfiguration:
                     clecert.cert_from_pem_bytes(pem)
 
                 self.__cle = clecert
+
+                if clecert.chaine is not None:
+                    pem_millegrille = clecert.chaine[-1].encode('utf-8')
+                    clecert_millegrille = EnveloppeCleCert()
+                    clecert_millegrille.cert_from_pem_bytes(pem_millegrille)
+                    self.__certificat_millegrille = clecert_millegrille
+
 
         self.__logger.info("Configuration MQ: host: %s, port: %s" % (self.mq_host, self.mq_port))
         self.__logger.info("Configuration Mongo: host: %s, port: %s" % (self.mongo_host, self.mongo_port))
@@ -481,6 +489,10 @@ class TransactionConfiguration:
     @cle.setter
     def cle(self, cle: EnveloppeCleCert):
         self.__cle = cle
+
+    @property
+    def certificat_millegrille(self) -> EnveloppeCleCert:
+        return self.__certificat_millegrille
 
 
 class ContexteRessourcesMilleGrilles:
