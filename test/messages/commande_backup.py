@@ -426,8 +426,8 @@ class MessagesSample(BaseCallback):
         # sample.commande_verifier_domaine('MaitreDesCles.5d541b783539eb95e465d941d03df36d38c761c5')
         # sample.commande_verifier_domaine('Topologie')
 
-        # sample.commande_preparer_restauration()
-        sample.commande_restaurer_transactions()
+        sample.commande_preparer_restauration()
+        # sample.commande_restaurer_transactions()
 
 
 # --- MAIN ---

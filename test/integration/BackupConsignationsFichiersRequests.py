@@ -150,6 +150,17 @@ class GetCommands(DomaineTest):
 
         return r
 
+    def head(self, requete, data: dict = None):
+        r = requests.head(
+            '%s/backup/%s' % (self.url_consignationfichiers, requete),
+            data=data,
+            verify=self._contexte.configuration.mq_cafile,
+            cert=(self.certfile, self.keyfile),
+            timeout=1,
+        )
+
+        return r
+
     def get_listedomaines(self):
         try:
             r = self.get('listedomaines')
@@ -182,19 +193,37 @@ class GetCommands(DomaineTest):
         content = r.content
         self.__logger.debug("Taille contenu fichier : %d" % len(content))
 
+    def get_listeapplications(self):
+        try:
+            r = self.get('listeapplications')
+            applications = r.json()['applications']
+            self.__logger.debug("Resultat get_listeapplications : %d\n%s" % (r.status_code, applications))
+        except requests.exceptions.RequestException:
+            self.__logger.exception("Timeout")
+
+    def head_application(self):
+        application = 'TestApp'
+        try:
+            r = self.head('application/%s' % application)
+            self.__logger.debug("Resultat head_application : %d\n%s" % (r.status_code, r.headers))
+        except requests.exceptions.RequestException:
+            self.__logger.exception("Timeout")
+
     def executer(self):
         self.__logger.debug("Executer")
         try:
             # self.get_listedomaines()
             # self.get_catalogues()
-            self.get_catalogues("Backup")
-            self.get_catalogues("MaitreDesCles")
-            self.get_catalogues("GrosFichiers")
+            # self.get_catalogues("Backup")
+            # self.get_catalogues("MaitreDesCles")
+            # self.get_catalogues("GrosFichiers")
             # self.get_liste_fichiers("sample5")
             # self.get_liste_fichiers("MaitreDesComptes")
             # self.get_fichier()
             # self.get_fichier('sample4', 'domaine.test_2020.tar')
             # self.get_fichier('mathieu.main', 'snapshot/test.txt')
+            # self.get_listeapplications()
+            self.head_application()
         except:
             self.__logger.exception("Erreur")
         finally:

@@ -7,7 +7,7 @@ from lzma import LZMAFile
 from uuid import uuid1
 
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesBackup
+from millegrilles.Constantes import ConstantesBackup, ConstantesMaitreDesCles
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, \
     TraitementMessageDomaine, TraitementMessageDomaineRequete, TraitementMessageDomaineCommande
 from millegrilles.MGProcessus import MGProcessusTransaction
@@ -442,6 +442,13 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             self.__logger.exception("Erreur demande liste de domaines pour la restauration")
             return {'err': str(re)}
 
+        # Faire la liste des applications a restaurer (optionnel
+        try:
+            applications = self.get_liste_applications()
+        except requests.exceptions.RequestException as re:
+            self.__logger.exception("Erreur demande liste de domaines pour la restauration")
+            applications = None
+
         # Utiliser uuid_transaction de la commande comme collateur pour cette restauration
         uuid_restauration = message_dict[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
             Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
@@ -449,6 +456,7 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
 
         parametres_processus = {
             'domaines': domaines,
+            'applications': applications,
             'uuid_restauration': uuid_restauration,
             'debut_restauration': debut_restauration,
         }
@@ -511,6 +519,24 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
         contenu_reponse = reponse.json()
         domaines = contenu_reponse['domaines']
         return domaines
+
+    def get_liste_applications(self):
+        url_liste_applications = 'https://%s:%s/backup/listeapplications' % (
+            self.configuration.serveur_consignationfichiers_host,
+            self.configuration.serveur_consignationfichiers_port)
+        mq_certfile = self._contexte.configuration.mq_certfile
+        mq_keyfile = self._contexte.configuration.mq_keyfile
+        mq_cafile = self._contexte.configuration.mq_cafile
+        reponse = requests.get(
+            url_liste_applications,
+            verify=mq_cafile,
+            cert=(mq_certfile, mq_keyfile),
+            timeout=2,
+        )
+        # On a recu la reponse, demarrer un processus de restauration
+        contenu_reponse = reponse.json()
+        applications = contenu_reponse['applications']
+        return applications
 
     def transmettre_commande_backup_horaire(self):
         """
@@ -1257,6 +1283,7 @@ class ProcessusPreparerRestauration(ProcessusRestauration):
             'idx_catalogue': 0,
             'idx_pki': 0,
             'idx_maitredescles': 0,
+            'idx_application': 0,
         }
 
     def boucle_transactions_pki(self):
@@ -1328,7 +1355,7 @@ class ProcessusPreparerRestauration(ProcessusRestauration):
             domaine = domaines[idx_catalogue]
         except IndexError:
             # Termine
-            self.set_etape_suivante(ProcessusPreparerRestauration.completer_preparation.__name__)
+            self.set_etape_suivante(ProcessusPreparerRestauration.boucle_catalogue_application.__name__)
             return
 
         self.__logger.debug("Extraction catalogues domaine : %s", domaine)
@@ -1343,9 +1370,64 @@ class ProcessusPreparerRestauration(ProcessusRestauration):
             'idx_catalogue': idx_catalogue + 1,
         }
 
+    def boucle_catalogue_application(self):
+        applications = self.parametres.get('applications')
+        idx_application = self.parametres['idx_application']
+
+        try:
+            application = applications[idx_application]
+        except (AttributeError, KeyError, IndexError):
+            self.set_etape_suivante(ProcessusPreparerRestauration.completer_preparation.__name__)
+            return
+
+        self._extraire_catalogue_application(application)
+
+        self.set_etape_suivante(ProcessusPreparerRestauration.boucle_catalogue_application.__name__)
+        return {
+            'idx_application': idx_application + 1,
+            'application': application
+        }
+
     def completer_preparation(self):
         self.__logger.debug("Terminer preparation restauration")
         self.set_etape_suivante()  # Termine
+
+    def _extraire_catalogue_application(self, application: str):
+        configuration = self.controleur.configuration
+        url_liste_domaines = 'https://%s:%s/backup/application/%s' % (
+            configuration.serveur_consignationfichiers_host, configuration.serveur_consignationfichiers_port, application)
+        mq_certfile = configuration.mq_certfile
+        mq_keyfile = configuration.mq_keyfile
+        mq_cafile = configuration.mq_cafile
+
+        # Demander headers uniquement - va retourner l'information du catalogue sans contenu de l'archive de backup
+        reponse = requests.head(
+            url_liste_domaines,
+            verify=mq_cafile,
+            cert=(mq_certfile, mq_keyfile),
+            timeout=3,
+        )
+
+        headers = reponse.headers
+
+        self.__logger.debug(
+            "Resultat application %s : %d\nHeaders: %s" % (application, reponse.status_code, headers))
+
+        iv = headers['iv']
+        cle = headers['cle']
+        fingerprint = self.controleur.configuration.certificat_millegrille.fingerprint_sha256_b64
+        hachage_bytes = headers['archive_hachage']
+
+        info_cle = {
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: ConstantesBackup.DOMAINE_NOM,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: {'adhoc': True},
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
+            "cles": {fingerprint: cle},
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: iv,
+        }
+        domaine_action = '.'.join(['commande', ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE])
+
+        self.ajouter_commande_a_transmettre(domaine_action, info_cle)
 
 
 class ProcessusRestaurerDomaines(ProcessusRestauration):
@@ -1411,5 +1493,5 @@ class ProcessusRestaurerDomaines(ProcessusRestauration):
         }
 
     def completer_restauration(self):
-
         self.set_etape_suivante()  # Termine
+
