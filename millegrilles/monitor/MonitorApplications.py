@@ -3,30 +3,24 @@ import logging
 import docker
 import json
 import secrets
-import os
-import tempfile
 import tarfile
 import io
-import requests
-import tempfile
-import lzma
 
-from io import BytesIO
 from typing import Optional
 from threading import Event
 from typing import cast
 from base64 import b64encode, b64decode
 from os import path
 from docker.errors import APIError
-from docker.types import SecretReference, NetworkAttachmentConfig, Resources, RestartPolicy, ServiceMode, \
-    ConfigReference, EndpointSpec, Mount
+from docker.types import SecretReference, RestartPolicy, ConfigReference
 
 from millegrilles import Constantes
-from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, GestionnaireImagesServices
+from millegrilles.monitor.MonitorDocker import GestionnaireModulesDocker, GestionnaireImagesDocker, \
+    GestionnaireImagesServices
 from millegrilles.monitor.MonitorConstantes import CommandeMonitor, ExceptionExecution, PkiCleNonTrouvee
 from millegrilles.util.X509Certificate import ConstantesGenerateurCertificat
 from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
-from millegrilles.util.Chiffrage import CipherMsg1Dechiffrer, DecipherStream
+
 
 class GestionnaireApplications:
     """
@@ -199,15 +193,15 @@ class GestionnaireApplications:
         reponse_info = dict()
         try:
             applications = list()
-            try:
-                # Transmettre reponse pour indiquer commande recue
-                mq_properties = commande.mq_properties
-                reply_to = mq_properties.reply_to
-                correlation_id = mq_properties.correlation_id
-                reponse = {'ok': True}
-                self.__service_monitor.generateur_transactions.transmettre_reponse(
-                    reponse, replying_to=reply_to, correlation_id=correlation_id)
+            # Transmettre reponse pour indiquer commande recue
+            mq_properties = commande.mq_properties
+            reply_to = mq_properties.reply_to
+            correlation_id = mq_properties.correlation_id
+            reponse = {'ok': True}
+            self.__service_monitor.generateur_transactions.transmettre_reponse(
+                reponse, replying_to=reply_to, correlation_id=correlation_id)
 
+            try:
                 nom_image_docker = commande.contenu['nom_application']
                 configuration_docker = commande.contenu.get('configuration')
                 applications.append({'nom_application': nom_image_docker, 'configuration': configuration_docker})

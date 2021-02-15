@@ -143,8 +143,10 @@ class GestionnaireCommandes:
             elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_SUPPRIMER_APPLICATION:
                 reponse = self._service_monitor.gestionnaire_applications.supprimer_application(commande)
 
+            elif nom_commande == Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION:
+                self._service_monitor.gestionnaire_applications.backup_application(commande)
+
             elif nom_commande in [
-                Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
                 Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_SNAPSHOT.split('.')[-1],
                 Constantes.ConstantesBackup.COMMANDE_BACKUP_DECLENCHER_HORAIRE_GLOBAL.split('.')[-1]
             ]:

@@ -73,8 +73,8 @@ class MessagesSample(BaseCallback):
 
     def backup_application(self):
         commande = {
-            'nom_application': 'redmine_mariadb',
-            # 'nom_application': 'blynk',
+            # 'nom_application': 'redmine_mariadb',
+            'nom_application': 'blynk',
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
             self.noeud_id, Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION)
@@ -107,7 +107,8 @@ class MessagesSample(BaseCallback):
 
     def restore_application(self):
         commande = {
-            'nom_application': 'redmine_mariadb',
+            # 'nom_application': 'redmine_mariadb',
+            'nom_application': 'blynk',
         }
         domaineAction = 'commande.servicemonitor.%s.%s' % (
             self.noeud_id, Constantes.ConstantesServiceMonitor.COMMANDE_RESTORE_APPLICATION)
@@ -125,6 +126,7 @@ class MessagesSample(BaseCallback):
 
     def executer(self):
         # self.backup_application()
+        # self.backup_applications()
         self.restore_application()
 
 
