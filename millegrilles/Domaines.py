@@ -1989,6 +1989,23 @@ class BackupHoraire(MGProcessus):
         gestionnaire = self.controleur.gestionnaire
         gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, heure, info_cles)
 
+        self.set_etape_suivante(BackupHoraire.executer_snapshot.__name__)
+
+        return dict()
+
+    def executer_snapshot(self):
+        """
+        Optionnel, fait un backup snapshot de toutes les transactions qui n'ont pas ete inclues dans le backup horaire
+        :return:
+        """
+        uuid_rapport = self.parametres[ConstantesBackup.CHAMP_UUID_RAPPORT]
+        gestionnaire = self.controleur.gestionnaire
+        info_cles = self.parametres['reponse'][0]
+
+        date_courante = datetime.datetime.utcnow()
+
+        gestionnaire.handler_backup.backup_horaire_domaine(uuid_rapport, date_courante, info_cles, snapshot=True)
+
         self.set_etape_suivante()  # Termine
 
         return dict()
