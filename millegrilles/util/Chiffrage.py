@@ -154,10 +154,13 @@ class CipherMsg1Dechiffrer(CipherMgs1):
     Helper pour dechiffrer en format MilleGrilles (mgs1)
     """
 
-    def __init__(self, iv: bytes, password: bytes):
+    def __init__(self, iv: bytes, password: bytes, padding=True):
         super().__init__()
         self.__skip_iv = True
-        self.__unpadder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).unpadder()
+        if padding:
+            self.__unpadder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).unpadder()
+        else:
+            self.__unpadder = None
 
         self._iv = iv
         self._password = password
@@ -169,7 +172,9 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         self.__skip_iv = True
 
     def update(self, data: bytes):
-        data = self.__unpadder.update(self._context.update(data))
+        data = self._context.update(data)
+        if self.__unpadder:
+            data = self.__unpadder.update(data)
         if self.__skip_iv:
             self.__skip_iv = False
             iv_dechiffre = data[:16]
@@ -179,8 +184,10 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         return data
 
     def finalize(self):
-        data = self.__unpadder.update(self._context.finalize())
-        data = data + self.__unpadder.finalize()
+        data = self._context.finalize()
+        if self.__unpadder is not None:
+            data = self.__unpadder.update(data)
+            data = data + self.__unpadder.finalize()
         return data
 
     @staticmethod
@@ -200,6 +207,17 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         )
 
         return contenu_dechiffre
+
+
+class CipherMsg2Dechiffrer(CipherMsg1Dechiffrer):
+
+    def __init__(self, iv: bytes, password: bytes, compute_tag: bytes):
+        self._compute_tag = compute_tag
+        super().__init__(iv, password, padding=False)
+
+    def _ouvrir_cipher(self):
+        backend = default_backend()
+        self._cipher = Cipher(algorithms.AES(self._password), modes.GCM(self._iv, self._compute_tag), backend=backend)
 
 
 class DigestStream(RawIOBase):

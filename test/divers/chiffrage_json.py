@@ -6,7 +6,7 @@ from base64 import b64encode, b64decode
 
 # from millegrilles.util.BaseTestMessages import DomaineTest
 # from millegrilles.SecuritePKI import SignateurTransaction
-from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer
+from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg2Dechiffrer
 
 # cle_secrete = secrets.token_bytes(32)
 # cle_secrete_b64 = base64.b64encode(cle_secrete).decode('utf-8')
@@ -31,9 +31,10 @@ class TestChiffrage:
         self.contenu = None
 
         self.contenu = {
-            "contenu_chiffre": "P5at2Zq8yCFwM0H8nKLWP2c+QbOBIIRsskwC93mOC/I=",
-            "iv": "HCDLdt3GF9cNj6twdsV5+g==",
-            "cle_secrete": "MmUwNWZmNjkwYTZhYTczOWE4MzE2YWMzMDAyZWQ4YzM3NDNhN2Q5OTk4NjI5NmIxZmNhMzg5YjVmODlkODcwYg==",
+            "contenu_chiffre": "AWfkRhmWpd72QSPDv3Hs9fkr4ja4NA4DE0cC4KUracovDBCrOiqf4KhsZ5nKJMrPv2kwoavFQJBR",
+            "iv": "SeAwHmHq+Ai4g6Mqkpf1gg==",
+            "cle_secrete": "NDUyMDcwNjA1YTRiZmRmYTE5ZDIwNDllNWEzNjk0MTg4YjBlZTQ3YjMwNmFiNDI3ZGIyYzI1ODc1ODZiNDNjNQ==",
+            "compute_tag": "1qixY0o+GF+XdF92pSEArQ==",
         }
 
         self.contenu_dechiffre = None
@@ -54,6 +55,7 @@ class TestChiffrage:
     def dechiffrer_contenu(self):
 
         iv = b64decode(self.contenu['iv'].encode('utf-8'))
+        compute_tag = b64decode(self.contenu['compute_tag'].encode('utf-8'))
 
         cle_secrete = b64decode(self.contenu['cle_secrete'].encode('utf-8'))
         # Unhexlify
@@ -62,21 +64,21 @@ class TestChiffrage:
         except Exception:
             self.__logger.info("Cle pas en format hex")
 
-        decipher = CipherMsg1Dechiffrer(iv, cle_secrete)
+        decipher = CipherMsg2Dechiffrer(iv, cle_secrete, compute_tag)
         contenu = decipher.update(b64decode(self.contenu['contenu_chiffre'].encode('utf-8'))) + decipher.finalize()
 
-        iv_dechiffre = contenu[0:16]
-        print("IV dechiffre : %s" % b64encode(iv_dechiffre))
-        if iv_dechiffre != iv:
-            raise Exception("IV!")
-        self.contenu_dechiffre = contenu[16:].decode('utf-8')
+        # iv_dechiffre = contenu[0:16]
+        # print("IV dechiffre : %s" % b64encode(iv_dechiffre))
+        #if iv_dechiffre != iv:
+        #    raise Exception("IV!")
+        self.contenu_dechiffre = contenu.decode('utf-8')
 
         print("Contenu dechiffre : %s" % self.contenu_dechiffre)
 
     def executer(self):
         self.__logger.debug("Executer")
-        self.chiffrer_contenu()
-        # self.dechiffrer_contenu()
+        # self.chiffrer_contenu()
+        self.dechiffrer_contenu()
 
 
 # --- MAIN ---
