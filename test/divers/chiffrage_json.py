@@ -1,12 +1,12 @@
 # Test chiffrage et dechiffrage JSON
 import logging
-import secrets
+import json
 import binascii
 from base64 import b64encode, b64decode
 
 # from millegrilles.util.BaseTestMessages import DomaineTest
 # from millegrilles.SecuritePKI import SignateurTransaction
-from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg2Dechiffrer
+from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer
 
 # cle_secrete = secrets.token_bytes(32)
 # cle_secrete_b64 = base64.b64encode(cle_secrete).decode('utf-8')
@@ -40,17 +40,19 @@ class TestChiffrage:
         self.contenu_dechiffre = None
 
     def chiffrer_contenu(self):
-        cipher = CipherMsg1Chiffrer()
+        cipher = CipherMsg2Chiffrer()
         valeur_init = cipher.start_encrypt()
         contenu_chiffre = valeur_init + cipher.update(self.contenu_original['secret'].encode('utf-8')) + cipher.finalize()
+        compute_tag = cipher.tag
 
         self.contenu = {
             "contenu_chiffre": b64encode(contenu_chiffre).decode('utf-8'),
             "iv": b64encode(cipher.iv).decode('utf-8'),
             "cle_secrete": b64encode(binascii.hexlify(cipher.password)).decode('utf-8'),
+            "compute_tag": b64encode(compute_tag).decode('utf-8'),
         }
 
-        print('Contenu chiffre : %s' % str(self.contenu))
+        print('Contenu chiffre : %s' % json.dumps(self.contenu, indent=2))
 
     def dechiffrer_contenu(self):
 
@@ -77,8 +79,8 @@ class TestChiffrage:
 
     def executer(self):
         self.__logger.debug("Executer")
-        # self.chiffrer_contenu()
-        self.dechiffrer_contenu()
+        self.chiffrer_contenu()
+        # self.dechiffrer_contenu()
 
 
 # --- MAIN ---

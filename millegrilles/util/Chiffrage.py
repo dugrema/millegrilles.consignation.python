@@ -58,7 +58,7 @@ class CipherMsg1Chiffrer(CipherMgs1):
     Helper method : chiffrer_motdepasse pour chiffrer le secret avec la cle publique (cert)
     """
 
-    def __init__(self, output_stream=None):
+    def __init__(self, output_stream=None, padding=True):
         """
         :param output_stream: Optionnel - permet d'utiliser le cipher comme stream (fileobj)
         """
@@ -66,6 +66,7 @@ class CipherMsg1Chiffrer(CipherMgs1):
         self.__output_stream = output_stream
         self.__padder: Optional[padding.PaddingContext] = None
         self.__generer()
+        self.__padding = padding
         self._ouvrir_cipher()
 
         if output_stream:
@@ -80,9 +81,12 @@ class CipherMsg1Chiffrer(CipherMgs1):
             raise Exception('Contexte cipher deja initialise')
 
         self._context = self._cipher.encryptor()
-        self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
+        if self.__padding is True:
+            self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
+            data = self._context.update(self.__padder.update(self._iv))
+        else:
+            data = self._context.update(self._iv)
 
-        data = self._context.update(self.__padder.update(self._iv))
         self._digest.update(data)
 
         if self.__output_stream is not None:
@@ -91,17 +95,25 @@ class CipherMsg1Chiffrer(CipherMgs1):
         return data
 
     def update(self, data: bytes):
-        data = self._context.update(self.__padder.update(data))
+        if self.__padder is not None:
+            data = self.__padder.update(data)
+
+        data = self._context.update(data)
         self._digest.update(data)
 
         return data
 
     def finalize(self):
-        data = self._context.update(self.__padder.finalize())
+        if self.__padder is not None:
+            data = self._context.update(self.__padder.finalize())
+        else:
+            data = bytes()
+
         data_final = data + self._context.finalize()
 
         if data_final is not None:
             self._digest.update(data_final)
+
         self._digest_result = self._digest.finalize()
 
         return data_final
@@ -209,7 +221,35 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         return contenu_dechiffre
 
 
+class CipherMsg2Chiffrer(CipherMsg1Chiffrer):
+    """
+    Chiffrage avec GCM, tag de 128 bits
+    """
+
+    def __init__(self, output_stream=None):
+        super().__init__(output_stream, padding=False)
+
+    def _ouvrir_cipher(self):
+        backend = default_backend()
+        self._cipher = Cipher(algorithms.AES(self._password), modes.GCM(self._iv), backend=backend)
+
+    def finalize(self):
+        data = super().finalize()
+
+        return data
+
+    @property
+    def tag(self):
+        """
+        :return: Compute tag necessaire pour verifier le dechiffrage
+        """
+        return self._context.tag
+
+
 class CipherMsg2Dechiffrer(CipherMsg1Dechiffrer):
+    """
+    Dechiffrage avec GCM, tag de 128 bits
+    """
 
     def __init__(self, iv: bytes, password: bytes, compute_tag: bytes):
         self._compute_tag = compute_tag
