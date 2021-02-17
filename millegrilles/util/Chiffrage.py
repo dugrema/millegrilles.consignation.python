@@ -82,10 +82,13 @@ class CipherMsg1Chiffrer(CipherMgs1):
 
         self._context = self._cipher.encryptor()
         if self.__padding is True:
+            # On assume mode CBC avec padding, IV requis
             self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
             data = self._context.update(self.__padder.update(self._iv))
+            data = bytes()
         else:
-            data = self._context.update(self._iv)
+            # Le IV n'est pas nessaire dans un mode sans padding (e.g. GCM)
+            data = bytes()
 
         self._digest.update(data)
 
@@ -168,7 +171,6 @@ class CipherMsg1Dechiffrer(CipherMgs1):
 
     def __init__(self, iv: bytes, password: bytes, padding=True):
         super().__init__()
-        self.__skip_iv = True
         if padding:
             self.__unpadder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).unpadder()
         else:
@@ -181,7 +183,11 @@ class CipherMsg1Dechiffrer(CipherMgs1):
 
     def __start_decrypt(self):
         self._context = self._cipher.decryptor()
-        self.__skip_iv = True
+        if self.__unpadder is not None:
+            self.__skip_iv = True
+        else:
+            # On assume mode sans besoin de prepend IV (e.g. GCM)
+            self.__skip_iv = False
 
     def update(self, data: bytes):
         data = self._context.update(data)

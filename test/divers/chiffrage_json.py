@@ -31,10 +31,10 @@ class TestChiffrage:
         self.contenu = None
 
         self.contenu = {
-            "contenu_chiffre": "AWfkRhmWpd72QSPDv3Hs9fkr4ja4NA4DE0cC4KUracovDBCrOiqf4KhsZ5nKJMrPv2kwoavFQJBR",
-            "iv": "SeAwHmHq+Ai4g6Mqkpf1gg==",
-            "cle_secrete": "NDUyMDcwNjA1YTRiZmRmYTE5ZDIwNDllNWEzNjk0MTg4YjBlZTQ3YjMwNmFiNDI3ZGIyYzI1ODc1ODZiNDNjNQ==",
-            "compute_tag": "1qixY0o+GF+XdF92pSEArQ==",
+            "contenu_chiffre": "d6b/7n5Usob5wE0oxu6nk50WSpQJ1t3qrzHhnF2fSz8g",
+            "iv": "C2h0U93HJ7a8b5d1WUmWtw==",
+            "cle_secrete": "MGY1MzQyMWJlZDc4NGFjNDJlZGEyMzIyY2JmODM4Mzg4NTdiNTE2NTg0NDk1ODA0YTRlOTE4YmJiNzJjMmVjMg==",
+            "compute_tag": "iQ8psN9J1mVAzlzeMgQsrg==",
         }
 
         self.contenu_dechiffre = None
@@ -79,8 +79,8 @@ class TestChiffrage:
 
     def executer(self):
         self.__logger.debug("Executer")
-        self.chiffrer_contenu()
-        # self.dechiffrer_contenu()
+        # self.chiffrer_contenu()
+        self.dechiffrer_contenu()
 
 
 # --- MAIN ---
