@@ -1,8 +1,8 @@
 import json
 import datetime
 import codecs
-import math
-from json.encoder import encode_basestring_ascii, encode_basestring, INFINITY, c_make_encoder, _make_iterencode
+# import math
+# from json.encoder import encode_basestring_ascii, encode_basestring, INFINITY, c_make_encoder, _make_iterencode
 
 
 class DateFormatEncoder(json.JSONEncoder):
