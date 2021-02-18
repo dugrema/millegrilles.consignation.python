@@ -20,8 +20,11 @@ class IdmgUtil:
     """
 
     # Version courante de IDMG
-    VERSION_ACTIVE = 1
-    VERSION_PACK = {1: {'header': '=BI'}}
+    VERSION_ACTIVE = 2
+    VERSION_PACK = {
+        1: '=B28sI',
+        2: {'header': '=BI'}
+    }
 
     ENCODING = 'base58btc'
     HASH_FUNCTION = 'sha2-256'
@@ -77,20 +80,33 @@ def verifier_idmg(idmg: str, certificat_pem: str):
     """
     # Extraire la version
     # valeur = base58.b58decode(idmg)
-    valeur = multibase.decode(idmg)
+    try:
+        valeur = multibase.decode(idmg)
+    except ValueError:
+        # Probablement version 1 sans multibase
+        # Tenter d'extraire directement en base58
+        valeur = base58.b58decode(idmg)
+
     version = int(valeur[0])
 
     version_info = IdmgUtil.VERSION_PACK[version]
-    header_struct = version_info['header']
 
-    header_size = struct.Struct(header_struct).size
-    (version, date_exp_int_recu) = struct.unpack(header_struct, valeur[0:header_size])
-    mh_bytes = valeur[header_size:]
-
-    mh = multihash.decode(mh_bytes)
-    hashing_code = mh.code
-    hashing_function = map_code_to_hashes(hashing_code)
-    digest_recu = mh.digest
+    if version == 1:
+        # Version 1 - 33 bytes en base58, hachage SHA512_224
+        (version, digest_recu, date_exp_int_recu) = struct.unpack(version_info, valeur)
+        hashing_function = hashes.SHA512_224()
+    elif version == 2:
+        # Version 2 - encodage multibase, 5 bytes header + multihash
+        header_struct = version_info['header']
+        header_size = struct.Struct(header_struct).size
+        (version, date_exp_int_recu) = struct.unpack(header_struct, valeur[0:header_size])
+        mh_bytes = valeur[header_size:]
+        mh = multihash.decode(mh_bytes)
+        hashing_code = mh.code
+        hashing_function = map_code_to_hashes(hashing_code)
+        digest_recu = mh.digest
+    else:
+        raise IdmgInvalide("Version non supportee : %d" % version)
 
     cert_x509 = x509.load_pem_x509_certificate(certificat_pem.encode('utf-8'), default_backend())
     digest_fingerprint_calcule = cert_x509.fingerprint(hashing_function)

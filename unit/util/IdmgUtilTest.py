@@ -14,9 +14,10 @@ logging.getLogger('millegrilles').setLevel(logging.DEBUG)
 
 class IdmgUtilTest(TestCase):
 
-    SAMPLE_IDMG_1 = "zhNmDkHqvrHpk15RninDob9WJApPfBtVXJWjty8x2buXcdttWg4PN"
-    SAMPLE_IDMG_1_BLAKE2s = "zEZaD2K7EdL9LBngY1V28AaUzdHz9exWt4HpBBLZ8VZqWm2TPZsqWQjn"
-    SAMPLE_IDMG_1_BLAKE2b = "z52fL6uhxXDMFNESkcGKe1vJGUE1TLSpmXTzdBvDj6GxE8bPi2pZyHMXi5K6pcpFMmmGeGb5sJifpdhvrZwjM2pNHFs7R7fq8rv5"
+    SAMPLE_VIEUX_IDMG = "QLA8z7SaLx4ZFTyRbUdPiejojm5hUfqxcPRcwsuiVR8T"
+    SAMPLE_IDMG_1 = "z2MFCe7c6DfeMwTYpSJBGRPhiyt3peu1ucycDGDReGJQTpidp4ABPi"
+    SAMPLE_IDMG_1_BLAKE2s = "zTHLGoJhFmyaCaqeMN16oZw3VY6YyhZpX3B65yPTPFfvStfyKmbY4eNQ"
+    SAMPLE_IDMG_1_BLAKE2b = "z8opdm3zQFJzU1FtdXL9RTP5JzXXVYeNSME4XVH2FPh8kYwyMzW8eCNgF6EsSPtBsJWT1zKWPcWAV4qTdR3V3ArHWYb5zP2M3bi1"
     SAMPLE_CERT_1 = """
 -----BEGIN CERTIFICATE-----
 MIIDJzCCAg+gAwIBAgIJh4hTAQFkKTIAMA0GCSqGSIb3DQEBDQUAMCcxDzANBgNV
@@ -70,3 +71,7 @@ CbpFuvHsuGMpL1Eg+nqDyn7z4GjAsjxu5UrCTlzXkUXyvGUcZ87zWFJo7ftG4EyM
 
     def test_verifier_idmg_mismatch(self):
         self.assertRaises(ValueError, verifier_idmg, 'IDMG dummy', IdmgUtilTest.SAMPLE_CERT_1)
+
+    def test_verifier_format_1(self):
+        verifier_idmg(IdmgUtilTest.SAMPLE_VIEUX_IDMG, IdmgUtilTest.SAMPLE_CERT_1)
+
