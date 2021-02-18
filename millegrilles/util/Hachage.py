@@ -13,8 +13,18 @@ from typing import Union, Optional
 
 
 class Hacheur:
+    """
+    Hacheur qui supporte verification de hachage de streams (via update).
+    """
 
     def __init__(self, hashing_code: Union[int, str] = 'sha2-512', encoding: str = 'base58btc'):
+        """
+        :param hashing_code: int ou str de l'algorithme de hachage, e.g. sha2-256, BLAKE2s-256
+                             Voir multihash.constantes.HASH_TABLE pour valeurs supportees.
+        :param encoding: Encoding du multibase, e.g. base58btc
+                         Voir multibase.ENCODINGS pour valeurs supportees.
+        """
+
         self.__encoding = encoding
 
         if isinstance(hashing_code, str):
@@ -32,12 +42,20 @@ class Hacheur:
         self.__hashing_context.update(data)
 
     def digest(self):
+        """
+        Calcule le digest
+        :return: Digest en bytes
+        """
         if self.__digest is None:
             self.__digest = self.__hashing_context.finalize()
             self.__hashing_context = None
         return self.__digest
 
     def finalize(self):
+        """
+        Calcule le digest et retourne le multibase encode
+        :return: str Multibase encode
+        """
         digest = self.digest()
         mh = multihash.encode(digest, self.__hashing_code)
         mb = multibase.encode(self.__encoding, mh)
@@ -47,6 +65,9 @@ class Hacheur:
 class VerificateurHachage:
 
     def __init__(self, hachage_multibase: str):
+        """
+        :param hachage_multibase: Hachage a verifier
+        """
         self.__hachage_multibase = hachage_multibase
 
         mb = multibase.decode(hachage_multibase)
@@ -65,12 +86,21 @@ class VerificateurHachage:
         self.__hashing_context.update(data)
 
     def digest(self) -> bytes:
+        """
+        Calcule le digest
+        :return: Digest en bytes
+        """
         if self.__hachage_calcule is None:
             self.__hachage_calcule = self.__hashing_context.finalize()
             self.__hashing_context = None
         return self.__hachage_calcule
 
     def verify(self) -> bool:
+        """
+        Calcule le digest
+        :return: True si le hachage calcule correspond a celui fourni.
+        :raises ErreurHachage: Si le digest calcule ne correspond pas au hachage fourni
+        """
         hachage_calcule = self.digest()
         if hachage_calcule != self.__hachage_recu:
             raise ErreurHachage("Hachage different")
@@ -79,6 +109,14 @@ class VerificateurHachage:
 
 
 def hacher_to_digest(valeur: Union[bytes, str], hashing_code: Union[int, str] = 'sha2-512') -> bytes:
+    """
+    Calcule un hachage en format multibase
+    :param valeur: Valeur a hacher
+    :param hashing_code: int ou str de l'algorithme de hachage, e.g. sha2-256, BLAKE2s-256
+                         Voir multihash.constantes.HASH_TABLE pour valeurs supportees.
+    :return: bytes Digest calcule
+    """
+
     if isinstance(hashing_code, str):
         hashing_code = HASH_CODES[hashing_code]
 
@@ -97,15 +135,32 @@ def hacher_to_digest(valeur: Union[bytes, str], hashing_code: Union[int, str] = 
     return digest
 
 
-def hacher(valeur: Union[bytes, str], hash_name: str = 'sha2-512', encoding: str = 'base58btc') -> str:
-    digest = hacher_to_digest(valeur, hash_name)
-    hashing_code = HASH_CODES[hash_name]
+def hacher(valeur: Union[bytes, str], hashing_code: Union[int, str] = 'sha2-512', encoding: str = 'base58btc') -> str:
+    """
+    Calcule le hachage et retourne la valeur multibase
+    :param valeur: Valeur a hacher
+    :param hashing_code: int ou str de l'algorithme de hachage, e.g. sha2-256, BLAKE2s-256
+                         Voir multihash.constantes.HASH_TABLE pour valeurs supportees.
+    :param encoding: Encoding du multibase, e.g. base58btc
+                     Voir multibase.ENCODINGS pour valeurs supportees.
+    :return:
+    """
+    digest = hacher_to_digest(valeur, hashing_code)
+    if isinstance(hashing_code, str):
+        hashing_code = HASH_CODES[hashing_code]
     mh = multihash.encode(digest, hashing_code)
     mb = multibase.encode(encoding, mh)
     return mb.decode('utf-8')
 
 
 def verifier_hachage(hachage_multibase: str, valeur: Union[bytes, str]) -> bool:
+    """
+
+    :param hachage_multibase: Hachage a verifier
+    :param valeur: Valeur a hacher pour la verification
+    :return: True si le hachage calcule correspond a celui fourni.
+    :raises ErreurHachage: Si le digest calcule ne correspond pas au hachage fourni
+    """
     mb = multibase.decode(hachage_multibase)
     mh = multihash.decode(mb)
     hachage_recu = mh.digest
@@ -120,6 +175,12 @@ def verifier_hachage(hachage_multibase: str, valeur: Union[bytes, str]) -> bool:
 
 
 def map_code_to_hashes(code: int) -> hashes.HashAlgorithm:
+    """
+    Fait correspondre un code multihash a un algorithme de hachage Cryptography
+    :param code: Code d'algorithme multihash
+    :return: HashAlgorithm correspondant au code multihash
+    """
+
     if code == 0x12:
         return hashes.SHA256()
     if code == 0x13:
