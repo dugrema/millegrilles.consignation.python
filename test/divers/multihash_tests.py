@@ -84,8 +84,8 @@ class MultihashTest:
         self.verifier_multihash(encodage, b'un test')
         print("Encodage = %s" % encodage)
 
-        encodage_multibase = self.encoder_multihash_multibase(b'un test')
-        encodage_multibase_sha512 = self.encoder_multihash_multibase(b'un test', HASH_CODES['sha2-512'])
+        encodage_multibase = self.encoder_multihash_multibase(b'Ceci est un test dadada')
+        encodage_multibase_sha512 = self.encoder_multihash_multibase(b'Ceci est un test dadada', HASH_CODES['sha2-512'])
         encodage_multibase_blake2s = self.encoder_multihash_multibase(b'un test', HASH_CODES['blake2s-256'])
         encodage_multibase_blake2b = self.encoder_multihash_multibase(b'un test', HASH_CODES['blake2b-512'])
 
