@@ -33,7 +33,7 @@ class IdmgUtil:
         pass
 
     def encoder_idmg(self, certificat_pem: str, version=VERSION_ACTIVE):
-        return encoder_idmg_cert(certificat_pem, version)
+        return encoder_idmg(certificat_pem, version)
 
     def encoder_idmg_cert(self, cert_x509: x509, version=VERSION_ACTIVE):
         return encoder_idmg_cert(cert_x509, version)
