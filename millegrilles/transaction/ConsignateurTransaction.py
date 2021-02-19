@@ -378,7 +378,7 @@ class ConsignateurTransactionCallback(BaseCallback):
             'commande', ConstantesPki.DOMAINE_NOM, ConstantesPki.COMMANDE_SAUVEGADER_CERTIFICAT])
 
         commande = {
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: enveloppe_cert_inclus.fingerprint_sha256_b64,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: enveloppe_cert_inclus.fingerprint,
             ConstantesSecurityPki.LIBELLE_CHAINE_PEM: certs,
         }
 
@@ -418,7 +418,7 @@ class ConsignateurTransactionCallback(BaseCallback):
 
             self.__emettre_chaine(certificat_inclus)
         except KeyError:
-            pass  #OK
+            pass  # OK
 
         # Ajouter la date de restauration
         evenements = enveloppe_transaction.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EVENEMENT)
