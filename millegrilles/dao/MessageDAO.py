@@ -1765,7 +1765,7 @@ class CertificatInconnu(Exception):
             self.__fingerprint.index(':')
         except ValueError:
             # Ajouter le type de hachage
-            self.__fingerprint = 'sha256_b64:' + self.__fingerprint
+            self.__fingerprint = self.__fingerprint
 
     @property
     def fingerprint(self):

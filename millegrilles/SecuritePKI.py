@@ -979,7 +979,7 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
         signateur_transactions.emettre_certificat()
 
         enveloppe = signateur_transactions.enveloppe_certificat_courant
-        fingerprint = enveloppe.fingerprint_sha256_b64
+        fingerprint = enveloppe.fingerprint
         routing_key = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_REQUETE, fingerprint)
 
         exchange_defaut = self.configuration.exchange_defaut

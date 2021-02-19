@@ -1106,7 +1106,7 @@ class ProcessusRestauration(MGProcessusTransaction):
             certificats_pem = catalogue['certificats_pem']
             certs = [EnveloppeCertificat(certificat_pem=certificats_pem[c]) for c in certificats_millegrilles if c in certificats_pem.keys()]
             idmg = self.controleur.configuration.idmg
-            fingerprint = [c for c in certs if c.idmg == idmg][0].fingerprint_sha256_b64
+            fingerprint = [c for c in certs if c.idmg == idmg][0].fingerprint
 
         commande = {
             'domaine': ConstantesBackup.DOMAINE_NOM,
@@ -1266,7 +1266,7 @@ class ProcessusPreparerRestauration(ProcessusRestauration):
         # Utilise pour retransmettre la cle de dechiffrage des fichiers de transaction
         with open(self.controleur.configuration.mq_cafile, 'r') as fichier:
             enveloppe_millegrille = EnveloppeCertificat(certificat_pem=fichier.read())
-        fingerprint_millegrille = enveloppe_millegrille.fingerprint_sha256_b64
+        fingerprint_millegrille = enveloppe_millegrille.fingerprint
 
         # Extraire liste des domaines Pki et MaitreDesCles pour charger ces transactions
         # en premier (elles ne sont pas chiffrees)
@@ -1415,7 +1415,7 @@ class ProcessusPreparerRestauration(ProcessusRestauration):
 
         iv = headers['iv']
         cle = headers['cle']
-        fingerprint = self.controleur.configuration.certificat_millegrille.fingerprint_sha256_b64
+        fingerprint = self.controleur.configuration.certificat_millegrille.fingerprint
         hachage_bytes = headers['archive_hachage']
 
         info_cle = {
@@ -1444,7 +1444,7 @@ class ProcessusRestaurerDomaines(ProcessusRestauration):
         # Utilise pour retransmettre la cle de dechiffrage des fichiers de transaction
         with open(self.controleur.configuration.mq_cafile, 'r') as fichier:
             enveloppe_millegrille = EnveloppeCertificat(certificat_pem=fichier.read())
-        fingerprint_millegrille = enveloppe_millegrille.fingerprint_sha256_b64
+        fingerprint_millegrille = enveloppe_millegrille.fingerprint
 
         self.set_etape_suivante(ProcessusRestaurerDomaines.boucle_restauration_domaines.__name__)
 

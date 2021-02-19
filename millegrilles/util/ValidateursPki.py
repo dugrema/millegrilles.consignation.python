@@ -173,7 +173,7 @@ class ValidateurCertificatCache(ValidateurCertificat):
         #     raise ValueError("Certificat non verifie - Le cache ne fonctionne que sur des enveloppes verifiees")
 
         # Verifier si le certificat est deja dans le cache
-        fingerprint = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
+        fingerprint = enveloppe.fingerprint
         if self.__enveloppe_leaf_par_fingerprint.get(fingerprint) is None:
             # S'assurer qu'on n'a pas deja depasse le nombre limite du cache
             if len(self.__enveloppe_leaf_par_fingerprint) > self.limite_obj_cache:
@@ -182,17 +182,6 @@ class ValidateurCertificatCache(ValidateurCertificat):
             # Conserver le certificat dans le cache
             self.__logger.debug("Cache certificat %s" % fingerprint)
             self.__enveloppe_leaf_par_fingerprint[fingerprint] = EntreeCacheEnveloppe(enveloppe)
-
-            # Conserver toute la chaine - les certs CA sont deja valides
-            # chaine = enveloppe.reste_chaine_pem
-            # for i in range(0, len(chaine)):
-            #     enveloppe_ca = EnveloppeCertificat(certificat_pem=chaine)
-            #     chaine = chaine[1:]
-            #     if enveloppe_ca.is_CA:
-            #         enveloppe_ca.set_est_verifie(True)
-            #         fingerprint_ca = enveloppe_ca.fingerprint_sha256_b64
-            #         if self.__enveloppe_leaf_par_fingerprint.get(fingerprint_ca) is None:
-            #             self.__enveloppe_leaf_par_fingerprint[fingerprint_ca] = EntreeCacheEnveloppe(enveloppe_ca)
 
         super()._conserver_enveloppe(enveloppe)
 
@@ -223,14 +212,14 @@ class ValidateurCertificatCache(ValidateurCertificat):
         sorted_entries = sorted(self.__enveloppe_leaf_par_fingerprint.values(), key=EntreeCacheEnveloppe.sort_key)
         supprimer = sorted_entries[self.max_entries_apres_nettoyage:]
         for e in supprimer:
-            fingerprint = e.enveloppe.fingerprint_sha256_b64
+            fingerprint = e.enveloppe.fingerprint
             del self.__enveloppe_leaf_par_fingerprint[fingerprint]
 
     def _charger_certificat(self, certificat: Union[bytes, str, list]) -> EnveloppeCertificat:
         enveloppe = super()._charger_certificat(certificat)
 
         # Tenter de charger l'enveloppe a partir du cache - elle serait deja verifiee
-        fingerprint = enveloppe.fingerprint_sha256_b64
+        fingerprint = enveloppe.fingerprint
         entree_cache = self.__enveloppe_leaf_par_fingerprint.get(fingerprint)
         try:
             enveloppe_verifiee = entree_cache.enveloppe  # self.get_enveloppe(fingerprint)
@@ -483,9 +472,8 @@ class ValidateurCertificatRequete(ValidateurCertificatCache):
 
     def recevoir_reponse(self, routing_key: str, message: dict):
 
-        fingerprint = None
         try:
-            fingerprint = 'sha256_b64:' + message[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
+            fingerprint = message[ConstantesSecurityPki.LIBELLE_FINGERPRINT]
         except KeyError:
             self.__logger.warning("Recu reponse de mauvais type - pas un certificat : %s" % str(message))
             return
@@ -575,7 +563,7 @@ class ReponseCertificatHandler(BaseCallback):
             self.__validateur.recevoir_reponse(routing_key, message_dict)
         except Exception:
             try:
-                fingerprint = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
+                fingerprint = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT]
                 self.__logger.exception("Erreur traitement message reception certificat %s" % fingerprint)
             except (KeyError, TypeError):
                 self.__logger.exception("Erreur traitement message reception certificat")

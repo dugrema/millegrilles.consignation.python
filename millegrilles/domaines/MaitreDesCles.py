@@ -323,7 +323,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
         enveloppe = self._contexte.signateur_transactions.enveloppe_certificat_courant
-        fingerprint_courant = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
+        fingerprint_courant = enveloppe.fingerprint
         cle_secrete_cryptee = dict_cles.get(fingerprint_courant)
         if cle_secrete_cryptee is not None:
             # On peut decoder la cle secrete
@@ -541,9 +541,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 domaine = evenement[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
                 hachage_bytes = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_LISTE_HACHAGE_BYTES][0]
                 iv = evenement[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV]
-                self._logger.info("On insere la cle dans le maitre des cles pour permettre un rechiffrage subsequent de la cle %s, %s" % (domaine, hachage_bytes))
+                self._logger.info("On insere la cle dans le maitre des cles pour permettre un "
+                                  "rechiffrage subsequent de la cle %s, %s" % (domaine, hachage_bytes))
 
-                fingerprint_millegrille = self.configuration.certificat_millegrille.fingerprint_sha256_b64
+                fingerprint_millegrille = self.configuration.certificat_millegrille.fingerprint
 
                 information_cle = {
                     Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: domaine,
@@ -595,8 +596,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Fingerprints qui doivent exister pour considerer dechiffrable
         fingerprint_b64_actifs = message_dict.get('fingerprints_actifs') or []
         # Ajouter fingerprint du maitre des cles local
-        # fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
-        fingerprint_b64_local = self._contexte.signateur_transactions.enveloppe_certificat_courant.fingerprint_sha256_b64
+        fingerprint_b64_local = self._contexte.signateur_transactions.enveloppe_certificat_courant.fingerprint
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
@@ -604,12 +604,12 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             {'non_dechiffrable': True}
         ]
         for fp in fingerprint_b64_actifs:
-            fp_avec_fonction = 'sha256_b64:' + fp
+            fp_avec_fonction = fp
             condition_actif.append({'cles.%s' % fp_avec_fonction: {'$exists': False}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
-            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_sha256_b64
+            fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint
 
         collection = self._contexte._document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
@@ -640,7 +640,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Ajouter fingerprint du maitre des cles local
         # fingerprint_b64_local = self.verificateur_certificats.enveloppe_certificat_courant.fingerprint_b64
         enveloppe_certificat_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
-        fingerprint_b64_local = enveloppe_certificat_courant.fingerprint_sha256_b64
+        fingerprint_b64_local = enveloppe_certificat_courant.fingerprint
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
@@ -648,12 +648,11 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             {ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: True}
         ]
         for fp in fingerprint_b64_actifs:
-            fp_avec_fonction = 'sha256_b64:' + fp
-            condition_actif.append({'cles.%s' % fp_avec_fonction: {'$exists': False}})
+            condition_actif.append({'cles.%s' % fp: {'$exists': False}})
 
         if not fingerprint_b64_dechiffrage:
             # Par defaut, assumer que la cle de dechiffrage sera la cle de millegrille
-            fingerprint_b64_dechiffrage = 'sha256_b64:' + self.certificat_millegrille.fingerprint_sha256_b64
+            fingerprint_b64_dechiffrage = self.certificat_millegrille.fingerprint
 
         collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
@@ -852,7 +851,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             fingerprint_hex = binascii.hexlify(fingerprint_bytes).decode('utf-8')
 
             transaction = {
-                ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64: 'sha256_b64:' + fp,
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT: fp,
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: message_dict[
                     Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: message_dict[
@@ -971,8 +970,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         enveloppe_maitredescles = self._contexte.signateur_transactions.enveloppe_certificat_courant
         clecert_maitredescles = EnveloppeCleCert(cert=enveloppe_maitredescles.certificat)
         dict_certs = self.get_certificats_backup.copy()
-        dict_certs[clecert_maitredescles.fingerprint_sha256_b64] = clecert_maitredescles
-        cles_connues = ['sha256_b64:' + c for c in list(dict_certs.keys())]
+        dict_certs[clecert_maitredescles.fingerprint] = clecert_maitredescles
+        cles_connues = [c for c in list(dict_certs.keys())]
         cles_documents = list(document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].keys())
 
         # Parcourir
@@ -983,7 +982,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 self._logger.debug("Ajouter cle %s dans document %s" % (
                     fingerprint, identificateur_document))
                 enveloppe_backup = dict_certs[fingerprint]
-                fingerprint_backup_b64 = enveloppe_backup.fingerprint_sha256_b64
+                fingerprint_backup_b64 = enveloppe_backup.fingerprint
 
                 try:
                     # Type EnveloppeCertificat
@@ -992,17 +991,17 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     # Type EnveloppeCleCert
                     certificat = enveloppe_backup.cert
 
-                cle_chiffree_backup, fingerprint_hex = self.crypter_cle(cle_dechiffree, cert=certificat)
+                cle_chiffree_backup, fingerprint = self.crypter_cle(cle_dechiffree, cert=certificat)
                 cle_chiffree_backup_base64 = str(b64encode(cle_chiffree_backup), 'utf-8')
                 self._logger.debug("Cle chiffree pour cert %s : %s" % (fingerprint_backup_b64, cle_chiffree_backup_base64))
 
                 transaction = {
-                    # ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE: document[Constantes.DOCUMENT_INFODOC_LIBELLE],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLE_INDIVIDUELLE: cle_chiffree_backup_base64,
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT: fingerprint_hex,
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64: fingerprint_backup_b64,
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT: fingerprint_backup_b64,
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: document[
+                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: document[
+                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateur_document,
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: document[
                         ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
@@ -1157,9 +1156,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         else:
             contenu_on_insert['non_dechiffrable'] = True
 
-        hachage_sha256 = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64]
-        if hachage_sha256.find(':') < 0:
-            hachage_sha256 = 'sha256_b64:' + hachage_sha256
+        hachage_sha256 = transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT]
 
         champ_cles = '.'.join([
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES,
@@ -1269,37 +1266,30 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         cert_millegrille = self.controleur.gestionnaire.certificat_millegrille
         fingerprint_cert_millegrille = cert_millegrille.fingerprint_b64
 
-        fingerprint_b64_backup = [fingerprint_cert_millegrille]
+        fingerprint_backup = [fingerprint_cert_millegrille]
         if self._controleur.gestionnaire.get_certificats_backup is not None:
             certificats_backup = self.controleur.gestionnaire.get_certificats_backup
             for fingerprint_cle_backup in certificats_backup.keys():
-                fingerprint_b64_backup.append(fingerprint_cle_backup)
+                fingerprint_backup.append(fingerprint_cle_backup)
 
-        for fingerprint_b64, cle in self.parametres['cles_rechiffrees'].items():
-            if fingerprint_b64 not in fingerprint_b64_backup:
+        for fingerprint, cle in self.parametres['cles_rechiffrees'].items():
+            if fingerprint not in fingerprint_backup:
                 continue
 
             # Convertir fingerprint b64 en hex - safe pour routing key MQ et nom de fichier
-            fingerprint_bytes = b64decode(fingerprint_b64)
-            fingerprint = binascii.hexlify(fingerprint_bytes).decode('utf-8')
-
             sous_domaine = '.'.join([ConstantesMaitreDesCles.DOMAINE_NOM, fingerprint, action + 'Backup'])
-
-            # identificateurs_document = transaction['identificateurs_document'].copy()
-            # identificateurs_document['fingerprint'] = fingerprint_b64
-
             domaine_effectif = domaine or transaction.get('domaine')
 
             transaction_cle = {
                 'domaine': domaine_effectif,
                 'identificateurs_document': transaction['identificateurs_document'],
-                'fingerprint': fingerprint,
-                'fingerprint_sha256_b64': fingerprint_b64,
+                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
                 'cle': cle,
                 'iv': transaction['iv'],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_UUID_ORIGINAL: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID],
             }
+
             self.ajouter_transaction_a_soumettre(sous_domaine, transaction_cle)
 
     def mettre_a_jour_document(self, transaction):

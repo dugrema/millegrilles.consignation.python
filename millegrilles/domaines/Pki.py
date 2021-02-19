@@ -164,9 +164,9 @@ class GestionnairePki(GestionnaireDomaineStandard):
         # Index par fingerprint de certificat
         collection_domaine.create_index(
             [
-                (ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64, 1)
+                (ConstantesSecurityPki.LIBELLE_FINGERPRINT, 1)
             ],
-            name='fingerprint_sha256_b64',
+            name='fingerprint',
             unique=False,
         )
         # Index par chaine de certificat verifie
@@ -385,15 +385,11 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         return certs
 
-    def get_certificat(self, fingerprint_sha256_b64, properties=None, demander_si_inconnu=True):
-
-        # S'assurer qu'on fait un match sur la partie fingerprint (si format est sha256_b64:abcd1234...)
-        fingerprint = fingerprint_sha256_b64.split(':').pop()
-
+    def get_certificat(self, fingerprint, properties=None, demander_si_inconnu=True):
         collection_pki = self.document_dao.get_collection(self.get_nom_collection())
         filtre = {
             # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
         }
         certificat = collection_pki.find_one(filtre)
 
@@ -404,12 +400,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
                     certificat_filtre[key] = value
         except AttributeError:
             if demander_si_inconnu:
-                self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint_sha256_b64)
+                self._logger.warning('Certificat %s inconnu, on fait une requete sur MQ' % fingerprint)
                 # Le certificat n'est pas connu, on fait une requete
-                self.demander_certificat_via_mq(fingerprint_sha256_b64)
+                self.demander_certificat_via_mq(fingerprint)
                 certificat_filtre = None  # Aucune reponse avant retour
             else:
-                self._logger.warning('Certificat %s inconnu' % fingerprint_sha256_b64)
+                self._logger.warning('Certificat %s inconnu' % fingerprint)
 
         return certificat_filtre
 
@@ -484,12 +480,12 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
     def recevoir_certificat(self, message_dict):
         # Verifier si le certificat existe deja
-        fingerprint_sha256_b64 = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
-        document_existant = self.verifier_presence_certificat(fingerprint_sha256_b64)
+        fingerprint = message_dict[ConstantesSecurityPki.LIBELLE_FINGERPRINT]
+        document_existant = self.verifier_presence_certificat(fingerprint)
 
         ajoute = False
         if document_existant is None:
-            self._logger.debug('Ajout du certificat %s' % fingerprint_sha256_b64)
+            self._logger.debug('Ajout du certificat %s' % fingerprint)
             chaine_pem = message_dict[ConstantesSecurityPki.LIBELLE_CHAINE_PEM]
             correlation_csr = message_dict.get(ConstantesSecurityPki.LIBELLE_CORRELATION_CSR)
             self.inserer_certificat_pem(chaine_pem, correlation_csr=correlation_csr)
@@ -498,8 +494,8 @@ class GestionnairePki(GestionnaireDomaineStandard):
 
         return {'ok': True, 'ajoute': ajoute}
 
-    def verifier_presence_certificat(self, fingerprint_sha256_b64: str):
-        filtre = {ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64}
+    def verifier_presence_certificat(self, fingerprint: str):
+        filtre = {ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint}
         collection = self._contexte.document_dao.get_collection(ConstantesPki.COLLECTION_DOCUMENTS_NOM)
         document_existant = collection.find_one(filtre, projection={'_id': True})
         return document_existant
@@ -508,7 +504,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         # def inserer_certificat(self, enveloppe, trusted=False, correlation_csr: str = None, transaction_faite=False):
         chaine_pem = [pem.strip() for pem in chaine_pem]
         enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(chaine_pem))
-        fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+        fingerprint = enveloppe.fingerprint
 
         # Valider la chaine de certificats - lance exception si invalide
         try:
@@ -526,8 +522,8 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 raise pve
 
         idmg = enveloppe.subject_organization_name
-        chaine_fingerprints = [fingerprint_sha256_b64]
-        certs_pem_dict = {fingerprint_sha256_b64: chaine_pem[0]}
+        chaine_fingerprints = [fingerprint]
+        certs_pem_dict = {fingerprint: chaine_pem[0]}
 
         document_cert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
@@ -562,13 +558,13 @@ class GestionnairePki(GestionnaireDomaineStandard):
         enveloppe_ca = None
         for pem in chaine_pem[1:]:
             enveloppe_ca = EnveloppeCertificat(certificat_pem=pem)
-            fingerprint_ca_sha256_b64 = enveloppe_ca.fingerprint_sha256_b64
-            chaine_fingerprints.append(fingerprint_ca_sha256_b64)
+            fingerprint_ca = enveloppe_ca.fingerprint
+            chaine_fingerprints.append(fingerprint_ca)
             if enveloppe_ca.is_CA is not True:
-                raise Exception("Chaine de certificat invalide, cert suivants dans liste pas CA : " + fingerprint_ca_sha256_b64)
+                raise Exception("Chaine de certificat invalide, cert suivants dans liste pas CA : " + fingerprint_ca)
             elif enveloppe.subject_organization_name != idmg:
-                raise Exception("Certificat dans la chain ne correspond pas au idmg : " + fingerprint_ca_sha256_b64)
-            certs_pem_dict[fingerprint_ca_sha256_b64] = pem
+                raise Exception("Certificat dans la chain ne correspond pas au idmg : " + fingerprint_ca)
+            certs_pem_dict[fingerprint_ca] = pem
 
         if enveloppe_ca is None:
             raise Exception("Chaine incomplete")
@@ -579,14 +575,13 @@ class GestionnairePki(GestionnaireDomaineStandard):
         maintenant = datetime.datetime.now(tz=datetime.timezone.utc)
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: maintenant,
-            # ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
         }
 
         if correlation_csr is not None:
             document_cert[ConstantesSecurityPki.LIBELLE_CORRELATION_CSR] = correlation_csr
 
         filtre = {
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint
         }
 
         ops = {
@@ -696,7 +691,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
 
     def initiale(self):
         transaction = self.charger_transaction(ConstantesPki.COLLECTION_TRANSACTIONS_NOM)
-        fingerprint = transaction[ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64]
+        fingerprint = transaction[ConstantesSecurityPki.LIBELLE_FINGERPRINT]
 
         # Verifier si on a deja les certificats
         self.__logger.debug("Chargement certificat fingerprint: %s" % fingerprint)
@@ -710,7 +705,7 @@ class ProcessusAjouterCertificat(MGProcessusTransaction):
             self.controleur.gestionnaire.inserer_certificat_pem(pems, dirty=False)
 
         self.set_etape_suivante()  # Termine
-        return {ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint}
+        return {ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint}
 
     def get_collection_transaction_nom(self):
         return ConstantesPki.COLLECTION_TRANSACTIONS_NOM

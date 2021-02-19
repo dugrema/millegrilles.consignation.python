@@ -190,11 +190,11 @@ class BackupUtil:
         for pem in pems:
             clecert = EnveloppeCleCert()
             clecert.cert_from_pem_bytes(pem.encode('utf-8'))
-            fingerprint_b64 = clecert.fingerprint_sha256_b64
-            cle_chiffree, fingerprint = clecert.chiffrage_asymmetrique(cle_secrete)
+            fingerprint = clecert.fingerprint
+            cle_chiffree, fingerprint_encodage = clecert.chiffrage_asymmetrique(cle_secrete)
 
             cle_chiffree_b64 = b64encode(cle_chiffree).decode('utf-8')
-            cles[fingerprint_b64] = cle_chiffree_b64
+            cles[fingerprint] = cle_chiffree_b64
 
         return cles
 
@@ -805,7 +805,7 @@ class HandlerBackupDomaine:
         # Ajouter le certificat du module courant pour etre sur
         clecert_courant = self._contexte.configuration.cle
         enveloppe = EnveloppeCertificat(certificat_pem=clecert_courant.chaine)
-        fp_enveloppe = 'sha256_b64:' + enveloppe.fingerprint_sha256_b64
+        fp_enveloppe = enveloppe.fingerprint
 
         # Conserver la chaine de validation du catalogue
         certs_pem = {fp_enveloppe: enveloppe.certificat_pem}
@@ -816,7 +816,7 @@ class HandlerBackupDomaine:
         certificats_validation_catalogue = list()
         catalogue_backup[ConstantesBackup.LIBELLE_CERTS_CHAINE_CATALOGUE] = certificats_validation_catalogue
         for cert_ca in liste_enveloppes_cas:
-            fingerprint_ca = 'sha256_b64:' + cert_ca.fingerprint_sha256_b64
+            fingerprint_ca = cert_ca.fingerprint
             certificats_validation_catalogue.append(fingerprint_ca)
             certs_pem[fingerprint_ca] = cert_ca.certificat_pem
 
@@ -872,14 +872,14 @@ class HandlerBackupDomaine:
 
         # S'assurer que le certificat racine correspond a la transaction
         ca_racine = liste_enveloppes_cas[-1]
-        if ca_racine.fingerprint_base58 != transaction['en-tete']['idmg']:
+        if ca_racine.idmg != transaction['en-tete']['idmg']:
             raise ValueError("Transaction IDMG ne correspond pas au certificat racine " + enveloppe.fingerprint_base58)
 
         # Extraire liste de fingerprints
-        liste_cas = ['sha256_b64:' + enveloppe.fingerprint_sha256_b64 for enveloppe in liste_enveloppes_cas]
+        liste_cas = [enveloppe.fingerprint for enveloppe in liste_enveloppes_cas]
 
         return {
-            'certificats': ['sha256_b64:' + enveloppe.fingerprint_sha256_b64],
+            'certificats': [enveloppe.fingerprint],
             'certificats_intermediaires': liste_cas[1:-1],
             'certificats_millegrille': [liste_cas[-1]],
         }
@@ -1988,23 +1988,23 @@ class HandlerCertificatsCatalogue:
                 validateur_pki.valider(pems, date_reference=date_reference, idmg=idmg)
             except certvalidator.errors.InvalidCertificateError:
                 if len(pems) >= 3:
-                    self.__logger.warning("Certificat non valide provient de backup : %s" % enveloppe.fingerprint_sha256_b64)
+                    self.__logger.warning("Certificat non valide provient de backup : %s" % enveloppe.fingerprint)
                 else:
-                    self.__logger.debug("Ignorer certificat millegrille/intermediaire pour restauration : %s" % enveloppe.fingerprint_sha256_b64)
+                    self.__logger.debug("Ignorer certificat millegrille/intermediaire pour restauration : %s" % enveloppe.fingerprint)
                 continue
             except certvalidator.errors.PathValidationError:
-                self.__logger.exception("Erreur validation certificat %s, le ceritifcat est ignore" % enveloppe.fingerprint_sha256_b64)
+                self.__logger.exception("Erreur validation certificat %s, le ceritifcat est ignore" % enveloppe.fingerprint)
                 continue
 
             # Ajouter la chaine complete a la liste
-            self.chaine_pems[enveloppe.fingerprint_sha256_b64] = pems
+            self.chaine_pems[enveloppe.fingerprint] = pems
 
     def emettre_certificats(self, generateur_transactions):
         for fp, pems in self.chaine_pems.items():
             self.__logger.debug("Certificat avec chaine complete %s = %s" % (fp, pems))
 
             commande = {
-                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fp,
+                Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT: fp,
                 Constantes.ConstantesSecurityPki.LIBELLE_CHAINE_PEM: pems,
             }
 

@@ -433,7 +433,6 @@ class ConstantesSecurityPki:
 
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'
-    # LIBELLE_FINGERPRINT_SHA256_B64 = 'fingerprint_sha256_b64'
     LIBELLE_CHAINE_PEM = 'chaine_pem'
     LIBELLE_CHAINE = 'chaine'
     LIBELLE_CERTIFICATS_PEM = 'certificats_pem'
@@ -769,7 +768,6 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_IV = 'iv'
     TRANSACTION_CHAMP_FINGERPRINT = 'fingerprint'
-    TRANSACTION_CHAMP_FINGERPRINT_SHA256_B64 = 'fingerprint_sha256_b64'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
     TRANSACTION_CHAMP_DOMAINES = 'domaines'

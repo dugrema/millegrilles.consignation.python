@@ -81,7 +81,7 @@ class GestionnaireWeb:
                         enveloppe_actuel = EnveloppeCertificat(certificat_pem=cert_actuel)
 
                         # Comparer les deux certificats via fingerprints
-                        if enveloppe_acme.fingerprint_sha256_b64 != enveloppe_actuel.fingerprint_sha256_b64:
+                        if enveloppe_acme.fingerprint != enveloppe_actuel.fingerprint:
                             self.__logger.info("Ajouter un nouveau certificat ACME a docker")
                             date_courante = datetime.datetime.utcnow().strftime(MonitorConstantes.DOCKER_LABEL_TIME)
                             gestionnaire_docker.sauvegarder_config('pki.web.cert.%s' % date_courante, cert_acme_bytes)
