@@ -1,5 +1,3 @@
-import uuid
-import datetime
 import re
 import logging
 
@@ -49,34 +47,6 @@ class GenerateurTransaction:
 
         return message
 
-        # # Identifier usager du systeme, nom de domaine
-        # signateur_transactions = self._contexte.signateur_transactions
-        #
-        # # common_name = signateur_transactions.enveloppe_certificat_courant.subject_common_name
-        # # identificateur_systeme = '%s/%s@%s' % (getpass.getuser(), socket.getfqdn(), common_name)
-        #
-        # # Ajouter identificateur unique et temps de la transaction
-        # uuid_transaction = uuid.uuid1()
-        #
-        # meta = dict()
-        # meta[Constantes.CONFIG_IDMG] = self._contexte.idmg
-        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = "%s" % uuid_transaction
-        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE] = int(datetime.datetime.utcnow().timestamp())
-        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION] = version
-        # if domaine is not None:
-        #     meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE] = domaine
-        # if idmg_destination is not None:
-        #     meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_IDMG_DESTINATION] = idmg_destination
-        #
-        # enveloppe = message_dict.copy()
-        # enveloppe[Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION] = meta
-        #
-        # # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
-        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = signateur_transactions.hacher_contenu(enveloppe)
-        # message_signe = signateur_transactions.signer(enveloppe)
-        #
-        # return message_signe
-
     def soumettre_transaction(self, message_dict, domaine_action=None,
                               reply_to=None, correlation_id=None,
                               version=Constantes.TRANSACTION_MESSAGE_LIBELLE_VERSION_6,
@@ -86,11 +56,13 @@ class GenerateurTransaction:
         Transmet un message. La connexion doit etre ouverte.
 
         :param message_dict: Dictionnaire du contenu (payload) du message.
-        :param routing: Routing du message. Utilise pour le routage de la transaction apres persistance.
+        :param domaine_action: Routing du message. Utilise pour le routage de la transaction apres persistance.
         :param reply_to:
         :param correlation_id:
         :param version:
         :param idmg_destination: MilleGrille destination
+        :param retourner_enveloppe:
+        :param ajouter_certificats:
         :returns: UUID de la transaction. Permet de retracer la transaction dans MilleGrilles une fois persistee.
         """
 
@@ -294,12 +266,10 @@ class GenerateurTransaction:
         :return:
         """
         enveloppe = EnveloppeCertificat(certificat_pem=chaine_pem[0])
-        fingerprint = enveloppe.fingerprint_ascii
-        fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+        fingerprint = enveloppe.fingerprint
 
         message = {
             ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
             ConstantesSecurityPki.LIBELLE_CHAINE_PEM: chaine_pem,
         }
         if correlation_csr is not None:
