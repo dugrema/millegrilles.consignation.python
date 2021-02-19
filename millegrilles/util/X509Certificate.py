@@ -5,17 +5,20 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
 from ipaddress import IPv4Address, IPv6Address
-from os import environ
 from typing import Union
+from multihash.constants import HASH_CODES
 
 import datetime
 import secrets
 import base64
 import logging
+import multihash
+import multibase
 
 from millegrilles import Constantes
-from millegrilles.util.IdmgUtil import IdmgUtil
+from millegrilles.util.IdmgUtil import encoder_idmg_cert
 from millegrilles.SecuritePKI import ConstantesSecurityPki
+from millegrilles.util.Hachage import map_code_to_hashes
 
 
 class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
@@ -65,13 +68,17 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
 
 class EnveloppeCleCert:
 
-    def __init__(self, private_key=None, cert=None, password=None):
+    HASH_FINGERPRINT = 'sha2-256'
+    ENCODING_FINGERPRINT = 'base58btc'
+
+    def __init__(self, private_key=None, cert: x509.Certificate = None, password=None):
         self.private_key = private_key
         self.cert = cert
         self.password = password
         self.csr = None
         self.chaine = None
-        self.__fingerprint_b64 = None
+        self.__fingerprint = None
+        self.__idmg = None
 
     def set_cert(self, cert):
         self.cert = cert
@@ -95,8 +102,7 @@ class EnveloppeCleCert:
         if self.chaine[-1] == END_MARKER:
             self.chaine = self.chaine[:-1]
 
-
-    def from_pem_bytes(self, private_key_bytes, cert_bytes, password_bytes=None):
+    def from_pem_bytes(self, private_key_bytes: bytes, cert_bytes: bytes, password_bytes: bytes = None):
         self.private_key = primitives.serialization.load_pem_private_key(
             private_key_bytes,
             password=password_bytes,
@@ -107,7 +113,7 @@ class EnveloppeCleCert:
 
         self.cert_from_pem_bytes(cert_bytes)
 
-    def cert_from_pem_bytes(self, cert_bytes):
+    def cert_from_pem_bytes(self, cert_bytes: bytes):
         self.cert = x509.load_pem_x509_certificate(cert_bytes, default_backend())
         pem_string = cert_bytes.decode('utf-8')
 
@@ -141,7 +147,7 @@ class EnveloppeCleCert:
 
         return False
 
-    def key_from_pem_bytes(self, key_bytes, password_bytes=None):
+    def key_from_pem_bytes(self, key_bytes: bytes, password_bytes: bytes = None):
         self.private_key = primitives.serialization.load_pem_private_key(
             key_bytes,
             password=password_bytes,
@@ -248,36 +254,54 @@ class EnveloppeCleCert:
 
     @property
     def fingerprint(self) -> str:
-        return bytes.hex(self.cert.fingerprint(hashes.SHA1()))
+        if self.__fingerprint is None:
+            hashing_code = HASH_CODES[EnveloppeCleCert.HASH_FINGERPRINT]
+            hash_method = map_code_to_hashes(hashing_code)
+            digest = self.cert.fingerprint(hash_method)
+            mh = multihash.encode(digest, EnveloppeCleCert.HASH_FINGERPRINT)
+            mb = multibase.encode(EnveloppeCleCert.ENCODING_FINGERPRINT, mh)
+            self.__fingerprint = mb.decode('utf-8')
 
-    @property
-    def fingerprint_base58(self) -> str:
-        return self.idmg
+        return self.__fingerprint
 
-    @property
-    def fingerprint_b64(self):
-        if not self.__fingerprint_b64:
-            self.__fingerprint_b64 = str(base64.b64encode(self.cert.fingerprint(hashes.SHA1())), 'utf-8')
+    # @property
+    # def fingerprint_base58(self) -> str:
+    #     return self.idmg
 
-        return self.__fingerprint_b64
+    # @property
+    # def fingerprint_b64(self):
+    #     if not self.__fingerprint_b64:
+    #         self.__fingerprint_b64 = str(base64.b64encode(self.cert.fingerprint(hashes.SHA1())), 'utf-8')
+    #
+    #     return self.__fingerprint_b64
 
-    @property
-    def fingerprint_sha256_b64(self):
-        return str(base64.b64encode(self.cert.fingerprint(hashes.SHA256())), 'utf-8')
+    # @property
+    # def fingerprint_sha256_b64(self):
+    #     return str(base64.b64encode(self.cert.fingerprint(hashes.SHA256())), 'utf-8')
 
-    @fingerprint_b64.setter
-    def fingerprint_b64(self, fingerprint_b64):
-        self.__fingerprint_b64 = fingerprint_b64
+    @fingerprint.setter
+    def fingerprint(self, fingerprint: str):
+        """
+        Set le fingerprint multibase base58btc, multihash SHA2-256
+        :param fingerprint:
+        :return:
+        """
+        self.__fingerprint = fingerprint
 
     @property
     def idmg(self) -> str:
         """
         Retourne le idmg du certificat.
-        Calcule avec SHA-512/224 retourne en base58
+        Si c'est un certificat CA, calcule le IDMG. Sinon utilise la valeur du champ Organization (O)
         """
-        util = IdmgUtil()
-        idmg = util.encoder_idmg_cert(self.cert)
-        return idmg
+        if self.__idmg is None:
+            if self.akid == self.skid:
+                self.__idmg = encoder_idmg_cert(self.cert)
+            else:
+                subject = self.formatter_subject()
+                self.__idmg = subject['organizationName']
+
+        return self.__idmg
 
     @property
     def not_valid_before(self) -> datetime.datetime:

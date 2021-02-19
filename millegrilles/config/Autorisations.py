@@ -17,7 +17,7 @@ _autorisations_idmg = {
 }
 
 
-def autorisations_idmg():
+def autorisations_idmg() -> dict:
     return _autorisations_idmg.copy()
 
 

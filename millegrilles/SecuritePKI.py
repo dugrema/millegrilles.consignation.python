@@ -3,10 +3,11 @@ import logging
 import json
 import re
 import base64
-import binascii
 import os
 import datetime
 import pytz
+import multibase
+import multihash
 
 from typing import Optional
 from cryptography.hazmat.primitives import serialization, asymmetric
@@ -15,17 +16,22 @@ from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from certvalidator import CertificateValidator, ValidationContext
 from certvalidator.errors import PathValidationError, PathBuildingError
+from multihash.constants import HASH_CODES
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
 from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, ExceptionConnectionFermee
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
-from millegrilles.util.IdmgUtil import IdmgUtil
+from millegrilles.util.IdmgUtil import encoder_idmg_cert
 from millegrilles.config.Autorisations import autorisations_idmg
+from millegrilles.util.Hachage import map_code_to_hashes
 
 
 class EnveloppeCertificat:
     """ Encapsule un certificat. """
+
+    ENCODING_FINGERPRINT = 'base58btc'
+    HASH_FINGERPRINT = 'sha2-256'
 
     def __init__(self, certificat=None, certificat_pem=None, fingerprint=None):
         """
@@ -62,21 +68,24 @@ class EnveloppeCertificat:
         else:
             self._fingerprint = EnveloppeCertificat.calculer_fingerprint(self._certificat)
 
+        self.__idmg: Optional[str] = None
+
     @staticmethod
     def calculer_fingerprint(certificat):
-        return certificat.fingerprint(hashes.SHA1())
+        hashing_code = HASH_CODES[EnveloppeCertificat.HASH_FINGERPRINT]
+        hash_method = map_code_to_hashes(hashing_code)
+        digest = certificat.fingerprint(hash_method)
+        mh = multihash.encode(digest, EnveloppeCertificat.HASH_FINGERPRINT)
+        mb = multibase.encode(EnveloppeCertificat.ENCODING_FINGERPRINT, mh)
+        return mb.decode('utf-8')
 
-    @staticmethod
-    def calculer_fingerprint_sha256(certificat):
-        return certificat.fingerprint(hashes.SHA256())
+    # @staticmethod
+    # def calculer_fingerprint_ascii(certificat):
+    #     return str(binascii.hexlify(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
 
-    @staticmethod
-    def calculer_fingerprint_ascii(certificat):
-        return str(binascii.hexlify(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
-
-    @staticmethod
-    def calculer_fingerprint_b64(certificat):
-        return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
+    # @staticmethod
+    # def calculer_fingerprint_b64(certificat):
+    #     return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
 
     def __split_chaine_certificats(self, pem_str: str):
         chaine_certs = [c + UtilCertificats.END_CERTIFICATE for c in pem_str.split(UtilCertificats.END_CERTIFICATE)]
@@ -84,36 +93,37 @@ class EnveloppeCertificat:
 
     @property
     def fingerprint(self):
+        if self._fingerprint is None:
+            self._fingerprint = EnveloppeCertificat.calculer_fingerprint(self.certificat)
         return self._fingerprint
 
-    @property
-    def fingerprint_ascii(self):
-        return str(binascii.hexlify(self._fingerprint), 'utf-8')
+    # @property
+    # def fingerprint_ascii(self):
+    #     return str(binascii.hexlify(self._fingerprint), 'utf-8')
 
-    @property
-    def fingerprint_b64(self):
-        return str(base64.b64encode(self.fingerprint), 'utf-8')
+    # @property
+    # def fingerprint_b64(self):
+    #     return str(base64.b64encode(self.fingerprint), 'utf-8')
 
-    @property
-    def fingerprint_sha256_b64(self):
-        return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint_sha256(self._certificat)), 'utf-8')
+    # @property
+    # def fingerprint_sha256_b64(self):
+    #     return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint_sha256(self._certificat)), 'utf-8')
 
-    @property
-    def fingerprint_base58(self):
-        """
-        Retourne le idmg
-        """
-        return self.idmg
+    # @property
+    # def fingerprint_base58(self):
+    #     """
+    #     Retourne le idmg
+    #     """
+    #     return self.idmg
 
     @property
     def idmg(self) -> str:
         """
         Retourne le idmg du certificat.
-        Calcule avec SHA-512/224 retourne en base58
         """
-        util = IdmgUtil()
-        idmg = util.encoder_idmg_cert(self._certificat)
-        return idmg
+        if self.__idmg is None:
+            self.__idmg = encoder_idmg_cert(self._certificat)
+        return self.__idmg
 
     @property
     def certificat(self):
@@ -187,11 +197,11 @@ class EnveloppeCertificat:
         return cn
 
     @property
-    def not_valid_before(self):
+    def not_valid_before(self) -> datetime.datetime:
         return self._certificat.not_valid_before
 
     @property
-    def not_valid_after(self):
+    def not_valid_after(self) -> datetime.datetime:
         return self._certificat.not_valid_after
 
     @property
@@ -273,7 +283,7 @@ class EnveloppeCertificat:
                 label=None
             )
         )
-        fingerprint = self.fingerprint_ascii
+        fingerprint = self.fingerprint
         return cle_secrete_backup, fingerprint
 
     def chaine_enveloppes(self):
@@ -298,14 +308,14 @@ class UtilCertificats:
         self._sign_hash_function = hashes.SHA512
         self._contenu_hash_function = hashes.SHA256
 
-        self._certificat: Optional[str] = None
+        self._certificat: Optional[x509.Certificate] = None
         self._cle = None
         self._enveloppe: Optional[EnveloppeCertificat] = None
         self._chaine: Optional[list] = None
 
         self.__validation_context: Optional[ValidationContext] = None
         self.__cert_millegrille: Optional[bytes] = None
-        self.__autorisations_idmg = autorisations_idmg  # Autorisations pour idmg tierces
+        self.__autorisations_idmg: dict = autorisations_idmg()  # Autorisations pour idmg tierces
 
     def initialiser(self):
         # Charger le contexte de validation
@@ -441,7 +451,8 @@ class UtilCertificats:
     def hacher_bytes(self, enveloppe_bytes: bytes, hachage=None):
         """
         Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete et les elements commencant par _.
-        :param dict_message:
+        :param enveloppe_bytes:
+        :param hachage:
         :return:
         """
         if hachage is None:
@@ -465,7 +476,7 @@ class UtilCertificats:
                 label=None
             )
         )
-        fingerprint = self._enveloppe.fingerprint_ascii
+        fingerprint = self._enveloppe.fingerprint
         return cle_secrete_backup, fingerprint
 
     def dechiffrage_asymmetrique(self, contenu) -> bytes:
@@ -495,12 +506,10 @@ class UtilCertificats:
         :return:
         """
         enveloppe = EnveloppeCertificat(certificat_pem=chaine_pem[0])
-        fingerprint = enveloppe.fingerprint_ascii
-        fingerprint_sha256_b64 = enveloppe.fingerprint_sha256_b64
+        fingerprint = enveloppe.fingerprint
 
         message = {
             ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint,
-            ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint_sha256_b64,
             ConstantesSecurityPki.LIBELLE_CHAINE_PEM: chaine_pem,
         }
         if correlation_csr is not None:
@@ -516,7 +525,6 @@ class UtilCertificats:
         Valide une enveloppe
         :param enveloppe:
         :param date_reference:
-        :param ignorer_date: Charger le certificat en utilisation date courante ou fin de periode de validite
         :return: Resultat de validation (toujours valide)
         :raises certvalidator.errors.PathBuildingError: Si le path est invalide
         """
@@ -540,6 +548,7 @@ class UtilCertificats:
                 cert_pem, intermediate_certs=inter_list, validation_context=validation_context)
             resultat = validator.validate_usage({'digital_signature'})
             enveloppe.set_est_verifie(True)
+            return resultat
         except PathValidationError as pve:
             msg = pve.args[0]
             if 'expired' in msg:
@@ -593,17 +602,15 @@ class UtilCertificats:
                     # Valide, on lance une exception pour indiquer la condition de validite (business rule)
                     raise AutorisationConditionnelleDomaine(autorisation['domaines_permis'], idmg, enveloppe)
 
-        return resultat
-
     @property
-    def certificat(self):
+    def certificat(self) -> x509.Certificate:
         return self._certificat
 
     @property
-    def chaine_certs(self):
+    def chaine_certs(self) -> list:
         return self._chaine
 
-    def __get_chaine_certificats(self, pem_str: str):
+    def __get_chaine_certificats(self, pem_str: str) -> list:
         chaine_certs = [c + UtilCertificats.END_CERTIFICATE for c in pem_str.split(UtilCertificats.END_CERTIFICATE)]
         return chaine_certs[0:-1]
 
@@ -618,8 +625,6 @@ class UtilCertificats:
         if self._chaine is not None:
             pem_millegrille = self._chaine[-1]
             return EnveloppeCertificat(certificat_pem=pem_millegrille)
-
-        return None
 
     @property
     def configuration(self):
@@ -651,9 +656,9 @@ class SignateurTransaction(UtilCertificats):
         dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE] = en_tete
 
         # Ajouter information du certification dans l'en_tete
-        fingerprint_cert = self._enveloppe.fingerprint_sha256_b64
+        fingerprint_cert = self._enveloppe.fingerprint
         # self._logger.debug("Fingerprint: %s" % fingerprint_cert)
-        en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT] = 'sha256_b64:' + fingerprint_cert
+        en_tete[Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT] = fingerprint_cert
 
         signature = self._produire_signature(dict_message_effectif)
         dict_message_effectif[Constantes.TRANSACTION_MESSAGE_LIBELLE_SIGNATURE] = signature
@@ -678,7 +683,7 @@ class SignateurTransaction(UtilCertificats):
         signature = self._produire_signature(message)
         contresignature[Constantes.TRANSACTION_MESSAGE_LIBELLE_CONTRESIGNATURE] = signature
         contresignature[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT] = \
-            self._enveloppe.fingerprint_ascii
+            self._enveloppe.fingerprint
 
     def _produire_signature(self, dict_message):
         message_bytes = self.preparer_transaction_bytes(dict_message)
@@ -835,7 +840,7 @@ class VerificateurTransaction(UtilCertificats):
             enveloppe_certificat = acd.enveloppe
 
         self._logger.debug(
-            "Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint_sha256_b64)
+            "Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint)
 
         self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
 
@@ -935,22 +940,20 @@ class VerificateurCertificats(UtilCertificats):
                            date_reference: datetime.datetime = None):
         # Tenter de charger a partir d'une copie locale
         if fingerprint is not None:
-            # Split fingerprint au besoin
-            fingerprint = fingerprint.split(':')[-1]
-
             # Verifier si le certificat est deja charge
             enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
 
             if enveloppe is None and self._contexte.document_dao is not None:
                 try:
                     collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-                    document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT_SHA256_B64: fingerprint})
+                    document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint})
                     if document_cert is not None:
                         pems = [document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in document_cert[ConstantesSecurityPki.LIBELLE_CHAINE]]
                         enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(pems))
                 except TypeError:
                     if self._logger.isEnabledFor(logging.DEBUG):
-                        self._logger.exception("DEBUG: Erreur access base de donnees mongo pour charger certificat manquant")
+                        self._logger.exception(
+                            "DEBUG: Erreur access base de donnees mongo pour charger certificat manquant")
 
         elif fichier is not None and os.path.isfile(fichier):
             with open(fichier, 'r') as fichier:
@@ -965,7 +968,7 @@ class VerificateurCertificats(UtilCertificats):
 
             if not enveloppe.est_verifie:
                 self.valider_x509_enveloppe(enveloppe, date_reference=date_reference)
-                self._cache_certificats_fingerprint[enveloppe.fingerprint_sha256_b64] = enveloppe
+                self._cache_certificats_fingerprint[enveloppe.fingerprint] = enveloppe
 
         else:
             raise CertificatInconnu("Certificat ne peut pas etre charge", fingerprint=fingerprint)
@@ -1019,23 +1022,6 @@ class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):
 
     def __on_channel_close(self, channel=None, code=None, reason=None):
         self.__channel = None
-
-    # def transmettre_certificat(self):
-    #     enveloppe = self.enveloppe_certificat_courant
-    #
-    #     message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
-    #     message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii
-    #     message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = str(
-    #         enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
-    #     )
-    #
-    #     routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
-    #     self.contexte.signateur_transactions.emettre_certificat()
-    #         message_dao.transmettre_message(
-    #         message_evenement, routing, channel=self.__channel, exchange='broadcast'
-    #     )
-    #
-    #     return enveloppe
 
     def traiter_message(self, ch, method, properties, body):
         # Implementer la lecture de messages, specialement pour transmettre un certificat manquant
