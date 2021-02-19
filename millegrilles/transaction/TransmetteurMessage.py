@@ -1,12 +1,10 @@
 import logging
 
 from pika.spec import Basic
-from pika.channel import Channel
 from pika import BasicProperties
 from threading import Lock, Event, Thread
 
 from millegrilles import Constantes
-from millegrilles.dao.MessageDAO import ConnexionWrapper
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder, JSONHelper
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles

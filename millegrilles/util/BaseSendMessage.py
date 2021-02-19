@@ -43,12 +43,12 @@ class BaseEnvoyerMessageEcouter(BaseCallback):
         enveloppe = EnveloppeCertificat(certificat_pem=cert_pem)
 
         message_evenement = ConstantesSecurityPki.DOCUMENT_EVENEMENT_CERTIFICAT.copy()
-        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint_ascii
+        message_evenement[ConstantesSecurityPki.LIBELLE_FINGERPRINT] = enveloppe.fingerprint
         message_evenement[ConstantesSecurityPki.LIBELLE_CERTIFICAT_PEM] = str(
             enveloppe.certificat.public_bytes(serialization.Encoding.PEM), 'utf-8'
         )
 
-        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint_ascii)
+        routing = '%s.%s' % (ConstantesSecurityPki.EVENEMENT_CERTIFICAT, enveloppe.fingerprint)
         self.contexte.message_dao.transmettre_message(
             message_evenement, routing
         )

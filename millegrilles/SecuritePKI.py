@@ -79,14 +79,6 @@ class EnveloppeCertificat:
         mb = multibase.encode(EnveloppeCertificat.ENCODING_FINGERPRINT, mh)
         return mb.decode('utf-8')
 
-    # @staticmethod
-    # def calculer_fingerprint_ascii(certificat):
-    #     return str(binascii.hexlify(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
-
-    # @staticmethod
-    # def calculer_fingerprint_b64(certificat):
-    #     return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint(certificat)), 'utf-8')
-
     def __split_chaine_certificats(self, pem_str: str):
         chaine_certs = [c + UtilCertificats.END_CERTIFICATE for c in pem_str.split(UtilCertificats.END_CERTIFICATE)]
         return chaine_certs[0:-1]
@@ -96,25 +88,6 @@ class EnveloppeCertificat:
         if self._fingerprint is None:
             self._fingerprint = EnveloppeCertificat.calculer_fingerprint(self.certificat)
         return self._fingerprint
-
-    # @property
-    # def fingerprint_ascii(self):
-    #     return str(binascii.hexlify(self._fingerprint), 'utf-8')
-
-    # @property
-    # def fingerprint_b64(self):
-    #     return str(base64.b64encode(self.fingerprint), 'utf-8')
-
-    # @property
-    # def fingerprint_sha256_b64(self):
-    #     return str(base64.b64encode(EnveloppeCertificat.calculer_fingerprint_sha256(self._certificat)), 'utf-8')
-
-    # @property
-    # def fingerprint_base58(self):
-    #     """
-    #     Retourne le idmg
-    #     """
-    #     return self.idmg
 
     @property
     def idmg(self) -> str:
@@ -779,12 +752,6 @@ class VerificateurTransaction(UtilCertificats):
             # ou des certificats inline
             certificats_inline = transaction.get('_certificats') or transaction.get('_certificat') or transaction.get('certificat')
             if certificats_inline:
-                # Charger les nouveaux certificats associes au message
-                # for cert in certificats_inline:
-                #     # Emettre le certificat sur MQ
-                #     enveloppe_temp = EnveloppeCertificat(certificat_pem=cert)
-                #     # self.contexte.generateur_transactions.emettre_certificat(cert, enveloppe_temp.fingerprint_ascii)
-                #     # self.emettre_certificat(certificats_inline)
                 try:
                     epoch_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
                     date_reference = datetime.datetime.fromtimestamp(epoch_transaction, tz=pytz.UTC)
@@ -862,7 +829,7 @@ class VerificateurTransaction(UtilCertificats):
         """
         if enveloppe is not None:
             certificat = enveloppe.certificat
-            self._logger.debug("Verifier signature, Certificat: %s" % enveloppe.fingerprint_ascii)
+            self._logger.debug("Verifier signature, Certificat: %s" % enveloppe.fingerprint)
         else:
             certificat = self.certificat
 
@@ -916,7 +883,7 @@ class VerificateurTransaction(UtilCertificats):
 
         # Les certificats de la fiche ont ete charges et sont valides. On les emet sur le reseau.
         for cert in enveloppes_certificats:
-            self.contexte.generateur_transactions.emettre_certificat(cert.certificat_pem, cert.fingerprint_ascii)
+            self.contexte.generateur_transactions.emettre_certificat(cert.certificat_pem, cert.fingerprint)
 
         return enveloppes_certificats
 
