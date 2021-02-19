@@ -4,6 +4,8 @@ import math
 import struct
 import multibase
 import multihash
+import datetime
+import pytz
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -117,6 +119,42 @@ def verifier_idmg(idmg: str, certificat_pem: str):
     date_exp_int = int(math.ceil(float(date_exp.timestamp()) / 1000.0))
     if date_exp_int_recu != date_exp_int:
         raise IdmgInvalide("IDMG fourni en parametre est invalide - date expiration mismatch")
+
+
+def expiration_idmg(idmg: str):
+    """
+    Retourne la date d'expiration du IDMG
+    :param idmg: IDMG a verifier
+    :return:
+    :raises: IdmgInvalide si version non supportee
+    """
+    # Extraire la version
+    # valeur = base58.b58decode(idmg)
+    try:
+        valeur = multibase.decode(idmg)
+    except ValueError:
+        # Probablement version 1 sans multibase
+        # Tenter d'extraire directement en base58
+        valeur = base58.b58decode(idmg)
+
+    version = int(valeur[0])
+
+    version_info = IdmgUtil.VERSION_PACK[version]
+
+    if version == 1:
+        # Version 1 - 33 bytes en base58, hachage SHA512_224
+        (version, digest_recu, date_exp_int_recu) = struct.unpack(version_info, valeur)
+    elif version == 2:
+        # Version 2 - encodage multibase, 5 bytes header + multihash
+        header_struct = version_info['header']
+        header_size = struct.Struct(header_struct).size
+        (version, date_exp_int_recu) = struct.unpack(header_struct, valeur[0:header_size])
+    else:
+        raise IdmgInvalide("Version non supportee : %d" % version)
+
+    date_expiration = datetime.datetime.fromtimestamp(date_exp_int_recu * 1000, pytz.UTC)
+
+    return date_expiration
 
 
 class IdmgInvalide(BaseException):
