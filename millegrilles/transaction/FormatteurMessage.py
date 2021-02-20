@@ -1,10 +1,11 @@
+import datetime
+import json
+import logging
+import uuid
+
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import SignateurTransaction
 from millegrilles.util.Hachage import hacher
-
-import uuid
-import datetime
-import json
 
 
 class FormatteurMessageMilleGrilles:
@@ -21,6 +22,7 @@ class FormatteurMessageMilleGrilles:
         """
         self.__idmg = idmg
         self.__signateur_transactions = signateur_transactions
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     def signer_message(self,
                        message: dict,
@@ -63,6 +65,7 @@ class FormatteurMessageMilleGrilles:
 
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
         # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
+        self.__logger.debug("Message a hacher : %s" % enveloppe_bytes.decode('utf-8'))
         meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = hacher(
             enveloppe_bytes, hashing_code='sha2-256', encoding='base64')
 
