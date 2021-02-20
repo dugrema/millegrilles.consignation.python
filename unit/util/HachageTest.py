@@ -20,6 +20,9 @@ class HacherTest(TestCase):
     HACHAGE_VALEUR_1_BLAKE2b = 'zSEfXUAeBiw7nBrvdg5cB5uEhTGU2pwqjKvC9r7Jj1KrGsa8ZKD7NmTu9iTjXMj3tzPcaYG4Lb1xmyJrxHoZzRGwAZGhJX'
     HACHAGE_VALEUR_1_BLAKE2s = 'z2i3XjxBjtwwdn45jqRHp3fjadypMexy2Qjzcmu1DRUWa44Pd54'
 
+    VALEUR_2 = u'ÀÉËÊÈÇÏÎÔÛŨÙàéëèçïîôù¤{}[]¬~`°|/\'"\n\\'
+    HACHAGE_VALEUR_2 = 'z8VujidaiuXmk2EFUmojr3Jw75CFHmvn4q6sCWRgBxhk5wq1NTc8t9wPAHmgok2yqjtBieDNpWjQeFPeZaJY4b2fYHB'
+
     def test_hacher_string(self):
         resultat = hacher(HacherTest.VALEUR_1)
         logger.debug("Resultat hacher_string: %s" % resultat)
@@ -86,3 +89,8 @@ class HacherTest(TestCase):
 
     def test_verification_blake2s_mismatch(self):
         self.assertRaises(ErreurHachage, verifier_hachage, HacherTest.HACHAGE_VALEUR_1_BLAKE2s, 'mauvaise valeur')
+
+    def test_hachage_chars_speciaux(self):
+        resultat = hacher(HacherTest.VALEUR_2)
+        logger.debug("Resultat hacher_string: %s" % resultat)
+        self.assertEqual(HacherTest.HACHAGE_VALEUR_2, resultat)
