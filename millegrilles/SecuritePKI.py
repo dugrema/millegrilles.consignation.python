@@ -24,7 +24,7 @@ from millegrilles.dao.MessageDAO import BaseCallback, CertificatInconnu, Excepti
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
 from millegrilles.util.IdmgUtil import encoder_idmg_cert
 from millegrilles.config.Autorisations import autorisations_idmg
-from millegrilles.util.Hachage import map_code_to_hashes
+from millegrilles.util.Hachage import hacher, map_code_to_hashes
 
 
 class EnveloppeCertificat:
@@ -421,23 +421,24 @@ class UtilCertificats:
 
         return digest_base64
 
-    def hacher_bytes(self, enveloppe_bytes: bytes, hachage=None):
+    def hacher_bytes(self, enveloppe_bytes: bytes, hachage='sha2-512', encoding='base58btc'):
         """
         Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete et les elements commencant par _.
         :param enveloppe_bytes:
         :param hachage:
+        :param encoding:
         :return:
         """
-        if hachage is None:
-            hachage = self._contenu_hash_function()
-
-        digest = hashes.Hash(hachage, backend=default_backend())
-        digest.update(enveloppe_bytes)
-        resultat_digest = digest.finalize()
-        digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
-        self._logger.debug("Resultat hash contenu: %s" % digest_base64)
-
-        return digest_base64
+        # if hachage is None:
+        #     hachage = self._contenu_hash_function()
+        # digest = hashes.Hash(hachage, backend=default_backend())
+        # digest.update(enveloppe_bytes)
+        # resultat_digest = digest.finalize()
+        # digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
+        # self._logger.debug("Resultat hash contenu: %s" % digest_base64)
+        #
+        # return digest_base64
+        hacher(enveloppe_bytes, hashing_code=hachage, encoding=encoding)
 
     def chiffrage_asymmetrique(self, cle_secrete):
         public_key = self.certificat.public_key()

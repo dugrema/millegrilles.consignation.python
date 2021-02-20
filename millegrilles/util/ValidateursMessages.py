@@ -4,16 +4,15 @@ import json
 import logging
 import pytz
 
-from base64 import b64encode, b64decode
-from cryptography.hazmat.backends import default_backend
+from base64 import b64decode
 from cryptography.hazmat.primitives import hashes, asymmetric
 from typing import Union
 
 from millegrilles import Constantes
-# from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.util.ValidateursPki import ValidateurCertificatRequete, ValidateurCertificatCache, ValidateurCertificat
-from millegrilles.SecuritePKI import EnveloppeCertificat, HachageInvalide
+from millegrilles.SecuritePKI import EnveloppeCertificat
 from millegrilles.util.JSONMessageEncoders import DateFormatEncoder
+from millegrilles.util.Hachage import verifier_hachage
 
 
 class ValidateurMessage:
@@ -36,7 +35,6 @@ class ValidateurMessage:
         else:
             raise ValueError("Il faut fournir le contexte ou le idmg")
 
-        self.__hash_function = hashes.SHA256
         self.__signature_hash_function = hashes.SHA512
 
     def connecter(self):
@@ -95,24 +93,16 @@ class ValidateurMessage:
 
         return enveloppe_certificat
 
-    def verifier_hachage(self, message: dict, fonction_hachage=None) -> str:
+    def verifier_hachage(self, message: dict) -> str:
+        """
+        :param message:
+        :return: Hachage du message
+        :raises ErreurHachage: Si le digest calcule ne correspond pas au hachage fourni
+        """
         entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         hachage = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
 
-        digest_base64 = self.hacher_dict(message, fonction_hachage)
-
-        self.__logger.debug("Resultat hash contenu: %s" % digest_base64)
-        if hachage != digest_base64:
-            raise HachageInvalide("Le hachage %s ne correspond pas au contenu recu %s" % (
-                hachage, digest_base64
-            ))
-        self.__logger.debug("Hachage de la transaction est OK: %s" % digest_base64)
-
-        return digest_base64
-
-    def hacher_dict(self, message, fonction_hachage=None):
         message_sans_entete = message.copy()
-
         try:
             del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         except KeyError:
@@ -126,14 +116,34 @@ class ValidateurMessage:
             separators=(',', ':')
         ).encode('utf-8')
 
-        if fonction_hachage is None:
-            fonction_hachage = self.__hash_function()
-        digest = hashes.Hash(fonction_hachage, backend=default_backend())
-        digest.update(message_bytes)
-        resultat_digest = digest.finalize()
-        digest_base64 = fonction_hachage.name + '_b64:' + b64encode(resultat_digest).decode('utf-8')
+        # Fonction de verification de hachage - lance une exception en cas de mismatch
+        verifier_hachage(hachage, message_bytes)
 
-        return digest_base64
+        return hachage
+
+    # def hacher_dict(self, message):
+    #     """
+    #     :param message: Message a verifier
+    #     :raises ErreurHachage: Si le digest calcule ne correspond pas au hachage fourni
+    #     """
+    #     entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+    #     hachage = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
+    #
+    #     message_sans_entete = message.copy()
+    #     try:
+    #         del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+    #     except KeyError:
+    #         pass  # Ce n'est pas un message avec entete
+    #
+    #     # message_bytes = json.dumps(message_sans_entete).encode('utf-8')
+    #     message_bytes = json.dumps(
+    #         message_sans_entete,
+    #         ensure_ascii=False,  # S'assurer de supporter tous le range UTF-8
+    #         sort_keys=True,
+    #         separators=(',', ':')
+    #     ).encode('utf-8')
+    #
+    #     verifier_hachage(hachage, message_bytes)
 
     def __verifier_signature(self, message: dict, signature: str, enveloppe: EnveloppeCertificat):
         # Le certificat est valide. Valider la signature du message.

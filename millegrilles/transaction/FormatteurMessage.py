@@ -1,5 +1,6 @@
 from millegrilles import Constantes
 from millegrilles.SecuritePKI import SignateurTransaction
+from millegrilles.util.Hachage import hacher
 
 import uuid
 import datetime
@@ -12,8 +13,7 @@ class FormatteurMessageMilleGrilles:
     Supporte aussi une contre-signature pour emission vers une MilleGrille tierce.
     """
 
-    def __init__(self, idmg: str, signateur_transactions: SignateurTransaction,
-                 contresignateur_transactions: SignateurTransaction = None):
+    def __init__(self, idmg: str, signateur_transactions: SignateurTransaction):
         """
         :param idmg: MilleGrille correspondant au signateur de transactions
         :param signateur_transactions: Signateur de transactions pour la MilleGrille
@@ -21,14 +21,6 @@ class FormatteurMessageMilleGrilles:
         """
         self.__idmg = idmg
         self.__signateur_transactions = signateur_transactions
-        self.__contresignateur_transactions = contresignateur_transactions
-
-        # with open(signateur_transactions.configuration.mq_certfile) as certs:
-        #     cert = self.__signateur_transactions.certificat
-        #     self.__chaine_certificats = [
-        #
-        #     ]
-
 
     def signer_message(self,
                        message: dict,
@@ -70,7 +62,9 @@ class FormatteurMessageMilleGrilles:
         enveloppe_bytes = self.__signateur_transactions.preparer_transaction_bytes(enveloppe)
 
         # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
-        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
+        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
+        meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = hacher(
+            enveloppe_bytes, hashing_code='sha2-256', encoding='base64')
 
         # Recuperer le dict de message (deserialiser), ajouter l'entete pour signer le message
         enveloppe = json.loads(enveloppe_bytes)
@@ -80,18 +74,10 @@ class FormatteurMessageMilleGrilles:
 
         if ajouter_chaine_certs:
             # Ajouter un element _certificats = [cert, inter, millegrilles]
-            message_signe['_certificats'] = self.__signateur_transactions.chaine_certs
+            message_signe[Constantes.TRANSACTION_MESSAGE_LIBELLE_CERTIFICAT_INCLUS] = \
+                self.__signateur_transactions.chaine_certs
 
         return message_signe, uuid_transaction
-
-    def contresigner_message(self, message: dict):
-        """
-        Ajouter une signature avec un certificat de MilleGrille tierce.
-        :param message:
-        :return:
-        """
-        message_contresigne = self.__contresignateur_transactions.signer(message)
-        return message_contresigne
 
     @property
     def chaine_certificat(self):

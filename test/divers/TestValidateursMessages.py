@@ -16,12 +16,12 @@ class ValiderMessage:
         self.validateur = None
 
     def initialiser_contexte(self):
-        self.contexte = ContexteRessourcesMilleGrilles()
-        self.contexte.initialiser()
+        # self.contexte = ContexteRessourcesMilleGrilles()
+        # self.contexte.initialiser()
 
         self.__logger.debug("Preparation validateur message")
-        self.validateur = ValidateurMessage(self.contexte)
-        self.validateur.connecter()
+        self.validateur = ValidateurMessage(idmg="QLA8z7SaLx4ZFTyRbUdPiejojm5hUfqxcPRcwsuiVR8T")
+        # self.validateur.connecter()
         self.__logger.debug("Validateur pret")
 
     def test_valider_message(self):
