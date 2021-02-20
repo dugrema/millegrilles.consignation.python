@@ -23,9 +23,10 @@ from millegrilles.Constantes import ConstantesBackup
 from millegrilles.util.JSONMessageEncoders import BackupFormatEncoder, DateFormatEncoder, decoder_backup
 from millegrilles.SecuritePKI import HachageInvalide, CertificatInvalide, CertificatInconnu, EnveloppeCertificat
 from millegrilles.util.X509Certificate import EnveloppeCleCert
-from millegrilles.util.Chiffrage import CipherMsg1Chiffrer, CipherMsg1Dechiffrer, DecipherStream, DigestStream
+from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback
+from millegrilles.util.Hachage import hacher
 
 
 # class CipherIOWriter(RawIOBase):
@@ -152,7 +153,7 @@ class BackupUtil:
         :param output_stream: Optionnel, stream/fichier d'output. Permet d'utiliser le cipher comme output stream dans un pipe.
         :return:
         """
-        cipher = CipherMsg1Chiffrer(output_stream=output_stream)
+        cipher = CipherMsg2Chiffrer(output_stream=output_stream)
         iv = b64encode(cipher.iv).decode('utf-8')
 
         # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
@@ -1747,10 +1748,11 @@ class ArchivesBackupParser:
                     self.__rapport_restauration.incrementer_indechiffrables(domaine)
                 else:
                     iv = b64decode(cle_iv['iv'].encode('utf-8'))
+                    compute_tag = b64decode(cle_iv['tag'].encode('utf-8'))
                     cle = cle_iv['cle']
 
                     cle_dechiffree = self.__contexte.signateur_transactions.dechiffrage_asymmetrique(cle)
-                    decipher = CipherMsg1Dechiffrer(iv, cle_dechiffree)
+                    decipher = CipherMsg2Dechiffrer(iv, cle_dechiffree, compute_tag)
                     stream = DecipherStream(decipher, file_object)
 
                     # Wrapper le stream dans un decodeur lzma

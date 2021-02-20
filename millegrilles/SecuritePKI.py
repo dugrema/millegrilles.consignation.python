@@ -1,9 +1,7 @@
 # Module pour la securite avec certificats (PKI)
 import logging
 import json
-import re
 import base64
-import os
 import datetime
 import pytz
 import multibase
@@ -395,7 +393,7 @@ class UtilCertificats:
         )
         self._cle = cle
 
-    def hacher_contenu(self, dict_message, hachage=None):
+    def hacher_contenu(self, dict_message, hachage='sha2-512'):
         """
         Produit un hash SHA-2 256bits du contenu d'un message. Exclue l'en-tete et les elements commencant par _.
         :param dict_message:
@@ -410,16 +408,18 @@ class UtilCertificats:
 
         message_bytes = self.preparer_transaction_bytes(dict_message_effectif)
 
-        if hachage is None:
-            hachage = self._contenu_hash_function()
+        # if hachage is None:
+        #     hachage = self._contenu_hash_function()
+        #
+        # digest = hashes.Hash(hachage, backend=default_backend())
+        # digest.update(message_bytes)
+        # resultat_digest = digest.finalize()
+        # digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
+        # self._logger.debug("Resultat hash contenu: %s" % digest_base64)
+        #
+        # return digest_base64
 
-        digest = hashes.Hash(hachage, backend=default_backend())
-        digest.update(message_bytes)
-        resultat_digest = digest.finalize()
-        digest_base64 = hachage.name + '_b64:' + str(base64.b64encode(resultat_digest), 'utf-8')
-        self._logger.debug("Resultat hash contenu: %s" % digest_base64)
-
-        return digest_base64
+        hacher(message_bytes, hashing_code=hachage)
 
     def hacher_bytes(self, enveloppe_bytes: bytes, hachage='sha2-512', encoding='base58btc'):
         """
@@ -690,264 +690,6 @@ class SignateurTransaction(UtilCertificats):
             chaine_pem = self.chaine_certs
 
         super().emettre_certificat(chaine_pem, correlation_csr)
-
-
-class VerificateurTransaction(UtilCertificats):
-    """ Verifie la signature des transactions. """
-
-    def __init__(self, contexte):
-        super().__init__(contexte.configuration)
-        self._contexte = contexte
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-    def verifier(self, transaction):
-        """
-        Verifie la signature d'une transaction.
-
-        :param transaction: Transaction str ou dict.
-        :raises: InvalidSignature si la signature est invalide.
-        :return: True si valide.
-        """
-
-        if transaction is str:
-            dict_message = json.loads(transaction)
-        elif isinstance(transaction, dict):
-            dict_message = transaction.copy()
-        else:
-            raise TypeError("La transaction doit etre en format str ou dict")
-
-        hachage = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
-        if hachage is None:
-            raise ValueError("Le %s n'existe pas sur la transaction" % Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE)
-
-        signature = dict_message['_signature']
-
-        if signature is None:
-            raise ValueError("La _signature n'existe pas sur la transaction")
-
-        # Verifier le hachage du contenu
-        hachage_contenu_courant = self.hacher_contenu(dict_message)
-        if hachage != hachage_contenu_courant:
-            raise HachageInvalide("Le hachage %s ne correspond pas au contenu recu %s" % (
-                hachage, hachage_contenu_courant
-            ))
-        self._logger.debug("Hachage de la transaction est OK: %s" % hachage_contenu_courant)
-
-        regex_ignorer = re.compile('^_.+')
-        keys = list()
-        keys.extend(dict_message.keys())
-        for cle in keys:
-            m = regex_ignorer.match(cle)
-            if m:
-                del dict_message[cle]
-                self._logger.debug("Enlever cle: %s" % cle)
-
-        # Verifier que le cert CA du message == IDMG du message. Charge le CA racine et intermediaires connus de
-        # la MilleGrille tierce dans un fichier (idmg.racine.pem et idmg.untrusted.cert.pem) au besoin.
-        # Retourne le idmg de la MilleGrille concernee.
-        exception_si_valide = None  # Exception a lancer si la signature est valide mais que le certificat est conditionnellement valide
-        try:
-            enveloppe_certificat = self._identifier_certificat(dict_message)
-        except CertificatInconnu as ci:
-            # Le certificat est inconnu. Verifier si le message contient une fiche (privee ou publique)
-            # ou des certificats inline
-            certificats_inline = transaction.get('_certificats') or transaction.get('_certificat') or transaction.get('certificat')
-            if certificats_inline:
-                try:
-                    epoch_transaction = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
-                    date_reference = datetime.datetime.fromtimestamp(epoch_transaction, tz=pytz.UTC)
-                except KeyError:
-                    date_reference = datetime.datetime.now(tz=pytz.UTC)
-
-                enveloppe_temp = EnveloppeCertificat(certificat_pem='\n'.join(certificats_inline))
-
-                # Tenter de valider le certificat immediatement, peut echouer si la chaine n'a pas ete traitee
-                try:
-                    enveloppe_certificat = self._contexte.verificateur_certificats.charger_certificat(
-                        enveloppe=enveloppe_temp, date_reference=date_reference)
-                    self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
-                except AutorisationConditionnelleDomaine as acd:
-                    self._contexte.verificateur_certificats.emettre_certificat(certificats_inline)
-                    raise acd
-                except ExceptionConnectionFermee:
-                    pass  # Ok, on peut travailler hors ligne
-
-            else:
-                # Verifier cas speciaux
-                enveloppe_certificat = None
-                entete = dict_message.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE)
-                if entete is not None:
-                    domaine_action = entete.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE)
-                    if domaine_action == Constantes.ConstantesPki.TRANSACTION_DOMAINE_NOUVEAU_CERTIFICAT:
-
-                        # C'est une transaction de certificats, on fait juste charger le contenu directement
-                        pems = [dict_message[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp]
-                                for fp in dict_message[ConstantesSecurityPki.LIBELLE_CHAINE]]
-
-                        enveloppe_certificat = EnveloppeCertificat(certificat_pem='\n'.join(pems))
-
-                # fiche = dict_message.get('fiche_privee')
-                # certs_signataires = dict_message.get('certificat_fullchain_signataire')
-                # if fiche is not None:
-                #     self._logger.info("Message avec une fichier privee, on charge les certificats")
-                #     self._charger_fiche(fiche, certs_signataires)
-                #     enveloppe_certificat = self._identifier_certificat(dict_message)
-                # else:
-                if enveloppe_certificat is None:
-                    self._logger.info("Certificat inconnu, requete MQ pour trouver %s" % ci.fingerprint)
-                    # routing = ConstantesSecurityPki.EVENEMENT_REQUETE + '.' + ci.fingerprint
-                    # Utiliser emettre commande pour eviter d'ajouter un prefixe au routage
-                    self.contexte.message_dao.transmettre_demande_certificat(ci.fingerprint)
-                    raise ci  # On re-souleve l'erreur
-
-        except AutorisationConditionnelleDomaine as acd:
-            # Le certificat est valide, mais seulement pour certains domaines
-            # On verifie la signature de la transation. Si elle est valide, on relance l'exception
-            # Sinon on laise l'erreur de signature etre lancee
-            exception_si_valide = acd
-            enveloppe_certificat = acd.enveloppe
-
-        self._logger.debug(
-            "Certificat utilise pour verification signature message: %s" % enveloppe_certificat.fingerprint)
-
-        self._verifier_signature(dict_message, signature, enveloppe=enveloppe_certificat)
-
-        if exception_si_valide is not None:
-            # On a une exception qui doit etre lancee uniquement quand la signature est valide
-            raise exception_si_valide
-
-        return enveloppe_certificat
-
-    def _verifier_signature(self, dict_message, signature, enveloppe=None):
-        """
-        Verifie la signature du message avec le certificat.
-
-        :param dict_message:
-        :param signature:
-        :param enveloppe: Optionnel. Certificat a utiliser pour la verification de signature
-        :raises InvalidSignature: Lorsque la signature est invalide
-        :return:
-        """
-        if enveloppe is not None:
-            certificat = enveloppe.certificat
-            self._logger.debug("Verifier signature, Certificat: %s" % enveloppe.fingerprint)
-        else:
-            certificat = self.certificat
-
-        signature_bytes = base64.b64decode(signature)
-        # message_json = json.dumps(dict_message, sort_keys=True, separators=(',', ':'))
-        # message_bytes = bytes(message_json, 'utf-8')
-        message_bytes = self.preparer_transaction_bytes(dict_message)
-        # self._logger.debug("Verifier signature, Message: %s" % str(dict_message))
-
-        cle_publique = certificat.public_key()
-        cle_publique.verify(
-            signature_bytes,
-            message_bytes,
-            asymmetric.padding.PSS(
-                mgf=asymmetric.padding.MGF1(self._sign_hash_function()),
-                salt_length=64  # max supporte sur iPhone asymmetric.padding.PSS.MAX_LENGTH
-            ),
-            self._sign_hash_function()
-        )
-        self._logger.debug("Signature OK")
-
-    def _identifier_certificat(self, dict_message):
-        """
-        Identifie le certificat, tente de le charger au besoin.
-
-        :param dict_message:
-        :return:
-        """
-
-        fingerprint = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_FINGERPRINT_CERTIFICAT]
-        self._logger.debug("Identifier certificat transaction, fingerprint %s" % fingerprint)
-        verificateur_certificats = self._contexte.verificateur_certificats
-
-        try:
-            epoch_transaction = dict_message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][
-                Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
-            date_reference = datetime.datetime.fromtimestamp(epoch_transaction, tz=pytz.UTC)
-        except KeyError:
-            date_reference = datetime.datetime.now(tz=pytz.UTC)
-
-        enveloppe_certificat = verificateur_certificats.charger_certificat(fingerprint=fingerprint, date_reference=date_reference)
-
-        return enveloppe_certificat
-
-    def _charger_fiche(self, fiche, certs_signataires: list = None):
-        """
-        Charge et emet les certificats valides d'une fiche de MilleGrille
-        """
-        verificateur_certificats = self._contexte.verificateur_certificats
-        enveloppes_certificats = verificateur_certificats.charger_fiche(fiche, certs_signataires)
-
-        # Les certificats de la fiche ont ete charges et sont valides. On les emet sur le reseau.
-        for cert in enveloppes_certificats:
-            self.contexte.generateur_transactions.emettre_certificat(cert.certificat_pem, cert.fingerprint)
-
-        return enveloppes_certificats
-
-
-class VerificateurCertificats(UtilCertificats):
-    """
-    Verifie les certificats en utilisant les certificats CA et openssl.
-
-    Charge les certificats en utilisant le fingerprint (inclu dans les transactions). Si un certificat n'est pas
-    connu, le verificateur va tenter de le trouver dans MongoDB. Si le certificat n'existe pas dans Mongo,
-    une erreur est lancee via RabbitMQ pour tenter de trouver le certificat via un des noeuds.
-    """
-
-    def __init__(self, contexte):
-        super().__init__(contexte)
-        self._logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
-
-        self._cache_certificats_fingerprint = dict()
-
-    def charger_certificat(self, fichier=None, fingerprint: str = None, enveloppe: EnveloppeCertificat = None,
-                           date_reference: datetime.datetime = None):
-        # Tenter de charger a partir d'une copie locale
-        if fingerprint is not None:
-            # Verifier si le certificat est deja charge
-            enveloppe = self._cache_certificats_fingerprint.get(fingerprint)
-
-            if enveloppe is None and self._contexte.document_dao is not None:
-                try:
-                    collection = self._contexte.document_dao.get_collection(ConstantesSecurityPki.COLLECTION_NOM)
-                    document_cert = collection.find_one({ConstantesSecurityPki.LIBELLE_FINGERPRINT: fingerprint})
-                    if document_cert is not None:
-                        pems = [document_cert[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in document_cert[ConstantesSecurityPki.LIBELLE_CHAINE]]
-                        enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(pems))
-                except TypeError:
-                    if self._logger.isEnabledFor(logging.DEBUG):
-                        self._logger.exception(
-                            "DEBUG: Erreur access base de donnees mongo pour charger certificat manquant")
-
-        elif fichier is not None and os.path.isfile(fichier):
-            with open(fichier, 'r') as fichier:
-                certificat = fichier.read()
-            # certificat = self._charger_pem(fichier)
-
-            if certificat is not None:
-                enveloppe = EnveloppeCertificat(certificat_pem=certificat)
-
-        # Conserver l'enveloppe dans le cache
-        if enveloppe is not None:
-
-            if not enveloppe.est_verifie:
-                self.valider_x509_enveloppe(enveloppe, date_reference=date_reference)
-                self._cache_certificats_fingerprint[enveloppe.fingerprint] = enveloppe
-
-        else:
-            raise CertificatInconnu("Certificat ne peut pas etre charge", fingerprint=fingerprint)
-
-        return enveloppe
-
-    def aligner_chaine_cas(self, enveloppe: EnveloppeCertificat):
-        liste_enveloppes_cas = [enveloppe]
-        for cert_pem in enveloppe.reste_chaine_pem:
-            liste_enveloppes_cas.append(EnveloppeCertificat(certificat_pem=cert_pem))
-        return liste_enveloppes_cas
 
 
 class GestionnaireEvenementsCertificat(UtilCertificats, BaseCallback):

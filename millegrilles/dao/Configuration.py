@@ -13,7 +13,7 @@ from threading import Thread, Event
 from millegrilles import Constantes
 from millegrilles.dao.MessageDAO import PikaDAO
 from millegrilles.transaction.GenerateurTransaction import GenerateurTransaction
-from millegrilles.SecuritePKI import SignateurTransaction, VerificateurTransaction, VerificateurCertificats
+from millegrilles.SecuritePKI import SignateurTransaction
 from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.ValidateursMessages import ValidateurMessage
 from millegrilles.util.ValidateursPki import ValidateurCertificat
@@ -194,7 +194,6 @@ class TransactionConfiguration:
                     clecert_millegrille = EnveloppeCleCert()
                     clecert_millegrille.cert_from_pem_bytes(pem_millegrille)
                     self.__certificat_millegrille = clecert_millegrille
-
 
         self.__logger.info("Configuration MQ: host: %s, port: %s" % (self.mq_host, self.mq_port))
         self.__logger.info("Configuration Mongo: host: %s, port: %s" % (self.mongo_host, self.mongo_port))
@@ -627,16 +626,6 @@ class ContexteRessourcesMilleGrilles:
     @property
     def signateur_transactions(self) -> SignateurTransaction:
         return self._signateur_transactions
-
-    @property
-    def verificateur_transaction(self) -> VerificateurTransaction:
-        raise NotImplementedError("Deprecated")
-        # return self._verificateur_transactions
-
-    @property
-    def verificateur_certificats(self) -> VerificateurCertificats:
-        raise NotImplementedError("Deprecated")
-        # return self._verificateur_certificats
 
     @property
     def idmg(self) -> str:

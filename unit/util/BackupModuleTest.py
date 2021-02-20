@@ -70,7 +70,9 @@ class BackupUtilTest(TestCaseContexte):
         resultat = resultat + cipher.update(b'test')
         resultat = resultat + cipher.finalize()
         self.assertIsNotNone(resultat, "Cipher n'est pas fonctionnel")
-        self.assertEqual(32, len(resultat), "Erreur taille resultat cipher")
+        self.assertEqual(4, len(resultat), "Erreur taille resultat cipher")
+
+        self.assertIsNotNone(cipher.tag, "Le compute tag n'est pas present")
 
         self.__class__.logger.debug("Transaction maitrecles : %s" % transaction_maitrecles)
 
