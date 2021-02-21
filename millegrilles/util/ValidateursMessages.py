@@ -3,8 +3,8 @@ import datetime
 import json
 import logging
 import pytz
+import multibase
 
-from base64 import b64decode
 from cryptography.hazmat.primitives import hashes, asymmetric
 from typing import Union
 
@@ -123,7 +123,12 @@ class ValidateurMessage:
 
     def __verifier_signature(self, message: dict, signature: str, enveloppe: EnveloppeCertificat):
         # Le certificat est valide. Valider la signature du message.
-        signature_bytes = b64decode(signature)
+        # signature_bytes = b64decode(signature)
+
+        signature_enveloppe = multibase.decode(signature.encode('utf-8'))
+        version_signature = signature_enveloppe[0]
+        signature_bytes = signature_enveloppe[1:]
+
         message_bytes = json.dumps(
             message,
             ensure_ascii=False,   # S'assurer de supporter tous le range UTF-8
@@ -133,15 +138,19 @@ class ValidateurMessage:
 
         certificat = enveloppe.certificat
         cle_publique = certificat.public_key()
-        cle_publique.verify(
-            signature_bytes,
-            message_bytes,
-            asymmetric.padding.PSS(
-                mgf=asymmetric.padding.MGF1(self.__signature_hash_function()),
-                salt_length=64  # max supporte sur iPhone asymmetric.padding.PSS.MAX_LENGTH
-            ),
-            self.__signature_hash_function()
-        )
+
+        if version_signature == 1:
+            cle_publique.verify(
+                signature_bytes,
+                message_bytes,
+                asymmetric.padding.PSS(
+                    mgf=asymmetric.padding.MGF1(self.__signature_hash_function()),
+                    salt_length=64  # max supporte sur iPhone asymmetric.padding.PSS.MAX_LENGTH
+                ),
+                self.__signature_hash_function()
+            )
+        else:
+            raise ValueError("Version de signature non supportee : %d" % version_signature)
 
         # Signature OK, aucune exception n'a ete lancee
 

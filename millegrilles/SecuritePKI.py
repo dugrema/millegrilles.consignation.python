@@ -652,11 +652,15 @@ class SignateurTransaction(UtilCertificats):
             ),
             self._sign_hash_function()
         )
+        # signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')
 
-        signature_texte_utf8 = str(base64.b64encode(signature), 'utf-8')
-        self._logger.debug("Signatures: %s" % signature_texte_utf8)
+        VERSION_SIGNATURE = 1
+        signature = bytes([VERSION_SIGNATURE]) + signature
 
-        return signature_texte_utf8
+        signature_encodee = multibase.encode('base64', signature).decode('utf-8')
+        self._logger.debug("Signature: %s" % signature_encodee)
+
+        return signature_encodee
 
     def emettre_certificat(self, chaine_pem: list = None, correlation_csr: str = None):
         """

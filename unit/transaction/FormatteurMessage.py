@@ -79,3 +79,8 @@ class ValiderMessageFormatte(TestCaseContexte):
         message = message_1.copy()
         message_signe, uuid_transaction = self.formatteur.signer_message(message, 'Domaine.test', ajouter_chaine_certs=True)
         self.validateur.verifier(message_signe, utiliser_date_message=True, utiliser_idmg_message=True)
+
+    def test_valider_message2(self):
+        message = message_2.copy()
+        message_signe, uuid_transaction = self.formatteur.signer_message(message, 'Domaine.test', ajouter_chaine_certs=True)
+        self.validateur.verifier(message_signe, utiliser_date_message=True, utiliser_idmg_message=True)
