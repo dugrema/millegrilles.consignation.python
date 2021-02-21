@@ -121,30 +121,6 @@ class ValidateurMessage:
 
         return hachage
 
-    # def hacher_dict(self, message):
-    #     """
-    #     :param message: Message a verifier
-    #     :raises ErreurHachage: Si le digest calcule ne correspond pas au hachage fourni
-    #     """
-    #     entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-    #     hachage = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE]
-    #
-    #     message_sans_entete = message.copy()
-    #     try:
-    #         del message_sans_entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
-    #     except KeyError:
-    #         pass  # Ce n'est pas un message avec entete
-    #
-    #     # message_bytes = json.dumps(message_sans_entete).encode('utf-8')
-    #     message_bytes = json.dumps(
-    #         message_sans_entete,
-    #         ensure_ascii=False,  # S'assurer de supporter tous le range UTF-8
-    #         sort_keys=True,
-    #         separators=(',', ':')
-    #     ).encode('utf-8')
-    #
-    #     verifier_hachage(hachage, message_bytes)
-
     def __verifier_signature(self, message: dict, signature: str, enveloppe: EnveloppeCertificat):
         # Le certificat est valide. Valider la signature du message.
         signature_bytes = b64decode(signature)

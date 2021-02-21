@@ -4,6 +4,7 @@ import logging
 
 from unit.helpers.TestBaseContexte import TestCaseContexte
 from millegrilles.transaction.FormatteurMessage import FormatteurMessageMilleGrilles
+from millegrilles.util.ValidateursMessages import ValidateurMessage
 
 
 # Setup logging
@@ -65,3 +66,16 @@ class FormatteurMessageTest(TestCaseContexte):
         self.assertEqual(HACHAGE_MESSAGE_2, message_signe['en-tete']['hachage_contenu'])
         self.assertIsNotNone(message_signe['_signature'])
         self.assertIsNotNone(message_signe['_certificat'])
+
+
+class ValiderMessageFormatte(TestCaseContexte):
+
+    def setUp(self) -> None:
+        idmg = 'z2RACWHAFSqghq8EaTg5HSGKNPBr3uBfpcpLmBTJa9SEK9MmbD6cA2'
+        self.formatteur = FormatteurMessageMilleGrilles(idmg, self.contexte.signateur_transactions)
+        self.validateur = ValidateurMessage(idmg=idmg)
+
+    def test_valider_message1(self):
+        message = message_1.copy()
+        message_signe, uuid_transaction = self.formatteur.signer_message(message, 'Domaine.test', ajouter_chaine_certs=True)
+        self.validateur.verifier(message_signe, utiliser_date_message=True, utiliser_idmg_message=True)

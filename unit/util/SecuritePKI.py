@@ -56,3 +56,4 @@ class EnveloppeCertificatTest(TestCase):
         logger.debug("idmg : %s" % idmg)
         self.assertEqual(IDMG_CERT_1, idmg)
 
+
