@@ -23,11 +23,11 @@ class CipherMgs1(RawIOBase):
     Implemente RawIOBase - permet d'utiliser le cipher comme fileobj (stream)
     """
 
-    def __init__(self):
+    def __init__(self, password: bytes = None):
         self.__skip_iv = False
 
         self._iv: Optional[bytes] = None
-        self._password: Optional[bytes] = None
+        self._password: Optional[bytes] = password
 
         self._cipher: Optional[Cipher] = None
 
@@ -58,22 +58,23 @@ class CipherMsg1Chiffrer(CipherMgs1):
     Helper method : chiffrer_motdepasse pour chiffrer le secret avec la cle publique (cert)
     """
 
-    def __init__(self, output_stream=None, padding=True):
+    def __init__(self, output_stream=None, password: bytes = None, padding=True):
         """
         :param output_stream: Optionnel - permet d'utiliser le cipher comme stream (fileobj)
         """
-        super().__init__()
+        super().__init__(password=password)
         self.__output_stream = output_stream
         self.__padder: Optional[padding.PaddingContext] = None
-        self.__generer()
+        self._generer()
         self.__padding = padding
         self._ouvrir_cipher()
 
         if output_stream:
             self.start_encrypt()
 
-    def __generer(self):
-        self._password = secrets.token_bytes(32)  # AES-256 = 32 bytes
+    def _generer(self):
+        if self._password is None:
+            self._password = secrets.token_bytes(32)  # AES-256 = 32 bytes
         self._iv = secrets.token_bytes(16)
 
     def start_encrypt(self):
@@ -232,8 +233,13 @@ class CipherMsg2Chiffrer(CipherMsg1Chiffrer):
     Chiffrage avec GCM, tag de 128 bits
     """
 
-    def __init__(self, output_stream=None):
-        super().__init__(output_stream, padding=False)
+    def __init__(self, output_stream=None, password: bytes = None):
+        super().__init__(output_stream, password, padding=False)
+
+    def _generer(self):
+        if self._password is None:
+            self._password = secrets.token_bytes(32)  # AES-256 = 32 bytes
+        self._iv = secrets.token_bytes(12)        # GCM 96 bits = 12 bytes
 
     def _ouvrir_cipher(self):
         backend = default_backend()
