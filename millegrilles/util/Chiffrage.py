@@ -1,11 +1,12 @@
 import secrets
 import json
+import multibase
 
 from uuid import uuid4
 from io import RawIOBase
-from base64 import b64encode, b64decode
-from typing import Optional
-from cryptography.hazmat.primitives import serialization, asymmetric, padding
+from base64 import b64encode
+from typing import Optional, Union
+from cryptography.hazmat.primitives import asymmetric, padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes, CipherContext
 from cryptography.hazmat.backends import default_backend
@@ -13,8 +14,8 @@ from base64 import b64decode
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurityPki
-from millegrilles.dao.MessageDAO import TraitementMQRequetesBlocking
 from millegrilles.SecuritePKI import EnveloppeCertificat
+from millegrilles.util.Hachage import Hacheur
 
 
 class CipherMgs1(RawIOBase):
@@ -33,7 +34,7 @@ class CipherMgs1(RawIOBase):
 
         self._context: Optional[CipherContext] = None
 
-        self._digest = hashes.Hash(hashes.SHA512(), backend=default_backend())
+        self._hacheur = Hacheur(hashing_code='sha2-512', encoding='base64')
         self._digest_result: Optional[str] = None
 
     def _ouvrir_cipher(self):
@@ -46,7 +47,14 @@ class CipherMgs1(RawIOBase):
         Digest calcule sur le resultat chiffre
         :return:
         """
-        return 'sha512_b64:' + b64encode(self._digest_result).decode('utf-8')
+        return self._digest_result
+
+    def get_meta(self):
+        meta_info = {
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: multibase.encode('base64', self._iv).decode('utf-8'),
+            Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: self.digest,
+        }
+        return meta_info
 
 
 class CipherMsg1Chiffrer(CipherMgs1):
@@ -86,12 +94,12 @@ class CipherMsg1Chiffrer(CipherMgs1):
             # On assume mode CBC avec padding, IV requis
             self.__padder = padding.PKCS7(ConstantesSecurityPki.SYMETRIC_PADDING).padder()
             data = self._context.update(self.__padder.update(self._iv))
-            data = bytes()
+            # data = bytes()
         else:
             # Le IV n'est pas nessaire dans un mode sans padding (e.g. GCM)
             data = bytes()
 
-        self._digest.update(data)
+        self._hacheur.update(data)
 
         if self.__output_stream is not None:
             self.__output_stream.write(data)
@@ -103,7 +111,7 @@ class CipherMsg1Chiffrer(CipherMgs1):
             data = self.__padder.update(data)
 
         data = self._context.update(data)
-        self._digest.update(data)
+        self._hacheur.update(data)
 
         return data
 
@@ -115,10 +123,10 @@ class CipherMsg1Chiffrer(CipherMgs1):
 
         data_final = data + self._context.finalize()
 
-        if data_final is not None:
-            self._digest.update(data_final)
+        if data_final:
+            self._hacheur.update(data_final)
 
-        self._digest_result = self._digest.finalize()
+        self._digest_result = self._hacheur.finalize()
 
         return data_final
 
@@ -245,11 +253,6 @@ class CipherMsg2Chiffrer(CipherMsg1Chiffrer):
         backend = default_backend()
         self._cipher = Cipher(algorithms.AES(self._password), modes.GCM(self._iv), backend=backend)
 
-    def finalize(self):
-        data = super().finalize()
-
-        return data
-
     @property
     def tag(self):
         """
@@ -257,13 +260,24 @@ class CipherMsg2Chiffrer(CipherMsg1Chiffrer):
         """
         return self._context.tag
 
+    def get_meta(self):
+        meta_info = super().get_meta()
+        meta_info[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = multibase.encode('base64', self.tag).decode('utf-8')
+        return meta_info
+
 
 class CipherMsg2Dechiffrer(CipherMsg1Dechiffrer):
     """
     Dechiffrage avec GCM, tag de 128 bits
     """
 
-    def __init__(self, iv: bytes, password: bytes, compute_tag: bytes):
+    def __init__(self, iv: Union[str, bytes], password: bytes, compute_tag: Union[str, bytes]):
+        if isinstance(iv, str):
+            iv = multibase.decode(iv.encode('utf-8'))
+
+        if isinstance(compute_tag, str):
+            compute_tag = multibase.decode(compute_tag.encode('utf-8'))
+
         self._compute_tag = compute_tag
         super().__init__(iv, password, padding=False)
 

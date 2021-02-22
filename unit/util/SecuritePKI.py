@@ -1,9 +1,7 @@
 import logging
 
 from unittest import TestCase
-from unit.helpers.TestBaseContexte import TestCaseContexte
 
-from millegrilles.util.Hachage import verifier_hachage
 from millegrilles.SecuritePKI import EnveloppeCertificat
 
 
