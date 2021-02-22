@@ -97,3 +97,21 @@ class ChiffrageTest(TestCase):
         decipher.update(ciphertext_bytes)
 
         self.assertRaises(InvalidTag, decipher.finalize)
+
+    def test_cycle(self):
+        cipher = CipherMsg2Chiffrer()
+        valeur_init = cipher.start_encrypt()
+        ciphertext = valeur_init + cipher.update(MESSAGE_1.encode('utf-8'))
+        ciphertext = ciphertext + cipher.finalize()
+        meta = cipher.get_meta()
+
+        decipher = CipherMsg2Dechiffrer(meta['iv'], cipher.password, meta['tag'])
+        resultat = decipher.update(ciphertext)
+        resultat = resultat + decipher.finalize()
+        resultat = resultat.decode('utf-8')
+
+        # Confirmer que le message est identique
+        self.assertEqual(MESSAGE_1, resultat, 'Erreur comparaison message')
+
+        # Confirmer que le hachage a fonctionne
+        verifier_hachage(meta['hachage_bytes'], ciphertext)
