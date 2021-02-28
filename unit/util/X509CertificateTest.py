@@ -1,4 +1,5 @@
 import logging
+import multibase
 
 from unittest import TestCase
 
@@ -66,6 +67,38 @@ Mp0ZzHARNeA6hsAjgnIliyUkhw8/A6mH/PDyl+RSl/w=
 -----END CERTIFICATE-----
 """
 
+SAMPLE_KEY_1 = """
+-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDPQmW19+jjbAmY
+TISTJJ8p6lE4IKwwVs4fLD2T0WWu2dtCaSHqf7Fti2v9+fQqpTRE86u08ETWHGAh
+5CdzlJubSKp1+cBHQetZHttpPC8rgYI5MqdVJOlacVcU5U1WTrLOXOBd7ySFpg3c
+IX5P1o7EQgoaUHmuDC6K1w6yKuHzTiPwbDGPo0rhiSkIB55Ehe51dQeE0BvlFKxm
+FVBkVykx3LyO92XdSB+T9W4vP4/MKsrN4CQZ4uzn8l8EzkmiUj2WPNzQqZcsTcCA
+4b4fkpJK2bVEtwB14DlCM8Xj053EVG6EBlN1uFUBl+B5L1ppzuE2Xr2THrtFGUZD
+uND5MFYbAgMBAAECggEBALvFrP56lx0LsXmwwV/KCwVfi6vtNfMpgd8OJs+4I4aR
+S6tUMm0QuT/E09cq0IKeX8ekd8ka8VKGLLYnzXJSjdPWttDhr8kfOMjqQuCJrTae
+Q8vsT1u9cEkHbFy7DiEGdcqurHuOAKmw8tef5J8ShQ/bwOlsRYFg+f3Br0fNwB27
+6T6vnBk1VraRFV1n7kHvZrELI4xQsA7SWGgiLOOiK/MGRn0GFyJT6xXdZkD3VWFn
+5nGEKsMqgdMF7mjLjx61cb24gcGB5s69vu8DVuU7FpmMjf17vCuJAMmmim5ts1vd
+2DdeBsMM7JFbVIApP03A4j4y3x97IVvaa1/9VM6eKfECgYEA6MOqz4Wo51ubpJcZ
+yej+E8b66MhxKuSqq6EzSANY1G5LcCtxUTl1ncErvUVZCNNWHADODbRAgTwsAg8m
+vYGeP1RbL9HMCCIA9ArLFxzsWcPyyNuFLMUy5R5ijJv+nuViXziIycKSSmGfl3q6
+yKSdz0DbiTu1jnPY1ZB6yKB0sIMCgYEA4/LyRdv52IkWzQ8W4sWQABqo2uMJPRGQ
+VPsTtNJBC8SfeP/XhF0z5TF7IRhWhffw/2MRXt1V7c0APWm2tQ5w7c/xVDzCeNiE
+IFKRiplRR3SIt6vorIFeovuhx15qXemyn4VF6v+17d2NdkoPWmRxf4L3X88sJ2tb
+bOiVBh4koIkCgYBzGvfoQefB6ZpxbUuSfsbOzvKblSvpk0UXNNNgRE90Vcq2gLU7
+/pc8WR+hLJ8X7zLBDGDZhA72GeSFbCqzQlsYZEXnwu8MAozIImJGXsY+qdjxHSWh
+ey9tAHappCbpOvRHtHRomfCwGdDLHyUpPcbQi/lExyNEe+N50UX22up5swKBgD1y
+BcCzFVw7R/wqrx6d5r1Acnfeb2UY0PE3ZQ5/Bq2naN1zCaNShGSpu+kl6FzggwQ0
+rkAGJd2ePwxO7MNNiz9vqDvuzPVKWANmfnj/7xr13My1+FhX3yzL68YUO1PpZQ7/
+G+PG3kGqUTGrsQvKu5WFti0LaXmOxOxMna8yfOkRAoGBALe4GqADsOsrTCt/pAdz
+idy5n/BMzN3rYszGfBo/Kk6+J/+ZMakEX5AJCo/FVB6+GwZXNXbSOwS8YeH7Ua3a
+R/l0sX1fFVaL6Ivvhe4h5fO+wnnTcwRQxdbpHUQMWfE7Jx5K0xv+EbWK/kum+zFN
+kdy1sUwsQF60ZfujqbMQ49Y4
+-----END PRIVATE KEY-----
+"""
+
+
 class EnveloppeCleCertTest(TestCase):
 
     def setUp(self) -> None:
@@ -97,4 +130,23 @@ class EnveloppeCleCertTest(TestCase):
 
         logger.debug("IDMG %s" % idmg)
         self.assertEqual(IDMG_CERT_1, idmg)
+
+
+PASSWORD_1 = "mh4P1n8aD/byx5+iEt9NU1JEV7JUT7n19lowKrwerkm3cQwLu3e//cZBdcya+2wdEIuYyMW/xlzL2l16o/OZGOzZzA6ZsTWM/9EhuMW+0GO6pwM53vWcooTBcc4HkEX5/6ZkbGUMFn+b/ii34QsrWi7u8NW39UtgcKy5+cS3M0s118yYXDOguJ3UXn8jgpxNYgM3deoFb2KlCRt+rgODTckQweSaOL0xGhsO7g8z4flKvoLfKZN2D5QmDAJK2T1OlUcya+EAnNSN7hT05s7AAQOy2MLS2IGQG1QDp02qlLVbxZWX8bLI9OlDTZ12voK4LcCreqzWqqhNpWDzhiXXc0w"
+PASSWORD_1_DECHIFFRE = 'mOBMFwIz7F9bgQvcrQ9xtAxAKBHpozGNQZt6AfYIVdFM'
+
+
+class EnveloppeCleKeyTest(TestCase):
+
+    def setUp(self) -> None:
+        self.clecert_1 = EnveloppeCleCert()
+        self.clecert_1.key_from_pem_bytes(SAMPLE_KEY_1.encode('utf-8'))
+
+    def test_dechiffrer_password1(self):
+        password1_chiffre_bytes = multibase.decode(PASSWORD_1.encode('utf-8'))
+        password_dechiffre = self.clecert_1.dechiffrage_asymmetrique(password1_chiffre_bytes)
+        pwd_dechiffre_str = multibase.encode('base64', password_dechiffre).decode('utf-8')
+        logger.debug("Password dechiffre : %s" % pwd_dechiffre_str)
+
+        self.assertEqual(PASSWORD_1_DECHIFFRE, pwd_dechiffre_str)
 
