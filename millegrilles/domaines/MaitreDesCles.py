@@ -916,8 +916,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         return self._contexte.signateur_transactions.enveloppe_certificat_courant.certificat_pem
 
     @property
-    def get_intermediaires_pem(self):
-        return self.__certificat_intermediaires_pem
+    def get_chaine_pem(self):
+        return self._contexte.signateur_transactions.enveloppe_certificat_courant.chaine_pem()
 
     @property
     def get_ca_pem(self):
@@ -1115,7 +1115,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         # Genere message reponse
         message_resultat = {
             'certificat_millegrille': self.get_ca_pem,
-            'certificat': [self.get_certificat_pem, self.get_intermediaires_pem],
+            'certificat': self.get_chaine_pem,
             'certificats_backup': self.get_certificats_backup,
         }
 
