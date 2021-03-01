@@ -23,6 +23,7 @@ import binascii
 import logging
 import datetime
 import re
+import multibase
 
 
 class TraitementRequetesNoeuds(TraitementMessageDomaineRequete):
@@ -525,8 +526,13 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
             cles[hachage_bytes] = {
                 Constantes.SECURITE_LIBELLE_REPONSE: Constantes.SECURITE_ACCES_PERMIS,
-                'cle': b64encode(cle_secrete_reencryptee).decode('utf-8'),
-                'iv': document_cle['iv'],
+                'cle': multibase.encode('base64', cle_secrete_reencryptee).decode('utf-8'),
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: document_cle[
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: document_cle[
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG],
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: document_cle[
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: document_cle[
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: document_cle[
@@ -740,7 +746,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             cles_dict = r['cles']
             for cle_sym_b64 in cles_dict.values():
                 for clecert in self.__clecert_historique:
-                    cle_sym = b64decode(cle_sym_b64)
+                    cle_sym = multibase.decode(cle_sym_b64)
                     try:
                         cle_dechiffree = clecert.dechiffrage_asymmetrique(cle_sym)
                         self.creer_transaction_cles_manquantes(r, cle_dechiffree=cle_dechiffree)
@@ -847,9 +853,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         for fp in fingerprints_inconnus:
             cle = message_dict['cles'][fp]
 
-            fingerprint_bytes = b64decode(fp.encode('utf-8'))
-            fingerprint_hex = binascii.hexlify(fingerprint_bytes).decode('utf-8')
-
             transaction = {
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT: fp,
                 Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: message_dict[
@@ -858,6 +861,10 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: message_dict[
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: message_dict[
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG],
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: message_dict[
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: message_dict[
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLE_INDIVIDUELLE: cle,
@@ -866,7 +873,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             # Creer domaine action (ex. MaitreDesCles.d16034660842cc9ad9ef37735069f3e3b534f728.cle)
             domaine_action_transaction = '.'.join([
                 ConstantesMaitreDesCles.DOMAINE_NOM,
-                fingerprint_hex,
+                fp,  # Sous-domaine est le fingerprint du certificat
                 ConstantesMaitreDesCles.TRANSACTION_CLE,
             ])
 
@@ -1129,6 +1136,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: datetime.datetime.utcnow(),
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: transaction[
                 ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
             Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: transaction[
@@ -1300,9 +1309,11 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         nouveaux_params = {
             # ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'cle_recue': cle_recue,
-            'iv': transaction['iv'],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG],
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT],
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: hachage_bytes,
-            'domaine': transaction['domaine'],
+            Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE: transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE],
         }
 
         non_dechiffrable = None

@@ -508,6 +508,8 @@ class ProcessusMajUsagerTotp(MGProcessusTransaction):
 
         self.set_etape_suivante()  #Termine
 
+        return {'ok': True}
+
 
 class ProcessusMajCleUsagerPrive(MGProcessusTransaction):
     """

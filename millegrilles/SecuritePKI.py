@@ -7,7 +7,7 @@ import pytz
 import multibase
 import multihash
 
-from typing import Optional
+from typing import Optional, Union
 from cryptography.hazmat.primitives import serialization, asymmetric
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
@@ -453,13 +453,16 @@ class UtilCertificats:
         fingerprint = self._enveloppe.fingerprint
         return cle_secrete_backup, fingerprint
 
-    def dechiffrage_asymmetrique(self, contenu) -> bytes:
+    def dechiffrage_asymmetrique(self, contenu: Union[bytes, str]) -> bytes:
         """
         Utilise la cle privee en memoire pour dechiffrer le contenu.
         :param contenu:
         :return:
         """
-        contenu_bytes = base64.b64decode(contenu)
+        if isinstance(contenu, str):
+            contenu = contenu.encode('utf-8')
+
+        contenu_bytes = multibase.decode(contenu)
 
         contenu_dechiffre = self._cle.decrypt(
             contenu_bytes,

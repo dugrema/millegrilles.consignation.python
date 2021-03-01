@@ -768,6 +768,7 @@ class ConstantesMaitreDesCles:
     TRANSACTION_CHAMP_CLES = 'cles'
     TRANSACTION_CHAMP_IV = 'iv'
     TRANSACTION_CHAMP_TAG = 'tag'
+    TRANSACTION_CHAMP_FORMAT = 'format'
     TRANSACTION_CHAMP_FINGERPRINT = 'fingerprint'
     TRANSACTION_CHAMP_SUJET_CLE = 'sujet'
     TRANSACTION_CHAMP_DOMAINE = 'domaine'
