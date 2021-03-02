@@ -13,6 +13,14 @@ _autorisations_idmg = {
             "CatalogueApplications.catalogueDomaines",
             "CatalogueApplications.catalogueApplication"
         ])
+    },
+    "z2W2ECnP9eauNXD628aaiURj6tJfSYiygTaffC1bTbCNHCtomhoR7s": {
+        "description": "Signature pour les catalogues officiels MilleGrille",
+        ConstantesAutorisation.REGLE_DOMAINEACTIONS_PERMIS: frozenset([
+            "CatalogueApplications.majDomaine",
+            "CatalogueApplications.catalogueDomaines",
+            "CatalogueApplications.catalogueApplication"
+        ])
     }
 }
 
