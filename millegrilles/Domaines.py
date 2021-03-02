@@ -2069,8 +2069,8 @@ class RestaurationTransactions(MGProcessus):
                 self.emettre_evenement_restauration({'action': 'debut_restauration'})
 
                 parser = ArchivesBackupParser(
-                    self.controleur.contexte,
-                    resultat.iter_content(chunk_size=10 * 1024)
+                    self.controleur.contexte
+                    # resultat.iter_content(chunk_size=10 * 1024)
                 )
 
                 # parser.start().wait(30)
