@@ -837,12 +837,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_MIMETYPE]
             set_operations[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE] = \
                 transaction[ConstantesGrosFichiers.DOCUMENT_FICHIER_TAILLE]
-            set_operations[ConstantesGrosFichiers.DOCUMENT_SECURITE] = \
-                transaction[ConstantesGrosFichiers.DOCUMENT_SECURITE]
-
-            torrent_collection = transaction.get(ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID)
-            if torrent_collection is not None:
-                set_operations[ConstantesGrosFichiers.DOCUMENT_TORRENT_COLLECTION_UUID] = torrent_collection
 
         operations = {
             '$set': set_operations,
@@ -2275,9 +2269,6 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         :return:
         """
 
-        securite = info['securite']
-        fuuid = info[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID]
-
         # Sauvegarder demande conversion
         self.ajouter_conversion_preview(info)
 
@@ -2683,13 +2674,11 @@ class ProcessusTransactionNouvelleVersionMetadata(ProcessusGrosFichiersActivite)
         resultat = {
             'uuid': resultat['uuid_fichier'],
             'fuuid': fuuid,
-            'securite': transaction['securite'],
             'collection_uuid': document_uuid,
             'mimetype': transaction['mimetype'],
             'extension': extension,
             'nom_fichier': transaction['nom_fichier'],
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: transaction[
-                ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE],
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: fuuid,
         }
 
         # Verifier s'il y a un traitement supplementaire a faire
