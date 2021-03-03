@@ -1022,7 +1022,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
                 domaine_action = '.'.join([
                     ConstantesMaitreDesCles.DOMAINE_NOM,
-                    fingerprint_hex,
+                    fingerprint,
                     ConstantesMaitreDesCles.TRANSACTION_CLE
                 ])
 

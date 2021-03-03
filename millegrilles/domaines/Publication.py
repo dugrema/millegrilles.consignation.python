@@ -289,7 +289,12 @@ class ProcessusTransactionMajSite(MGProcessusTransaction):
         transaction = self.transaction
         self.controleur.gestionnaire.maj_site(transaction)
 
-        self._transmettre_maj(transaction['site_id'])
+        try:
+            site_id = transaction[ConstantesPublication.CHAMP_SITE_ID]
+        except KeyError:
+            # Par defaut le site id est l'identificateur unique de la transaction
+            site_id = transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+        self._transmettre_maj(site_id)
 
         self.set_etape_suivante()  # Termine
 

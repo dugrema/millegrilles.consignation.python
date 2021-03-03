@@ -1741,7 +1741,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 ConstantesGrosFichiers.DOCUMENT_FICHIER_EXTENSION_PREVIEW]
 
             fuuid_associes.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID_PREVIEW])
-            liste_hachage.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE])
+            liste_hachage.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_FUUID])
             liste_hachage.append(info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE_PREVIEW])
         except (KeyError, TypeError):
             pass
