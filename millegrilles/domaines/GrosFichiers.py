@@ -2326,7 +2326,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         # Transmettre commande a consignation_fichiers
         commande = {
             'fuuid': fuuid,
-            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: info_version[ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE],
+            ConstantesGrosFichiers.DOCUMENT_FICHIER_HACHAGE: fuuid,
         }
 
         domaine_action = 'commande.fichiers.transcoderVideo'
