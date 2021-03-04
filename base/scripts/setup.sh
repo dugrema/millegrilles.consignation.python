@@ -14,8 +14,8 @@ if [ ! -f $REQ_FILE ]; then
 fi
 
 echo "Installer dependances Python avec pip: fichier $REQ_FILE"
-https_proxy=http://192.168.2.195:8000 pip3 install --no-cache-dir -r $REQ_FILE
-# pip3 install --no-cache-dir -r $REQ_FILE
+# https_proxy=http://192.168.2.195:8000 pip3 install --no-cache-dir -r $REQ_FILE
+pip3 install --no-cache-dir -r $REQ_FILE
 
 # Fix pymongo, erreur cannot import abc (issue #305)
 pip3 uninstall -y bson
