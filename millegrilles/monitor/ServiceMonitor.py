@@ -1125,7 +1125,13 @@ class ServiceMonitor:
 
         certificat_pem = params.get('certificatPem') or params['cert']
         chaine = params.get('chainePem') or params['fullchain']
-        certificat_millegrille = chaine[-1]
+
+        certificat_millegrille_present = False
+        try:
+            certificat_millegrille = self.gestionnaire_docker.charger_config('pki.millegrille.cert').decode('utf-8')
+            certificat_millegrille_present = True
+        except IndexError:
+            certificat_millegrille = chaine[-1]
 
         try:
             config_csr = self.gestionnaire_docker.charger_config_recente('pki.monitor.csr')
@@ -1172,6 +1178,9 @@ class ServiceMonitor:
 
         if self.idmg != idmg:
             raise ValueError("Le IDMG du certificat (%s) ne correspond pas a celui du noeud (%s)", (idmg, self.idmg))
+
+        if certificat_millegrille_present is False:
+            self.gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
 
         # clecert_recu = EnveloppeCleCert()
         # clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'))
@@ -2422,7 +2431,14 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         with open(os.path.join(self._args.secrets, nom_fichier_passwd), 'rb') as fichier:
             intermediaire_passwd_pem = fichier.read()
         certificat_pem = params['certificatPem']
-        certificat_millegrille = params['chainePem'][-1]
+
+        certificat_millegrille_existe = False
+        try:
+            certificat_millegrille = self.gestionnaire_docker.charger_config('pki.millegrille.cert')
+            certificat_millegrille_existe = True
+        except AttributeError:
+            certificat_millegrille = params['chainePem'][-1]
+
         chaine = params['chainePem']
 
         # Extraire IDMG
@@ -2433,6 +2449,9 @@ class ServiceMonitorInstalleur(ServiceMonitor):
 
         if self.idmg != idmg:
             raise ValueError("Le IDMG du certificat (%s) ne correspond pas a celui du noeud (%s)", (idmg, self.idmg))
+
+        if certificat_millegrille_existe is False:
+            self.gestionnaire_docker.sauvegarder_config('pki.millegrille.cert', certificat_millegrille)
 
         clecert_recu = EnveloppeCleCert()
         clecert_recu.from_pem_bytes(intermediaire_key_pem, certificat_pem.encode('utf-8'), intermediaire_passwd_pem)
