@@ -1823,25 +1823,36 @@ class ServiceMonitorPrive(ServiceMonitor):
         :return:
         """
 
-        if self.path_secrets == MonitorConstantes.PATH_SECRET_DEFAUT:
-            # Le monitor est deploye sous forme de service, on copie les secrets vers le repertoire partage
-            path_secret_prives = '/var/opt/millegrilles_secrets'
-            self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
+        volume_secrets = self.path_secrets or '/var/opt/millegrilles_secrets'
 
-            if os.path.exists(path_secret_prives):
-                volume_secrets = '/var/opt/millegrilles_secrets'
-                self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
-                fichiers = [
-                    # (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-                    (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-                    (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
-                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
-                ]
+        self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
+        fichiers = [
+            # (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
+            (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
+            (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
+            (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
+        ]
 
-                for fichier in fichiers:
-                    with open(fichier[0], 'w') as cle_out:
-                        with open(fichier[1], 'r') as cle_in:
-                            cle_out.write(cle_in.read())
+        # Le monitor est deploye sous forme de service, on copie les secrets vers le repertoire partage
+        # path_secret_prives = '/var/opt/millegrilles_secrets'
+        # self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
+
+        if os.path.exists(volume_secrets):
+            # volume_secrets = '/var/opt/millegrilles_secrets'
+            # self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
+            # fichiers = [
+            #     # (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
+            #     (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
+            #     (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
+            #     (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
+            # ]
+
+            for fichier in fichiers:
+                with open(fichier[0], 'w') as cle_out:
+                    with open(fichier[1], 'r') as cle_in:
+                        cle_out.write(cle_in.read())
+        else:
+            raise Exception("Path secret n'existe pas : %s" % volume_secrets)
 
     def _entretien_certificats(self):
         """
