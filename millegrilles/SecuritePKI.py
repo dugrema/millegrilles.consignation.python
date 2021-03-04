@@ -496,6 +496,8 @@ class UtilCertificats:
         routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
         self._contexte.generateur_transactions.emettre_message(message, routing)
 
+        return message
+
     def valider_x509_enveloppe(self, enveloppe: EnveloppeCertificat,
                                date_reference: datetime.datetime = None):
         """

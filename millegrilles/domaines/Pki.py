@@ -24,17 +24,22 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
         routing_key = method.routing_key
 
         # Verifier si la requete est pour un certificat
+        reponse = None
         if routing_key and routing_key.startswith('requete.certificat.'):
             fingerprint = routing_key.split('.')[-1]
             certificat = self.gestionnaire.get_certificat(fingerprint, demander_si_inconnu=False)
             try:
-                self.gestionnaire.generateur_transactions.emettre_certificat(
-                    certificat[ConstantesSecurityPki.LIBELLE_CHAINE_PEM])
+                chaine = [certificat[ConstantesSecurityPki.LIBELLE_CERTIFICATS_PEM][fp] for fp in certificat[ConstantesSecurityPki.LIBELLE_CHAINE]]
+                generateur_transactions = self.gestionnaire.generateur_transactions
+                reponse = generateur_transactions.emettre_certificat(chaine)
             except KeyError:
                 pass  # Certificat inconnu
         else:
             super().traiter_message(ch, method, properties, body)
             return
+
+        if reponse is not None and properties.correlation_id is not None:
+            self.transmettre_reponse(dict(), reponse, properties.reply_to, properties.correlation_id)
 
     def traiter_requete(self, ch, method, properties, body, message_dict):
         routing_key = method.routing_key

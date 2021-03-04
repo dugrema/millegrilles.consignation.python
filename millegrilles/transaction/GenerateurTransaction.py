@@ -277,7 +277,9 @@ class GenerateurTransaction:
 
         # Emet le certificat sur l'exchange par defaut
         routing = Constantes.ConstantesPki.EVENEMENT_CERTIFICAT_EMIS
-        self.emettre_message(message, routing)
+        self.emettre_message(message, routing, exchanges=[Constantes.SECURITE_PUBLIC, Constantes.SECURITE_PRIVE, Constantes.SECURITE_PROTEGE])
+
+        return message
 
     def transmettre_evenement_persistance(self, id_document, id_transaction, domaine, properties_mq):
         message = {
