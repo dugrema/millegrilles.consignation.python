@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Fichier de setup pour container Docker (doit etre execute dans le container via Dockerfile)
+PIP_ENV="https_proxy=http://192.168.2.195:8000"
 
 REQ_FILE=$BUILD_FOLDER/requirements.txt
 if [ ! -f $REQ_FILE ]; then
@@ -15,7 +16,7 @@ if [ ! -f $REQ_FILE ]; then
 fi
 
 echo "Installer dependances Python avec pip: fichier $REQ_FILE"
-http_proxy=http://192.168.2.195:8000 pip3 install --no-cache-dir -r $REQ_FILE
+$PIP_ENV pip3 install --no-cache-dir -r $REQ_FILE
 # pip3 install --no-cache-dir -r $REQ_FILE
 
 # Fix pymongo, erreur cannot import abc (issue #305)
