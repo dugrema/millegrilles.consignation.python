@@ -2,3 +2,6 @@ Probleme avec bson - erreur abc. Doit desinstaller et reinstaller.
 
 lxml>=4.3,<5
 Problem sur RPi, utilise package debian/ubuntu
+
+cryptography>=3.1.1
+Probleme sur RPi 32bit apres ca, wheel n'est pas bati correctement
