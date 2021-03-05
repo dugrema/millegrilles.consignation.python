@@ -19,7 +19,6 @@ from base64 import b64encode, b64decode
 from typing import Optional
 from os import path, listdir
 
-import binascii
 import logging
 import datetime
 import re
@@ -691,19 +690,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             if cles_existantes is None:
                 continue
 
-            # mg_libelle = doc[Constantes.DOCUMENT_INFODOC_LIBELLE]
-            # if mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_GROSFICHIERS:
-            #     domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_GROSFICHIER
-            # elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_DOCUMENT:
-            #     domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_DOCUMENT
-            # elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPTRANSACTIONS:
-            #     domaine_transaction = ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPTRANSACTIONS
-            # elif mg_libelle == ConstantesMaitreDesCles.DOCUMENT_LIBVAL_CLES_BACKUPAPPLICATION:
-            #     domaine_transaction = self.get_nom_domaine() + '.' + ConstantesMaitreDesCles.TRANSACTION_NOUVELLE_CLE_BACKUPAPPLICATION
-            # else:
-            #     self._logger.warning("Type de cle inconnu pour rechiffrage : %s" % mg_libelle)
-            #     continue
-
             # Extraire cle specifique pour rechiffrage
             cle_secrete = cles_existantes.get(fingerprint_b64_dechiffrage)
 
@@ -742,22 +728,33 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         info_non_dechiffrables = self.transmettre_cles_non_dechiffrables(dict(), toutes_cles=True)
         cles_non_dechiffrables = info_non_dechiffrables.get('cles')
 
+        compte_cles_non_dechiffrables = 0
         for r in cles_non_dechiffrables:
             self._logger.debug("Cle non dechiffrable : %s" % r)
             # Tenter de dechiffrer la cle symetrique avec une des vieilles cles asymetriques de maitre des cles
             cles_dict = r['cles']
+            dechiffree = False
             for cle_sym_b64 in cles_dict.values():
                 for clecert in self.__clecert_historique:
                     cle_sym = multibase.decode(cle_sym_b64)
                     try:
                         cle_dechiffree = clecert.dechiffrage_asymmetrique(cle_sym)
-                        self.creer_transaction_cles_manquantes(r, cle_dechiffree=cle_dechiffree)
+                        # Transmettre commande sauvegarder cle
+                        self.creer_commande_cles_manquantes(r, cle_dechiffree=cle_dechiffree)
                         self._logger.debug("Cle trouvee pour dechiffrer une cle symmetrique")
+                        dechiffree = True
+                        break
                     except ValueError:
-                        # self._logger.exception("Erreur dechiffrage")
-                        pass  # Non dechiffre
+                        pass  # OK, on fait l'aggregation des echecs a la fin
                     except Exception:
                         self._logger.exception("Erreur dechiffrage")
+
+            if dechiffree is False:
+                self._logger.warning("Cle non dechiffrable : %s" % r['hachage_bytes'])
+                compte_cles_non_dechiffrables = compte_cles_non_dechiffrables + 1
+
+        if compte_cles_non_dechiffrables > 0:
+            self._logger.warning("Rechiffrage : %d cles non dechiffrables" % compte_cles_non_dechiffrables)
 
     # def signer_cle_backup(self, properties, message_dict):
     #     self._logger.debug("Signer cle de backup : %s" % str(message_dict))
@@ -838,12 +835,14 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         }
 
         collection_cles = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
-        transaction_cle = collection_cles.find_one(filtre)
+        document_existant_cle = collection_cles.find_one(filtre)
 
         fingerprints_inconnus = message_dict['cles'].keys()
-        if transaction_cle is not None:
+        flag_non_dechiffrable = False
+        if document_existant_cle is not None:
             # Le document existe deja pour cette cle - on verifie s'il nous manque des fingerprint
-            fingerprint_connus = transaction_cle['cles'].keys()
+            fingerprint_connus = document_existant_cle['cles'].keys()
+            flag_non_dechiffrable = document_existant_cle[ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE]
 
             for fp in fingerprint_connus:
                 try:
@@ -948,7 +947,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
     def renouvelleur_certificat(self) -> RenouvelleurCertificat:
         return self.__renouvelleur_certificat
 
-    def creer_transaction_cles_manquantes(self, document, clecert_dechiffrage: EnveloppeCleCert = None, cle_dechiffree: bytes = None):
+    def creer_commande_cles_manquantes(self, document, clecert_dechiffrage: EnveloppeCleCert = None, cle_dechiffree: bytes = None):
         """
         Methode qui va dechiffrer une cle secrete et la rechiffrer pour chaque cle backup/maitre des cles manquant.
 
@@ -956,25 +955,6 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :param document: Document avec des cles chiffrees manquantes.
         :return:
         """
-
-        # Extraire cle secrete en utilisant le certificat du maitre des cles courant
-        try:
-
-            if cle_dechiffree is not None:
-                pass
-            elif clecert_dechiffrage:
-                fingerprint_cert_dechiffrage = clecert_dechiffrage.fingerprint_b64
-                cle_chiffree = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_MOTDEPASSE][
-                    fingerprint_cert_dechiffrage]
-                cle_dechiffree = clecert_dechiffrage.dechiffrage_asymmetrique(cle_chiffree)
-            else:
-                # Par defaut, utiliser clecert du maitredescles
-                cle_dechiffree = self.decrypter_motdepasse(document)
-
-        except KeyError:
-            self._logger.exception("Cle du document non-rechiffrable (%s), cle secrete associe au cert introuvable" %
-                                   document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS))
-            return
 
         # Recuperer liste des certs a inclure
         enveloppe_maitredescles = self._contexte.signateur_transactions.enveloppe_certificat_courant
@@ -985,14 +965,15 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         cles_documents = list(document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES].keys())
 
         # Parcourir
+        cle_deja_dechiffrable = True
         for fingerprint in cles_connues:
             if fingerprint not in cles_documents:
+                cle_deja_dechiffrable = False
                 identificateur_document = document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS]
 
                 self._logger.debug("Ajouter cle %s dans document %s" % (
                     fingerprint, identificateur_document))
                 enveloppe_backup = dict_certs[fingerprint]
-                fingerprint_backup_b64 = enveloppe_backup.fingerprint
 
                 try:
                     # Type EnveloppeCertificat
@@ -1002,40 +983,45 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                     certificat = enveloppe_backup.cert
 
                 cle_chiffree_backup, fingerprint = self.crypter_cle(cle_dechiffree, cert=certificat)
-                cle_chiffree_backup_base64 = str(b64encode(cle_chiffree_backup), 'utf-8')
-                self._logger.debug("Cle chiffree pour cert %s : %s" % (fingerprint_backup_b64, cle_chiffree_backup_base64))
+                cle_chiffree_backup = multibase.encode('base64', cle_chiffree_backup).decode('utf-8')
+                self._logger.debug("Cle re-chiffree pour cert %s" % fingerprint)
 
-                transaction = {
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLE_INDIVIDUELLE: cle_chiffree_backup_base64,
-                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FINGERPRINT: fingerprint_backup_b64,
+                commande = {
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_CLES: {
+                        fingerprint: cle_chiffree_backup,
+                    },
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE: document[
                         ConstantesMaitreDesCles.TRANSACTION_CHAMP_DOMAINE],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV: document[
                         ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG: document[
+                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG],
+                    ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT: document[
+                        ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT],
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateur_document,
                     ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: document[
                         ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES],
                 }
                 if document.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID):
-                    transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
+                    commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
-                sujet = document.get(ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE)
-                if sujet:
-                    transaction[ConstantesMaitreDesCles.TRANSACTION_CHAMP_SUJET_CLE] = sujet
+                domaine_action = ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE
 
-                domaine_action = '.'.join([
-                    ConstantesMaitreDesCles.DOMAINE_NOM,
-                    fingerprint,
-                    ConstantesMaitreDesCles.TRANSACTION_CLE
-                ])
+                # Soumettre la commande immediatement
+                self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
-                # Soumettre la transaction immediatement
-                # Permet de fonctionner incrementalement si le nombre de cles est tres grand
-                self.generateur_transactions.soumettre_transaction(
-                    transaction,
-                    domaine_action,
-                    version=ConstantesMaitreDesCles.TRANSACTION_VERSION_COURANTE,
-                )
+        if cle_deja_dechiffrable:
+            # On a un flag non-dechiffrable pour une cle qui est deja dechiffrable
+            # Mettre a jour le document immediatement
+            collection_cles = self.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
+            filtre = {
+                ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES: document[ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES]
+            }
+            ops = {
+                '$set': {ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: False},
+                '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+            }
+            collection_cles.update_one(filtre, ops)
 
     # def creer_transaction_motsdepasse_manquants(self, document, clecert_dechiffrage: EnveloppeCleCert = None):
     #     """
@@ -1259,8 +1245,8 @@ class ProcessusReceptionCles(MGProcessusTransaction):
         cles_secretes_encryptees = dict()
         for backup in cert_rechiffrage:
             cle_secrete_backup, fingerprint = self.controleur.gestionnaire.crypter_cle(cle_secrete, cert=backup.certificat)
-            fingerprint_b64 = b64encode(binascii.unhexlify(fingerprint)).decode('utf-8')
-            cles_secretes_encryptees[fingerprint_b64] = b64encode(cle_secrete_backup).decode('utf-8')
+            # fingerprint_b64 = b64encode(binascii.unhexlify(fingerprint)).decode('utf-8')
+            cles_secretes_encryptees[fingerprint] = multibase.encode('base64', cle_secrete_backup).decode('utf-8')
 
         return cles_secretes_encryptees
 
@@ -1370,7 +1356,7 @@ class ProcessusTrouverClesBackupManquantes(MGProcessus):
         erreurs = list()
         for doc in self.curseur_docs_cle_manquante(fingerprints):
             self.__logger.debug("Cles manquantes dans " + str(doc))
-            self.controleur.gestionnaire.creer_transaction_cles_manquantes(doc)
+            self.controleur.gestionnaire.creer_commande_cles_manquantes(doc)
 
         self.set_etape_suivante()  # Termine
 
