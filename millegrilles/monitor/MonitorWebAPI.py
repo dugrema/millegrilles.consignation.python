@@ -230,12 +230,13 @@ class ServerMonitorHttp(SimpleHTTPRequestHandler):
         except AttributeError:
             # On est probablement dans un monitor instancie, charger avec docker
             try:
-                csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente('pki.intermediaire.csr')
+                csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
+                    'pki.monitor.csr')
             except AttributeError:
-                self.__logger.exception("CSR intermediaire introuvable, on verifier si le CSR monitor existe")
+                self.__logger.exception("CSR monitor introuvable, on verifier si le CSR intermediaire existe")
                 try:
                     csr_intermediaire_docker = self.service_monitor.gestionnaire_docker.charger_config_recente(
-                        'pki.monitor.csr')
+                        'pki.intermediaire.csr')
                 except AttributeError:
                     csr_intermediaire_docker = None
 
