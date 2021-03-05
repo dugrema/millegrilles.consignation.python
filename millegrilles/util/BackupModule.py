@@ -26,7 +26,7 @@ from millegrilles.util.X509Certificate import EnveloppeCleCert
 from millegrilles.util.Chiffrage import CipherMsg2Chiffrer, CipherMsg2Dechiffrer, DecipherStream, DigestStream
 from millegrilles.dao.Configuration import ContexteRessourcesMilleGrilles
 from millegrilles.dao.MessageDAO import TraitementMessageCallback
-from millegrilles.util.Hachage import hacher
+from millegrilles.util.Hachage import hacher, Hacheur, VerificateurHachage
 
 
 # class CipherIOWriter(RawIOBase):
@@ -1103,17 +1103,27 @@ class HandlerBackupDomaine:
         :param entete:
         :return:
         """
-        hachage_backup = self._contexte.validateur_message.hacher_dict(entete)
+        enveloppe = self._contexte.generateur_transactions.preparer_enveloppe(entete.copy())
+        hachage_backup = enveloppe['en-tete']['hachage_contenu']
+
+        # Hacher le contenu avec SHA2-256 et signer le message avec le certificat du noeud
+        # meta[Constantes.TRANSACTION_MESSAGE_LIBELLE_HACHAGE] = self.__signateur_transactions.hacher_bytes(enveloppe_bytes)
+        # self.__logger.debug("Message a hacher : %s" % enveloppe_bytes.decode('utf-8'))
+        # hachage_backup = self._contexte.validateur_message.hacher_dict(entete)
+
         return hachage_backup
 
     def calculer_fichier_SHA512(self, path_fichier):
-        sha512 = hashlib.sha512()
+        hacheur = Hacheur()
+
         with open(path_fichier, 'rb') as fichier:
             buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
             while buffer:
-                sha512.update(buffer)
+                hacheur.update(buffer)
                 buffer = fichier.read(HandlerBackupDomaine.BUFFER_SIZE)
-        sha512_digest = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+
+        sha512_digest = hacheur.finalize()
+
         return sha512_digest
 
     def _requests_put(self, *args, **kwargs):
@@ -1218,16 +1228,20 @@ class HandlerRestaurationDomaine:
             # Catalogue ok, on verifie fichier de transactions
             self.__logger.debug("Verifier SHA_512 sur le fichier de transactions %s" % nom_fichier_transaction)
             transactions_sha512 = catalogue[ConstantesBackup.LIBELLE_TRANSACTIONS_HACHAGE]
-            sha512 = hashlib.sha512()
-            with open(path.join(backup_workdir, nom_fichier_transaction), 'rb') as fichier:
-                sha512.update(fichier.read())
-            sha512_digest_calcule = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
 
-            if transactions_sha512 != sha512_digest_calcule:
-                raise Exception(
-                    "Le fichier de transactions %s est incorrect, SHA512 ne correspond pas a celui du catalogue" %
-                    nom_fichier_transaction
-                )
+            # sha512 = hashlib.sha512()
+            verificateur_hachage = VerificateurHachage(transactions_sha512)
+            with open(path.join(backup_workdir, nom_fichier_transaction), 'rb') as fichier:
+                verificateur_hachage.update(fichier.read())
+
+            verificateur_hachage.verify()  # Lance une exception si hachage invalide
+
+            # sha512_digest_calcule = 'sha512_b64:' + b64encode(sha512.digest()).decode('utf-8')
+            # if transactions_sha512 != sha512_digest_calcule:
+            #     raise Exception(
+            #         "Le fichier de transactions %s est incorrect, SHA512 ne correspond pas a celui du catalogue" %
+            #         nom_fichier_transaction
+            #     )
 
         # Une fois tous les fichiers telecharges et verifies, on peut commencer le
         # chargement dans la collection des transactions du domaine

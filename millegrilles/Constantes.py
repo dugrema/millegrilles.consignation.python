@@ -1012,6 +1012,7 @@ class ConstantesGrosFichiers:
     DOCUMENT_FICHIER_MIMETYPE_PREVIEW = 'mimetype_preview'
     DOCUMENT_FICHIER_EXTENSION_PREVIEW = 'extension_preview'
     DOCUMENT_FICHIER_HACHAGE_PREVIEW = 'hachage_preview'
+    DOCUMENT_FICHIER_FUUID_VIDEO = "fuuidVideo"
     DOCUMENT_FICHIER_FUUID_480P = "fuuidVideo480p"
     DOCUMENT_FICHIER_MIMETYPE_480P = "mimetypeVideo480p"
     DOCUMENT_FICHIER_TAILLE_480P = "tailleVideo480p"
@@ -1289,6 +1290,7 @@ class ConstantesBackup:
 
     COMMANDE_BACKUP_PREPARER_RESTAURATION = 'preparerStagingRestauration'
     COMMANDE_BACKUP_RESTAURER_TRANSACTIONS = 'restaurerTransactions'
+    COMMANDE_BACKUP_BACKUP_HORAIRE_TRANSACTIONS = 'declencherBackupHoraire'
 
     REQUETE_BACKUP_DERNIERHORAIRE = '%s.backupDernierHoraire' % DOMAINE_NOM
 

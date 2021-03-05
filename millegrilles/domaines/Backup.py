@@ -47,6 +47,8 @@ class TraitementCommandeBackup(TraitementMessageDomaineCommande):
             return self.gestionnaire.preparer_restauration(message_dict)
         elif action == ConstantesBackup.COMMANDE_BACKUP_RESTAURER_TRANSACTIONS:
             return self.gestionnaire.lancer_processus_restauration(message_dict)
+        elif action == ConstantesBackup.COMMANDE_BACKUP_BACKUP_HORAIRE_TRANSACTIONS:
+            pass  # Rien a faire, les catalogues font deja partis des backups
         else:
             raise ValueError("Type de commande de backup inconnue : %s" % action)
 
@@ -382,12 +384,15 @@ class GestionnaireBackup(GestionnaireDomaineStandard):
             self.handler_backup.transmettre_evenement_backup(
                 uuid_rapport, ConstantesBackup.EVENEMENT_BACKUP_COMPLET_TERMINE, heure_backup)
         else:
-            if evenement_backup.get['info']['inclure_sousdomaines'] is True:
-                # Retransmettre l'evenement pour chaque sous-domaine
-                sous_domaines = [k for k in rapport.keys() if k.startswith(domaine + '/')]
-                for sd in sous_domaines:
-                    self.handler_backup.transmettre_evenement_backup(
-                        uuid_rapport, evenement_backup, heure_backup, sousdomaine=sd)
+            try:
+                if message['info']['inclure_sousdomaines'] is True:
+                    # Retransmettre l'evenement pour chaque sous-domaine
+                    sous_domaines = [k for k in rapport.keys() if k.startswith(domaine + '/')]
+                    for sd in sous_domaines:
+                        self.handler_backup.transmettre_evenement_backup(
+                            uuid_rapport, evenement_backup, heure_backup, sousdomaine=sd)
+            except KeyError:
+                pass  # OK, pas de directives
 
     def verifier_si_rapport_complet(self, rapport):
         # Verifier si tous les domaines ont ete traites
