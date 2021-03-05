@@ -679,6 +679,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IV,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS,
             ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG,
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_FORMAT,
         ]
 
         resultats = collection.find(filtre).sort(hint).hint(hint).limit(taille_bacth)
@@ -890,8 +892,9 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 reply_to=reply_to, correlation_id=correlation_id
             )
 
-        # Pas de retour de valeur - on laisse les transactions retourner les confirmations
-        # return {'ok': True}
+        if len(fingerprints_inconnus) == 0:
+            # Aucune transaction a creer, on retourne la reponse
+            return {'ok': True}
 
     def get_nom_queue(self):
         return ConstantesMaitreDesCles.QUEUE_NOM
