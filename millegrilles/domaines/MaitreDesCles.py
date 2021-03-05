@@ -649,9 +649,8 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         if fingerprint_b64_local not in fingerprint_b64_actifs:
             fingerprint_b64_actifs.append(fingerprint_b64_local)
 
-        condition_actif = [
-            {ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: True}
-        ]
+        condition_actif = list()
+
         for fp in fingerprint_b64_actifs:
             condition_actif.append({'cles.%s' % fp: {'$exists': False}})
 
@@ -661,6 +660,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
 
         collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
         filtre = {
+            ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: True,
             '$or': condition_actif,
             'cles.' + fingerprint_b64_dechiffrage: {'$exists': True},
             'domaine': {'$ne': None},
@@ -725,9 +725,26 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
         :return:
         """
 
+        # Flagger toutes les cles qui ne sont pas supportees par la cle locale (meme si au moins un maitre des cles
+        # different est capable de la dechiffrer)
+        enveloppe_certificat_courant = self._contexte.signateur_transactions.enveloppe_certificat_courant
+        fingerprint = enveloppe_certificat_courant.fingerprint
+        collection = self._contexte.document_dao.get_collection(ConstantesMaitreDesCles.COLLECTION_CLES_NOM)
+        filtre = {
+            'cles.' + fingerprint: {'$exists': False},
+        }
+        ops = {
+            '$set': {ConstantesMaitreDesCles.TRANSACTION_CHAMP_NON_DECHIFFRABLE: True},
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        resultat_non_dechiffrable = collection.update_many(filtre, ops)
+        compte_cles_non_dechiffrables = resultat_non_dechiffrable.matched_count
+        if compte_cles_non_dechiffrables == 0:
+            # Rien a faire, toutes les cles sont dechiffrables
+            return
+
         info_non_dechiffrables = self.transmettre_cles_non_dechiffrables(dict(), toutes_cles=True)
         cles_non_dechiffrables = info_non_dechiffrables.get('cles')
-
         compte_cles_non_dechiffrables = 0
         for r in cles_non_dechiffrables:
             self._logger.debug("Cle non dechiffrable : %s" % r)
@@ -1005,7 +1022,7 @@ class GestionnaireMaitreDesCles(GestionnaireDomaineStandard):
                 if document.get(Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID):
                     commande[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID] = document[Constantes.TRANSACTION_MESSAGE_LIBELLE_UUID]
 
-                domaine_action = ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE
+                domaine_action = '.'.join(['commande', ConstantesMaitreDesCles.DOMAINE_NOM, ConstantesMaitreDesCles.COMMANDE_SAUVEGARDER_CLE])
 
                 # Soumettre la commande immediatement
                 self.generateur_transactions.transmettre_commande(commande, domaine_action)
