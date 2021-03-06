@@ -10,6 +10,7 @@ import psutil
 import tarfile
 import io
 import lzma
+import pytz
 
 from typing import cast, Optional
 from threading import Event, BrokenBarrierError
@@ -560,7 +561,7 @@ class ServiceMonitor:
                 'est_expire': True,
             }
 
-        date_courante = datetime.datetime.utcnow()
+        date_courante = datetime.datetime.now(tz=pytz.UTC)
 
         for config in self._docker.configs.list(filters=filtre):
             self.__logger.debug("Config : %s", str(config))
@@ -582,7 +583,7 @@ class ServiceMonitor:
                     not_valid_before = clecert.not_valid_before
                     delta_fin_debut = date_expiration.timestamp() - not_valid_before.timestamp()
                     epoch_deux_tiers = delta_fin_debut / 3 * 2 + not_valid_before.timestamp()
-                    date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers)
+                    date_renouvellement = datetime.datetime.fromtimestamp(epoch_deux_tiers, tz=pytz.UTC)
 
                     # Verifier si on renouvelle
                     if date_renouvellement < date_courante:
