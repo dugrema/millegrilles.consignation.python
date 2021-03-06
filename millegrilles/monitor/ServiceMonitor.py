@@ -1721,6 +1721,9 @@ class ServiceMonitorPrive(ServiceMonitor):
                 self._entretien_certificats()
                 self._entretien_secrets_pki()
 
+                # Mettre a jour les certificats utilises par les modules prives
+                self.preparer_secrets()
+
     def connecter_middleware(self):
         """
         Genere un contexte et se connecte a MQ et MongoDB.
@@ -1824,21 +1827,26 @@ class ServiceMonitorPrive(ServiceMonitor):
         :return:
         """
 
-        volume_secrets = self.path_secrets or '/var/opt/millegrilles_secrets'
+        volume_secrets = '/var/opt/millegrilles_secrets'
 
-        self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
-        fichiers = [
-            # (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-            (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-            (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
-            (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
-        ]
+        try:
+            configuration = self.connexion_middleware.configuration
+        except AttributeError:
+            self.__logger.error("Connexion middleware n'est pas prete, configuration secret abandonnee")
+            return
 
         # Le monitor est deploye sous forme de service, on copie les secrets vers le repertoire partage
         # path_secret_prives = '/var/opt/millegrilles_secrets'
         # self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
 
         if os.path.exists(volume_secrets):
+            self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
+            fichiers = [
+                (os.path.join(volume_secrets, 'key.pem'), configuration.mq_keyfile),
+                (os.path.join(volume_secrets, 'cert.pem'), configuration.mq_certfile),
+                (os.path.join(volume_secrets, 'millegrille.cert.pem'), configuration.mq_cafile)
+            ]
+            
             # volume_secrets = '/var/opt/millegrilles_secrets'
             # self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
             # fichiers = [
@@ -1849,9 +1857,13 @@ class ServiceMonitorPrive(ServiceMonitor):
             # ]
 
             for fichier in fichiers:
-                with open(fichier[0], 'w') as cle_out:
-                    with open(fichier[1], 'r') as cle_in:
-                        cle_out.write(cle_in.read())
+                try:
+                    with open(fichier[0], 'w') as cle_out:
+                        with open(fichier[1], 'r') as cle_in:
+                            cle_out.write(cle_in.read())
+                except FileNotFoundError:
+                    self.__logger.exception("Fichier n'existe pas : %s" % fichier[1])
+
         else:
             raise Exception("Path secret n'existe pas : %s" % volume_secrets)
 
@@ -2075,18 +2087,27 @@ class ServiceMonitorPublic(ServiceMonitor):
             self.__logger.info("Preparer clecert pour les containers a partir de " + path_secret_prives)
 
             if os.path.exists(path_secret_prives):
+                try:
+                    configuration = self.connexion_middleware.configuration
+                except AttributeError:
+                    self.__logger.error("Connexion middleware n'est pas prete, configuration secret abandonnee")
+                    return
+
                 volume_secrets = '/var/opt/millegrilles_secrets'
                 self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
                 fichiers = [
-                    (os.path.join(volume_secrets, 'key.pem'), self._configuration.mq_keyfile),
-                    (os.path.join(volume_secrets, 'cert.pem'), self._configuration.mq_certfile),
-                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), self._configuration.mq_cafile)
+                    (os.path.join(volume_secrets, 'key.pem'), configuration.mq_keyfile),
+                    (os.path.join(volume_secrets, 'cert.pem'), configuration.mq_certfile),
+                    (os.path.join(volume_secrets, 'millegrille.cert.pem'), configuration.mq_cafile)
                 ]
 
                 for fichier in fichiers:
-                    with open(fichier[0], 'w') as cle_out:
-                        with open(fichier[1], 'r') as cle_in:
-                            cle_out.write(cle_in.read())
+                    try:
+                        with open(fichier[0], 'w') as cle_out:
+                            with open(fichier[1], 'r') as cle_in:
+                                cle_out.write(cle_in.read())
+                    except FileNotFoundError:
+                        self.__logger.error('Configuration secrets, fichier non trouve : %s' % fichier[1])
 
     def ajouter_compte(self, certificat: str):
         raise NotImplementedError("Ajouter compte PEM (**non implemente pour public**): %s" % certificat)

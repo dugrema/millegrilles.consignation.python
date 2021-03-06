@@ -14,6 +14,9 @@ export PYTHONPATH
 # export CERT_DUREE=30
 # export CERT_DUREE_HEURES=0
 
+export MG_MQ_HOST=mg-dev4.maple.maceroc.com
+export MG_MQ_PORT=5673
+
 python3 $CONSIGNATION_PYTHON/millegrilles/monitor/ServiceMonitor.py --dev --debug \
   --secrets /var/opt/millegrilles/secrets \
   --webroot $WEBROOT
