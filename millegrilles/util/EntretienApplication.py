@@ -6,6 +6,7 @@ import lzma
 import datetime
 import subprocess
 import sys
+import multibase
 
 from typing import Optional
 from os import environ, listdir, path, makedirs
@@ -75,8 +76,16 @@ class BackupApplication(ModeleConfiguration):
         self.__lzma_compressor.close()
         self.__cipher.close()
 
-        self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = self.__cipher.digest
-        self.__transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = self.__cipher.digest
+        digest_archive = self.__cipher.digest
+        tag = multibase.encode('base64', self.__cipher.tag).decode('utf-8')
+
+        # Mettre digest et tag dans catalogue
+        self.__catalogue_backup[Constantes.ConstantesBackup.LIBELLE_ARCHIVE_HACHAGE] = digest_archive
+        self.__catalogue_backup[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = tag
+
+        # Mettre digest et tag dans transaction de maitre des cles
+        self.__transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_HACHAGE_BYTES] = digest_archive
+        self.__transaction_maitredescles[Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_TAG] = tag
 
         self.upload()
 

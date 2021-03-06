@@ -24,7 +24,7 @@ class CipherMgs1(RawIOBase):
     Implemente RawIOBase - permet d'utiliser le cipher comme fileobj (stream)
     """
 
-    def __init__(self, password: bytes = None):
+    def __init__(self, password: bytes = None, encoding_digest='base64'):
         self.__skip_iv = False
 
         self._iv: Optional[bytes] = None
@@ -34,7 +34,7 @@ class CipherMgs1(RawIOBase):
 
         self._context: Optional[CipherContext] = None
 
-        self._hacheur = Hacheur(hashing_code='sha2-512', encoding='base64')
+        self._hacheur = Hacheur(hashing_code='sha2-512', encoding=encoding_digest)
         self._digest_result: Optional[str] = None
 
     def _ouvrir_cipher(self):
@@ -66,11 +66,11 @@ class CipherMsg1Chiffrer(CipherMgs1):
     Helper method : chiffrer_motdepasse pour chiffrer le secret avec la cle publique (cert)
     """
 
-    def __init__(self, output_stream=None, password: bytes = None, padding=True):
+    def __init__(self, output_stream=None, password: bytes = None, padding=True, encoding_digest='base64'):
         """
         :param output_stream: Optionnel - permet d'utiliser le cipher comme stream (fileobj)
         """
-        super().__init__(password=password)
+        super().__init__(password=password, encoding_digest=encoding_digest)
         self.__output_stream = output_stream
         self.__padder: Optional[padding.PaddingContext] = None
         self._generer()
@@ -241,8 +241,8 @@ class CipherMsg2Chiffrer(CipherMsg1Chiffrer):
     Chiffrage avec GCM, tag de 128 bits
     """
 
-    def __init__(self, output_stream=None, password: bytes = None):
-        super().__init__(output_stream, password, padding=False)
+    def __init__(self, output_stream=None, password: bytes = None, encoding_digest='base64'):
+        super().__init__(output_stream, password, padding=False, encoding_digest=encoding_digest)
 
     def _generer(self):
         if self._password is None:

@@ -8,6 +8,7 @@ import requests
 import tarfile
 import tempfile
 import certvalidator
+import multibase
 
 from typing import Optional, List, Dict
 from io import RawIOBase
@@ -153,13 +154,14 @@ class BackupUtil:
         :param output_stream: Optionnel, stream/fichier d'output. Permet d'utiliser le cipher comme output stream dans un pipe.
         :return:
         """
-        cipher = CipherMsg2Chiffrer(output_stream=output_stream)
-        iv = b64encode(cipher.iv).decode('utf-8')
+        cipher = CipherMsg2Chiffrer(output_stream=output_stream, encoding_digest='base58btc')
+        iv = multibase.encode('base64', cipher.iv).decode('utf-8')
 
         # Conserver iv et cle chiffree avec cle de millegrille (restore dernier recours)
         enveloppe_millegrille = self.__contexte.signateur_transactions.get_enveloppe_millegrille()
-        catalogue_backup['cle'] = b64encode(cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
+        catalogue_backup['cle'] = multibase.encode('base64', cipher.chiffrer_motdepasse_enveloppe(enveloppe_millegrille)).decode('utf-8')
         catalogue_backup['iv'] = iv
+        catalogue_backup['format'] = 'mgs2'
 
         # Generer transaction pour sauvegarder les cles de ce backup avec le maitredescles
         certs_cles_backup = [
@@ -180,6 +182,8 @@ class BackupUtil:
         transaction_maitredescles = {
             Constantes.ConstantesMaitreDesCles.TRANSACTION_CHAMP_IDENTIFICATEURS_DOCUMENTS: identificateurs_document,
             'iv': iv,
+            'tag': '!!!REMPLACER!!!!',
+            'format': 'mgs2',
             'cles': cles_chiffrees,
             'domaine': ConstantesBackup.DOMAINE_NOM,
         }
@@ -194,8 +198,8 @@ class BackupUtil:
             fingerprint = clecert.fingerprint
             cle_chiffree, fingerprint_encodage = clecert.chiffrage_asymmetrique(cle_secrete)
 
-            cle_chiffree_b64 = b64encode(cle_chiffree).decode('utf-8')
-            cles[fingerprint] = cle_chiffree_b64
+            cle_chiffree_mb = multibase.encode('base64', cle_chiffree).decode('utf-8')
+            cles[fingerprint] = cle_chiffree_mb
 
         return cles
 
@@ -1414,6 +1418,11 @@ class HandlerBackupApplication:
                 output.write(cipher.update(lzma_compressor.flush()))
                 output.write(cipher.finalize())
         digest_archive = cipher.digest
+
+        # Extraire le compute tag de chiffrage et l'inserer dans les documents appropries
+        tag = multibase.encode('base64', cipher.tag).decode('utf-8')
+        catalogue_backup['tag'] = tag
+        transaction_maitredescles['tag'] = tag
 
         return nom_fichier_backup, digest_archive, transaction_maitredescles
 
