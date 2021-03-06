@@ -1846,7 +1846,7 @@ class ServiceMonitorPrive(ServiceMonitor):
                 (os.path.join(volume_secrets, 'cert.pem'), configuration.mq_certfile),
                 (os.path.join(volume_secrets, 'millegrille.cert.pem'), configuration.mq_cafile)
             ]
-            
+
             # volume_secrets = '/var/opt/millegrilles_secrets'
             # self.__logger.debug("Copie cle/certs vers %s" % volume_secrets)
             # fichiers = [
