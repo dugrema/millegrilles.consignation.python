@@ -125,8 +125,8 @@ class MessagesSample(BaseCallback):
         return enveloppe
 
     def executer(self):
-        self.backup_application()
-        # self.backup_applications()
+        # self.backup_application()
+        self.backup_applications()
         # self.restore_application()
 
 

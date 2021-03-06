@@ -116,7 +116,7 @@ class BackupApplication(ModeleConfiguration):
 
     def preparer_catalogue(self):
         date_formattee = datetime.datetime.utcnow().strftime(BackupApplication.FORMAT_HEURE)
-        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs1' % (self.__nom_application, date_formattee)
+        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs2' % (self.__nom_application, date_formattee)
         nom_fichier_catalogue = 'application_%s_catalogue_%s.json' % (self.__nom_application, date_formattee)
 
         self.__catalogue_backup = {
@@ -132,7 +132,7 @@ class BackupApplication(ModeleConfiguration):
         cles_chiffrage = self.__handler_requetes.requete(domaine_action)
         self.__logger.debug("Cles chiffrage recu : %s" % cles_chiffrage)
 
-        # Creer un fichier .tar.xz.mgs1 pour streamer le backup
+        # Creer un fichier .tar.xz.mgs2 pour streamer le backup
         self.__output_stream = open(self.__path_output, 'wb')
 
         heure = datetime.datetime.utcnow().strftime(BackupApplication.FORMAT_HEURE)
@@ -153,7 +153,7 @@ class BackupApplication(ModeleConfiguration):
 
     def ajouter_fichier(self, file_path: str):
         """
-        Ajoute le fichier a l'archive .tar.xz.mgs1. Tronque le path.
+        Ajoute le fichier a l'archive .tar.xz.mgs2. Tronque le path.
         :param file_path:
         :return:
         """

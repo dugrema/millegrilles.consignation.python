@@ -680,8 +680,8 @@ class HandlerBackupDomaine:
 
         # Determiner si on doit chiffrer le fichier de transactions
         if self._doit_chiffrer():
-            # Fichier va etre chiffre en format mgs1
-            extension_transactions = 'jsonl.xz.mgs1'
+            # Fichier va etre chiffre en format mgs2
+            extension_transactions = 'jsonl.xz.mgs2'
         else:
             extension_transactions = 'jsonl.xz'
 
@@ -1355,7 +1355,7 @@ class HandlerBackupApplication:
         #     "application": "Application___",
         #     "securite": "3.protege",
         #     "catalogue_nomfichier": "application_app_catalogue_202010070000.json.xz",
-        #     "archive_nomfichier": "application_app_archive_2020100700.tar.xz.mgs1",
+        #     "archive_nomfichier": "application_app_archive_2020100700.tar.xz.mgs2",
         #     "archive_hachage": "sha512_b64:NZXajIM8OnHR505RynFyL7olyXxnw5ChqY8+Z391GzIRLsQEEiuGtK1iJ+4YIdlTUE/VxsPvOPZLt46PM7Cmew==",
 
         # Signer les transactions
@@ -1385,7 +1385,7 @@ class HandlerBackupApplication:
 
     def _chiffrer_archive(self, nom_application, path_archive, catalogue_backup: dict):
         date_formattee = datetime.datetime.utcnow().strftime('%Y%m%d%H%M')
-        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs1' % (nom_application, date_formattee)
+        nom_fichier_backup = 'application_%s_archive_%s.tar.xz.mgs2' % (nom_application, date_formattee)
         nom_fichier_catalogue = 'application_%s_catalogue_%s.json' % (nom_application, date_formattee)
         catalogue_backup[ConstantesBackup.LIBELLE_ARCHIVE_NOMFICHIER] = nom_fichier_backup
         catalogue_backup[ConstantesBackup.LIBELLE_CATALOGUE_NOMFICHIER] = nom_fichier_catalogue
@@ -1574,8 +1574,8 @@ class ArchivesBackupParser:
         self.__rapport_restauration = RapportRestauration()
 
         # Parametres
-        self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs1)
-        self.skip_chiffrage = False     # Mettre a true pour ignorer tous les messages chiffres (.mgs1)
+        self.skip_transactions = False  # Mettre a true pour ignorer archives de transactions (.jsonl.xz, .mgs2)
+        self.skip_chiffrage = False     # Mettre a true pour ignorer tous les messages chiffres (.mgs2)
         self.fermer_auto = True         # Ferme la connexion automatiquement sur fin de thread
 
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -1758,7 +1758,7 @@ class ArchivesBackupParser:
         try:
             extension = path.splitext(nom_fichier)
 
-            if extension[1] == '.mgs1':
+            if extension[1] == '.mgs2':
                 # Transaction chiffree, demander la cle pour dechiffrer
                 internal_file_object = None
 
@@ -1842,12 +1842,12 @@ class ArchivesBackupParser:
 
         # Detecter type de fichier en fonction de l'extension
         # .tar = agregee (quotidienne ou annuelle)
-        # .jsonl.xz.mgs1, .jsonl.xz = transactions
+        # .jsonl.xz.mgs2, .jsonl.xz = transactions
         # .json.xz = catalogue
 
         if nom_fichier.endswith('.tar'):
             return 'tar'
-        elif nom_fichier.endswith('.jsonl.xz.mgs1') or nom_fichier.endswith('.jsonl.xz'):
+        elif nom_fichier.endswith('.jsonl.xz.mgs2') or nom_fichier.endswith('.jsonl.xz'):
             type = 'transactions'
         elif nom_fichier.endswith('.json.xz'):
             type = 'catalogue'
