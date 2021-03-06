@@ -294,7 +294,10 @@ class EnveloppeCleCert:
 
     @property
     def not_valid_after(self) -> datetime.datetime:
-        return self.cert.not_valid_after
+        try:
+            return self.cert.not_valid_after
+        except OverflowError:
+            return Constantes.Hacks.EPOCHALYPSE_DATE
 
     @property
     def private_key_bytes(self):

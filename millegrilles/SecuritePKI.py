@@ -173,7 +173,11 @@ class EnveloppeCertificat:
 
     @property
     def not_valid_after(self) -> datetime.datetime:
-        return self._certificat.not_valid_after
+        try:
+            return self._certificat.not_valid_after
+        except OverflowError:
+            # Epochalypse: https://en.wikipedia.org/wiki/Year_2038_problem
+            return Constantes.Hacks.EPOCHALYPSE_DATE
 
     @property
     def subject_key_identifier(self):
@@ -217,7 +221,14 @@ class EnveloppeCertificat:
     @property
     def _is_valid_at_current_time(self):
         now = datetime.datetime.utcnow()
-        return (now > self.certificat.not_valid_before) and (now < self.certificat.not_valid_after)
+        is_valid_from = (now > self.certificat.not_valid_before)
+
+        try:
+            is_valid_to = (now < self.certificat.not_valid_after)
+        except OverflowError:
+            is_valid_to = (now < Constantes.Hacks.EPOCHALYPSE_DATE)
+
+        return is_valid_from and is_valid_to
 
     def date_valide_concat(self):
         date_brute = self.certificat.not_valid_before
@@ -534,6 +545,7 @@ class UtilCertificats:
                 self._logger.info("Un des certificats est expire, verifier en fonction de la date de reference")
                 # Le certificat est expire, on fait la validation pour la fin de la periode de validite
                 date_reference = pytz.UTC.localize(enveloppe.not_valid_after)
+
                 validation_context = ValidationContext(moment=date_reference, trust_roots=[self.__cert_millegrille])
                 validator = CertificateValidator(
                     cert_pem, intermediate_certs=inter_list, validation_context=validation_context)

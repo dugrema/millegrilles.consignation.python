@@ -2447,7 +2447,7 @@ class ServiceMonitorInstalleur(ServiceMonitor):
         try:
             certificat_millegrille = self.gestionnaire_docker.charger_config('pki.millegrille.cert')
             certificat_millegrille_existe = True
-        except AttributeError:
+        except (AttributeError, IndexError):
             certificat_millegrille = params['chainePem'][-1]
 
         chaine = params['chainePem']
