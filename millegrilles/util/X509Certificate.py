@@ -14,6 +14,7 @@ import base64
 import logging
 import multihash
 import multibase
+import pytz
 
 from millegrilles import Constantes
 from millegrilles.util.IdmgUtil import encoder_idmg_cert
@@ -290,14 +291,17 @@ class EnveloppeCleCert:
 
     @property
     def not_valid_before(self) -> datetime.datetime:
-        return self.cert.not_valid_before
+        # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+        #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+        #        https://en.wikipedia.org/wiki/Year_2038_problem
+        return pytz.utc.localize(self.cert.not_valid_before)
 
     @property
     def not_valid_after(self) -> datetime.datetime:
-        try:
-            return self.cert.not_valid_after
-        except OverflowError:
-            return Constantes.Hacks.EPOCHALYPSE_DATE
+        # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+        #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+        #        https://en.wikipedia.org/wiki/Year_2038_problem
+        return pytz.utc.localize(self.cert.not_valid_after)
 
     @property
     def private_key_bytes(self):

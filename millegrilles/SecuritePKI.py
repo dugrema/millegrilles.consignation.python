@@ -169,15 +169,17 @@ class EnveloppeCertificat:
 
     @property
     def not_valid_before(self) -> datetime.datetime:
-        return self._certificat.not_valid_before
+        # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+        #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+        #        https://en.wikipedia.org/wiki/Year_2038_problem
+        return pytz.utc.localize(self._certificat.not_valid_before)
 
     @property
     def not_valid_after(self) -> datetime.datetime:
-        try:
-            return self._certificat.not_valid_after
-        except OverflowError:
-            # Epochalypse: https://en.wikipedia.org/wiki/Year_2038_problem
-            return Constantes.Hacks.EPOCHALYPSE_DATE
+        # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+        #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+        #        https://en.wikipedia.org/wiki/Year_2038_problem
+        return pytz.utc.localize(self._certificat.not_valid_after)
 
     @property
     def subject_key_identifier(self):
@@ -221,12 +223,12 @@ class EnveloppeCertificat:
     @property
     def _is_valid_at_current_time(self):
         now = datetime.datetime.utcnow()
-        is_valid_from = (now > self.certificat.not_valid_before)
 
-        try:
-            is_valid_to = (now < self.certificat.not_valid_after)
-        except OverflowError:
-            is_valid_to = (now < Constantes.Hacks.EPOCHALYPSE_DATE)
+        # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+        #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+        #        https://en.wikipedia.org/wiki/Year_2038_problem
+        is_valid_from = (now > pytz.utc.localize(self.certificat.not_valid_before))
+        is_valid_to = (now < pytz.utc.localize(self.certificat.not_valid_after))
 
         return is_valid_from and is_valid_to
 

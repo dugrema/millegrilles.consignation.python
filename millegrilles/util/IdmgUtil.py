@@ -59,12 +59,10 @@ def encoder_idmg_cert(cert_x509: x509, version=IdmgUtil.VERSION_ACTIVE, hashing_
     # Encoder hachage dans un multihash
     mh = multihash.encode(digest_fingerprint, hashing_code)
 
-    try:
-        date_exp = cert_x509.not_valid_after
-    except OverflowError:
-        # Epochalypse: https://en.wikipedia.org/wiki/Year_2038_problem
-        date_exp = Hacks.EPOCHALYPSE_DATE
-
+    # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+    #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+    #        https://en.wikipedia.org/wiki/Year_2038_problem
+    date_exp = pytz.utc.localize(cert_x509.not_valid_after)
     date_exp_int = int(math.ceil(float(date_exp.timestamp()) / 1000.0))
 
     version_info = IdmgUtil.VERSION_PACK[version]
@@ -121,13 +119,12 @@ def verifier_idmg(idmg: str, certificat_pem: str):
     if digest_recu != digest_fingerprint_calcule:
         raise IdmgInvalide("IDMG ne correspond pas au certificat")
 
-    try:
-        date_exp = cert_x509.not_valid_after
-    except OverflowError:
-        # Epochalypse: https://en.wikipedia.org/wiki/Year_2038_problem
-        date_exp = Hacks.EPOCHALYPSE_DATE
-
+    # Note : utilisation de pytz pour transformer la date vers le format datetime python3
+    #        cryptography utilise un format susceptible a epochalypse sur .timestamp()
+    #        https://en.wikipedia.org/wiki/Year_2038_problem
+    date_exp = pytz.utc.localize(cert_x509.not_valid_after)
     date_exp_int = int(math.ceil(float(date_exp.timestamp()) / 1000.0))
+
     if date_exp_int_recu != date_exp_int:
         raise IdmgInvalide("IDMG fourni en parametre est invalide - date expiration mismatch")
 

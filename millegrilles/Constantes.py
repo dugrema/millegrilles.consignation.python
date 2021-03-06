@@ -276,11 +276,6 @@ SECURITE_ACCES_CLE_INCONNUE = '4.inconnue'
 CLE_CERT_CA = 'pki.millegrille'
 
 
-class Hacks:
-
-    EPOCHALYPSE_DATE = datetime.datetime(year=2038, month=1, day=19, tzinfo=pytz.UTC)
-
-
 class ConstantesSecurite:
 
     EXCHANGE_SECURE = 'millegrilles.middleware'
