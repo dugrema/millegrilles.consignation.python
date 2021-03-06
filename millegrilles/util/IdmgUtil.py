@@ -13,7 +13,6 @@ from cryptography.hazmat.primitives import hashes
 from multihash.constants import HASH_CODES
 from typing import Union
 
-from millegrilles.Constantes import Hacks
 from millegrilles.util.Hachage import map_code_to_hashes
 
 
