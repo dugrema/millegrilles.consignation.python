@@ -222,7 +222,7 @@ class CipherMsg1Dechiffrer(CipherMgs1):
         """
         Utilise la cle privee dans l'enveloppe pour dechiffrer la cle secrete chiffree
         """
-        contenu_bytes = b64decode(cle_chiffree)
+        contenu_bytes = multibase.decode(cle_chiffree)
 
         contenu_dechiffre = cle_privee.decrypt(
             contenu_bytes,
