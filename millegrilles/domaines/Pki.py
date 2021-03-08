@@ -519,7 +519,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             cert_millegrille_pem = chaine_pem[-1]
             enveloppe_millegrille = EnveloppeCertificat(certificat_pem=cert_millegrille_pem)
             idmg_validation = enveloppe_millegrille.idmg
-            date_reference = pytz.UTC.localize(dt=enveloppe.not_valid_after)
+            date_reference = enveloppe.not_valid_after
 
             self._contexte.validateur_pki.valider(chaine_pem, date_reference=date_reference, idmg=idmg_validation)
         except PathValidationError as pve:
