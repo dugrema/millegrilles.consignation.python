@@ -522,6 +522,7 @@ class ConstantesPki:
     REQUETE_CERTIFICAT = 'requeteCertificat'
     REQUETE_LISTE_CA = 'requete.Pki.ca'
     REQUETE_LISTE_CERTS_CA = 'certificatsCA'
+    REQUETE_CERTIFICAT_PAR_PK = 'certificatParPk'
     TRANSACTION_EVENEMENT_CERTIFICAT = 'certificat'  # Indique que c'est une transaction avec un certificat a ajouter
 
     COMMANDE_SAUVEGADER_CERTIFICAT = 'certificat'  # Commande pour s'assurer d'avoir un certificat

@@ -3,8 +3,10 @@ import logging
 import multibase
 
 from unittest import TestCase
+from cryptography.hazmat.primitives import serialization
 
 from millegrilles.util.X509Certificate import EnveloppeCleCert
+from millegrilles.util.Hachage import hacher
 
 
 # Setup logging
@@ -99,6 +101,44 @@ kdy1sUwsQF60ZfujqbMQ49Y4
 -----END PRIVATE KEY-----
 """
 
+CLE_PUBLIQUE_JS = """
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw8XGggPNs6E4zWATtB75
+Fmx7AX71LXJ2icYkq+ZVkjGIl816gOF6125Ggx+JsWj+5PEqbf0xA/TrzL82zGNY
+SMpniSjpbWQxhkkWq5L+kCeUiE+qQBNgpMJ82ez49IDXEk3CpE640yiBYvpDutMp
+UwFaHGZIlQrgoRFzi+7mf1mG8b6eXv3ppR3YL20W/crUTcS90MnBjpFX+M4916vy
++pH3wRI/g5OkSSKEoEEshLKCrFlHJjZE1j8n+7Mv7MhiojagzPD3bKcVbTBsaWQl
+sLih1DqFW+pCun/9fp/dY9GKOpibdrQ9fCWLjRCH8Zx2H4PEJZmx3GCploEhtH5u
+9QIDAQAB
+-----END PUBLIC KEY-----
+""".strip()
+
+CERT_SIGNE_JS = """
+-----BEGIN CERTIFICATE-----
+MIIECzCCAvOgAwIBAgIUB+3jwsZO+AOuFgHmTfTh/SB7D7YwDQYJKoZIhvcNAQEL
+BQAwgYgxLTArBgNVBAMTJGY4ZjkyZGE4LTU5ZDAtNDZlYy1hNzFmLWE1ZjFmNjFi
+ZDlhMjEWMBQGA1UECxMNaW50ZXJtZWRpYWlyZTE/MD0GA1UEChM2ejJXMkVDblA5
+ZWF1TlhENjI4YWFpVVJqNnRKZlNZaXlnVGFmZkMxYlRiQ05IQ3RvbWhvUjdzMB4X
+DTIxMDMwOTIzMzEzNVoXDTIxMDQwODIzMzMzNVowYzE/MD0GA1UECgw2ejJXMkVD
+blA5ZWF1TlhENjI4YWFpVVJqNnRKZlNZaXlnVGFmZkMxYlRiQ05IQ3RvbWhvUjdz
+MRMwEQYDVQQLDApOYXZpZ2F0ZXVyMQswCQYDVQQDDAJ1MTCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAM6w1EDg5mVRjoKp1eRKCvCHTD/clcac0yTMbnwF
+D53Gja4HSY4orHJWL+OyeCGFxmspNx3gw/sODABhX+LFAUESmEi9OthVVAELZBlp
+gwluSq7OWESC60wRm2PsLExHFPIFqM7tZZ4ihWh19YncSkexoi+Dz8kQoT9m8W18
+V6XjRD0R0HqjB8tdno3lXacrQPufuKDNwTtLF5+VGj4F1ESm6Iz96xa7bA2X1ZIw
+1qCuo5rGOFSaDUyK79UGMfPjVOKnOho8vb6pNvUl+ckX4QWENo0D4SX8qp9WvyrO
+VLxWo0D8UN/Ilr04dybmow6GbssPqh32o+Dw45H2UfaHWVsCAwEAAaOBkDCBjTAd
+BgNVHQ4EFgQU8J7j6qzk9re4uAY3JFV7jyVnl28wHwYDVR0jBBgwFoAUbxTKbZcD
+YUc+zO3wc1dQinq1FUgwDAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBPAwHwYEKgME
+AQQXbmF2aWdhdGV1cixHcm9zRmljaGllcnMwDwYEKgMEAAQHMi5wcml2ZTANBgkq
+hkiG9w0BAQsFAAOCAQEAEnokVwcrrcJ4GXEZy3JipmHXMuHWGTbHblMybRRm75pM
+8tlEzKQH2OLwOcgbm9gcdI2euuG+i9Q3VTW5aV8uQzXC13GkuXh1UzHaY8tkf7Zc
+FLSUkmSFmuigFY2X2QHz/JRolqA6iTx5g9jQ1iteAJv9PW2aVl2OR5B1YMZRTje0
+fpFN+18XMwBE/gurUDeQDtsUmTgbDmseyLPc/bN5IBOp54awjcjV0x1Ek4b+c6zV
+0MMvfhyKdmEwyAodqsKxDeIhba+QSBrYUOXAkmRTi9T0pMwB4jLuhSF1s15SMwfg
+cL/ItpqMkgr+lTikG49Mzk7m/81elw9gARv8eMd+6w==
+-----END CERTIFICATE-----
+"""
 
 class EnveloppeCleCertTest(TestCase):
 
@@ -107,6 +147,8 @@ class EnveloppeCleCertTest(TestCase):
         self.clecert_1.cert_from_pem_bytes(SAMPLE_CERT_1.encode('utf-8'))
         self.clecert_2 = EnveloppeCleCert()
         self.clecert_2.cert_from_pem_bytes(SAMPLE_CERT_2.encode('utf-8'))
+        self.clecert_js = EnveloppeCleCert()
+        self.clecert_js.cert_from_pem_bytes(CERT_SIGNE_JS.encode('utf-8'))
 
     def test_fingerprint_cert1(self):
         fingerprint = self.clecert_1.fingerprint
@@ -134,17 +176,14 @@ class EnveloppeCleCertTest(TestCase):
         self.assertEqual('QLA8z7SaLx4ZFTyRbUdPiejojm5hUfqxcPRcwsuiVR8T', idmg)
 
     def test_fingerprint_cle_publique(self):
-        fp = self.clecert_1.fingerprint_cle_publique
+        # cert_js = self.clecert_js.cert
+        # public_key_js = cert_js.public_key()
+        # pem = public_key_js.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode('utf-8')
+        # logger.debug("Public key JS\n%s" % pem)
+        # self.assertEqual(pem.strip(), CLE_PUBLIQUE_JS)
+        fp = self.clecert_js.fingerprint_cle_publique
         logger.debug("Fingerprint cle publique : %s" % fp)
-
-        # pem = fp['pem'].decode('utf-8')
-        # der = fp['der']
-        #
-        # der_b64 = base64.b64encode(der)
-        #
-        # logger.debug("Fingerprint cle publique PEM:\n%s\nDER:\n%s" % (pem, der_b64))
-
-
+        self.assertEqual('mEiD2f+fyk6D7NtWr/ff+vfb6A84sRAH+9OmqcWkCAIMnYg', fp)
 
 
 PASSWORD_1 = "mh4P1n8aD/byx5+iEt9NU1JEV7JUT7n19lowKrwerkm3cQwLu3e//cZBdcya+2wdEIuYyMW/xlzL2l16o/OZGOzZzA6ZsTWM/9EhuMW+0GO6pwM53vWcooTBcc4HkEX5/6ZkbGUMFn+b/ii34QsrWi7u8NW39UtgcKy5+cS3M0s118yYXDOguJ3UXn8jgpxNYgM3deoFb2KlCRt+rgODTckQweSaOL0xGhsO7g8z4flKvoLfKZN2D5QmDAJK2T1OlUcya+EAnNSN7hT05s7AAQOy2MLS2IGQG1QDp02qlLVbxZWX8bLI9OlDTZ12voK4LcCreqzWqqhNpWDzhiXXc0w"

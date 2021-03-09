@@ -283,8 +283,11 @@ class EnveloppeCertificat:
 
     @property
     def fingerprint_cle_publique(self) -> str:
-        der = self.certificat.public_bytes(serialization.Encoding.DER)
-        return hacher(der, hashing_code='sha2-256', encoding='base64')
+        pk = self.certificat.public_key()
+        pem = pk.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+        pem_bytes = ''.join(pem.strip().decode('utf-8').split('\n')[1:-1]).encode('utf-8')
+        pk_bytes = base64.b64decode(pem_bytes)
+        return hacher(pk_bytes, hashing_code='sha2-256', encoding='base64')
 
 
 class UtilCertificats:

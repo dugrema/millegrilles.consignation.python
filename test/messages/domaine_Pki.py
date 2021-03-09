@@ -67,6 +67,19 @@ class MessagesSample(BaseCallback):
         print("Envoi requete: %s" % enveloppe_requete)
         return enveloppe_requete
 
+    def requete_cert_pk(self):
+        fingerprint = 'mEiArAuRl5bnjog3KF5M94sP4480FOF2JCjuMcCnqjFGI9gd'
+        enveloppe_requete = self.generateur.transmettre_requete(
+            {Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE: fingerprint},
+            'requete.Pki.' + ConstantesPki.REQUETE_CERTIFICAT_PAR_PK,
+            'abcd-1234',
+            self.queue_name,
+            securite=Constantes.SECURITE_PROTEGE,
+        )
+
+        print("Envoi requete: %s" % enveloppe_requete)
+        return enveloppe_requete
+
     def requete_cert_backup(self):
         requete_cert = {}
         enveloppe_requete = self.generateur.transmettre_requete(
@@ -109,7 +122,8 @@ class MessagesSample(BaseCallback):
         # self.renouveller_certs_docker()
         # self.requete_cert_backup()
         # self.requete_cert_noeuds()
-        self.requete_certificat()
+        # self.requete_certificat()
+        self.requete_cert_pk()
 
 
 # --- MAIN ---

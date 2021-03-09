@@ -100,6 +100,8 @@ class TraitementRequetesProtegeesPki(TraitementRequetesProtegees):
                 reponse = self.gestionnaire.get_certificats_backup()
             elif domaine_routing_key == ConstantesPki.REQUETE_LISTE_CERTS_CA:
                 reponse = self.gestionnaire.get_liste_certificats_ca()
+            elif domaine_action == ConstantesPki.REQUETE_CERTIFICAT_PAR_PK:
+                reponse = self.gestionnaire.get_certificat_par_pk(message_dict)
             else:
                 super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -190,6 +192,14 @@ class GestionnairePki(GestionnaireDomaineStandard):
                 (ConstantesPki.LIBELLE_NOT_VALID_AFTER, 1)
             ],
             name='subject-valid'
+        )
+
+        # Index pour trouver un certificat par cle publique (creation compte usager hors bande)
+        collection_domaine.create_index(
+            [
+                (ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE, 1),
+            ],
+            name='fingerprint_pk',
         )
 
     def demarrer(self):
@@ -482,6 +492,22 @@ class GestionnairePki(GestionnaireDomaineStandard):
             documents[doc['fingerprint']] = document_cert
 
         return documents
+
+    def get_certificat_par_pk(self, message: dict):
+        fingerprint = message[ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE]
+        collection_pki = self.document_dao.get_collection(self.get_nom_collection())
+        filtre = {
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE: fingerprint,
+        }
+        certificat = collection_pki.find_one(filtre)
+
+        if certificat is not None:
+            pems = certificat['certificats_pem']
+            chaine = [pems[c] for c in certificat['chaine']]
+
+            return {'certificat': chaine}
+
+        return {'resultat': False}
 
     def recevoir_certificat(self, message_dict):
         # Verifier si le certificat existe deja
