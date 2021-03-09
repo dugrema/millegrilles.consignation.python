@@ -510,6 +510,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
         chaine_pem = [pem.strip() for pem in chaine_pem]
         enveloppe = EnveloppeCertificat(certificat_pem='\n'.join(chaine_pem))
         fingerprint = enveloppe.fingerprint
+        fingerprint_cle_publique = enveloppe.fingerprint_cle_publique
 
         # Valider la chaine de certificats - lance exception si invalide
         try:
@@ -535,6 +536,7 @@ class GestionnairePki(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesPki.LIBVAL_CERTIFICAT_NOEUD,
             ConstantesPki.LIBELLE_IDMG: idmg,
             ConstantesSecurityPki.LIBELLE_FINGERPRINT: enveloppe.fingerprint,
+            ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE: fingerprint_cle_publique,
             ConstantesPki.LIBELLE_SUBJECT: enveloppe.formatter_subject(),
             ConstantesPki.LIBELLE_NOT_VALID_BEFORE: enveloppe.not_valid_before,
             ConstantesPki.LIBELLE_NOT_VALID_AFTER: enveloppe.not_valid_after,

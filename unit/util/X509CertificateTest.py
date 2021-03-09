@@ -1,3 +1,4 @@
+import base64
 import logging
 import multibase
 
@@ -131,6 +132,19 @@ class EnveloppeCleCertTest(TestCase):
 
         logger.debug("IDMG %s" % idmg)
         self.assertEqual('QLA8z7SaLx4ZFTyRbUdPiejojm5hUfqxcPRcwsuiVR8T', idmg)
+
+    def test_fingerprint_cle_publique(self):
+        fp = self.clecert_1.fingerprint_cle_publique
+        logger.debug("Fingerprint cle publique : %s" % fp)
+
+        # pem = fp['pem'].decode('utf-8')
+        # der = fp['der']
+        #
+        # der_b64 = base64.b64encode(der)
+        #
+        # logger.debug("Fingerprint cle publique PEM:\n%s\nDER:\n%s" % (pem, der_b64))
+
+
 
 
 PASSWORD_1 = "mh4P1n8aD/byx5+iEt9NU1JEV7JUT7n19lowKrwerkm3cQwLu3e//cZBdcya+2wdEIuYyMW/xlzL2l16o/OZGOzZzA6ZsTWM/9EhuMW+0GO6pwM53vWcooTBcc4HkEX5/6ZkbGUMFn+b/ii34QsrWi7u8NW39UtgcKy5+cS3M0s118yYXDOguJ3UXn8jgpxNYgM3deoFb2KlCRt+rgODTckQweSaOL0xGhsO7g8z4flKvoLfKZN2D5QmDAJK2T1OlUcya+EAnNSN7hT05s7AAQOy2MLS2IGQG1QDp02qlLVbxZWX8bLI9OlDTZ12voK4LcCreqzWqqhNpWDzhiXXc0w"

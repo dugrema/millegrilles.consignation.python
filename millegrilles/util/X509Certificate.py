@@ -1,6 +1,6 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat import primitives
-from cryptography.hazmat.primitives import hashes, padding
+from cryptography.hazmat.primitives import hashes, padding, serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import asymmetric
@@ -19,7 +19,7 @@ import pytz
 from millegrilles import Constantes
 from millegrilles.util.IdmgUtil import encoder_idmg_cert
 from millegrilles.SecuritePKI import ConstantesSecurityPki
-from millegrilles.util.Hachage import map_code_to_hashes
+from millegrilles.util.Hachage import map_code_to_hashes, hacher
 
 
 class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
@@ -273,6 +273,11 @@ class EnveloppeCleCert:
         :return:
         """
         self.__fingerprint = fingerprint
+
+    @property
+    def fingerprint_cle_publique(self) -> str:
+        der = self.cert.public_bytes(serialization.Encoding.DER)
+        return hacher(der, hashing_code='sha2-256', encoding='base64')
 
     @property
     def idmg(self) -> str:

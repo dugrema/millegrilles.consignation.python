@@ -434,6 +434,7 @@ class ConstantesSecurityPki:
 
     LIBELLE_CERTIFICAT_PEM = 'certificat_pem'
     LIBELLE_FINGERPRINT = 'fingerprint'
+    LIBELLE_FINGERPRINT_CLE_PUBLIQUE ='fingerprint_pk'
     LIBELLE_CHAINE_PEM = 'chaine_pem'
     LIBELLE_CHAINE = 'chaine'
     LIBELLE_CERTIFICATS_PEM = 'certificats_pem'

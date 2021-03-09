@@ -281,6 +281,11 @@ class EnveloppeCertificat:
         pems.extend(self.reste_chaine_pem)
         return pems
 
+    @property
+    def fingerprint_cle_publique(self) -> str:
+        der = self.certificat.public_bytes(serialization.Encoding.DER)
+        return hacher(der, hashing_code='sha2-256', encoding='base64')
+
 
 class UtilCertificats:
 
