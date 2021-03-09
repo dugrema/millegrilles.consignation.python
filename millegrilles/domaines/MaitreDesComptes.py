@@ -238,17 +238,13 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE: motdepasse
         }
 
-        if est_proprietaire:
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
-            }
-            # Pour le proprietaire, on permet de changer le nom d'usager a volonte
-            set_ops[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER] = nom_usager
-        else:
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-                ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-            }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {'$in': [
+                ConstantesMaitreDesComptes.LIBVAL_USAGER,
+                ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
+            ]},
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
 
         ops = {
             '$set': set_ops,

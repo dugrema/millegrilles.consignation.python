@@ -1977,7 +1977,7 @@ class RenouvelleurCertificat:
         if not csr.is_signature_valid:
             raise ValueError("Signature invalide")
 
-        certificat = generateur.signer(csr, securite=securite, **kwargs)
+        certificat = generateur.signer(csr, securite=securite, role='Navigateur', **kwargs)
         chaine = generateur.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)
