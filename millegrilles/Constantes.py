@@ -1403,16 +1403,23 @@ class ConstantesMaitreDesComptes:
     DOMAINE_NOM = 'MaitreDesComptes'
     COLLECTION_TRANSACTIONS_NOM = DOMAINE_NOM
     COLLECTION_DOCUMENTS_NOM = '%s/documents' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_USAGERS_NOM = '%s/usagers' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
 
     LIBVAL_USAGER = 'usager'
     LIBVAL_PROPRIETAIRE = 'proprietaire'
 
+    CHAMP_ID_USAGER = 'idUsager'
     CHAMP_NOM_USAGER = 'nomUsager'
     CHAMP_MOTDEPASSE = 'motdepasse'
     CHAMP_CLE = 'cle'
-    CHAMP_CLES_U2F = 'u2f'
+    CHAMP_USER_ID = 'userId'
+    CHAMP_PK_CRED_ID = 'credId'
+    CHAMP_PK_COUNTER = 'counter'
+    CHAMP_PK_PEM = 'publicKeyPem'
+    CHAMP_PK_TYPE = 'type'
+    CHAMP_WEBAUTHN = 'webauthn'
     CHAMP_RESET_CLES = 'reset_cles'
     CHAMP_EST_PROPRIETAIRE = 'est_proprietaire'
     CHAMP_CHAINE_CERTIFICAT = 'chaine_certificats'

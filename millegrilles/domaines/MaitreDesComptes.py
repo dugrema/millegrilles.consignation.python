@@ -69,6 +69,26 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
     def configurer(self):
         super().configurer()
 
+        collection_domaine = self.document_dao.get_collection(self.get_nom_collection_usagers())
+
+        # Index noeud, _mg-libelle
+        collection_domaine.create_index(
+            [
+                (ConstantesMaitreDesComptes.CHAMP_ID_USAGER, 1)
+            ],
+            name='idusager_unique',
+            unique=True,
+        )
+
+        collection_domaine.create_index(
+            [
+                (ConstantesMaitreDesComptes.CHAMP_NOM_USAGER, 1)
+            ],
+            name='nomusager_unique',
+            unique=True,
+        )
+
+
     def demarrer(self):
         super().demarrer()
         # self.initialiser_document(ConstantesMaitreDesCles.LIBVAL_CONFIGURATION, ConstantesMaitreDesCles.DOCUMENT_DEFAUT)
@@ -113,6 +133,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
     def get_nom_collection(self):
         return ConstantesMaitreDesComptes.COLLECTION_DOCUMENTS_NOM
 
+    def get_nom_collection_usagers(self):
+        return ConstantesMaitreDesComptes.COLLECTION_USAGERS_NOM
+
     def get_collection_transaction_nom(self):
         return ConstantesMaitreDesComptes.COLLECTION_TRANSACTIONS_NOM
 
@@ -134,28 +157,21 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         document_usager = collection.find_one(filtre)
 
         if document_usager:
             champs_conserver = [
                 Constantes.DOCUMENT_INFODOC_LIBELLE,
-                ConstantesMaitreDesComptes.CHAMP_CLES_U2F,
+                ConstantesMaitreDesComptes.CHAMP_WEBAUTHN,
                 ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE,
                 ConstantesMaitreDesComptes.CHAMP_NOM_USAGER,
-                ConstantesMaitreDesComptes.CHAMP_IDMGS,
-                ConstantesMaitreDesComptes.CHAMP_IDMG_COMPTE,
                 ConstantesMaitreDesComptes.CHAMP_TOTP,
             ]
             document_filtre = dict()
             for key, value in document_usager.items():
                 if key in champs_conserver:
                     document_filtre[key] = value
-
-            champs_certs = document_usager.get(ConstantesMaitreDesComptes.CHAMP_CERTIFICATS)
-            if champs_certs:
-                idmg_usager = [idmg for idmg in champs_certs.keys()]
-                document_filtre['liste_idmg'] = idmg_usager
 
             return document_filtre
         else:
@@ -169,7 +185,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
         }
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         document_proprietaire = collection.find_one(filtre)
         if document_proprietaire:
             document_proprietaire = self.filtrer_champs_document(document_proprietaire)
@@ -181,7 +197,14 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
     def inscrire_proprietaire(self, info_proprietaire: dict):
         date_courante = datetime.datetime.utcnow()
 
-        cle = info_proprietaire[ConstantesMaitreDesComptes.CHAMP_CLE]
+        # cle = info_proprietaire[ConstantesMaitreDesComptes.CHAMP_CLE]
+
+        cle = {
+            ConstantesMaitreDesComptes.CHAMP_PK_CRED_ID: info_proprietaire[ConstantesMaitreDesComptes.CHAMP_PK_CRED_ID],
+            ConstantesMaitreDesComptes.CHAMP_PK_COUNTER: info_proprietaire[ConstantesMaitreDesComptes.CHAMP_PK_COUNTER],
+            ConstantesMaitreDesComptes.CHAMP_PK_PEM: info_proprietaire[ConstantesMaitreDesComptes.CHAMP_PK_PEM],
+            ConstantesMaitreDesComptes.CHAMP_PK_TYPE: info_proprietaire[ConstantesMaitreDesComptes.CHAMP_PK_TYPE],
+        }
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
@@ -191,15 +214,16 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
-            ConstantesMaitreDesComptes.CHAMP_CLES_U2F: [cle],
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'proprietaire'
+            ConstantesMaitreDesComptes.CHAMP_USER_ID: info_proprietaire[ConstantesMaitreDesComptes.CHAMP_USER_ID],
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: info_proprietaire[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER],
+            ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: [cle],
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
 
         # S'assurer que le document n'existe pas deja
         doc_existant = collection.find_one(filtre)
-        if doc_existant and doc_existant.get('u2f'):
+        if doc_existant and doc_existant.get(ConstantesMaitreDesComptes.CHAMP_WEBAUTHN):
             raise ValueError("Proprietaire deja assigne pour cette MilleGrille")
 
         resultat = collection.insert_one(doc)
@@ -228,7 +252,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             }
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops, upsert=True)
         if not resultat.upserted_id and resultat.matched_count == 0:
             raise Exception("Erreur inscription, aucun document modifie")
@@ -253,13 +277,13 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             }
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops)
         if resultat.matched_count != 1:
             raise Exception("Erreur maj mot de passe, aucun document modifie")
 
     def maj_usager_totp(self, transaction: dict):
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
 
         info_totp = transaction['totp']
 
@@ -283,7 +307,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             raise Exception("Erreur maj_usager_totp, aucun document modifie")
 
     def maj_cle_usagerprive(self, nom_usager: str, cle: str):
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
 
         info_usager = collection.find_one({
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
@@ -324,7 +348,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             }
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops)
         if resultat.matched_count != 1:
             raise Exception("Erreur suppression mot de passe, aucun document modifie")
@@ -333,21 +357,16 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
     def ajouter_cle(self, cle: dict, nom_usager: str = None, est_proprietaire=False, reset_autres_cles=False,):
         if reset_autres_cles:
-            op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_CLES_U2F: [cle]}}
+            op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: [cle]}}
         else:
-            op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_CLES_U2F: cle}}
+            op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: cle}}
 
-        if est_proprietaire:
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE
-            }
-        else:
-            filtre = {
-                Constantes.DOCUMENT_INFODOC_LIBELLE: {
-                    '$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE]
-                },
-                ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-            }
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: {
+                '$in': [ConstantesMaitreDesComptes.LIBVAL_USAGER, ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE]
+            },
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
 
         ops = {
             '$currentDate': {
@@ -356,7 +375,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         }
         ops.update(op_cle)
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops)
         if resultat.matched_count != 1:
             raise Exception("Erreur ajout cle, aucun document modifie")
@@ -367,13 +386,13 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
         ops = {
-            '$unset': {ConstantesMaitreDesComptes.CHAMP_CLES_U2F: True},
+            '$unset': {ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: True},
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
             }
         }
 
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops)
         if resultat.matched_count != 1:
             raise Exception("Erreur suppression mot de passe, aucun document modifie")
@@ -385,76 +404,76 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
-        collection = self.document_dao.get_collection(self.get_nom_collection())
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.delete_one(filtre)
         if resultat.deleted_count != 1:
             raise Exception("Erreur suppression usager, aucun document modifie")
 
         return {Constantes.EVENEMENT_REPONSE: True}
 
-    def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-        }
+    # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
+    #     filtre = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+    #         ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+    #     }
+    #
+    #     set_ops = {}
+    #     document_idmg = {}
+    #     if chaine_certificats:
+    #         document_idmg[ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT] = chaine_certificats
+    #     if cle_intermediaire:
+    #         document_idmg[ConstantesMaitreDesComptes.CHAMP_CLE] = cle_intermediaire
+    #     if reset_certificats:
+    #         set_ops['certificats'] = {
+    #             idmg: document_idmg
+    #         }
+    #     else:
+    #         set_ops['certificats.%s' % idmg] = document_idmg
+    #
+    #     ops = {
+    #         '$set': set_ops,
+    #         '$currentDate': {
+    #             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+    #         }
+    #     }
+    #
+    #     collection = self.document_dao.get_collection(self.get_nom_collection())
+    #     resultat = collection.update_one(filtre, ops)
+    #     if resultat.matched_count != 1:
+    #         raise Exception("Erreur suppression mot de passe, aucun document modifie")
+    #
+    #     return {Constantes.EVENEMENT_REPONSE: True}
 
-        set_ops = {}
-        document_idmg = {}
-        if chaine_certificats:
-            document_idmg[ConstantesMaitreDesComptes.CHAMP_CHAINE_CERTIFICAT] = chaine_certificats
-        if cle_intermediaire:
-            document_idmg[ConstantesMaitreDesComptes.CHAMP_CLE] = cle_intermediaire
-        if reset_certificats:
-            set_ops['certificats'] = {
-                idmg: document_idmg
-            }
-        else:
-            set_ops['certificats.%s' % idmg] = document_idmg
-
-        ops = {
-            '$set': set_ops,
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
-        }
-
-        collection = self.document_dao.get_collection(self.get_nom_collection())
-        resultat = collection.update_one(filtre, ops)
-        if resultat.matched_count != 1:
-            raise Exception("Erreur suppression mot de passe, aucun document modifie")
-
-        return {Constantes.EVENEMENT_REPONSE: True}
-
-    def ajouter_certificat_navigateur(self, nom_usager, info_certificat: dict):
-        filtre = {
-            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
-            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
-        }
-
-        idmg = info_certificat['idmg']
-        fingerprint_navigateur = info_certificat['fingerprint']
-
-        set_ops = {}
-        set_ops['idmgs.%s.navigateurs.%s' % (idmg, fingerprint_navigateur)] = {
-            'cleChiffree': info_certificat['cleChiffree'],
-            'certificat': info_certificat['certificat'],
-            'motdepassePartiel': info_certificat['motdepassePartiel'],
-            'expiration': info_certificat['expiration'],
-        }
-
-        ops = {
-            '$set': set_ops,
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
-        }
-
-        collection = self.document_dao.get_collection(self.get_nom_collection())
-        resultat = collection.update_one(filtre, ops)
-        if resultat.matched_count != 1:
-            raise Exception("Erreur suppression mot de passe, aucun document modifie")
-
-        return {Constantes.EVENEMENT_REPONSE: True}
+    # def ajouter_certificat_navigateur(self, nom_usager, info_certificat: dict):
+    #     filtre = {
+    #         Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
+    #         ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+    #     }
+    #
+    #     idmg = info_certificat['idmg']
+    #     fingerprint_navigateur = info_certificat['fingerprint']
+    #
+    #     set_ops = {}
+    #     set_ops['idmgs.%s.navigateurs.%s' % (idmg, fingerprint_navigateur)] = {
+    #         'cleChiffree': info_certificat['cleChiffree'],
+    #         'certificat': info_certificat['certificat'],
+    #         'motdepassePartiel': info_certificat['motdepassePartiel'],
+    #         'expiration': info_certificat['expiration'],
+    #     }
+    #
+    #     ops = {
+    #         '$set': set_ops,
+    #         '$currentDate': {
+    #             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
+    #         }
+    #     }
+    #
+    #     collection = self.document_dao.get_collection(self.get_nom_collection())
+    #     resultat = collection.update_one(filtre, ops)
+    #     if resultat.matched_count != 1:
+    #         raise Exception("Erreur suppression mot de passe, aucun document modifie")
+    #
+    #     return {Constantes.EVENEMENT_REPONSE: True}
 
 
 class ProcessusInscrireProprietaire(MGProcessusTransaction):
