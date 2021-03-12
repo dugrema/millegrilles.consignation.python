@@ -167,6 +167,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
                 ConstantesMaitreDesComptes.CHAMP_MOTDEPASSE,
                 ConstantesMaitreDesComptes.CHAMP_NOM_USAGER,
                 ConstantesMaitreDesComptes.CHAMP_TOTP,
+                ConstantesMaitreDesComptes.CHAMP_USER_ID,
             ]
             document_filtre = dict()
             for key, value in document_usager.items():
