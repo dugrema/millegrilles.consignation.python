@@ -174,6 +174,9 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
                 if key in champs_conserver:
                     document_filtre[key] = value
 
+            if document_filtre[Constantes.DOCUMENT_INFODOC_LIBELLE] == ConstantesMaitreDesComptes.LIBVAL_PROPRIETAIRE:
+                document_filtre[ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE] = True
+
             return document_filtre
         else:
             return {Constantes.EVENEMENT_REPONSE: False}
