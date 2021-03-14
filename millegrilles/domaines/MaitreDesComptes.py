@@ -612,7 +612,7 @@ class ProcessusAjouterCle(MGProcessusTransaction):
 
         nom_usager = transaction.get(ConstantesMaitreDesComptes.CHAMP_NOM_USAGER)
         cle = self.transaction[ConstantesMaitreDesComptes.CHAMP_CLE]
-        fingerprint_pk = self.transaction[Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE]
+        fingerprint_pk = self.transaction.get(Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE)
         reset_autres_cles = transaction.get(ConstantesMaitreDesComptes.CHAMP_RESET_CLES) or False
         self.controleur.gestionnaire.ajouter_cle(
             cle, nom_usager=nom_usager, reset_autres_cles=reset_autres_cles,
