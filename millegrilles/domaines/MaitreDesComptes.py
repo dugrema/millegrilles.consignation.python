@@ -241,11 +241,19 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
     def inscrire_usager(self, info_usager: dict):
         nom_usager = info_usager[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
         id_usager = info_usager[ConstantesMaitreDesComptes.CHAMP_ID_USAGER]
-        date_courante = datetime.datetime.utcnow()
+        fingerprint_pk = info_usager[Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE]
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
+        }
+
+        set_ops = {
+            '.'.join([ConstantesMaitreDesComptes.CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK, fingerprint_pk]): {
+                'associe': False,
+                'date_activation': date_courante
+            }
         }
 
         set_on_insert = {
@@ -255,6 +263,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         }
 
         ops = {
+            '$set': set_ops,
             '$setOnInsert': set_on_insert,
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
