@@ -1410,7 +1410,7 @@ class ConstantesMaitreDesComptes:
     LIBVAL_USAGER = 'usager'
     LIBVAL_PROPRIETAIRE = 'proprietaire'
 
-    CHAMP_ID_USAGER = 'idUsager'
+    CHAMP_ID_USAGER = 'userId'
     CHAMP_NOM_USAGER = 'nomUsager'
     CHAMP_MOTDEPASSE = 'motdepasse'
     CHAMP_CLE = 'cle'

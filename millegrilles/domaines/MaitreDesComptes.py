@@ -240,6 +240,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
     def inscrire_usager(self, info_usager: dict):
         nom_usager = info_usager[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+        id_usager = info_usager[ConstantesMaitreDesComptes.CHAMP_ID_USAGER]
         date_courante = datetime.datetime.utcnow()
 
         filtre = {
@@ -250,10 +251,10 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         set_on_insert = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesMaitreDesComptes.LIBVAL_USAGER,
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+            ConstantesMaitreDesComptes.CHAMP_ID_USAGER: id_usager,
         }
 
         ops = {
-            '$set': info_usager,
             '$setOnInsert': set_on_insert,
             '$currentDate': {
                 Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
