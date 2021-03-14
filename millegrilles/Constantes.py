@@ -1428,6 +1428,7 @@ class ConstantesMaitreDesComptes:
     CHAMP_IDMGS = 'idmgs'
     CHAMP_IDMG_COMPTE = 'idmgCompte'
     CHAMP_TOTP = 'totp'
+    CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK = 'activations_par_fingerprint_pk'
 
     REQUETE_CHARGER_USAGER = 'chargerUsager'
     REQUETE_INFO_PROPRIETAIRE = 'infoProprietaire'

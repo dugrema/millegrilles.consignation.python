@@ -171,6 +171,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
                 ConstantesMaitreDesComptes.CHAMP_NOM_USAGER,
                 ConstantesMaitreDesComptes.CHAMP_TOTP,
                 ConstantesMaitreDesComptes.CHAMP_USER_ID,
+                ConstantesMaitreDesComptes.CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK,
             ]
             document_filtre = dict()
             for key, value in document_usager.items():
@@ -362,11 +363,30 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
 
         return {Constantes.EVENEMENT_REPONSE: True}
 
-    def ajouter_cle(self, cle: dict, nom_usager: str = None, est_proprietaire=False, reset_autres_cles=False,):
+    def ajouter_cle(self, cle: dict, nom_usager: str = None, reset_autres_cles=False, fingerprint_pk=None):
+        set_ops = {}
+        push_ops = {}
+
+        if fingerprint_pk is not None:
+            champ_fp = '.'.join(
+                [ConstantesMaitreDesComptes.CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK, fingerprint_pk, 'associe'])
+            champ_date = '.'.join(
+                [ConstantesMaitreDesComptes.CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK, fingerprint_pk, 'date_association'])
+            set_ops[champ_fp] = True
+            set_ops[champ_date] = pytz.utc.localize(datetime.datetime.utcnow())
+
         if reset_autres_cles:
-            op_cle = {'$set': {ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: [cle]}}
+            set_ops[ConstantesMaitreDesComptes.CHAMP_WEBAUTHN] = [cle]
         else:
-            op_cle = {'$push': {ConstantesMaitreDesComptes.CHAMP_WEBAUTHN: cle}}
+            push_ops[ConstantesMaitreDesComptes.CHAMP_WEBAUTHN] = cle
+
+        ops = {
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+        if len(set_ops) > 0:
+            ops['$set'] = set_ops
+        if len(push_ops) > 0:
+            ops['$push'] = push_ops
 
         filtre = {
             Constantes.DOCUMENT_INFODOC_LIBELLE: {
@@ -374,13 +394,6 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             },
             ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager,
         }
-
-        ops = {
-            '$currentDate': {
-                Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True
-            }
-        }
-        ops.update(op_cle)
 
         collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
         resultat = collection.update_one(filtre, ops)
@@ -430,7 +443,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         ts_courant = pytz.utc.localize(datetime.datetime.utcnow())
 
         set_ops = {
-            'activations_par_fingerprint_pk.%s' % fingerprint_pk: {'associe': False, 'date_activation': ts_courant}
+            '.'.join([ConstantesMaitreDesComptes.CHAMP_ACTIVATIONS_PAR_FINGERPRINT_PK, fingerprint_pk]): {'associe': False, 'date_activation': ts_courant}
         }
         ops = {
             '$set': set_ops,
@@ -444,7 +457,7 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
         resultat = collection.update_one(filtre, ops)
         if resultat.matched_count != 1:
             raise Exception("Erreur set flag d'activation tierce sur usager %s pour fingerprint %s, "
-                            "aucun document modifie" % (nom_usager, fingerprint))
+                            "aucun document modifie" % (nom_usager, fingerprint_pk))
 
         return {'ok': True}
 
@@ -598,11 +611,12 @@ class ProcessusAjouterCle(MGProcessusTransaction):
         transaction = self.transaction
 
         nom_usager = transaction.get(ConstantesMaitreDesComptes.CHAMP_NOM_USAGER)
-        est_proprietaire = transaction.get(ConstantesMaitreDesComptes.CHAMP_EST_PROPRIETAIRE)
         cle = self.transaction[ConstantesMaitreDesComptes.CHAMP_CLE]
+        fingerprint_pk = self.transaction[Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE]
         reset_autres_cles = transaction.get(ConstantesMaitreDesComptes.CHAMP_RESET_CLES) or False
         self.controleur.gestionnaire.ajouter_cle(
-            cle, nom_usager=nom_usager, est_proprietaire=est_proprietaire, reset_autres_cles=reset_autres_cles)
+            cle, nom_usager=nom_usager, reset_autres_cles=reset_autres_cles,
+            fingerprint_pk=fingerprint_pk)
 
         self.set_etape_suivante()  #Termine
 
