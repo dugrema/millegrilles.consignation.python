@@ -1444,6 +1444,8 @@ class ConstantesMaitreDesComptes:
     TRANSACTION_AJOUTER_NAVIGATEUR = 'ajouterNavigateur'
     TRANSACTION_MAJ_USAGER_TOTP = 'majUsagerTotp'
 
+    COMMANDE_ACTIVATION_TIERCE = 'activationTierce'
+
 
 class ConstantesMessagerie:
 

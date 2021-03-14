@@ -192,8 +192,18 @@ class MessagesSample(BaseCallback):
         print("Envoi : %s" % enveloppe)
         return enveloppe
 
+    def commande_activer_certificat(self):
+        transaction = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: 'proprietaire',
+            Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE: 'abcd1234',
+        }
+        domaine_action = '.'.join(['commande', ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE])
+        enveloppe = self.generateur.transmettre_commande(transaction, domaine_action, correlation_id='abcd-1234', reply_to=self.queue_name)
+        print("Envoi : %s" % enveloppe)
+        return enveloppe
+
     def executer(self):
-        self.requete_info_proprietaire()
+        # self.requete_info_proprietaire()
         # self.requete_profil_usager()
         # self.transaction_inscrire_proprietaire()
         # self.transaction_inscrire_usager()
@@ -207,6 +217,7 @@ class MessagesSample(BaseCallback):
         # self.transaction_associer_idmg()
         # self.transaction_ajouter_certificat_navigateur()
         # self.transaction_maj_usager_totp()
+        self.commande_activer_certificat()
 
 
 # --- MAIN ---

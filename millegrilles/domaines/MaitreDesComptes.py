@@ -1,5 +1,6 @@
 import logging
 import datetime
+import pytz
 
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesMaitreDesComptes
@@ -40,12 +41,14 @@ class TraitementCommandesMaitredesclesProtegees(TraitementCommandesProtegees):
         action = routing_key.split('.')[-1]
 
         resultat: dict
+        if action == ConstantesMaitreDesComptes.COMMANDE_ACTIVATION_TIERCE:
+            resultat = self.gestionnaire.set_activation_tierce(message_dict)
         # if routing_key == 'commande.%s.%s' % (ConstantesMaitreDesComptes.DOMAINE_NOM, ConstantesMaitreDesComptes.COMMANDE_SIGNER_CLE_BACKUP):
         #     resultat = self.gestionnaire.AAAA()
         # else:
         #     resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
-
-        resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
+        else:
+            resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
         return resultat
 
@@ -414,6 +417,36 @@ class GestionnaireMaitreDesComptes(GestionnaireDomaineStandard):
             raise Exception("Erreur suppression usager, aucun document modifie")
 
         return {Constantes.EVENEMENT_REPONSE: True}
+
+    def set_activation_tierce(self, commande: dict):
+        """
+        Ajoute un flag pour indiquer qu'un certificat doit permettre l'enregistrement d'un (1) appareil
+        :param commande:
+        :return:
+        """
+        fingerprint_pk = commande[Constantes.ConstantesSecurityPki.LIBELLE_FINGERPRINT_CLE_PUBLIQUE]
+        nom_usager = commande[ConstantesMaitreDesComptes.CHAMP_NOM_USAGER]
+
+        ts_courant = pytz.utc.localize(datetime.datetime.utcnow())
+
+        set_ops = {
+            'activations_par_fingerprint_pk.%s' % fingerprint_pk: {'associe': False, 'date_activation': ts_courant}
+        }
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+        filtre = {
+            ConstantesMaitreDesComptes.CHAMP_NOM_USAGER: nom_usager
+        }
+
+        collection = self.document_dao.get_collection(self.get_nom_collection_usagers())
+        resultat = collection.update_one(filtre, ops)
+        if resultat.matched_count != 1:
+            raise Exception("Erreur set flag d'activation tierce sur usager %s pour fingerprint %s, "
+                            "aucun document modifie" % (nom_usager, fingerprint))
+
+        return {'ok': True}
 
     # def associer_idmg(self, nom_usager, idmg, chaine_certificats=None, cle_intermediaire=None, reset_certificats=None):
     #     filtre = {
