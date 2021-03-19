@@ -1,0 +1,8 @@
+{
+  "domaines": {
+    "SenseursPassifs": {
+      "module": "millegrilles.domaines.SenseursPassifs",
+      "classe": "GestionnaireSenseursPassifs"
+    }
+  }
+}
