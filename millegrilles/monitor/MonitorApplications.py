@@ -320,10 +320,10 @@ class GestionnaireApplications:
 
         nginx_config = configuration_docker.get('nginx')
         if nginx_config is not None:
-            path_location = configuration_docker.get('path_location')
+            path_location = nginx_config.get('path_location')
             server_file = nginx_config.get('server_file')
             if path_location is not None:
-                elems_config = configuration_docker.copy()
+                elems_config = nginx_config.copy()
                 elems_config['appname'] = nom_application
                 conf = """
                     location {path_location} {{
