@@ -180,12 +180,16 @@ proxy_pass $upstream_fichiers;
         with open(path.join(self.__repertoire_modules, 'proxypass_fichiers.include'), 'w') as fichier:
             fichier.write(proxypass_fichiers)
 
-        proxypass_coupdoeil = """
-set $upstream_coupdoeil https://coupdoeil:443; 
-proxy_pass $upstream_coupdoeil;
+        app_coupdoeil = """
+location /coupdoeil {
+    set $upstream_coupdoeil https://coupdoeil:443;
+    proxy_pass $upstream_coupdoeil;
+
+    include /etc/nginx/conf.d/component_base_auth.include;
+}
 """
-        with open(path.join(self.__repertoire_modules, 'proxypass_coupdoeil.include'), 'w') as fichier:
-            fichier.write(proxypass_coupdoeil)
+        with open(path.join(self.__repertoire_modules, 'coupdoeil.app.location'), 'w') as fichier:
+            fichier.write(app_coupdoeil)
 
         domaine_installeur = 'monitor'
         if self.__mode_dev:
@@ -392,9 +396,6 @@ location %s {
         location_public_paths = [
             "/vitrine",
         ]
-        location_prot_paths = [
-            "coupdoeil",
-        ]
 
         certificats = """
 location /certs {
@@ -403,17 +404,15 @@ location /certs {
         """
 
         locations_list = list()
+
         locations_list.append(location_redirect_installation)
         locations_list.append(location_data_vitrine)
         locations_list.append(location_fichiers)
         locations_list.append(certificats)
         locations_list.extend([location_public_component % loc for loc in location_public_paths])
-        if securite == Constantes.SECURITE_PROTEGE:
-            locations_list.extend([location_priv_prot_component % ('/' + loc, loc) for loc in location_prot_paths])
         locations_list.extend([location_installation_component % loc for loc in location_installation_paths])
 
         locations_content = '\n'.join(locations_list)
-
         with open(path.join(self.__repertoire_modules, 'locations.include'), 'w') as fichier:
             fichier.write(locations_content)
 

@@ -284,7 +284,8 @@ class GestionnaireModulesDocker:
 
         if configuration_service:
             # S'assurer que le certificat existe, est a date et que le compte est cree
-            cle_config_service = configuration_service.get('role') or configuration_service.get('nom')
+            # cle_config_service = configuration_service.get('role') or configuration_service.get('nom')
+            cle_config_service = configuration_service.get('nom_config') or service_name
             if cle_config_service:
                 configuration_service_meta = self.charger_config_recente('docker.cfg.' + cle_config_service)
                 config_attrs = configuration_service_meta['config'].attrs

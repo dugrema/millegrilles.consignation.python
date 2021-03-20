@@ -1595,7 +1595,7 @@ class ConstantesServiceMonitor:
     # MODULE_TRANSMISSION = 'transmission'
     # MODULE_DOMAINES = 'domaines'
     MODULE_PRINCIPAL = 'principal'
-    MODULE_DOMAINES_DYNAMIQUES = 'domaines_dynamiques'
+    # MODULE_DOMAINES_DYNAMIQUES = 'domaines_dynamiques'
     MODULE_NGINX = 'nginx'
     MODULE_WEB_PROTEGE = 'web_protege'
     MODULE_WEB = 'web'
@@ -1723,6 +1723,7 @@ class ConstantesTopologie:
 
     VALEUR_AWSS3_CONSIGNATION_WEB_NGINX = 'cachenginx'
     VALEUR_AWSS3_CONSIGNATION_WEB_AWSS3 = 'awss3'
+
 
 class ConstantesPublication:
 
