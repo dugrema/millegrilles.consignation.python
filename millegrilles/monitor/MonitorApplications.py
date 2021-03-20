@@ -319,10 +319,28 @@ class GestionnaireApplications:
                     raise api
 
         nginx_config = configuration_docker.get('nginx')
-        if nginx_config:
+        if nginx_config is not None:
+            path_location = configuration_docker.get('path_location')
             server_file = nginx_config.get('server_file')
-            conf: Optional[str] = None
-            if server_file:
+            if path_location is not None:
+                elems_config = configuration_docker.copy()
+                elems_config['appname'] = nom_application
+                conf = """
+                    location {path_location} {{
+                        set $upstream_{appname} {proxypass};
+                        proxy_pass $upstream_{appname};
+                        include /etc/nginx/conf.d/component_base_auth.include;
+                    }}
+                """
+                conf = conf.format(**elems_config)
+
+                # Injecter le fichier dans le repertoire de nginx
+                path_nginx = '/var/opt/millegrilles/nginx/modules'
+                with open(path.join(path_nginx, nom_application + '.app.location'), 'w') as fichier:
+                    fichier.write(conf)
+
+            elif server_file is not None:
+                conf: Optional[str] = None
                 # Charger le fichier a partir de l'archive tar
                 server_file_obj = io.BytesIO(b64decode(configuration_docker['scripts']))
                 tar_content = tarfile.open(fileobj=server_file_obj)
@@ -332,21 +350,21 @@ class GestionnaireApplications:
                 server_file_obj = None
                 tar_content = None
 
-            # Remplacer les variables de conf
-            server_domain = self.__gestionnaire_modules_docker.hostname
-            app_domain = '.'.join([nginx_config['subdomain'], server_domain])
+                # Remplacer les variables de conf
+                server_domain = self.__gestionnaire_modules_docker.hostname
+                app_domain = '.'.join([nginx_config['subdomain'], server_domain])
 
-            conf = conf.replace("${HOSTNAME}", server_domain)
-            conf = conf.replace("${APP_DOMAIN}", app_domain)
+                conf = conf.replace("${HOSTNAME}", server_domain)
+                conf = conf.replace("${APP_DOMAIN}", app_domain)
 
-            if nginx_config.get('params'):
-                for key, value in nginx_config['params'].items():
-                    conf = conf.replace('${%s}' % key, value)
+                if nginx_config.get('params'):
+                    for key, value in nginx_config['params'].items():
+                        conf = conf.replace('${%s}' % key, value)
 
-            # Injecter le fichier dans le repertoire de nginx
-            path_nginx = '/var/opt/millegrilles/nginx/modules'
-            with open(path.join(path_nginx, server_file), 'w') as fichier:
-                fichier.write(conf)
+                # Injecter le fichier dans le repertoire de nginx
+                path_nginx = '/var/opt/millegrilles/nginx/modules'
+                with open(path.join(path_nginx, nom_application + '.app.server'), 'w') as fichier:
+                    fichier.write(conf)
 
             # Redemarrer nginx
             nom_service_nginx = 'nginx'
