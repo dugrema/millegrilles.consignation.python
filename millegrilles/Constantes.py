@@ -1599,6 +1599,7 @@ class ConstantesServiceMonitor:
     MODULE_NGINX = 'nginx'
     MODULE_WEB_PROTEGE = 'web_protege'
     MODULE_WEB = 'web'
+    MODULE_WEB_COUPDOEIL = 'web_coupdoeil'
     MODULE_PYTHON = 'mg-python'
     MODULE_MONGOEXPRESS = 'mongoxp'
     # MODULE_HEBERGEMENT_TRANSACTIONS = 'heb_transaction'

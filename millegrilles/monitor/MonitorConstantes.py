@@ -70,16 +70,21 @@ DICT_MODULES_PROTEGES = {
         'nom_image': ConstantesServiceMonitor.MODULE_WEB,
         'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
     },
+    ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL: {
+        'nom': ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
+        'nom_image': ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
+        'role': ConstantesGenerateurCertificat.ROLE_WEB_PROTEGE,
+    },
     ConstantesServiceMonitor.MODULE_PRINCIPAL: {
         'nom': ConstantesServiceMonitor.MODULE_PYTHON,
         'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
         'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
     },
-    ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
-        'nom': ConstantesServiceMonitor.MODULE_PYTHON,
-        'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
-        'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
-    },
+    # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES: {
+    #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
+    #     'nom_image': ConstantesServiceMonitor.MODULE_PYTHON,
+    #     'role': ConstantesGenerateurCertificat.ROLE_DOMAINES,
+    # },
     # ConstantesServiceMonitor.MODULE_HEBERGEMENT_TRANSACTIONS: {
     #     'nom': ConstantesServiceMonitor.MODULE_PYTHON,
     #     'role': ConstantesGenerateurCertificat.ROLE_HEBERGEMENT_TRANSACTIONS,
@@ -118,7 +123,8 @@ MODULES_REQUIS_PRIMAIRE = [
     ConstantesServiceMonitor.MODULE_PRINCIPAL,
     ConstantesServiceMonitor.MODULE_CONSIGNATIONFICHIERS,
     ConstantesServiceMonitor.MODULE_WEB_PROTEGE,
-    ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
+    ConstantesServiceMonitor.MODULE_WEB_COUPDOEIL,
+    # ConstantesServiceMonitor.MODULE_DOMAINES_DYNAMIQUES,
 ]
 
 MODULES_REQUIS_DEPENDANT = [
