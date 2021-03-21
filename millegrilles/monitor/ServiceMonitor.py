@@ -232,6 +232,11 @@ class ServiceMonitor:
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
 
+        # Initialiser dernier backup d'application a l'heure de backup habituelle, mais pour aujourd'hui
+        date_now = pytz.utc.localize(datetime.datetime.utcnow())
+        self._applications_backup_date = pytz.utc.localize(datetime.datetime(year=date_now.year, month=date_now.month, day=date_now.day, hour=9))
+        self._applications_backup_frequence = datetime.timedelta(days=1)
+
         # self._verificateur_transactions: Optional[VerificateurTransaction] = None
         self.__validateur_message: Optional[ValidateurMessage] = None
 
@@ -674,19 +679,33 @@ class ServiceMonitor:
             # Entretien du middleware
             self._gestionnaire_mq.entretien()
 
+            date_now = pytz.utc.localize(datetime.datetime.utcnow())
+
             # Entretien web
             if self._web_entretien_date is None or \
-                    self._web_entretien_date + self._web_entretien_frequence < datetime.datetime.utcnow():
-                self._web_entretien_date = datetime.datetime.utcnow()
+                    self._web_entretien_date + self._web_entretien_frequence < date_now:
+                self._web_entretien_date = date_now
                 self._gestionnaire_web.entretien()
 
             # Entretien des certificats du monitor, services
             if self._certificats_entretien_date is None or \
-                    self._certificats_entretien_date + self._certificats_entretien_frequence < datetime.datetime.utcnow():
+                    self._certificats_entretien_date + self._certificats_entretien_frequence < date_now:
 
-                self._certificats_entretien_date = datetime.datetime.utcnow()
+                self._certificats_entretien_date = date_now
                 self._entretien_certificats()
                 self._entretien_secrets_pki()
+
+            # Backup
+            if self._applications_backup_date + self._applications_backup_frequence < date_now:
+                # Placer la date de backup pour que l'intervalle tombe le lendemain
+                self._applications_backup_date = pytz.utc.localize(datetime.datetime(
+                    year=date_now.year, month=date_now.month, day=date_now.day, hour=9))
+
+                # Declencher backup quotidien pour les applications
+                commande = CommandeMonitor({
+                    'commande': Constantes.ConstantesServiceMonitor.COMMANDE_BACKUP_APPLICATION,
+                })
+                self._gestionnaire_commandes.ajouter_commande(commande)
 
     def run(self):
         raise NotImplementedError()

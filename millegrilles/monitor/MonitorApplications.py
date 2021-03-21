@@ -195,11 +195,12 @@ class GestionnaireApplications:
             applications = list()
             # Transmettre reponse pour indiquer commande recue
             mq_properties = commande.mq_properties
-            reply_to = mq_properties.reply_to
-            correlation_id = mq_properties.correlation_id
-            reponse = {'ok': True}
-            self.__service_monitor.generateur_transactions.transmettre_reponse(
-                reponse, replying_to=reply_to, correlation_id=correlation_id)
+            if mq_properties is not None:
+                reply_to = mq_properties.reply_to
+                correlation_id = mq_properties.correlation_id
+                reponse = {'ok': True}
+                self.__service_monitor.generateur_transactions.transmettre_reponse(
+                    reponse, replying_to=reply_to, correlation_id=correlation_id)
 
             try:
                 nom_image_docker = commande.contenu['nom_application']
