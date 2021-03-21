@@ -119,9 +119,11 @@ class AfficheurDocumentMAJDirecte:
             'evenement.' + SenseursPassifsConstantes.EVENEMENT_DOMAINE_LECTURE_CONFIRMEE,
             'evenement.' + SenseursPassifsConstantes.EVENEMENT_MAJ_NOEUD_CONFIRMEE,
         ]
-        exchanges = [self._contexte.configuration.exchange_defaut]
-        if exchanges[0] == Constantes.SECURITE_PROTEGE:
-            exchanges.append(Constantes.SECURITE_PRIVE)
+        # exchanges = [self._contexte.configuration.exchange_defaut]
+        # if exchanges[0] == Constantes.SECURITE_PROTEGE:
+        #     exchanges.append(Constantes.SECURITE_PRIVE)
+
+        exchanges = [Constantes.SECURITE_PRIVE]
 
         self.__logger.info("Binding q %s sur exchanges %s" % (nom_queue, exchanges))
 
