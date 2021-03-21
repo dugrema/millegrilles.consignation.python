@@ -232,10 +232,10 @@ class ServiceMonitor:
         self._web_entretien_date = None
         self._web_entretien_frequence = datetime.timedelta(minutes=2)
 
-        # Initialiser dernier backup d'application a l'heure de backup habituelle, mais pour aujourd'hui
+        # Initialiser dernier backup d'application comme s'il etait du dans quelques minutes
         date_now = pytz.utc.localize(datetime.datetime.utcnow())
-        self._applications_backup_date = pytz.utc.localize(datetime.datetime(year=date_now.year, month=date_now.month, day=date_now.day, hour=9))
         self._applications_backup_frequence = datetime.timedelta(days=1)
+        self._applications_backup_date = date_now - self._applications_backup_frequence + datetime.timedelta(minutes=20)
 
         # self._verificateur_transactions: Optional[VerificateurTransaction] = None
         self.__validateur_message: Optional[ValidateurMessage] = None
