@@ -224,6 +224,13 @@ class ConnexionWrapper:
         except AMQPConnectionError as e:
             self._logger.error("Erreur ouverture connexion MQ: %s" % str(e))
             self.enter_error_state()
+
+        if self.__channel is not None:
+            try:
+                self.__channel.close()
+            except:
+                self._logger.exception("__run_ioloop: Erreur fermeture channel")
+
         self._logger.info("Fin execution MQ-IOLoop")
 
     def __on_connection_open(self, connection):

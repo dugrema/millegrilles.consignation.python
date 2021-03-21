@@ -52,4 +52,4 @@ except Exception as e:
     traceback.print_exc()
 finally:
     test.fermer()
-    test.contexte.deconnecter()
+    # test.contexte.deconnecter()
