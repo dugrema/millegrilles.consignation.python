@@ -60,6 +60,28 @@ class TestForum(DomaineTest):
         self.generateur.soumettre_transaction(
             transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def creer_commentaire(self):
+        transaction = {
+            ConstantesForum.CHAMP_POST_ID: 'b13f03c0-8b5f-11eb-b5ae-0f2c17a0e437',
+            ConstantesForum.CHAMP_USERID: 'mabcd1234',
+            ConstantesForum.CHAMP_CONTENU: 'Un commentaire',
+        }
+        domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE
+        correlation_id = 'test'
+        self.generateur.soumettre_transaction(
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
+    def maj_commentaire(self):
+        transaction = {
+            ConstantesForum.CHAMP_COMMENT_ID: 'e38e971c-8b66-11eb-b5ae-0f2c17a0e437',
+            ConstantesForum.CHAMP_USERID: 'mabcd1234',
+            ConstantesForum.CHAMP_CONTENU: 'Commentaire mis a jour',
+        }
+        domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_COMMENTAIRE
+        correlation_id = 'test'
+        self.generateur.soumettre_transaction(
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
     # def maj_site(self):
     #     info_site = {
     #         ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
@@ -85,8 +107,10 @@ class TestForum(DomaineTest):
         # self.creer_forum()
         # self.maj_forum()
         # self.creer_forum()
-        self.creer_post()
+        # self.creer_post()
         # self.maj_post()
+        # self.creer_commentaire()
+        self.maj_commentaire()
 
 
 # --- MAIN ---

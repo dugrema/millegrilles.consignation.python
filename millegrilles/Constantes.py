@@ -1863,6 +1863,8 @@ class ConstantesForum:
     CHAMP_LANGUE_FORUM = 'langue'
 
     CHAMP_POST_ID = 'post_id'
+    CHAMP_COMMENT_ID = 'comment_id'
+    CHAMP_COMMENT_PARENT_ID = 'comment_parent_id'
     CHAMP_VERSION_ID = 'version_id'
     CHAMP_TITRE = 'titre'
     CHAMP_TYPE_POST = 'typePost'

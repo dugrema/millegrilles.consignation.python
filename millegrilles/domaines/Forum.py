@@ -166,7 +166,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         elif domaine_action == ConstantesForum.TRANSACTION_MODIFIER_POST:
             processus = "millegrilles_domaines_Forum:ProcessusTransactionModifierPost"
         elif domaine_action == ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE:
-            processus = "millegrilles_domaines_Forum:ProcessusTransactionMAjouterCommentaire"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionAjouterCommentaire"
         elif domaine_action == ConstantesForum.TRANSACTION_MODIFIER_COMMENTAIRE:
             processus = "millegrilles_domaines_Forum:ProcessusTransactionModifierCommentaire"
         else:
@@ -328,6 +328,49 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         return {'ok': True}
 
+    def maj_commentaire(self, params: dict):
+        version_id = params['en-tete']['uuid_transaction']
+        comment_id = params.get(ConstantesForum.CHAMP_COMMENT_ID) or version_id
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+
+        set_ops = {
+            ConstantesForum.CHAMP_VERSION_ID: version_id,
+        }
+
+        champs_supportes = [
+            ConstantesForum.CHAMP_CONTENU,
+        ]
+        for key in params:
+            if key in champs_supportes:
+                set_ops[key] = params[key]
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        if comment_id == version_id:
+            ops['$setOnInsert'] = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_COMMENTAIRE,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                ConstantesForum.CHAMP_POST_ID: params[ConstantesForum.CHAMP_POST_ID],
+                ConstantesForum.CHAMP_COMMENT_ID: version_id,
+                ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
+            }
+
+        filtre = {
+            ConstantesForum.CHAMP_COMMENT_ID: comment_id,
+        }
+
+        collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
+        resultat = collection_commentaires.update_one(filtre, ops, upsert=True)
+        modified_count = resultat.modified_count
+        upserted_id = resultat.upserted_id
+        if modified_count == 0 and upserted_id is None:
+            return {'ok': False, 'err': 'Echec ajout post'}
+
+        return {'ok': True}
+
 
 class ProcessusTransactionCreationForum(MGProcessusTransaction):
 
@@ -395,6 +438,42 @@ class ProcessusTransactionModifierPost(MGProcessusTransaction):
         """
         transaction = self.transaction
         reponse = self.controleur.gestionnaire.maj_post(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return reponse
+
+
+class ProcessusTransactionAjouterCommentaire(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        reponse = self.controleur.gestionnaire.maj_commentaire(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return reponse
+
+
+class ProcessusTransactionModifierCommentaire(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        reponse = self.controleur.gestionnaire.maj_commentaire(transaction)
 
         self.set_etape_suivante()  # Termine
 
