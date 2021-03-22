@@ -1,11 +1,12 @@
+import logging
+import datetime
+import pytz
+
 from millegrilles import Constantes
-from millegrilles.Constantes import ConstantesForum
+from millegrilles.Constantes import ConstantesSecurite, ConstantesForum
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
     TraitementMessageDomaineCommande, TraitementCommandesProtegees
 from millegrilles.MGProcessus import MGProcessusTransaction
-
-import logging
-import datetime
 
 
 class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
@@ -40,13 +41,16 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
         domaine_action = routing_key.split('.').pop()
 
         if domaine_action == ConstantesForum.REQUETE_FORUMS:
-            reponse = self.gestionnaire.get_forums_prives(message_dict)
+            message_dict['securite'] = Constantes.SECURITE_PRIVE
+            reponse = self.gestionnaire.get_forums(message_dict)
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesForum.REQUETE_FORUM_POSTS:
-            reponse = self.gestionnaire.get_forums_posts_prives(message_dict)
+            message_dict['securite'] = Constantes.SECURITE_PRIVE
+            reponse = self.gestionnaire.get_forums_posts(message_dict)
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesForum.REQUETE_POSTS:
-            reponse = self.gestionnaire.get_posts_prives(message_dict)
+            message_dict['securite'] = Constantes.SECURITE_PRIVE
+            reponse = self.gestionnaire.get_posts(message_dict)
             reponse = {'resultats': reponse}
         else:
             reponse = {'err': 'Commande invalide', 'routing_key': routing_key, 'domaine_action': domaine_action}
@@ -64,8 +68,10 @@ class TraitementRequetesProtegees(TraitementRequetesPrivees):
         routing_key = method.routing_key
         domaine_action = routing_key.split('.').pop()
 
-        if False:
-            pass
+        if domaine_action == ConstantesForum.REQUETE_FORUMS:
+            message_dict['securite'] = Constantes.SECURITE_PROTEGE
+            reponse = self.gestionnaire.get_forums(message_dict)
+            reponse = {'resultats': reponse}
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
 
@@ -130,7 +136,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
     def creer_index(self):
         pass
-        # collection_sites = self.document_dao.get_collection(ConstantesPublication.COLLECTION_SITES_NOM)
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        collection_forums.create_index([(ConstantesForum.CHAMP_REF_ID, 1)], name='ref_id', unique=True)
+
         # collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
         #
         # # Index _mg-libelle
@@ -150,17 +158,17 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def identifier_processus(self, domaine_transaction):
         domaine_action = domaine_transaction.split('.').pop()
         if domaine_action == ConstantesForum.TRANSACTION_CREER_FORUM:
-            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajSite"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionCreationForum"
         elif domaine_action == ConstantesForum.TRANSACTION_MODIFIER_FORUM:
-            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionModifierForum"
         elif domaine_action == ConstantesForum.TRANSACTION_AJOUTER_POST:
-            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionAjouterPost"
         elif domaine_action == ConstantesForum.TRANSACTION_MODIFIER_POST:
-            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionModifierPost"
         elif domaine_action == ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE:
-            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionMAjouterCommentaire"
         elif domaine_action == ConstantesForum.TRANSACTION_MODIFIER_COMMENTAIRE:
-            processus = "millegrilles_domaines_Publication:ProcessusTransactionMajPost"
+            processus = "millegrilles_domaines_Forum:ProcessusTransactionModifierCommentaire"
         else:
             # Type de transaction inconnue, on lance une exception
             processus = super().identifier_processus(domaine_transaction)
@@ -203,16 +211,73 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return ConstantesForum.DOMAINE_NOM
 
-    def get_liste_forums(self):
+    def get_forums(self, params: dict):
+        niveaux_securite = ConstantesSecurite.cascade_public(params['securite']) or Constantes.SECURITE_PUBLIC
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_SECURITE: {'$in': niveaux_securite}
+        }
         collection_site = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-        curseur = collection_site.find()
+        curseur = collection_site.find(filtre)
 
         forums = list()
         for forum in curseur:
-            del forum['_id']
+            for key in list(forum.keys()):
+                if key.startswith('_'):
+                    del forum[key]
             forums.append(forum)
 
         return forums
+
+    def creer_forum(self, params: dict):
+        uuid_transaction = params['en-tete']['uuid_transaction']
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+        forum = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM,
+            Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+            Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
+
+            'ref_id': uuid_transaction,
+            'securite': Constantes.SECURITE_PROTEGE,
+        }
+        collection_site = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+
+        resultat = collection_site.insert_one(forum)
+        if resultat.acknowledged is not True:
+            return {'ok': False, 'err': 'Echec ajout document de forum'}
+
+        return {'ok': True}
+
+    def maj_forum(self, params: dict):
+        ref_id = params[ConstantesForum.CHAMP_REF_ID]
+
+        champs_supportes = [
+            ConstantesForum.CHAMP_NOM_FORUM,
+            ConstantesForum.CHAMP_LANGUE_FORUM,
+            ConstantesForum.CHAMP_DESCRIPTION_FORUM,
+        ]
+
+        # Transferer les valeurs a modifier en fonction de la liste de champs supportes
+        set_ops = dict()
+        for key in params:
+            if key in champs_supportes:
+                set_ops[key] = params[key]
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True}
+        }
+
+        filtre = {
+            ConstantesForum.CHAMP_REF_ID: ref_id,
+        }
+
+        collection_site = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        resultats = collection_site.update_one(filtre, ops)
+
+        if resultats.modified_count != 1:
+            return {'ok': False, 'err': "Echec mise a jour, document non trouve"}
+
+        return {'ok': True}
 
 
 class ProcessusTransactionCreationForum(MGProcessusTransaction):
@@ -226,9 +291,26 @@ class ProcessusTransactionCreationForum(MGProcessusTransaction):
         :return:
         """
         transaction = self.transaction
-        self.controleur.gestionnaire.creer_forum(transaction)
+        reponse = self.controleur.gestionnaire.creer_forum(transaction)
 
         self.set_etape_suivante()  # Termine
 
-        return {'ok': True}
+        return reponse
 
+
+class ProcessusTransactionModifierForum(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        reponse = self.controleur.gestionnaire.maj_forum(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return reponse

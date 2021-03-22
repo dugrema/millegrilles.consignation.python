@@ -283,6 +283,39 @@ class ConstantesSecurite:
     EXCHANGE_PRIVE = 'millegrilles.prive'
     EXCHANGE_PUBLIC = 'millegrilles.public'
 
+    LISTE_NIVEAUX = [
+        SECURITE_PUBLIC,
+        SECURITE_PRIVE,
+        SECURITE_PROTEGE,
+        SECURITE_SECURE,
+    ]
+
+    @staticmethod
+    def cascade_secure(niveau):
+        """
+        :param niveau: Le moins securitaire
+        :return: Liste des niveaux de securite aussi ou plus securitaires que celui en parametre
+        """
+        niveaux = ConstantesSecurite.LISTE_NIVEAUX.copy()
+        while niveaux[0] != niveau:
+            niveaux.pop(0)
+
+        return niveaux
+
+    @staticmethod
+    def cascade_public(niveau):
+        """
+        :param niveau: Le plus securitaire
+        :return: Liste des niveaux de securite moins securitaires que celui en parametre, inclus celui en parametre
+        """
+        niveaux = ConstantesSecurite.LISTE_NIVEAUX.copy()
+
+        niveaux.reverse()
+        while niveaux[0] != niveau:
+            niveaux.pop(0)
+
+        return niveaux
+
 
 class ConstantesDomaines:
 
@@ -1806,6 +1839,11 @@ class ConstantesForum:
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
 
+    LIBVAL_FORUM = 'forum'
+    LIBVAL_POST = 'post'
+    LIBVAL_COMMENTAIRE = 'commentaire'
+    LIBVAL_VOTE = 'vote'
+
     REQUETE_FORUMS = 'getForums'
     REQUETE_FORUM_POSTS = 'getForumPosts'
     REQUETE_POSTS = 'getPosts'
@@ -1818,3 +1856,8 @@ class ConstantesForum:
     TRANSACTION_MODIFIER_COMMENTAIRE = 'modifierCommentairePost'
 
     COMMANDE_VOTER = 'voter'
+
+    CHAMP_REF_ID = 'ref_id'
+    CHAMP_NOM_FORUM = 'nom'
+    CHAMP_DESCRIPTION_FORUM = 'description'
+    CHAMP_LANGUE_FORUM = 'langue'
