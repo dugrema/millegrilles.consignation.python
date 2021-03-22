@@ -1,14 +1,10 @@
-from pymongo.errors import DuplicateKeyError
-
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesPublication
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementRequetesProtegees, TraitementMessageDomaineRequete
 from millegrilles.MGProcessus import MGProcessusTransaction
 
 import logging
-import uuid
 import datetime
-import json
 
 
 class TraitementRequetesPubliquesPublication(TraitementMessageDomaineRequete):
