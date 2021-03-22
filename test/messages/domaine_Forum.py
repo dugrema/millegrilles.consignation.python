@@ -10,6 +10,8 @@ class TestForum(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
+        self.forum_id = '2326666c-8b5c-11eb-b5ae-0f2c17a0e437'
+
     def requete_liste_forum(self):
         requete = dict()
         domaine_action = 'requete.Forum.' + ConstantesForum.REQUETE_FORUMS
@@ -26,7 +28,7 @@ class TestForum(DomaineTest):
 
     def maj_forum(self):
         transaction = {
-            ConstantesForum.CHAMP_REF_ID: 'ea8c2736-8b4e-11eb-b5ae-0f2c17a0e437',
+            ConstantesForum.CHAMP_FORUM_ID: self.forum_id,
             ConstantesForum.CHAMP_NOM_FORUM: 'Mon forum #2',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_FORUM
@@ -34,6 +36,29 @@ class TestForum(DomaineTest):
         self.generateur.soumettre_transaction(
             transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def creer_post(self):
+        transaction = {
+            ConstantesForum.CHAMP_FORUM_ID: self.forum_id,
+            ConstantesForum.CHAMP_TYPE_POST: 'texte',
+            ConstantesForum.CHAMP_USERID: 'mabcd1234',
+            ConstantesForum.CHAMP_TITRE: 'Mon post',
+            ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu',
+        }
+        domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_POST
+        correlation_id = 'test'
+        self.generateur.soumettre_transaction(
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
+    def maj_post(self):
+        transaction = {
+            ConstantesForum.CHAMP_POST_ID: 'b13f03c0-8b5f-11eb-b5ae-0f2c17a0e437',
+            ConstantesForum.CHAMP_TITRE: 'Mon post updated!',
+            ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres',
+        }
+        domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_POST
+        correlation_id = 'test'
+        self.generateur.soumettre_transaction(
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
     # def maj_site(self):
     #     info_site = {
@@ -58,7 +83,10 @@ class TestForum(DomaineTest):
 
         # self.requete_liste_forum()
         # self.creer_forum()
-        self.maj_forum()
+        # self.maj_forum()
+        # self.creer_forum()
+        self.creer_post()
+        # self.maj_post()
 
 
 # --- MAIN ---

@@ -137,7 +137,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def creer_index(self):
         pass
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-        collection_forums.create_index([(ConstantesForum.CHAMP_REF_ID, 1)], name='ref_id', unique=True)
+        collection_forums.create_index([(ConstantesForum.CHAMP_FORUM_ID, 1)], name='ref_id', unique=True)
 
         # collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
         #
@@ -236,7 +236,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
             Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: date_courante,
 
-            'ref_id': uuid_transaction,
+            ConstantesForum.CHAMP_FORUM_ID: uuid_transaction,
             'securite': Constantes.SECURITE_PROTEGE,
         }
         collection_site = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
@@ -248,7 +248,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         return {'ok': True}
 
     def maj_forum(self, params: dict):
-        ref_id = params[ConstantesForum.CHAMP_REF_ID]
+        ref_id = params[ConstantesForum.CHAMP_FORUM_ID]
 
         champs_supportes = [
             ConstantesForum.CHAMP_NOM_FORUM,
@@ -268,7 +268,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         filtre = {
-            ConstantesForum.CHAMP_REF_ID: ref_id,
+            ConstantesForum.CHAMP_FORUM_ID: ref_id,
         }
 
         collection_site = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
@@ -276,6 +276,55 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         if resultats.modified_count != 1:
             return {'ok': False, 'err': "Echec mise a jour, document non trouve"}
+
+        return {'ok': True}
+
+    # def creer_post(self, params: dict):
+    #     uuid_transaction = params['en-tete']['uuid_transaction']
+
+    def maj_post(self, params: dict):
+        version_id = params['en-tete']['uuid_transaction']
+        post_id = params.get(ConstantesForum.CHAMP_POST_ID) or version_id
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+
+        set_ops = {
+            ConstantesForum.CHAMP_VERSION_ID: version_id,
+        }
+
+        champs_supportes = [
+            ConstantesForum.CHAMP_TITRE,
+            ConstantesForum.CHAMP_CONTENU,
+            ConstantesForum.CHAMP_MEDIA_PREVIEW,
+            ConstantesForum.CHAMP_IMG,
+        ]
+        for key in params:
+            if key in champs_supportes:
+                set_ops[key] = params[key]
+
+        ops = {
+            '$set': set_ops,
+            '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
+        }
+
+        if post_id == version_id:
+            ops['$setOnInsert'] = {
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
+                Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
+                ConstantesForum.CHAMP_POST_ID: version_id,
+                ConstantesForum.CHAMP_TYPE_POST: params[ConstantesForum.CHAMP_TYPE_POST],
+                ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
+            }
+
+        filtre = {
+            ConstantesForum.CHAMP_POST_ID: post_id,
+        }
+
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        resultat = collection_posts.update_one(filtre, ops, upsert=True)
+        modified_count = resultat.modified_count
+        upserted_id = resultat.upserted_id
+        if modified_count == 0 and upserted_id is None:
+            return {'ok': False, 'err': 'Echec ajout post'}
 
         return {'ok': True}
 
@@ -310,6 +359,42 @@ class ProcessusTransactionModifierForum(MGProcessusTransaction):
         """
         transaction = self.transaction
         reponse = self.controleur.gestionnaire.maj_forum(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return reponse
+
+
+class ProcessusTransactionAjouterPost(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        reponse = self.controleur.gestionnaire.maj_post(transaction)
+
+        self.set_etape_suivante()  # Termine
+
+        return reponse
+
+
+class ProcessusTransactionModifierPost(MGProcessusTransaction):
+
+    def __init__(self, controleur, evenement):
+        super().__init__(controleur, evenement)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
+    def initiale(self):
+        """
+        :return:
+        """
+        transaction = self.transaction
+        reponse = self.controleur.gestionnaire.maj_post(transaction)
 
         self.set_etape_suivante()  # Termine
 

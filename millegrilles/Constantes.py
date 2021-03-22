@@ -1857,7 +1857,18 @@ class ConstantesForum:
 
     COMMANDE_VOTER = 'voter'
 
-    CHAMP_REF_ID = 'ref_id'
+    CHAMP_FORUM_ID = 'forum_id'
     CHAMP_NOM_FORUM = 'nom'
     CHAMP_DESCRIPTION_FORUM = 'description'
     CHAMP_LANGUE_FORUM = 'langue'
+
+    CHAMP_POST_ID = 'post_id'
+    CHAMP_VERSION_ID = 'version_id'
+    CHAMP_TITRE = 'titre'
+    CHAMP_TYPE_POST = 'typePost'
+    CHAMP_CONTENU = 'contenu'
+    CHAMP_USERID = 'userId'
+    CHAMP_MEDIA_PREVIEW = 'mediaPreview'
+    CHAMP_DATE_CREATION = 'dateCreation'
+    CHAMP_DATE_MODIFICATION = 'dateModification'
+    CHAMP_IMG = 'img'
