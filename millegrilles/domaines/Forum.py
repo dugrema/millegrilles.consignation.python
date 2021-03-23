@@ -106,6 +106,8 @@ class TraitementCommandesForumProtegees(TraitementCommandesProtegees):
             resultat = self.gestionnaire.ajouter_vote(message_dict)
         elif action == ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS:
             resultat = self.gestionnaire.generer_forums_posts(message_dict)
+        elif action == ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES:
+            resultat = self.gestionnaire.generer_posts_comments(message_dict)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -497,6 +499,119 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         upserted_id = resultat.upserted_id
         if modified_count == 0 and upserted_id is None:
             raise Exception("Erreur creation document forums posts")
+
+    def generer_posts_comments(self, params: dict):
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+
+        forum_id = params.get(ConstantesForum.CHAMP_FORUM_ID)
+        if forum_id is None:
+            collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+            filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM}
+            curseur_forums = collection_forums.find(filtre)
+            forum_ids = [forum[ConstantesForum.CHAMP_FORUM_ID] for forum in curseur_forums]
+        else:
+            forum_ids = [forum_id]
+
+        for forum_id in forum_ids:
+            curseur_posts = collection_posts.find({
+                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
+                ConstantesForum.CHAMP_FORUM_ID: forum_id,
+            })
+            for post in curseur_posts:
+                self.generer_doc_post(post, params)
+
+        return {'ok': True}
+
+    def generer_doc_post(self, post: dict, params: dict):
+
+        post_id = post[ConstantesForum.CHAMP_POST_ID]
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+
+        champs_post = [
+            ConstantesForum.CHAMP_FORUM_ID,
+            ConstantesForum.CHAMP_POST_ID,
+            ConstantesForum.CHAMP_DATE_CREATION,
+            ConstantesForum.CHAMP_DATE_MODIFICATION,
+            ConstantesForum.CHAMP_TITRE,
+            ConstantesForum.CHAMP_TYPE_POST,
+            ConstantesForum.CHAMP_USERID,
+            ConstantesForum.CHAMP_VERSION_ID,
+            ConstantesForum.CHAMP_MEDIA_PREVIEW,
+            ConstantesForum.CHAMP_CONTENU,
+            ConstantesForum.CHAMP_IMG,
+        ]
+
+        champs_commentaires = [
+            ConstantesForum.CHAMP_DATE_CREATION,
+            ConstantesForum.CHAMP_DATE_MODIFICATION,
+            ConstantesForum.CHAMP_USERID,
+            ConstantesForum.CHAMP_CONTENU,
+            ConstantesForum.CHAMP_COMMENT_ID,
+        ]
+
+        post_dict = {
+            ConstantesForum.CHAMP_POST_ID: post_id,
+            ConstantesForum.CHAMP_DATE_MODIFICATION: date_courante,
+        }
+        for key, value in post.items():
+            if key in champs_post:
+                post_dict[key] = value
+
+        collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
+        filtre = {
+            ConstantesForum.CHAMP_POST_ID: post_id,
+        }
+        ordre = [(ConstantesForum.CHAMP_DATE_CREATION, 1)]
+        curseur_commentaires = collection_commentaires.find(filtre, sort=ordre)
+
+        commentaires_par_id = dict()
+        top_level_commentaires = list()
+        post_dict[ConstantesForum.CHAMP_COMMENTAIRES] = top_level_commentaires
+
+        for commentaire in curseur_commentaires:
+
+            comment_dict = dict()
+            for key, value in commentaire.items():
+                if key in champs_commentaires:
+                    comment_dict[key] = value
+
+            # Conserver reference au commentaire pour inserer les sous-commentaires (hierarchie)
+            commentaires_par_id[commentaire[ConstantesForum.CHAMP_COMMENT_ID]] = comment_dict
+
+            parent_id = commentaire.get(ConstantesForum.CHAMP_COMMENT_PARENT_ID)
+            if parent_id is None:
+                # Ajouter commentaire a la liste directe sous le post (top-level)
+                top_level_commentaires.append(comment_dict)
+            else:
+                parent_commentaire = commentaires_par_id[parent_id]
+
+                try:
+                    commentaires = parent_commentaire[ConstantesForum.COLLECTION_COMMENTAIRES_NOM]
+                except KeyError:
+                    # Creer list sous-commentaires pour le parent
+                    commentaires = list()
+                    parent_commentaire[ConstantesForum.COLLECTION_COMMENTAIRES_NOM] = commentaires
+
+                # Inserer commentaire sous le parent
+                commentaires.append(comment_dict)
+
+        # Signer le post
+        post_dict = self.generateur_transactions.preparer_enveloppe(
+            post_dict,
+            domaine='Forum.ConstantesForum.LIBVAL_POST',
+            ajouter_certificats=True
+        )
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST_COMMENTAIRES,
+            ConstantesForum.CHAMP_POST_ID: post_id,
+        }
+
+        ops = {
+            '$set': post_dict,
+        }
+
+        collection_post_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
+        collection_post_commentaires.update(filtre, ops, upsert=True)
 
 
 class ProcessusTransactionCreationForum(MGProcessusTransaction):

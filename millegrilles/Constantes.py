@@ -1845,6 +1845,7 @@ class ConstantesForum:
     COLLECTION_FORUMS_POSTS_NOM = '%s/forumsPosts' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_POSTS_NOM = '%s/posts' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_COMMENTAIRES_NOM = '%s/commentaires' % COLLECTION_TRANSACTIONS_NOM
+    COLLECTION_POSTS_COMMENTAIRES_NOM = '%s/postsCommentaires' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_VOTES_NOM = '%s/votes' % COLLECTION_TRANSACTIONS_NOM
     COLLECTION_PROCESSUS_NOM = '%s/processus' % COLLECTION_TRANSACTIONS_NOM
     QUEUE_NOM = DOMAINE_NOM
@@ -1853,6 +1854,7 @@ class ConstantesForum:
     LIBVAL_FORUM_POSTS = 'forumPosts'
     LIBVAL_POST = 'post'
     LIBVAL_COMMENTAIRE = 'commentaire'
+    LIBVAL_POST_COMMENTAIRES = 'postCommentaires'
     LIBVAL_VOTE = 'vote'
 
     REQUETE_FORUMS = 'getForums'
@@ -1868,6 +1870,7 @@ class ConstantesForum:
 
     COMMANDE_VOTER = 'voter'
     COMMANDE_GENERER_FORUMS_POSTS = 'genererForumsPosts'
+    COMMANDE_GENERER_POSTS_COMMENTAIRES = 'genererPostsCommentaires'
 
     CHAMP_FORUM_ID = 'forum_id'
     CHAMP_NOM_FORUM = 'nom'
@@ -1889,3 +1892,4 @@ class ConstantesForum:
     CHAMP_DATE_MODIFICATION = 'dateModification'
     CHAMP_IMG = 'img'
     CHAMP_DIRTY = 'dirty'
+    CHAMP_COMMENTAIRES = 'commentaires'
