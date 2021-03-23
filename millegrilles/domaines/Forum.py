@@ -378,6 +378,21 @@ class ProcessusTransactionCreationForum(MGProcessusTransaction):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def verifier_autorisation(self):
+        """
+        S'assurer que l'usager a un acces 3.protege
+        :param certificat:
+        :return:
+        """
+        certificat = self.certificat
+        niveaux_securite = certificat.get_exchanges
+
+        if Constantes.SECURITE_PROTEGE not in niveaux_securite and Constantes.SECURITE_SECURE not in niveaux_securite:
+            self.__logger.error("ProcessusTransactionCreationForum: Usager n'a pas le niveau securite 3.protege")
+            return False
+
+        return True
+
     def initiale(self):
         """
         :return:

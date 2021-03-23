@@ -1570,6 +1570,7 @@ class MGProcessusTransaction(MGProcessus):
 
         self._transaction_mapper = transaction_mapper
         self._transaction = None
+        self._certificat = None
 
         self.__logger = logging.getLogger('%s.%s' % (__name__, self.__class__.__name__))
 
@@ -1601,8 +1602,12 @@ class MGProcessusTransaction(MGProcessus):
         try:
             # Verifier la transaction. Utilise idmg et date (estampille) du message pour permettre
             # de regenerer les transactions.
-            self._controleur.gestionnaire.validateur_message.verifier(
+            self._certificat = self._controleur.gestionnaire.validateur_message.verifier(
                 self._transaction, utiliser_date_message=True, utiliser_idmg_message=True)
+
+            if self.verifier_autorisation() is False:
+                raise Exception("Echec autorisation pour transaction %s", id_transaction)
+
         except AutorisationConditionnelleDomaine as acd:
             domaine = self._transaction[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE][Constantes.TRANSACTION_MESSAGE_LIBELLE_DOMAINE]
             if domaine not in acd.domaines:
@@ -1679,6 +1684,16 @@ class MGProcessusTransaction(MGProcessus):
                 transaction_filtree[key] = value
 
         return transaction_filtree
+
+    @property
+    def certificat(self):
+        if self._certificat is None:
+            self.charger_transaction()
+        return self._certificat
+
+    def verifier_autorisation(self):
+        """ Verifier l'autorisation d'execution de la transaction """
+        return True
 
 
 class MGProcessusDocInitial(MGProcessusTransaction):

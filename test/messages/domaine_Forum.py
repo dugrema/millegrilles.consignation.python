@@ -104,10 +104,10 @@ class TestForum(DomaineTest):
         self.__logger.debug("Executer")
 
         # self.requete_liste_forum()
-        # self.creer_forum()
+        self.creer_forum()
         # self.maj_forum()
         # self.creer_post()
-        self.maj_post()
+        # self.maj_post()
         # self.creer_commentaire()
         # self.maj_commentaire()
 
