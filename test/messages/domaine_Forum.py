@@ -61,7 +61,7 @@ class TestForum(DomaineTest):
 
     def creer_commentaire(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: 'c24ec2de-8bf7-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_POST_ID: '7cfaffa0-8bfb-11eb-80e1-6d0a897f52de',
             ConstantesForum.CHAMP_CONTENU: 'Un commentaire',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE
@@ -105,8 +105,8 @@ class TestForum(DomaineTest):
         # self.maj_forum()
         # self.creer_post()
         # self.maj_post()
-        # self.creer_commentaire()
-        self.maj_commentaire()
+        self.creer_commentaire()
+        # self.maj_commentaire()
 
 
 # --- MAIN ---

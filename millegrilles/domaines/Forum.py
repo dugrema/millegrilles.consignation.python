@@ -305,6 +305,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         set_ops = {
             ConstantesForum.CHAMP_VERSION_ID: version_id,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_transaction,
+            ConstantesForum.CHAMP_DIRTY: True,
         }
 
         champs_supportes = [
@@ -365,6 +366,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         set_ops = {
             ConstantesForum.CHAMP_VERSION_ID: version_id,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_transaction,
+            ConstantesForum.CHAMP_DIRTY: True,
         }
 
         champs_supportes = [

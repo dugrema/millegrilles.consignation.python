@@ -1884,3 +1884,4 @@ class ConstantesForum:
     CHAMP_DATE_CREATION = 'dateCreation'
     CHAMP_DATE_MODIFICATION = 'dateModification'
     CHAMP_IMG = 'img'
+    CHAMP_DIRTY = 'dirty'
