@@ -645,13 +645,15 @@ class GestionnaireCertificatsNoeudProtegePrincipal(GestionnaireCertificatsNoeudP
 
         csr = contenu['csr'].encode('utf-8')
         est_proprietaire = contenu.get('estProprietaire')
+        nom_usager = contenu['nomUsager']
+        user_id = contenu['userId']
         if est_proprietaire:
             securite = Constantes.SECURITE_PROTEGE
         else:
             securite = Constantes.SECURITE_PRIVE
 
         clecert = self.__renouvelleur.signer_navigateur(
-            csr, securite, duree=duree_delta, est_proprietaire=est_proprietaire)
+            csr, securite, duree=duree_delta, est_proprietaire=est_proprietaire, nom_usager=nom_usager, user_id=user_id)
 
         # Emettre le nouveau certificat pour conserver sous PKI
         self._service_monitor.generateur_transactions.emettre_certificat(clecert.chaine)

@@ -66,6 +66,9 @@ class ConstantesGenerateurCertificat(Constantes.ConstantesGenerateurCertificat):
     # Liste des domaines: SenseursPassifs,GrosFichiers,MaitreDesCles,etc.
     MQ_DOMAINES_OID = x509.ObjectIdentifier('1.2.3.4.2')
 
+    # userId: ID unique de l'usager (ne pas confondre avec nomUsager dans CN)
+    MQ_USERID_OID = x509.ObjectIdentifier('1.2.3.4.3')
+
 
 class EnveloppeCleCert:
 
@@ -227,6 +230,15 @@ class EnveloppeCleCert:
         oid_value = oid_value.value.decode('utf-8')
         attribute_values = oid_value.split(',')
         return attribute_values
+
+    @property
+    def get_user_id(self):
+        MQ_DOMAINES_OID = ConstantesGenerateurCertificat.MQ_USERID_OID
+        extensions = self.cert.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_DOMAINES_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        return oid_value
 
     @property
     def cert_bytes(self):
@@ -1788,6 +1800,18 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
         ]
         exchange_list = [Constantes.SECURITE_PRIVE]
 
+        csr = kwargs.get('csr')
+        sujet_dict = dict()
+        for elem in csr.subject:
+            sujet_dict[elem.oid._name] = elem.value
+        common_name = sujet_dict['commonName']
+        nom_usager: str = kwargs['nom_usager']
+        if common_name != nom_usager:
+            raise Exception("Nom usager du CSR (%s) ne correspond par a celui de la commande (%s)" % (common_name, nom_usager))
+
+        # On doit recuperer le user_id en parametres
+        user_id: str = kwargs['user_id']
+
         if kwargs.get('est_proprietaire'):
             roles.append('proprietaire')
             exchange_list.append(Constantes.SECURITE_PROTEGE)
@@ -1805,6 +1829,12 @@ class GenerateurCertificateNavigateur(GenerateurCertificateParRequest):
         exchanges = ','.join(exchange_list).encode('utf-8')
         builder = builder.add_extension(
             x509.UnrecognizedExtension(custom_oid_permis, exchanges),
+            critical=False
+        )
+
+        custom_oid_user_id = ConstantesGenerateurCertificat.MQ_USERID_OID
+        builder = builder.add_extension(
+            x509.UnrecognizedExtension(custom_oid_user_id, user_id.encode('utf-8')),
             critical=False
         )
 
@@ -1978,14 +2008,14 @@ class RenouvelleurCertificat:
         cert_dict = generateur_instance.generer()
         return cert_dict
 
-    def signer_navigateur(self, csr_pem: bytes, securite: str, **kwargs):
+    def signer_navigateur(self, csr_pem: bytes, securite: str, nom_usager: str, user_id: str, **kwargs):
         generateur = GenerateurCertificateNavigateur(self.__idmg, self.__dict_ca, self.__clecert_intermediaire)
 
         csr = x509.load_pem_x509_csr(csr_pem, backend=default_backend())
         if not csr.is_signature_valid:
             raise ValueError("Signature invalide")
 
-        certificat = generateur.signer(csr, securite=securite, role='Navigateur', **kwargs)
+        certificat = generateur.signer(csr, securite=securite, role='Navigateur', nom_usager=nom_usager, user_id=user_id, **kwargs)
         chaine = generateur.aligner_chaine(certificat)
 
         clecert = EnveloppeCleCert(cert=certificat)
