@@ -298,8 +298,13 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         post_id = params.get(ConstantesForum.CHAMP_POST_ID) or version_id
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
+        entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        date_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        date_transaction = datetime.datetime.fromtimestamp(date_transaction, tz=pytz.utc)
+
         set_ops = {
             ConstantesForum.CHAMP_VERSION_ID: version_id,
+            ConstantesForum.CHAMP_DATE_MODIFICATION: date_transaction,
         }
 
         champs_supportes = [
@@ -317,7 +322,12 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
+        filtre = {
+            ConstantesForum.CHAMP_POST_ID: post_id,
+        }
+
         if post_id == version_id:
+            upsert = True
             ops['$setOnInsert'] = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
@@ -325,14 +335,17 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 ConstantesForum.CHAMP_FORUM_ID: params[ConstantesForum.CHAMP_FORUM_ID],
                 ConstantesForum.CHAMP_TYPE_POST: params[ConstantesForum.CHAMP_TYPE_POST],
                 ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
+                ConstantesForum.CHAMP_DATE_CREATION: date_transaction,
             }
-
-        filtre = {
-            ConstantesForum.CHAMP_POST_ID: post_id,
-        }
+        else:
+            # Empecher update d'un post si la transaction est plus vieille que la derniere
+            # transaction a modifier le post.
+            upsert = False  # Eviter de creer des doublons
+            filtre[ConstantesForum.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
-        resultat = collection_posts.update_one(filtre, ops, upsert=True)
+        resultat = collection_posts.update_one(filtre, ops, upsert=upsert)
+
         modified_count = resultat.modified_count
         upserted_id = resultat.upserted_id
         if modified_count == 0 and upserted_id is None:
@@ -345,8 +358,13 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         comment_id = params.get(ConstantesForum.CHAMP_COMMENT_ID) or version_id
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
+        entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        date_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        date_transaction = datetime.datetime.fromtimestamp(date_transaction, tz=pytz.utc)
+
         set_ops = {
             ConstantesForum.CHAMP_VERSION_ID: version_id,
+            ConstantesForum.CHAMP_DATE_MODIFICATION: date_transaction,
         }
 
         champs_supportes = [
@@ -361,21 +379,29 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             '$currentDate': {Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION: True},
         }
 
+        filtre = {
+            ConstantesForum.CHAMP_COMMENT_ID: comment_id,
+        }
+
         if comment_id == version_id:
+            upsert = True
             ops['$setOnInsert'] = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_COMMENTAIRE,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
                 ConstantesForum.CHAMP_POST_ID: params[ConstantesForum.CHAMP_POST_ID],
                 ConstantesForum.CHAMP_COMMENT_ID: version_id,
                 ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
+                ConstantesForum.CHAMP_DATE_CREATION: date_transaction,
             }
-
-        filtre = {
-            ConstantesForum.CHAMP_COMMENT_ID: comment_id,
-        }
+        else:
+            # Empecher update d'un post si la transaction est plus vieille que la derniere
+            # transaction a modifier le commentaire.
+            upsert = False  # Eviter de creer des doublons
+            filtre[ConstantesForum.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
         collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
-        resultat = collection_commentaires.update_one(filtre, ops, upsert=True)
+        resultat = collection_commentaires.update_one(filtre, ops, upsert=upsert)
+
         modified_count = resultat.modified_count
         upserted_id = resultat.upserted_id
         if modified_count == 0 and upserted_id is None:

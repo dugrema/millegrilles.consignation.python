@@ -50,9 +50,9 @@ class TestForum(DomaineTest):
 
     def maj_post(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: '0597f4ac-8bee-11eb-80e1-6d0a897f52de',
-            ConstantesForum.CHAMP_TITRE: 'Mon post updated 3!',
-            ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres 3',
+            ConstantesForum.CHAMP_POST_ID: 'c24ec2de-8bf7-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_TITRE: 'Mon post updated 5!',
+            ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres 5',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_POST
         correlation_id = 'test'
@@ -61,7 +61,7 @@ class TestForum(DomaineTest):
 
     def creer_commentaire(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: '0597f4ac-8bee-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_POST_ID: 'c24ec2de-8bf7-11eb-80e1-6d0a897f52de',
             ConstantesForum.CHAMP_CONTENU: 'Un commentaire',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE
@@ -71,7 +71,7 @@ class TestForum(DomaineTest):
 
     def maj_commentaire(self):
         transaction = {
-            ConstantesForum.CHAMP_COMMENT_ID: 'c6acbf78-8bf4-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_COMMENT_ID: '6efa08f8-8bf9-11eb-80e1-6d0a897f52de',
             ConstantesForum.CHAMP_CONTENU: 'Commentaire mis a jour',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_COMMENTAIRE
