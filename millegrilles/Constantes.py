@@ -1850,6 +1850,7 @@ class ConstantesForum:
     QUEUE_NOM = DOMAINE_NOM
 
     LIBVAL_FORUM = 'forum'
+    LIBVAL_FORUM_POSTS = 'forumPosts'
     LIBVAL_POST = 'post'
     LIBVAL_COMMENTAIRE = 'commentaire'
     LIBVAL_VOTE = 'vote'
@@ -1866,11 +1867,14 @@ class ConstantesForum:
     TRANSACTION_MODIFIER_COMMENTAIRE = 'modifierCommentairePost'
 
     COMMANDE_VOTER = 'voter'
+    COMMANDE_GENERER_FORUMS_POSTS = 'genererForumsPosts'
 
     CHAMP_FORUM_ID = 'forum_id'
     CHAMP_NOM_FORUM = 'nom'
     CHAMP_DESCRIPTION_FORUM = 'description'
     CHAMP_LANGUE_FORUM = 'langue'
+    CHAMP_POSTS = 'posts'
+    CHAMP_SORT_TYPE = 'sortType'
 
     CHAMP_POST_ID = 'post_id'
     CHAMP_COMMENT_ID = 'comment_id'

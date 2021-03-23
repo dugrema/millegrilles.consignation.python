@@ -104,6 +104,8 @@ class TraitementCommandesForumProtegees(TraitementCommandesProtegees):
         resultat: dict
         if action == ConstantesForum.COMMANDE_VOTER:
             resultat = self.gestionnaire.ajouter_vote(message_dict)
+        elif action == ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS:
+            resultat = self.gestionnaire.generer_forums_posts(message_dict)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -124,7 +126,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         self.__handler_commandes = {
             Constantes.SECURITE_PRIVE: TraitementCommandesPrivees(self),
-            Constantes.SECURITE_PROTEGE: TraitementCommandesProtegees(self)
+            Constantes.SECURITE_PROTEGE: TraitementCommandesForumProtegees(self)
         }
 
     def configurer(self):
@@ -410,6 +412,91 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             return {'ok': False, 'err': 'Echec ajout post'}
 
         return {'ok': True}
+
+    def generer_forums_posts(self, params: dict):
+        """
+        Generer les documents de metadonnees pour les forums.
+        :param params:
+        :return:
+        """
+
+        # Si la liste de forum est None, indique qu'on fait tous les forums
+        forum_list = params.get('forum_list') or None
+
+        # Si dirty_only==True, on skip les forums qui n'ont pas de posts/comments qui sont dirty
+        dirty_only = params.get('dirty_only') or False
+
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+
+        curseur_forum = collection_forums.find({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM})
+        for forum in curseur_forum:
+            self.generer_doc_forum(forum, params)
+
+        return {'ok': True}
+
+    def generer_doc_forum(self, forum: dict, params):
+        forum_id = forum[ConstantesForum.CHAMP_FORUM_ID]
+        nom_forum = forum.get(ConstantesForum.CHAMP_NOM_FORUM) or forum_id
+        self.__logger.debug("Traitement posts du forum %s (%s)" % (nom_forum, forum_id))
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+
+        champs_projection = [
+            ConstantesForum.CHAMP_POST_ID,
+            ConstantesForum.CHAMP_DATE_CREATION,
+            ConstantesForum.CHAMP_DATE_MODIFICATION,
+            ConstantesForum.CHAMP_TITRE,
+            ConstantesForum.CHAMP_TYPE_POST,
+            ConstantesForum.CHAMP_USERID,
+            ConstantesForum.CHAMP_VERSION_ID,
+            ConstantesForum.CHAMP_MEDIA_PREVIEW,
+        ]
+
+        # Genrer doc posts plus recent
+        posts_plus_recents = list()
+        filtre = {
+            ConstantesForum.CHAMP_FORUM_ID: forum[ConstantesForum.CHAMP_FORUM_ID],
+        }
+        sort = [(ConstantesForum.CHAMP_DATE_CREATION, -1)]
+        limit = 100
+
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        posts = collection_posts.find(filtre, projection=champs_projection, sort=sort, limit=limit)
+        for post in posts:
+            post_filtre = dict()
+            for key, value in post.items():
+                if key in champs_projection:
+                    post_filtre[key] = value
+            posts_plus_recents.append(post_filtre)
+
+        # Signer le document
+        document_forum_posts = {
+            ConstantesForum.CHAMP_FORUM_ID: forum_id,
+            ConstantesForum.CHAMP_NOM_FORUM: nom_forum,
+            ConstantesForum.CHAMP_DATE_MODIFICATION: date_courante,
+            ConstantesForum.CHAMP_POSTS: posts_plus_recents,
+            ConstantesForum.CHAMP_SORT_TYPE: 'plusRecent',
+        }
+        document_forum_posts = self.generateur_transactions.preparer_enveloppe(
+            document_forum_posts,
+            domaine='Forum.' + ConstantesForum.LIBVAL_FORUM_POSTS,
+            ajouter_certificats=True
+        )
+
+        filtre = {
+            ConstantesForum.CHAMP_FORUM_ID: forum_id,
+            ConstantesForum.CHAMP_SORT_TYPE: 'plusRecent',
+        }
+        ops = {
+            '$set': document_forum_posts,
+        }
+
+        collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
+        resultat = collection_forums_posts.update_one(filtre, ops, upsert=True)
+
+        modified_count = resultat.modified_count
+        upserted_id = resultat.upserted_id
+        if modified_count == 0 and upserted_id is None:
+            raise Exception("Erreur creation document forums posts")
 
 
 class ProcessusTransactionCreationForum(MGProcessusTransaction):

@@ -79,23 +79,12 @@ class TestForum(DomaineTest):
         self.generateur.soumettre_transaction(
             transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
-    # def maj_site(self):
-    #     info_site = {
-    #         ConstantesPublication.CHAMP_SITE_ID: '09906262-206c-11eb-88cc-af560af5618f',
-    #         ConstantesPublication.CHAMP_NOM_SITE: 'Mon site',
-    #         ConstantesPublication.CHAMP_LANGUAGES: ['fr', 'en'],
-    #         ConstantesPublication.CHAMP_NOEUDS_URLS: {
-    #             self.site_id: ["mg-dev3.maple.maceroc.com"]
-    #         },
-    #         ConstantesPublication.CHAMP_FICHIERS: {
-    #             ConstantesPublication.CHAMP_TOUTES_COLLECTIONS: True
-    #         },
-    #         ConstantesPublication.CHAMP_ALBUMS: {
-    #             ConstantesPublication.CHAMP_TOUTES_COLLECTIONS: True
-    #         }
-    #     }
-    #     domaine_action = 'Publication.' + ConstantesPublication.TRANSACTION_MAJ_SITE
-    #     self.generateur.soumettre_transaction(info_site, domaine_action, reply_to=self.queue_name)
+    def commande_generer_forums_posts(self):
+        commande = {}
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        correlation_id = 'test'
+        self.generateur.transmettre_commande(
+            commande, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
     def executer(self):
         self.__logger.debug("Executer")
@@ -105,8 +94,9 @@ class TestForum(DomaineTest):
         # self.maj_forum()
         # self.creer_post()
         # self.maj_post()
-        self.creer_commentaire()
+        # self.creer_commentaire()
         # self.maj_commentaire()
+        self.commande_generer_forums_posts()
 
 
 # --- MAIN ---
