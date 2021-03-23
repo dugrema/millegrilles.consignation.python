@@ -19,6 +19,25 @@ class TestForum(DomaineTest):
         self.generateur.transmettre_requete(
             requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
+    def requete_liste_forum_posts(self):
+        requete = {
+            ConstantesForum.CHAMP_FORUM_ID: '93f69900-8be0-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_SORT_TYPE: ConstantesForum.TRI_PLUSRECENT,
+        }
+        domaine_action = 'requete.Forum.' + ConstantesForum.REQUETE_FORUM_POSTS
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
+
+    def requete_liste_post_commentaires(self):
+        requete = {
+            ConstantesForum.CHAMP_POST_ID: 'aeaaf988-8c1e-11eb-80e2-6d0a897f52de',
+        }
+        domaine_action = 'requete.Forum.' + ConstantesForum.REQUETE_POST_COMMENTAIRES
+        correlation_id = 'test'
+        self.generateur.transmettre_requete(
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
+
     def creer_forum(self):
         transaction = {}
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_CREER_FORUM
@@ -99,6 +118,8 @@ class TestForum(DomaineTest):
         self.__logger.debug("Executer")
 
         # self.requete_liste_forum()
+        # self.requete_liste_forum_posts()
+        self.requete_liste_post_commentaires()
         # self.creer_forum()
         # self.maj_forum()
         # self.creer_post()
@@ -106,7 +127,7 @@ class TestForum(DomaineTest):
         # self.creer_commentaire()
         # self.maj_commentaire()
         # self.commande_generer_forums_posts()
-        self.commande_generer_posts_commentaires()
+        # self.commande_generer_posts_commentaires()
 
 
 # --- MAIN ---

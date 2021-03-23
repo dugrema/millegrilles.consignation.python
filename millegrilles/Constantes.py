@@ -1859,7 +1859,7 @@ class ConstantesForum:
 
     REQUETE_FORUMS = 'getForums'
     REQUETE_FORUM_POSTS = 'getForumPosts'
-    REQUETE_POSTS = 'getPosts'
+    REQUETE_POST_COMMENTAIRES = 'getPostCommentaires'
 
     TRANSACTION_CREER_FORUM = 'creerForum'
     TRANSACTION_MODIFIER_FORUM = 'modifierForum'
@@ -1894,3 +1894,5 @@ class ConstantesForum:
     CHAMP_DIRTY_POSTS = 'dirty_posts'
     CHAMP_DIRTY_COMMENTS = 'dirty_comments'
     CHAMP_COMMENTAIRES = 'commentaires'
+
+    TRI_PLUSRECENT = 'plusRecent'

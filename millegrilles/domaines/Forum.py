@@ -19,7 +19,7 @@ class TraitementRequetesPubliques(TraitementMessageDomaineRequete):
             reponse = self.gestionnaire.get_forums_publics(message_dict)
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesForum.REQUETE_FORUM_POSTS:
-            reponse = self.gestionnaire.get_forums_posts_publics(message_dict)
+            reponse = self.gestionnaire.get_forum_posts(message_dict)
             reponse = {'resultats': reponse}
         elif domaine_action == ConstantesForum.REQUETE_POSTS:
             reponse = self.gestionnaire.get_posts_publics(message_dict)
@@ -48,7 +48,7 @@ class TraitementRequetesPrivees(TraitementMessageDomaineRequete):
             message_dict['securite'] = Constantes.SECURITE_PRIVE
             reponse = self.gestionnaire.get_forums_posts(message_dict)
             reponse = {'resultats': reponse}
-        elif domaine_action == ConstantesForum.REQUETE_POSTS:
+        elif domaine_action == ConstantesForum.REQUETE_POST_COMMENTAIRES:
             message_dict['securite'] = Constantes.SECURITE_PRIVE
             reponse = self.gestionnaire.get_posts(message_dict)
             reponse = {'resultats': reponse}
@@ -71,6 +71,14 @@ class TraitementRequetesProtegees(TraitementRequetesPrivees):
         if domaine_action == ConstantesForum.REQUETE_FORUMS:
             message_dict['securite'] = Constantes.SECURITE_PROTEGE
             reponse = self.gestionnaire.get_forums(message_dict)
+            reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesForum.REQUETE_FORUM_POSTS:
+            message_dict['securite'] = Constantes.SECURITE_PROTEGE
+            reponse = self.gestionnaire.get_forums_posts(message_dict)
+            reponse = {'resultats': reponse}
+        elif domaine_action == ConstantesForum.REQUETE_POST_COMMENTAIRES:
+            message_dict['securite'] = Constantes.SECURITE_PROTEGE
+            reponse = self.gestionnaire.get_post_commentaires(message_dict)
             reponse = {'resultats': reponse}
         else:
             reponse = super().traiter_requete(ch, method, properties, body, message_dict)
@@ -141,14 +149,25 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def creer_index(self):
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         collection_forums.create_index([(ConstantesForum.CHAMP_FORUM_ID, 1)], name='ref_id', unique=True)
+        collection_forums.create_index([(ConstantesForum.CHAMP_DIRTY_POSTS, 1)], name='dirty_posts')
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
         collection_posts.create_index([(ConstantesForum.CHAMP_POST_ID, 1)], name='post_id', unique=True)
         collection_posts.create_index([(ConstantesForum.CHAMP_FORUM_ID, 1)], name='forum_id')
+        collection_posts.create_index([(ConstantesForum.CHAMP_DIRTY_COMMENTS, 1)], name='dirty_comments')
 
         collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
         collection_commentaires.create_index([(ConstantesForum.CHAMP_COMMENT_ID, 1)], name='comment_id', unique=True)
         collection_commentaires.create_index([(ConstantesForum.CHAMP_POST_ID, 1)], name='post_id')
+
+        collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
+        collection_forums_posts.create_index(
+            [(ConstantesForum.CHAMP_FORUM_ID, 1), (ConstantesForum.CHAMP_SORT_TYPE, 1)],
+            name='forum_sorttype', unique=True
+        )
+
+        collection_posts_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
+        collection_posts_commentaires.create_index([(ConstantesForum.CHAMP_POST_ID, 1)], name='post_id', unique=True)
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
@@ -242,6 +261,55 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             forums.append(forum)
 
         return forums
+
+    def get_forum(self, forum_id: str):
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        filtre = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
+        return collection_forums.find_one(filtre)
+
+    def get_forums_posts(self, params: dict):
+        forum_id = params[ConstantesForum.CHAMP_FORUM_ID]
+        ordre_tri = params[ConstantesForum.CHAMP_SORT_TYPE]
+        niveaux_securite = params['securite'] or Constantes.SECURITE_PUBLIC
+
+        forum = self.get_forum(forum_id)
+        securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+        if securite_forum not in ConstantesSecurite.cascade_public(niveaux_securite):
+            return {'ok': False, 'err': 'Niveau securite insuffisant'}
+
+        filtre = {
+            ConstantesForum.CHAMP_FORUM_ID: forum_id,
+            ConstantesForum.CHAMP_SORT_TYPE: ordre_tri,
+        }
+        collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
+        doc_forum_posts = collection_forums_posts.find_one(filtre)
+
+        del doc_forum_posts['_id']
+
+        return doc_forum_posts
+
+    def get_post_commentaires(self, params: dict):
+        post_id = params[ConstantesForum.CHAMP_POST_ID]
+        niveaux_securite = params['securite'] or Constantes.SECURITE_PUBLIC
+
+        filtre = {
+            ConstantesForum.CHAMP_POST_ID: post_id,
+        }
+        collection_post_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
+        doc_post_commentaires = collection_post_commentaires.find_one(filtre)
+
+        del doc_post_commentaires['_id']
+        del doc_post_commentaires[Constantes.DOCUMENT_INFODOC_LIBELLE]
+
+        # Verification de securite (acces)
+        forum = self.get_forum(doc_post_commentaires[ConstantesForum.CHAMP_FORUM_ID])
+        securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+
+        if securite_forum not in ConstantesSecurite.cascade_public(niveaux_securite):
+            return {'ok': False, 'err': 'Niveau securite insuffisant'}
+
+        return doc_post_commentaires
 
     def creer_forum(self, params: dict):
         uuid_transaction = params['en-tete']['uuid_transaction']
@@ -496,7 +564,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         filtre = {
             ConstantesForum.CHAMP_FORUM_ID: forum_id,
-            ConstantesForum.CHAMP_SORT_TYPE: 'plusRecent',
+            ConstantesForum.CHAMP_SORT_TYPE: ConstantesForum.TRI_PLUSRECENT,
         }
         ops = {
             '$set': document_forum_posts,
