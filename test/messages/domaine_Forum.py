@@ -40,7 +40,6 @@ class TestForum(DomaineTest):
         transaction = {
             ConstantesForum.CHAMP_FORUM_ID: self.forum_id,
             ConstantesForum.CHAMP_TYPE_POST: 'texte',
-            ConstantesForum.CHAMP_USERID: 'mabcd1234',
             ConstantesForum.CHAMP_TITRE: 'Mon post',
             ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu',
         }
@@ -62,8 +61,7 @@ class TestForum(DomaineTest):
 
     def creer_commentaire(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: 'b13f03c0-8b5f-11eb-b5ae-0f2c17a0e437',
-            ConstantesForum.CHAMP_USERID: 'mabcd1234',
+            ConstantesForum.CHAMP_POST_ID: '0597f4ac-8bee-11eb-80e1-6d0a897f52de',
             ConstantesForum.CHAMP_CONTENU: 'Un commentaire',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE
@@ -73,8 +71,7 @@ class TestForum(DomaineTest):
 
     def maj_commentaire(self):
         transaction = {
-            ConstantesForum.CHAMP_COMMENT_ID: 'e38e971c-8b66-11eb-b5ae-0f2c17a0e437',
-            ConstantesForum.CHAMP_USERID: 'mabcd1234',
+            ConstantesForum.CHAMP_COMMENT_ID: 'c6acbf78-8bf4-11eb-80e1-6d0a897f52de',
             ConstantesForum.CHAMP_CONTENU: 'Commentaire mis a jour',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_COMMENTAIRE
@@ -107,9 +104,9 @@ class TestForum(DomaineTest):
         # self.creer_forum()
         # self.maj_forum()
         # self.creer_post()
-        self.maj_post()
+        # self.maj_post()
         # self.creer_commentaire()
-        # self.maj_commentaire()
+        self.maj_commentaire()
 
 
 # --- MAIN ---
