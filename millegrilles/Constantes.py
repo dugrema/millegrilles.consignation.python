@@ -316,6 +316,16 @@ class ConstantesSecurite:
 
         return niveaux
 
+    @staticmethod
+    def verifier_minimum(niveau_minimal: str, liste_niveaux: list):
+        """ Verifie que le niveau minimal ou un niveau plus secure est inclus dans la liste de niveaux """
+        niveaux_minimal = ConstantesSecurite.cascade_secure(niveau_minimal)
+        for niveau in niveaux_minimal:
+            if niveau in liste_niveaux:
+                return True
+
+        return False
+
 
 class ConstantesDomaines:
 

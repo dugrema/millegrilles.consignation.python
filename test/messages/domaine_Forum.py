@@ -10,7 +10,7 @@ class TestForum(DomaineTest):
         super().__init__()
         self.__logger = logging.getLogger(self.__class__.__name__)
 
-        self.forum_id = '2326666c-8b5c-11eb-b5ae-0f2c17a0e437'
+        self.forum_id = '93f69900-8be0-11eb-80e1-6d0a897f52de'
 
     def requete_liste_forum(self):
         requete = dict()
@@ -51,7 +51,7 @@ class TestForum(DomaineTest):
 
     def maj_post(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: '8dae94b6-8b69-11eb-b5ae-0f2c17a0e437',
+            ConstantesForum.CHAMP_POST_ID: 'f4badee8-8be2-11eb-80e1-6d0a897f52de',
             ConstantesForum.CHAMP_TITRE: 'Mon post updated!',
             ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres',
         }
@@ -104,10 +104,10 @@ class TestForum(DomaineTest):
         self.__logger.debug("Executer")
 
         # self.requete_liste_forum()
-        self.creer_forum()
+        # self.creer_forum()
         # self.maj_forum()
         # self.creer_post()
-        # self.maj_post()
+        self.maj_post()
         # self.creer_commentaire()
         # self.maj_commentaire()
 

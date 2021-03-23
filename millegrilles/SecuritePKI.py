@@ -148,6 +148,15 @@ class EnveloppeCertificat:
         return attribute_values
 
     @property
+    def get_user_id(self):
+        MQ_USERID_OID = x509.ObjectIdentifier('1.2.3.4.3')
+        extensions = self._certificat.extensions
+        oid_attribute = extensions.get_extension_for_oid(MQ_USERID_OID)
+        oid_value = oid_attribute.value
+        oid_value = oid_value.value.decode('utf-8')
+        return oid_value
+
+    @property
     def subject_organization_name(self):
         organization = self._certificat.subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)
         if len(organization) > 0:

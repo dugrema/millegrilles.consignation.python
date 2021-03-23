@@ -210,6 +210,12 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def get_nom_domaine(self):
         return ConstantesForum.DOMAINE_NOM
 
+    def get_post(self, post_id):
+        filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
+        collection_post = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        post = collection_post.find_one(filtre)
+        return post
+
     def get_forums(self, params: dict):
         niveaux_securite = ConstantesSecurite.cascade_public(params['securite']) or Constantes.SECURITE_PUBLIC
         filtre = {
@@ -411,6 +417,21 @@ class ProcessusTransactionModifierForum(MGProcessusTransaction):
         super().__init__(controleur, evenement)
         self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+    def verifier_autorisation(self):
+        """
+        S'assurer que l'usager a un acces 3.protege
+        :param certificat:
+        :return:
+        """
+        certificat = self.certificat
+        niveaux_securite = certificat.get_exchanges
+
+        if Constantes.SECURITE_PROTEGE not in niveaux_securite and Constantes.SECURITE_SECURE not in niveaux_securite:
+            self.__logger.error("ProcessusTransactionCreationForum: Usager n'a pas le niveau securite 3.protege")
+            return False
+
+        return True
+
     def initiale(self):
         """
         :return:
@@ -423,7 +444,41 @@ class ProcessusTransactionModifierForum(MGProcessusTransaction):
         return reponse
 
 
-class ProcessusTransactionAjouterPost(MGProcessusTransaction):
+class ProcessusTransactionPost(MGProcessusTransaction):
+
+    def verifier_autorisation(self):
+        """
+        S'assurer que l'usager correspond au userId de la transaction
+        :param certificat:
+        :return:
+        """
+        transaction = self.transaction
+        certificat = self.certificat
+
+        niveaux_securite = certificat.get_exchanges
+        if ConstantesSecurite.verifier_minimum(Constantes.SECURITE_PRIVE, niveaux_securite) is False:
+            self.__logger.error("L'usager n'a pas un certificat de niveau prive ou plus secure")
+            return False
+
+        if transaction.get(ConstantesForum.CHAMP_POST_ID) is None:
+            # La transaction est un nouveau post. Un usager prive peut creer un nouveau post.
+            return True
+        else:
+            # Verifier si l'usager est l'originateur du post
+            user_id = certificat.get_user_id
+
+            post_id = transaction[ConstantesForum.CHAMP_POST_ID]
+            post = self.controleur.gestionnaire.get_post(post_id)
+            post_user_id = post[ConstantesForum.CHAMP_USERID]
+
+            if user_id != post_user_id:
+                self.__logger.error("User %s ne correspond pas au user_id dans le post (%s)" % (user_id, post_user_id))
+                return False
+
+        return True
+
+
+class ProcessusTransactionAjouterPost(ProcessusTransactionPost):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
@@ -441,7 +496,7 @@ class ProcessusTransactionAjouterPost(MGProcessusTransaction):
         return reponse
 
 
-class ProcessusTransactionModifierPost(MGProcessusTransaction):
+class ProcessusTransactionModifierPost(ProcessusTransactionPost):
 
     def __init__(self, controleur, evenement):
         super().__init__(controleur, evenement)
