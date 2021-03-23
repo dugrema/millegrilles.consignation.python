@@ -17,14 +17,14 @@ class TestForum(DomaineTest):
         domaine_action = 'requete.Forum.' + ConstantesForum.REQUETE_FORUMS
         correlation_id = 'test'
         self.generateur.transmettre_requete(
-            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            requete, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     def creer_forum(self):
         transaction = {}
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_CREER_FORUM
         correlation_id = 'test'
         self.generateur.soumettre_transaction(
-            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     def maj_forum(self):
         transaction = {
@@ -34,7 +34,7 @@ class TestForum(DomaineTest):
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_FORUM
         correlation_id = 'test'
         self.generateur.soumettre_transaction(
-            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     def creer_post(self):
         transaction = {
@@ -47,18 +47,18 @@ class TestForum(DomaineTest):
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_POST
         correlation_id = 'test'
         self.generateur.soumettre_transaction(
-            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     def maj_post(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: 'f4badee8-8be2-11eb-80e1-6d0a897f52de',
-            ConstantesForum.CHAMP_TITRE: 'Mon post updated!',
-            ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres',
+            ConstantesForum.CHAMP_POST_ID: '0597f4ac-8bee-11eb-80e1-6d0a897f52de',
+            ConstantesForum.CHAMP_TITRE: 'Mon post updated 3!',
+            ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres 3',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_POST
         correlation_id = 'test'
         self.generateur.soumettre_transaction(
-            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     def creer_commentaire(self):
         transaction = {
@@ -69,7 +69,7 @@ class TestForum(DomaineTest):
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE
         correlation_id = 'test'
         self.generateur.soumettre_transaction(
-            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     def maj_commentaire(self):
         transaction = {
@@ -80,7 +80,7 @@ class TestForum(DomaineTest):
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_MODIFIER_COMMENTAIRE
         correlation_id = 'test'
         self.generateur.soumettre_transaction(
-            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+            transaction, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name, ajouter_certificats=True)
 
     # def maj_site(self):
     #     info_site = {

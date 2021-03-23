@@ -446,6 +446,10 @@ class ProcessusTransactionModifierForum(MGProcessusTransaction):
 
 class ProcessusTransactionPost(MGProcessusTransaction):
 
+    def __init__(self, controleur, evenement, transaction_mapper=None):
+        super().__init__(controleur, evenement, transaction_mapper)
+        self.__logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
     def verifier_autorisation(self):
         """
         S'assurer que l'usager correspond au userId de la transaction
@@ -489,6 +493,11 @@ class ProcessusTransactionAjouterPost(ProcessusTransactionPost):
         :return:
         """
         transaction = self.transaction
+
+        # Injecter userId a partir du certificat
+        certificat = self.certificat
+        transaction[ConstantesForum.CHAMP_USERID] = certificat.get_user_id
+
         reponse = self.controleur.gestionnaire.maj_post(transaction)
 
         self.set_etape_suivante()  # Termine

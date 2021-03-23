@@ -12,7 +12,6 @@ import binascii
 import hashlib
 
 
-
 class GenerateurCertificat:
 
     def __init__(self, idmg):
