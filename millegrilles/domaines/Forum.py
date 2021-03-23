@@ -135,17 +135,16 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         super().demarrer()
 
     def creer_index(self):
-        pass
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         collection_forums.create_index([(ConstantesForum.CHAMP_FORUM_ID, 1)], name='ref_id', unique=True)
 
-        # collection_posts = self.document_dao.get_collection(ConstantesPublication.COLLECTION_POSTS_NOM)
-        #
-        # # Index _mg-libelle
-        # collection_sites.create_index([(ConstantesPublication.CHAMP_SITE_ID, 1)], name='site_id')
-        # collection_posts.create_index([(Constantes.DOCUMENT_INFODOC_LIBELLE, 1)], name='mglibelle')
-        #
-        # collection_sites.create_index([(ConstantesPublication.CHAMP_NOEUDS_URLS, 1)], name='noeuds_urls')
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        collection_posts.create_index([(ConstantesForum.CHAMP_POST_ID, 1)], name='post_id', unique=True)
+        collection_posts.create_index([(ConstantesForum.CHAMP_FORUM_ID, 1)], name='forum_id')
+
+        collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
+        collection_commentaires.create_index([(ConstantesForum.CHAMP_COMMENT_ID, 1)], name='comment_id', unique=True)
+        collection_commentaires.create_index([(ConstantesForum.CHAMP_POST_ID, 1)], name='post_id')
 
     def traiter_cedule(self, evenement):
         super().traiter_cedule(evenement)
@@ -311,6 +310,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
                 ConstantesForum.CHAMP_POST_ID: version_id,
+                ConstantesForum.CHAMP_FORUM_ID: params[ConstantesForum.CHAMP_FORUM_ID],
                 ConstantesForum.CHAMP_TYPE_POST: params[ConstantesForum.CHAMP_TYPE_POST],
                 ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
             }

@@ -51,7 +51,7 @@ class TestForum(DomaineTest):
 
     def maj_post(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: 'b13f03c0-8b5f-11eb-b5ae-0f2c17a0e437',
+            ConstantesForum.CHAMP_POST_ID: '8dae94b6-8b69-11eb-b5ae-0f2c17a0e437',
             ConstantesForum.CHAMP_TITRE: 'Mon post updated!',
             ConstantesForum.CHAMP_CONTENU: 'Ceci est du contenu, maj apres',
         }
@@ -106,11 +106,10 @@ class TestForum(DomaineTest):
         # self.requete_liste_forum()
         # self.creer_forum()
         # self.maj_forum()
-        # self.creer_forum()
         # self.creer_post()
-        # self.maj_post()
+        self.maj_post()
         # self.creer_commentaire()
-        self.maj_commentaire()
+        # self.maj_commentaire()
 
 
 # --- MAIN ---
