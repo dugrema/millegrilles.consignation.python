@@ -309,7 +309,6 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         set_ops = {
             ConstantesForum.CHAMP_VERSION_ID: version_id,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_transaction,
-            ConstantesForum.CHAMP_DIRTY: True,
         }
 
         champs_supportes = [
@@ -356,10 +355,17 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         if modified_count == 0 and upserted_id is None:
             return {'ok': False, 'err': 'Echec ajout post'}
 
+        # Flag dirty sur forum
+        filtre = {ConstantesForum.CHAMP_FORUM_ID: params[ConstantesForum.CHAMP_FORUM_ID]}
+        ops = {'$set': {ConstantesForum.CHAMP_DIRTY_POSTS: True}}
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        collection_forums.update_one(filtre, ops)
+
         return {'ok': True}
 
     def maj_commentaire(self, params: dict):
         version_id = params['en-tete']['uuid_transaction']
+        post_id = params[ConstantesForum.CHAMP_POST_ID]
         comment_id = params.get(ConstantesForum.CHAMP_COMMENT_ID) or version_id
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
@@ -370,7 +376,6 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         set_ops = {
             ConstantesForum.CHAMP_VERSION_ID: version_id,
             ConstantesForum.CHAMP_DATE_MODIFICATION: date_transaction,
-            ConstantesForum.CHAMP_DIRTY: True,
         }
 
         champs_supportes = [
@@ -394,7 +399,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ops['$setOnInsert'] = {
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_COMMENTAIRE,
                 Constantes.DOCUMENT_INFODOC_DATE_CREATION: date_courante,
-                ConstantesForum.CHAMP_POST_ID: params[ConstantesForum.CHAMP_POST_ID],
+                ConstantesForum.CHAMP_POST_ID: post_id,
                 ConstantesForum.CHAMP_COMMENT_ID: version_id,
                 ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
                 ConstantesForum.CHAMP_DATE_CREATION: date_transaction,
@@ -412,6 +417,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         upserted_id = resultat.upserted_id
         if modified_count == 0 and upserted_id is None:
             return {'ok': False, 'err': 'Echec ajout post'}
+
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
+        ops = {'$set': {ConstantesForum.CHAMP_DIRTY_COMMENTS: True}}
+        collection_posts.update_one(filtre, ops, upsert=upsert)
 
         return {'ok': True}
 
@@ -499,6 +509,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         upserted_id = resultat.upserted_id
         if modified_count == 0 and upserted_id is None:
             raise Exception("Erreur creation document forums posts")
+
+        collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        filtre = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
+        ops = {'$set': {ConstantesForum.CHAMP_DIRTY_POSTS: False}}
+        collection_forums.update_one(filtre, ops)
 
     def generer_posts_comments(self, params: dict):
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
@@ -598,7 +613,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         # Signer le post
         post_dict = self.generateur_transactions.preparer_enveloppe(
             post_dict,
-            domaine='Forum.ConstantesForum.LIBVAL_POST',
+            domaine='Forum.' + ConstantesForum.LIBVAL_POST,
             ajouter_certificats=True
         )
         filtre = {
@@ -612,6 +627,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         collection_post_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
         collection_post_commentaires.update(filtre, ops, upsert=True)
+
+        collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+        filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
+        ops = {'$set': {ConstantesForum.CHAMP_DIRTY_COMMENTS: False}}
+        collection_posts.update_one(filtre, ops)
 
 
 class ProcessusTransactionCreationForum(MGProcessusTransaction):

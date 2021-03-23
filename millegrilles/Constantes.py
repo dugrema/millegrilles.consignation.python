@@ -1891,5 +1891,6 @@ class ConstantesForum:
     CHAMP_DATE_CREATION = 'dateCreation'
     CHAMP_DATE_MODIFICATION = 'dateModification'
     CHAMP_IMG = 'img'
-    CHAMP_DIRTY = 'dirty'
+    CHAMP_DIRTY_POSTS = 'dirty_posts'
+    CHAMP_DIRTY_COMMENTS = 'dirty_comments'
     CHAMP_COMMENTAIRES = 'commentaires'
