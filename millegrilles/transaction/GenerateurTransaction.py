@@ -159,7 +159,7 @@ class GenerateurTransaction:
 
         return uuid_transaction
 
-    def transmettre_reponse(self, message_dict, replying_to, correlation_id, idmg_destination: str = None, ajouter_certificats=False):
+    def transmettre_reponse(self, message_dict, replying_to, correlation_id, idmg_destination: str = None, ajouter_certificats=False, no_format=False):
         """
         Transmet une reponse a une requete. La reponse va directement sur la queue replying_to (pas de topic).
         :param message_dict: Message de reponse
@@ -169,7 +169,10 @@ class GenerateurTransaction:
         :return:
         """
 
-        enveloppe = self.preparer_enveloppe(message_dict, idmg_destination=idmg_destination, ajouter_certificats=ajouter_certificats)
+        if no_format is False:
+            enveloppe = self.preparer_enveloppe(message_dict, idmg_destination=idmg_destination, ajouter_certificats=ajouter_certificats)
+        else:
+            enveloppe = message_dict
 
         uuid_transaction = enveloppe.get(
             Constantes.TRANSACTION_MESSAGE_LIBELLE_INFO_TRANSACTION).get(

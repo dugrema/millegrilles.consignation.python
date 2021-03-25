@@ -1857,6 +1857,9 @@ class ConstantesForum:
     LIBVAL_POST_COMMENTAIRES = 'postCommentaires'
     LIBVAL_VOTE = 'vote'
 
+    EVENEMENT_MAJ_FORUM_POSTS = 'majForumPosts'
+    EVENEMENT_MAJ_POST_COMMENTS = 'majPostComments'
+
     REQUETE_FORUMS = 'getForums'
     REQUETE_FORUM_POSTS = 'getForumPosts'
     REQUETE_POST_COMMENTAIRES = 'getPostCommentaires'

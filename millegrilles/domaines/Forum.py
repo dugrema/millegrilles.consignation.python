@@ -2,6 +2,8 @@ import logging
 import datetime
 import pytz
 
+from pymongo import ReturnDocument
+
 from millegrilles import Constantes
 from millegrilles.Constantes import ConstantesSecurite, ConstantesForum
 from millegrilles.Domaines import GestionnaireDomaineStandard, TraitementMessageDomaineRequete, \
@@ -514,9 +516,20 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
 
+        rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUM_POSTS
+
         curseur_forum = collection_forums.find({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM})
         for forum in curseur_forum:
-            self.generer_doc_forum(forum, params)
+            securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+            exchanges = ConstantesSecurite.cascade_secure(securite_forum)
+            exchanges.pop()  # Enlever 4.secure
+
+            document_forum_posts = self.generer_doc_forum(forum, params)
+
+            # Emettre document sous forme d'evenement
+            del document_forum_posts['_id']
+            self.generateur_transactions.emettre_message(
+                document_forum_posts, rk_evenement, exchanges=exchanges)
 
         return {'ok': True}
 
@@ -577,17 +590,15 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
-        resultat = collection_forums_posts.update_one(filtre, ops, upsert=True)
-
-        modified_count = resultat.modified_count
-        upserted_id = resultat.upserted_id
-        if modified_count == 0 and upserted_id is None:
-            raise Exception("Erreur creation document forums posts")
+        forum_posts = collection_forums_posts.find_one_and_update(
+            filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         filtre = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_POSTS: False}}
         collection_forums.update_one(filtre, ops)
+
+        return forum_posts
 
     def generer_posts_comments(self, params: dict):
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
@@ -601,13 +612,25 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         else:
             forum_ids = [forum_id]
 
+        rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_POST_COMMENTS
+
         for forum_id in forum_ids:
+            forum = self.get_forum(forum_id)
+            securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+            exchanges = ConstantesSecurite.cascade_secure(securite_forum)
+            exchanges.pop()  # Enlever niveau secure
+
             curseur_posts = collection_posts.find({
                 Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
                 ConstantesForum.CHAMP_FORUM_ID: forum_id,
             })
             for post in curseur_posts:
-                self.generer_doc_post(post, params)
+                document_post_commentaires = self.generer_doc_post(post, params)
+
+                # Emettre document sous forme d'evenement
+                del document_post_commentaires['_id']
+                self.generateur_transactions.emettre_message(
+                    document_post_commentaires, rk_evenement, exchanges=exchanges)
 
         return {'ok': True}
 
@@ -700,12 +723,15 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         collection_post_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
-        collection_post_commentaires.update(filtre, ops, upsert=True)
+        post_commentaires = collection_post_commentaires.find_one_and_update(
+            filtre, ops, upsert=True, return_document=ReturnDocument.AFTER)
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
         filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_COMMENTS: False}}
         collection_posts.update_one(filtre, ops)
+
+        return post_commentaires
 
     def transmettre_forums_posts(self, params: dict, properties):
         """
@@ -747,7 +773,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             self.generateur_transactions.transmettre_reponse(
                 forum_posts,
                 replying_to=reply_to,
-                correlation_id=ConstantesForum.LIBVAL_FORUM_POSTS
+                correlation_id=ConstantesForum.LIBVAL_FORUM_POSTS,
+                no_format=True
             )
 
         if reponse_transmise is False:
@@ -797,7 +824,8 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             self.generateur_transactions.transmettre_reponse(
                 post_commentaires,
                 replying_to=reply_to,
-                correlation_id=ConstantesForum.LIBVAL_POST_COMMENTAIRES
+                correlation_id=ConstantesForum.LIBVAL_POST_COMMENTAIRES,
+                no_format=True,
             )
 
         if reponse_transmise is False:
