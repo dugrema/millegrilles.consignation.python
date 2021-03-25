@@ -24,6 +24,7 @@ class DomaineTest(BaseCallback):
         self.channel = None
         self.event_recu = Event()
         self.messages = list()
+        self.attendre_apres_recu = False
 
     def on_channel_open(self, channel):
         # Enregistrer la reply-to queue
@@ -55,7 +56,9 @@ class DomaineTest(BaseCallback):
         print("Method : " + str(method))
         print("Properties : " + str(properties))
         print("Channel virtual host : " + str(ch.connection.params.virtual_host))
-        self.event_recu.set()
+
+        if self.attendre_apres_recu is False:
+            self.event_recu.set()
 
     def executer(self):
         raise NotImplementedError()

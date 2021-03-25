@@ -114,12 +114,31 @@ class TestForum(DomaineTest):
         self.generateur.transmettre_commande(
             commande, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
 
+    def commande_transmettre_forums_posts(self):
+        self.attendre_apres_recu = True  # On attend plusieurs messages
+        commande = {}
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_TRANSMETTRE_FORUMS_POSTS
+        correlation_id = 'test'
+        self.generateur.transmettre_commande(
+            commande, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
+    def commande_transmettre_posts_commentaires(self):
+        self.attendre_apres_recu = True  # On attend plusieurs messages
+        commande = {
+            # ConstantesForum.CHAMP_FORUM_ID: '93f69900-8be0-11eb-80e1-6d0a897f52de',
+        }
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_TRANSMETTRE_POSTS_COMMENTAIRES
+        correlation_id = 'test'
+        self.generateur.transmettre_commande(
+            commande, domaine_action, correlation_id=correlation_id, reply_to=self.queue_name)
+
+
     def executer(self):
         self.__logger.debug("Executer")
 
         # self.requete_liste_forum()
         # self.requete_liste_forum_posts()
-        self.requete_liste_post_commentaires()
+        # self.requete_liste_post_commentaires()
         # self.creer_forum()
         # self.maj_forum()
         # self.creer_post()
@@ -128,6 +147,8 @@ class TestForum(DomaineTest):
         # self.maj_commentaire()
         # self.commande_generer_forums_posts()
         # self.commande_generer_posts_commentaires()
+        # self.commande_transmettre_forums_posts()
+        self.commande_transmettre_posts_commentaires()
 
 
 # --- MAIN ---
@@ -139,5 +160,5 @@ if __name__ == '__main__':
     # TEST
 
     # FIN TEST
-    test.event_recu.wait(10)
+    test.event_recu.wait(5)
     test.deconnecter()

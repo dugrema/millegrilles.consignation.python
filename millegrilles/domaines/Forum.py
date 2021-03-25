@@ -116,6 +116,12 @@ class TraitementCommandesForumProtegees(TraitementCommandesProtegees):
             resultat = self.gestionnaire.generer_forums_posts(message_dict)
         elif action == ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES:
             resultat = self.gestionnaire.generer_posts_comments(message_dict)
+        elif action == ConstantesForum.COMMANDE_TRANSMETTRE_FORUMS_POSTS:
+            message_dict['securite'] = Constantes.SECURITE_PROTEGE
+            resultat = self.gestionnaire.transmettre_forums_posts(message_dict, properties)
+        elif action == ConstantesForum.COMMANDE_TRANSMETTRE_POSTS_COMMENTAIRES:
+            message_dict['securite'] = Constantes.SECURITE_PROTEGE
+            resultat = self.gestionnaire.transmettre_posts_commentaires(message_dict, properties)
         else:
             resultat = super().traiter_commande(enveloppe_certificat, ch, method, properties, body, message_dict)
 
@@ -700,6 +706,104 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_COMMENTS: False}}
         collection_posts.update_one(filtre, ops)
+
+    def transmettre_forums_posts(self, params: dict, properties):
+        """
+        Emet tous les forums posts correspondants aux params vers le demandeur
+        au rythme d'un message par forum_posts.
+        :param params:
+        :param properties:
+        :return:
+        """
+        filtre = {
+            # Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST_COMMENTAIRES,
+        }
+        forum_ids = params.get(ConstantesForum.CHAMP_FORUM_IDS)
+        if forum_ids is not None:
+            filtre[ConstantesForum.CHAMP_FORUM_IDS] = {'$in': forum_ids}
+
+        collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
+        curseur = collection_forums_posts.find(filtre)
+
+        # Emettre chaque forum_posts dans un message different vers le demandeur
+        reply_to = properties.reply_to
+        correlation_id = properties.correlation_id
+
+        reponse_transmise = False
+
+        for forum_posts in curseur:
+            # Enlever metadata base de donnee
+            del forum_posts['_id']
+            # del forum_posts[Constantes.DOCUMENT_INFODOC_DATE_CREATION]
+            # del forum_posts[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION]
+
+            if reponse_transmise is False:
+                # Liberer thread sur client, indiquer que les reponses vont etre emises
+                self.generateur_transactions.transmettre_reponse(
+                    {'ok': True, 'vide': False}, replying_to=reply_to, correlation_id=correlation_id)
+                reponse_transmise = True
+
+            # Emettre le message (il est deja formatte avec entete, _certificat et _signature)
+            self.generateur_transactions.transmettre_reponse(
+                forum_posts,
+                replying_to=reply_to,
+                correlation_id=ConstantesForum.LIBVAL_FORUM_POSTS
+            )
+
+        if reponse_transmise is False:
+            # Liberer thread sur client, indiquer qu'on n'a aucun resultat a transmettre
+            self.generateur_transactions.transmettre_reponse(
+                {'ok': True, 'vide': True}, replying_to=reply_to, correlation_id=correlation_id)
+
+    def transmettre_posts_commentaires(self, params: dict, properties):
+        """
+        Emet tous les post commentaires correspondants aux params vers le demandeur
+        au rythme d'un message par forum_posts.
+        :param params:
+        :param properties:
+        :return:
+        """
+
+        filtre = dict()
+        forum_id = params.get(ConstantesForum.CHAMP_FORUM_ID)
+        post_ids = params.get(ConstantesForum.CHAMP_POST_IDS)
+        if forum_id is not None:
+            filtre[ConstantesForum.CHAMP_FORUM_ID] = forum_id
+        if post_ids is not None:
+            filtre[ConstantesForum.CHAMP_FORUM_IDS] = {'$in': post_ids}
+
+        collection_posts_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
+        curseur = collection_posts_commentaires.find(filtre)
+
+        # Emettre chaque forum_posts dans un message different vers le demandeur
+        reply_to = properties.reply_to
+        correlation_id = properties.correlation_id
+
+        reponse_transmise = False
+
+        for post_commentaires in curseur:
+            # Enlever metadata base de donnee
+            del post_commentaires['_id']
+            # del forum_posts[Constantes.DOCUMENT_INFODOC_DATE_CREATION]
+            # del forum_posts[Constantes.DOCUMENT_INFODOC_DERNIERE_MODIFICATION]
+
+            if reponse_transmise is False:
+                # Liberer thread sur client, indiquer que les reponses vont etre emises
+                self.generateur_transactions.transmettre_reponse(
+                    {'ok': True, 'vide': False}, replying_to=reply_to, correlation_id=correlation_id)
+                reponse_transmise = True
+
+            # Emettre le message (il est deja formatte avec entete, _certificat et _signature)
+            self.generateur_transactions.transmettre_reponse(
+                post_commentaires,
+                replying_to=reply_to,
+                correlation_id=ConstantesForum.LIBVAL_POST_COMMENTAIRES
+            )
+
+        if reponse_transmise is False:
+            # Liberer thread sur client, indiquer qu'on n'a aucun resultat a transmettre
+            self.generateur_transactions.transmettre_reponse(
+                {'ok': True, 'vide': True}, replying_to=reply_to, correlation_id=correlation_id)
 
 
 class ProcessusTransactionCreationForum(MGProcessusTransaction):

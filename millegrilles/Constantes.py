@@ -1871,6 +1871,8 @@ class ConstantesForum:
     COMMANDE_VOTER = 'voter'
     COMMANDE_GENERER_FORUMS_POSTS = 'genererForumsPosts'
     COMMANDE_GENERER_POSTS_COMMENTAIRES = 'genererPostsCommentaires'
+    COMMANDE_TRANSMETTRE_FORUMS_POSTS = 'transmettreForumsPosts'
+    COMMANDE_TRANSMETTRE_POSTS_COMMENTAIRES = 'transmettrePostsCommentaires'
 
     CHAMP_FORUM_ID = 'forum_id'
     CHAMP_NOM_FORUM = 'nom'
@@ -1894,5 +1896,8 @@ class ConstantesForum:
     CHAMP_DIRTY_POSTS = 'dirty_posts'
     CHAMP_DIRTY_COMMENTS = 'dirty_comments'
     CHAMP_COMMENTAIRES = 'commentaires'
+
+    CHAMP_FORUM_IDS = 'forum_ids'
+    CHAMP_POST_IDS = 'post_ids'
 
     TRI_PLUSRECENT = 'plusRecent'
