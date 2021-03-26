@@ -83,7 +83,7 @@ class TestForum(DomaineTest):
 
     def creer_commentaire(self):
         transaction = {
-            ConstantesForum.CHAMP_POST_ID: 'aeaaf988-8c1e-11eb-80e2-6d0a897f52de',
+            ConstantesForum.CHAMP_POST_ID: '8dae94b6-8b69-11eb-b5ae-0f2c17a0e437',
             ConstantesForum.CHAMP_CONTENU: 'Un commentaire',
         }
         domaine_action = 'Forum.' + ConstantesForum.TRANSACTION_AJOUTER_COMMENTAIRE
@@ -113,6 +113,7 @@ class TestForum(DomaineTest):
     def commande_generer_posts_commentaires(self):
         commande = {
             ConstantesForum.CHAMP_FORUM_ID: '93f69900-8be0-11eb-80e1-6d0a897f52de',
+            # ConstantesForum.CHAMP_POST_IDS: ['8dae94b6-8b69-11eb-b5ae-0f2c17a0e437']
         }
         domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES
         correlation_id = 'test'
@@ -146,12 +147,12 @@ class TestForum(DomaineTest):
         # self.requete_liste_post_commentaires()
         # self.creer_forum()
         # self.maj_forum()
-        self.creer_post()
+        # self.creer_post()
         # self.maj_post()
         # self.creer_commentaire()
         # self.maj_commentaire()
         # self.commande_generer_forums_posts()
-        # self.commande_generer_posts_commentaires()
+        self.commande_generer_posts_commentaires()
         # self.commande_transmettre_forums_posts()
         # self.commande_transmettre_posts_commentaires()
 

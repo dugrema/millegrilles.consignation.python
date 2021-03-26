@@ -509,6 +509,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_COMMENTS: True}}
         collection_posts.update_one(filtre, ops, upsert=upsert)
 
+        # Transmettre commande pour regenerer post
+        commande_generer = {ConstantesForum.CHAMP_POST_IDS: [post_id]}
+        domaine_action_generer = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES
+        self.generateur_transactions.transmettre_commande(commande_generer, domaine_action_generer)
+
         return {'ok': True}
 
     def generer_forums_posts(self, params: dict):
@@ -617,34 +622,62 @@ class GestionnaireForum(GestionnaireDomaineStandard):
     def generer_posts_comments(self, params: dict):
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
 
-        forum_id = params.get(ConstantesForum.CHAMP_FORUM_ID)
-        if forum_id is None:
-            collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
-            filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM}
-            curseur_forums = collection_forums.find(filtre)
-            forum_ids = [forum[ConstantesForum.CHAMP_FORUM_ID] for forum in curseur_forums]
-        else:
-            forum_ids = [forum_id]
+        post_ids = params.get(ConstantesForum.CHAMP_POST_IDS)
+        forum_ids = params.get(ConstantesForum.CHAMP_FORUM_IDS)
 
+        # Routing key pour emettre maj d'un post
         rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_POST_COMMENTS
 
-        for forum_id in forum_ids:
-            forum = self.get_forum(forum_id)
-            securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
-            exchanges = ConstantesSecurite.cascade_secure(securite_forum)
-            exchanges.pop()  # Enlever niveau secure
+        if post_ids is not None:
+            # Traitement par posts individuel
+            collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
+            filtre = {ConstantesForum.CHAMP_POST_ID: {'$in': post_ids}}
+            # Trier par forum_id, permet de faire un seul fetch par forum
+            ordre_tri = [(ConstantesForum.CHAMP_FORUM_ID, 1)]
+            curseur_posts = collection_forums.find(filtre, sort=ordre_tri)
 
-            curseur_posts = collection_posts.find({
-                Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
-                ConstantesForum.CHAMP_FORUM_ID: forum_id,
-            })
+            forum = None
+            exchanges = None
             for post in curseur_posts:
                 document_post_commentaires = self.generer_doc_post(post, params)
+
+                forum_id = post[ConstantesForum.CHAMP_FORUM_ID]
+                if forum is None or forum_id != forum[ConstantesForum.CHAMP_FORUM_ID]:
+                    # Charger nouveau forum pour trouver le niveau de securite
+                    forum = self.get_forum(forum_id)
+                    exchanges = ConstantesSecurite.cascade_secure(forum[Constantes.DOCUMENT_INFODOC_SECURITE])
+                    exchanges.pop()  # Enlever 4.secure
 
                 # Emettre document sous forme d'evenement
                 del document_post_commentaires['_id']
                 self.generateur_transactions.emettre_message(
                     document_post_commentaires, rk_evenement, exchanges=exchanges)
+
+        else:
+            # Traitement par forum_id
+            if forum_ids is None:
+                collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+                filtre = {Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM}
+                curseur_forums = collection_forums.find(filtre)
+                forum_ids = [forum[ConstantesForum.CHAMP_FORUM_ID] for forum in curseur_forums]
+
+            for forum_id in forum_ids:
+                forum = self.get_forum(forum_id)
+                securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
+                exchanges = ConstantesSecurite.cascade_secure(securite_forum)
+                exchanges.pop()  # Enlever niveau secure
+
+                curseur_posts = collection_posts.find({
+                    Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_POST,
+                    ConstantesForum.CHAMP_FORUM_ID: forum_id,
+                })
+                for post in curseur_posts:
+                    document_post_commentaires = self.generer_doc_post(post, params)
+
+                    # Emettre document sous forme d'evenement
+                    del document_post_commentaires['_id']
+                    self.generateur_transactions.emettre_message(
+                        document_post_commentaires, rk_evenement, exchanges=exchanges)
 
         return {'ok': True}
 
@@ -688,7 +721,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_POST_ID: post_id,
         }
         ordre = [(ConstantesForum.CHAMP_DATE_CREATION, 1)]
-        curseur_commentaires = collection_commentaires.find(filtre, sort=ordre)
+        curseur_commentaires = collection_commentaires.find(filtre, sort=ordre, limit=1000)
 
         commentaires_par_id = dict()
         top_level_commentaires = list()
