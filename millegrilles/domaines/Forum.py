@@ -573,6 +573,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_USERID,
             ConstantesForum.CHAMP_VERSION_ID,
             ConstantesForum.CHAMP_MEDIA_PREVIEW,
+            ConstantesForum.CHAMP_CONTENU,
         ]
 
         # Genrer doc posts plus recent
