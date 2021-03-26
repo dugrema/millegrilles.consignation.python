@@ -144,7 +144,7 @@ class TestForum(DomaineTest):
 
         # self.requete_liste_forum()
         # self.requete_liste_forum_posts()
-        # self.requete_liste_post_commentaires()
+        self.requete_liste_post_commentaires()
         # self.creer_forum()
         # self.maj_forum()
         # self.creer_post()
@@ -152,7 +152,7 @@ class TestForum(DomaineTest):
         # self.creer_commentaire()
         # self.maj_commentaire()
         # self.commande_generer_forums_posts()
-        self.commande_generer_posts_commentaires()
+        # self.commande_generer_posts_commentaires()
         # self.commande_transmettre_forums_posts()
         # self.commande_transmettre_posts_commentaires()
 

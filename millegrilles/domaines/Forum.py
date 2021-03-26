@@ -281,6 +281,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         niveaux_securite = params['securite'] or Constantes.SECURITE_PUBLIC
 
         forum = self.get_forum(forum_id)
+        if forum is None:
+            return {'ok': False, 'err': "Forum non trouve"}
+
         securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
 
         if securite_forum not in ConstantesSecurite.cascade_public(niveaux_securite):
@@ -306,6 +309,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
         collection_post_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_COMMENTAIRES_NOM)
         doc_post_commentaires = collection_post_commentaires.find_one(filtre)
+
+        if doc_post_commentaires is None:
+            return {'ok': False, 'err': "Post id inconnu"}
 
         del doc_post_commentaires['_id']
         del doc_post_commentaires[Constantes.DOCUMENT_INFODOC_LIBELLE]
