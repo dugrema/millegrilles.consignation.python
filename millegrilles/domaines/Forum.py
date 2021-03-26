@@ -424,18 +424,28 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             filtre[ConstantesForum.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
-        resultat = collection_posts.update_one(filtre, ops, upsert=upsert)
+        post = collection_posts.find_one_and_update(
+            filtre, ops, upsert=upsert,
+            projection={ConstantesForum.CHAMP_FORUM_ID: True},
+            return_document=ReturnDocument.AFTER
+        )
 
-        modified_count = resultat.modified_count
-        upserted_id = resultat.upserted_id
-        if modified_count == 0 and upserted_id is None:
+        if post is None:
             return {'ok': False, 'err': 'Echec ajout post'}
 
+        # Recuperer le forum_id du post - la transaction ne contient pas le forum_id sur update de post
+        forum_id = post[ConstantesForum.CHAMP_FORUM_ID]
+
         # Flag dirty sur forum
-        filtre = {ConstantesForum.CHAMP_FORUM_ID: params[ConstantesForum.CHAMP_FORUM_ID]}
+        filtre = {ConstantesForum.CHAMP_FORUM_ID: forum_id}
         ops = {'$set': {ConstantesForum.CHAMP_DIRTY_POSTS: True}}
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         collection_forums.update_one(filtre, ops)
+
+        # Commande mise a jour forum posts
+        commande = {ConstantesForum.CHAMP_FORUM_IDS: [forum_id]}
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
         return {'ok': True}
 
@@ -508,17 +518,21 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         :return:
         """
 
-        # Si la liste de forum est None, indique qu'on fait tous les forums
-        forum_list = params.get('forum_list') or None
-
         # Si dirty_only==True, on skip les forums qui n'ont pas de posts/comments qui sont dirty
         dirty_only = params.get('dirty_only') or False
 
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM,
+        }
 
+        # Si la liste de forum est None, indique qu'on fait tous les forums
+        forum_list = params.get(ConstantesForum.CHAMP_FORUM_IDS) or None
+        if forum_list is not None:
+            filtre[ConstantesForum.CHAMP_FORUM_ID] = {'$in': forum_list}
+
+        curseur_forum = collection_forums.find(filtre)
         rk_evenement = 'evenement.Forum.' + ConstantesForum.EVENEMENT_MAJ_FORUM_POSTS
-
-        curseur_forum = collection_forums.find({Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesForum.LIBVAL_FORUM})
         for forum in curseur_forum:
             securite_forum = forum[Constantes.DOCUMENT_INFODOC_SECURITE]
             exchanges = ConstantesSecurite.cascade_secure(securite_forum)
@@ -556,7 +570,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_FORUM_ID: forum[ConstantesForum.CHAMP_FORUM_ID],
         }
         sort = [(ConstantesForum.CHAMP_DATE_CREATION, -1)]
-        limit = 100
+        limit = 500
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
         posts = collection_posts.find(filtre, projection=champs_projection, sort=sort, limit=limit)
