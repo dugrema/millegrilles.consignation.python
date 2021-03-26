@@ -500,6 +500,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 ConstantesForum.CHAMP_USERID: params[ConstantesForum.CHAMP_USERID],
                 ConstantesForum.CHAMP_DATE_CREATION: date_transaction,
             }
+            parent_id = params.get(ConstantesForum.CHAMP_COMMENT_PARENT_ID)
+            if parent_id is not None:
+                ops['$setOnInsert'][ConstantesForum.CHAMP_COMMENT_PARENT_ID] = parent_id
         else:
             # Empecher update d'un post si la transaction est plus vieille que la derniere
             # transaction a modifier le commentaire.
@@ -756,11 +759,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
                 parent_commentaire = commentaires_par_id[parent_id]
 
                 try:
-                    commentaires = parent_commentaire[ConstantesForum.COLLECTION_COMMENTAIRES_NOM]
+                    commentaires = parent_commentaire[ConstantesForum.CHAMP_COMMENTAIRES]
                 except KeyError:
                     # Creer list sous-commentaires pour le parent
                     commentaires = list()
-                    parent_commentaire[ConstantesForum.COLLECTION_COMMENTAIRES_NOM] = commentaires
+                    parent_commentaire[ConstantesForum.CHAMP_COMMENTAIRES] = commentaires
 
                 # Inserer commentaire sous le parent
                 commentaires.append(comment_dict)
