@@ -448,9 +448,13 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         collection_forums = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_NOM)
         collection_forums.update_one(filtre, ops)
 
-        # Commande mise a jour forum posts
+        # Commande mise a jour forum posts et post comments
         commande = {ConstantesForum.CHAMP_FORUM_IDS: [forum_id]}
         domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        self.generateur_transactions.transmettre_commande(commande, domaine_action)
+
+        commande = {ConstantesForum.CHAMP_POST_IDS: [post_id]}
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_POSTS_COMMENTAIRES
         self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
         return {'ok': True}
