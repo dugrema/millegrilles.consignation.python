@@ -1072,6 +1072,10 @@ class ProcessusTransactionModifierPost(ProcessusTransactionPost):
         :return:
         """
         transaction = self.transaction
+
+        certificat = self.certificat
+        transaction[ConstantesForum.CHAMP_USERID] = certificat.get_user_id
+
         reponse = self.controleur.gestionnaire.maj_post(transaction)
 
         self.set_etape_suivante()  # Termine
@@ -1113,6 +1117,10 @@ class ProcessusTransactionModifierCommentaire(ProcessusTransactionCommentaire):
         :return:
         """
         transaction = self.transaction
+
+        certificat = self.certificat
+        transaction[ConstantesForum.CHAMP_USERID] = certificat.get_user_id
+
         reponse = self.controleur.gestionnaire.maj_commentaire(transaction)
 
         self.set_etape_suivante()  # Termine
