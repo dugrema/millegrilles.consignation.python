@@ -461,7 +461,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
 
     def maj_commentaire(self, params: dict):
         version_id = params['en-tete']['uuid_transaction']
-        post_id = params[ConstantesForum.CHAMP_POST_ID]
+        post_id = params.get(ConstantesForum.CHAMP_POST_ID)
         comment_id = params.get(ConstantesForum.CHAMP_COMMENT_ID) or version_id
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
 
@@ -510,12 +510,13 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             filtre[ConstantesForum.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
         collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
-        resultat = collection_commentaires.update_one(filtre, ops, upsert=upsert)
+        comment_doc = collection_commentaires.find_one_and_update(filtre, ops, upsert=upsert, return_document=ReturnDocument.AFTER)
 
-        modified_count = resultat.modified_count
-        upserted_id = resultat.upserted_id
-        if modified_count == 0 and upserted_id is None:
+        if comment_doc is None:
             return {'ok': False, 'err': 'Echec ajout post'}
+
+        # Extraire le post id du commentaire (e.g. non fourni dans params sur maj)
+        post_id = comment_doc[ConstantesForum.CHAMP_POST_ID]
 
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
         filtre = {ConstantesForum.CHAMP_POST_ID: post_id}
