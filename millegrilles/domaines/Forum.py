@@ -383,6 +383,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         version_id = params['en-tete']['uuid_transaction']
         post_id = params.get(ConstantesForum.CHAMP_POST_ID) or version_id
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+        user_id = params[ConstantesForum.CHAMP_USERID]
 
         entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         date_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
@@ -429,6 +430,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             upsert = False  # Eviter de creer des doublons
             filtre[ConstantesForum.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
 
+            # Valider que l'usager qui modifie le post est le meme qui l'a cree
+            filtre[ConstantesForum.CHAMP_USERID] = user_id
+
         collection_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_POSTS_NOM)
         post = collection_posts.find_one_and_update(
             filtre, ops, upsert=upsert,
@@ -464,6 +468,7 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         post_id = params.get(ConstantesForum.CHAMP_POST_ID)
         comment_id = params.get(ConstantesForum.CHAMP_COMMENT_ID) or version_id
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+        user_id = params[ConstantesForum.CHAMP_USERID]
 
         entete = params[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
         date_transaction = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
@@ -508,6 +513,9 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             # transaction a modifier le commentaire.
             upsert = False  # Eviter de creer des doublons
             filtre[ConstantesForum.CHAMP_DATE_MODIFICATION] = {'$lt': date_transaction}
+
+            # Validation que l'usager qui modifie le commentaire est bien celui qui l'a emis
+            filtre[ConstantesForum.CHAMP_USERID] = user_id
 
         collection_commentaires = self.document_dao.get_collection(ConstantesForum.COLLECTION_COMMENTAIRES_NOM)
         comment_doc = collection_commentaires.find_one_and_update(filtre, ops, upsert=upsert, return_document=ReturnDocument.AFTER)
