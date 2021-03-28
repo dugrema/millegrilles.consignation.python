@@ -395,10 +395,14 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         }
 
         champs_supportes = [
+            # ConstantesForum.CHAMP_TYPE_POST, // setOnInsert
             ConstantesForum.CHAMP_TITRE,
             ConstantesForum.CHAMP_CONTENU,
-            ConstantesForum.CHAMP_MEDIA_PREVIEW,
-            ConstantesForum.CHAMP_IMG,
+            ConstantesForum.CHAMP_MEDIA_UUID,
+            ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW,
+            ConstantesForum.CHAMP_MEDIA_MIMETYPE_PREVIEW,
+            ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA,
+            ConstantesForum.CHAMP_MEDIA_MIMETYPE_MEDIA,
         ]
         for key in params:
             if key in champs_supportes:
@@ -588,8 +592,10 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_TYPE_POST,
             ConstantesForum.CHAMP_USERID,
             ConstantesForum.CHAMP_VERSION_ID,
-            ConstantesForum.CHAMP_MEDIA_PREVIEW,
             ConstantesForum.CHAMP_CONTENU,
+            ConstantesForum.CHAMP_MEDIA_UUID,
+            ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW,
+            ConstantesForum.CHAMP_MEDIA_MIMETYPE_PREVIEW,
         ]
 
         # Genrer doc posts plus recent
@@ -718,9 +724,12 @@ class GestionnaireForum(GestionnaireDomaineStandard):
             ConstantesForum.CHAMP_TYPE_POST,
             ConstantesForum.CHAMP_USERID,
             ConstantesForum.CHAMP_VERSION_ID,
-            ConstantesForum.CHAMP_MEDIA_PREVIEW,
             ConstantesForum.CHAMP_CONTENU,
-            ConstantesForum.CHAMP_IMG,
+            ConstantesForum.CHAMP_MEDIA_UUID,
+            ConstantesForum.CHAMP_MEDIA_FUUID_PREVIEW,
+            ConstantesForum.CHAMP_MEDIA_MIMETYPE_PREVIEW,
+            ConstantesForum.CHAMP_MEDIA_FUUID_MEDIA,
+            ConstantesForum.CHAMP_MEDIA_MIMETYPE_MEDIA,
         ]
 
         champs_commentaires = [
