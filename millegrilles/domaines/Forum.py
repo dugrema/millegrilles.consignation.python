@@ -383,6 +383,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         if resultats.modified_count != 1:
             return {'ok': False, 'err': "Echec mise a jour, document non trouve"}
 
+        # Trigger maj du forumPost
+        commande = {ConstantesForum.CHAMP_FORUM_IDS: [ref_id]}
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        self.generateur_transactions.transmettre_commande(commande, domaine_action)
+
         return {'ok': True}
 
     # def creer_post(self, params: dict):
