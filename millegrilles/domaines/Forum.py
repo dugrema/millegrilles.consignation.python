@@ -296,7 +296,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         collection_forums_posts = self.document_dao.get_collection(ConstantesForum.COLLECTION_FORUMS_POSTS_NOM)
         doc_forum_posts = collection_forums_posts.find_one(filtre)
 
-        del doc_forum_posts['_id']
+        try:
+            del doc_forum_posts['_id']
+        except TypeError:
+            # Aucun forum post, probablement un nouveau forum
+            doc_forum_posts = dict()
 
         return doc_forum_posts
 
@@ -341,6 +345,11 @@ class GestionnaireForum(GestionnaireDomaineStandard):
         resultat = collection_site.insert_one(forum)
         if resultat.acknowledged is not True:
             return {'ok': False, 'err': 'Echec ajout document de forum'}
+
+        # Trigger creation du forumPosts
+        commande = {ConstantesForum.CHAMP_FORUM_IDS: [uuid_transaction]}
+        domaine_action = 'commande.Forum.' + ConstantesForum.COMMANDE_GENERER_FORUMS_POSTS
+        self.generateur_transactions.transmettre_commande(commande, domaine_action)
 
         return {'ok': True}
 
