@@ -2487,7 +2487,7 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
         estampille = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
         date_courante = pytz.utc.localize(datetime.datetime.utcnow())
         expiration_requete = date_courante - datetime.timedelta(minutes=1)
-        if estampille < expiration_requete.timestamp() or estampille > date_courante.timestamp():
+        if estampille < expiration_requete.timestamp():  # or estampille > date_courante.timestamp():
             return {'err': 'Estampille requete expiree ou invalide'}
 
         certificat = self.validateur_message.verifier(message, utiliser_idmg_message=True)
