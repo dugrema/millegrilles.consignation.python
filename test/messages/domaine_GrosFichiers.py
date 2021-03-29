@@ -448,6 +448,16 @@ class MessagesSample(BaseCallback):
             ajouter_certificats=True
         )
 
+    def requete_collection_personnelle(self):
+        requete = {}
+        self.generateur.transmettre_requete(
+            requete,
+            'GrosFichiers.' + Constantes.ConstantesGrosFichiers.REQUETE_COLLECTION_PERSONNELLE,
+            'abcd-1234',
+            self.queue_name,
+            ajouter_certificats=True
+        )
+
     def commande_regenerer_previews(self):
         requete = {}
         self.generateur.transmettre_commande(
@@ -552,7 +562,7 @@ class MessagesSample(BaseCallback):
 
         # enveloppe = sample.transaction_changer_favoris()
 
-        sample.transaction_nouveau_fichier_usager()
+        # sample.transaction_nouveau_fichier_usager()
 
         # enveloppe1 = sample.transaction_nouvelle_version_metadata()
         # enveloppe = sample.requete_activite()
@@ -576,6 +586,8 @@ class MessagesSample(BaseCallback):
         # sample.commande_reset_fichiers_publies()
         # sample.requete_transferts_en_cours()
         # sample.commande_clear_fichier_publie()
+
+        sample.requete_collection_personnelle()
 
         pass
 

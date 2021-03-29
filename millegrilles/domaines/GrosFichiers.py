@@ -13,6 +13,7 @@ import uuid
 import datetime
 import json
 import uuid
+import pytz
 
 
 class TraitementRequetesPubliquesGrosFichiers(TraitementMessageDomaineRequete):
@@ -66,6 +67,8 @@ class TraitementRequetesProtegeesGrosFichiers(TraitementRequetesProtegees):
             reponse = {'resultats': self.gestionnaire.get_contenu_collection(message_dict)}
         elif action == ConstantesGrosFichiers.REQUETE_DOCUMENTS_PAR_UUID:
             reponse = {'resultats': self.gestionnaire.get_documents_par_uuid(message_dict)}
+        elif domaine_action == ConstantesGrosFichiers.REQUETE_COLLECTION_PERSONNELLE:
+            reponse = {'resultats': self.gestionnaire.get_contenu_collection_personnelle(message_dict)}
         elif domaine_action == ConstantesGrosFichiers.REQUETE_DOCUMENT_PAR_FUUID:
             reponse = self.gestionnaire.get_document_par_fuuid(message_dict)
         elif domaine_action == ConstantesGrosFichiers.REQUETE_PERMISSION_DECHIFFRAGE_PUBLIC:
@@ -2477,6 +2480,30 @@ class GestionnaireGrosFichiers(GestionnaireDomaineStandard):
                 raise CollectionAbsenteException()
 
         return collection_usager
+
+    def get_contenu_collection_personnelle(self, message: dict):
+        # Recuperer user_id du message
+        entete = message[Constantes.TRANSACTION_MESSAGE_LIBELLE_EN_TETE]
+        estampille = entete[Constantes.TRANSACTION_MESSAGE_LIBELLE_ESTAMPILLE]
+        date_courante = pytz.utc.localize(datetime.datetime.utcnow())
+        expiration_requete = date_courante - datetime.timedelta(minutes=1)
+        if estampille < expiration_requete.timestamp() or estampille > date_courante.timestamp():
+            return {'err': 'Estampille requete expiree ou invalide'}
+
+        certificat = self.validateur_message.verifier(message, utiliser_idmg_message=True)
+        user_id = certificat.get_user_id
+
+        filtre = {
+            Constantes.DOCUMENT_INFODOC_LIBELLE: ConstantesGrosFichiers.LIBVAL_FICHIER,
+            ConstantesGrosFichiers.DOCUMENT_COLLECTIONS: {'$all': [user_id]},
+        }
+        collection = self.get_collection()
+        curseur = collection.find(filtre)
+
+        # Extraire la liste des fichiers
+        fichiers = self.mapper_fichier_version(curseur)
+
+        return fichiers
 
 
 class RegenerateurGrosFichiers(RegenerateurDeDocuments):

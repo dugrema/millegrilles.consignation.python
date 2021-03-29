@@ -1164,6 +1164,7 @@ class ConstantesGrosFichiers:
     REQUETE_COLLECTIONS_PUBLIQUES = 'collectionsPubliques'
     REQUETE_DETAIL_COLLECTIONS_PUBLIQUES = 'detailCollectionsPubliques'
     REQUETE_TRANSFERTS_EN_COURS = 'transfertsEnCours'
+    REQUETE_COLLECTION_PERSONNELLE = 'getCollectionPersonnelle'
 
     COMMANDE_GENERER_THUMBNAIL_PROTEGE = 'commande.grosfichiers.genererThumbnailProtege'
     COMMANDE_REGENERER_PREVIEWS = 'regenererPreviews'
